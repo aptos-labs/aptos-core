@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::ParserConfig,
+    config::{NFTMetadataCrawlerConfig, ParserConfig},
     utils::{
         counters::{
             GOT_CONNECTION_COUNT, PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT,
@@ -27,17 +27,25 @@ use tracing::{error, info, warn};
 /// Struct to hold context required for parsing
 #[derive(Clone)]
 pub struct ParserContext {
-    pub parser_config: Arc<ParserConfig>,
+    pub nft_metadata_crawler_config: Arc<NFTMetadataCrawlerConfig>,
     pub pool: Pool<ConnectionManager<PgConnection>>,
     pub gcs_client: Arc<GCSClient>,
 }
 
 impl ParserContext {
     pub async fn new(
-        parser_config: Arc<ParserConfig>,
+        nft_metadata_crawler_config: Arc<NFTMetadataCrawlerConfig>,
         pool: Pool<ConnectionManager<PgConnection>>,
     ) -> Self {
-        if let Some(google_application_credentials) = &parser_config.google_application_credentials
+        if nft_metadata_crawler_config.parser_config.is_none() {
+            error!(config = ?nft_metadata_crawler_config, "[NFT Metadata Crawler] parser_config not found");
+            panic!();
+        }
+
+        if let Some(google_application_credentials) =
+            &get_parser_config(nft_metadata_crawler_config.clone())
+                .unwrap()
+                .google_application_credentials
         {
             info!(
                 "[NFT Metadata Crawler] Google Application Credentials path found, setting env var"
@@ -61,7 +69,7 @@ impl ParserContext {
             });
 
         Self {
-            parser_config,
+            nft_metadata_crawler_config,
             pool,
             gcs_client: Arc::new(GCSClient::new(gcs_config)),
         }
@@ -125,12 +133,13 @@ impl ParserContext {
 
         // Spawn worker
         let last_transaction_version = parts[2].to_string().parse().unwrap_or_else(|e| {
-        error!(
-            error = ?e,
-            "[NFT Metadata Crawler] Failed to parse last transaction version from PubSub message"
-        );
-        panic!();
-    });
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to parse last transaction version from PubSub message"
+            );
+            panic!();
+        });
+
         let last_transaction_timestamp =
             chrono::NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
                 chrono::NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")
@@ -142,8 +151,9 @@ impl ParserContext {
                         panic!();
                     }),
             );
+
         let mut worker = Worker::new(
-            self.parser_config.clone(),
+            self.nft_metadata_crawler_config.clone(),
             conn,
             self.gcs_client.clone(),
             &pubsub_message,
@@ -181,11 +191,20 @@ impl Server for ParserContext {
     async fn handle_request(self: Arc<Self>, msg: Bytes) -> Response {
         self.spawn_parser(msg).await;
 
-        if !self.parser_config.ack_parsed_uris {
+        if !get_parser_config(self.nft_metadata_crawler_config.clone())
+            .unwrap()
+            .ack_parsed_uris
+        {
             return StatusCode::BAD_REQUEST.into_response();
         }
 
         PUBSUB_ACK_SUCCESS_COUNT.inc();
         StatusCode::OK.into_response()
     }
+}
+
+fn get_parser_config(
+    nft_metadata_crawler_config: Arc<NFTMetadataCrawlerConfig>,
+) -> Option<ParserConfig> {
+    nft_metadata_crawler_config.as_ref().parser_config.clone()
 }

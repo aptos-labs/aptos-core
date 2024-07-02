@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::ParserConfig,
+    config::NFTMetadataCrawlerConfig,
     models::{
         nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
@@ -33,7 +33,7 @@ use url::Url;
 
 /// Stuct that represents a parser for a single entry from queue
 pub struct Worker {
-    config: Arc<ParserConfig>,
+    config: Arc<NFTMetadataCrawlerConfig>,
     conn: PooledConnection<ConnectionManager<PgConnection>>,
     gcs_client: Arc<GCSClient>,
     pubsub_message: String,
@@ -47,7 +47,7 @@ pub struct Worker {
 
 impl Worker {
     pub fn new(
-        config: Arc<ParserConfig>,
+        config: Arc<NFTMetadataCrawlerConfig>,
         conn: PooledConnection<ConnectionManager<PgConnection>>,
         gcs_client: Arc<GCSClient>,
         pubsub_message: &str,
@@ -57,6 +57,11 @@ impl Worker {
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
     ) -> Self {
+        if config.parser_config.is_none() {
+            error!(config = ?config, "[NFT Metadata Crawler] nft_metadata_crawler_config not found");
+            panic!();
+        }
+
         let model = NFTMetadataCrawlerURIs::new(asset_uri);
         let worker = Self {
             config,
@@ -76,6 +81,11 @@ impl Worker {
 
     /// Main parsing flow
     pub async fn parse(&mut self) -> anyhow::Result<()> {
+        let crawler_config = {
+            let crawler_config = self.config.as_ref().parser_config.as_ref().unwrap();
+            crawler_config.clone()
+        };
+
         // Deduplicate asset_uri
         // Exit if not force or if asset_uri has already been parsed
         let prev_model =
@@ -112,9 +122,9 @@ impl Worker {
             // Parse asset_uri
             self.log_info("Parsing asset_uri");
             let json_uri = URIParser::parse(
-                &self.config.ipfs_prefix,
+                &crawler_config.ipfs_prefix,
                 &self.model.get_asset_uri(),
-                self.config.ipfs_auth_key.as_deref(),
+                crawler_config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse asset_uri", None);
@@ -125,7 +135,7 @@ impl Worker {
             // Parse JSON for raw_image_uri and raw_animation_uri
             self.log_info("Starting JSON parsing");
             let (raw_image_uri, raw_animation_uri, json) =
-                JSONParser::parse(json_uri, self.config.max_file_size_bytes)
+                JSONParser::parse(json_uri, crawler_config.max_file_size_bytes)
                     .await
                     .unwrap_or_else(|e| {
                         // Increment retry count if JSON parsing fails
@@ -141,7 +151,7 @@ impl Worker {
             if json != Value::Null {
                 self.log_info("Writing JSON to GCS");
                 let cdn_json_uri_result = write_json_to_gcs(
-                    &self.config.bucket,
+                    &crawler_config.bucket,
                     &self.asset_uri,
                     &json,
                     &self.gcs_client,
@@ -156,7 +166,7 @@ impl Worker {
                 }
 
                 let cdn_json_uri = cdn_json_uri_result
-                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .map(|value| format!("{}{}", crawler_config.cdn_prefix, value))
                     .ok();
                 self.model.set_cdn_json_uri(cdn_json_uri);
             }
@@ -213,9 +223,9 @@ impl Worker {
             }
 
             let img_uri = URIParser::parse(
-                &self.config.ipfs_prefix,
+                &crawler_config.ipfs_prefix,
                 &raw_image_uri,
-                self.config.ipfs_auth_key.as_deref(),
+                crawler_config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_image_uri", None);
@@ -230,9 +240,9 @@ impl Worker {
                 .inc();
             let (image, format) = ImageOptimizer::optimize(
                 &img_uri,
-                self.config.max_file_size_bytes,
-                self.config.image_quality,
-                self.config.max_image_dimensions,
+                crawler_config.max_file_size_bytes,
+                crawler_config.image_quality,
+                crawler_config.max_image_dimensions,
             )
             .await
             .unwrap_or_else(|e| {
@@ -247,7 +257,7 @@ impl Worker {
                 self.log_info("Writing image to GCS");
                 let cdn_image_uri_result = write_image_to_gcs(
                     format,
-                    &self.config.bucket,
+                    &crawler_config.bucket,
                     &raw_image_uri,
                     image,
                     &self.gcs_client,
@@ -262,7 +272,7 @@ impl Worker {
                 }
 
                 let cdn_image_uri = cdn_image_uri_result
-                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .map(|value| format!("{}{}", crawler_config.cdn_prefix, value))
                     .ok();
                 self.model.set_cdn_image_uri(cdn_image_uri);
                 self.model.reset_json_parser_retry_count();
@@ -306,9 +316,9 @@ impl Worker {
         if let Some(raw_animation_uri) = raw_animation_uri_option {
             self.log_info("Parsing raw_animation_uri");
             let animation_uri = URIParser::parse(
-                &self.config.ipfs_prefix,
+                &crawler_config.ipfs_prefix,
                 &raw_animation_uri,
-                self.config.ipfs_auth_key.as_deref(),
+                crawler_config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_animation_uri", None);
@@ -323,9 +333,9 @@ impl Worker {
                 .inc();
             let (animation, format) = ImageOptimizer::optimize(
                 &animation_uri,
-                self.config.max_file_size_bytes,
-                self.config.image_quality,
-                self.config.max_image_dimensions,
+                crawler_config.max_file_size_bytes,
+                crawler_config.image_quality,
+                crawler_config.max_image_dimensions,
             )
             .await
             .unwrap_or_else(|e| {
@@ -340,7 +350,7 @@ impl Worker {
                 self.log_info("Writing animation to GCS");
                 let cdn_animation_uri_result = write_image_to_gcs(
                     format,
-                    &self.config.bucket,
+                    &crawler_config.bucket,
                     &raw_animation_uri,
                     animation,
                     &self.gcs_client,
@@ -352,7 +362,7 @@ impl Worker {
                 }
 
                 let cdn_animation_uri = cdn_animation_uri_result
-                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .map(|value| format!("{}{}", crawler_config.cdn_prefix, value))
                     .ok();
                 self.model.set_cdn_animation_uri(cdn_animation_uri);
             }
@@ -389,6 +399,10 @@ impl Worker {
 
     fn is_blacklisted_uri(&mut self, uri: &str) -> bool {
         self.config
+            .as_ref()
+            .parser_config
+            .as_ref()
+            .unwrap()
             .uri_blacklist
             .iter()
             .any(|blacklist_uri| uri.contains(blacklist_uri))

@@ -19,35 +19,51 @@ use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tracing::info;
 
-/// Structs to hold config from YAML
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AssetUploaderConfig {
+    pub cloudflare_auth_key: String,
+    pub cloudflare_account_id: String,
+    pub cloudflare_account_hash: String,
+    pub cloudflare_image_delivery_prefix: String,
+    pub cloudflare_default_variant: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParserConfig {
     pub google_application_credentials: Option<String>,
     pub bucket: String,
-    pub database_url: String,
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
     pub ipfs_auth_key: Option<String>,
-    #[serde(default = "ParserConfig::default_max_file_size_bytes")]
+    #[serde(default = "NFTMetadataCrawlerConfig::default_max_file_size_bytes")]
     pub max_file_size_bytes: u32,
-    #[serde(default = "ParserConfig::default_image_quality")]
+    #[serde(default = "NFTMetadataCrawlerConfig::default_image_quality")]
     pub image_quality: u8, // Quality up to 100
-    #[serde(default = "ParserConfig::default_max_image_dimensions")]
+    #[serde(default = "NFTMetadataCrawlerConfig::default_max_image_dimensions")]
     pub max_image_dimensions: u32,
-    #[serde(default = "ParserConfig::default_max_num_parse_retries")]
-    pub max_num_parse_retries: i32,
     #[serde(default)]
     pub ack_parsed_uris: bool,
     #[serde(default)]
     pub uri_blacklist: Vec<String>,
-    pub server_port: u16,
-    #[serde(default = "ParserConfig::default_server_type")]
-    pub server_type: ServerType,
-    pub cloudflare_auth_key: Option<String>,
 }
 
-impl ParserConfig {
+/// Structs to hold config from YAML
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NFTMetadataCrawlerConfig {
+    pub database_url: String,
+    #[serde(default = "NFTMetadataCrawlerConfig::default_max_num_parse_retries")]
+    pub max_num_parse_retries: i32,
+    pub server_port: u16,
+    #[serde(default = "NFTMetadataCrawlerConfig::default_server_type")]
+    pub server_type: ServerType,
+    pub asset_uploader_config: Option<AssetUploaderConfig>,
+    pub parser_config: Option<ParserConfig>,
+}
+
+impl NFTMetadataCrawlerConfig {
     pub const fn default_max_file_size_bytes() -> u32 {
         DEFAULT_MAX_FILE_SIZE_BYTES
     }
@@ -70,7 +86,7 @@ impl ParserConfig {
 }
 
 #[async_trait::async_trait]
-impl RunnableConfig for ParserConfig {
+impl RunnableConfig for NFTMetadataCrawlerConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
     async fn run(&self) -> anyhow::Result<()> {
         info!(
