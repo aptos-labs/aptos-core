@@ -40,12 +40,22 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use rayon::ThreadPool;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
 };
+
+pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .thread_name(|index| format!("par_exec-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -396,7 +406,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    pub fn execute_block<
+    pub fn execute_block_on_thread_pool<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
@@ -454,5 +464,24 @@ impl BlockAptosVM {
             }),
             Err(BlockExecutionError::FatalVMError(err)) => Err(err),
         }
+    }
+
+    /// Uses shared thread pool to execute blocks.
+    pub fn execute_block<
+        S: StateView + Sync,
+        L: TransactionCommitHook<Output = AptosTransactionOutput>,
+    >(
+        signature_verified_block: &[SignatureVerifiedTransaction],
+        state_view: &S,
+        config: BlockExecutorConfig,
+        transaction_commit_listener: Option<L>,
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        Self::execute_block_on_thread_pool::<S, L>(
+            Arc::clone(&RAYON_EXEC_POOL),
+            signature_verified_block,
+            state_view,
+            config,
+            transaction_commit_listener,
+        )
     }
 }

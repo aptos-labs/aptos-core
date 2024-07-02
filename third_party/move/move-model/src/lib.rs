@@ -90,7 +90,10 @@ pub fn run_model_builder_in_compiler_mode(
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
+    warn_of_deprecation_use: bool,
+    warn_of_deprecation_use_in_aptos_libs: bool,
     compile_test_code: bool,
+    compile_verify_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -110,7 +113,10 @@ pub fn run_model_builder_in_compiler_mode(
             ..ModelBuilderOptions::default()
         },
         Flags::model_compilation()
+            .set_warn_of_deprecation_use(warn_of_deprecation_use)
+            .set_warn_of_deprecation_use_in_aptos_libs(warn_of_deprecation_use_in_aptos_libs)
             .set_skip_attribute_checks(skip_attribute_checks)
+            .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)
             .set_lang_v2(language_version != LanguageVersion::V1)
             .set_compiler_v2(true),
