@@ -86,7 +86,7 @@ fn test_feature_gating(
 //    inputs, not field elements as inputs. Again, to avoid dependency on ark.
 //  - Another sub-problem is the RNG, which is not the right version... so we cannot pass our RNG
 //    from aptos-core into your functions.
-fn generate_vk() -> (ProvingKeyWithTrapdoor<Bn254>, Groth16VerificationKey) {
+fn generate_vk() -> (Trapdoor, Groth16VerificationKey) {
     let mut rng = thread_rng();
     let (prk, vrk) = bn254_circuit_agnostic_setup_with_trapdoor(&mut rng, 1);
 }

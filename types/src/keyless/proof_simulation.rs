@@ -301,7 +301,7 @@ where
     }
 }
 
-pub fn bn254_circuit_agnostic_setup_with_trapdoor<R>(mut rng: &mut R, num_public_inputs: usize) -> (ProvingKeyWithTrapdoor<Bn254>, Groth16VerificationKey)
+pub fn bn254_circuit_agnostic_setup_with_trapdoor<R>(mut rng: &mut R, num_public_inputs: usize) -> (Trapdoor, Groth16VerificationKey)
     where R: RngCore
 {
     let (prk, vk) = Groth16Simulator::<Bn254>::circuit_agnostic_setup_with_trapdoor(&mut rng, num_public_inputs as u32).unwrap();
