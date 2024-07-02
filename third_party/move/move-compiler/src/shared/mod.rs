@@ -117,13 +117,13 @@ pub fn shortest_cycle<'a, T: Ord + Hash>(
             );
             match (shortest_path, path_opt) {
                 (p, None) | (None, p) => p,
-                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => Some(
-                    if cur_len < acc_len {
+                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => {
+                    Some(if cur_len < acc_len {
                         (cur_len, cur_path)
                     } else {
                         (acc_len, acc_path)
-                    },
-                ),
+                    })
+                },
             }
         });
     let (_, mut path) = shortest_path.unwrap();
@@ -250,6 +250,10 @@ impl CompilationEnv {
         self.diags.len()
     }
 
+    pub fn borrow_diags(&self) -> &Diagnostics {
+        &self.diags
+    }
+
     pub fn has_diags_at_or_above_severity(&self, threshold: Severity) -> bool {
         match self.diags.max_severity() {
             Some(max) if max >= threshold => true,
@@ -261,12 +265,6 @@ impl CompilationEnv {
         &mut self,
         threshold: Severity,
     ) -> Result<(), Diagnostics> {
-        let threshold =
-            if self.flags.warnings_are_errors() && threshold == Severity::NonblockingError {
-                Severity::NonblockingError
-            } else {
-                threshold
-            };
         if self.has_diags_at_or_above_severity(threshold) {
             Err(std::mem::take(&mut self.diags))
         } else {

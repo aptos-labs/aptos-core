@@ -418,16 +418,22 @@ impl<'a> SteppedCompiler<'a, PASS_COMPILATION> {
         self,
     ) -> Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics> {
         let Self {
-            mut compilation_env,
+            compilation_env,
             pre_compiled_lib: _,
             program,
         } = self;
         let warnings_are_errors = compilation_env.flags().warnings_are_errors();
-        if warnings_are_errors {
-            compilation_env.check_diags_at_or_above_severity(Severity::Warning)?;
-        }
         match program {
-            Some(PassResult::Compilation(units, warnings)) => Ok((units, warnings)),
+            Some(PassResult::Compilation(units, warnings)) => {
+                if warnings_are_errors {
+                    match warnings.max_severity() {
+                        Some(max) if max >= Severity::Warning => Err(warnings),
+                        _ => Ok((units, warnings)),
+                    }
+                } else {
+                    Ok((units, warnings))
+                }
+            },
             _ => panic!(),
         }
     }
