@@ -268,7 +268,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                                     caller_func.module_env.get_full_name_str()
                                                 );
                                             } else {
-                                                diff_package_error(
+                                                call_package_fun_from_diff_package_error(
                                                     env,
                                                     sites,
                                                     &caller_func,
@@ -277,7 +277,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                                 false
                                             }
                                         } else {
-                                            diff_addr_error(env, sites, &caller_func, &callee_func);
+                                            call_package_fun_from_diff_addr_error(env, sites, &caller_func, &callee_func);
                                             false
                                         }
                                     } else {
@@ -425,7 +425,7 @@ fn not_a_friend_error(
     cannot_call_error(env, &why, sites, caller, callee);
 }
 
-fn diff_package_error(
+fn call_package_fun_from_diff_package_error(
     env: &GlobalEnv,
     sites: &BTreeSet<NodeId>,
     caller: &FunctionEnv,
@@ -435,7 +435,7 @@ fn diff_package_error(
     cannot_call_error(env, why, sites, caller, callee);
 }
 
-fn diff_addr_error(
+fn call_package_fun_from_diff_addr_error(
     env: &GlobalEnv,
     sites: &BTreeSet<NodeId>,
     caller: &FunctionEnv,
