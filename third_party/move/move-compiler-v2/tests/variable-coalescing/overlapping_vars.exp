@@ -110,14 +110,10 @@ B0:
 	1: LdU64(2)
 	2: LdU64(3)
 	3: StLoc[0](loc0: u64)
-	4: StLoc[1](loc1: u64)
-	5: StLoc[2](loc2: u64)
-	6: MoveLoc[2](loc2: u64)
-	7: MoveLoc[1](loc1: u64)
-	8: Add
-	9: MoveLoc[0](loc0: u64)
-	10: Add
-	11: Ret
+	4: Add
+	5: MoveLoc[0](loc0: u64)
+	6: Add
+	7: Ret
 }
 }
 ============ bytecode verification succeeded ========

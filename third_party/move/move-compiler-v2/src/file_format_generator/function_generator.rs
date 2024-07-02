@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    experiments::Experiment,
     file_format_generator::{
         module_generator::{ModuleContext, ModuleGenerator, SOURCE_MAP_OK},
-        MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
+        Options, MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
     },
     pipeline::livevar_analysis_processor::LiveVarAnnotation,
 };
@@ -206,6 +207,16 @@ impl<'a> FunctionGenerator<'a> {
             }
         }
 
+        let options = ctx
+            .module
+            .env
+            .get_extension::<Options>()
+            .expect("Options is available");
+        if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
+            // Peephole optimization: remove redundant pairs of instructions.
+            self.remove_redundant_instr_pairs();
+        }
+
         // At this point, all labels should be resolved, so link them.
         for info in self.label_info.values() {
             if let Some(label_offs) = info.resolution {
@@ -234,6 +245,123 @@ impl<'a> FunctionGenerator<'a> {
             locals,
             code: std::mem::take(&mut self.code),
         }
+    }
+
+    /// Remove pairs of instructions that are equivalent to a no-op.
+    fn remove_redundant_instr_pairs(&mut self) {
+        let mut changed = true;
+        let mut deleted = vec![false; self.code.len()];
+        let mut no_deletions = true; // same as `deleted.iter().all(|v| !*v)`
+        let mut is_jump_target = vec![false; self.code.len()];
+        for info in self.label_info.values() {
+            if let Some(label_offs) = info.resolution {
+                if !info.references.is_empty() {
+                    is_jump_target[label_offs as usize] = true;
+                }
+            }
+        }
+        // Note: this is a worst case n^2 algorithm, but it is expected to be linear in practice.
+        // It marks instructions to be deleted lazily.
+        // If this becomes a bottleneck, we can implement a worst case linear algorithm (by
+        // maintaining a doubly-linked list of next-previous undeleted instruction indices).
+        while changed {
+            // repeat until no more deletions
+            changed = false;
+            let mut this_index = 0;
+            while this_index < (self.code.len() - 1) {
+                if deleted[this_index] {
+                    this_index += 1;
+                    continue;
+                }
+                let this_bc = &self.code[this_index];
+                if let Some(mut next_index) = deleted[(this_index + 1)..].iter().position(|v| !*v) {
+                    next_index += this_index + 1;
+                    // Note that we should not delete a sequence of pairs of instructions if we can jump to
+                    // any of them (except the first one).
+                    if is_jump_target[(this_index + 1)..=next_index]
+                        .iter()
+                        .all(|v| !*v)
+                    {
+                        let next_bc = &self.code[next_index];
+                        use FF::Bytecode::*;
+                        // Each of these pairs of instructions are equivalent to a no-op, so they can be safely
+                        // removed assuming the above conditions are met.
+                        match (this_bc, next_bc) {
+                            (StLoc(u), MoveLoc(v))
+                            | (CopyLoc(u), StLoc(v))
+                            | (MoveLoc(u), StLoc(v))
+                                if *u == *v =>
+                            {
+                                deleted[this_index] = true;
+                                deleted[next_index] = true;
+                                no_deletions = false;
+                                changed = true;
+                            },
+                            _ => {},
+                        }
+                    }
+                    this_index = next_index;
+                } else {
+                    break; // no more instructions left for the inner loop
+                }
+            }
+        }
+        if no_deletions {
+            return;
+        }
+        // Remove deleted instructions.
+        let mut new_code = vec![];
+        // Because of instructions being deleted, their offsets may have changed.
+        let mut offset_remap: Vec<CodeOffset> =
+            (0..self.code.len()).map(|x| x as CodeOffset).collect();
+        for (i, bc) in self.code.iter().enumerate() {
+            if !deleted[i] {
+                offset_remap[i] = new_code.len() as CodeOffset;
+                new_code.push(bc.clone());
+            }
+        }
+        for i in 0..self.code.len() {
+            if deleted[i] {
+                if let Some(next_undeleted) = deleted[(i + 1)..].iter().position(|v| !*v) {
+                    offset_remap[i] = offset_remap[i + 1 + next_undeleted];
+                } else {
+                    unreachable!("There should be at least one undeleted instruction after every deleted one")
+                }
+            }
+        }
+        self.code = new_code;
+        // Update label info withe new code offsets.
+        self.label_info = self
+            .label_info
+            .iter()
+            .map(|(label, info)| {
+                let resolution = info.resolution.map(|o| offset_remap[o as usize]);
+                let references = info
+                    .references
+                    .iter()
+                    .map(|o| offset_remap[*o as usize])
+                    .collect();
+                (*label, LabelInfo {
+                    resolution,
+                    references,
+                })
+            })
+            .collect();
+        // Update spec blocks with new code offsets.
+        self.spec_blocks = self
+            .spec_blocks
+            .iter()
+            .map(|(offs, spec)| {
+                (offset_remap[*offs as usize], Spec {
+                    on_impl: spec
+                        .on_impl
+                        .iter()
+                        .map(|(o, s)| (offset_remap[*o as usize], s.clone()))
+                        .collect(),
+                    ..spec.clone()
+                })
+            })
+            .collect();
     }
 
     /// Generate file-format bytecode from a stackless bytecode and an optional next bytecode
@@ -357,7 +485,7 @@ impl<'a> FunctionGenerator<'a> {
             .insert(offset);
     }
 
-    /// Sets the resolution of a lable to the current code offset.
+    /// Sets the resolution of a label to the current code offset.
     fn define_label(&mut self, label: Label) {
         let offset = self.code.len() as FF::CodeOffset;
         self.label_info.entry(label).or_default().resolution = Some(offset)

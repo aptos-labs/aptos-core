@@ -201,23 +201,19 @@ public test(Arg0: u32) /* def_idx: 2 */ {
 L1:	loc0: u32
 B0:
 	0: CopyLoc[0](Arg0: u32)
-	1: StLoc[1](loc0: u32)
-	2: MoveLoc[1](loc0: u32)
+	1: Call consume(u32)
+	2: MoveLoc[0](Arg0: u32)
 	3: Call consume(u32)
-	4: MoveLoc[0](Arg0: u32)
-	5: Call consume(u32)
-	6: Ret
+	4: Ret
 }
 public test_(Arg0: W) /* def_idx: 3 */ {
 L1:	loc0: W
 B0:
 	0: CopyLoc[0](Arg0: W)
-	1: StLoc[1](loc0: W)
-	2: MoveLoc[1](loc0: W)
+	1: Call consume_(W)
+	2: MoveLoc[0](Arg0: W)
 	3: Call consume_(W)
-	4: MoveLoc[0](Arg0: W)
-	5: Call consume_(W)
-	6: Ret
+	4: Ret
 }
 }
 ============ bytecode verification succeeded ========

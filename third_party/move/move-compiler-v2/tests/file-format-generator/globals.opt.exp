@@ -47,15 +47,13 @@ B0:
 	1: MutBorrowGlobal[0](R)
 	2: LdU64(2)
 	3: StLoc[1](Arg1: u64)
-	4: StLoc[2](loc0: &mut R)
-	5: MoveLoc[2](loc0: &mut R)
-	6: MutBorrowField[0](R.f: u64)
-	7: StLoc[3](loc1: &mut u64)
-	8: MoveLoc[1](Arg1: u64)
-	9: MoveLoc[3](loc1: &mut u64)
-	10: WriteRef
-	11: LdU64(9)
-	12: Ret
+	4: MutBorrowField[0](R.f: u64)
+	5: StLoc[3](loc1: &mut u64)
+	6: MoveLoc[1](Arg1: u64)
+	7: MoveLoc[3](loc1: &mut u64)
+	8: WriteRef
+	9: LdU64(9)
+	10: Ret
 }
 }
 ============ bytecode verification succeeded ========

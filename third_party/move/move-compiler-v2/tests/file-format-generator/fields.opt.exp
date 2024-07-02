@@ -41,9 +41,7 @@ B0:
 	8: MutBorrowField[1](T.h: u64)
 	9: WriteRef
 	10: MoveLoc[0](loc0: S)
-	11: StLoc[1](loc1: S)
-	12: MoveLoc[1](loc1: S)
-	13: Ret
+	11: Ret
 }
 write_local_via_ref(): S /* def_idx: 3 */ {
 L0:	loc0: S
@@ -60,18 +58,14 @@ B0:
 	5: MutBorrowLoc[0](loc0: S)
 	6: LdU64(42)
 	7: StLoc[1](loc1: u64)
-	8: StLoc[2](loc2: &mut S)
-	9: MoveLoc[2](loc2: &mut S)
-	10: MutBorrowField[0](S.g: T)
-	11: MutBorrowField[1](T.h: u64)
-	12: StLoc[3](loc3: &mut u64)
-	13: MoveLoc[1](loc1: u64)
-	14: MoveLoc[3](loc3: &mut u64)
-	15: WriteRef
-	16: MoveLoc[0](loc0: S)
-	17: StLoc[4](loc4: S)
-	18: MoveLoc[4](loc4: S)
-	19: Ret
+	8: MutBorrowField[0](S.g: T)
+	9: MutBorrowField[1](T.h: u64)
+	10: StLoc[3](loc3: &mut u64)
+	11: MoveLoc[1](loc1: u64)
+	12: MoveLoc[3](loc3: &mut u64)
+	13: WriteRef
+	14: MoveLoc[0](loc0: S)
+	15: Ret
 }
 write_param(Arg0: &mut S) /* def_idx: 4 */ {
 B0:
@@ -91,9 +85,7 @@ B0:
 	3: MutBorrowField[1](T.h: u64)
 	4: WriteRef
 	5: MoveLoc[0](Arg0: S)
-	6: StLoc[1](loc0: S)
-	7: MoveLoc[1](loc0: S)
-	8: Ret
+	6: Ret
 }
 }
 ============ bytecode verification succeeded ========

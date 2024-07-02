@@ -156,21 +156,15 @@ B0:
 	0: LdU64(5)
 	1: StLoc[0](loc0: u64)
 	2: ImmBorrowLoc[0](loc0: u64)
-	3: StLoc[1](loc1: &u64)
-	4: MoveLoc[1](loc1: &u64)
-	5: Pop
-	6: LdU64(5)
-	7: StLoc[2](loc2: u64)
-	8: ImmBorrowLoc[2](loc2: u64)
-	9: StLoc[1](loc1: &u64)
-	10: MoveLoc[1](loc1: &u64)
-	11: StLoc[3](loc3: &u64)
-	12: MoveLoc[3](loc3: &u64)
-	13: ReadRef
-	14: LdU64(5)
-	15: Eq
-	16: Pop
-	17: Ret
+	3: Pop
+	4: LdU64(5)
+	5: StLoc[2](loc2: u64)
+	6: ImmBorrowLoc[2](loc2: u64)
+	7: ReadRef
+	8: LdU64(5)
+	9: Eq
+	10: Pop
+	11: Ret
 }
 }
 ============ bytecode verification succeeded ========

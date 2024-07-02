@@ -130,21 +130,19 @@ L1:	loc0: u32
 L2:	loc1: u32
 B0:
 	0: LdU32(1)
-	1: MoveLoc[0](Arg0: bool)
-	2: StLoc[0](Arg0: bool)
-	3: StLoc[1](loc0: u32)
-	4: MoveLoc[0](Arg0: bool)
-	5: BrFalse(9)
+	1: StLoc[1](loc0: u32)
+	2: MoveLoc[0](Arg0: bool)
+	3: BrFalse(7)
 B1:
-	6: MoveLoc[1](loc0: u32)
-	7: StLoc[2](loc1: u32)
-	8: Branch(11)
+	4: MoveLoc[1](loc0: u32)
+	5: StLoc[2](loc1: u32)
+	6: Branch(9)
 B2:
-	9: LdU32(9)
-	10: StLoc[2](loc1: u32)
+	7: LdU32(9)
+	8: StLoc[2](loc1: u32)
 B3:
-	11: MoveLoc[2](loc1: u32)
-	12: Ret
+	9: MoveLoc[2](loc1: u32)
+	10: Ret
 }
 }
 ============ bytecode verification succeeded ========
