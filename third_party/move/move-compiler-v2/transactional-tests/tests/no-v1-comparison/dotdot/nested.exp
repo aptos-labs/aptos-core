@@ -12,6 +12,8 @@ Error: compilation errors:
    = missing `E::V2{..}`
 
 
+Exiting: code generation errors
+
 
 task 1 'run'. lines 53-53:
 Error: Function execution failed with VMError: {

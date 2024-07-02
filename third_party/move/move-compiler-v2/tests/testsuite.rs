@@ -6,6 +6,8 @@ use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use datatest_stable::Requirements;
 use itertools::Itertools;
 use log::debug;
+use move_command_line_common::env::read_bool_env_var;
+use move_compiler::command_line as cli;
 use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
     logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
@@ -14,8 +16,9 @@ use move_compiler_v2::{
 use move_model::{metadata::LanguageVersion, model::GlobalEnv, sourcifier::Sourcifier};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
-use once_cell::unsync::Lazy;
+use once_cell::sync::Lazy;
 use std::{
+    backtrace::{Backtrace, BacktraceStatus},
     cell::{RefCell, RefMut},
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -213,7 +216,12 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         TestConfig {
             name: "inlining-et-al",
             runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
-            include: vec!["/inlining/", "/folding/", "/simplifier/"],
+            include: vec![
+                "/inlining/",
+                "/folding/",
+                "/simplifier/",
+                "/warnings-are-errors/",
+            ],
             exclude: vec!["/more-v1/"],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
@@ -746,7 +754,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     options.warn_unused = path_str.contains("/unused/");
     options.warn_deprecated = path_str.contains("/deprecated/");
     options.compile_verify_code = path_str.contains("/verification/verify/");
-    options.warnings_are_errors = path_str.contains("/warnings_are_errors/");
+    options.warnings_are_errors = path_str.contains("/warnings-are-errors/");
     options.sources_deps = extract_test_directives(path, "// dep:")?;
     options.sources = vec![path_str.clone()];
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
@@ -770,7 +778,8 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
 
     // Run context checker
     let mut env = move_compiler_v2::run_checker(options.clone())?;
-    let mut ok = check_diags(&mut test_output.borrow_mut(), &env);
+    let mut saw_warnings = false;
+    let mut ok = check_diags(&mut test_output.borrow_mut(), &env, &mut saw_warnings);
 
     if ok {
         // Run env processor pipeline.
@@ -786,10 +795,10 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
             test_output
                 .borrow_mut()
                 .push_str(&String::from_utf8_lossy(&out.into_inner()));
-            ok = check_diags(&mut test_output.borrow_mut(), &env);
+            ok = check_diags(&mut test_output.borrow_mut(), &env, &mut saw_warnings);
         } else {
             env_pipeline.run(&mut env);
-            ok = check_diags(&mut test_output.borrow_mut(), &env);
+            ok = check_diags(&mut test_output.borrow_mut(), &env, &mut saw_warnings);
             if ok && config.dump_ast == DumpLevel::EndStage {
                 test_output.borrow_mut().push_str(&format!(
                     "// -- Model dump before bytecode pipeline\n{}\n",
@@ -814,13 +823,13 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         // In real use, this is run outside of the compilation process, but the needed info is
         // available in `env` once we finish the AST.
         plan_builder::construct_test_plan(&env, None);
-        ok = check_diags(&mut test_output.borrow_mut(), &env);
+        ok = check_diags(&mut test_output.borrow_mut(), &env, &mut saw_warnings);
     }
 
     if ok && config.stop_after > StopAfter::AstPipeline {
         // Run stackless bytecode generator
         let mut targets = move_compiler_v2::run_bytecode_gen(&env);
-        ok = check_diags(&mut test_output.borrow_mut(), &env);
+        ok = check_diags(&mut test_output.borrow_mut(), &env, &mut saw_warnings);
         if ok {
             // Run the target pipeline.
             let bytecode_pipeline = if config.stop_after == StopAfter::BytecodeGen {
@@ -835,6 +844,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
             };
             let count = bytecode_pipeline.processor_count();
             let ok = RefCell::new(true);
+            let saw_warnings_rc = RefCell::new(saw_warnings);
             bytecode_pipeline.run_with_hook(
                 &env,
                 &mut targets,
@@ -842,7 +852,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 // bytecode from the generator, if requested.
                 |targets_before| {
                     let out = &mut test_output.borrow_mut();
-                    update_diags(ok.borrow_mut(), out, &env);
+                    update_diags(ok.borrow_mut(), out, &env, saw_warnings_rc.borrow_mut());
                     if bytecode_dump_enabled(&config, true, INITIAL_BYTECODE_STAGE) {
                         let dump =
                             &move_stackless_bytecode::print_targets_with_annotations_for_test(
@@ -860,7 +870,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 // bytecode after the processor, if requested.
                 |i, processor, targets_after| {
                     let out = &mut test_output.borrow_mut();
-                    update_diags(ok.borrow_mut(), out, &env);
+                    update_diags(ok.borrow_mut(), out, &env, saw_warnings_rc.borrow_mut());
                     if bytecode_dump_enabled(&config, i + 1 == count, processor.name().as_str()) {
                         let title = format!("after {}:", processor.name());
                         let dump =
@@ -880,7 +890,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {
                 let units = run_file_format_gen(&mut env, &targets);
                 let out = &mut test_output.borrow_mut();
-                update_diags(ok.borrow_mut(), out, &env);
+                update_diags(ok.borrow_mut(), out, &env, saw_warnings_rc.borrow_mut());
                 if *ok.borrow() {
                     if bytecode_dump_enabled(&config, true, FILE_FORMAT_STAGE) {
                         out.push_str(
@@ -894,10 +904,16 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                     } else {
                         out.push_str("\n============ bytecode verification failed ========\n");
                     }
-                    check_diags(out, &env);
+                    check_diags(out, &env, &mut saw_warnings_rc.borrow_mut());
                 }
-            }
+            };
+            saw_warnings = saw_warnings_rc.take();
         }
+    }
+    if options.warnings_are_errors && saw_warnings && ok {
+        test_output.borrow_mut().push_str(
+            "\nError: Warnings found, and configuration indicates that warnings should be treated as errors\n",
+        );
     }
 
     // Generate/check baseline.
@@ -918,21 +934,46 @@ fn bytecode_dump_enabled(config: &TestConfig, is_last: bool, name: &str) -> bool
                 .contains(&name))
 }
 
+static DUMP_BACKTRACE: Lazy<bool> = Lazy::new(|| {
+    read_bool_env_var(cli::MOVE_COMPILER_BACKTRACE_ENV_VAR)
+        | read_bool_env_var(cli::MVC_BACKTRACE_ENV_VAR)
+});
+
 /// Checks for diagnostics and adds them to the baseline.
-fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {
+/// Returns (has_errors, has_warnings), where has_warnings is ORed with had_warnings,
+/// to capture cumulative warnings over a run.
+fn check_diags(baseline: &mut String, env: &GlobalEnv, had_warnings: &mut bool) -> bool {
     let mut error_writer = Buffer::no_color();
     env.report_diag(&mut error_writer, Severity::Note);
     let diag = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
     if !diag.is_empty() {
-        *baseline += &format!("\nDiagnostics:\n{}", diag);
+        if false && *DUMP_BACKTRACE {
+            let bt = Backtrace::capture();
+            if BacktraceStatus::Captured == bt.status() {
+                *baseline += &format!("\nDiagnostics Backtrace:\n{}\nDiagnostics:\n{}", bt, diag);
+            } else {
+                *baseline += &format!("\nDiagnostics:\n{}", diag);
+            }
+        } else {
+            *baseline += &format!("\nDiagnostics:\n{}", diag);
+        }
     }
     let ok = !env.has_errors();
+    let has_warnings = env.has_warnings();
     env.clear_diag();
+    if has_warnings {
+        *had_warnings = true;
+    };
     ok
 }
 
-fn update_diags(mut ok: RefMut<bool>, baseline: &mut String, env: &GlobalEnv) {
-    if !check_diags(baseline, env) {
+fn update_diags(
+    mut ok: RefMut<bool>,
+    baseline: &mut String,
+    env: &GlobalEnv,
+    mut had_warnings: RefMut<bool>,
+) {
+    if !check_diags(baseline, env, &mut had_warnings) {
         *ok = false;
     }
 }

@@ -148,7 +148,7 @@ impl BuildPlan {
                 let (files, units_res) = compiler.build()?;
                 match units_res {
                     Ok((units, warning_diags)) => {
-                        report_warnings(&files, warning_diags);
+                        report_warnings(&files, warning_diags, false);
                         Ok((files, units, None))
                     },
                     Err(error_diags) => {

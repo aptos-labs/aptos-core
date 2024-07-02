@@ -117,13 +117,13 @@ pub fn shortest_cycle<'a, T: Ord + Hash>(
             );
             match (shortest_path, path_opt) {
                 (p, None) | (None, p) => p,
-                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => {
-                    Some(if cur_len < acc_len {
+                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => Some(
+                    if cur_len < acc_len {
                         (cur_len, cur_path)
                     } else {
                         (acc_len, acc_path)
-                    })
-                },
+                    },
+                ),
             }
         });
     let (_, mut path) = shortest_path.unwrap();
@@ -237,8 +237,13 @@ impl CompilationEnv {
     }
 
     pub fn has_errors(&self) -> bool {
-        // Non-blocking Error is the min level considered an error
-        self.has_diags_at_or_above_severity(Severity::NonblockingError)
+        if self.flags.warnings_are_errors() {
+            // Treat warnings as errors
+            self.has_diags_at_or_above_severity(Severity::Warning)
+        } else {
+            // Non-blocking Error is the min level considered an error
+            self.has_diags_at_or_above_severity(Severity::NonblockingError)
+        }
     }
 
     pub fn count_diags(&self) -> usize {

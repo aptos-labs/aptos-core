@@ -177,8 +177,11 @@ pub trait MoveTestAdapter<'a>: Sized {
     fn compiled_state(&mut self) -> &mut CompiledState<'a>;
     fn default_syntax(&self) -> SyntaxChoice;
     fn known_attributes(&self) -> &BTreeSet<String>;
+    fn get_warnings_are_errors(&self) -> bool;
     fn run_config(&self) -> TestRunConfig {
-        TestRunConfig::CompilerV1
+        TestRunConfig::CompilerV1 {
+            warnings_are_errors: false,
+        }
     }
     fn init(
         default_syntax: SyntaxChoice,
@@ -275,22 +278,32 @@ pub trait MoveTestAdapter<'a>: Sized {
                     TestRunConfig::CompilerV2 {
                         language_version,
                         v2_experiments,
+                        warnings_are_errors,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
                         &state.source_files().cloned().collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
+                        warnings_are_errors,
                         language_version,
                         v2_experiments,
                     )?,
                     // In all other cases, run V1
-                    _ => compile_source_unit(
+                    TestRunConfig::ComparisonV1V2 {
+                        warnings_are_errors,
+                        ..
+                    }
+                    | TestRunConfig::CompilerV1 {
+                        warnings_are_errors,
+                        ..
+                    } => compile_source_unit(
                         state.pre_compiled_deps_v1,
                         state.named_address_mapping.clone(),
                         &state.source_files().cloned().collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
+                        warnings_are_errors,
                         need_model,
                     )?,
                 };
@@ -351,17 +364,20 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (script, opt_model, warning_opt) = match syntax {
             SyntaxChoice::Source => {
+                let warnings_are_errors = run_config.get_warnings_are_errors();
                 let (unit, opt_model, warning_opt) = match run_config {
                     // Run the V2 compiler if requested.
                     TestRunConfig::CompilerV2 {
                         language_version,
                         v2_experiments,
+                        ..
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
                         &state.source_files().cloned().collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
+                        warnings_are_errors,
                         language_version,
                         v2_experiments,
                     )?,
@@ -372,6 +388,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         &state.source_files().cloned().collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
+                        warnings_are_errors,
                         need_model,
                     )?,
                 };
@@ -787,6 +804,7 @@ fn compile_source_unit_v2(
     deps: &[String],
     path: String,
     known_attributes: &BTreeSet<String>,
+    warnings_are_errors: bool,
     language_version: LanguageVersion,
     experiments: Vec<(String, bool)>,
 ) -> Result<(AnnotatedCompiledUnit, Option<GlobalEnv>, Option<String>)> {
@@ -817,6 +835,7 @@ fn compile_source_unit_v2(
             .map(|(alias, addr)| format!("{}={}", alias, addr))
             .collect(),
         known_attributes: known_attributes.clone(),
+        warnings_are_errors,
         language_version: Some(language_version),
         ..move_compiler_v2::Options::default()
     };
@@ -826,8 +845,8 @@ fn compile_source_unit_v2(
     let mut error_writer = termcolor::Buffer::no_color();
     let result = move_compiler_v2::run_move_compiler(&mut error_writer, options);
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-    let (model, mut units) =
-        result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;
+    let (model, mut units) = result
+        .map_err(|message| anyhow::anyhow!("compilation errors:\n {}\n{}\n", error_str, message))?;
     let unit = if units.len() != 1 {
         anyhow::bail!("expected either one script or one module")
     } else {
@@ -857,6 +876,7 @@ fn compile_source_unit(
     deps: &[String],
     path: String,
     known_attributes: &BTreeSet<String>,
+    warnings_are_errors: bool,
     need_model: bool,
 ) -> Result<(AnnotatedCompiledUnit, Option<GlobalEnv>, Option<String>)> {
     fn rendered_diags(files: &FilesSourceText, diags: Diagnostics) -> Option<String> {
@@ -875,7 +895,12 @@ fn compile_source_unit(
     use move_compiler::PASS_COMPILATION;
     let flags = move_compiler::Flags::empty()
         .set_sources_shadow_deps(true)
-        .set_skip_attribute_checks(false);
+        .set_skip_attribute_checks(false)
+        .set_warnings_are_errors(warnings_are_errors);
+    eprintln!(
+        "at 901: Path is {}, warnings_are_errors is {}",
+        path, warnings_are_errors
+    );
 
     let (mut files, comments_and_compiler_res) = move_compiler::Compiler::from_files(
         vec![path.clone()],
@@ -890,7 +915,7 @@ fn compile_source_unit(
         .map(|(_comments, move_compiler)| move_compiler.into_compiled_units());
 
     match units_or_diags {
-        Err(diags) => {
+        Err(diags) | Ok(Err(diags)) => {
             if let Some((pcd, _paths)) = pre_compiled_deps {
                 for (file_name, text) in &pcd.files {
                     // TODO This is bad. Rethink this when errors are redone
@@ -902,7 +927,7 @@ fn compile_source_unit(
 
             Err(anyhow!(rendered_diags(&files, diags).unwrap()))
         },
-        Ok((mut units, warnings)) => {
+        Ok(Ok((mut units, warnings))) => {
             let warnings = rendered_diags(&files, warnings);
             let len = units.len();
             if len != 1 {
@@ -991,13 +1016,20 @@ where
     let (runs, comparison_mode) = if let TestRunConfig::ComparisonV1V2 {
         language_version,
         v2_experiments,
+        warnings_are_errors,
     } = config.clone()
     {
         (
-            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2 {
-                language_version,
-                v2_experiments,
-            }],
+            vec![
+                TestRunConfig::CompilerV1 {
+                    warnings_are_errors,
+                },
+                TestRunConfig::CompilerV2 {
+                    language_version,
+                    v2_experiments,
+                    warnings_are_errors,
+                },
+            ],
             true,
         )
     } else {
@@ -1081,7 +1113,7 @@ where
         last_output += &format!(
             "\n>>> {} {{\n{}\n}}\n",
             match config {
-                TestRunConfig::CompilerV1 => "V1 Compiler",
+                TestRunConfig::CompilerV1 { .. } => "V1 Compiler",
                 TestRunConfig::CompilerV2 { .. } => "V2 Compiler",
                 _ => panic!("unexpected test config"),
             },

@@ -117,16 +117,11 @@ impl ModelBuilder {
             ),
         };
 
-        let skip_attribute_checks = self
-            .resolution_graph
-            .build_options
-            .compiler_config
-            .skip_attribute_checks;
-        let known_attributes = &self
-            .resolution_graph
-            .build_options
-            .compiler_config
-            .known_attributes;
+        let compiler_config = &self.resolution_graph.build_options.compiler_config;
+        let skip_attribute_checks = compiler_config.skip_attribute_checks;
+        let known_attributes = &compiler_config.known_attributes;
+        let warnings_are_errors = compiler_config.warnings_are_errors;
+
         match self.model_config.compiler_version {
             CompilerVersion::V1 => run_model_builder_with_options(
                 all_targets,
@@ -135,6 +130,7 @@ impl ModelBuilder {
                 ModelBuilderOptions::default(),
                 skip_attribute_checks,
                 known_attributes,
+                warnings_are_errors, // warnings_are_errors
             ),
             CompilerVersion::V2_0 | CompilerVersion::V2_1 => {
                 let mut options = make_options_for_v2_compiler(all_targets, all_deps);

@@ -27,6 +27,7 @@ use once_cell::sync::Lazy;
 use std::{
     backtrace::{Backtrace, BacktraceStatus},
     collections::{BTreeMap, HashMap, HashSet},
+    io::Write,
     iter::FromIterator,
     ops::Range,
 };
@@ -62,28 +63,49 @@ pub struct Diagnostics {
 
 pub fn report_diagnostics(files: &FilesSourceText, diags: Diagnostics) -> ! {
     let should_exit = true;
-    report_diagnostics_impl(files, diags, should_exit);
+    report_diagnostics_impl(files, diags, should_exit, false);
     unreachable!()
 }
 
 // report diagnostics, but do not exit if diags are all warnings
-pub fn report_diagnostics_exit_on_error(files: &FilesSourceText, diags: Diagnostics) {
+pub fn report_diagnostics_exit_on_error(
+    files: &FilesSourceText,
+    diags: Diagnostics,
+    warnings_are_errors: bool,
+) {
     let should_exit = diags
         .diagnostics
         .iter()
         .any(|diag| diag.info.severity() > Severity::Warning);
-    report_diagnostics_impl(files, diags, should_exit);
+    let exit_due_to_warnings = warnings_are_errors
+        && !should_exit
+        && diags
+            .diagnostics
+            .iter()
+            .any(|diag| diag.info.severity() >= Severity::Warning);
+    report_diagnostics_impl(
+        files,
+        diags,
+        should_exit || exit_due_to_warnings,
+        exit_due_to_warnings,
+    );
 }
 
-pub fn report_warnings(files: &FilesSourceText, warnings: Diagnostics) {
+pub fn report_warnings(files: &FilesSourceText, warnings: Diagnostics, warnings_are_errors: bool) {
     if warnings.is_empty() {
         return;
     }
     debug_assert!(warnings.max_severity().unwrap() == Severity::Warning);
-    report_diagnostics_impl(files, warnings, false)
+    let should_exit = warnings_are_errors;
+    report_diagnostics_impl(files, warnings, should_exit, warnings_are_errors);
 }
 
-fn report_diagnostics_impl(files: &FilesSourceText, diags: Diagnostics, should_exit: bool) {
+fn report_diagnostics_impl(
+    files: &FilesSourceText,
+    diags: Diagnostics,
+    should_exit: bool,
+    exiting_due_to_warnings: bool,
+) {
     let color_choice = match read_env_var(COLOR_MODE_ENV_VAR).as_str() {
         "NONE" => ColorChoice::Never,
         "ANSI" => ColorChoice::AlwaysAnsi,
@@ -93,6 +115,11 @@ fn report_diagnostics_impl(files: &FilesSourceText, diags: Diagnostics, should_e
     let mut writer = StandardStream::stderr(color_choice);
     output_diagnostics(&mut writer, files, diags);
     if should_exit {
+        if exiting_due_to_warnings {
+            let _ = writer.write(
+                b"Exiting due to configuration requesting treatment of Warnings as Errors\n",
+            );
+        }
         std::process::exit(1);
     }
 }

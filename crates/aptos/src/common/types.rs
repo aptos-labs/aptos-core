@@ -1121,6 +1121,12 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub dev: bool,
 
+    /// Treat warnings as errors: stop compilation if warnings occur.
+    /// Note that current value of this constant is "Werror"
+    #[clap(long = cli::MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG,
+           default_value=bool_to_str(move_compiler_warnings_are_errors_env_var()))]
+    warnings_are_errors: bool,
+
     /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
     /// See <https://github.com/aptos-labs/aptos-core/issues/10335>

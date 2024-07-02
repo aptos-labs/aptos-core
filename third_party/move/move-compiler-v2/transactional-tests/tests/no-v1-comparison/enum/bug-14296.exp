@@ -11,3 +11,5 @@ Error: compilation errors:
    = missing `E::V1{..}`
 
 
+Exiting: code generation errors
+

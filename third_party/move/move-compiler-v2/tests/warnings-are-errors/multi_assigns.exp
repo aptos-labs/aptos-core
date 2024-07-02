@@ -1,0 +1,23 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    private fun test(): u64 {
+        {
+          let x: u64 = 1;
+          x: u64 = 2;
+          x
+        }
+    }
+} // end 0xc0ffee::m
+
+
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/warnings-are-errors/multi_assigns.move:3:17
+  │
+3 │         let x = 1;
+  │                 ^
+
+
+============ bytecode verification succeeded ========
+
+Error: Warnings found, and configuration indicates that warnings should be treated as errors

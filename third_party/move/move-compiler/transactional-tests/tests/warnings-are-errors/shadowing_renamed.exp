@@ -1,0 +1,10 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-19:
+warning[W09003]: unused assignment
+  ┌─ TEMPFILE:8:13
+  │
+8 │         let x = 1;
+  │             ^ Unused assignment or binding for local 'x'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_x')
+
+

@@ -10,6 +10,8 @@ comparison between v1 and v2 failed:
 +    │                ^^^^
 + 
 + 
++ Exiting: assembling errors
++ 
 + 
 = task 1 'run'. lines 30-30:
 - return values: 625

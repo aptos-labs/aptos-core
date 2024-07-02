@@ -10,14 +10,23 @@ use std::path::Path;
 datatest_stable::harness!(runner, "tests", r".*\.(mvir|move)$");
 
 fn runner(path: &Path) -> anyhow::Result<(), Box<dyn std::error::Error>> {
+    let warnings_are_errors = path.to_str().unwrap().contains("/warnings-are-errors/");
+    eprintln!(
+        "Path is {}, warnings_are_errors is {}",
+        path.to_str().unwrap(),
+        warnings_are_errors
+    );
     if path.to_str().unwrap().contains("v2-tests/") {
         // TODO: we may later want to change this to comparison testing. For now we are mostly
         //    interested in debugging v2 bytecode.
         run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
             language_version: LanguageVersion::default(),
             v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
+            warnings_are_errors,
         })
     } else {
-        run_aptos_test_with_config(path, TestRunConfig::CompilerV1)
+        run_aptos_test_with_config(path, TestRunConfig::CompilerV1 {
+            warnings_are_errors,
+        })
     }
 }

@@ -108,7 +108,7 @@ pub struct BuildOptions {
     pub move_2: bool,
     #[clap(long = WARN_UNUSED_FLAG, default_value="false")]
     pub warn_unused: bool,
-    #[clap(long = MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG, bool_to_str(move_compilers_warnings_are_errors_env_var()))]
+    #[clap(long = MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG, default_value=bool_to_str(move_compiler_warnings_are_errors_env_var()))]
     pub warnings_are_errors: bool,
 }
 
@@ -219,15 +219,12 @@ pub fn build_model(
     let compiler_version = compiler_version.unwrap_or_default();
     let language_version = language_version.unwrap_or_default();
     compiler_version.check_language_support(language_version)?;
-    build_config.move_model_for_package(
-        package_path,
-        ModelConfig {
-            target_filter,
-            all_files_as_targets: false,
-            compiler_version,
-            language_version,
-        },
-    )
+    build_config.move_model_for_package(package_path, ModelConfig {
+        target_filter,
+        all_files_as_targets: false,
+        compiler_version,
+        language_version,
+    })
 }
 
 impl BuiltPackage {

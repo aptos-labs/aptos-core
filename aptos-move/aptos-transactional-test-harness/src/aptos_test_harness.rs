@@ -607,6 +607,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         aptos_framework::extended_checks::get_all_attribute_names()
     }
 
+    fn get_warnings_are_errors(&self) -> bool {
+        self.run_config.get_warnings_are_errors()
+    }
+
     fn run_config(&self) -> TestRunConfig {
         self.run_config.clone()
     }
@@ -1120,18 +1124,29 @@ fn precompiled_v2_stdlib_if_needed(
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_aptos_test_with_config(path, TestRunConfig::CompilerV1)
+    let warnings_are_errors = path.to_str().unwrap().contains("/warnings-are-errors/");
+    run_aptos_test_with_config(path, TestRunConfig::CompilerV1 {
+        warnings_are_errors,
+    })
 }
 
 pub fn run_aptos_test_with_config(
     path: &Path,
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let warnings_are_errors = path.to_str().unwrap().contains("/warnings-are-errors/");
+    eprintln!(
+        "Path is {}, warnings_are_errors is {}, config.warnings_are_errors is {}",
+        path.to_str().unwrap(),
+        warnings_are_errors,
+        config.get_warnings_are_errors(),
+    );
     let (suffix, config) =
         if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
             (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
                 language_version: LanguageVersion::default(),
                 v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
+                warnings_are_errors,
             })
         } else {
             (Some(EXP_EXT.to_owned()), config)

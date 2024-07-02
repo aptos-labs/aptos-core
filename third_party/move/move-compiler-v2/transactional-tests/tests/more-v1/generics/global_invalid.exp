@@ -40,7 +40,9 @@ comparison between v1 and v2 failed:
 +   │         Invalid call to MoveFrom<T>.
 = 
 = 
++ Exiting: code generation errors
 = 
++ 
 = task 1 'publish'. lines 10-22:
 - Error: error[E03009]: unbound variable
 + Error: compilation errors:
@@ -71,8 +73,9 @@ comparison between v1 and v2 failed:
 - 18 │         my_borrow().f;
 -    │         ^^^^^^^^^^^^^ Unbound field 'f'
 = 
++ Exiting: checking errors
 = 
-- 
+= 
 = task 2 'run'. lines 24-30:
 - Error: error[E03002]: unbound module
 + Error: compilation errors:
@@ -90,4 +93,6 @@ comparison between v1 and v2 failed:
 =    │         ^ Unbound module or type alias 'M'
 = 
 = 
++ Exiting: checking errors
 = 
++ 

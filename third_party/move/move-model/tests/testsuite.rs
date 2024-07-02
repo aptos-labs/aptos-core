@@ -9,7 +9,11 @@ use move_model::{options::ModelBuilderOptions, run_model_builder_with_options};
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use std::path::Path;
 
-fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Result<()> {
+fn test_runner(
+    path: &Path,
+    options: ModelBuilderOptions,
+    warnings_are_errors: bool,
+) -> datatest_stable::Result<()> {
     let targets = vec![PackagePaths {
         name: None,
         paths: vec![path.to_str().unwrap().to_string()],
@@ -22,6 +26,7 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
         options,
         false,
         KnownAttribute::get_all_attribute_names(),
+        warnings_are_errors,
     )?;
     let diags = if env.diag_count(Severity::Warning) > 0 {
         let mut writer = Buffer::no_color();
@@ -36,14 +41,16 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
 }
 
 fn runner(path: &Path) -> datatest_stable::Result<()> {
-    if path.display().to_string().contains("/compile_via_model/") {
-        test_runner(path, ModelBuilderOptions {
-            compile_via_model: true,
+    let compile_via_model = path.display().to_string().contains("/compile_via_model/");
+    let warnings_are_errors = path.display().to_string().contains("/warnings-are-errors/");
+    test_runner(
+        path,
+        ModelBuilderOptions {
+            compile_via_model,
             ..Default::default()
-        })
-    } else {
-        test_runner(path, ModelBuilderOptions::default())
-    }
+        },
+        warnings_are_errors,
+    )
 }
 
 datatest_stable::harness!(runner, "tests/sources", r".*\.move$");

@@ -111,6 +111,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         KnownAttribute::get_all_attribute_names()
     }
 
+    fn get_warnings_are_errors(&self) -> bool {
+        self.run_config.get_warnings_are_errors()
+    }
+
     fn run_config(&self) -> TestRunConfig {
         self.run_config.clone()
     }
@@ -486,19 +490,49 @@ static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| 
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum TestRunConfig {
-    CompilerV1,
+    CompilerV1 {
+        warnings_are_errors: bool,
+    },
     CompilerV2 {
         language_version: LanguageVersion,
         v2_experiments: Vec<(String, bool)>,
+        warnings_are_errors: bool,
     },
     ComparisonV1V2 {
         language_version: LanguageVersion,
         v2_experiments: Vec<(String, bool)>,
+        warnings_are_errors: bool,
     },
 }
 
+impl TestRunConfig {
+    pub fn get_warnings_are_errors(&self) -> bool {
+        use TestRunConfig::*;
+        match self {
+            CompilerV1 {
+                warnings_are_errors,
+                ..
+            }
+            | CompilerV2 {
+                warnings_are_errors,
+                ..
+            }
+            | ComparisonV1V2 {
+                warnings_are_errors,
+                ..
+            } => *warnings_are_errors,
+        }
+    }
+}
+
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_with_config(TestRunConfig::CompilerV1, path)
+    let warnings_are_errors = path.to_string_lossy().contains("/warnings-are-errors/");
+    run_test_with_config(
+        TestRunConfig::CompilerV1 {
+            warnings_are_errors,
+        },
+        path,
+    )
 }
 
 fn precompiled_v1_stdlib_if_needed(
@@ -530,6 +564,7 @@ pub fn run_test_with_config(
             (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
                 language_version: LanguageVersion::default(),
                 v2_experiments: vec![],
+                warnings_are_errors: config.get_warnings_are_errors(),
             })
         } else {
             (Some(EXP_EXT.to_owned()), config)
@@ -549,6 +584,7 @@ pub fn run_test_with_config_and_exp_suffix(
             TestRunConfig::CompilerV2 {
                 language_version: LanguageVersion::default(),
                 v2_experiments: vec![],
+                warnings_are_errors: config.get_warnings_are_errors(),
             }
         } else {
             config
