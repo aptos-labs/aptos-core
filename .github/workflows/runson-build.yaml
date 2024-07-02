@@ -41,8 +41,7 @@ jobs:
       - name: Build Rust
         run: |
           sudo apt update && sudo apt install -y libudev-dev
-          cargo build -p aptos-node --profile performance
-          cargo build -p aptos-forge-cli --release
+          cargo xbuild group forge
 
       - name: Build Tools
         run: |
