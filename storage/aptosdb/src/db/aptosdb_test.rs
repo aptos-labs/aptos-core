@@ -265,8 +265,8 @@ fn test_revert_single_commit() {
     }
 
     // Check expected before revert commit
-    let expected_version = cur_ver - 1;
-    assert_eq!(db.get_latest_version().unwrap(), expected_version);
+    let pre_revert_version = cur_ver - 1;
+    assert_eq!(db.get_latest_version().unwrap(), pre_revert_version);
 
     // Get the latest ledger info before revert
     let latest_ledger_info_before_revert = blocks[1].1.clone();
@@ -276,6 +276,21 @@ fn test_revert_single_commit() {
     db.revert_commit(&latest_ledger_info_before_revert).unwrap();
 
     assert_eq!(db.get_latest_version().unwrap(), version_to_revert_to);
+    let ledger_info = db.get_latest_ledger_info().unwrap();
+    assert_eq!(ledger_info, latest_ledger_info_before_revert);
+    let tx_acc_db = db.ledger_db.transaction_accumulator_db();
+    for i in version_to_revert_to + 1..=pre_revert_version {
+        let _ = tx_acc_db
+            .get_root_hash(i)
+            .expect_err(&format!("expected no state for {i}"));
+    }
+    let root_hash = tx_acc_db.get_root_hash(version_to_revert_to).unwrap();
+    assert_eq!(
+        root_hash,
+        latest_ledger_info_before_revert
+            .commit_info()
+            .executed_state_id()
+    );
 }
 
 #[test]
