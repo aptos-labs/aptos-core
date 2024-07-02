@@ -135,6 +135,17 @@ impl Type {
         self.is_numerical() || self.is_bool()
     }
 
+    /// Check if the type is a reference
+    pub fn is_ref(&self) -> bool {
+        matches!(self, Type::Ref(_))
+    }
+
+    /// Check if the type is a type parameter
+    pub fn is_type_parameter(&self) -> bool {
+        matches!(self, Type::TypeParameter(_))
+    }
+
+    // Check if the type is concrete
     pub fn is_concrete(&self) -> bool {
         if self.is_num_or_bool() {
             return true;

@@ -1290,6 +1290,7 @@ impl MoveSmith {
             2,                // If-Else
             func_call_weight, // FunctionCall
             binop_weight,     // BinaryOperation
+            2,                // Dereference
         ];
 
         let idx = choose_idx_weighted(u, &weights)?;
@@ -1317,6 +1318,12 @@ impl MoveSmith {
                 assert!(typ.is_num_or_bool());
                 let binop = self.generate_binary_operation(u, parent_scope, Some(typ.clone()))?;
                 choices.push(Expression::BinaryOperation(Box::new(binop)));
+            },
+            3 => {
+                // Generate a dereference expression
+                assert!(!typ.is_ref());
+                let deref = self.generate_dereference(u, parent_scope, typ)?;
+                choices.push(deref);
             },
             _ => panic!("Invalid option for expression generation"),
         };
@@ -1367,7 +1374,44 @@ impl MoveSmith {
             warn!("{:?} does not have copy ability", chosen);
         }
 
+        // Note: since we assume everything is copyable, we can arbitrarily
+        // drop the copy annotation.
+        if bool::arbitrary(u)? {
+            copy = false;
+        }
+
         Ok(Some(VariableAccess { name: chosen, copy }))
+    }
+
+    /// Generate a deference expression of type `typ`
+    ///
+    /// This function will try to select an existing variable to dereference if possible.
+    ///
+    /// If no variable is available, it will generate a new expression that is the reference
+    /// of the gien type.
+    fn generate_dereference(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+        typ: &Type,
+    ) -> Result<Expression> {
+        let mut idents = self.env().live_variables(parent_scope, Some(typ));
+
+        let ref_typ = Type::Ref(Box::new(typ.clone()));
+        // TODO: if things are not copyable by default, we need to check for copy here
+        idents.retain(|i| self.env().type_pool.get_type(i).unwrap() == ref_typ);
+
+        let inner_expr = match idents.is_empty() {
+            true => self.generate_expression_of_type(u, parent_scope, &ref_typ, true, true)?,
+            false => {
+                let chosen = u.choose(&idents)?.clone();
+                Expression::Variable(VariableAccess {
+                    name: chosen,
+                    copy: false,
+                })
+            },
+        };
+        Ok(Expression::Dereference(Box::new(inner_expr)))
     }
 
     /// Generate an If expression
@@ -2010,7 +2054,7 @@ impl MoveSmith {
             // so we simply remove all reference types if non_instantiatable type
             // parameters are not allowed
             if allow_type_param && !only_instantiatable {
-                refs.retain(|(ty, _)| matches!(ty, Type::TypeParameter(_)));
+                refs.retain(|(ty, _)| ty.is_type_parameter());
             }
             if !refs.is_empty() {
                 categories.push(refs);

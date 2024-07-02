@@ -338,7 +338,8 @@ impl CodeGenerator for Expression {
             Expression::Assign(assignment) => assignment.emit_code_lines(),
             Expression::BinaryOperation(binop) => binop.emit_code_lines(),
             Expression::IfElse(if_expr) => if_expr.emit_code_lines(),
-            Expression::Reference(expr) => vec![format!("&{}", expr.inline())],
+            Expression::Reference(expr) => vec![format!("&({})", expr.inline())],
+            Expression::Dereference(expr) => vec![format!("*({})", expr.inline())],
         }
     }
 }
