@@ -54,6 +54,7 @@ members = [
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
+    "crates/aptos-debugger",
     "crates/aptos-dkg",
     "crates/aptos-drop-helper",
     "crates/aptos-enum-conversion-derive",
@@ -306,6 +307,7 @@ aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-indexer-schemas = { path = "storage/indexer_schemas" }
 aptos-db-tool = { path = "storage/db-tool" }
+aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-dkg = { path = "crates/aptos-dkg" }
 aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
