@@ -277,7 +277,12 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                                 false
                                             }
                                         } else {
-                                            call_package_fun_from_diff_addr_error(env, sites, &caller_func, &callee_func);
+                                            call_package_fun_from_diff_addr_error(
+                                                env,
+                                                sites,
+                                                &caller_func,
+                                                &callee_func,
+                                            );
                                             false
                                         }
                                     } else {
