@@ -257,11 +257,13 @@ impl RecoveryData {
                 .collect::<Vec<String>>()
         );
 
-        let blocks_to_prune = Some(Self::find_blocks_to_prune(
-            root.0.id(),
-            &mut blocks,
-            &mut quorum_certs,
-        ));
+        // TODO: is pruning an optimization or a necessity?
+        // let blocks_to_prune = Some(Self::find_blocks_to_prune(
+        //     root.0.id(),
+        //     &mut blocks,
+        //     &mut quorum_certs,
+        // ));
+        let blocks_to_prune = Some(vec![]);
         info!(
             "RecoveryData blocks_to_prune: {:?}",
             blocks_to_prune.as_ref().map(|ids| ids
