@@ -108,22 +108,19 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
 
+    let txns = vec![
+        TransactionSummary::new(PeerId::ONE, 0, HashValue::zero()),
+        TransactionSummary::new(PeerId::ONE, 1, HashValue::zero()),
+        TransactionSummary::new(PeerId::ONE, 2, HashValue::zero()),
+        TransactionSummary::new(PeerId::ONE, 3, HashValue::zero()),
+    ];
+
     let author_0_batches = vec![
         proof_of_store(author_0, BatchId::new_for_test(0), 100),
         proof_of_store(author_0, BatchId::new_for_test(1), 200),
         proof_of_store(author_0, BatchId::new_for_test(2), 50),
         proof_of_store(author_0, BatchId::new_for_test(3), 300),
     ];
-    let info_1 = author_0_batches[0].info().clone();
-    let info_2 = author_0_batches[3].info().clone();
-    proof_queue.add_batch_summaries(vec![(info_1, vec![TransactionSummary::new(
-        PeerId::ONE,
-        1,
-        HashValue::zero(),
-    )])]);
-    for batch in author_0_batches {
-        proof_queue.push(batch);
-    }
 
     let author_1_batches = vec![
         proof_of_store(author_1, BatchId::new_for_test(4), 500),
@@ -131,36 +128,43 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
         proof_of_store(author_1, BatchId::new_for_test(6), 600),
         proof_of_store(author_1, BatchId::new_for_test(7), 50),
     ];
-    let info_3 = author_1_batches[1].info().clone();
-    let info_4 = author_1_batches[3].info().clone();
-    for batch in author_1_batches {
-        proof_queue.push(batch);
-    }
-    assert_eq!(proof_queue.remaining_txns_and_proofs(), (8, 8));
 
-    proof_queue.add_batch_summaries(vec![(info_3, vec![TransactionSummary::new(
-        PeerId::ONE,
-        1,
-        HashValue::zero(),
-    )])]);
+    let info_1 = author_0_batches[0].info().clone();
+    let info_2 = author_0_batches[1].info().clone();
+    let info_3 = author_0_batches[2].info().clone();
+    let info_4 = author_0_batches[3].info().clone();
+    let info_5 = author_1_batches[0].info().clone();
+    let info_6 = author_1_batches[1].info().clone();
+    let info_7 = author_1_batches[2].info().clone();
+    let info_8 = author_1_batches[3].info().clone();
 
-    assert_eq!(proof_queue.remaining_txns_and_proofs(), (7, 8));
+    proof_queue.add_batch_summaries(vec![(info_1, vec![txns[0]])]);
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (0, 0));
 
-    proof_queue.add_batch_summaries(vec![(info_2, vec![TransactionSummary::new(
-        PeerId::ONE,
-        2,
-        HashValue::zero(),
-    )])]);
+    proof_queue.push(author_0_batches[0].clone());
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (1, 1));
 
-    assert_eq!(proof_queue.remaining_txns_and_proofs(), (7, 8));
+    proof_queue.push(author_0_batches[1].clone());
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
-    proof_queue.add_batch_summaries(vec![(info_4, vec![TransactionSummary::new(
-        PeerId::ONE,
-        2,
-        HashValue::zero(),
-    )])]);
+    proof_queue.add_batch_summaries(vec![(info_2, vec![txns[1]])]);
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
-    assert_eq!(proof_queue.remaining_txns_and_proofs(), (6, 8));
+    proof_queue.add_batch_summaries(vec![(info_3, vec![txns[0]])]);
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
+
+    proof_queue.push(author_0_batches[2].clone());
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 3));
+
+    proof_queue.add_batch_summaries(vec![(info_4, vec![txns[2]])]);
+    proof_queue.add_batch_summaries(vec![(info_5, vec![txns[1]])]);
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 3));
+
+    proof_queue.push(author_1_batches[0].clone());
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 4));
+
+    proof_queue.push(author_0_batches[3].clone());
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (3, 5));
 }
 
 #[test]
