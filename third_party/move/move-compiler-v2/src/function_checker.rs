@@ -18,7 +18,7 @@ type QualifiedFunId = QualifiedId<FunId>;
 /// check that non-inline function parameters do not have function type.
 pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     for caller_module in env.get_modules() {
-        if caller_module.is_target() {
+        if caller_module.is_primary_target() {
             for caller_func in caller_module.get_functions() {
                 // Check that non-inline function parameters don't have function type
                 if !caller_func.is_inline() {
@@ -191,7 +191,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
 
     for caller_module in env.get_modules() {
-        if caller_module.is_target() {
+        if caller_module.is_primary_target() {
             let caller_module_id = caller_module.get_id();
             let caller_module_has_friends = !caller_module.has_no_friends();
             let caller_module_is_script = caller_module.get_name().is_script();
@@ -263,7 +263,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                             {
                                                 // we should've inferred the friend declaration
                                                 panic!(
-                                                    "ICE: {} should have friend {}",
+                                                    "{} should have friend {}",
                                                     callee_func.module_env.get_full_name_str(),
                                                     caller_func.module_env.get_full_name_str()
                                                 );
