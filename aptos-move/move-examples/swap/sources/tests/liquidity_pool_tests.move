@@ -12,7 +12,7 @@ module swap::liquidity_pool_tests {
     fun test_e2e_volatile(lp_1: &signer, lp_2: &signer) {
         test_helpers::set_up(lp_1);
         let is_stable = false;
-        let (pool, tokens_2, tokens_1) = create_pool(lp_1, is_stable);
+        let (pool, tokens_1, tokens_2) = create_pool(lp_1, is_stable);
 
         // Add liquidity to the pool
         add_liquidity(lp_1, &mut tokens_1, &mut tokens_2, 100000, 200000, is_stable);
