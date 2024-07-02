@@ -1391,23 +1391,27 @@ impl AptosVM {
                         let name = module.self_name();
                         let state_key = StateKey::module(addr, name);
 
-                        if let Some(size) = resolver
+                        // TODO: Allow the check of special addresses to be customized.
+                        if addr.is_special()
+                            || traversal_context.visited.insert((addr, name), ()).is_some()
+                        {
+                            continue;
+                        }
+
+                        let size_if_module_exists = resolver
                             .as_executor_view()
                             .get_module_state_value_size(&state_key)
-                            .map_err(|e| e.finish(Location::Undefined))?
-                        {
-                            if !addr.is_special()
-                                && traversal_context.visited.insert((addr, name), ()).is_none()
-                            {
-                                gas_meter
-                                    .charge_dependency(false, addr, name, NumBytes::new(size))
-                                    .map_err(|err| {
-                                        err.finish(Location::Module(ModuleId::new(
-                                            *addr,
-                                            name.to_owned(),
-                                        )))
-                                    })?;
-                            }
+                            .map_err(|e| e.finish(Location::Undefined))?;
+
+                        if let Some(size) = size_if_module_exists {
+                            gas_meter
+                                .charge_dependency(false, addr, name, NumBytes::new(size))
+                                .map_err(|err| {
+                                    err.finish(Location::Module(ModuleId::new(
+                                        *addr,
+                                        name.to_owned(),
+                                    )))
+                                })?;
                         }
                     }
 
