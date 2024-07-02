@@ -36,28 +36,6 @@ class Flow(Flag):
 # Tests that are run on LAND_BLOCKING and continuously on main
 LAND_BLOCKING_AND_C = Flow.LAND_BLOCKING | Flow.CONTINUOUS
 
-
-@dataclass
-class RunGroupKey:
-    transaction_type: str
-    module_working_set_size: int = field(default=1)
-    executor_type: str = field(default="VM")
-
-    transaction_type_override: Optional[str] = field(default=None)
-    transaction_weights_override: Optional[str] = field(default=None)
-    sharding_traffic_flags: Optional[str] = field(default=None)
-
-    smaller_working_set: bool = field(default=False)
-
-
-@dataclass
-class RunGroupConfig:
-    key: RunGroupKey
-    expected_tps: float
-    included_in: Flow
-    waived: bool = field(default=False)
-
-
 SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 
@@ -77,14 +55,135 @@ NUM_ACCOUNTS = max(
 )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
+NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
+NOISE_LOWER_LIMIT_WARN = None if IS_MAINNET else 0.9
+# If you want to calibrate the upper limit for perf improvement, you can
+# increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
+NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.15
+NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
+
+# bump after a perf improvement, so you can easily distinguish runs
+# that are on top of this commit
+CODE_PERF_VERSION = "v5"
+
+# default to using production number of execution threads for assertions
+NUMBER_OF_EXECUTION_THREADS = int(
+    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
+)
+
+if os.environ.get("DETAILED"):
+    EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 48, 60]
+else:
+    EXECUTION_ONLY_NUMBER_OF_THREADS = []
+
+if os.environ.get("RELEASE_BUILD"):
+    BUILD_FLAG = "--release"
+    BUILD_FOLDER = "target/release"
+else:
+    BUILD_FLAG = "--profile performance"
+    BUILD_FOLDER = "target/performance"
+
+if os.environ.get("PROD_DB_FLAGS"):
+    DB_CONFIG_FLAGS = ""
+else:
+    DB_CONFIG_FLAGS = "--enable-storage-sharding"
+
+if os.environ.get("ENABLE_PRUNER"):
+    DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"
+else:
+    DB_PRUNER_FLAGS = ""
+
+HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
+SKIP_MOVE_E2E = os.environ.get("SKIP_MOVE_E2E")
+
+
+@dataclass(frozen=True)
+class RunGroupKey:
+    transaction_type: str
+    module_working_set_size: int = field(default=1)
+    executor_type: str = field(default="VM")
+
+
+@dataclass(frozen=True)
+class RunGroupKeyExtra:
+    transaction_type_override: Optional[str] = field(default=None)
+    transaction_weights_override: Optional[str] = field(default=None)
+    sharding_traffic_flags: Optional[str] = field(default=None)
+
+    smaller_working_set: bool = field(default=False)
+
+
+@dataclass
+class RunGroupConfig:
+    key: RunGroupKey
+    expected_tps: float
+    included_in: Flow
+    key_extra: RunGroupKeyExtra = field(default_factory=RunGroupKeyExtra)
+    waived: bool = field(default=False)
+
+
 # numbers are based on the machine spec used by github action
+# Local machine numbers will be different.
+#
 # Calibrate using median value from
-# Axiom: https://app.axiom.co/aptoslabs-hghf/explorer?qid=88fegG0H1si-s3x8pv&relative=1
 # Humio: https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
-# Local machine numbers will be higher.
-# For charts over time, you can modify the following query:
-# https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
+# Exporting as CSV and copying to the table below.
+#
+# Dashboard: https://aptoslabs.grafana.net/d/fdf2e5rdip5vkd/single-node-performance-benchmark?orgId=1
 # fmt: off
+
+# 0-indexed
+CALIBRATED_TPS_INDEX = -1
+CALIBRATION_SEPARATOR = " "
+
+# transaction_type                                 module_working_set  executor      block_size    expected t/s    t/s
+CALIBRATION = """
+warmup                                                            1  VM                 10000               0  22583                                                                                                                                                                                                                                                 
+no-op                                                             1  VM                 10000           21300  46213                                                                                                                                    
+no-op                                                          1000  VM                 10000           11500  24829                                                                                                                                    
+coin-transfer                                                     1  VM                 10000           12800  30914                                                                                                                                    
+coin-transfer                                                     1  native             10000           36820  46476                                                                                                                                    
+account-generation                                                1  VM                  9000            9000  23172                                                                                                                                    
+account-generation                                                1  native             10000           27873  37468                                                                                                                                    
+account-resource32-b                                              1  VM                 10000           18600  37801                                                                                                                                    
+modify-global-resource                                            1  VM                  4040            4040   3283                                                                                                                                    
+modify-global-resource                                           10  VM                 10000           14700  18722                                                                                                                                    
+publish-package                                                   1  VM                   137             137    150                                                                                                                                    
+mix_publish_transfer                                              1  VM                  2050            2050   2238                                                                                                                                    
+batch100-transfer                                                 1  VM                   294             294    651                                                                                                                                    
+batch100-transfer                                                 1  native               901             901   1316                                                                                                                                    
+vector-picture30k                                                 1  VM                   151             151    147                                                                                                                                    
+vector-picture30k                                                20  VM                   900             900   1373                                                                                                                                    
+smart-table-picture30-k-with200-change                            1  VM                    23              23     22                                                                                                                                    
+smart-table-picture30-k-with200-change                           20  VM                   123             123    165                                                                                                                                    
+modify-global-resource-agg-v2                                     1  VM                 10000           19320  38218                                                                                                                                    
+modify-global-flag-agg-v2                                         1  VM                  6873            6873   6312                                                                                                                                    
+modify-global-bounded-agg-v2                                      1  VM                 10000           12070          3792          6022         10610         12575          12763          11962          11075           9618  10904                                                                                                                                    
+modify-global-milestone-agg-v2                                    1  VM                 10000           16195          3603          5943         11154         18429          28590          35953          30466          23162  30004                                                                                                                                    
+resource-groups-global-write-tag1-kb                              1  VM                  7920            7920          3061          4696          7934          8532           9507          10157           9761           8826   6491                                                                                                                                    
+resource-groups-global-write-and-read-tag1-kb                     1  VM                  6000            6000          2925          4276          6204          6827           7176           6624           6033           5836   6367                                                                                                                                    
+resource-groups-sender-write-tag1-kb                              1  VM                 10000           15630          3146          5247          9497         16898          28232          42439          44297          43920  19391                                                                                                                                    
+resource-groups-sender-multi-change1-kb                           1  VM                 10000           13830          2782          4552          8549         15313          25451          38636          39079          35976  15270                                                                                                                                    
+token-v1ft-mint-and-transfer                                      1  VM                  1540            1540          1394          1403          1629          1496           1434           1284           1258           1188   1265                                                                                                                                    
+token-v1ft-mint-and-transfer                                     20  VM                  7550            7550          1585          2678          4655          7777          11265          13980          14601          14555  12404                                                                                                                                    
+token-v1nft-mint-and-transfer-sequential                          1  VM                   969             969           917           968           951           906            879            833            826            815    837                                                                                                                                    
+token-v1nft-mint-and-transfer-sequential                         20  VM                  5189            5189          1049          1745          3118          5178           7159           8471           9008           8796   7744                                                                                                                                    
+coin-init-and-mint                                                1  VM                 10000           13780          2534          4323          7889         14149          23974          36884          42214          40649  32006                                                                                                                                    
+coin-init-and-mint                                               20  VM                 10000           11000          1881          3342          6257         11413          19595          31227          36960          35236  26882                                                                                                                                    
+fungible-asset-mint                                               1  VM                 10000           10980          1992          3400          6396         11710          19903          31627          28795          23013  26315                                                                                                                                    
+fungible-asset-mint                                              20  VM                  9508            9508          1744          2836          5373          9904          17308          28097          29211          24806  24750                                                                                                                                    
+no-op5-signers                                                    1  VM                 10000           21342          4291          6907         12820         22064          36123          52069          58639          54412  44554                                                                                                                                    
+token-v2-ambassador-mint                                          1  VM                  6700            6700          1152          2013          3675          6955          12336          20336          20208          16159  18786                                                                                                                                    
+token-v2-ambassador-mint                                         20  VM                  6625            6625          1153          1957          3657          6856          11975          19864          19824          16600  18453                                                                                                                                    
+liquidity-pool-swap                                               1  VM                  1060            1060           980           981          1114          1052           1013            997            944            906    963                                                                                                                                    
+liquidity-pool-swap                                              20  VM                  4665            4665           972          1676          2869          4891           7154           8930           9050           9046   8231                                                                                                                                    
+liquidity-pool-swap-stable                                        1  VM                  1016            1016           952           944          1031          1003            963            937            902            871    920                                                                                                                                    
+liquidity-pool-swap-stable                                       20  VM                  4519            4519           978          1590          2843          4712           6843           8492           9068           8850   7844                                                                                                                                    
+deserialize-u256                                                  1  VM                 10000           19230          3688          6138         11072         19840          33600          49417          56330          52896  43961                                                                                                                                    
+no-op-fee-payer                                                   1  VM                  3068            3068          2740          2813          2973          2771           2572           2257           2050           1923   2251                                                                                                                                    
+no-op-fee-payer                                                  50  VM                 10000           17400          3421          5923         10342         17353          26131          32640          33675          28677  29265
+"""
+
 TESTS = [
     RunGroupConfig(expected_tps=21300, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
@@ -96,8 +195,7 @@ TESTS = [
     RunGroupConfig(expected_tps=4040, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=14700, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=137, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=2050, key=RunGroupKey(
-        "mix_publish_transfer",
+    RunGroupConfig(expected_tps=2050, key=RunGroupKey("mix_publish_transfer"), key_extra=RunGroupKeyExtra(
         transaction_type_override="publish-package coin-transfer",
         transaction_weights_override="1 500",
     ), included_in=LAND_BLOCKING_AND_C),
@@ -163,59 +261,18 @@ TESTS = [
     RunGroupConfig(expected_tps=3068, key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=17400, key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS),
 
-    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
 
     # setting separately for previewnet, as we run on a different number of cores.
-    RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer", smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer"), key_extra=RunGroupKeyExtra(smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
     RunGroupConfig(expected_tps=23000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
     RunGroupConfig(expected_tps=130 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
     RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
-    RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
+    RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
+    RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
 ]
 # fmt: on
-
-NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
-NOISE_LOWER_LIMIT_WARN = None if IS_MAINNET else 0.9
-# If you want to calibrate the upper limit for perf improvement, you can
-# increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
-NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.15
-NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
-
-# bump after a perf improvement, so you can easily distinguish runs
-# that are on top of this commit
-CODE_PERF_VERSION = "v4"
-
-# default to using production number of execution threads for assertions
-NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=8)
-)
-
-if os.environ.get("DETAILED"):
-    EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 48, 60]
-else:
-    EXECUTION_ONLY_NUMBER_OF_THREADS = []
-
-if os.environ.get("RELEASE_BUILD"):
-    BUILD_FLAG = "--release"
-    BUILD_FOLDER = "target/release"
-else:
-    BUILD_FLAG = "--profile performance"
-    BUILD_FOLDER = "target/performance"
-
-if os.environ.get("PROD_DB_FLAGS"):
-    DB_CONFIG_FLAGS = ""
-else:
-    DB_CONFIG_FLAGS = "--enable-storage-sharding"
-
-if os.environ.get("ENABLE_PRUNER"):
-    DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"
-else:
-    DB_PRUNER_FLAGS = ""
-
-HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
-SKIP_MOVE_E2E = os.environ.get("SKIP_MOVE_E2E")
 
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
@@ -450,6 +507,17 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 exit(1)
             move_e2e_benchmark_failed = True
 
+    calibrated_expected_tps = {
+        RunGroupKey(
+            transaction_type=parts[0],
+            module_working_set_size=int(parts[1]),
+            executor_type=parts[2],
+        ): float(parts[CALIBRATED_TPS_INDEX])
+        for line in CALIBRATION.split("\n")
+        if len(parts := [part for part in line.strip().split(CALIBRATION_SEPARATOR) if part]) >= 1
+    }
+    print(calibrated_expected_tps)
+
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
     create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
@@ -474,19 +542,27 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         if SELECTED_FLOW not in test.included_in:
             continue
 
+        if test.key in calibrated_expected_tps:
+            expected_tps = calibrated_expected_tps[test.key]
+        else:
+            print(f"WARNING: Couldn't find {test.key} in calibration results")
+            expected_tps = test.expected_tps
+
         print(f"Testing {test.key}")
-        if test.key.transaction_type_override == "":
+        if test.key_extra.transaction_type_override == "":
             workload_args_str = ""
         else:
             transaction_type_list = (
-                test.key.transaction_type_override or test.key.transaction_type
+                test.key_extra.transaction_type_override or test.key.transaction_type
             )
-            transaction_weights_list = test.key.transaction_weights_override or "1"
+            transaction_weights_list = (
+                test.key_extra.transaction_weights_override or "1"
+            )
             workload_args_str = f"--transaction-type {transaction_type_list} --transaction-weights {transaction_weights_list}"
 
-        cur_block_size = int(min([test.expected_tps, MAX_BLOCK_SIZE]))
+        cur_block_size = int(min([expected_tps, MAX_BLOCK_SIZE]))
 
-        sharding_traffic_flags = test.key.sharding_traffic_flags or ""
+        sharding_traffic_flags = test.key_extra.sharding_traffic_flags or ""
 
         if test.key.executor_type == "VM":
             executor_type_str = "--transactions-per-sender 1"
@@ -499,7 +575,9 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         txn_emitter_prefix_str = "" if NUM_BLOCKS > 200 else " --generate-then-execute"
 
         ADDITIONAL_DST_POOL_ACCOUNTS = (
-            2 * MAX_BLOCK_SIZE * (1 if test.key.smaller_working_set else NUM_BLOCKS)
+            2
+            * MAX_BLOCK_SIZE
+            * (1 if test.key_extra.smaller_working_set else NUM_BLOCKS)
         )
 
         common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
@@ -533,7 +611,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 single_node_result=single_node_result,
                 number_of_threads_results=number_of_threads_results,
                 block_size=cur_block_size,
-                expected_tps=test.expected_tps,
+                expected_tps=expected_tps,
             )
         )
 
@@ -549,7 +627,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     single_node_result=stage_node_result,
                     number_of_threads_results=number_of_threads_results,
                     block_size=cur_block_size,
-                    expected_tps=test.expected_tps,
+                    expected_tps=expected_tps,
                 )
             )
 
@@ -562,7 +640,8 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "module_working_set_size": test.key.module_working_set_size,
                     "executor_type": test.key.executor_type,
                     "block_size": cur_block_size,
-                    "expected_tps": test.expected_tps,
+                    "execution_threads": NUMBER_OF_EXECUTION_THREADS,
+                    "expected_tps": expected_tps,
                     "waived": test.waived,
                     "tps": single_node_result.tps,
                     "gps": single_node_result.gps,
@@ -601,33 +680,33 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
         if (
             NOISE_LOWER_LIMIT is not None
-            and single_node_result.tps < test.expected_tps * NOISE_LOWER_LIMIT
+            and single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT
         ):
-            text = f"regression detected {single_node_result.tps} < {test.expected_tps * NOISE_LOWER_LIMIT} = {test.expected_tps} * {NOISE_LOWER_LIMIT}, {test.key} didn't meet TPS requirements"
+            text = f"regression detected {single_node_result.tps} < {expected_tps * NOISE_LOWER_LIMIT} = {expected_tps} * {NOISE_LOWER_LIMIT}, {test.key} didn't meet TPS requirements"
             if not test.waived:
                 errors.append(text)
             else:
                 warnings.append(text)
         elif (
             NOISE_LOWER_LIMIT_WARN is not None
-            and single_node_result.tps < test.expected_tps * NOISE_LOWER_LIMIT_WARN
+            and single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT_WARN
         ):
-            text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {test.expected_tps * NOISE_LOWER_LIMIT_WARN} = {test.expected_tps} * {NOISE_LOWER_LIMIT_WARN}, {test.key} didn't meet TPS requirements"
+            text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {expected_tps * NOISE_LOWER_LIMIT_WARN} = {expected_tps} * {NOISE_LOWER_LIMIT_WARN}, {test.key} didn't meet TPS requirements"
             warnings.append(text)
         elif (
             NOISE_UPPER_LIMIT is not None
-            and single_node_result.tps > test.expected_tps * NOISE_UPPER_LIMIT
+            and single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT
         ):
-            text = f"perf improvement detected {single_node_result.tps} > {test.expected_tps * NOISE_UPPER_LIMIT} = {test.expected_tps} * {NOISE_UPPER_LIMIT}, {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
+            text = f"perf improvement detected {single_node_result.tps} > {expected_tps * NOISE_UPPER_LIMIT} = {expected_tps} * {NOISE_UPPER_LIMIT}, {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             if not test.waived:
                 errors.append(text)
             else:
                 warnings.append(text)
         elif (
             NOISE_UPPER_LIMIT_WARN is not None
-            and single_node_result.tps > test.expected_tps * NOISE_UPPER_LIMIT_WARN
+            and single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT_WARN
         ):
-            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {test.expected_tps * NOISE_UPPER_LIMIT_WARN} = {test.expected_tps} * {NOISE_UPPER_LIMIT_WARN}, {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
+            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {expected_tps * NOISE_UPPER_LIMIT_WARN} = {expected_tps} * {NOISE_UPPER_LIMIT_WARN}, {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             warnings.append(text)
 
 if HIDE_OUTPUT:
