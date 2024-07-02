@@ -212,6 +212,10 @@ impl DbWriter for AptosDB {
         let latest_version = self.get_synced_version()?;
         let target_version = ledger_info_with_sigs.ledger_info().version();
 
+        // Update in-memory state first, as this is what
+        // concurrent readers would use for the latest ledger info.
+        self.pre_revert(latest_version, &ledger_info_with_sigs);
+
         // Update the provided ledger info and the overall commit progress
         let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
         self.commit_ledger_info(target_version, new_root_hash, Some(&ledger_info_with_sigs))?;
@@ -736,5 +740,43 @@ impl AptosDB {
         }
 
         Ok(())
+    }
+
+    // Update in-memory state of the database and the metrics before reverting.
+    // Note that any failures in persisting the revert should be treated as
+    // non-recoverable.
+    fn pre_revert(
+        &self,
+        latest_version: Version,
+        ledger_info_with_sigs: &LedgerInfoWithSignatures,
+    ) {
+        let target_version = ledger_info_with_sigs.ledger_info().version();
+        let num_txns = latest_version - target_version + 1;
+        if num_txns > 0 {
+            // TODO: also update the COMMITTED_TXNS, but currently it can only go up
+            LATEST_TXN_VERSION.set(target_version as i64);
+
+            // Set back the ledger pruner and state kv pruner.
+            // Note the state merkle pruner is activated when state snapshots are persisted
+            // in their async thread.
+            self.ledger_pruner
+                .maybe_set_pruner_target_db_version(target_version);
+            self.state_store
+                .state_kv_pruner
+                .maybe_set_pruner_target_db_version(target_version);
+        }
+
+        if let Some(_indexer) = &self.indexer {
+            // TODO: prune the reverted write sets from the indexer
+        }
+
+        // Update the metrics
+        LEDGER_VERSION.set(target_version as i64);
+        NEXT_BLOCK_EPOCH.set(ledger_info_with_sigs.ledger_info().next_block_epoch() as i64);
+
+        // Update the latest in-memory ledger info.
+        self.ledger_db
+            .metadata_db()
+            .set_latest_ledger_info(ledger_info_with_sigs.clone());
     }
 }
