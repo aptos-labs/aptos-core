@@ -1728,6 +1728,16 @@ impl Pattern {
         }
     }
 
+    /// Returns true if it is a flat tuple with only var or wildcard
+    pub fn flat_tuple_with_no_error_or_structs(&self) -> bool {
+        if let Pattern::Tuple(_, pats) = self {
+            pats.iter()
+                .all(|p| matches!(p, Pattern::Var(..) | Pattern::Wildcard(_)))
+        } else {
+            false
+        }
+    }
+
     /// Returns the variables in this pattern, per node_id and name.
     pub fn vars(&self) -> Vec<(NodeId, Symbol)> {
         let mut result = vec![];
