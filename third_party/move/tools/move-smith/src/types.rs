@@ -57,11 +57,10 @@ pub struct TypeParameters {
 }
 
 impl TypeParameters {
-    pub fn find_idx_of_parameter(&self, param: &TypeParameter) -> usize {
+    pub fn find_idx_of_parameter(&self, param: &TypeParameter) -> Option<usize> {
         self.type_parameters
             .iter()
             .position(|x| x.name == param.name)
-            .unwrap()
     }
 }
 

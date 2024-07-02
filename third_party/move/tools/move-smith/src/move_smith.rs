@@ -1660,9 +1660,33 @@ impl MoveSmith {
                     // Find the concrete type for this type parameter
                     // TODO: known issue: if one field is a struct with type parameters unconcretized,
                     // TODO: we need to concretize them according to the type parameters of this parent struct
-                    let idx = struct_def.type_parameters.find_idx_of_parameter(param);
+                    let idx = struct_def
+                        .type_parameters
+                        .find_idx_of_parameter(param)
+                        .unwrap();
                     let concrete_type = st_concrete.type_args.get_type_arg_at_idx(idx).unwrap();
                     self.generate_expression_of_type(u, parent_scope, &concrete_type, true, true)?
+                },
+                Type::StructConcrete(st) => {
+                    let mut st = st.clone();
+                    let new_args = st
+                        .type_args
+                        .type_args
+                        .iter()
+                        .map(|arg| {
+                            if let Type::TypeParameter(tp) = arg {
+                                let idx = struct_def
+                                    .type_parameters
+                                    .find_idx_of_parameter(tp)
+                                    .unwrap();
+                                st_concrete.type_args.get_type_arg_at_idx(idx).unwrap()
+                            } else {
+                                arg.clone()
+                            }
+                        })
+                        .collect();
+                    st.type_args.type_args = new_args;
+                    self.generate_struct_pack_concrete(u, parent_scope, &st)?
                 },
                 _ => self.generate_expression_of_type(u, parent_scope, typ, true, true)?,
             };
