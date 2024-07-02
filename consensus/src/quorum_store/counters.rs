@@ -401,20 +401,20 @@ pub static TXNS_WITH_DUPLICATE_BATCHES: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static TXNS_IN_PROOF_QUEUE: Lazy<Histogram> = Lazy::new(|| {
+pub static TXNS_IN_PROOFS_WITH_SUMMARIES: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_txns_in_proof_queue",
+        "quorum_store_txns_in_proof_queue_with_summaries",
         "Number of transactions in the proof queue",
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub static PROOFS_IN_PROOF_QUEUE: Lazy<Histogram> = Lazy::new(|| {
+pub static TXNS_IN_PROOFS_WITHOUT_SUMMARIES: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_proofs_in_proof_queue",
-        "Number of proofs in the proof queue",
-        PROOF_COUNT_BUCKETS.clone(),
+        "quorum_store_txns_in_proof_queue_without_summaries",
+        "Number of transactions in the proof queue",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });

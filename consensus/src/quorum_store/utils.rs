@@ -606,32 +606,17 @@ impl ProofQueue {
         count
     }
 
-    // Number of unexpired and uncommitted proofs in the pipeline
-    fn num_proofs(&self) -> u64 {
-        let mut count = 0;
-        self.author_to_batches.values().for_each(|batches| {
-            count += batches
-                .iter()
-                .filter(|(sort_key, _)| {
-                    self.batch_to_proof
-                        .get(&sort_key.batch_key)
-                        .map_or(false, Option::is_some)
-                })
-                .count() as u64;
-        });
-        count
-    }
-
     pub(crate) fn remaining_txns_and_proofs(&self) -> (u64, u64) {
         let start = Instant::now();
         counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_txns_with_duplicates as f64);
         counters::NUM_TOTAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_proofs as f64);
         counters::NUM_LOCAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_local_txns as f64);
         counters::NUM_LOCAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_local_proofs as f64);
+
         let remaining_txns_without_duplicates = self.remaining_txns_without_duplicates();
         counters::NUM_UNIQUE_TOTAL_TXNS_LEFT_ON_UPDATE
             .observe(remaining_txns_without_duplicates as f64);
-        //count the number of transactions with more than one batches
+        // Number of txns with more than one batches
         counters::TXNS_WITH_DUPLICATE_BATCHES.observe(
             self.txn_summary_num_occurrences
                 .iter()
@@ -639,12 +624,20 @@ impl ProofQueue {
                 .count() as f64,
         );
 
-        counters::TXNS_IN_PROOF_QUEUE.observe(self.txn_summary_num_occurrences.len() as f64);
+        // Number of txns in unexpired and uncommitted proofs with summaries in batch_to_txn_summaries
+        counters::TXNS_IN_PROOFS_WITH_SUMMARIES
+            .observe(self.txn_summary_num_occurrences.len() as f64);
+
+        // Number of txns in unexpired and uncommitted proofs without summaries in batch_to_txn_summaries
+        counters::TXNS_IN_PROOFS_WITHOUT_SUMMARIES.observe(
+            (remaining_txns_without_duplicates - self.txn_summary_num_occurrences.len() as u64)
+                as f64,
+        );
 
         counters::PROOFS_WITHOUT_BATCH_SUMMARY
             .observe(self.num_proofs_without_batch_summary() as f64);
         counters::PROOFS_WITH_BATCH_SUMMARY.observe(self.num_proofs_with_batch_summary() as f64);
-        counters::PROOFS_IN_PROOF_QUEUE.observe(self.num_proofs() as f64);
+
         counters::PROOF_QUEUE_REMAINING_TXNS_DURATION.observe_duration(start.elapsed());
         (remaining_txns_without_duplicates, self.remaining_proofs)
     }
