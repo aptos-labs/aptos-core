@@ -178,7 +178,7 @@ impl PayloadManager {
     pub async fn get_transactions(
         &self,
         block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<usize>)> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok((Vec::new(), None)),

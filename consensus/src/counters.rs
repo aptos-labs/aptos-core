@@ -284,11 +284,19 @@ pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
-/// Counts when chain_health backoff is triggered
+/// Counts when pipeline backpressure is triggered
 pub static PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "aptos_pipeline_backpressure_on_proposal_triggered",
-        "Counts when chain_health backoff is triggered",
+        "Counts when pipeline backpressure is triggered",
+    )
+});
+
+/// Counts when execution backpressure is triggered
+pub static EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_execution_backpressure_on_proposal_triggered",
+        "Counts when execution backpressure is triggered",
     )
 });
 
@@ -316,6 +324,26 @@ pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
     register_gauge!(
         "aptos_proposer_delay_proposal",
         "Amount of time (in seconds) proposal is delayed due to backpressure/backoff",
+    )
+    .unwrap()
+});
+
+/// Histogram for max number of transactions proposer uses when creating block.
+pub static PROPOSER_MAX_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_max_block_txns",
+        "Histogram for max number of transactions proposer uses when creating block.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for max number of transactions to execute proposer uses when creating block.
+pub static PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_max_block_txns_to_execute",
+        "Histogram for max number of transactions to execute proposer uses when creating block.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
     )
     .unwrap()
 });

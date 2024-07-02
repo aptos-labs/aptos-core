@@ -44,7 +44,7 @@ impl ConsensusObserverMessage {
     pub fn new_block_payload_message(
         block: BlockInfo,
         transactions: Vec<SignedTransaction>,
-        limit: Option<usize>,
+        limit: Option<u64>,
     ) -> ConsensusObserverDirectSend {
         ConsensusObserverDirectSend::BlockPayload(BlockPayload {
             block,
@@ -175,5 +175,5 @@ pub struct OrderedBlock {
 pub struct BlockPayload {
     pub block: BlockInfo,
     pub transactions: Vec<SignedTransaction>,
-    pub limit: Option<usize>,
+    pub limit: Option<u64>,
 }

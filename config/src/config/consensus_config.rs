@@ -69,6 +69,7 @@ pub struct ConsensusConfig {
     pub intra_consensus_channel_buffer_size: usize,
     pub quorum_store: QuorumStoreConfig,
     pub vote_back_pressure_limit: u64,
+    pub execution_backpressure: Option<ExecutionBackpressureConfig>,
     pub pipeline_backpressure: Vec<PipelineBackpressureValues>,
     // Used to decide if backoff is needed.
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
@@ -129,6 +130,17 @@ impl Default for DelayedQcAggregatorConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureConfig {
+    pub back_pressure_pipeline_latency_limit_ms: u64,
+    pub num_blocks_to_look_at: usize,
+    pub min_blocks_to_activate: usize,
+    pub percentile: f64,
+    pub target_block_time_ms: usize,
+    pub min_block_time_ms_to_activate: usize,
+    pub reordering_ovarpacking_factor: f64,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct PipelineBackpressureValues {
     pub back_pressure_pipeline_latency_limit_ms: u64,
@@ -140,7 +152,7 @@ pub struct PipelineBackpressureValues {
     // If we want to dynamically increase it beyond quorum_store_poll_time,
     // we need to adjust timeouts other nodes use for the backpressured round.
     pub backpressure_proposal_delay_ms: u64,
-    pub max_txns_from_block_to_execute: Option<usize>,
+    pub max_txns_from_block_to_execute: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -151,7 +163,7 @@ pub struct ChainHealthBackoffValues {
     pub max_sending_block_bytes_override: u64,
 
     pub backoff_proposal_delay_ms: u64,
-    pub max_txns_from_block_to_execute: Option<usize>,
+    pub max_txns_from_block_to_execute: Option<u64>,
 }
 
 impl Default for ConsensusConfig {
@@ -191,6 +203,15 @@ impl Default for ConsensusConfig {
             // Considering block gas limit and pipeline backpressure should keep number of blocks
             // in the pipline very low, we can keep this limit pretty low, too.
             vote_back_pressure_limit: 7,
+            execution_backpressure: Some(ExecutionBackpressureConfig {
+                back_pressure_pipeline_latency_limit_ms: 500,
+                num_blocks_to_look_at: 12,
+                min_blocks_to_activate: 4,
+                percentile: 0.5,
+                target_block_time_ms: 300,
+                min_block_time_ms_to_activate: 100,
+                reordering_ovarpacking_factor: 1.0,
+            }),
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {
                     // pipeline_latency looks how long has the oldest block still in pipeline
@@ -213,48 +234,49 @@ impl Default for ConsensusConfig {
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1400,
-                    max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+                    max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1700,
-                    max_sending_block_txns_override: 1000,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+                    max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 400,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2000,
+                    max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    backpressure_proposal_delay_ms: 500,
+                    max_txns_from_block_to_execute: None,
+                },
+                // with other pipeline backpressure, only later start reducing block size
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 3000,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(400),
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2300,
+                    back_pressure_pipeline_latency_limit_ms: 4000,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(150),
+                    max_txns_from_block_to_execute: Some(200),
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2700,
+                    back_pressure_pipeline_latency_limit_ms: 5000,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(50),
+                    max_txns_from_block_to_execute: Some(30),
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 3100,
-                    max_sending_block_txns_override: 1000,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(20),
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 3500,
+                    back_pressure_pipeline_latency_limit_ms: 6000,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 500,

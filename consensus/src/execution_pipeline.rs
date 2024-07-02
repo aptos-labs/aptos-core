@@ -26,7 +26,10 @@ use aptos_types::{
 use fail::fail_point;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{mpsc, oneshot};
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -48,6 +51,7 @@ impl ExecutionPipeline {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
+
         runtime.spawn(Self::prepare_block_stage(
             prepare_block_rx,
             execute_block_tx,
@@ -185,11 +189,14 @@ impl ExecutionPipeline {
                             error: "Injected error in compute".into(),
                         })
                     });
-                    executor.execute_and_state_checkpoint(
-                        block,
-                        parent_block_id,
-                        block_executor_onchain_config,
-                    )
+                    let start = Instant::now();
+                    executor
+                        .execute_and_state_checkpoint(
+                            block,
+                            parent_block_id,
+                            block_executor_onchain_config,
+                        )
+                        .map(|output| (output, start.elapsed()))
                 })
                 .await
             )
@@ -216,24 +223,28 @@ impl ExecutionPipeline {
             input_txns,
             block_id,
             parent_block_id,
-            state_checkpoint_output,
+            state_checkpoint_output: execution_result,
             result_tx,
         }) = block_rx.recv().await
         {
             debug!("ledger_apply stage received block {}.", block_id);
             let res = async {
+                let (state_checkpoint_output, execution_duration) = execution_result?;
                 let executor = executor.clone();
                 monitor!(
                     "ledger_apply",
                     tokio::task::spawn_blocking(move || {
-                        executor.ledger_update(block_id, parent_block_id, state_checkpoint_output?)
+                        executor.ledger_update(block_id, parent_block_id, state_checkpoint_output)
                     })
                 )
                 .await
                 .expect("Failed to spawn_blocking().")
+                .map(|output| (output, execution_duration))
             }
             .await;
-            let pipe_line_res = res.map(|output| PipelineExecutionResult::new(input_txns, output));
+            let pipe_line_res = res.map(|(output, execution_duration)| {
+                PipelineExecutionResult::new(input_txns, output, execution_duration)
+            });
             result_tx.send(pipe_line_res).unwrap_or_else(|err| {
                 error!(
                     block_id = block_id,
@@ -267,6 +278,6 @@ struct LedgerApplyCommand {
     input_txns: Vec<SignedTransaction>,
     block_id: HashValue,
     parent_block_id: HashValue,
-    state_checkpoint_output: ExecutorResult<StateCheckpointOutput>,
+    state_checkpoint_output: ExecutorResult<(StateCheckpointOutput, Duration)>,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
 }
