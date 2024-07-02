@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::ledger_db::transaction_accumulator_db::TransactionAccumulatorDb;
-use crate::ledger_db::write_set_db::WriteSetDb;
+use crate::utils::truncation_helper::{truncate_ledger_db, truncate_state_kv_db_shards};
 
 impl DbWriter for AptosDB {
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
@@ -228,48 +227,17 @@ impl DbWriter for AptosDB {
         let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
         self.commit_ledger_info(target_version, new_root_hash, Some(&ledger_info_with_sigs))?;
 
-        // Revert the transaction accumulator
-        let batch = SchemaBatch::new();
-        TransactionAccumulatorDb::prune(target_version + 1, latest_version + 1, &batch)?;
-        self.ledger_db
-            .transaction_accumulator_db()
-            .write_schemas(batch)?;
+        truncate_ledger_db(self.ledger_db.clone(), target_version)?;
+        truncate_state_kv_db_shards(&self.state_kv_db, target_version)?;
 
-        // Revert the transaction info
-        let batch = SchemaBatch::new();
-        TransactionInfoDb::prune(target_version + 1, latest_version + 1, &batch)?;
-        self.ledger_db.transaction_info_db().write_schemas(batch)?;
-
-        // Revert the events
-        let batch = SchemaBatch::new();
-        self.ledger_db
-            .event_db()
-            .prune_events(target_version + 1, latest_version + 1, &batch)?;
-        self.ledger_db.event_db().write_schemas(batch)?;
-
-        // Revert the transaction auxiliary data
-        let batch = SchemaBatch::new();
-        TransactionAuxiliaryDataDb::prune(target_version + 1, latest_version + 1, &batch)?;
-        self.ledger_db
-            .transaction_auxiliary_data_db()
-            .write_schemas(batch)?;
-
-        // Revert the write set
-        let batch = SchemaBatch::new();
-        WriteSetDb::prune(target_version + 1, latest_version + 1, &batch)?;
-        self.ledger_db.write_set_db().write_schemas(batch)?;
-
-        // Remove the transactions
-        let batch = SchemaBatch::new();
-        self.ledger_db.transaction_db().prune_transactions(
-            target_version + 1,
-            latest_version + 1,
-            &batch,
-        )?;
-        self.ledger_db.transaction_db().write_schemas(batch)?;
-
-        // Revert the state kv and ledger metadata
-        self.revert_state_kv_and_ledger_metadata(target_version, latest_version)?;
+        // Revert block index if event index is skipped.
+        if self.skip_index_and_usage {
+            let batch = SchemaBatch::new();
+            self.ledger_db
+                .metadata_db()
+                .truncate_block_info(target_version, &batch)?;
+            self.ledger_db.metadata_db().write_schemas(batch)?;
+        }
 
         Ok(())
     }
@@ -480,62 +448,6 @@ impl AptosDB {
                 self.state_kv_db
                     .commit(
                         last_version,
-                        state_kv_metadata_batch,
-                        sharded_state_kv_batches,
-                    )
-                    .unwrap();
-            });
-        });
-
-        Ok(())
-    }
-
-    fn revert_state_kv_and_ledger_metadata(
-        &self,
-        target_version: Version,
-        latest_version: Version,
-    ) -> Result<()> {
-        let ledger_metadata_batch = SchemaBatch::new();
-        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
-        let state_kv_metadata_batch = SchemaBatch::new();
-
-        self.state_store.revert_value_sets(
-            target_version,
-            latest_version,
-            &ledger_metadata_batch,
-            &sharded_state_kv_batches,
-            &state_kv_metadata_batch,
-            self.state_store.state_kv_db.enabled_sharding(),
-        )?;
-
-        // Revert block index if event index is skipped.
-        if self.skip_index_and_usage {
-            self.ledger_db
-                .metadata_db()
-                .truncate_block_info(target_version + 1, &ledger_metadata_batch)?;
-        }
-
-        ledger_metadata_batch
-            .put::<DbMetadataSchema>(
-                &DbMetadataKey::LedgerCommitProgress,
-                &DbMetadataValue::Version(target_version),
-            )
-            .unwrap();
-
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["revert_state_kv_and_ledger_metadata___commit"])
-            .start_timer();
-        rayon::scope(|s| {
-            s.spawn(|_| {
-                self.ledger_db
-                    .metadata_db()
-                    .write_schemas(ledger_metadata_batch)
-                    .unwrap();
-            });
-            s.spawn(|_| {
-                self.state_kv_db
-                    .commit(
-                        target_version,
                         state_kv_metadata_batch,
                         sharded_state_kv_batches,
                     )
