@@ -5,6 +5,7 @@ use crate::AptosVM;
 #[cfg(any(test, feature = "testing"))]
 use crate::{
     aptos_vm::get_or_vm_startup_failure, data_cache::AsMoveResolver,
+    move_vm_ext::session::user_transaction_sessions::session_change_sets::SystemSessionChangeSet,
     transaction_metadata::TransactionMetadata,
 };
 #[cfg(any(test, feature = "testing"))]
@@ -12,7 +13,7 @@ use aptos_types::{state_store::StateView, transaction::SignedTransaction};
 #[cfg(any(test, feature = "testing"))]
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 #[cfg(any(test, feature = "testing"))]
-use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput};
+use aptos_vm_types::output::VMOutput;
 use move_binary_format::errors::VMResult;
 #[cfg(any(test, feature = "testing"))]
 use move_core_types::vm_status::VMStatus;
@@ -103,7 +104,7 @@ impl AptosVM {
         let resolver = state_view.as_move_resolver();
         let storage = TraversalStorage::new();
         self.failed_transaction_cleanup(
-            VMChangeSet::empty(),
+            SystemSessionChangeSet::empty(),
             error_vm_status,
             &mut gas_meter,
             &txn_data,

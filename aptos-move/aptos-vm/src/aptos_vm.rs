@@ -14,7 +14,8 @@ use crate::{
             abort_hook::AbortHookSession,
             epilogue::EpilogueSession,
             prologue::PrologueSession,
-            user::{UserSession, UserSessionChangeSet},
+            session_change_sets::{SystemSessionChangeSet, UserSessionChangeSet},
+            user::UserSession,
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
@@ -149,10 +150,23 @@ pub(crate) fn get_system_transaction_output(
     session: SessionExt,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let (change_set, module_write_set) = session.finish(change_set_configs)?;
+    let (change_set, empty_module_write_set) = session.finish(change_set_configs)?;
+
+    // System transactions can never publish modules! When we move publishing outside MoveVM, we do not
+    // need to have this check here, as modules will only be visible in user session.
+    empty_module_write_set
+        .is_empty_or_invariant_violation()
+        .map_err(|e| {
+            e.with_message(
+                "Non-empty module write set in when creating system transaction output".to_string(),
+            )
+            .finish(Location::Undefined)
+            .into_vm_status()
+        })?;
+
     Ok(VMOutput::new(
         change_set,
-        module_write_set,
+        ModuleWriteSet::empty(),
         FeeStatement::zero(),
         TransactionStatus::Keep(ExecutionStatus::Success),
         TransactionAuxiliaryData::default(),
@@ -391,7 +405,7 @@ impl AptosVM {
 
     pub(crate) fn failed_transaction_cleanup(
         &self,
-        prologue_change_set: VMChangeSet,
+        prologue_session_change_set: SystemSessionChangeSet,
         error_vm_status: VMStatus,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -437,26 +451,20 @@ impl AptosVM {
                 // gas). Even if the previous failure occurred while running the epilogue, it
                 // should not fail now. If it somehow fails here, there is no choice but to
                 // discard the transaction.
-                let txn_output = match self.finish_aborted_transaction(
-                    prologue_change_set,
-                    gas_meter,
-                    txn_data,
-                    resolver,
-                    status,
-                    log_context,
-                    change_set_configs,
-                    traversal_context,
-                ) {
-                    Ok((change_set, module_write_set, fee_statement, status)) => VMOutput::new(
-                        change_set,
-                        module_write_set,
-                        fee_statement,
-                        TransactionStatus::Keep(status),
+                let output = self
+                    .finish_aborted_transaction(
+                        prologue_session_change_set,
+                        gas_meter,
+                        txn_data,
+                        resolver,
+                        status,
                         txn_aux_data,
-                    ),
-                    Err(err) => discarded_output(err.status_code()),
-                };
-                (error_vm_status, txn_output)
+                        log_context,
+                        change_set_configs,
+                        traversal_context,
+                    )
+                    .unwrap_or_else(|status| discarded_output(status.status_code()));
+                (error_vm_status, output)
             },
             TransactionStatus::Discard(status_code) => {
                 let discarded_output = discarded_output(status_code);
@@ -488,139 +496,124 @@ impl AptosVM {
 
     fn finish_aborted_transaction(
         &self,
-        prologue_change_set: VMChangeSet,
+        prologue_session_change_set: SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
         status: ExecutionStatus,
+        txn_aux_data: TransactionAuxiliaryData,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
-    ) -> Result<(VMChangeSet, ModuleWriteSet, FeeStatement, ExecutionStatus), VMStatus> {
+    ) -> Result<VMOutput, VMStatus> {
         let is_account_init_for_sponsored_transaction =
             is_account_init_for_sponsored_transaction(txn_data, self.features(), resolver)?;
 
-        if is_account_init_for_sponsored_transaction {
-            let mut abort_hook_session =
-                AbortHookSession::new(self, txn_data, resolver, prologue_change_set);
-            // Abort information is injected using the user defined error in the Move contract.
-            let status = self.inject_abort_info_if_available(status);
+        let (previous_session_change_set, fee_statement) =
+            if is_account_init_for_sponsored_transaction {
+                let mut abort_hook_session =
+                    AbortHookSession::new(self, txn_data, resolver, prologue_session_change_set);
 
-            abort_hook_session.execute(|session| {
-                create_account_if_does_not_exist(
-                    session,
-                    gas_meter,
-                    txn_data.sender(),
-                    traversal_context,
-                )
-                // if this fails, it is likely due to out of gas, so we try again without metering
-                // and then validate below that we charged sufficiently.
-                .or_else(|_err| {
+                abort_hook_session.execute(|session| {
                     create_account_if_does_not_exist(
                         session,
-                        &mut UnmeteredGasMeter,
+                        gas_meter,
                         txn_data.sender(),
                         traversal_context,
                     )
-                })
-                .map_err(expect_no_verification_errors)
-                .or_else(|err| {
-                    expect_only_successful_execution(
+                    // If this fails, it is likely due to out of gas, so we try again without metering
+                    // and then validate below that we charged sufficiently.
+                    .or_else(|_err| {
+                        create_account_if_does_not_exist(
+                            session,
+                            &mut UnmeteredGasMeter,
+                            txn_data.sender(),
+                            traversal_context,
+                        )
+                    })
+                    .map_err(expect_no_verification_errors)
+                    .or_else(|err| {
+                        expect_only_successful_execution(
+                            err,
+                            &format!("{:?}::{}", ACCOUNT_MODULE, CREATE_ACCOUNT_IF_DOES_NOT_EXIST),
+                            log_context,
+                        )
+                    })
+                })?;
+
+                let mut abort_hook_session_change_set =
+                    abort_hook_session.finish(change_set_configs)?;
+                if let Err(err) = self.charge_change_set(
+                    &mut abort_hook_session_change_set,
+                    gas_meter,
+                    txn_data,
+                    resolver,
+                ) {
+                    info!(
+                        *log_context,
+                        "Failed during charge_change_set: {:?}. Most likely exceeded gas limited.",
                         err,
+                    );
+                };
+
+                let fee_statement = AptosVM::fee_statement_from_gas_meter(
+                    txn_data, gas_meter, /*storage_fee_refund = */ 0,
+                );
+
+                // Verify we charged sufficiently for creating an account slot
+                let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
+                let gas_unit_price = u64::from(txn_data.gas_unit_price());
+                let gas_used = fee_statement.gas_used();
+                let storage_fee = fee_statement.storage_fee_used();
+                let storage_refund = fee_statement.storage_fee_refund();
+
+                let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
+                let expected = u64::from(
+                    gas_meter
+                        .disk_space_pricing()
+                        .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
+                );
+                if actual < expected {
+                    expect_only_successful_execution(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(
+                                "Insufficient fee for storing account for sponsored transaction"
+                                    .to_string(),
+                            )
+                            .finish(Location::Undefined),
                         &format!("{:?}::{}", ACCOUNT_MODULE, CREATE_ACCOUNT_IF_DOES_NOT_EXIST),
                         log_context,
-                    )
-                })
-            })?;
-
-            let mut change_set = abort_hook_session.finish(change_set_configs)?;
-            if let Err(err) = self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)
-            {
-                info!(
-                    *log_context,
-                    "Failed during charge_change_set: {:?}. Most likely exceeded gas limited.", err,
+                    )?;
+                }
+                (abort_hook_session_change_set, fee_statement)
+            } else {
+                let fee_statement = AptosVM::fee_statement_from_gas_meter(
+                    txn_data, gas_meter, /*storage_fee_refund = */ 0,
                 );
+                (prologue_session_change_set, fee_statement)
             };
 
-            let fee_statement = AptosVM::fee_statement_from_gas_meter(
-                txn_data, gas_meter, /*storage_fee_refund = */ 0,
-            );
-
-            // Verify we charged sufficiently for creating an account slot
-            let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
-            let gas_unit_price = u64::from(txn_data.gas_unit_price());
-            let gas_used = fee_statement.gas_used();
-            let storage_fee = fee_statement.storage_fee_used();
-            let storage_refund = fee_statement.storage_fee_refund();
-
-            let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
-            let expected = u64::from(
-                gas_meter
-                    .disk_space_pricing()
-                    .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
-            );
-            if actual < expected {
-                expect_only_successful_execution(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(
-                            "Insufficient fee for storing account for sponsored transaction"
-                                .to_string(),
-                        )
-                        .finish(Location::Undefined),
-                    &format!("{:?}::{}", ACCOUNT_MODULE, CREATE_ACCOUNT_IF_DOES_NOT_EXIST),
-                    log_context,
-                )?;
-            }
-
-            let mut epilogue_session =
-                EpilogueSession::on_user_session_failure(self, txn_data, resolver, change_set);
-
-            epilogue_session.execute(|session| {
-                transaction_validation::run_failure_epilogue(
-                    session,
-                    gas_meter.balance(),
-                    fee_statement,
-                    self.features(),
-                    txn_data,
-                    log_context,
-                    traversal_context,
-                )
-            })?;
-            epilogue_session
-                .finish(change_set_configs)
-                .map(|(change_set, module_write_set)| {
-                    (change_set, module_write_set, fee_statement, status)
-                })
-        } else {
-            let mut epilogue_session = EpilogueSession::on_user_session_failure(
-                self,
+        let mut epilogue_session = EpilogueSession::on_user_session_failure(
+            self,
+            txn_data,
+            resolver,
+            previous_session_change_set,
+        );
+        epilogue_session.execute(|session| {
+            transaction_validation::run_failure_epilogue(
+                session,
+                gas_meter.balance(),
+                fee_statement,
+                self.features(),
                 txn_data,
-                resolver,
-                prologue_change_set,
-            );
+                log_context,
+                traversal_context,
+            )
+        })?;
 
-            let status = self.inject_abort_info_if_available(status);
-
-            let fee_statement = AptosVM::fee_statement_from_gas_meter(
-                txn_data, gas_meter, /*storage_fee_refund = */ 0,
-            );
-            epilogue_session.execute(|session| {
-                transaction_validation::run_failure_epilogue(
-                    session,
-                    gas_meter.balance(),
-                    fee_statement,
-                    self.features(),
-                    txn_data,
-                    log_context,
-                    traversal_context,
-                )
-            })?;
-            epilogue_session
-                .finish(change_set_configs)
-                .map(|(change_set, module_write_set)| {
-                    (change_set, module_write_set, fee_statement, status)
-                })
-        }
+        // Abort information is injected using the user defined error in the Move contract.
+        let status = self.inject_abort_info_if_available(status);
+        epilogue_session.finish(fee_statement, status, txn_aux_data, change_set_configs)
     }
 
     fn success_transaction_cleanup(
@@ -663,15 +656,12 @@ impl AptosVM {
                 traversal_context,
             )
         })?;
-        let (change_set, module_write_set) = epilogue_session.finish(change_set_configs)?;
-        let output = VMOutput::new(
-            change_set,
-            module_write_set,
+        let output = epilogue_session.finish(
             fee_statement,
-            TransactionStatus::Keep(ExecutionStatus::Success),
+            ExecutionStatus::Success,
             TransactionAuxiliaryData::default(),
-        );
-
+            change_set_configs,
+        )?;
         Ok((VMStatus::Executed, output))
     }
 
@@ -967,7 +957,7 @@ impl AptosVM {
         &'l self,
         resolver: &'r impl AptosMoveResolver,
         mut session: UserSession<'r, 'l>,
-        prologue_change_set: &VMChangeSet,
+        prologue_session_change_set: &SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         txn_data: &TransactionMetadata,
@@ -1088,7 +1078,7 @@ impl AptosVM {
                 };
                 self.failure_multisig_payload_cleanup(
                     resolver,
-                    prologue_change_set,
+                    prologue_session_change_set,
                     execution_error,
                     txn_data,
                     cleanup_args,
@@ -1136,7 +1126,7 @@ impl AptosVM {
         &'l self,
         resolver: &'r impl AptosMoveResolver,
         session: UserSession<'r, 'l>,
-        proglogue_change_set: &VMChangeSet,
+        prologue_session_change_set: &SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
         txn_data: &TransactionMetadata,
@@ -1161,7 +1151,7 @@ impl AptosVM {
             self.execute_multisig_transaction(
                 resolver,
                 session,
-                proglogue_change_set,
+                prologue_session_change_set,
                 gas_meter,
                 traversal_context,
                 txn_data,
@@ -1213,7 +1203,7 @@ impl AptosVM {
     fn failure_multisig_payload_cleanup<'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
-        prologue_change_set: &VMChangeSet,
+        prologue_session_change_set: &SystemSessionChangeSet,
         execution_error: VMStatus,
         txn_data: &'l TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
@@ -1225,7 +1215,7 @@ impl AptosVM {
             self,
             txn_data,
             resolver,
-            prologue_change_set.clone(),
+            prologue_session_change_set.clone(),
         );
         let execution_error = ExecutionError::try_from(execution_error)
             .map_err(|_| VMStatus::error(StatusCode::UNREACHABLE, None))?;
@@ -1569,7 +1559,7 @@ impl AptosVM {
     // transaction, or clean up the failed state.
     fn on_user_transaction_execution_failure(
         &self,
-        prologue_change_set: VMChangeSet,
+        prologue_session_change_set: SystemSessionChangeSet,
         err: VMStatus,
         resolver: &impl AptosMoveResolver,
         txn_data: &TransactionMetadata,
@@ -1589,7 +1579,7 @@ impl AptosVM {
         };
 
         self.failed_transaction_cleanup(
-            prologue_change_set,
+            prologue_session_change_set,
             err,
             gas_meter,
             txn_data,
@@ -1859,8 +1849,10 @@ impl AptosVM {
 
                 let change_set_configs =
                     ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
-                let (change_set, module_write_set) = tmp_session.finish(&change_set_configs)?;
 
+                // TODO(George): This session should not publish modules, and should be using native
+                //               code context instead.
+                let (change_set, module_write_set) = tmp_session.finish(&change_set_configs)?;
                 Ok((change_set, module_write_set))
             },
         }

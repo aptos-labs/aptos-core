@@ -5,7 +5,9 @@ use crate::{
     move_vm_ext::{
         session::{
             respawned_session::RespawnedSession,
-            user_transaction_sessions::user::UserSessionChangeSet,
+            user_transaction_sessions::session_change_sets::{
+                SystemSessionChangeSet, UserSessionChangeSet,
+            },
         },
         AptosMoveResolver, SessionId,
     },
@@ -13,8 +15,12 @@ use crate::{
     AptosVM,
 };
 use aptos_gas_algebra::Fee;
+use aptos_types::{
+    fee_statement::FeeStatement,
+    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
+};
 use aptos_vm_types::{
-    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
+    change_set::VMChangeSet, module_write_set::ModuleWriteSet, output::VMOutput,
     storage::change_set_configs::ChangeSetConfigs,
 };
 use derive_more::{Deref, DerefMut};
@@ -53,13 +59,13 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
         vm: &'l AptosVM,
         txn_meta: &'l TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
-        previous_session_change_set: VMChangeSet,
+        previous_session_change_set: SystemSessionChangeSet,
     ) -> Self {
         Self::new(
             vm,
             txn_meta,
             resolver,
-            previous_session_change_set,
+            previous_session_change_set.unpack(),
             ModuleWriteSet::empty(),
             0.into(),
         )
@@ -95,8 +101,11 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
 
     pub fn finish(
         self,
+        fee_statement: FeeStatement,
+        execution_status: ExecutionStatus,
+        txn_aux_data: TransactionAuxiliaryData,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMChangeSet, ModuleWriteSet), VMStatus> {
+    ) -> Result<VMOutput, VMStatus> {
         let Self {
             session,
             storage_refund: _,
@@ -105,6 +114,8 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
 
         let (change_set, empty_module_write_set) =
             session.finish_with_squashed_change_set(change_set_configs, true)?;
+        let epilogue_session_change_set =
+            SystemSessionChangeSet::new(change_set, change_set_configs)?;
 
         // Epilogue can never publish modules! When we move publishing outside MoveVM, we do not need to have
         // this check here, as modules will only be visible in user session.
@@ -116,7 +127,12 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
                     .into_vm_status()
             })?;
 
-        change_set_configs.check_change_set(&change_set)?;
-        Ok((change_set, module_write_set))
+        Ok(VMOutput::new(
+            epilogue_session_change_set.unpack(),
+            module_write_set,
+            fee_statement,
+            TransactionStatus::Keep(execution_status),
+            txn_aux_data,
+        ))
     }
 }
