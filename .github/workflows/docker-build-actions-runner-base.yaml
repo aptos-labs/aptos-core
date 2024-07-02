@@ -1,0 +1,27 @@
+name: docker-build-actions-runner-base
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/docker-build-actions-runner-base.yaml
+      # build on changes to dockerfile and build script
+      - "docker/ci/docker-build-actions-runner-base.sh"
+      - "docker/ci/actions-runner-base.Dockerfile"
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation
+
+jobs:
+  build-actions-runner-base:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Build actions-runner-base
+        run: GIT_REF=main docker/ci/docker-build-actions-runner-base.sh
