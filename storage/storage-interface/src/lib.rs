@@ -542,7 +542,9 @@ pub trait DbWriter: Send + Sync {
     fn revert_commit(
         &self,
         ledger_info_with_sigs: &LedgerInfoWithSignatures,
-    ) -> Result<()> ;
+    ) -> Result<()> {
+        unimplemented!()
+    }
 
 }
 
