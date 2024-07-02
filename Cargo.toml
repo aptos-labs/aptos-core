@@ -177,6 +177,8 @@ members = [
     "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
+    "testsuite/forge",
+    "testsuite/forge-cli",
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
     "testsuite/module-publish",
@@ -326,6 +328,7 @@ aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
 aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-service = { path = "crates/aptos-faucet/service" }
 aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
+aptos-forge = { path = "testsuite/forge" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-framework = { path = "aptos-move/framework" }
 fuzzer = { path = "testsuite/fuzzer" }
