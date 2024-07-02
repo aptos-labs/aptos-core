@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    secp256k1_ecdsa::{self, PrivateKey, PublicKey},
-    test_utils::KeyPair,
-    Signature, SigningKey, Uniform,
+    secp256k1_ecdsa::{self, PrivateKey, PublicKey, Signature as ECDSASignature}, test_utils::KeyPair, Signature, SigningKey, Uniform
 };
 use rand_core::OsRng;
 
@@ -78,6 +76,14 @@ fn serialization() {
     assert_eq!(key_pair.public_key, public_key_deserialized);
 }
 
+fn from_u32_be(val: u32) -> Vec<u8> {
+    let res_0 = (val >> 24) as u8;
+    let res_1 = (val >> 16) as u8;
+    let res_2 = (val >> 8) as u8;
+    let res_3 = val as u8; 
+    vec![res_0, res_1, res_2, res_3]
+}
+
 /// Tests malleability
 #[test]
 fn malleability() {
@@ -109,6 +115,38 @@ fn malleability() {
     high_signature
         .verify_arbitrary_msg(message, &key_pair.public_key)
         .unwrap_err();
+
+    // Test that floor(n/2) where n is the scalar field order does not fail verification due to
+    // malleability checks, as floor(n/2) < n/2
+    const SECP256K1_HALF_ORDER_FLOOR: [u32; 8] = [0x681B20A0, 0xDFE92F46, 0x57A4501D, 0x5D576E73, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF];
+    let mut vec_0 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[0]);
+    let mut vec_1 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[1]); 
+    let mut vec_2 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[2]); 
+    let mut vec_3 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[3]); 
+    let mut vec_4 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[4]); 
+    let mut vec_5 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[5]); 
+    let mut vec_6 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[6]); 
+    let mut vec_7 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[7]); 
+    let mut vector = vec!();
+    let mut dummy_vec: Vec<u8> = vec![0; 32];
+    vector.append(&mut dummy_vec);
+    vector.append(&mut vec_0);
+    vector.append(&mut vec_1); 
+    vector.append(&mut vec_2);
+    vector.append(&mut vec_3);
+    vector.append(&mut vec_4);
+    vector.append(&mut vec_5);
+    vector.append(&mut vec_6);
+    vector.append(&mut vec_7);
+
+    let sig = ECDSASignature::try_from(&vector[..]).unwrap();
+    let res = sig
+        .verify_arbitrary_msg(message, &key_pair.public_key);
+    let err = match res {
+        Ok(_v) => panic!(),
+        Err(v) => v.to_string(),
+    };
+    assert_eq!(err, "Unable to verify signature.");
 }
 
 /// Test deserialization_failures
