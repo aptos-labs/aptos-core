@@ -349,7 +349,7 @@ impl EventStore {
     ) -> anyhow::Result<()> {
         let mut iter = self
             .event_db
-            .iter::<EventAccumulatorSchema>(Default::default())?;
+            .iter::<EventAccumulatorSchema>()?;
         iter.seek(&(version, Position::from_inorder_index(0)))?;
         while let Some(((ver, position), _)) = iter.next().transpose()? {
             if ver != version {
