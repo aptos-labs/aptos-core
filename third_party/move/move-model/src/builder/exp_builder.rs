@@ -3462,7 +3462,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 .parent
                 .spec_schema_table
                 .contains_key(&global_var_sym)
-                && self.env().language_version.is_at_least(LanguageVersion::V2_0)
+                && self
+                    .env()
+                    .language_version
+                    .is_at_least(LanguageVersion::V2_0)
             {
                 self.error(loc, "indexing is only allowed for resource or vector");
                 call = Some(self.new_error_exp());
