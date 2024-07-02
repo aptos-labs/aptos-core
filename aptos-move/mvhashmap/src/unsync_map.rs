@@ -242,7 +242,7 @@ impl<
 
     pub fn fetch_module(&self, key: &K) -> Option<MVModulesOutput<V, X>> {
         use MVModulesOutput::*;
-        debug_assert!(key.module_path().is_some());
+        debug_assert!(key.is_module_path());
 
         self.module_map.borrow_mut().get_mut(key).map(|entry| {
             let hash = entry.1.get_or_insert(module_hash(entry.0.as_ref()));

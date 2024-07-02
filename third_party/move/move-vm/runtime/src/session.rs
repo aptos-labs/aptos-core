@@ -11,11 +11,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    compatibility::Compatibility,
-    errors::*,
-    file_format::{AbilitySet, LocalIndex},
-};
+use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -412,11 +408,6 @@ impl<'r, 'l> Session<'r, 'l> {
             .loader()
             .type_to_type_tag(ty)
             .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    /// Gets the abilities for this type, at it's particular instantiation
-    pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        ty.abilities().map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the underlying native extensions.

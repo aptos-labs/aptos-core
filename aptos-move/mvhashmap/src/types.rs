@@ -246,13 +246,13 @@ pub(crate) mod test {
     use super::*;
     use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
-        access_path::AccessPath,
         executable::ModulePath,
         state_store::state_value::StateValue,
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
     use claims::{assert_err, assert_ok_eq};
+    use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
     use std::{fmt::Debug, hash::Hash, sync::Arc};
 
     #[derive(Clone, Eq, Hash, PartialEq, Debug)]
@@ -262,8 +262,15 @@ pub(crate) mod test {
     );
 
     impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
-        fn module_path(&self) -> Option<AccessPath> {
-            None
+        fn is_module_path(&self) -> bool {
+            false
+        }
+
+        fn from_address_and_module_name(
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> Self {
+            unreachable!("Irrelevant for test")
         }
     }
 

@@ -1296,7 +1296,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         kind: ReadKind,
     ) -> PartialVMResult<ReadResult> {
         debug_assert!(
-            state_key.module_path().is_none(),
+            !state_key.is_module_path(),
             "Reading a module {:?} using ResourceView",
             state_key,
         );
@@ -1529,7 +1529,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
         debug_assert!(
-            state_key.module_path().is_some(),
+            state_key.is_module_path(),
             "Reading a resource {:?} using ModuleView",
             state_key,
         );
