@@ -152,6 +152,9 @@ impl MoveSmith {
         _u: &mut Unstructured,
         function: &RefCell<Function>,
     ) -> Result<()> {
+        if function.borrow().body.is_none() {
+            return Ok(());
+        }
         let body_code = function.borrow().body.as_ref().unwrap().inline();
         let self_name = function.borrow().signature.name.inline();
 
@@ -393,7 +396,15 @@ impl MoveSmith {
                 match u.int_in_range(0..=2)? {
                     // More chance to use basic types than struct types
                     0 | 1 => {
-                        break self.get_random_type(u, &struct_scope, true, false, true, false)?
+                        break self.get_random_type(
+                            u,
+                            &struct_scope,
+                            true,
+                            false,
+                            true,
+                            false,
+                            false,
+                        )?
                     },
                     // Use another struct as the field
                     2 => {
@@ -632,7 +643,7 @@ impl MoveSmith {
         let mut parameters = Vec::new();
         for _ in 0..num_params {
             let (name, _) = self.get_next_identifier(IDKinds::Var, parent_scope);
-            let typ = self.get_random_type(u, parent_scope, true, false, true, false)?;
+            let typ = self.get_random_type(u, parent_scope, true, false, true, false, true)?;
             self.env_mut().type_pool.insert_mapping(&name, &typ);
             parameters.push((name, typ));
         }
@@ -640,7 +651,7 @@ impl MoveSmith {
         // More chance to have return type than not
         // so that we can compare the the return value
         let return_type = match u.int_in_range(0..=10)? > 2 {
-            true => Some(self.get_random_type(u, parent_scope, true, false, true, false)?),
+            true => Some(self.get_random_type(u, parent_scope, true, false, true, false, true)?),
             false => None,
         };
 
@@ -648,7 +659,13 @@ impl MoveSmith {
         // type is a type parameter.
         // If not in params, we insert one more parameter so that we have
         // something to return
-        if let Some(ret_ty @ Type::TypeParameter(_)) = &return_type {
+        let ret_ty_to_check = match &return_type {
+            Some(ret_ty @ Type::TypeParameter(_)) => Some(ret_ty),
+            Some(Type::Ref(ret_ty)) => Some(ret_ty.as_ref()),
+            _ => None,
+        };
+
+        if let Some(ret_ty) = ret_ty_to_check {
             if !parameters.iter().any(|(_, param_ty)| param_ty == ret_ty) {
                 let (name, _) = self.get_next_identifier(IDKinds::Var, parent_scope);
                 self.env_mut().type_pool.insert_mapping(&name, ret_ty);
@@ -831,7 +848,7 @@ impl MoveSmith {
         self.env_mut().live_vars.mark_alive(parent_scope, &name);
 
         // TODO: we should not omit type parameter as we can call a function to get an object of that type
-        let mut typ = self.get_random_type(u, parent_scope, true, true, false, false)?;
+        let mut typ = self.get_random_type(u, parent_scope, true, true, false, false, true)?;
         trace!(
             "Generating declaration for {} of type: {:?}",
             name.inline(),
@@ -930,7 +947,9 @@ impl MoveSmith {
             // Generate a block
             2 => {
                 let ret_typ = match bool::arbitrary(u)? {
-                    true => Some(self.get_random_type(u, parent_scope, true, true, true, true)?),
+                    true => {
+                        Some(self.get_random_type(u, parent_scope, true, true, true, true, true)?)
+                    },
                     false => None,
                 };
                 let block = self.generate_block(u, parent_scope, None, ret_typ)?;
@@ -987,6 +1006,12 @@ impl MoveSmith {
                 self.concretize_type_parameter(u, tp, parent_scope, constraints, parent_type)
             },
             Type::Struct(st) => self.concretize_struct(u, parent_scope, st, constraints),
+            Type::Ref(inner) => {
+                match self.concretize_type(u, inner, parent_scope, constraints, parent_type) {
+                    Some(concrete_inner) => Type::Ref(Box::new(concrete_inner)),
+                    None => Type::Ref(inner.clone()),
+                }
+            },
             _ => panic!("{:?} cannot be concretized.", typ),
         };
 
@@ -1120,6 +1145,7 @@ impl MoveSmith {
                 tp_scope != calling_func_scope
             },
             Type::Struct(st) => !st.type_parameters.type_parameters.is_empty(),
+            Type::Ref(inner) => self.is_type_concretizable(inner, parent_scope),
             _ => false,
         }
     }
@@ -1159,6 +1185,12 @@ impl MoveSmith {
             None => typ,
         };
         trace!("Concretized type is: {:?}", typ);
+
+        if let Type::Ref(inner) = typ {
+            return Ok(Expression::Reference(Box::new(
+                self.generate_expression_of_type(u, parent_scope, inner, allow_var, allow_call)?,
+            )));
+        }
 
         // Store default choices that do not require recursion
         // If other options are available, will not use these
@@ -1400,7 +1432,7 @@ impl MoveSmith {
                 true => t,
                 false => panic!("Invalid type for binary operation"),
             },
-            None => self.get_random_type(u, parent_scope, true, false, false, false)?,
+            None => self.get_random_type(u, parent_scope, true, false, false, false, false)?,
         };
 
         if chosen_typ.is_bool() {
@@ -1468,7 +1500,7 @@ impl MoveSmith {
             // To generate a boolean, we can select any numerical type
             // If a type is not provided, we also randomly select a numerical type
             Some(Type::Bool) | None => {
-                self.get_random_type(u, parent_scope, false, false, false, false)?
+                self.get_random_type(u, parent_scope, false, false, false, false, false)?
             },
             Some(_) => panic!("Invalid type"),
         };
@@ -1581,7 +1613,7 @@ impl MoveSmith {
         let op = EqualityBinaryOperator::arbitrary(u)?;
         let mut chosen_typ = match typ {
             Some(t) => t,
-            None => self.get_random_type(u, parent_scope, true, true, true, true)?,
+            None => self.get_random_type(u, parent_scope, true, true, true, true, true)?,
         };
         if self.is_type_concretizable(&chosen_typ, parent_scope) {
             chosen_typ = self
@@ -1859,7 +1891,7 @@ impl MoveSmith {
     ) -> Result<NumberLiteral> {
         let typ = match typ {
             Some(t) => t.clone(),
-            None => self.get_random_type(u, &ROOT_SCOPE, false, false, false, false)?,
+            None => self.get_random_type(u, &ROOT_SCOPE, false, false, false, false, false)?,
         };
 
         let mut value = match &typ {
@@ -1899,6 +1931,7 @@ impl MoveSmith {
         allow_struct: bool,
         allow_type_param: bool,
         only_instantiatable: bool,
+        allow_reference: bool,
     ) -> Result<Type> {
         let bool_weight = match allow_bool {
             true => 10,
@@ -1959,6 +1992,28 @@ impl MoveSmith {
 
             if !param_cat.is_empty() {
                 categories.push(param_cat);
+                category_weights.push(5);
+            }
+        }
+
+        if allow_reference {
+            let mut refs = vec![];
+            for cat in categories.iter() {
+                for (typ, _) in cat.iter() {
+                    if let Type::Ref(_) = typ {
+                        panic!("Reference type should not be in the category");
+                    }
+                    refs.push((Type::Ref(Box::new(typ.clone())), 1));
+                }
+            }
+            // We cannot create a reference to a non_instantiatable type parameter
+            // so we simply remove all reference types if non_instantiatable type
+            // parameters are not allowed
+            if allow_type_param && !only_instantiatable {
+                refs.retain(|(ty, _)| matches!(ty, Type::TypeParameter(_)));
+            }
+            if !refs.is_empty() {
+                categories.push(refs);
                 category_weights.push(5);
             }
         }

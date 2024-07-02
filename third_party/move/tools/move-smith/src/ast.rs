@@ -146,6 +146,7 @@ pub enum Expression {
     Assign(Box<Assignment>),
     BinaryOperation(Box<BinaryOperation>),
     IfElse(Box<IfExpr>),
+    Reference(Box<Expression>),
 }
 
 /// Represents a variable access

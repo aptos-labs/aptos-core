@@ -338,6 +338,7 @@ impl CodeGenerator for Expression {
             Expression::Assign(assignment) => assignment.emit_code_lines(),
             Expression::BinaryOperation(binop) => binop.emit_code_lines(),
             Expression::IfElse(if_expr) => if_expr.emit_code_lines(),
+            Expression::Reference(expr) => vec![format!("&{}", expr.inline())],
         }
     }
 }
@@ -541,6 +542,7 @@ impl CodeGenerator for Type {
             T::U128 => "u128".to_string(),
             T::U256 => "u256".to_string(),
             T::Bool => "bool".to_string(),
+            T::Ref(t) => format!("&{}", t.inline()),
             T::Struct(st) => st.name.inline(),
             T::StructConcrete(st) => st.inline(),
             T::TypeParameter(tp) => tp.name.inline(),
