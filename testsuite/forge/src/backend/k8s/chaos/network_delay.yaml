@@ -1,0 +1,35 @@
+kind: NetworkChaos
+apiVersion: chaos-mesh.org/v1alpha1
+metadata:
+  namespace: {namespace}
+  name: {name}
+spec:
+  selector:
+    namespaces:
+      - {namespace}
+    expressionSelectors:
+      - {{ key: app.kubernetes.io/instance, operator: In, values: [{instance_labels}] }}
+  mode: all
+  action: delay
+  delay:
+    latency: "{latency_ms}ms"
+    correlation: "{correlation_percentage}"
+    jitter: "{jitter_ms}ms"
+  # Indicates the direction of target packets. Available values include:
+  # from (the packets from target)
+  # to (the packets to target)
+  # both ( the packets from or to target)
+  # This parameter makes Chaos only take effect for a specific direction of packets.
+  direction: both
+  target:
+    # For delay NetworkChaos, always use "from" direction and always target an entire namespace
+    # This is because Forge submits API requests to k8s Services, whereas Chaos Mesh applies the chaos
+    # via netem on the PodIP directly.
+    # This also hinges on the fact that the Forge workloads (txn-emitter and overall test runner) exist
+    # in a separate k8s Namespace, so they are not affected by the below selector.
+    selector:
+      namespaces:
+        - {namespace}
+      expressionSelectors:
+        - {{ key: app.kubernetes.io/instance, operator: In, values: [{target_instance_labels}] }}
+    mode: all

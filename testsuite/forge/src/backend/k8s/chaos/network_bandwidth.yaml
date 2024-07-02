@@ -1,0 +1,17 @@
+kind: NetworkChaos
+apiVersion: chaos-mesh.org/v1alpha1
+metadata:
+  namespace: {namespace}
+  name: forge-namespace-{rate}mbps-bandwidth
+spec:
+  action: bandwidth
+  mode: all
+  selector:
+    namespaces:
+      - {namespace}
+    labelSelectors:
+      app.kubernetes.io/name: validator
+  bandwidth:
+    rate: "{rate}mbps"
+    limit: {limit}
+    buffer: {buffer}
