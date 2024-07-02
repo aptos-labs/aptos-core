@@ -1,15 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Usage: check_output.sh [NUM_PROG]
+# usage: ./scripts/check_output.sh [options...]
+# options:
+#   --num [TXT]: Number of packages to generate. Default: 10
+#   --jobs [TXT]: Number of threads. Defaul: 8
+#   --skiprun: Skip running transactional test.
+#   --skipcompile: Skip checking compilation.
 #
-# This script runs the static generator to generate NUM_PROG Move packages
+# This script runs the static generator to generate $num Move packages
 # and checks if they can compile with compiler V1.
 # The generated packages are stored under `output`.
 
-NUM_PROG=${1:-10}
 MOVE_SMITH_DIR=$(realpath $(dirname $0)/..)
 OUTPUT_DIR="$MOVE_SMITH_DIR/output"
 APTOS_DIR=$(realpath $MOVE_SMITH_DIR/../../../..)
+
+source $MOVE_SMITH_DIR/scripts/argparse.sh
 
 function get_error() {
   find $1 -name compile.log | while read f; do
@@ -42,43 +48,59 @@ function check_run_transactional() {
   fi
 }
 
+
+define_arg "num" "10" "Number of packages to generate. Default: 10" "string" "false"
+define_arg "jobs" "8" "Number of threads. Defaul: 8" "string" "false"
+define_arg "skipcompile" "false" "Skip checking compilation." "store_true" "false"
+define_arg "skiprun" "false" "Skip running transactional test." "store_true" "false"
+parse_args "$@"
+
+num_prog=$num
+
 start_time=$(date +%s)
 
 rm -rf $OUTPUT_DIR
 cargo_start_time=$(date +%s)
-cargo run --bin generator -- -o $OUTPUT_DIR -s 1234 -p -n $NUM_PROG
+cargo run --bin generator -- -o $OUTPUT_DIR -s 1234 -p -n $num_prog
 if [ $? -ne 0 ]; then
   echo "Failed to generate Move packages"
   exit 1
 fi
 cargo_end_time=$(date +%s)
 
-N=8
-for p in $OUTPUT_DIR/*; do
-  ((i=i%N)); ((i++==0)) && wait
-  check_compile $p &
-done
-wait
+if $skipcompile; then
+  echo "Skip compiling..."
+else
+  for p in $OUTPUT_DIR/*; do
+    ((i=i%jobs)); ((i++==0)) && wait
+    check_compile $p &
+  done
+  wait
+fi
 compile_end_time=$(date +%s)
 
-# Run transactional tests
-echo "Building run_transactional binary"
-cargo build --bin run_transactional > /dev/null 2>&1
-RT_BIN=$(realpath $(find $APTOS_DIR/target/ -name "run_transactional"))
-
 transactional_start_time=$(date +%s)
-for p in $OUTPUT_DIR/*; do
-  ((i=i%N)); ((i++==0)) && wait
-  check_run_transactional $p $RT_BIN &
-done
-wait
+if $skiprun; then
+  echo "Skip running transactional..."
+else
+  echo "Building run_transactional binary"
+  cargo build --bin run_transactional > /dev/null 2>&1
+  RT_BIN=$(realpath $(find $APTOS_DIR/target/ -name "run_transactional"))
+
+  transactional_start_time=$(date +%s)
+  for p in $OUTPUT_DIR/*; do
+    ((i=i%jobs)); ((i++==0)) && wait
+    check_run_transactional $p $RT_BIN &
+  done
+  wait
+fi
 end_time=$(date +%s)
 
 
 echo
 printf "\033[1;32mChecking stats:\n"
 num_succ=$(find output -type d -name build | wc -l | xargs)
-echo "Out out $NUM_PROG packages, $num_succ can be compiled successfully."
+echo "Out out $num_prog packages, $num_succ can be compiled successfully."
 
 errors=$(get_error $OUTPUT_DIR)
 if [ -z "$errors" ]; then
@@ -97,7 +119,7 @@ transactional_time=$((end_time - transactional_start_time))
 echo
 printf "\033[1;33mTime profiling results:\n"
 echo "Total time: $total_time seconds"
-echo "Time to generate $NUM_PROG packages: $cargo_time seconds x 1 thread"
-echo "Time to compile $NUM_PROG packages: $compile_time seconds x $N threads"
-echo "Time to run $NUM_PROG transactional: $transactional_time seconds x $N threads"
+echo "Time to generate $num_prog packages: $cargo_time seconds x 1 thread"
+echo "Time to compile $num_prog packages: $compile_time seconds x $jobs threads"
+echo "Time to run $num_prog transactional: $transactional_time seconds x $jobs threads"
 printf "\033[0m\n"
