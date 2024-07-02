@@ -8,7 +8,7 @@ use aptos_vm_types::resolver::{
     ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::language_storage::StructTag;
 use move_vm_types::resolver::MoveResolver;
 use std::collections::{BTreeMap, HashMap};
@@ -20,7 +20,7 @@ pub trait AptosMoveResolver:
     AggregatorV1Resolver
     + ConfigStorage
     + DelayedFieldResolver
-    + MoveResolver<PartialVMError>
+    + MoveResolver
     + ResourceGroupResolver
     + StateStorageView
     + TableResolver
