@@ -444,15 +444,6 @@ pub enum WriteSetPayload {
     },
 }
 
-impl WriteSetPayload {
-    pub fn should_trigger_reconfiguration_by_default(&self) -> bool {
-        match self {
-            Self::Direct(_) => true,
-            Self::Script { .. } => false,
-        }
-    }
-}
-
 /// A transaction that has been signed.
 ///
 /// A `SignedTransaction` is a single transaction that can be atomically executed. Clients submit
@@ -1004,14 +995,6 @@ impl TransactionStatus {
                 TransactionStatus::Keep(status.remove_error_detail())
             },
             _ => self,
-        }
-    }
-
-    pub fn from_executed_vm_status(vm_status: VMStatus) -> Self {
-        if vm_status == VMStatus::Executed {
-            TransactionStatus::Keep(ExecutionStatus::Success)
-        } else {
-            panic!("Auto-conversion should not be called with non-executed status.")
         }
     }
 }

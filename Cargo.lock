@@ -9763,6 +9763,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-logging",
  "claims",
  "fail",
  "move-binary-format",

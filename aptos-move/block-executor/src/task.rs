@@ -33,6 +33,7 @@ pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
+    MaterializedSkipRest(O),
     /// Transaction detected that it is in inconsistent state due to speculative
     /// reads it did, and needs to be re-executed.
     SpeculativeExecutionAbortError(String),
@@ -72,6 +73,7 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
+        base_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         view: &(impl TExecutorView<
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Tag,
@@ -86,8 +88,6 @@ pub trait ExecutorTask: Sync {
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
-
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }
 
 /// Trait for execution result of a single transaction.
@@ -188,8 +188,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
         )>,
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) -> Result<(), PanicError>;
-
-    fn set_txn_output_for_non_dynamic_change_set(&self);
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
