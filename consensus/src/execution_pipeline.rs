@@ -48,6 +48,7 @@ impl ExecutionPipeline {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
+        let (prec_commit_tx, pre_commit_rx) = mpsc::unbounded_channel();
         runtime.spawn(Self::prepare_block_stage(
             prepare_block_rx,
             execute_block_tx,
@@ -57,7 +58,12 @@ impl ExecutionPipeline {
             ledger_apply_tx,
             executor.clone(),
         ));
-        runtime.spawn(Self::ledger_apply_stage(ledger_apply_rx, executor));
+        runtime.spawn(Self::ledger_apply_stage(
+            ledger_apply_rx,
+            prec_commit_tx,
+            executor.clone(),
+        ));
+        runtime.spawn(Self::pre_commit_stage(pre_commit_rx, executor));
         Self { prepare_block_tx }
     }
 
@@ -210,6 +216,7 @@ impl ExecutionPipeline {
 
     async fn ledger_apply_stage(
         mut block_rx: mpsc::UnboundedReceiver<LedgerApplyCommand>,
+        pre_commit_tx: mpsc::UnboundedSender<PreCommitCommand>,
         executor: Arc<dyn BlockExecutorTrait>,
     ) {
         while let Some(LedgerApplyCommand {
@@ -233,7 +240,16 @@ impl ExecutionPipeline {
                 .expect("Failed to spawn_blocking().")
             }
             .await;
-            let pipe_line_res = res.map(|output| PipelineExecutionResult::new(input_txns, output));
+            let (commit_tx, commit_rx) = oneshot::channel();
+            let pipe_line_res =
+                res.map(|output| PipelineExecutionResult::new(input_txns, output, commit_rx));
+            pre_commit_tx
+                .send(PreCommitCommand {
+                    block_id,
+                    parent_block_id,
+                    result_tx: commit_tx,
+                })
+                .expect("Failed to send block to pre_commit stage.");
             result_tx.send(pipe_line_res).unwrap_or_else(|err| {
                 error!(
                     block_id = block_id,
@@ -242,6 +258,39 @@ impl ExecutionPipeline {
             });
         }
         debug!("ledger_apply stage quitting.");
+    }
+
+    async fn pre_commit_stage(
+        mut block_rx: mpsc::UnboundedReceiver<PreCommitCommand>,
+        executor: Arc<dyn BlockExecutorTrait>,
+    ) {
+        while let Some(PreCommitCommand {
+            block_id,
+            parent_block_id,
+            result_tx,
+        }) = block_rx.recv().await
+        {
+            debug!("pre_commit stage received block {}.", block_id);
+            let res = async {
+                let executor = executor.clone();
+                monitor!(
+                    "pre_commit",
+                    tokio::task::spawn_blocking(move || {
+                        executor.pre_commit(block_id, parent_block_id)
+                    })
+                )
+                .await
+                .expect("Failed to spawn_blocking().")
+            }
+            .await;
+            result_tx.send(res).unwrap_or_else(|err| {
+                error!(
+                    block_id = block_id,
+                    "Failed to send back execution result for block {}: {:?}", block_id, err,
+                );
+            });
+        }
+        debug!("pre_commit stage quitting.");
     }
 }
 
@@ -269,4 +318,10 @@ struct LedgerApplyCommand {
     parent_block_id: HashValue,
     state_checkpoint_output: ExecutorResult<StateCheckpointOutput>,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+}
+
+struct PreCommitCommand {
+    block_id: HashValue,
+    parent_block_id: HashValue,
+    result_tx: oneshot::Sender<ExecutorResult<()>>,
 }
