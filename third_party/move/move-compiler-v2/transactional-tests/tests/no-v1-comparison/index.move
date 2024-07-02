@@ -110,6 +110,10 @@ module 0x42::test {
         assert!(v[1].field.value == false, 0);
     }
 
+    fun foo(v: &Y<X<bool>>) {
+        assert!(v.field.value == true, 0);
+    }
+
     fun test_vector_borrow_freeze() {
         let x1 = X {
             value: true
@@ -128,6 +132,7 @@ module 0x42::test {
         assert!(v_y1.field.value == true, 0);
         assert!(v[0].field.value == true, 0);
         assert!(v[1].field.value == false, 0);
+        foo(&mut v[0]);
     }
 
     fun test_vector_borrow_mut() {
