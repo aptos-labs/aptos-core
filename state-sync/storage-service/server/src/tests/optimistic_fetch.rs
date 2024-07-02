@@ -62,7 +62,11 @@ async fn test_peers_with_ready_optimistic_fetches() {
 
     // Create the storage reader
     let storage_service_config = StorageServiceConfig::default();
-    let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
+    let storage_reader = StorageReader::new(
+        storage_service_config,
+        Arc::new(db_reader),
+        time_service.clone(),
+    );
 
     // Create test data with an empty storage server summary
     let cached_storage_server_summary =
@@ -167,7 +171,11 @@ async fn test_peers_with_ready_optimistic_fetches_update() {
     // Create the storage reader
     let db_reader = mock::create_mock_db_reader();
     let storage_service_config = StorageServiceConfig::default();
-    let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
+    let storage_reader = StorageReader::new(
+        storage_service_config,
+        Arc::new(db_reader),
+        time_service.clone(),
+    );
 
     // Create test data with an empty storage server summary
     let cached_storage_server_summary =
@@ -276,8 +284,12 @@ async fn test_remove_expired_optimistic_fetches() {
 
     // Create the mock storage reader and time service
     let db_reader = mock::create_mock_db_reader();
-    let storage = StorageReader::new(storage_service_config, Arc::new(db_reader));
     let time_service = TimeService::mock();
+    let storage = StorageReader::new(
+        storage_service_config,
+        Arc::new(db_reader),
+        time_service.clone(),
+    );
 
     // Create the test components
     let cached_storage_server_summary =

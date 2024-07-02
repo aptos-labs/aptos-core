@@ -34,13 +34,18 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
+    contract_event::ContractEvent,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueChunkWithProof},
+    },
     transaction::{
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
         TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
     },
     validator_verifier::ValidatorVerifier,
@@ -53,6 +58,7 @@ use dashmap::DashMap;
 use futures::channel::oneshot::Receiver;
 use mockall::predicate::eq;
 use rand::{prelude::SliceRandom, rngs::OsRng, Rng};
+use serde::Serialize;
 use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
@@ -124,13 +130,13 @@ pub fn create_epoch_ending_ledger_info(epoch: u64, version: u64) -> LedgerInfoWi
 pub fn create_output_list_using_sizes(
     start_version: u64,
     num_outputs: u64,
-    min_bytes_per_output: u64,
+    min_bytes_per_transaction: u64,
 ) -> TransactionOutputListWithProof {
     // Create a test transaction list that enforces the given size requirements
     let transaction_list_with_proof = create_transaction_list_using_sizes(
         start_version,
         num_outputs,
-        min_bytes_per_output,
+        min_bytes_per_transaction,
         false,
     );
 
@@ -138,7 +144,7 @@ pub fn create_output_list_using_sizes(
     let transactions_and_outputs = transaction_list_with_proof
         .transactions
         .iter()
-        .map(|txn| (txn.clone(), create_test_transaction_output()))
+        .map(|transaction| (transaction.clone(), create_test_transaction_output()))
         .collect();
 
     TransactionOutputListWithProof::new(
@@ -154,12 +160,15 @@ pub fn create_output_list_with_proof(
     end_version: u64,
     proof_version: u64,
 ) -> TransactionOutputListWithProof {
+    // Create a transaction list with proof
     let transaction_list_with_proof =
-        create_transaction_list_with_proof(start_version, end_version, proof_version, false);
+        create_transaction_list_with_proof(start_version, end_version, proof_version, true);
+
+    // Create transactions and outputs
     let transactions_and_outputs = transaction_list_with_proof
         .transactions
         .iter()
-        .map(|txn| (txn.clone(), create_test_transaction_output()))
+        .map(|transaction| (transaction.clone(), create_test_transaction_output()))
         .collect();
 
     TransactionOutputListWithProof::new(
@@ -219,6 +228,18 @@ fn create_test_transaction(sequence_number: u64, code_bytes: Vec<u8>) -> Transac
     Transaction::UserTransaction(signed_transaction)
 }
 
+/// Creates a test transaction info
+fn create_test_transaction_info() -> TransactionInfo {
+    TransactionInfo::new(
+        HashValue::zero(),
+        HashValue::zero(),
+        HashValue::zero(),
+        None,
+        0,
+        ExecutionStatus::Success,
+    )
+}
+
 /// Creates a test transaction list with proof with the given sizes
 pub fn create_transaction_list_using_sizes(
     start_version: u64,
@@ -232,23 +253,39 @@ pub fn create_transaction_list_using_sizes(
         .map(|_| rng.gen::<u8>())
         .collect();
 
-    // Include events if required
-    let events = if include_events { Some(vec![]) } else { None };
-
     // Create the requested transactions
+    let end_version = start_version + num_transactions - 1;
     let mut transactions = vec![];
-    for sequence_number in start_version..=start_version + num_transactions - 1 {
+    for sequence_number in start_version..=end_version {
         transactions.push(create_test_transaction(
             sequence_number,
             random_bytes.clone(),
         ));
     }
 
+    // Create the requested transaction infos
+    let mut transaction_infos = vec![];
+    for _ in start_version..=end_version {
+        transaction_infos.push(create_test_transaction_info());
+    }
+
+    // Create the requested events
+    let transaction_events = if include_events {
+        let mut transaction_events = vec![];
+        for _ in start_version..=end_version {
+            transaction_events.push(vec![]);
+        }
+        Some(transaction_events)
+    } else {
+        None
+    };
+
     // Create a transaction list with an empty proof
     let mut transaction_list_with_proof = TransactionListWithProof::new_empty();
     transaction_list_with_proof.first_transaction_version = Some(start_version);
-    transaction_list_with_proof.events = events;
     transaction_list_with_proof.transactions = transactions;
+    transaction_list_with_proof.proof.transaction_infos = transaction_infos;
+    transaction_list_with_proof.events = transaction_events;
 
     transaction_list_with_proof
 }
@@ -260,20 +297,35 @@ pub fn create_transaction_list_with_proof(
     _proof_version: u64,
     include_events: bool,
 ) -> TransactionListWithProof {
-    // Include events if required
-    let events = if include_events { Some(vec![]) } else { None };
-
     // Create the requested transactions
     let mut transactions = vec![];
     for sequence_number in start_version..=end_version {
         transactions.push(create_test_transaction(sequence_number, vec![]));
     }
 
+    // Create the requested transaction infos
+    let mut transaction_infos = vec![];
+    for _ in start_version..=end_version {
+        transaction_infos.push(create_test_transaction_info());
+    }
+
+    // Create the requested events
+    let transaction_events = if include_events {
+        let mut transaction_events = vec![];
+        for _ in start_version..=end_version {
+            transaction_events.push(vec![]);
+        }
+        Some(transaction_events)
+    } else {
+        None
+    };
+
     // Create a transaction list with an empty proof
     let mut transaction_list_with_proof = TransactionListWithProof::new_empty();
     transaction_list_with_proof.first_transaction_version = Some(start_version);
-    transaction_list_with_proof.events = events;
     transaction_list_with_proof.transactions = transactions;
+    transaction_list_with_proof.proof.transaction_infos = transaction_infos;
+    transaction_list_with_proof.events = transaction_events;
 
     transaction_list_with_proof
 }
@@ -284,7 +336,7 @@ fn create_test_transaction_output() -> TransactionOutput {
         WriteSet::default(),
         vec![],
         0,
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+        TransactionStatus::Keep(ExecutionStatus::Success),
         TransactionAuxiliaryData::default(),
     )
 }
@@ -319,21 +371,69 @@ pub async fn elapse_time(time_ms: u64, time_service: &TimeService) {
         .await;
 }
 
-/// Sets an expectation on the given mock db for a call to fetch an epoch change proof
+/// Sets expectations on the given mock db for the relevant calls
+/// to fetch the epoch ending ledger infos.
 pub fn expect_get_epoch_ending_ledger_infos(
     mock_db: &mut MockDatabaseReader,
     start_epoch: u64,
     expected_end_epoch: u64,
     epoch_change_proof: EpochChangeProof,
 ) {
+    // Create an iterator that returns the relevant epoch ending ledger infos
+    let epoch_ending_ledger_infos = epoch_change_proof.ledger_info_with_sigs.into_iter().map(Ok);
+    let ledger_info_iterator = Box::new(epoch_ending_ledger_infos)
+        as Box<
+            dyn Iterator<Item = aptos_storage_interface::Result<LedgerInfoWithSignatures>> + Send,
+        >;
+
+    // Expect a call to get the epoch ending ledger info iterator
+    let end_epoch = expected_end_epoch + 1; // The end epoch is exclusive in DbReader
     mock_db
-        .expect_get_epoch_ending_ledger_infos()
+        .expect_get_epoch_ending_ledger_info_iterator()
         .times(1)
-        .with(eq(start_epoch), eq(expected_end_epoch))
-        .returning(move |_, _| Ok(epoch_change_proof.clone()));
+        .with(eq(start_epoch), eq(end_epoch))
+        .return_once(move |_, _| Ok(ledger_info_iterator));
 }
 
-/// Sets an expectation on the given mock db for a call to fetch transaction outputs
+/// Sets an expectation on the given mock db for the relevant calls
+/// to fetch state values with proof.
+pub fn expect_get_state_values_with_proof(
+    mock_db: &mut MockDatabaseReader,
+    version: u64,
+    start_index: u64,
+    chunk_size: u64,
+    state_value_chunk_with_proof: StateValueChunkWithProof,
+) {
+    // Create an iterator that returns the relevant state values
+    let state_values = state_value_chunk_with_proof.raw_values.clone();
+    let state_value_iterator = Box::new(state_values.into_iter().map(Ok))
+        as Box<
+            dyn Iterator<Item = aptos_storage_interface::Result<(StateKey, StateValue)>>
+                + Send
+                + Sync,
+        >;
+
+    // Expect a call to get the state value iterator
+    mock_db
+        .expect_get_state_value_chunk_iter()
+        .times(1)
+        .with(
+            eq(version),
+            eq(start_index as usize),
+            eq(chunk_size as usize),
+        )
+        .return_once(move |_, _, _| Ok(state_value_iterator));
+
+    // Set expectations for the chunk proof
+    let state_values = state_value_chunk_with_proof.raw_values.clone();
+    mock_db
+        .expect_get_state_value_chunk_proof()
+        .times(1)
+        .with(eq(version), eq(start_index as usize), eq(state_values))
+        .return_once(move |_, _, _| Ok(state_value_chunk_with_proof));
+}
+
+/// Sets expectations on the given mock db for the relevant calls to fetch outputs
 pub fn expect_get_transaction_outputs(
     mock_db: &mut MockDatabaseReader,
     start_version: u64,
@@ -341,32 +441,121 @@ pub fn expect_get_transaction_outputs(
     proof_version: u64,
     output_list: TransactionOutputListWithProof,
 ) {
+    // Fetch the transactions, infos, write sets, events and auxiliary data from the output list
+    let (transactions, transaction_outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
+        output_list.transactions_and_outputs.into_iter().unzip();
+    let transaction_infos = output_list.proof.transaction_infos.into_iter().map(Ok);
+    let transaction_write_sets = transaction_outputs
+        .clone()
+        .into_iter()
+        .map(|output| Ok(output.write_set().clone()));
+    let transaction_events = transaction_outputs
+        .clone()
+        .into_iter()
+        .map(|output| Ok(output.events().to_vec()));
+    let transaction_auxiliary_data = transaction_outputs
+        .clone()
+        .into_iter()
+        .map(|output| Ok(output.auxiliary_data().clone()));
+
+    // Create iterators for the transactions, infos, write sets, events and auxiliary data
+    let transaction_iterator = Box::new(transactions.into_iter().map(Ok))
+        as Box<dyn Iterator<Item = aptos_storage_interface::Result<Transaction>> + Send>;
+    let transaction_info_iterator = Box::new(transaction_infos)
+        as Box<dyn Iterator<Item = aptos_storage_interface::Result<TransactionInfo>> + Send>;
+    let transaction_write_set_iterator = Box::new(transaction_write_sets)
+        as Box<dyn Iterator<Item = aptos_storage_interface::Result<WriteSet>> + Send>;
+    let transaction_event_iterator = Box::new(transaction_events)
+        as Box<dyn Iterator<Item = aptos_storage_interface::Result<Vec<ContractEvent>>> + Send>;
+    let transaction_auxiliary_data_iterator = Box::new(transaction_auxiliary_data)
+        as Box<
+            dyn Iterator<Item = aptos_storage_interface::Result<TransactionAuxiliaryData>> + Send,
+        >;
+
+    // Expect calls to get iterators for the transactions, infos, write sets, events and auxiliary data
     mock_db
-        .expect_get_transaction_outputs()
+        .expect_get_transaction_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .return_once(move |_, _| Ok(transaction_iterator));
+    mock_db
+        .expect_get_transaction_info_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .return_once(move |_, _| Ok(transaction_info_iterator));
+    mock_db
+        .expect_get_write_set_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .return_once(move |_, _| Ok(transaction_write_set_iterator));
+    mock_db
+        .expect_get_events_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .return_once(move |_, _| Ok(transaction_event_iterator));
+    mock_db
+        .expect_get_auxiliary_data_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .return_once(move |_, _| Ok(transaction_auxiliary_data_iterator));
+
+    // Expect calls to get the accumulator range proof
+    let accumulator_range_proof = output_list.proof.ledger_info_to_transaction_infos_proof;
+    mock_db
+        .expect_get_transaction_accumulator_range_proof()
         .times(1)
         .with(eq(start_version), eq(num_items), eq(proof_version))
-        .returning(move |_, _, _| Ok(output_list.clone()));
+        .return_once(move |_, _, _| Ok(accumulator_range_proof));
 }
 
-/// Sets an expectation on the given mock db for a call to fetch transactions
+/// Sets expectations on the given mock db for the relevant calls to fetch transactions
 pub fn expect_get_transactions(
     mock_db: &mut MockDatabaseReader,
     start_version: u64,
     num_items: u64,
     proof_version: u64,
-    include_events: bool,
+    _include_events: bool,
     transaction_list: TransactionListWithProof,
 ) {
+    // Fetch the transactions, infos and events from the transaction list
+    let transactions = transaction_list.transactions.into_iter().map(Ok);
+    let transaction_infos = transaction_list.proof.transaction_infos.into_iter().map(Ok);
+    let transaction_events = transaction_list.events.unwrap().into_iter().map(Ok);
+
+    // Create iterators for the transactions, infos and events
+    let transaction_iterator = Box::new(transactions)
+        as Box<dyn Iterator<Item = aptos_storage_interface::Result<Transaction>> + Send>;
+    let transaction_info_iterator = Box::new(transaction_infos)
+        as Box<dyn Iterator<Item = aptos_storage_interface::Result<TransactionInfo>> + Send>;
+    let transaction_event_iterator = Box::new(transaction_events)
+        as Box<dyn Iterator<Item = aptos_storage_interface::Result<Vec<ContractEvent>>> + Send>;
+
+    // Expect calls to get iterators for the transactions, infos and events
     mock_db
-        .expect_get_transactions()
+        .expect_get_transaction_iterator()
         .times(1)
-        .with(
-            eq(start_version),
-            eq(num_items),
-            eq(proof_version),
-            eq(include_events),
-        )
-        .returning(move |_, _, _, _| Ok(transaction_list.clone()));
+        .with(eq(start_version), eq(num_items))
+        .return_once(move |_, _| Ok(transaction_iterator));
+    mock_db
+        .expect_get_transaction_info_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .return_once(move |_, _| Ok(transaction_info_iterator));
+    mock_db
+        .expect_get_events_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .return_once(move |_, _| Ok(transaction_event_iterator));
+
+    // Expect calls to get the accumulator range proof
+    let accumulator_range_proof = transaction_list
+        .proof
+        .ledger_info_to_transaction_infos_proof;
+    mock_db
+        .expect_get_transaction_accumulator_range_proof()
+        .times(1)
+        .with(eq(start_version), eq(num_items), eq(proof_version))
+        .return_once(move |_, _, _| Ok(accumulator_range_proof));
 }
 
 /// Extracts the peer and network ids from an optional peer network id
@@ -463,6 +652,11 @@ pub async fn get_number_of_states(
 ) -> Result<StorageServiceResponse, StorageServiceError> {
     let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
     send_storage_request(mock_client, use_compression, data_request).await
+}
+
+/// Serializes the given data and returns the number of serialized bytes
+pub fn get_num_serialized_bytes<T: ?Sized + Serialize>(data: &T) -> u64 {
+    bcs::serialized_size(data).unwrap() as u64
 }
 
 /// Generates and returns a random number (u64)
@@ -822,8 +1016,9 @@ pub async fn verify_new_transaction_outputs_with_proof(
 pub async fn verify_new_transactions_with_proof(
     mock_client: &mut MockClient,
     receiver: Receiver<Result<Bytes, RpcError>>,
-    expected_transactions_with_proof: TransactionListWithProof,
+    mut expected_transactions_with_proof: TransactionListWithProof,
     expected_ledger_info: LedgerInfoWithSignatures,
+    include_events: bool,
 ) {
     match mock_client
         .wait_for_response(receiver)
@@ -833,6 +1028,10 @@ pub async fn verify_new_transactions_with_proof(
         .unwrap()
     {
         DataResponse::NewTransactionsWithProof((transactions_with_proof, ledger_info)) => {
+            // If events are not included, remove them from the expected response
+            if !include_events {
+                expected_transactions_with_proof.events = None;
+            }
             assert_eq!(transactions_with_proof, expected_transactions_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
         },
