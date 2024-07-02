@@ -268,7 +268,7 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_groth16_verifies_using_rust_sdk() {
-    let (_tw_sk, _, _, mut swarm, mut cli, root_idx) = setup_local_net().await;
+    let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
 
     let jwt = get_sample_jwt_token();
     let blinder = get_sample_epk_blinder();
