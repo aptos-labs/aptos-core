@@ -16,12 +16,7 @@ use aptos_types::{
 use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-<<<<<<< HEAD
-use std::{cmp::min, collections::HashSet, fmt, fmt::Write};
-=======
-use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
-use tokio::sync::oneshot;
->>>>>>> upstream/main
+use std::{collections::HashSet, fmt, fmt::Write};
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed

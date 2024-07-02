@@ -10,6 +10,7 @@ use crate::{
         rsa::{INSECURE_TEST_RSA_KEY_PAIR, RSA_JWK},
     },
     keyless::{
+        configuration,
         base64url_encode_str,
         bn254_circom::{G1Bytes, G2Bytes},
         g1_projective_str_to_affine, g2_projective_str_to_affine, Claims, Configuration,

@@ -404,12 +404,11 @@ fn initialize(
     // Calculate the per-epoch rewards rate, represented as 2 separate ints (numerator and
     // denominator).
     let rewards_rate_denominator = 1_000_000_000;
-    // Fold division of the percentage by 100 into multiplication with the denominator
-    // to minimize rounding errors due to integer division.
-    let rewards_rate_numerator = genesis_config.rewards_apy_percentage
-        * (rewards_rate_denominator / 100)
-        * genesis_config.epoch_duration_secs
-        / NUM_SECONDS_PER_YEAR;
+    let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / genesis_config.epoch_duration_secs;
+    // Multiplication before division to minimize rounding errors due to integer division.
+    let rewards_rate_numerator = (genesis_config.rewards_apy_percentage * rewards_rate_denominator
+        / 100)
+        / num_epochs_in_a_year;
 
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.

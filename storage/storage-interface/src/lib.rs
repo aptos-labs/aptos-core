@@ -490,53 +490,6 @@ pub trait DbReader: Send + Sync {
     }
 }
 
-impl DbReader for Arc<dyn DbReader> {
-    fn get_read_delegatee(&self) -> &dyn DbReader {
-        &**self
-    }
-}
-
-impl MoveStorage for &dyn DbReader {
-    fn fetch_resource_by_version(
-        &self,
-        access_path: AccessPath,
-        version: Version,
-    ) -> Result<Vec<u8>, anyhow::Error> {
-        let state_value =
-            self.get_state_value_by_version(&StateKey::access_path(access_path), version)?;
-
-        state_value
-            .ok_or_else(|| anyhow!("no value found in DB".to_string()))
-            .map(|value| value.bytes().to_vec())
-    }
-
-    fn fetch_config_by_version(
-        &self,
-        config_id: ConfigID,
-        version: Version,
-    ) -> Result<Vec<u8>, anyhow::Error> {
-        let config_value_option = self.get_state_value_by_version(
-            &StateKey::access_path(AccessPath::new(
-                CORE_CODE_ADDRESS,
-                access_path_for_config(config_id)?.path,
-            )),
-            version,
-        )?;
-        config_value_option
-            .map(|x| x.bytes().to_vec())
-            .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
-    }
-
-    fn fetch_synced_version(&self) -> Result<u64, anyhow::Error> {
-        self.get_latest_version().map_err(Into::into)
-    }
-
-    fn fetch_latest_state_checkpoint_version(&self) -> Result<Version, anyhow::Error> {
-        self.get_latest_state_checkpoint_version()?
-            .ok_or_else(|| anyhow!("[MoveStorage] Latest state checkpoint not found.".to_string()))
-    }
-}
-
 /// Trait that is implemented by a DB that supports certain public (to client) write APIs
 /// expected of an Aptos DB. This adds write APIs to DbReader.
 #[allow(unused_variables)]
@@ -586,13 +539,11 @@ pub trait DbWriter: Send + Sync {
         unimplemented!()
     }
 
-    /// Revert to committed state referred to with the ledger information.
     fn revert_commit(
         &self,
         ledger_info_with_sigs: &LedgerInfoWithSignatures,
-    ) -> Result<()> {
-        unimplemented!()
-    }
+    ) -> Result<()> ;
+
 }
 
 #[derive(Clone)]

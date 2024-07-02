@@ -209,7 +209,7 @@ impl DbWriter for AptosDB {
             .with_label_values(&["revert_commit"])
             .start_timer();
 
-        let latest_version = self.get_latest_version()?;
+        let latest_version = self.get_synced_version()?;
         let target_version = ledger_info_with_sigs.ledger_info().version();
 
         let ledger_batch = SchemaBatch::new();
