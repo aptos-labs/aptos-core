@@ -1058,7 +1058,7 @@ pub(crate) fn apply_named_address_renaming(
         .collect()
 }
 
-pub(crate) fn make_source_and_deps_for_compiler(
+pub fn make_source_and_deps_for_compiler(
     resolution_graph: &ResolvedGraph,
     root: &ResolvedPackage,
     deps: Vec<(
