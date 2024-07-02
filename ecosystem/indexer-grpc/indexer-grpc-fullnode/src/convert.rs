@@ -1,24 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::{
-    AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId,
-    EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction,
-    MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
-    MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType,
-    MultiEd25519Signature, MultiKeySignature, MultisigPayload, MultisigTransactionPayload,
-    PublicKey, ScriptPayload, Signature, SingleKeySignature, Transaction, TransactionInfo,
-    TransactionPayload, TransactionSignature, WriteSet, WriteSetChange,
+use aptos_api_types::{transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, MultiKeySignature, MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature, SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature, WriteSet, WriteSetChange
 };
+use aptos_protos::transaction::v1::validator_transaction::observed_jwk_update::exported_provider_jw_ks::Jwk as ProtoJwk;
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
 use aptos_protos::{
-    transaction::{
-        v1 as transaction,
-        v1::{any_signature, Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn},
-    },
+    transaction::v1::{self as transaction, any_signature, validator_transaction, Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn},
     util::timestamp,
 };
+use aptos_types::jwks::jwk::JWK;
 use hex;
 use move_binary_format::file_format::Ability;
 use std::time::Duration;
@@ -806,7 +798,9 @@ pub fn convert_transaction(
         },
         Transaction::StateCheckpointTransaction(_st) => {
             transaction::transaction::TxnData::StateCheckpoint(
-                transaction::StateCheckpointTransaction {},
+                transaction::StateCheckpointTransaction {
+
+                },
             )
         },
         Transaction::BlockEpilogueTransaction(block_epilogue) => {
@@ -826,8 +820,80 @@ pub fn convert_transaction(
             )
         },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
-        Transaction::ValidatorTransaction(_) => {
-            transaction::transaction::TxnData::Validator(transaction::ValidatorTransaction {})
+        Transaction::ValidatorTransaction(api_validator_txn) => {
+            transaction::transaction::TxnData::Validator(transaction::ValidatorTransaction {
+                validator_transaction_type: match api_validator_txn {
+                    ApiValidatorTransactionEnum::DkgResult(dgk_result) => {
+                        Some(
+                            validator_transaction::ValidatorTransactionType::DkgUpdate(
+                                validator_transaction::DkgUpdate {
+                                    dkg_transcript: Some(validator_transaction::dkg_update::DkgTranscript {
+                                        author: dgk_result.dkg_transcript.author.to_string(),
+                                        epoch: dgk_result.dkg_transcript.epoch.0,
+                                        payload: dgk_result.dkg_transcript.payload.0.clone(),
+                                    }),
+                                },
+                            )
+                        )
+                    },
+                    ApiValidatorTransactionEnum::ObservedJwkUpdate(observed_jwk_update) => {
+                        Some(
+                            validator_transaction::ValidatorTransactionType::ObservedJwkUpdate(
+                                validator_transaction::ObservedJwkUpdate {
+                                    quorum_certified_update: Some(
+                                        validator_transaction::observed_jwk_update::QuorumCertifiedUpdate {
+                                            update: Some(
+                                                validator_transaction::observed_jwk_update::ExportedProviderJwKs {
+                                                    issuer: observed_jwk_update.quorum_certified_update.update.issuer.to_string(),
+                                                    version: observed_jwk_update.quorum_certified_update.update.version,
+                                                    jwks: observed_jwk_update.quorum_certified_update.update.jwks.iter().map(|jwk| {
+                                                        match jwk {
+                                                            JWK::RSA(rsa) => {
+                                                                ProtoJwk {
+                                                                    jwk_type: Some(
+                                                                        aptos_protos::transaction::v1::validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::JwkType::Rsa(
+                                                                            aptos_protos::transaction::v1::validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::Rsa {
+                                                                                kid: rsa.kid.to_string(),
+                                                                                n: rsa.n.to_string(),
+                                                                                e: rsa.e.to_string(),
+                                                                                kty: rsa.kty.to_string(),
+                                                                                alg: rsa.alg.to_string(),
+                                                                            }
+                                                                        )
+                                                                    )
+                                                                }
+                                                            },
+                                                            JWK::Unsupported(unsupported) => {
+                                                                ProtoJwk {
+                                                                    jwk_type: Some(
+                                                                        aptos_protos::transaction::v1::validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::JwkType::UnsupportedJwk(
+                                                                            aptos_protos::transaction::v1::validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::UnsupportedJwk {
+                                                                                id: unsupported.id.clone(),
+                                                                                payload: unsupported.payload.clone()
+                                                                            }
+                                                                        )
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }).collect(),
+                                                }
+                                            ),
+                                            multi_sig: Some(aptos_protos::transaction::v1::validator_transaction::observed_jwk_update::ExportedAggregateSignature {
+                                                signer_indices: observed_jwk_update.quorum_certified_update.multi_sig.signer_indices.clone().into_iter().map(|i| i as u64).collect(),
+                                                sig: match &observed_jwk_update.quorum_certified_update.multi_sig.sig {
+                                                    Some(sig) =>  sig.0.clone(),
+                                                    None => vec![],
+                                                },
+                                            }),
+                                        }
+                                    )
+                                },
+                            )
+                        )
+                    },
+                }
+            })
         },
     };
 

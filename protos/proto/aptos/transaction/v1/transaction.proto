@@ -116,7 +116,7 @@ message ValidatorTransaction {
         }
       }
 
-      repeated JWK jwk = 3;
+      repeated JWK jwks = 3;
     }
     message ExportedAggregateSignature {
       repeated uint64 signer_indices = 1;
@@ -132,9 +132,9 @@ message ValidatorTransaction {
 
   message DkgUpdate {
     message DkgTranscript {
-      int32 epoch = 1;
+      uint64 epoch = 1;
       string author = 2;
-      string payload = 3;
+      bytes payload = 3;
     }
     DkgTranscript dkg_transcript = 1;
   }

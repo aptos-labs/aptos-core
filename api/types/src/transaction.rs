@@ -690,9 +690,9 @@ impl From<QuorumCertifiedUpdate> for ExportedQuorumCertifiedUpdate {
 /// A more API-friendly representation of the on-chain `aptos_types::aggregate_signature::AggregateSignature`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ExportedAggregateSignature {
-    signer_indices: Vec<usize>,
+    pub signer_indices: Vec<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sig: Option<HexEncodedBytes>,
+    pub sig: Option<HexEncodedBytes>,
 }
 
 impl From<AggregateSignature> for ExportedAggregateSignature {
@@ -744,9 +744,9 @@ pub struct DKGResultTransaction {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ExportedDKGTranscript {
-    epoch: U64,
-    author: Address,
-    payload: HexEncodedBytes,
+    pub epoch: U64,
+    pub author: Address,
+    pub payload: HexEncodedBytes,
 }
 
 impl From<DKGTranscript> for ExportedDKGTranscript {

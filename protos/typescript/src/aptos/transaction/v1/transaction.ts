@@ -327,7 +327,7 @@ export interface ValidatorTransaction_ObservedJwkUpdate {
 export interface ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs {
   issuer?: string | undefined;
   version?: bigint | undefined;
-  jwk?: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK[] | undefined;
+  jwks?: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK[] | undefined;
 }
 
 export interface ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK {
@@ -366,9 +366,9 @@ export interface ValidatorTransaction_DkgUpdate {
 }
 
 export interface ValidatorTransaction_DkgUpdate_DkgTranscript {
-  epoch?: number | undefined;
+  epoch?: bigint | undefined;
   author?: string | undefined;
-  payload?: string | undefined;
+  payload?: Uint8Array | undefined;
 }
 
 export interface BlockEpilogueTransaction {
@@ -2247,7 +2247,7 @@ export const ValidatorTransaction_ObservedJwkUpdate = {
 };
 
 function createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs(): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs {
-  return { issuer: "", version: BigInt("0"), jwk: [] };
+  return { issuer: "", version: BigInt("0"), jwks: [] };
 }
 
 export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs = {
@@ -2264,8 +2264,8 @@ export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs = {
       }
       writer.uint32(16).uint64(message.version.toString());
     }
-    if (message.jwk !== undefined && message.jwk.length !== 0) {
-      for (const v of message.jwk) {
+    if (message.jwks !== undefined && message.jwks.length !== 0) {
+      for (const v of message.jwks) {
         ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.encode(v!, writer.uint32(26).fork()).ldelim();
       }
     }
@@ -2298,7 +2298,7 @@ export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs = {
             break;
           }
 
-          message.jwk!.push(
+          message.jwks!.push(
             ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.decode(reader, reader.uint32()),
           );
           continue;
@@ -2355,8 +2355,8 @@ export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs = {
     return {
       issuer: isSet(object.issuer) ? globalThis.String(object.issuer) : "",
       version: isSet(object.version) ? BigInt(object.version) : BigInt("0"),
-      jwk: globalThis.Array.isArray(object?.jwk)
-        ? object.jwk.map((e: any) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.fromJSON(e))
+      jwks: globalThis.Array.isArray(object?.jwks)
+        ? object.jwks.map((e: any) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.fromJSON(e))
         : [],
     };
   },
@@ -2369,8 +2369,8 @@ export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs = {
     if (message.version !== undefined && message.version !== BigInt("0")) {
       obj.version = message.version.toString();
     }
-    if (message.jwk?.length) {
-      obj.jwk = message.jwk.map((e) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.toJSON(e));
+    if (message.jwks?.length) {
+      obj.jwks = message.jwks.map((e) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.toJSON(e));
     }
     return obj;
   },
@@ -2386,8 +2386,8 @@ export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs = {
     const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs();
     message.issuer = object.issuer ?? "";
     message.version = object.version ?? BigInt("0");
-    message.jwk =
-      object.jwk?.map((e) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.fromPartial(e)) || [];
+    message.jwks =
+      object.jwks?.map((e) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.fromPartial(e)) || [];
     return message;
   },
 };
@@ -3211,19 +3211,22 @@ export const ValidatorTransaction_DkgUpdate = {
 };
 
 function createBaseValidatorTransaction_DkgUpdate_DkgTranscript(): ValidatorTransaction_DkgUpdate_DkgTranscript {
-  return { epoch: 0, author: "", payload: "" };
+  return { epoch: BigInt("0"), author: "", payload: new Uint8Array(0) };
 }
 
 export const ValidatorTransaction_DkgUpdate_DkgTranscript = {
   encode(message: ValidatorTransaction_DkgUpdate_DkgTranscript, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.epoch !== undefined && message.epoch !== 0) {
-      writer.uint32(8).int32(message.epoch);
+    if (message.epoch !== undefined && message.epoch !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.epoch) !== message.epoch) {
+        throw new globalThis.Error("value provided for field message.epoch of type uint64 too large");
+      }
+      writer.uint32(8).uint64(message.epoch.toString());
     }
     if (message.author !== undefined && message.author !== "") {
       writer.uint32(18).string(message.author);
     }
-    if (message.payload !== undefined && message.payload !== "") {
-      writer.uint32(26).string(message.payload);
+    if (message.payload !== undefined && message.payload.length !== 0) {
+      writer.uint32(26).bytes(message.payload);
     }
     return writer;
   },
@@ -3240,7 +3243,7 @@ export const ValidatorTransaction_DkgUpdate_DkgTranscript = {
             break;
           }
 
-          message.epoch = reader.int32();
+          message.epoch = longToBigint(reader.uint64() as Long);
           continue;
         case 2:
           if (tag !== 18) {
@@ -3254,7 +3257,7 @@ export const ValidatorTransaction_DkgUpdate_DkgTranscript = {
             break;
           }
 
-          message.payload = reader.string();
+          message.payload = reader.bytes();
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -3301,22 +3304,22 @@ export const ValidatorTransaction_DkgUpdate_DkgTranscript = {
 
   fromJSON(object: any): ValidatorTransaction_DkgUpdate_DkgTranscript {
     return {
-      epoch: isSet(object.epoch) ? globalThis.Number(object.epoch) : 0,
+      epoch: isSet(object.epoch) ? BigInt(object.epoch) : BigInt("0"),
       author: isSet(object.author) ? globalThis.String(object.author) : "",
-      payload: isSet(object.payload) ? globalThis.String(object.payload) : "",
+      payload: isSet(object.payload) ? bytesFromBase64(object.payload) : new Uint8Array(0),
     };
   },
 
   toJSON(message: ValidatorTransaction_DkgUpdate_DkgTranscript): unknown {
     const obj: any = {};
-    if (message.epoch !== undefined && message.epoch !== 0) {
-      obj.epoch = Math.round(message.epoch);
+    if (message.epoch !== undefined && message.epoch !== BigInt("0")) {
+      obj.epoch = message.epoch.toString();
     }
     if (message.author !== undefined && message.author !== "") {
       obj.author = message.author;
     }
-    if (message.payload !== undefined && message.payload !== "") {
-      obj.payload = message.payload;
+    if (message.payload !== undefined && message.payload.length !== 0) {
+      obj.payload = base64FromBytes(message.payload);
     }
     return obj;
   },
@@ -3330,9 +3333,9 @@ export const ValidatorTransaction_DkgUpdate_DkgTranscript = {
     object: DeepPartial<ValidatorTransaction_DkgUpdate_DkgTranscript>,
   ): ValidatorTransaction_DkgUpdate_DkgTranscript {
     const message = createBaseValidatorTransaction_DkgUpdate_DkgTranscript();
-    message.epoch = object.epoch ?? 0;
+    message.epoch = object.epoch ?? BigInt("0");
     message.author = object.author ?? "";
-    message.payload = object.payload ?? "";
+    message.payload = object.payload ?? new Uint8Array(0);
     return message;
   },
 };

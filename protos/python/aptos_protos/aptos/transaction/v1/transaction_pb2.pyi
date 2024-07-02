@@ -207,7 +207,7 @@ class ValidatorTransaction(_message.Message):
         __slots__ = ["quorum_certified_update"]
 
         class ExportedProviderJWKs(_message.Message):
-            __slots__ = ["issuer", "version", "jwk"]
+            __slots__ = ["issuer", "version", "jwks"]
 
             class JWK(_message.Message):
                 __slots__ = ["unsupported_jwk", "rsa"]
@@ -265,17 +265,17 @@ class ValidatorTransaction(_message.Message):
                 ) -> None: ...
             ISSUER_FIELD_NUMBER: _ClassVar[int]
             VERSION_FIELD_NUMBER: _ClassVar[int]
-            JWK_FIELD_NUMBER: _ClassVar[int]
+            JWKS_FIELD_NUMBER: _ClassVar[int]
             issuer: str
             version: int
-            jwk: _containers.RepeatedCompositeFieldContainer[
+            jwks: _containers.RepeatedCompositeFieldContainer[
                 ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK
             ]
             def __init__(
                 self,
                 issuer: _Optional[str] = ...,
                 version: _Optional[int] = ...,
-                jwk: _Optional[
+                jwks: _Optional[
                     _Iterable[
                         _Union[
                             ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK,
@@ -340,12 +340,12 @@ class ValidatorTransaction(_message.Message):
             PAYLOAD_FIELD_NUMBER: _ClassVar[int]
             epoch: int
             author: str
-            payload: str
+            payload: bytes
             def __init__(
                 self,
                 epoch: _Optional[int] = ...,
                 author: _Optional[str] = ...,
-                payload: _Optional[str] = ...,
+                payload: _Optional[bytes] = ...,
             ) -> None: ...
         DKG_TRANSCRIPT_FIELD_NUMBER: _ClassVar[int]
         dkg_transcript: ValidatorTransaction.DkgUpdate.DkgTranscript

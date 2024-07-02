@@ -8157,13 +8157,13 @@ impl serde::Serialize for validator_transaction::dkg_update::DkgTranscript {
         }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.DkgUpdate.DkgTranscript", len)?;
         if self.epoch != 0 {
-            struct_ser.serialize_field("epoch", &self.epoch)?;
+            struct_ser.serialize_field("epoch", ToString::to_string(&self.epoch).as_str())?;
         }
         if !self.author.is_empty() {
             struct_ser.serialize_field("author", &self.author)?;
         }
         if !self.payload.is_empty() {
-            struct_ser.serialize_field("payload", &self.payload)?;
+            struct_ser.serialize_field("payload", pbjson::private::base64::encode(&self.payload).as_str())?;
         }
         struct_ser.end()
     }
@@ -8251,7 +8251,9 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::dkg_update::DkgTran
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("payload"));
                             }
-                            payload__ = Some(map.next_value()?);
+                            payload__ =
+                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
+                            ;
                         }
                     }
                 }
@@ -8485,7 +8487,7 @@ impl serde::Serialize for validator_transaction::observed_jwk_update::ExportedPr
         if self.version != 0 {
             len += 1;
         }
-        if !self.jwk.is_empty() {
+        if !self.jwks.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs", len)?;
@@ -8495,8 +8497,8 @@ impl serde::Serialize for validator_transaction::observed_jwk_update::ExportedPr
         if self.version != 0 {
             struct_ser.serialize_field("version", ToString::to_string(&self.version).as_str())?;
         }
-        if !self.jwk.is_empty() {
-            struct_ser.serialize_field("jwk", &self.jwk)?;
+        if !self.jwks.is_empty() {
+            struct_ser.serialize_field("jwks", &self.jwks)?;
         }
         struct_ser.end()
     }
@@ -8510,14 +8512,14 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
         const FIELDS: &[&str] = &[
             "issuer",
             "version",
-            "jwk",
+            "jwks",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Issuer,
             Version,
-            Jwk,
+            Jwks,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -8541,7 +8543,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
                         match value {
                             "issuer" => Ok(GeneratedField::Issuer),
                             "version" => Ok(GeneratedField::Version),
-                            "jwk" => Ok(GeneratedField::Jwk),
+                            "jwks" => Ok(GeneratedField::Jwks),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -8563,7 +8565,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
             {
                 let mut issuer__ = None;
                 let mut version__ = None;
-                let mut jwk__ = None;
+                let mut jwks__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Issuer => {
@@ -8580,18 +8582,18 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::Jwk => {
-                            if jwk__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("jwk"));
+                        GeneratedField::Jwks => {
+                            if jwks__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("jwks"));
                             }
-                            jwk__ = Some(map.next_value()?);
+                            jwks__ = Some(map.next_value()?);
                         }
                     }
                 }
                 Ok(validator_transaction::observed_jwk_update::ExportedProviderJwKs {
                     issuer: issuer__.unwrap_or_default(),
                     version: version__.unwrap_or_default(),
-                    jwk: jwk__.unwrap_or_default(),
+                    jwks: jwks__.unwrap_or_default(),
                 })
             }
         }
