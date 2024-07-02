@@ -5,10 +5,14 @@
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "1.5.0",
-    "html-webpack-plugin": "^5.3.2",
+    "html-webpack-plugin": "^5.6.0",
     "text-encoding": "^0.7.0",
-    "webpack": "^5.49.0",
-    "webpack-cli": "^4.7.2",
-    "webpack-dev-server": "^4.15.1"
+    "webpack": "^5.92.1",
+    "webpack-cli": "^4.10.0",
+    "webpack-dev-server": "^4.15.2"
+  },
+  "dependencies": {
+    "@wgb5445/aptos-labs-ts-sdk": "^1.22.3",
+    "buffer": "^6.0.3"
   }
 }

@@ -9,6 +9,9 @@ module.exports = {
     path: path.resolve(__dirname, 'dist'),
     filename: 'index.js',
   },
+  devServer: {
+    port: 9000,
+  },
   plugins: [
     new HtmlWebpackPlugin(),
     new WasmPackPlugin({
@@ -24,5 +27,6 @@ module.exports = {
   mode: 'development',
   experiments: {
     asyncWebAssembly: true
-  }
+  },
+  
 };
