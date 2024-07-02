@@ -4,7 +4,7 @@
 
 use crate::compiler::{as_module, as_script, compile_units};
 use bytes::Bytes;
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -529,27 +529,23 @@ struct BogusModuleStorage {
 }
 
 impl ModuleResolver for BogusModuleStorage {
-    type Error = PartialVMError;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }
 
 impl ResourceResolver for BogusModuleStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         unreachable!()
     }
 }
@@ -561,27 +557,23 @@ struct BogusResourceStorage {
 }
 
 impl ModuleResolver for BogusResourceStorage {
-    type Error = PartialVMError;
-
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         self.module_storage.get_module_metadata(module_id)
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         self.module_storage.get_module(module_id)
     }
 }
 
 impl ResourceResolver for BogusResourceStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }
