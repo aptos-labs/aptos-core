@@ -399,9 +399,7 @@ impl BatchGenerator {
             Duration::from_millis(self.config.back_pressure.increase_duration_ms);
         let mut back_pressure_decrease_latest = start;
         let mut back_pressure_increase_latest = start;
-        let mut dynamic_pull_txn_per_s = (self.config.back_pressure.dynamic_min_txn_per_s
-            + self.config.back_pressure.dynamic_max_txn_per_s)
-            / 2;
+        let mut dynamic_pull_txn_per_s = self.config.back_pressure.dynamic_max_txn_per_s;
 
         loop {
             let _timer = counters::BATCH_GENERATOR_MAIN_LOOP.start_timer();
@@ -431,7 +429,7 @@ impl BatchGenerator {
                         if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
                             back_pressure_increase_latest = tick_start;
                             dynamic_pull_txn_per_s = std::cmp::min(
-                                dynamic_pull_txn_per_s + self.config.back_pressure.dynamic_min_txn_per_s,
+                                (dynamic_pull_txn_per_s as f64 * self.config.back_pressure.increase_fraction) as u64,
                                 self.config.back_pressure.dynamic_max_txn_per_s,
                             );
                             trace!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
@@ -451,7 +449,6 @@ impl BatchGenerator {
                     if (!self.back_pressure.proof_count
                         && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
                         || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms {
-
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
                         let pull_max_txn = std::cmp::min(
