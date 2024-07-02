@@ -21,9 +21,7 @@ use crate::{
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
-    state_restore::{
-        StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter,
-    },
+    state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
     state_store::buffered_state::BufferedState,
     utils::{
         iterators::PrefixedStateValueIterator,
@@ -37,6 +35,8 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
+use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_executor::components::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
@@ -104,6 +104,7 @@ pub(crate) struct StateStore {
     buffered_state: Mutex<BufferedState>,
     buffered_state_target_items: usize,
     smt_ancestors: Mutex<SmtAncestors<StateValue>>,
+    internal_indexer_db: Option<InternalIndexerDB>,
 }
 
 impl Deref for StateStore {
@@ -287,6 +288,7 @@ impl StateStore {
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
         skip_usage: bool,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Self {
         if !hack_for_tests && !empty_buffered_state_for_restore {
             Self::sync_commit_progress(
@@ -325,6 +327,7 @@ impl StateStore {
             buffered_state: Mutex::new(buffered_state),
             buffered_state_target_items,
             smt_ancestors: Mutex::new(smt_ancestors),
+            internal_indexer_db,
         }
     }
 
@@ -1169,7 +1172,15 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             self.state_kv_db.enabled_sharding(),
         )?;
         self.state_kv_db
-            .commit(version, batch, sharded_schema_batch)
+            .commit(version, batch, sharded_schema_batch)?;
+        if self.internal_indexer_db.is_some() {
+            let keys = node_batch.iter().map(|(key, _)| key.0.clone()).collect();
+            self.internal_indexer_db
+                .as_ref()
+                .unwrap()
+                .write_keys_to_indexer_db(&keys, version, progress)?;
+        }
+        Ok(())
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
@@ -1177,10 +1188,24 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
     }
 
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
-        Ok(self
+        let main_db_progress = self
             .state_kv_db
             .metadata_db()
             .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
-            .map(|v| v.expect_state_snapshot_progress()))
+            .map(|v| v.expect_state_snapshot_progress());
+
+        if self.internal_indexer_db.is_some() {
+            let progress_opt = self
+                .internal_indexer_db
+                .as_ref()
+                .unwrap()
+                .get_restore_progress(version)?;
+            ensure!(
+                main_db_progress == progress_opt,
+                "Inconsistent progress between main db and internal indexer db."
+            );
+        }
+
+        Ok(main_db_progress)
     }
 }

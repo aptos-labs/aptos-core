@@ -4,6 +4,7 @@
 use crate::metrics::OTHER_TIMERS_SECONDS;
 use anyhow::anyhow;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value};
 use aptos_storage_interface::{Result, StateSnapshotReceiver};
@@ -29,19 +30,6 @@ pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
 
 /// Key-Value batch that will be written into db atomically with other batches.
 pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub struct StateSnapshotProgress {
-    pub key_hash: HashValue,
-    pub usage: StateStorageUsage,
-}
-
-impl StateSnapshotProgress {
-    pub fn new(key_hash: HashValue, usage: StateStorageUsage) -> Self {
-        Self { key_hash, usage }
-    }
-}
 
 pub trait StateValueWriter<K, V>: Send + Sync {
     /// Writes a kv batch into storage.

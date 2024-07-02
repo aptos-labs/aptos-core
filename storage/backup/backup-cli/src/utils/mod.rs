@@ -21,10 +21,10 @@ use aptos_db::{
     db::AptosDB,
     get_restore_handler::GetRestoreHandler,
     state_restore::{
-        StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch,
-        StateValueWriter,
+        StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch, StateValueWriter,
     },
 };
+use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
 use aptos_logger::info;

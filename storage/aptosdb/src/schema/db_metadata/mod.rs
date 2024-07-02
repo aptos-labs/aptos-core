@@ -9,8 +9,9 @@
 //! ```
 //!
 
-use crate::{schema::DB_METADATA_CF_NAME, state_restore::StateSnapshotProgress};
+use crate::schema::DB_METADATA_CF_NAME;
 use anyhow::Result;
+use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},

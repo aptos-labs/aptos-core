@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Result;
 use aptos_config::config::NodeConfig;
 use aptos_db_indexer::{
     db_indexer::{DBIndexer, InternalIndexerDB},
@@ -9,7 +10,7 @@ use aptos_db_indexer::{
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_storage_interface::DbReader;
-use aptos_types::indexer::indexer_db_reader::IndexerReader;
+use aptos_types::{indexer::indexer_db_reader::IndexerReader, transaction::Version};
 use std::sync::Arc;
 use tokio::runtime::Handle;
 
@@ -57,18 +58,45 @@ impl InternalIndexerDBService {
         Arc::clone(&self.db_indexer)
     }
 
-    pub async fn run(&mut self) {
-        let mut start_version = self
+    pub async fn get_start_version(&self, node_config: &NodeConfig) -> Result<Version> {
+        let indexer_version = self.db_indexer.indexer_db.get_persisted_version()?;
+        let fast_sync_enabled = node_config
+            .state_sync
+            .state_sync_driver
+            .bootstrapping_mode
+            .is_fast_sync();
+        let mut db_min_version = self.db_indexer.get_main_db_lowest_viable_version()?;
+
+        // Wait till fast sync is done
+        while fast_sync_enabled && db_min_version == 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            db_min_version = self.db_indexer.get_main_db_lowest_viable_version()?;
+        }
+        let fast_sync_version_opt = self
             .db_indexer
             .indexer_db
-            .get_persisted_version()
-            .unwrap_or(0);
+            .get_restore_progress(db_min_version)?;
+
+        if node_config.indexer_db_config.enable_statekeys()
+            && fast_sync_enabled
+            && fast_sync_version_opt.is_none()
+        {
+            panic!("Internal indexer db don't have state keys restored. Please run state sync with state keys enabled.");
+        }
+
+        if indexer_version >= db_min_version {
+            Ok(indexer_version)
+        } else {
+            Ok(db_min_version)
+        }
+    }
+
+    pub async fn run(&mut self, node_config: &NodeConfig) -> Result<()> {
+        let mut start_version = self.get_start_version(node_config).await?;
+
         loop {
             let start_time: std::time::Instant = std::time::Instant::now();
-            let next_version = self
-                .db_indexer
-                .process_a_batch(Some(start_version))
-                .expect("Failed to run internal db indexer");
+            let next_version = self.db_indexer.process_a_batch(Some(start_version))?;
 
             if next_version == start_version {
                 tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -112,8 +140,12 @@ impl MockInternalIndexerDBService {
         let handle = Handle::current();
         let mut internal_indexer_db_service = InternalIndexerDBService::new(db_reader, db);
         let db_indexer = internal_indexer_db_service.get_db_indexer();
+        let config_clone = node_config.to_owned();
         handle.spawn(async move {
-            internal_indexer_db_service.run().await;
+            internal_indexer_db_service
+                .run(&config_clone)
+                .await
+                .unwrap();
         });
         Self {
             indexer_readers: IndexerReaders::new(None, Some(db_indexer)),

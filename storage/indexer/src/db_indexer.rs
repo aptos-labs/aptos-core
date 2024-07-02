@@ -4,7 +4,7 @@
 use crate::utils::PrefixedStateValueIterator;
 use aptos_config::config::internal_indexer_db_config::InternalIndexerDBConfig;
 use aptos_db_indexer_schemas::{
-    metadata::{MetadataKey, MetadataValue},
+    metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
     schema::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
         indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema,
@@ -78,6 +78,26 @@ impl InternalIndexerDB {
         Self { db, config }
     }
 
+    pub fn write_keys_to_indexer_db(
+        &self,
+        keys: &Vec<StateKey>,
+        snapshot_version: Version,
+        progress: StateSnapshotProgress,
+    ) -> Result<()> {
+        // add state value to internal indexer
+        let batch = SchemaBatch::new();
+        for state_key in keys {
+            batch.put::<StateKeysSchema>(state_key, &())?;
+        }
+
+        batch.put::<InternalIndexerMetadataSchema>(
+            &MetadataKey::StateSnapshotRestoreProgress(snapshot_version),
+            &MetadataValue::StateSnapshotProgress(progress),
+        )?;
+        self.db.write_schemas(batch)?;
+        Ok(())
+    }
+
     pub fn get_persisted_version(&self) -> Result<Version> {
         // read the latest key from the db
         self.db
@@ -103,6 +123,15 @@ impl InternalIndexerDB {
 
     pub fn get_inner_db_clone(&self) -> Arc<DB> {
         Arc::clone(&self.db)
+    }
+
+    pub fn get_restore_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
+        Ok(self
+            .db
+            .get::<InternalIndexerMetadataSchema>(&MetadataKey::StateSnapshotRestoreProgress(
+                version,
+            ))?
+            .map(|e| e.expect_state_snapshot_progress()))
     }
 
     pub fn ensure_cover_ledger_version(&self, ledger_version: Version) -> Result<()> {
@@ -188,6 +217,24 @@ impl InternalIndexerDB {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
+    pub fn get_restore_version_and_progress(
+        &self,
+    ) -> Result<Option<(Version, StateSnapshotProgress)>> {
+        let mut iter = self.db.iter::<InternalIndexerMetadataSchema>()?;
+        iter.seek_to_first();
+        let mut last_version = None;
+        let mut last_progress = None;
+        for res in iter {
+            let (key, value) = res?;
+            if let MetadataKey::StateSnapshotRestoreProgress(version) = key {
+                last_version = Some(version);
+                last_progress = Some(value.expect_state_snapshot_progress());
+            }
+        }
+        Ok(last_version.map(|version| (version, last_progress.unwrap())))
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn get_state_keys(&self, prefix: &StateKeyPrefix) -> Result<Vec<StateKey>> {
         let mut iter = self.db.iter::<StateKeysSchema>()?;
         iter.seek_to_first();
@@ -246,6 +293,22 @@ impl DBIndexer {
             sender,
             committer_handle: Some(committer_handle),
         }
+    }
+
+    pub fn get_main_db_lowest_viable_version(&self) -> Result<Version> {
+        self.main_db_reader
+            .get_first_txn_version()
+            .transpose()
+            .expect("main db lowest viable version doesn't exist")
+    }
+
+    pub fn ensure_cover_ledger_version(&self, ledger_version: Version) -> Result<()> {
+        let indexer_latest_version = self.indexer_db.get_persisted_version()?;
+        ensure!(
+            indexer_latest_version >= ledger_version,
+            "ledger version too new"
+        );
+        Ok(())
     }
 
     fn get_main_db_iter(

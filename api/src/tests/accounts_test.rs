@@ -148,10 +148,11 @@ async fn test_get_account_resources_by_ledger_version() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resources_by_too_large_ledger_version() {
     let mut context = new_test_context(current_function_name!());
+    let account = context.root_account().await;
     let resp = context
         .expect_status_code(404)
         .get(&account_resources_with_ledger_version(
-            &context.root_account().await.address().to_hex_literal(),
+            &account.address().to_hex_literal(),
             1000000000000000000,
         ))
         .await;

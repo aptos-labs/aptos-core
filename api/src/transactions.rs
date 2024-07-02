@@ -986,7 +986,7 @@ impl TransactionsApi {
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
         // Verify the account exists
-        let account = Account::new(self.context.clone(), address, None, None, None)?;
+        let account = Account::new(self.context.clone(), address, None, None, None, true)?;
         account.get_account_resource()?;
 
         let latest_ledger_info = account.latest_ledger_info;
