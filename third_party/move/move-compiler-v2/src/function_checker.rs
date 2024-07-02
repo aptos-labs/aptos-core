@@ -262,7 +262,11 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                                 .in_same_package(&caller_func.module_env)
                                             {
                                                 // we should've inferred the friend declaration
-                                                panic!("ICE: {} should have friend {}", callee_func.module_env.get_full_name_str(), caller_func.module_env.get_full_name_str());
+                                                panic!(
+                                                    "ICE: {} should have friend {}",
+                                                    callee_func.module_env.get_full_name_str(),
+                                                    caller_func.module_env.get_full_name_str()
+                                                );
                                             } else {
                                                 diff_package_error(
                                                     env,
