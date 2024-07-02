@@ -238,6 +238,7 @@ async fn loopback_commit_vote(
                 msg.verify(verifier).unwrap();
                 let request = IncomingCommitRequest {
                     req: *msg,
+                    author,
                     protocol,
                     response_sender: callback,
                 };

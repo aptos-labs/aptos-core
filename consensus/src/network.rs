@@ -117,6 +117,7 @@ pub struct IncomingDAGRequest {
 #[derive(Debug)]
 pub struct IncomingCommitRequest {
     pub req: CommitMessage,
+    pub author: Author,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
@@ -738,6 +739,7 @@ impl NetworkTask {
                             let req_with_callback =
                                 IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                     req: CommitMessage::Vote(*commit_vote),
+                                    author: peer_id,
                                     protocol: RPC[0],
                                     response_sender: tx,
                                 });
@@ -753,6 +755,7 @@ impl NetworkTask {
                             let req_with_callback =
                                 IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                     req: CommitMessage::Decision(*commit_decision),
+                                    author: peer_id,
                                     protocol: RPC[0],
                                     response_sender: tx,
                                 });
@@ -850,6 +853,7 @@ impl NetworkTask {
                         ConsensusMsg::CommitMessage(req) => {
                             IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                 req: *req,
+                                author: peer_id,
                                 protocol,
                                 response_sender: callback,
                             })
