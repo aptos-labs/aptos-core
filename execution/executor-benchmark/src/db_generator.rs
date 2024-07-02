@@ -82,6 +82,7 @@ fn bootstrap_with_genesis(
             false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
         )
         .expect("DB should open."),
     );

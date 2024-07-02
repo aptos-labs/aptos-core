@@ -167,8 +167,9 @@ fn check_indexer_db(vfn_config: &NodeConfig) {
         .get_prefixed_state_value_iterator(&prefix, None, Version::MAX)
         .unwrap();
     let main_db_keys: HashSet<StateKey> = main_db_iter.map(|iter| iter.unwrap().0).collect();
-    let indexer_keys: HashSet<StateKey> =
-        get_indexer_db_content::<StateKeysSchema, StateKey>(internal_indexer_db.clone());
+    let indexer_keys: HashSet<StateKey> = get_indexer_db_content::<StateKeysSchema, StateKey>(
+        internal_indexer_db.get_inner_db_clone().clone(),
+    );
     println!(
         "Total state keys: {}, {}",
         main_db_keys.len(),

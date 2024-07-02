@@ -190,17 +190,29 @@ impl EventDb {
         start: Version,
         end: Version,
         db_batch: &SchemaBatch,
-    ) -> anyhow::Result<()> {
+        split_indexer_deletes: bool,
+    ) -> anyhow::Result<SchemaBatch> {
         let mut current_version = start;
+        let indexer_batch = SchemaBatch::new();
         for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
             for (idx, event) in (events?).into_iter().enumerate() {
                 if let ContractEvent::V1(v1) = event {
-                    db_batch.delete::<EventByVersionSchema>(&(
-                        *v1.key(),
-                        current_version,
-                        v1.sequence_number(),
-                    ))?;
-                    db_batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
+                    if split_indexer_deletes {
+                        indexer_batch.delete::<EventByVersionSchema>(&(
+                            *v1.key(),
+                            current_version,
+                            v1.sequence_number(),
+                        ))?;
+                        indexer_batch
+                            .delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
+                    } else {
+                        db_batch.delete::<EventByVersionSchema>(&(
+                            *v1.key(),
+                            current_version,
+                            v1.sequence_number(),
+                        ))?;
+                        db_batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
+                    }
                 }
                 db_batch.delete::<EventSchema>(&(current_version, idx as u64))?;
             }
@@ -208,6 +220,6 @@ impl EventDb {
         }
         self.event_store
             .prune_event_accumulator(start, end, db_batch)?;
-        Ok(())
+        Ok(indexer_batch)
     }
 }

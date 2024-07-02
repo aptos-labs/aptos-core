@@ -410,7 +410,8 @@ fn delete_event_data(
             );
             ledger_db
                 .event_db()
-                .prune_events(start_version, latest_version + 1, batch)?;
+                .prune_events(start_version, latest_version + 1, batch, false)?;
+            // we don't need to delete from internal indexer when syncing main db.
         }
     }
     Ok(())

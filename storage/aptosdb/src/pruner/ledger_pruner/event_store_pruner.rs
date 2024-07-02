@@ -6,6 +6,11 @@ use crate::{
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
+use aptos_db_indexer_schemas::{
+    metadata::{MetadataKey as IndexerMetadataKey, MetadataValue as IndexerMetadataValue},
+    schema::indexer_metadata::IndexerMetadataSchema,
+};
 use aptos_logger::info;
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::Result;
@@ -15,6 +20,7 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct EventStorePruner {
     ledger_db: Arc<LedgerDb>,
+    internal_indexer_db: Option<InternalIndexerDB>,
 }
 
 impl DBSubPruner for EventStorePruner {
@@ -24,13 +30,28 @@ impl DBSubPruner for EventStorePruner {
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
-        self.ledger_db
-            .event_db()
-            .prune_events(current_progress, target_version, &batch)?;
+        let split_indexer_deletes = self.internal_indexer_db.is_some();
+        let indexer_deletes = self.ledger_db.event_db().prune_events(
+            current_progress,
+            target_version,
+            &batch,
+            split_indexer_deletes,
+        )?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::EventPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
+        if let Some(indexer_db) = &self.internal_indexer_db {
+            indexer_deletes.put::<IndexerMetadataSchema>(
+                &IndexerMetadataKey::EventPrunerProgress,
+                &IndexerMetadataValue::Version(target_version),
+            )?;
+            if indexer_db.event_enabled() {
+                indexer_db
+                    .get_inner_db_ref()
+                    .write_schemas(indexer_deletes)?;
+            }
+        }
         self.ledger_db.event_db().write_schemas(batch)
     }
 }
@@ -39,6 +60,7 @@ impl EventStorePruner {
     pub(in crate::pruner) fn new(
         ledger_db: Arc<LedgerDb>,
         metadata_progress: Version,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
             ledger_db.event_db_raw(),
@@ -46,7 +68,10 @@ impl EventStorePruner {
             metadata_progress,
         )?;
 
-        let myself = EventStorePruner { ledger_db };
+        let myself = EventStorePruner {
+            ledger_db,
+            internal_indexer_db,
+        };
 
         info!(
             progress = progress,
