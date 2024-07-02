@@ -15305,7 +15305,6 @@ dependencies = [
  "move-vm-test-utils",
  "move-vm-types",
  "num_cpus",
- "once_cell",
  "rand 0.8.5",
  "tracing",
  "tracing-subscriber 0.3.18",
