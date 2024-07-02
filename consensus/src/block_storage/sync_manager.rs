@@ -276,7 +276,7 @@ impl BlockStore {
             block_id = root.0.id(),
         );
         info!(
-            "sync_to_highest_ordered_cert finished with blocks: {:?}",
+            "sync_to_highest_quorum_cert finished with blocks: {:?}",
             blocks
                 .iter()
                 .map(|b| format!("epoch: {}, round: {}, id: {}", b.epoch(), b.round(), b.id()))
@@ -324,6 +324,10 @@ impl BlockStore {
 
         // we fetch the blocks from
         let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
+        info!(
+            "fast_forward_sync window_size: {}, target_round: {}, num_blocks: {}",
+            window_size, target_round, num_blocks
+        );
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
