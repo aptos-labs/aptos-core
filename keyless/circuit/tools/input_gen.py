@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# WARNING: This code is guaranteed to work only for the hardcoded JWT present, and is meant only to be used to provide a quick and easy way to run the full Keyless circuit. Detailed unit testing can be found in `circuit/templates/tests`
+# WARNING: This code is guaranteed to work only for the hardcoded JWT present, and is meant only to be used to provide a quick and easy way to run the full Keyless circuit. Detailed unit tests can be found in `circuit/src`.
 
 import json
 import os
