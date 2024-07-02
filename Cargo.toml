@@ -41,7 +41,6 @@ members = [
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
     "aptos-move/vm-genesis",
-    "aptos-move/writeset-transaction-generator",
     "aptos-node",
     "aptos-utils",
     "config",
@@ -454,7 +453,6 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
-aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
