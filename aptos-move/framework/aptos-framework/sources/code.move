@@ -145,6 +145,15 @@ module aptos_framework::code {
     /// Publishes a package at the given signer's address. The caller must provide package metadata describing the
     /// package.
     public fun publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) acquires PackageRegistry {
+        publish_package_inner(owner, pack, code, true)
+    }
+
+    inline fun publish_package_inner(
+        owner: &signer,
+        pack: PackageMetadata,
+        code: vector<vector<u8>>,
+        request_publish: bool,
+    ) acquires PackageRegistry {
         // Disallow incompatible upgrade mode. Governance can decide later if this should be reconsidered.
         assert!(
             pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy,
@@ -197,12 +206,14 @@ module aptos_framework::code {
         });
 
         // Request publish
-        if (features::code_dependency_check_enabled())
-            request_publish_with_allowed_deps(addr, module_names, allowed_deps, code, policy.policy)
-        else
-        // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
-        // compatible code.
-            request_publish(addr, module_names, code, policy.policy)
+        if (request_publish) {
+            if (features::code_dependency_check_enabled())
+                request_publish_with_allowed_deps(addr, module_names, allowed_deps, code, policy.policy)
+            else
+            // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
+            // compatible code.
+                request_publish(addr, module_names, code, policy.policy)
+        }
     }
 
     public fun freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) acquires PackageRegistry {
@@ -356,4 +367,21 @@ module aptos_framework::code {
         bundle: vector<vector<u8>>,
         policy: u8
     );
+
+    #[test_only]
+    /// Allows publication of multiple packages during a single txn for testing purposes, by
+    /// circumventing the request publish native function, which only allows publication of one
+    /// package during a single transaction.
+    public fun publish_package_txn_for_testing(
+        owner: &signer,
+        metadata_serialized: vector<u8>,
+        code: vector<vector<u8>>,
+    ) acquires PackageRegistry {
+        publish_package_inner(
+            owner,
+            util::from_bytes<PackageMetadata>(metadata_serialized),
+            code,
+            false,
+        )
+    }
 }

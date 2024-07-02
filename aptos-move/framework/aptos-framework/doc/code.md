@@ -20,6 +20,7 @@ This module supports functionality related to code management.
 -  [Function `can_change_upgrade_policy_to`](#0x1_code_can_change_upgrade_policy_to)
 -  [Function `initialize`](#0x1_code_initialize)
 -  [Function `publish_package`](#0x1_code_publish_package)
+-  [Function `publish_package_inner`](#0x1_code_publish_package_inner)
 -  [Function `freeze_code_object`](#0x1_code_freeze_code_object)
 -  [Function `publish_package_txn`](#0x1_code_publish_package_txn)
 -  [Function `check_upgradability`](#0x1_code_check_upgradability)
@@ -598,6 +599,35 @@ package.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_publish_package">publish_package</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pack: <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <a href="code.md#0x1_code_publish_package_inner">publish_package_inner</a>(owner, pack, <a href="code.md#0x1_code">code</a>, <b>true</b>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_code_publish_package_inner"></a>
+
+## Function `publish_package_inner`
+
+
+
+<pre><code><b>fun</b> <a href="code.md#0x1_code_publish_package_inner">publish_package_inner</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pack: <a href="code.md#0x1_code_PackageMetadata">code::PackageMetadata</a>, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, request_publish: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="code.md#0x1_code_publish_package_inner">publish_package_inner</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pack: <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>,
+    <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    request_publish: bool,
+) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
     // Disallow incompatible upgrade mode. Governance can decide later <b>if</b> this should be reconsidered.
     <b>assert</b>!(
         pack.upgrade_policy.policy &gt; <a href="code.md#0x1_code_upgrade_policy_arbitrary">upgrade_policy_arbitrary</a>().policy,
@@ -650,12 +680,14 @@ package.
     });
 
     // Request publish
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_code_dependency_check_enabled">features::code_dependency_check_enabled</a>())
-        <a href="code.md#0x1_code_request_publish_with_allowed_deps">request_publish_with_allowed_deps</a>(addr, module_names, allowed_deps, <a href="code.md#0x1_code">code</a>, policy.policy)
-    <b>else</b>
-    // The new `request_publish_with_allowed_deps` <b>has</b> not yet rolled out, so call downwards
-    // compatible <a href="code.md#0x1_code">code</a>.
-        <a href="code.md#0x1_code_request_publish">request_publish</a>(addr, module_names, <a href="code.md#0x1_code">code</a>, policy.policy)
+    <b>if</b> (request_publish) {
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_code_dependency_check_enabled">features::code_dependency_check_enabled</a>())
+            <a href="code.md#0x1_code_request_publish_with_allowed_deps">request_publish_with_allowed_deps</a>(addr, module_names, allowed_deps, <a href="code.md#0x1_code">code</a>, policy.policy)
+        <b>else</b>
+        // The new `request_publish_with_allowed_deps` <b>has</b> not yet rolled out, so call downwards
+        // compatible <a href="code.md#0x1_code">code</a>.
+            <a href="code.md#0x1_code_request_publish">request_publish</a>(addr, module_names, <a href="code.md#0x1_code">code</a>, policy.policy)
+    }
 }
 </code></pre>
 
