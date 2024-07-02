@@ -5,7 +5,7 @@ use crate::metrics::{BIG_QUERY_REQUEST_FAILURES_TOTAL, BIG_QUERY_REQUEST_TOTAL};
 use aptos_infallible::RwLock;
 use aptos_types::PeerId;
 use gcp_bigquery_client::{model::query_request::QueryRequest, Client as BigQueryClient};
-use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashMap, env, str::FromStr, sync::Arc, time::Duration};
 
 const ANALYTICS_PROJECT_ID: &str = "analytics-test-345723";
 
@@ -36,10 +36,14 @@ impl PeerLocationUpdater {
     pub fn run(self) -> anyhow::Result<()> {
         tokio::spawn(async move {
             loop {
-                let locations = query_peer_locations(&self.client).await.unwrap();
-                {
-                    let mut peer_locations = self.peer_locations.write();
-                    *peer_locations = locations;
+                match query_peer_locations(&self.client).await {
+                    Ok(locations) => {
+                        let mut peer_locations = self.peer_locations.write();
+                        *peer_locations = locations;
+                    },
+                    Err(e) => {
+                        aptos_logger::error!("Failed to query peer locations: {}", e);
+                    },
                 }
                 tokio::time::sleep(Duration::from_secs(3600)).await; // 1 hour
             }
@@ -51,26 +55,9 @@ impl PeerLocationUpdater {
 pub async fn query_peer_locations(
     client: &BigQueryClient,
 ) -> anyhow::Result<HashMap<PeerId, PeerLocation>> {
-    let req = QueryRequest::new("
-        SELECT
-            sq.peer_id,
-            sq.country,
-            sq.region,
-            '1985-04-12T23:20:50.52Z' as geo_updated_at
-        FROM (
-            SELECT
-            tm.peer_id,
-            tm.epoch,
-            ROW_NUMBER() OVER (PARTITION BY tm.peer_id ORDER BY tm.epoch DESC) AS row_number,
-            tm.country,
-            tm.region
-            FROM
-            `node-telemetry.aptos_node_telemetry.custom_events_mainnet_telemetry_rollup_metrics` tm) sq
-        WHERE
-            sq.row_number = 1
-        LIMIT
-            1000
-    ");
+    let query = env::var("PEER_LOCATION_QUERY")?;
+
+    let req = QueryRequest::new(query);
     let req = QueryRequest {
         timeout_ms: Some(10000),
         ..req
@@ -95,7 +82,7 @@ pub async fn query_peer_locations(
                 Ok(peer_id) => {
                     let location = PeerLocation {
                         peer_id,
-                        geo_updated_at: res.get_string_by_name("geo_updated_at")?,
+                        geo_updated_at: res.get_string_by_name("update_timestamp")?,
                         country: res.get_string_by_name("country")?,
                         region: res.get_string_by_name("region")?,
                     };
