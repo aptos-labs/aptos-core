@@ -6,6 +6,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Invalid message error: {0}")]
+    InvalidMessageError(String),
+
     #[error("Network error: {0}")]
     NetworkError(String),
 
@@ -32,6 +35,7 @@ impl Error {
     /// Returns a summary label for the error
     pub fn get_label(&self) -> &'static str {
         match self {
+            Self::InvalidMessageError(_) => "invalid_message_error",
             Self::NetworkError(_) => "network_error",
             Self::RpcError(_) => "rpc_error",
             Self::SubscriptionDisconnected(_) => "subscription_disconnected",
