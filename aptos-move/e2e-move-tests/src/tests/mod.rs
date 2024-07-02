@@ -22,6 +22,7 @@ mod governance_updates;
 mod infinite_loop;
 mod init_module;
 mod keyless_feature_gating;
+mod large_package_publishing;
 mod lazy_natives;
 mod max_loop_depth;
 mod memory_quota;
