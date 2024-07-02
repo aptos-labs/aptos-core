@@ -62,7 +62,7 @@ template Base64URLLookup() {
     signal sum_underscore <== sum_minus + equal_underscore.out * 63;
 
     out <== sum_underscore;
-    log("sum_underscore (out): ", out);
+    //log("sum_underscore (out): ", out);
 
     // '='
     component equal_eqsign = IsZero();
@@ -73,14 +73,14 @@ template Base64URLLookup() {
     zero_padding.in <== in;
 
 
-    log("zero_padding.out: ", zero_padding.out);
-    log("equal_eqsign.out: ", equal_eqsign.out);
-    log("equal_underscore.out: ", equal_underscore.out);
-    log("equal_minus.out: ", equal_minus.out);
-    log("range_09: ", range_09);
-    log("range_az: ", range_az);
-    log("range_AZ: ", range_AZ);
-    log("< end Base64URLLookup");
+    //log("zero_padding.out: ", zero_padding.out);
+    //log("equal_eqsign.out: ", equal_eqsign.out);
+    //log("equal_underscore.out: ", equal_underscore.out);
+    //log("equal_minus.out: ", equal_minus.out);
+    //log("range_09: ", range_09);
+    //log("range_az: ", range_az);
+    //log("range_AZ: ", range_AZ);
+    //log("< end Base64URLLookup");
 
     signal result <== range_AZ + range_az + range_09 + equal_minus.out + equal_underscore.out + equal_eqsign.out + zero_padding.out;
     1 === result;
@@ -107,8 +107,8 @@ template Base64Decode(N) {
         for (var j = 0; j < 4; j++) {
             bits_in[i\4][j] = Num2Bits(6);
 
-            log(">> calling into Base64URLLookup");
-            log("translate[i\\4][j].in: ", in[i+j]);
+            //log(">> calling into Base64URLLookup");
+            //log("translate[i\\4][j].in: ", in[i+j]);
 
             translate[i\4][j] = Base64URLLookup();
             translate[i\4][j].in <== in[i+j];
