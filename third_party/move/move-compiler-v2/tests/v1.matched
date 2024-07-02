@@ -1,3 +1,6 @@
+WARNING: test `move-compiler-v2/tests/verification/cross_module_valid.verification.move` and `move-compiler-v2/tests/verification/verify/cross_module_valid.move` share common key `verification/cross_module_valid.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/verification/double_annotation.verification.move` and `move-compiler-v2/tests/verification/verify/double_annotation.move` share common key `verification/double_annotation.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/verification/single_module_valid.verification.move` and `move-compiler-v2/tests/verification/verify/single_module_valid.move` share common key `verification/single_module_valid.verification.move`, discarding former one
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_1.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_1.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_2.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_2.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_3.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_3.exp
@@ -138,6 +141,7 @@ move-compiler/tests/move_check/translated_ir_tests/move/commands/continue_outsid
 move-compiler/tests/move_check/translated_ir_tests/move/commands/else_assigns_if_doesnt.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/else_assigns_if_doesnt.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/if_assigns_else_doesnt.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/if_assigns_else_doesnt.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/if_assigns_no_else.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/if_assigns_no_else.exp
+move-compiler/tests/move_check/translated_ir_tests/move/commands/mixed_lvalue.exp   move-compiler-v2/tests/unused-assignment/v1-commands/mixed_lvalue.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/move_before_assign.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/move_before_assign.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/no_let_outside_if.exp   move-compiler-v2/tests/checking/typing/v1-commands/no_let_outside_if.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/pop_negative.exp   move-compiler-v2/tests/checking/typing/v1-commands/pop_negative.exp
@@ -151,6 +155,19 @@ move-compiler/tests/move_check/translated_ir_tests/move/commands/use_before_assi
 move-compiler/tests/move_check/control_flow/for_loop_empty_novar.exp   move-compiler-v2/tests/checking/control_flow/for_loop_empty_novar.exp
 move-compiler/tests/move_check/control_flow/for_type_mismatch.exp   move-compiler-v2/tests/checking/control_flow/for_type_mismatch.exp
 move-compiler/tests/move_check/control_flow/loop_after_loop.exp   move-compiler-v2/tests/checking/control_flow/loop_after_loop.exp
+move-compiler/tests/move_check/deprecated/deprecated_constant_duplicated_struct.exp   move-compiler-v2/tests/deprecated/deprecated_constant_duplicated_struct.exp
+move-compiler/tests/move_check/deprecated/deprecated_constant_duplicated_struct2.exp   move-compiler-v2/tests/deprecated/deprecated_constant_duplicated_struct2.exp
+move-compiler/tests/move_check/deprecated/deprecated_field_type.exp   move-compiler-v2/tests/deprecated/deprecated_field_type.exp
+move-compiler/tests/move_check/deprecated/deprecated_field_type2.exp   move-compiler-v2/tests/deprecated/deprecated_field_type2.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_address.exp   move-compiler-v2/tests/deprecated/deprecated_placement_address.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_address_module_members.exp   move-compiler-v2/tests/deprecated/deprecated_placement_address_module_members.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_members.exp   move-compiler-v2/tests/deprecated/deprecated_placement_members.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module.exp   move-compiler-v2/tests/deprecated/deprecated_placement_module.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module2.exp   move-compiler-v2/tests/deprecated/deprecated_placement_module2.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module_members.exp   move-compiler-v2/tests/deprecated/deprecated_placement_module_members.exp
+move-compiler/tests/move_check/deprecated/public_script.exp   move-compiler-v2/tests/deprecated/public_script.exp
+move-compiler/tests/move_check/examples/multi_pool_money_market_token.exp   move-compiler-v2/tests/checking/typing/v1-examples/multi_pool_money_market_token.exp
+move-compiler/tests/move_check/examples/simple_money_market_token.exp   move-compiler-v2/tests/checking/typing/v1-examples/simple_money_market_token.exp
 move-compiler/tests/move_check/folding/empty_vectors.exp   move-compiler-v2/tests/folding/empty_vectors.exp
 move-compiler/tests/move_check/folding/empty_vectors2.exp   move-compiler-v2/tests/folding/empty_vectors2.exp
 move-compiler/tests/move_check/folding/non_constant_empty_vec.exp   move-compiler-v2/tests/folding/non_constant_empty_vec.exp
@@ -205,9 +222,16 @@ move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_l
 move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_loops/two_loops.exp   move-compiler-v2/tests/cyclic-instantiation-checker/v1-tests/two_loops.exp
 move-compiler/tests/move_check/liveness/mut_inline.exp   move-compiler-v2/tests/live-var/mut_inline.exp
 move-compiler/tests/move_check/liveness/mut_ref.exp   move-compiler-v2/tests/live-var/mut_ref.exp
+move-compiler/tests/move_check/liveness/unused_assignment.exp   move-compiler-v2/tests/unused-assignment/v1-liveness/unused_assignment.exp
+move-compiler/tests/move_check/locals/assign_partial_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/assign_partial_resource.exp
+move-compiler/tests/move_check/locals/assign_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/assign_resource.exp
 move-compiler/tests/move_check/locals/drop_conditional.exp   move-compiler-v2/tests/ability-check/v1-locals/drop_conditional.exp
 move-compiler/tests/move_check/locals/eliminate_temps.exp   move-compiler-v2/tests/reference-safety/v1-locals/eliminate_temps.exp
 move-compiler/tests/move_check/locals/reassign_parameter.exp   move-compiler-v2/tests/ability-check/v1-locals/reassign_parameter.exp
+move-compiler/tests/move_check/locals/struct_use_before_assign.exp   move-compiler-v2/tests/unused-assignment/v1-locals/struct_use_before_assign.exp
+move-compiler/tests/move_check/locals/unused_copyable.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_copyable.exp
+move-compiler/tests/move_check/locals/unused_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_resource.exp
+move-compiler/tests/move_check/locals/unused_resource_explicit_return.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_resource_explicit_return.exp
 move-compiler/tests/move_check/locals/use_before_assign_if.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_if.exp
 move-compiler/tests/move_check/locals/use_before_assign_if_else.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_if_else.exp
 move-compiler/tests/move_check/locals/use_before_assign_loop.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_loop.exp
@@ -615,3 +639,12 @@ move-compiler/tests/move_check/unit_test/test_filter_function.exp   move-compile
 move-compiler/tests/move_check/unit_test/test_filter_struct.exp   move-compiler-v2/tests/unit_test/notest/test_filter_struct.exp
 move-compiler/tests/move_check/unit_test/valid_test_module.exp   move-compiler-v2/tests/unit_test/notest/valid_test_module.exp
 move-compiler/tests/move_check/unit_test/valid_test_module.unit_test.exp   move-compiler-v2/tests/unit_test/test/valid_test_module.exp
+move-compiler/tests/move_check/verification/cross_module_invalid.exp   move-compiler-v2/tests/verification/noverify/cross_module_invalid.exp
+move-compiler/tests/move_check/verification/cross_module_valid.exp   move-compiler-v2/tests/verification/noverify/cross_module_valid.exp
+move-compiler/tests/move_check/verification/cross_module_valid.verification.exp   move-compiler-v2/tests/verification/verify/cross_module_valid.exp
+move-compiler/tests/move_check/verification/double_annotation.exp   move-compiler-v2/tests/verification/noverify/double_annotation.exp
+move-compiler/tests/move_check/verification/double_annotation.verification.exp   move-compiler-v2/tests/verification/verify/double_annotation.exp
+move-compiler/tests/move_check/verification/single_module_invalid.exp   move-compiler-v2/tests/verification/noverify/single_module_invalid.exp
+move-compiler/tests/move_check/verification/single_module_invalid.verification.exp   move-compiler-v2/tests/verification/single_module_invalid.verification.exp
+move-compiler/tests/move_check/verification/single_module_valid.exp   move-compiler-v2/tests/verification/noverify/single_module_valid.exp
+move-compiler/tests/move_check/verification/single_module_valid.verification.exp   move-compiler-v2/tests/verification/verify/single_module_valid.exp

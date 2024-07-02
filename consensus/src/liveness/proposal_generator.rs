@@ -164,6 +164,8 @@ pub struct ProposalGenerator {
     quorum_store_poll_time: Duration,
     // Max number of transactions to be added to a proposed block.
     max_block_txns: u64,
+    // Max number of unique transactions to be added to a proposed block.
+    max_block_unique_txns: u64,
     // Max number of bytes to be added to a proposed block.
     max_block_bytes: u64,
     // Max number of inline transactions to be added to a proposed block.
@@ -193,6 +195,7 @@ impl ProposalGenerator {
         time_service: Arc<dyn TimeService>,
         quorum_store_poll_time: Duration,
         max_block_txns: u64,
+        max_block_unique_txns: u64,
         max_block_bytes: u64,
         max_inline_txns: u64,
         max_inline_bytes: u64,
@@ -210,6 +213,7 @@ impl ProposalGenerator {
             time_service,
             quorum_store_poll_time,
             max_block_txns,
+            max_block_unique_txns,
             max_block_bytes,
             max_inline_txns,
             max_inline_bytes,
@@ -312,9 +316,14 @@ impl ProposalGenerator {
 
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-            let (max_block_txns, max_block_bytes, max_txns_from_block_to_execute, proposal_delay) =
-                self.calculate_max_block_sizes(voting_power_ratio, timestamp, round)
-                    .await;
+            let (
+                max_block_unique_txns,
+                max_block_bytes,
+                max_txns_from_block_to_execute,
+                proposal_delay,
+            ) = self
+                .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
+                .await;
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -349,7 +358,8 @@ impl ProposalGenerator {
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
-                    max_block_txns,
+                    self.max_block_txns,
+                    max_block_unique_txns,
                     max_block_bytes,
                     // TODO: Set max_inline_txns and max_inline_bytes correctly
                     self.max_inline_txns,

@@ -75,6 +75,14 @@ public fun m::test4($t0: u64): u64 {
  17: return $t1
 }
 
+
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/variable-coalescing/self_assigns.move:3:9
+  │
+3 │         x = x;
+  │         ^^^^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]

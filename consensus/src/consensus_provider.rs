@@ -133,7 +133,15 @@ pub fn start_consensus_observer(
     let runtime = aptos_runtimes::spawn_named_runtime("observer".into(), None);
 
     // Create the consensus observer client
-    let consensus_observer_client = ConsensusObserverClient::new(observer_network_client.clone());
+    let consensus_observer_client = if let Some(consensus_publisher) = &consensus_publisher {
+        // Get the consensus observer client from the consensus publisher
+        consensus_publisher.get_consensus_observer_client()
+    } else {
+        // Otherwise, create a new client (the publisher is not enabled)
+        Arc::new(ConsensusObserverClient::new(
+            observer_network_client.clone(),
+        ))
+    };
 
     // Create the consensus observer network events
     let observer_network_events =

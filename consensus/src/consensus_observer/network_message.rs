@@ -14,7 +14,7 @@ use std::{
 };
 
 /// Types of messages that can be sent between the consensus publisher and observer
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ConsensusObserverMessage {
     Request(ConsensusObserverRequest),
     Response(ConsensusObserverResponse),
@@ -75,7 +75,7 @@ impl Display for ConsensusObserverMessage {
 }
 
 /// Types of requests that can be sent between the consensus publisher and observer
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ConsensusObserverRequest {
     Subscribe,
     Unsubscribe,
@@ -97,7 +97,7 @@ impl ConsensusObserverRequest {
 }
 
 /// Types of responses that can be sent between the consensus publisher and observer
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ConsensusObserverResponse {
     SubscribeAck,
     UnsubscribeAck,
@@ -119,7 +119,7 @@ impl ConsensusObserverResponse {
 }
 
 /// Types of direct sends that can be sent between the consensus publisher and observer
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ConsensusObserverDirectSend {
     OrderedBlock(OrderedBlock),
     CommitDecision(CommitDecision),
@@ -164,14 +164,14 @@ impl ConsensusObserverDirectSend {
 }
 
 /// OrderedBlock message contains the ordered blocks and the proof of the ordering
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OrderedBlock {
     pub blocks: Vec<Arc<PipelinedBlock>>,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
 /// Payload message contains the block, transactions and the limit of the block
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockPayload {
     pub block: BlockInfo,
     pub transactions: Vec<SignedTransaction>,

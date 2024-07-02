@@ -124,6 +124,10 @@ pub(crate) struct StructEntry {
     /// Maps simple function names to the qualified symbols of receiver functions. The
     /// symbol can be used to index the global function table.
     pub receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
+    /// Whether the struct is originally empty
+    /// always false when it is enum
+    pub is_empty_struct: bool,
+    pub is_native: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -351,6 +355,7 @@ impl<'env> ModelBuilder<'env> {
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
         layout: StructLayout,
+        is_native: bool,
     ) {
         let entry = StructEntry {
             loc,
@@ -361,6 +366,8 @@ impl<'env> ModelBuilder<'env> {
             type_params,
             layout,
             receiver_functions: BTreeMap::new(),
+            is_empty_struct: false,
+            is_native,
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
@@ -547,6 +554,11 @@ impl<'env> ModelBuilder<'env> {
     /// Looks up the StructEntry for a qualified id.
     pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
         let struct_name = self.get_struct_name(id);
+        self.lookup_struct_entry_by_name(struct_name)
+    }
+
+    /// Looks up the StructEntry by `struct_name`
+    pub fn lookup_struct_entry_by_name(&self, struct_name: &QualifiedSymbol) -> &StructEntry {
         self.struct_table
             .get(struct_name)
             .expect("invalid Type::Struct")

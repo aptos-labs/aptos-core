@@ -24,6 +24,7 @@ use aptos_config::config::{
     merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
 };
 use aptos_framework::ReleaseBundle;
+use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
@@ -196,6 +197,7 @@ pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_observer_runtime: Option<Runtime>,
+    _consensus_publisher_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
@@ -665,6 +667,8 @@ pub fn setup_environment_and_start_node(
         db_rw.reader.clone(),
     );
 
+    let internal_indexer_db = InternalIndexerDBService::get_indexer_db(&node_config);
+
     // Start state sync and get the notification endpoints for mempool and consensus
     let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
@@ -673,6 +677,7 @@ pub fn setup_environment_and_start_node(
             genesis_waypoint,
             event_subscription_service,
             db_rw.clone(),
+            internal_indexer_db.clone(),
         )?;
 
     // Start the node inspection service
@@ -690,7 +695,12 @@ pub fn setup_environment_and_start_node(
         indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
-    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
+    ) = services::bootstrap_api_and_indexer(
+        &node_config,
+        db_rw.clone(),
+        chain_id,
+        internal_indexer_db,
+    )?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
@@ -733,7 +743,7 @@ pub fn setup_environment_and_start_node(
     debug!("State sync initialization complete.");
 
     // Create the consensus observer publisher (if enabled)
-    let consensus_observer_publisher =
+    let (consensus_publisher_runtime, consensus_publisher) =
         consensus::create_consensus_publisher(&node_config, &consensus_observer_network_interfaces);
 
     // Create the consensus runtime (if enabled)
@@ -745,7 +755,7 @@ pub fn setup_environment_and_start_node(
         consensus_notifier.clone(),
         consensus_to_mempool_sender.clone(),
         vtxn_pool,
-        consensus_observer_publisher.clone(),
+        consensus_publisher.clone(),
         &mut admin_service,
     );
 
@@ -753,7 +763,7 @@ pub fn setup_environment_and_start_node(
     let consensus_observer_runtime = consensus::create_consensus_observer_runtime(
         &node_config,
         consensus_observer_network_interfaces,
-        consensus_observer_publisher,
+        consensus_publisher,
         consensus_notifier,
         consensus_to_mempool_sender,
         db_rw,
@@ -765,6 +775,7 @@ pub fn setup_environment_and_start_node(
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_observer_runtime: consensus_observer_runtime,
+        _consensus_publisher_runtime: consensus_publisher_runtime,
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,

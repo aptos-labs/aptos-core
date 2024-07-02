@@ -53,6 +53,10 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
     /// method does not guarantee message delivery or handle responses.
     fn send_to_peer(&self, _message: Message, _peer: PeerNetworkId) -> Result<(), Error>;
 
+    /// Sends the given message bytes to the specified peer. Note: this
+    /// method does not guarantee message delivery or handle responses.
+    fn send_to_peer_raw(&self, _message: Bytes, _peer: PeerNetworkId) -> Result<(), Error>;
+
     /// Sends the given message to each peer in the specified peer list.
     /// Note: this method does not guarantee message delivery or handle responses.
     fn send_to_peers(&self, _message: Message, _peers: Vec<PeerNetworkId>) -> Result<(), Error>;
@@ -217,6 +221,13 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         let direct_send_protocol_id = self
             .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
         Ok(network_sender.send_to(peer.peer_id(), direct_send_protocol_id, message)?)
+    }
+
+    fn send_to_peer_raw(&self, message: Bytes, peer: PeerNetworkId) -> Result<(), Error> {
+        let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
+        let direct_send_protocol_id = self
+            .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
+        Ok(network_sender.send_to_raw(peer.peer_id(), direct_send_protocol_id, message)?)
     }
 
     fn send_to_peers(&self, message: Message, peers: Vec<PeerNetworkId>) -> Result<(), Error> {

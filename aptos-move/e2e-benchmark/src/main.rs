@@ -105,7 +105,7 @@ fn main() {
             num_objects: 10,
             object_payload_size: 0,
         }),
-        (7130, EntryPoints::CreateObjects {
+        (7800, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 10 * 1024,
         }),
@@ -113,14 +113,14 @@ fn main() {
             num_objects: 100,
             object_payload_size: 0,
         }),
-        (8570, EntryPoints::CreateObjects {
+        (9000, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 10 * 1024,
         }),
         (65, EntryPoints::InitializeVectorPicture { length: 40 }),
         (14, EntryPoints::VectorPicture { length: 40 }),
         (14, EntryPoints::VectorPictureRead { length: 40 }),
-        (27180, EntryPoints::InitializeVectorPicture {
+        (29000, EntryPoints::InitializeVectorPicture {
             length: 30 * 1024,
         }),
         (4510, EntryPoints::VectorPicture { length: 30 * 1024 }),

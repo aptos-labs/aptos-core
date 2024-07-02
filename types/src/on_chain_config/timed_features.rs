@@ -10,7 +10,7 @@ use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 const NOT_YET_SPECIFIED: u64 = END_OF_TIME; /* Thursday, December 31, 2099 11:59:59 PM */
 
 pub const END_OF_TIME: u64 = 4102444799000; /* Thursday, December 31, 2099 11:59:59 PM */
-#[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy)]
+#[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy, Eq, PartialEq)]
 pub enum TimedFeatureFlag {
     DisableInvariantViolationCheckInSwapLoc,
     LimitTypeTagSize,
@@ -128,7 +128,7 @@ impl TimedFeaturesBuilder {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Eq, PartialEq)]
 pub struct TimedFeatures([bool; TimedFeatureFlag::COUNT]);
 
 impl TimedFeatures {

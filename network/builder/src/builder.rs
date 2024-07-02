@@ -466,11 +466,9 @@ impl NetworkBuilder {
         max_parallel_deserialization_tasks: Option<usize>,
         allow_out_of_order_delivery: bool,
     ) -> EventsT {
-        let (peer_mgr_reqs_rx, connection_notifs_rx) =
-            self.peer_manager_builder.add_service(config);
+        let peer_mgr_reqs_rx = self.peer_manager_builder.add_service(config);
         EventsT::new(
             peer_mgr_reqs_rx,
-            connection_notifs_rx,
             max_parallel_deserialization_tasks,
             allow_out_of_order_delivery,
         )

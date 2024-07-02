@@ -23,6 +23,13 @@ pub struct ConsensusObserverConfig {
 
     /// Maximum number of pending network messages
     pub max_network_channel_size: u64,
+    /// Maximum number of parallel serialization tasks for message sends
+    pub max_parallel_serialization_tasks: usize,
+    /// Timeout (in milliseconds) for network RPC requests
+    pub network_request_timeout_ms: u64,
+
+    /// Interval (in milliseconds) to garbage collect peer state
+    pub garbage_collection_interval_ms: u64,
     /// Maximum timeout (in milliseconds) for active subscriptions
     pub max_subscription_timeout_ms: u64,
     /// Maximum timeout (in milliseconds) we'll wait for the synced version to
@@ -32,8 +39,6 @@ pub struct ConsensusObserverConfig {
     pub peer_optimality_check_interval_ms: u64,
     /// Interval (in milliseconds) to check progress of the consensus observer
     pub progress_check_interval_ms: u64,
-    /// Timeout (in milliseconds) for network RPC requests
-    pub request_timeout_ms: u64,
 }
 
 impl Default for ConsensusObserverConfig {
@@ -42,11 +47,13 @@ impl Default for ConsensusObserverConfig {
             observer_enabled: false,
             publisher_enabled: false,
             max_network_channel_size: 1000,
-            max_subscription_timeout_ms: 30_000,   // 30 seconds
-            max_synced_version_timeout_ms: 60_000, // 60 seconds
-            peer_optimality_check_interval_ms: 300_000, // 5 minutes
-            progress_check_interval_ms: 5_000,     // 5 seconds
-            request_timeout_ms: 10_000,            // 10 seconds
+            max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
+            network_request_timeout_ms: 10_000,                // 10 seconds
+            garbage_collection_interval_ms: 60_000,            // 60 seconds
+            max_subscription_timeout_ms: 30_000,               // 30 seconds
+            max_synced_version_timeout_ms: 60_000,             // 60 seconds
+            peer_optimality_check_interval_ms: 60_000,         // 60 seconds
+            progress_check_interval_ms: 5_000,                 // 5 seconds
         }
     }
 }

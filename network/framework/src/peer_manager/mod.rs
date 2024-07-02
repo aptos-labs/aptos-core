@@ -325,8 +325,7 @@ where
                 if !self.active_peers.contains_key(&peer_id) {
                     let notif = ConnectionNotification::LostPeer(
                         lost_conn_metadata,
-                        self.network_context,
-                        reason,
+                        self.network_context.network_id(),
                     );
                     self.send_conn_notification(peer_id, notif);
                 }
@@ -687,7 +686,8 @@ where
         )?;
         // Send NewPeer notification to connection event handlers.
         if send_new_peer_notification {
-            let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context);
+            let notif =
+                ConnectionNotification::NewPeer(conn_meta, self.network_context.network_id());
             self.send_conn_notification(peer_id, notif);
         }
 

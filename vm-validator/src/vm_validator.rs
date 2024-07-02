@@ -15,7 +15,7 @@ use aptos_types::{
     state_store::{MoveResourceExt, StateView},
     transaction::{SignedTransaction, VMValidatorResult},
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::AptosVM;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use rand::{thread_rng, Rng};
@@ -56,10 +56,7 @@ impl VMValidator {
             AdapterLogSchema::new(state_view.id(), 0),
             "AptosVM created for Validation"
         );
-        AptosVM::new(
-            &state_view.as_move_resolver(),
-            /*override_is_delayed_field_optimization_capable=*/ None,
-        )
+        AptosVM::new(state_view)
     }
 
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {

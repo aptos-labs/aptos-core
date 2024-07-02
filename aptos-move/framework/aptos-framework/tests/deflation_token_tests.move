@@ -17,7 +17,7 @@ module 0xcafe::deflation_token_tests {
         aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
-        let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
@@ -64,7 +64,7 @@ module 0xcafe::deflation_token_tests {
         aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
-        let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
@@ -87,7 +87,7 @@ module 0xcafe::deflation_token_tests {
         creator: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
-        let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
@@ -112,7 +112,7 @@ module 0xcafe::deflation_token_tests {
         aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
-        let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
@@ -138,7 +138,7 @@ module 0xcafe::deflation_token_tests {
         creator: &signer,
     ) {
         let (creator_ref, _) = fungible_asset::create_test_token(creator);
-        let (_, _, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let (_, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         deflation_token::initialize(creator, &creator_ref);
 
         let withdraw = function_info::new_function_info(
@@ -272,7 +272,7 @@ module 0xcafe::deflation_token_tests {
         creator: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
-        let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);
@@ -360,7 +360,7 @@ module 0xcafe::deflation_token_tests {
         aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
-        let (mint, transfer_ref, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let (mint, transfer_ref, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);

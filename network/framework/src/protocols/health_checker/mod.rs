@@ -23,6 +23,7 @@ use crate::{
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     logging::NetworkSchema,
+    peer_manager::ConnectionNotification,
     protocols::{
         health_checker::interface::HealthCheckNetworkInterface,
         network::{
@@ -47,6 +48,7 @@ use futures::{
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tokio::time::timeout;
 
 pub mod builder;
 mod interface;
@@ -109,6 +111,9 @@ pub struct HealthChecker<NetworkClient> {
     ping_failures_tolerated: u64,
     /// Counter incremented in each round of health checks
     round: u64,
+
+    /// This should normally be None and is only used in testing to inject test events.
+    connection_events_injection: Option<tokio::sync::mpsc::Receiver<ConnectionNotification>>,
 }
 
 impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChecker<NetworkClient> {
@@ -130,9 +135,20 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             ping_timeout,
             ping_failures_tolerated,
             round: 0,
+            connection_events_injection: None,
         }
     }
 
+    #[cfg(test)]
+    /// Set source of mock connection events for testing.
+    pub fn set_connection_source(
+        &mut self,
+        connection_events: tokio::sync::mpsc::Receiver<ConnectionNotification>,
+    ) {
+        self.connection_events_injection = Some(connection_events);
+    }
+
+    /// testing_connection_events should be None except in unit test code
     pub async fn start(mut self) {
         let mut tick_handlers = FuturesUnordered::new();
         info!(
@@ -142,6 +158,15 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
 
         let ticker = self.time_service.interval(self.ping_interval);
         tokio::pin!(ticker);
+
+        let connection_events = self
+            .connection_events_injection
+            .take()
+            .unwrap_or_else(|| self.network_interface.get_peers_and_metadata().subscribe());
+        let mut connection_events =
+            tokio_stream::wrappers::ReceiverStream::new(connection_events).fuse();
+
+        let self_network_id = self.network_context.network_id();
 
         loop {
             futures::select! {
@@ -154,16 +179,6 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     };
 
                     match event {
-                        Event::NewPeer(metadata) => {
-                            self.network_interface.create_peer_and_health_data(
-                                metadata.remote_peer_id, self.round
-                            );
-                        }
-                        Event::LostPeer(metadata) => {
-                            self.network_interface.remove_peer_and_health_data(
-                                &metadata.remote_peer_id
-                            );
-                        }
                         Event::RpcRequest(peer_id, msg, protocol, res_tx) => {
                             match msg {
                                 HealthCheckerMsg::Ping(ping) => self.handle_ping_request(peer_id, ping, protocol, res_tx),
@@ -190,6 +205,26 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                                 msg,
                             );
                             debug_assert!(false, "Unexpected network event");
+                        }
+                    }
+                }
+                conn_event = connection_events.select_next_some() => {
+                    match conn_event {
+                        ConnectionNotification::NewPeer(metadata, network_id) => {
+                            // PeersAndMetadata is a global singleton across all networks; filter connect/disconnect events to the NetworkId that this HealthChecker instance is watching
+                            if network_id == self_network_id {
+                                self.network_interface.create_peer_and_health_data(
+                                    metadata.remote_peer_id, self.round
+                                );
+                            }
+                        }
+                        ConnectionNotification::LostPeer(metadata, network_id) => {
+                            // PeersAndMetadata is a global singleton across all networks; filter connect/disconnect events to the NetworkId that this HealthChecker instance is watching
+                            if network_id == self_network_id {
+                                self.network_interface.remove_peer_and_health_data(
+                                    &metadata.remote_peer_id
+                                );
+                            }
                         }
                     }
                 }
@@ -339,10 +374,11 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     );
                     let peer_network_id =
                         PeerNetworkId::new(self.network_context.network_id(), peer_id);
-                    if let Err(err) = self
-                        .network_interface
-                        .disconnect_peer(peer_network_id)
-                        .await
+                    if let Err(err) = timeout(
+                        Duration::from_millis(50),
+                        self.network_interface.disconnect_peer(peer_network_id),
+                    )
+                    .await
                     {
                         warn!(
                             NetworkSchema::new(&self.network_context)

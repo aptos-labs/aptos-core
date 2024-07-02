@@ -124,8 +124,8 @@ pub fn run_benchmark<V>(
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
     let (db, executor) = init_db_and_executor::<V>(&config);
-
-    let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
+    let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
+    let root_account = Arc::new(root_account);
     let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
@@ -153,7 +153,7 @@ pub fn run_benchmark<V>(
 
         let (transaction_generator_creator, phase) = init_workload::<V>(
             transaction_mix,
-            &mut root_account,
+            root_account.clone(),
             main_signer_accounts,
             burner_accounts,
             db.clone(),
@@ -187,6 +187,7 @@ pub fn run_benchmark<V>(
             }
         }
     }
+    let root_account = Arc::into_inner(root_account).unwrap();
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         root_account,
@@ -232,22 +233,24 @@ pub fn run_benchmark<V>(
         }
     );
 
-    let num_txns = db.reader.get_synced_version().unwrap() - version - num_blocks_created as u64;
-    overall_measuring.print_end("Overall", num_txns);
+    if !pipeline_config.skip_commit {
+        let num_txns =
+            db.reader.get_synced_version().unwrap() - version - num_blocks_created as u64;
+        overall_measuring.print_end("Overall", num_txns);
 
-    if verify_sequence_numbers {
-        generator.verify_sequence_numbers(db.reader.clone());
+        if verify_sequence_numbers {
+            generator.verify_sequence_numbers(db.reader.clone());
+        }
+        log_total_supply(&db.reader);
     }
 
     // Assert there were no error log lines in the run.
     assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
-
-    log_total_supply(&db.reader);
 }
 
 fn init_workload<V>(
     transaction_mix: Vec<(TransactionType, usize)>,
-    root_account: &mut LocalAccount,
+    root_account: Arc<LocalAccount>,
     mut main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,

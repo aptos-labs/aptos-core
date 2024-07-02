@@ -41,7 +41,6 @@ members = [
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
     "aptos-move/vm-genesis",
-    "aptos-move/writeset-transaction-generator",
     "aptos-node",
     "aptos-utils",
     "config",
@@ -198,6 +197,7 @@ members = [
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
+    "third_party/move/move-bytecode-spec",
     "third_party/move/move-bytecode-verifier",
     "third_party/move/move-bytecode-verifier/bytecode-verifier-tests",
     "third_party/move/move-bytecode-verifier/fuzz",
@@ -453,7 +453,6 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
-aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
@@ -803,6 +802,7 @@ z3tracer = "0.8.0"
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
+move-bytecode-spec = { path = "third_party/move/move-bytecode-spec" }
 move-bytecode-verifier = { path = "third_party/move/move-bytecode-verifier" }
 move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
 move-cli = { path = "third_party/move/tools/move-cli" }

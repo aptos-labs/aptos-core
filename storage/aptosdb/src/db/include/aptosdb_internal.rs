@@ -152,12 +152,16 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
+        enable_sharding: bool,
     ) -> Self {
         Self::open(
             StorageDirPaths::from_path(db_root_path),
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfigs::default(),
+            RocksdbConfigs {
+                enable_storage_sharding: enable_sharding,
+                ..Default::default()
+            },
             enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,

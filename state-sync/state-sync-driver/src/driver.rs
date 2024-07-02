@@ -32,6 +32,7 @@ use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_schemadb::DB;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -151,6 +152,7 @@ impl<
         StreamingClient,
     >
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_notification_listener: ClientNotificationListener,
         commit_notification_listener: CommitNotificationListener,
@@ -168,6 +170,7 @@ impl<
         streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
         time_service: TimeService,
+        internal_indexer_db: Option<Arc<DB>>,
     ) -> Self {
         let output_fallback_handler =
             OutputFallbackHandler::new(driver_configuration.clone(), time_service.clone());
@@ -178,6 +181,7 @@ impl<
             streaming_client.clone(),
             storage.clone(),
             storage_synchronizer.clone(),
+            internal_indexer_db,
         );
         let continuous_syncer = ContinuousSyncer::new(
             driver_configuration.clone(),

@@ -5,7 +5,11 @@ use crate::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
     event::EventKey,
-    state_store::table::{TableHandle, TableInfo},
+    state_store::{
+        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_value::StateValue,
+        table::{TableHandle, TableInfo},
+    },
     transaction::{AccountTransactionsWithProof, Version},
 };
 use anyhow::Result;
@@ -45,4 +49,11 @@ pub trait IndexerReader: Send + Sync {
         include_events: bool,
         ledger_version: Version,
     ) -> Result<AccountTransactionsWithProof>;
+
+    fn get_prefixed_state_value_iterator(
+        &self,
+        key_prefix: &StateKeyPrefix,
+        cursor: Option<&StateKey>,
+        version: Version,
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
 }

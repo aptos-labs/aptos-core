@@ -1647,7 +1647,14 @@ impl Loader {
             Type::U256 => TypeTag::U256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
-            Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
+            Type::Vector(ty) => {
+                let el_ty_tag = if self.vm_config.pseudo_meter_vector_ty_to_ty_tag_construction {
+                    self.type_to_type_tag_impl(ty, gas_context)?
+                } else {
+                    self.type_to_type_tag(ty)?
+                };
+                TypeTag::Vector(Box::new(el_ty_tag))
+            },
             Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
                 *idx,
                 &[],
@@ -1754,7 +1761,7 @@ impl Loader {
         &self,
         struct_name: &StructIdentifier,
     ) -> Option<IdentifierMappingKind> {
-        if !self.vm_config.aggregator_v2_type_tagging {
+        if !self.vm_config.delayed_field_optimization_enabled {
             return None;
         }
 

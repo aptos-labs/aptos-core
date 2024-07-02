@@ -543,7 +543,7 @@ function install_dotnet {
     # Below we need to (a) set TERM variable because the .net installer expects it and it is not set
     # in some environments (b) use bash not sh because the installer uses bash features.
     # NOTE: use wget to better follow the redirect
-    wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+    wget --tries 10 --retry-connrefused --waitretry=5 https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
     chmod +x dotnet-install.sh
     ./dotnet-install.sh --channel $DOTNET_VERSION --install-dir "${DOTNET_INSTALL_DIR}" --version latest
     rm dotnet-install.sh

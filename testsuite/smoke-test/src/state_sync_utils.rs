@@ -31,7 +31,7 @@ pub async fn create_fullnode(full_node_config: NodeConfig, swarm: &mut LocalSwar
             validator_peer_id,
         )
         .unwrap();
-    for fullnode in swarm.full_nodes_mut() {
+    for fullnode in swarm.full_nodes() {
         fullnode
             .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
             .await
@@ -62,7 +62,7 @@ pub async fn stop_fullnode_and_delete_storage(
     fullnode: AccountAddress,
     clear_storage: bool,
 ) {
-    let fullnode = swarm.full_node_mut(fullnode).unwrap();
+    let fullnode = swarm.full_node(fullnode).unwrap();
     if clear_storage {
         // The fullnode is implicitly stopped during the clear_storage() call
         fullnode.clear_storage().await.unwrap();

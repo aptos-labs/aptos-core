@@ -111,8 +111,7 @@ fn script_large_ty() {
         verifier_config,
         paranoid_type_checks: true,
         ..Default::default()
-    })
-    .unwrap();
+    });
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();

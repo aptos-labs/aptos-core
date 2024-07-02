@@ -1641,6 +1641,7 @@ impl GlobalEnv {
             field_data,
             variants: None,
             spec: RefCell::new(Spec::default()),
+            is_native: false,
         }
     }
 
@@ -3256,6 +3257,9 @@ pub struct StructData {
 
     /// Associated specification.
     pub(crate) spec: RefCell<Spec>,
+
+    /// Whether this struct is native
+    pub is_native: bool,
 }
 
 #[derive(Debug)]
@@ -3472,6 +3476,11 @@ impl<'env> StructEnv<'env> {
                 struct_env: self.clone(),
                 data,
             })
+    }
+
+    /// Return true if it is a native struct
+    pub fn is_native(&self) -> bool {
+        self.data.is_native
     }
 
     /// Return the number of fields in the struct. Notice of the struct has variants, this
