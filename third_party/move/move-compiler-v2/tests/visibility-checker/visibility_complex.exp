@@ -1,0 +1,25 @@
+// -- Model dump before bytecode pipeline
+module 0x42::B {
+    friend fun foo() {
+        Tuple()
+    }
+} // end 0x42::B
+module 0x42::A {
+    friend fun foo() {
+        Tuple()
+    }
+} // end 0x42::A
+module 0x42::C {
+    friend fun foo() {
+        A::foo();
+        B::foo();
+        Tuple()
+    }
+} // end 0x42::C
+module 0x42::D {
+    friend fun bar() {
+        B::foo();
+        C::foo();
+        Tuple()
+    }
+} // end 0x42::D

@@ -618,6 +618,7 @@ fn visibility(v: Visibility) -> IR::FunctionVisibility {
         Visibility::Public(_) => IR::FunctionVisibility::Public,
         Visibility::Friend(_) => IR::FunctionVisibility::Friend,
         Visibility::Internal => IR::FunctionVisibility::Internal,
+        _ => panic!("unexpected visibility"),
     }
 }
 

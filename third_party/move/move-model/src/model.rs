@@ -80,6 +80,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
     fmt::{self, Formatter, Write},
+    path::Path,
     rc::Rc,
 };
 
@@ -1769,6 +1770,7 @@ impl GlobalEnv {
         name: Symbol,
         loc: Loc,
         visibility: Visibility,
+        has_package_visibility: bool,
         type_params: Vec<TypeParameter>,
         params: Vec<Parameter>,
         result_type: Type,
@@ -1782,6 +1784,7 @@ impl GlobalEnv {
             def_idx: None,
             handle_idx: None,
             visibility,
+            has_package_visibility,
             is_native: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
@@ -1909,6 +1912,10 @@ impl GlobalEnv {
             env: self,
             data: module_data,
         }
+    }
+
+    pub(crate) fn get_module_data_mut(&mut self, id: ModuleId) -> &mut ModuleData {
+        &mut self.module_data[id.0 as usize]
     }
 
     /// Gets a struct by qualified id.
@@ -2658,7 +2665,7 @@ impl<'env> ModuleEnv<'env> {
         self.data.name.is_script()
     }
 
-    /// Returns true of this module is target of compilation. A non-target module is
+    /// Returns true if this module is target of compilation. A non-target module is
     /// a dependency only but not explicitly requested to process.
     pub fn is_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
@@ -2669,6 +2676,13 @@ impl<'env> ModuleEnv<'env> {
     pub fn is_primary_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
         self.env.file_id_is_primary_target.contains(&file_id)
+    }
+
+    /// Returns true if both modules are defined in the same package.
+    pub fn in_same_package(&self, other: &'env Self) -> bool {
+        let self_path = Path::new(self.get_source_path());
+        let other_path = Path::new(other.get_source_path());
+        self_path.parent().expect("parent") == other_path.parent().expect("parent")
     }
 
     /// Returns the path to source file of this module.
@@ -2737,6 +2751,39 @@ impl<'env> ModuleEnv<'env> {
     /// Returns the set of modules this one declares as friends.
     pub fn get_friend_modules(&self) -> BTreeSet<ModuleId> {
         self.data.friend_modules.clone()
+    }
+
+    /// Returns the set of modules in the current package,
+    /// whose public(package) functions are called in the current module.
+    pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
+        let mut deps = BTreeSet::new();
+        if self.is_script_module() {
+            return deps;
+        }
+        for fun_env in self.get_functions() {
+            let called_funs = fun_env.get_called_functions().expect("called functions");
+            for fun in called_funs {
+                let mod_id = fun.module_id;
+                if self.get_id() == mod_id {
+                    // no need to friend self
+                    continue;
+                }
+                let mod_env = self.env.get_module(mod_id);
+                let fun_env = mod_env.get_function(fun.id);
+                if fun_env.has_package_visibility() && self.can_call_package_fun_in(&mod_env) {
+                    deps.insert(mod_id);
+                }
+            }
+        }
+        deps
+    }
+
+    /// Returns true if functions in the current module can call a public(package) function in the given module.
+    pub fn can_call_package_fun_in(&self, other: &Self) -> bool {
+        !self.is_script_module()
+            && !other.is_script_module()
+            && self.in_same_package(other)
+            && self.self_address() == other.self_address()
     }
 
     /// Returns true if the given module is a transitive dependency of this one. The
@@ -3823,6 +3870,10 @@ pub struct FunctionData {
     /// Visibility of this function (private, friend, or public)
     pub(crate) visibility: Visibility,
 
+    /// Whether this function has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
+    pub(crate) has_package_visibility: bool,
+
     /// Whether this is a native function
     pub(crate) is_native: bool,
 
@@ -4188,6 +4239,11 @@ impl<'env> FunctionEnv<'env> {
     /// Return true if this function is a friend function
     pub fn is_friend(&self) -> bool {
         self.visibility() == Visibility::Friend
+    }
+
+    /// Return true iff this function is has package visibility
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 
     /// Returns true if invariants are declared disabled in body of function

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: public(package) function `0x42::test::foo` cannot be called from a script because it is not public
+  ┌─ tests/visibility-checker/script_call_package_fun.move:2:25
+  │
+2 │     public(package) fun foo() {}
+  │                         ^^^ callee
+  ·
+7 │         0x42::test::foo()
+  │         ----------------- called here
