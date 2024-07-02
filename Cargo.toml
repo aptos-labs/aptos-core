@@ -84,6 +84,8 @@ members = [
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
+    "crates/aptos-rosetta",
+    "crates/aptos-rosetta-cli",
     "crates/aptos-runtimes",
     "crates/aptos-speculative-state-helper",
     "crates/aptos-system-utils",
@@ -403,6 +405,7 @@ aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
 aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
 aptos-rocksdb-options = { path = "storage/rocksdb-options" }
+aptos-rosetta = { path = "crates/aptos-rosetta" }
 aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
