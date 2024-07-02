@@ -60,7 +60,7 @@ let a3: address = @0x42;
 You can think of `@` as an operator that takes an address from being a namespace item to an
 expression item.
 
-Named addresses are not declared in Move source code. Instead they
+Named addresses are not declared in Move source code. Instead, they
 must be declared---and given a value---when invoking the Move compiler. E.g.,
 
 ```bash
