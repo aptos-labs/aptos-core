@@ -60,7 +60,7 @@ module aptos_framework::staking_contract {
     const EINSUFFICIENT_ACTIVE_STAKE_TO_WITHDRAW: u64 = 7;
     /// Caller must be either the staker, operator, or beneficiary.
     const ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY: u64 = 8;
-    /// Chaning beneficiaries for operators is not supported.
+    /// Changing beneficiaries for operators is not supported.
     const EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED: u64 = 9;
 
     /// Maximum number of distributions a stake pool can support.
