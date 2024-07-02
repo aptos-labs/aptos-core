@@ -294,6 +294,10 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
             })
     }
 
+    fn pending_values(&self, committed_idx: TxnIndex, txn_idx: TxnIndex) -> usize {
+        self.versioned_map.range(committed_idx..txn_idx).count()
+    }
+
     // Reads a given aggregator value at a given version (transaction index) and produces
     // a ReadResult if successful, which is either a u128 value, or a snapshot specifying
     // a different aggregator (with ID) at a given version and a delta to apply on top.
@@ -356,6 +360,8 @@ pub trait TVersionedDelayedFieldView<K> {
         current_txn_idx: TxnIndex,
         read_position: ReadPosition,
     ) -> Result<DelayedFieldValue, MVDelayedFieldsError>;
+
+    fn pending_values(&self, id: &K, txn_idx: TxnIndex) -> usize;
 }
 
 /// Maps each ID (access path) to an internal VersionedValue, managing versioned updates to the
@@ -694,6 +700,13 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
 impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
     for VersionedDelayedFields<K>
 {
+    fn pending_values(&self, id: &K, txn_idx: TxnIndex) -> usize {
+        txn_idx.saturating_sub(self.next_idx_to_commit.load(Ordering::Relaxed)) as usize
+        // self.values.get_mut(id).map_or(0, |v| {
+        //     v.pending_values(self.next_idx_to_commit.load(Ordering::Relaxed), txn_idx)
+        // })
+    }
+
     fn read(
         &self,
         id: &K,
