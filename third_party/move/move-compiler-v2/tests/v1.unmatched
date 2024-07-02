@@ -1,6 +1,3 @@
-WARNING: test `move-compiler-v2/tests/verification/cross_module_valid.verification.move` and `move-compiler-v2/tests/verification/verify/cross_module_valid.move` share common key `verification/cross_module_valid.verification.move`, discarding former one
-WARNING: test `move-compiler-v2/tests/verification/double_annotation.verification.move` and `move-compiler-v2/tests/verification/verify/double_annotation.move` share common key `verification/double_annotation.verification.move`, discarding former one
-WARNING: test `move-compiler-v2/tests/verification/single_module_valid.verification.move` and `move-compiler-v2/tests/verification/verify/single_module_valid.move` share common key `verification/single_module_valid.verification.move`, discarding former one
 move-compiler/tests/move_check/borrow_tests/{
   borrow_global_acquires_duplicate_annotation.move,
   eq_bad.move,

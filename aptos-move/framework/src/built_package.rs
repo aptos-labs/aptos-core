@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    docgen::DocgenOptions,
+    docgen::{get_docgen_output_dir, DocgenOptions},
     extended_checks,
     natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
     zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
@@ -257,7 +257,7 @@ impl BuiltPackage {
                         .unwrap()
                         .parent()
                         .unwrap()
-                        .join("doc")
+                        .join(get_docgen_output_dir())
                         .display()
                         .to_string()
                 })
