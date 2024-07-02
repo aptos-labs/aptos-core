@@ -59,12 +59,12 @@ impl<'de> serde::Deserialize<'de> for Empty {
                 formatter.write_str("struct aptos.remote_executor.v1.Empty")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<Empty, V::Error>
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<Empty, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                while map.next_key::<GeneratedField>()?.is_some() {
-                    let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                while map_.next_key::<GeneratedField>()?.is_some() {
+                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
                 }
                 Ok(Empty {
                 })
@@ -89,6 +89,7 @@ impl serde::Serialize for NetworkMessage {
         }
         let mut struct_ser = serializer.serialize_struct("aptos.remote_executor.v1.NetworkMessage", len)?;
         if !self.message.is_empty() {
+            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("message", pbjson::private::base64::encode(&self.message).as_str())?;
         }
         if !self.message_type.is_empty() {
@@ -151,27 +152,27 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                 formatter.write_str("struct aptos.remote_executor.v1.NetworkMessage")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<NetworkMessage, V::Error>
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<NetworkMessage, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut message__ = None;
                 let mut message_type__ = None;
-                while let Some(k) = map.next_key()? {
+                while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Message => {
                             if message__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("message"));
                             }
                             message__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
+                                Some(map_.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::MessageType => {
                             if message_type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("messageType"));
                             }
-                            message_type__ = Some(map.next_value()?);
+                            message_type__ = Some(map_.next_value()?);
                         }
                     }
                 }

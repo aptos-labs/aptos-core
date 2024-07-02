@@ -15,6 +15,8 @@ use aptos_gas_algebra::Gas;
 use aptos_types::{
     account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
     on_chain_config::Features, transaction::Multisig,
+    move_utils::as_move_value::AsMoveValue,
+    transaction::authenticator::AuthenticationProof
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -76,29 +78,29 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     let txn_sequence_number = txn_data.sequence_number();
-    let txn_authentication_key = txn_data.authentication_key().to_vec();
+    let txn_authentication_key = txn_data.authentication_proof().optional_auth_key();
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
     let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
     let chain_id = txn_data.chain_id();
     let mut gas_meter = UnmeteredGasMeter;
     let secondary_auth_keys: Vec<MoveValue> = txn_data
-        .secondary_authentication_keys
+        .secondary_authentication_proofs
         .iter()
-        .map(|auth_key| MoveValue::vector_u8(auth_key.to_vec()))
+        .map(|auth_key| auth_key.optional_auth_key().as_move_value())
         .collect();
-    let (prologue_function_name, args) = if let (Some(fee_payer), Some(fee_payer_auth_key)) = (
+    let (prologue_function_name, args) = if let (Some(fee_payer), Some(AuthenticationProof::Key(fee_payer_authentication_key))) = (
         txn_data.fee_payer(),
-        txn_data.fee_payer_authentication_key.as_ref(),
+        txn_data.fee_payer_authentication_proof.as_ref(),
     ) {
         let args = vec![
             MoveValue::Signer(txn_data.sender),
             MoveValue::U64(txn_sequence_number),
-            MoveValue::vector_u8(txn_authentication_key),
+            txn_authentication_key.as_move_value(),
             MoveValue::vector_address(txn_data.secondary_signers()),
             MoveValue::Vector(secondary_auth_keys),
             MoveValue::Address(fee_payer),
-            MoveValue::vector_u8(fee_payer_auth_key.to_vec()),
+            MoveValue::vector_u8(fee_payer_authentication_key.clone()),
             MoveValue::U64(txn_gas_price.into()),
             MoveValue::U64(txn_max_gas_units.into()),
             MoveValue::U64(txn_expiration_timestamp_secs),
@@ -109,7 +111,7 @@ pub(crate) fn run_script_prologue(
         let args = vec![
             MoveValue::Signer(txn_data.sender),
             MoveValue::U64(txn_sequence_number),
-            MoveValue::vector_u8(txn_authentication_key),
+            txn_authentication_key.as_move_value(),
             MoveValue::vector_address(txn_data.secondary_signers()),
             MoveValue::Vector(secondary_auth_keys),
             MoveValue::U64(txn_gas_price.into()),
@@ -125,7 +127,7 @@ pub(crate) fn run_script_prologue(
         let args = vec![
             MoveValue::Signer(txn_data.sender),
             MoveValue::U64(txn_sequence_number),
-            MoveValue::vector_u8(txn_authentication_key),
+            txn_authentication_key.as_move_value(),
             MoveValue::U64(txn_gas_price.into()),
             MoveValue::U64(txn_max_gas_units.into()),
             MoveValue::U64(txn_expiration_timestamp_secs),

@@ -659,6 +659,14 @@ pub fn convert_account_signature(
                 convert_multi_key_signature(s),
             ),
         ),
+        AccountSignature::AbstractionSignature(s) => (
+            transaction::account_signature::Type::Abstraction,
+            transaction::account_signature::Signature::Abstraction(
+                transaction::AbstractionSignature {
+                    signature: s.signature.inner().to_owned()
+                }
+            )
+        )
     };
 
     transaction::AccountSignature {

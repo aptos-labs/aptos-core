@@ -54,6 +54,7 @@ use serde_json::{json, Value};
 use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
+use aptos_types::function_info::FunctionInfo;
 
 const TRANSFER_AMOUNT: u64 = 200_000_000;
 
@@ -365,6 +366,15 @@ impl TestContext {
         )
     }
 
+    pub async fn update_dispatchable_authenticator(&self, account: &LocalAccount, func: FunctionInfo) -> SignedTransaction {
+        let factory = self.transaction_factory();
+        account.sign_with_transaction_builder(
+            factory
+                .update_dispatchable_authenticator(func)
+                .expiration_timestamp_secs(u64::MAX),
+        )
+    }
+
     pub async fn execute_multisig_transaction(
         &mut self,
         owner: &mut LocalAccount,
@@ -596,7 +606,7 @@ impl TestContext {
         }
     }
 
-    pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
+    pub async fn try_commit_block(&mut self, signed_txns: &[SignedTransaction]) -> Vec<TransactionStatus> {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usecs();
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
@@ -620,28 +630,33 @@ impl TestContext {
             .unwrap();
         let compute_status = result.compute_status_for_input_txns().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
-        // But the rest of the txns must be Kept.
-        for st in compute_status {
+        if compute_status.iter().find(|s| !matches!(s, TransactionStatus::Keep(_))).is_none() {
+            self.executor
+                .commit_blocks(
+                    vec![metadata.id()],
+                    // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+                    self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
+                )
+                .unwrap();
+
+            self.mempool
+                .mempool_notifier
+                .notify_new_commit(txns, timestamp)
+                .await
+                .unwrap();
+        }
+        compute_status
+    }
+
+    pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
+        // The txns must be kept.
+        for st in self.try_commit_block(signed_txns).await {
             match st {
                 TransactionStatus::Discard(st) => panic!("transaction is discarded: {:?}", st),
                 TransactionStatus::Retry => panic!("should not retry"),
                 TransactionStatus::Keep(_) => (),
             }
         }
-
-        self.executor
-            .commit_blocks(
-                vec![metadata.id()],
-                // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
-                self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
-            )
-            .unwrap();
-
-        self.mempool
-            .mempool_notifier
-            .notify_new_commit(txns, timestamp)
-            .await
-            .unwrap();
     }
 
     pub async fn get_sequence_number(&self, account: AccountAddress) -> u64 {

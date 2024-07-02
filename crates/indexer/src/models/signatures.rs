@@ -301,6 +301,9 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             )],
+            APIAccountSignature::AbstractionSignature(sig) => vec![Self::parse_abstraction_signature(
+                sig,
+            )],
         }
     }
 

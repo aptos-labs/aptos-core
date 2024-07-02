@@ -232,7 +232,7 @@ Basic account creation methods.
     <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_lite_account_enabled">features::lite_account_enabled</a>()) {
         <b>let</b> account_signer = <a href="account.md#0x1_account_create_account">account::create_account</a>(auth_key);
         <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(&account_signer);
-    }
+    };
 }
 </code></pre>
 
@@ -292,20 +292,21 @@ This would create the recipient account first, which also registers it to receiv
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_transfer">transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64) {
-    <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
-        <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(<b>to</b>)
-    };
-
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
-        <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(source, <b>to</b>, amount)
-    } <b>else</b> {
+    <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_lite_account_enabled">features::lite_account_enabled</a>()) {
+        <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
+            <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(<b>to</b>);
+        };
         // Resource accounts can be created without registering them <b>to</b> receive APT.
         // This conveniently does the registration <b>if</b> necessary.
         <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(<b>to</b>)) {
             <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(<b>to</b>));
         };
+    };
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
+        <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(source, <b>to</b>, amount);
+    } <b>else</b> {
         <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(source, <b>to</b>, amount)
-    }
+    };
 }
 </code></pre>
 

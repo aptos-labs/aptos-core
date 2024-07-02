@@ -17,7 +17,9 @@ impl serde::Serialize for Transaction {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.bigquery_schema.transaction.v1.Transaction", len)?;
+        #[allow(clippy::needless_borrow)]
         struct_ser.serialize_field("version", ToString::to_string(&self.version).as_str())?;
+        #[allow(clippy::needless_borrow)]
         struct_ser.serialize_field("blockHeight", ToString::to_string(&self.block_height).as_str())?;
         struct_ser.serialize_field("hash", &self.hash)?;
         struct_ser.serialize_field("type", &self.r#type)?;
@@ -29,13 +31,18 @@ impl serde::Serialize for Transaction {
         if let Some(v) = self.state_checkpoint_hash.as_ref() {
             struct_ser.serialize_field("stateCheckpointHash", v)?;
         }
+        #[allow(clippy::needless_borrow)]
         struct_ser.serialize_field("gasUsed", ToString::to_string(&self.gas_used).as_str())?;
         struct_ser.serialize_field("success", &self.success)?;
         struct_ser.serialize_field("vmStatus", &self.vm_status)?;
         struct_ser.serialize_field("accumulatorRootHash", &self.accumulator_root_hash)?;
+        #[allow(clippy::needless_borrow)]
         struct_ser.serialize_field("numEvents", ToString::to_string(&self.num_events).as_str())?;
+        #[allow(clippy::needless_borrow)]
         struct_ser.serialize_field("numWriteSetChanges", ToString::to_string(&self.num_write_set_changes).as_str())?;
+        #[allow(clippy::needless_borrow)]
         struct_ser.serialize_field("epoch", ToString::to_string(&self.epoch).as_str())?;
+        #[allow(clippy::needless_borrow)]
         struct_ser.serialize_field("insertedAt", ToString::to_string(&self.inserted_at).as_str())?;
         struct_ser.end()
     }
@@ -145,7 +152,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                 formatter.write_str("struct aptos.bigquery_schema.transaction.v1.Transaction")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<Transaction, V::Error>
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<Transaction, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
@@ -165,14 +172,14 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                 let mut num_write_set_changes__ = None;
                 let mut epoch__ = None;
                 let mut inserted_at__ = None;
-                while let Some(k) = map.next_key()? {
+                while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Version => {
                             if version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("version"));
                             }
                             version__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::BlockHeight => {
@@ -180,77 +187,77 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                                 return Err(serde::de::Error::duplicate_field("blockHeight"));
                             }
                             block_height__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Hash => {
                             if hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("hash"));
                             }
-                            hash__ = Some(map.next_value()?);
+                            hash__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Type => {
                             if r#type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            r#type__ = Some(map.next_value()?);
+                            r#type__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Payload => {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("payload"));
                             }
-                            payload__ = map.next_value()?;
+                            payload__ = map_.next_value()?;
                         }
                         GeneratedField::StateChangeHash => {
                             if state_change_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateChangeHash"));
                             }
-                            state_change_hash__ = Some(map.next_value()?);
+                            state_change_hash__ = Some(map_.next_value()?);
                         }
                         GeneratedField::EventRootHash => {
                             if event_root_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("eventRootHash"));
                             }
-                            event_root_hash__ = Some(map.next_value()?);
+                            event_root_hash__ = Some(map_.next_value()?);
                         }
                         GeneratedField::StateCheckpointHash => {
                             if state_checkpoint_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateCheckpointHash"));
                             }
-                            state_checkpoint_hash__ = map.next_value()?;
+                            state_checkpoint_hash__ = map_.next_value()?;
                         }
                         GeneratedField::GasUsed => {
                             if gas_used__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("gasUsed"));
                             }
                             gas_used__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Success => {
                             if success__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("success"));
                             }
-                            success__ = Some(map.next_value()?);
+                            success__ = Some(map_.next_value()?);
                         }
                         GeneratedField::VmStatus => {
                             if vm_status__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("vmStatus"));
                             }
-                            vm_status__ = Some(map.next_value()?);
+                            vm_status__ = Some(map_.next_value()?);
                         }
                         GeneratedField::AccumulatorRootHash => {
                             if accumulator_root_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("accumulatorRootHash"));
                             }
-                            accumulator_root_hash__ = Some(map.next_value()?);
+                            accumulator_root_hash__ = Some(map_.next_value()?);
                         }
                         GeneratedField::NumEvents => {
                             if num_events__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("numEvents"));
                             }
                             num_events__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::NumWriteSetChanges => {
@@ -258,7 +265,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                                 return Err(serde::de::Error::duplicate_field("numWriteSetChanges"));
                             }
                             num_write_set_changes__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Epoch => {
@@ -266,7 +273,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                                 return Err(serde::de::Error::duplicate_field("epoch"));
                             }
                             epoch__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::InsertedAt => {
@@ -274,7 +281,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                                 return Err(serde::de::Error::duplicate_field("insertedAt"));
                             }
                             inserted_at__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                     }

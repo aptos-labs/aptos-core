@@ -15,8 +15,26 @@ pub static ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     )
 });
 
+pub static LITE_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("lite_account").to_owned(),
+    )
+});
+
+pub static COIN_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("coin").to_owned(),
+    )
+});
+
 pub const CREATE_ACCOUNT_IF_DOES_NOT_EXIST: &IdentStr =
     ident_str!("create_account_if_does_not_exist");
+
+pub const FORCE_TRANSFER: &IdentStr = ident_str!("force_transfer");
+pub const AUTHENTICATE: &IdentStr = ident_str!("authenticate");
+pub const VERIFY_PAY_MASTER: &IdentStr = ident_str!("verify_pay_master");
 
 // Data to resolve basic account and transaction flow functions and structs
 /// The ModuleId for the aptos block module

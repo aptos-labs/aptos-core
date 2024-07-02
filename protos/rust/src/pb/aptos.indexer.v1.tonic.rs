@@ -125,7 +125,7 @@ pub mod raw_data_server {
     #[async_trait]
     pub trait RawData: Send + Sync + 'static {
         /// Server streaming response type for the GetTransactions method.
-        type GetTransactionsStream: futures_core::Stream<
+        type GetTransactionsStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<super::TransactionsResponse, tonic::Status>,
             >
             + Send
@@ -240,7 +240,7 @@ pub mod raw_data_server {
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                (*inner).get_transactions(request).await
+                                <T as RawData>::get_transactions(&inner, request).await
                             };
                             Box::pin(fut)
                         }
