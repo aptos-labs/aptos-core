@@ -113,6 +113,7 @@ members = [
     "crates/transaction-generator-lib",
     "crates/validator-transaction-pool",
     "devtools/aptos-cargo-cli",
+    "devtools/xbuild",
     "dkg",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
@@ -800,6 +801,8 @@ which = "4.2.5"
 whoami = "1.5.0"
 x25519-dalek = "1.2.0"
 z3tracer = "0.8.0"
+xshell = "0.2.6"
+xflags = "0.3.2"
 
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
