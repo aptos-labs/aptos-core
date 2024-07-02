@@ -53,4 +53,6 @@ jobs:
 
       - name: Build Rust
         run: |
+          ls -la target/
+          find target/ -maxdepth 2 || true
           cargo xbuild group forge
