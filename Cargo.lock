@@ -4427,19 +4427,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-writeset-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "aptos-vm",
- "move-core-types",
- "move-vm-runtime",
- "move-vm-types",
-]
-
-[[package]]
 name = "arbitrary"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

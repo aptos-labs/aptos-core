@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::fund_account;
+use super::utils::{explorer_transaction_link, fund_account};
 use crate::{
     common::{
         init::Network,
@@ -232,6 +232,7 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
+    /// Name of network being used, if setup from aptos init
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
@@ -1716,25 +1717,19 @@ impl TransactionOptions {
             adjusted_max_gas
         };
 
-        // Sign and submit transaction
+        // Build a transaction
         let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
             .with_transaction_expiration_time(self.gas_options.expiration_secs);
 
-        match self.get_transaction_account_type() {
+        // Sign it with the appropriate signer
+        let transaction = match self.get_transaction_account_type() {
             Ok(AccountType::Local) => {
                 let (private_key, _) = self.get_key_and_address()?;
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
-                let transaction = sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload));
-                let response = client
-                    .submit_and_wait(&transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-                Ok(response.into_inner())
+                sender_account.sign_with_transaction_builder(transaction_factory.payload(payload))
             },
             Ok(AccountType::HardwareWallet) => {
                 let sender_account = &mut HardwareWalletAccount::new(
@@ -1747,17 +1742,33 @@ impl TransactionOptions {
                     HardwareWalletType::Ledger,
                     sequence_number,
                 );
-                let transaction = sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload))?;
-                let response = client
-                    .submit_and_wait(&transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-                Ok(response.into_inner())
+                sender_account
+                    .sign_with_transaction_builder(transaction_factory.payload(payload))?
             },
-            Err(err) => Err(err),
-        }
+            Err(err) => return Err(err),
+        };
+
+        // Submit the transaction, printing out a useful transaction link
+        client
+            .submit_bcs(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+        let transaction_hash = transaction.clone().committed_hash();
+        let network = self
+            .profile_options
+            .profile()
+            .ok()
+            .and_then(|profile| profile.network);
+        eprintln!(
+            "Transaction submitted: {}",
+            explorer_transaction_link(transaction_hash, network)
+        );
+        let response = client
+            .wait_for_signed_transaction(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+        Ok(response.into_inner())
     }
 
     /// Simulates a transaction locally, using the debugger to fetch required data from remote.

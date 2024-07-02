@@ -183,6 +183,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         time_service,
         Duration::ZERO,
         1,
+        1,
         1024,
         1,
         1024,

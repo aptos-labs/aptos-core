@@ -46,6 +46,7 @@ impl QuorumStoreClient {
     async fn pull_internal(
         &self,
         max_items: u64,
+        max_unique_items: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
@@ -55,6 +56,7 @@ impl QuorumStoreClient {
         let (callback, callback_rcv) = oneshot::channel();
         let req = GetPayloadCommand::GetPayloadRequest(
             max_items,
+            max_unique_items,
             max_bytes,
             max_inline_items,
             max_inline_bytes,
@@ -88,6 +90,7 @@ impl UserPayloadClient for QuorumStoreClient {
         &self,
         max_poll_time: Duration,
         max_items: u64,
+        max_unique_items: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
@@ -117,6 +120,7 @@ impl UserPayloadClient for QuorumStoreClient {
             let payload = self
                 .pull_internal(
                     max_items,
+                    max_unique_items,
                     max_bytes,
                     max_inline_items,
                     max_inline_bytes,
@@ -138,6 +142,7 @@ impl UserPayloadClient for QuorumStoreClient {
             max_poll_time_ms = max_poll_time.as_millis() as u64,
             payload_len = payload.len(),
             max_items = max_items,
+            max_unique_items = max_unique_items,
             max_bytes = max_bytes,
             max_inline_items = max_inline_items,
             max_inline_bytes = max_inline_bytes,

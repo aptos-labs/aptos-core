@@ -18,6 +18,7 @@ pub trait PayloadClient: Send + Sync {
         &self,
         max_poll_time: Duration,
         max_items: u64,
+        max_unique_items: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
