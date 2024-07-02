@@ -108,11 +108,7 @@ fn dag_realistic_env_max_load_test(
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                    config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
-                        sender_conflict_window_size: 256,
-                        module_conflict_window_size: 2,
-                        entry_fun_conflict_window_size: 3,
-                    };
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(32);
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -211,11 +207,7 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                     }
                     OnChainExecutionConfig::V4(config_v4) => {
                         config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                        config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
-                            sender_conflict_window_size: 256,
-                            module_conflict_window_size: 2,
-                            entry_fun_conflict_window_size: 3,
-                        };
+                        config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(32);
                     }
             }
             helm_values["chain"]["on_chain_execution_config"] =

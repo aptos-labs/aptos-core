@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction_shuffler::fairness::{
+use crate::transaction_shuffler::deprecated_fairness::{
     conflict_key::{ConflictKeyId, ConflictKeyRegistry, MapByKeyId},
     TxnIdx,
 };
