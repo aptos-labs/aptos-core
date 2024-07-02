@@ -31,7 +31,7 @@ module 0xcafe::permissioned_token {
             constructor_ref,
             option::some(withdraw),
             option::none(),
-            option::none()
+            option::none(),
         );
     }
 
