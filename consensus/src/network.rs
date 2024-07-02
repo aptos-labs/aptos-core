@@ -2,24 +2,25 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    block_storage::tracing::{observe_block, BlockStage},
-    counters,
-    dag::{
-        DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
-        TDAGNetworkSender,
-    },
-    logging::{LogEvent, LogSchema},
-    monitor,
-    network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
-    pipeline::commit_reliable_broadcast::CommitMessage,
-    quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::{
-        network_messages::{RandGenMessage, RandMessage},
-        types::{AugmentedData, FastShare, Share},
-    },
+use std::{
+    collections::HashMap,
+    mem::{discriminant, Discriminant},
+    sync::Arc,
+    time::Duration,
 };
+
 use anyhow::{anyhow, bail, ensure};
+use async_trait::async_trait;
+use bytes::Bytes;
+use fail::fail_point;
+use futures::{
+    channel::oneshot,
+    SinkExt,
+    stream::{select, select_all}, Stream, StreamExt,
+};
+use serde::{de::DeserializeOwned, Serialize};
+use tokio::time::timeout;
+
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
@@ -35,30 +36,32 @@ use aptos_consensus_types::{
 use aptos_logger::prelude::*;
 use aptos_network::{
     application::interface::{NetworkClient, NetworkServiceEvents},
-    protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
+    protocols::{network::Event, rpc::error::RpcError},
 };
 use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
-use async_trait::async_trait;
-use bytes::Bytes;
-use fail::fail_point;
-use futures::{
-    channel::oneshot,
-    stream::{select, select_all},
-    SinkExt, Stream, StreamExt,
+
+use crate::{
+    block_storage::tracing::{BlockStage, observe_block},
+    counters,
+    dag::{
+        DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
+        TDAGNetworkSender,
+    },
+    logging::{LogEvent, LogSchema},
+    monitor,
+    network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
+    pipeline::commit_reliable_broadcast::CommitMessage,
+    quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
+    rand::rand_gen::{
+        network_messages::{RandGenMessage, RandMessage},
+        types::{AugmentedData, FastShare, Share},
+    },
 };
-use serde::{de::DeserializeOwned, Serialize};
-use std::{
-    collections::HashMap,
-    mem::{discriminant, Discriminant},
-    sync::Arc,
-    time::Duration,
-};
-use tokio::time::timeout;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
@@ -186,6 +189,7 @@ pub trait QuorumStoreSender: Send + Clone {
         signed_batch_infos: Vec<SignedBatchInfo>,
         recipients: Vec<Author>,
     );
+    async fn broadcast_signed_batch_info_msg(&self, signed_batch_infos: Vec<SignedBatchInfo>);
 
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
 
@@ -521,6 +525,13 @@ impl QuorumStoreSender for NetworkSender {
         let msg =
             ConsensusMsg::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(signed_batch_infos)));
         self.send(msg, recipients).await
+    }
+
+    async fn broadcast_signed_batch_info_msg(&self, signed_batch_infos: Vec<SignedBatchInfo>) {
+        fail_point!("consensus::send::broadcast::signed_batch_info", |_| ());
+        let msg =
+            ConsensusMsg::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(signed_batch_infos)));
+        self.broadcast(msg).await
     }
 
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
