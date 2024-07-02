@@ -1,13 +1,17 @@
 module B::B {
-    use B::C;
-
     public(package) fun foo() {
-        C::bar()
+        0x43::B::bar()
+    }
+}
+
+module 0x43::B {
+    public(package) fun bar() {
+
     }
 }
 
 module B::C {
-    public(package) fun bar() {
-
+    public fun baz() {
+        B::B::foo()
     }
 }
