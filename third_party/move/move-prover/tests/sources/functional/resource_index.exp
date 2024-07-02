@@ -1,0 +1,6 @@
+Move prover returns: exiting with model building errors
+error: not supported before language version `2.0-unstable`: resource indexing
+   ┌─ tests/sources/functional/resource_index.move:15:20
+   │
+15 │             assert Y<X<bool>>[addr].field.value == false;
+   │                    ^^^^^^^^^^^^^^^^

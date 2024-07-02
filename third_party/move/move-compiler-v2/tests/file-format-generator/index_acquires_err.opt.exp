@@ -1,0 +1,28 @@
+
+Diagnostics:
+error: Invalid operation: storage operation on type `test::Y` can only be done within the defining module `0x42::test`
+   ┌─ tests/file-format-generator/index_acquires_err.move:14:9
+   │
+14 │     fun test_resource_other_module() acquires 0x42::test::Y {
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 │         let addr = @0x1;
+16 │         assert!((&0x42::test::Y<0x42::test::X<bool>>[addr]).field.value == true, 1);
+   │                 ------------------------------------------- called here
+
+error: Invalid operation: access of the field `field` on type `test::Y` can only be done within the defining module `0x42::test`
+   ┌─ tests/file-format-generator/index_acquires_err.move:14:9
+   │
+14 │     fun test_resource_other_module() acquires 0x42::test::Y {
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 │         let addr = @0x1;
+16 │         assert!((&0x42::test::Y<0x42::test::X<bool>>[addr]).field.value == true, 1);
+   │                 ------------------------------------------------- accessed here
+
+error: Invalid operation: access of the field `value` on type `test::X` can only be done within the defining module `0x42::test`
+   ┌─ tests/file-format-generator/index_acquires_err.move:14:9
+   │
+14 │     fun test_resource_other_module() acquires 0x42::test::Y {
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 │         let addr = @0x1;
+16 │         assert!((&0x42::test::Y<0x42::test::X<bool>>[addr]).field.value == true, 1);
+   │                 ------------------------------------------------------- accessed here
