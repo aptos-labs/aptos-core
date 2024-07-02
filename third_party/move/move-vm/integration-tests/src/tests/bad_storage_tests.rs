@@ -10,13 +10,15 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::{
+    gas::UnmeteredGasMeter,
+    resolver::{ModuleResolver, ResourceResolver},
+};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 

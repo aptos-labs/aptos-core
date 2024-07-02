@@ -9,7 +9,8 @@ use aptos_vm_types::resolver::{
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
+use move_core_types::language_storage::StructTag;
+use move_vm_types::resolver::MoveResolver;
 use std::collections::{BTreeMap, HashMap};
 
 /// A general resolver used by AptosVM. Allows to implement custom hooks on

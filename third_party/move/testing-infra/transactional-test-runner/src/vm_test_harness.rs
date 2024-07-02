@@ -31,7 +31,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     value::MoveValue,
 };
 use move_model::metadata::LanguageVersion;
@@ -48,6 +47,7 @@ use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
     InMemoryStorage,
 };
+use move_vm_types::resolver::MoveResolver;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},

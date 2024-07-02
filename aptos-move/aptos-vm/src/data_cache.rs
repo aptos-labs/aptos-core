@@ -40,10 +40,12 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
 };
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::{
+    delayed_values::delayed_field_id::DelayedFieldID,
+    resolver::{resource_size, ModuleResolver, ResourceResolver},
+};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},

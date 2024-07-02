@@ -23,11 +23,11 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
+use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},

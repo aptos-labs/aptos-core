@@ -14,7 +14,6 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
@@ -25,7 +24,10 @@ use move_vm_runtime::{
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
-use move_vm_types::values::{Reference, Value};
+use move_vm_types::{
+    resolver::MoveResolver,
+    values::{Reference, Value},
+};
 use std::{
     collections::HashMap,
     error::Error,
