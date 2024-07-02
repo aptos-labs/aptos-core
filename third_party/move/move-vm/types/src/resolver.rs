@@ -52,29 +52,6 @@ pub trait ResourceResolver {
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver: ModuleResolver + ResourceResolver {
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> PartialVMResult<Option<Bytes>> {
-        Ok(self
-            .get_resource_with_metadata(
-                address,
-                struct_tag,
-                &self.get_module_metadata(&struct_tag.module_id()),
-            )?
-            .0)
-    }
-
-    fn get_resource_with_metadata(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-        metadata: &[Metadata],
-    ) -> PartialVMResult<(Option<Bytes>, usize)> {
-        self.get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, None)
-    }
-}
+pub trait MoveResolver: ModuleResolver + ResourceResolver {}
 
 impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}

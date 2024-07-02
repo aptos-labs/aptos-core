@@ -2646,13 +2646,19 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
     features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> VMResult<bool> {
+    let account_resource_struct_tag = AccountResource::struct_tag();
     Ok(
         features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
             && txn_data.fee_payer.is_some()
             && txn_data.sequence_number == 0
             && resolver
-                .get_resource(&txn_data.sender(), &AccountResource::struct_tag())
-                .map(|data| data.is_none())
+                .get_resource_bytes_with_metadata_and_layout(
+                    &txn_data.sender(),
+                    &account_resource_struct_tag,
+                    &resolver.get_module_metadata(&account_resource_struct_tag.module_id()),
+                    None,
+                )
+                .map(|(data, _)| data.is_none())
                 .map_err(|e| e.finish(Location::Undefined))?,
     )
 }
