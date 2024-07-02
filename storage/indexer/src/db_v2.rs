@@ -5,11 +5,12 @@
 /// At the end of the migration to migrate table info mapping
 /// from storage critical path to indexer, the other file will be removed
 /// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
-use crate::{
+use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
 use aptos_logger::info;
+use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
     db_other_bail as bail, state_view::DbStateViewAtVersion, AptosDbError, DbReader, Result,
@@ -18,21 +19,19 @@ use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
+        StateView,
     },
     transaction::Version,
     write_set::{WriteOp, WriteSet},
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use bytes::Bytes;
 use dashmap::{DashMap, DashSet};
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
-    resolver::ModuleResolver,
 };
-use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -83,8 +82,7 @@ impl IndexerAsyncV2 {
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
         let state_view = db_reader.state_view_at_version(Some(last_version))?;
-        let resolver = state_view.as_move_resolver();
-        let annotator = MoveValueAnnotator::new(&resolver);
+        let annotator = AptosValueAnnotator::new(&state_view);
         self.index_with_annotator(
             &annotator,
             first_version,
@@ -95,9 +93,9 @@ impl IndexerAsyncV2 {
 
     /// Index write sets with the move annotator to parse obscure table handle and key value types
     /// After the current batch's parsed, write the mapping to the rocksdb, also update the next version to be processed
-    pub fn index_with_annotator<R: ModuleResolver>(
+    pub fn index_with_annotator<R: StateView>(
         &self,
-        annotator: &MoveValueAnnotator<R>,
+        annotator: &AptosValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
         end_early_if_pending_on_empty: bool,
@@ -217,15 +215,15 @@ impl IndexerAsyncV2 {
 
 struct TableInfoParser<'a, R> {
     indexer_async_v2: &'a IndexerAsyncV2,
-    annotator: &'a MoveValueAnnotator<'a, R>,
+    annotator: &'a AptosValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
 }
 
-impl<'a, R: ModuleResolver> TableInfoParser<'a, R> {
+impl<'a, R: StateView> TableInfoParser<'a, R> {
     pub fn new(
         indexer_async_v2: &'a IndexerAsyncV2,
-        annotator: &'a MoveValueAnnotator<R>,
+        annotator: &'a AptosValueAnnotator<R>,
         pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
     ) -> Self {
         Self {
@@ -303,12 +301,12 @@ impl<'a, R: ModuleResolver> TableInfoParser<'a, R> {
                 }
             },
             AnnotatedMoveValue::Struct(struct_value) => {
-                let struct_tag = &struct_value.type_;
+                let struct_tag = &struct_value.ty_tag;
                 if Self::is_table(struct_tag) {
-                    assert_eq!(struct_tag.type_params.len(), 2);
+                    assert_eq!(struct_tag.type_args.len(), 2);
                     let table_info = TableInfo {
-                        key_type: struct_tag.type_params[0].clone(),
-                        value_type: struct_tag.type_params[1].clone(),
+                        key_type: struct_tag.type_args[0].clone(),
+                        value_type: struct_tag.type_args[1].clone(),
                     };
                     let table_handle = match &struct_value.value[0] {
                         (name, AnnotatedMoveValue::Address(handle)) => {

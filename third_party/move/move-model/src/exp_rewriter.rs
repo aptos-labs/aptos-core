@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        Condition, Exp, ExpData, MemoryLabel, Operation, Pattern, Spec, SpecBlockTarget, TempIndex,
-        Value,
+        Condition, Exp, ExpData, MatchArm, MemoryLabel, Operation, Pattern, Spec, SpecBlockTarget,
+        TempIndex, Value,
     },
     model::{GlobalEnv, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -14,7 +14,6 @@ use crate::{
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::trace;
-use move_binary_format::file_format::CodeOffset;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Rewriter for expressions, allowing to substitute locals by expressions as well as instantiate
@@ -261,10 +260,6 @@ pub trait ExpRewriterFunctions {
     ) -> Option<Condition> {
         None
     }
-    // Might only be useful with V1-compiled code
-    fn rewrite_offset_spec(&mut self, offset: CodeOffset, spec: &Spec) -> Option<Spec> {
-        None
-    }
 
     // Core traversal functions, not intended to be re-implemented
     // -----------------------------------------------------------
@@ -459,6 +454,34 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
+            Match(id, disc, arms) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
+                let (disc_changed, new_disc) = self.internal_rewrite_exp(disc);
+                let (mut arms_changed, mut new_arms) = (false, vec![]);
+                for arm in arms {
+                    let (pat_changed, new_pat) = self.internal_rewrite_pattern(&arm.pattern, true);
+                    self.rewrite_enter_block_scope(new_id, &new_pat, &None);
+                    let (cond_changed, new_cond) = if let Some(c) = &arm.condition {
+                        let (c, e) = self.internal_rewrite_exp(c);
+                        (c, Some(e))
+                    } else {
+                        (false, arm.condition.clone())
+                    };
+                    let (body_changed, new_body) = self.internal_rewrite_exp(&arm.body);
+                    new_arms.push(MatchArm {
+                        loc: arm.loc.clone(),
+                        pattern: new_pat,
+                        condition: new_cond,
+                        body: new_body,
+                    });
+                    arms_changed = arms_changed || pat_changed || cond_changed || body_changed;
+                }
+                if id_changed || disc_changed || arms_changed {
+                    Match(*id, new_disc, new_arms).into_exp()
+                } else {
+                    exp
+                }
+            },
             Sequence(id, es) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let changed_vec = self.internal_rewrite_vec(es);
@@ -554,14 +577,14 @@ pub trait ExpRewriterFunctions {
 
     fn internal_rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> (bool, Pattern) {
         match pat {
-            Pattern::Tuple(_, pattern_vec) | Pattern::Struct(_, _, pattern_vec) => {
+            Pattern::Tuple(_, pattern_vec) | Pattern::Struct(_, _, _, pattern_vec) => {
                 let (changed, final_pattern_vec) =
                     self.internal_rewrite_pattern_vector(pattern_vec, creating_scope);
                 if changed {
                     let new_pat = match pat {
                         Pattern::Tuple(id, _) => Pattern::Tuple(*id, final_pattern_vec),
-                        Pattern::Struct(id, struct_id, _) => {
-                            Pattern::Struct(*id, struct_id.clone(), final_pattern_vec)
+                        Pattern::Struct(id, struct_id, variant, _) => {
+                            Pattern::Struct(*id, struct_id.clone(), *variant, final_pattern_vec)
                         },
                         _ => unreachable!(),
                     };
@@ -601,69 +624,6 @@ pub trait ExpRewriterFunctions {
             } else {
                 (false, condition)
             }
-        }
-    }
-
-    fn internal_rewrite_spec_conditions(
-        &mut self,
-        conditions: Vec<Condition>,
-    ) -> (bool, Vec<Condition>) {
-        let (tests, rewritten_conds): (Vec<bool>, Vec<Condition>) = conditions
-            .into_iter()
-            .map(|cond| self.internal_rewrite_spec_condition(cond))
-            .unzip();
-        let summary_bool = tests.into_iter().any(|x| x);
-        (summary_bool, rewritten_conds)
-    }
-
-    // Might only be used with v1 compile chain.
-    fn internal_rewrite_spec_on_impl(
-        &mut self,
-        mut on_impl: BTreeMap<CodeOffset, Spec>,
-    ) -> (bool, BTreeMap<CodeOffset, Spec>) {
-        let mut changed = false;
-        for (key, value) in on_impl.iter_mut() {
-            let old_value = std::mem::take(value);
-            let (changed_value, new_spec) = self.internal_rewrite_offset_spec(*key, old_value);
-            *value = new_spec;
-            changed = changed || changed_value;
-        }
-        (changed, on_impl)
-    }
-
-    fn rewrite_spec_update_map(
-        &mut self,
-        mut update_map: BTreeMap<NodeId, Condition>,
-    ) -> (bool, BTreeMap<NodeId, Condition>) {
-        let (changed_vec, new_map): (Vec<bool>, BTreeMap<NodeId, Condition>) = update_map
-            .into_iter()
-            .map(|(id, cond)| {
-                let (changed, new_cond) = self.internal_rewrite_spec_condition(cond);
-                (changed, (id, new_cond))
-            })
-            .unzip();
-        let changed = changed_vec.into_iter().any(|x| x);
-        (changed, new_map)
-    }
-
-    fn internal_rewrite_offset_spec(&mut self, offset: CodeOffset, spec: Spec) -> (bool, Spec) {
-        let (conditions_changed, new_conditions) =
-            self.internal_rewrite_spec_conditions(spec.conditions);
-        let (on_impl_changed, new_on_impl) = self.internal_rewrite_spec_on_impl(spec.on_impl);
-        let (update_map_changed, new_update_map) = self.rewrite_spec_update_map(spec.update_map);
-        let newspec = Spec {
-            conditions: new_conditions,
-            on_impl: new_on_impl,
-            update_map: new_update_map,
-            ..spec
-        };
-        if let Some(newer_spec) = self.rewrite_offset_spec(offset, &newspec) {
-            (true, newer_spec)
-        } else {
-            (
-                conditions_changed || on_impl_changed || update_map_changed,
-                newspec,
-            )
         }
     }
 

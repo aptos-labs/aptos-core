@@ -331,6 +331,29 @@ impl Client {
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
+    pub async fn view_bcs_with_json_response(
+        &self,
+        request: &ViewFunction,
+        version: Option<u64>,
+    ) -> AptosResult<Response<Vec<serde_json::Value>>> {
+        let txn_payload = bcs::to_bytes(request)?;
+        let mut url = self.build_path("view")?;
+        if let Some(version) = version {
+            url.set_query(Some(format!("ledger_version={}", version).as_str()));
+        }
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
+            .header(ACCEPT, JSON)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        self.json(response).await
+    }
+
     pub async fn simulate(
         &self,
         txn: &SignedTransaction,
@@ -560,7 +583,7 @@ impl Client {
     ) -> AptosResult<Response<Transaction>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash(
-            transaction.clone().committed_hash(),
+            transaction.committed_hash(),
             expiration_timestamp,
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,
@@ -574,7 +597,7 @@ impl Client {
     ) -> AptosResult<Response<TransactionOnChainData>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash_bcs(
-            transaction.clone().committed_hash(),
+            transaction.committed_hash(),
             expiration_timestamp,
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,
@@ -1582,7 +1605,7 @@ impl Client {
         base: &str,
         limit_per_request: u64,
         ledger_version: Option<u64>,
-        cursor: Option<String>,
+        cursor: &Option<String>,
     ) -> AptosResult<Url> {
         let mut path = format!("{}?limit={}", base, limit_per_request);
         if let Some(ledger_version) = ledger_version {
@@ -1614,11 +1637,11 @@ impl Client {
                 base_path,
                 limit_per_request,
                 ledger_version,
-                cursor,
+                &cursor,
             )?;
             let raw_response = self.inner.get(url).send().await?;
             let response: Response<Vec<T>> = self.json(raw_response).await?;
-            cursor = response.state().cursor.clone();
+            cursor.clone_from(&response.state().cursor);
             if cursor.is_none() {
                 break Ok(response.map(|mut v| {
                     result.append(&mut v);
@@ -1647,13 +1670,13 @@ impl Client {
                 base_path,
                 limit_per_request,
                 ledger_version,
-                cursor,
+                &cursor,
             )?;
             let response: Response<BTreeMap<T, Vec<u8>>> = self
                 .get_bcs(url)
                 .await?
                 .and_then(|inner| bcs::from_bytes(&inner))?;
-            cursor = response.state().cursor.clone();
+            cursor.clone_from(&response.state().cursor);
             if cursor.is_none() {
                 break Ok(response.map(|mut v| {
                     result.append(&mut v);

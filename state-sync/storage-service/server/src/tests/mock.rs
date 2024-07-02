@@ -97,13 +97,8 @@ impl MockClient {
             .queue_style(QueueStyle::FIFO)
             .counters(&metrics::PENDING_STORAGE_SERVER_NETWORK_EVENTS);
             let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
-            let (_, connection_notification_receiver) = queue_cfg.build();
 
-            let network_events = NetworkEvents::new(
-                peer_manager_notification_receiver,
-                connection_notification_receiver,
-                None,
-            );
+            let network_events = NetworkEvents::new(peer_manager_notification_receiver, None, true);
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);
         }
@@ -287,7 +282,9 @@ mock! {
 
         fn get_latest_ledger_info(&self) -> aptos_storage_interface::Result<LedgerInfoWithSignatures>;
 
-        fn get_latest_version(&self) -> aptos_storage_interface::Result<Version>;
+        fn get_synced_version(&self) -> aptos_storage_interface::Result<Version>;
+
+        fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> aptos_storage_interface::Result<(Version, u64)>;
 

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     invalid_signature, keyless::circuit_constants, move_utils::as_move_value::AsMoveValue,
@@ -55,7 +56,7 @@ impl MoveStructType for Configuration {
 
 impl Configuration {
     /// Should only be used for testing.
-    pub const OVERRIDE_AUD_FOR_TESTING: &'static str = "some_override_aud";
+    pub const OVERRIDE_AUD_FOR_TESTING: &'static str = "test.recovery.aud";
 
     pub fn new_for_devnet() -> Configuration {
         Configuration {

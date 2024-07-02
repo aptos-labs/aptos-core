@@ -179,11 +179,6 @@ impl<T: StorageReaderInterface> Handler<T> {
             },
             PeerMonitoringServiceRequest::GetNodeInformation => self.get_node_information(),
             PeerMonitoringServiceRequest::LatencyPing(request) => self.handle_latency_ping(request),
-
-            #[cfg(feature = "network-perf-test")] // Disabled by default
-            PeerMonitoringServiceRequest::PerformanceMonitoringRequest(request) => {
-                self.handle_performance_monitoring_request(request)
-            },
         };
 
         // Process the response and handle any errors
@@ -296,20 +291,6 @@ impl<T: StorageReaderInterface> Handler<T> {
             latency_ping_response,
         ))
     }
-
-    #[cfg(feature = "network-perf-test")] // Disabled by default
-    fn handle_performance_monitoring_request(
-        &self,
-        performance_monitoring_request: &aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest,
-    ) -> Result<PeerMonitoringServiceResponse, Error> {
-        let performance_monitoring_response =
-            aptos_peer_monitoring_service_types::response::PerformanceMonitoringResponse {
-                response_counter: performance_monitoring_request.request_counter,
-            };
-        Ok(PeerMonitoringServiceResponse::PerformanceMonitoring(
-            performance_monitoring_response,
-        ))
-    }
 }
 
 /// Returns the distance from the validators using the given base config
@@ -340,7 +321,7 @@ fn get_distance_from_validators(
     // Otherwise, go through our peers, find the min, and return a distance relative to the min
     let mut min_peer_distance_from_validators = MAX_DISTANCE_FROM_VALIDATORS;
     for peer_metadata in connected_peers_and_metadata.values() {
-        if let Some(latest_network_info_response) = peer_metadata
+        if let Some(ref latest_network_info_response) = peer_metadata
             .get_peer_monitoring_metadata()
             .latest_network_info_response
         {

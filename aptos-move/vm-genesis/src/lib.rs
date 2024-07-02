@@ -14,35 +14,41 @@ use aptos_crypto::{
 };
 use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas_schedule::{
-    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
-    ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
-    keyless,
-    keyless::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME},
+    jwks::{
+        patch::{PatchJWKMoveStruct, PatchUpsertJWK},
+        secure_test_rsa_jwk,
+    },
+    keyless::{
+        self, test_utils::get_sample_iss, Groth16VerificationKey, DEVNET_VERIFICATION_KEY,
+        KEYLESS_ACCOUNT_MODULE_NAME,
+    },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
+        randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
+        APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{GenesisMoveVM, SessionExt},
 };
-use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveTypeLayout, MoveValue},
 };
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -59,6 +65,8 @@ const JWK_CONSENSUS_CONFIG_MODULE_NAME: &str = "jwk_consensus_config";
 const JWKS_MODULE_NAME: &str = "jwks";
 const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
 const DKG_MODULE_NAME: &str = "dkg";
+const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
+const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
@@ -113,25 +121,15 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     assert!(!genesis_config.is_test, "This is mainnet!");
     validate_genesis_config(genesis_config);
 
-    // Create a Move VM session so we can invoke on-chain genesis intializations.
+    // Create a Move VM session, so we can invoke on-chain genesis initializations.
     let mut state_view = GenesisStateView::new();
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
-    let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
-        LATEST_GAS_FEATURE_VERSION,
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
-    let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+
+    let vm = GenesisMoveVM::new(chain_id);
+    let resolver = state_view.as_move_resolver();
+    let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default_for_genesis();
@@ -162,17 +160,16 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+    let configs = vm.genesis_change_set_configs();
     let mut change_set = session.finish(&configs).unwrap();
 
-    // Publish the framework, using a different session id, in case both scripts creates tables
+    // Publish the framework, using a different session id, in case both scripts create tables.
     let state_view = GenesisStateView::new();
-    let data_cache = state_view.as_move_resolver();
+    let resolver = state_view.as_move_resolver();
 
-    let mut id2_arr = [0u8; 32];
-    id2_arr[31] = 1;
-    let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
+    let mut new_id = [0u8; 32];
+    new_id[31] = 1;
+    let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
     publish_framework(&mut session, framework);
     let additional_change_set = session.finish(&configs).unwrap();
     change_set
@@ -231,25 +228,15 @@ pub fn encode_genesis_change_set(
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
-    // Create a Move VM session so we can invoke on-chain genesis intializations.
+    // Create a Move VM session so we can invoke on-chain genesis initializations.
     let mut state_view = GenesisStateView::new();
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
-    let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
-        LATEST_GAS_FEATURE_VERSION,
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
-    let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+
+    let resolver = state_view.as_move_resolver();
+    let vm = GenesisMoveVM::new(chain_id);
+    let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
     // On-chain genesis process.
     initialize(
@@ -279,6 +266,8 @@ pub fn encode_genesis_change_set(
         .randomness_config_override
         .clone()
         .unwrap_or_else(OnChainRandomnessConfig::default_for_genesis);
+    initialize_randomness_api_v0_config(&mut session);
+    initialize_randomness_config_seqnum(&mut session);
     initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
@@ -298,17 +287,16 @@ pub fn encode_genesis_change_set(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+    let configs = vm.genesis_change_set_configs();
     let mut change_set = session.finish(&configs).unwrap();
 
     let state_view = GenesisStateView::new();
-    let data_cache = state_view.as_move_resolver();
+    let resolver = state_view.as_move_resolver();
 
-    // Publish the framework, using a different session id, in case both scripts creates tables
-    let mut id2_arr = [0u8; 32];
-    id2_arr[31] = 1;
-    let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
+    // Publish the framework, using a different id, in case both scripts create tables.
+    let mut new_id = [0u8; 32];
+    new_id[31] = 1;
+    let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
     publish_framework(&mut session, framework);
     let additional_change_set = session.finish(&configs).unwrap();
     change_set
@@ -375,16 +363,15 @@ fn exec_function(
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
 ) {
+    let storage = TraversalStorage::new();
     session
         .execute_function_bypass_visibility(
-            &ModuleId::new(
-                account_config::CORE_CODE_ADDRESS,
-                Identifier::new(module_name).unwrap(),
-            ),
+            &ModuleId::new(CORE_CODE_ADDRESS, Identifier::new(module_name).unwrap()),
             &Identifier::new(function_name).unwrap(),
             ty_args,
             args,
             &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&storage),
         )
         .unwrap_or_else(|e| {
             panic!(
@@ -497,6 +484,30 @@ fn initialize_dkg(session: &mut SessionExt) {
         "initialize",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_randomness_config_seqnum(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_randomness_api_v0_config(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RANDOMNESS_API_V0_CONFIG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            RequiredGasDeposit::default_for_genesis().as_move_value(),
+            AllowCustomMaxGasFlag::default_for_genesis().as_move_value(),
+        ]),
     );
 }
 
@@ -618,7 +629,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
         ]),
     );
     if !chain_id.is_mainnet() {
-        let vk = Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone());
+        let vk = Groth16VerificationKey::from(&*DEVNET_VERIFICATION_KEY);
         exec_function(
             session,
             KEYLESS_ACCOUNT_MODULE_NAME,
@@ -629,19 +640,20 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
                 vk.as_move_value(),
             ]),
         );
-    }
-    if !chain_id.id() > 100 {
+
+        let patch: PatchJWKMoveStruct = PatchUpsertJWK {
+            issuer: get_sample_iss(),
+            jwk: secure_test_rsa_jwk().into(),
+        }
+        .into();
         exec_function(
             session,
             JWKS_MODULE_NAME,
-            "upsert_oidc_provider",
+            "set_patches",
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
-                "https://accounts.google.com".to_string().as_move_value(),
-                "https://accounts.google.com/.well-known/openid-configuration"
-                    .to_string()
-                    .as_move_value(),
+                MoveValue::Vector(vec![patch.as_move_value()]),
             ]),
         );
     }
@@ -1045,21 +1057,11 @@ pub fn test_genesis_module_publishing() {
     {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
 
-    let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
-        LATEST_GAS_FEATURE_VERSION,
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
-    let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+    let vm = GenesisMoveVM::new(ChainId::test());
+    let resolver = state_view.as_move_resolver();
+
+    let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
     publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
 }
 
@@ -1067,7 +1069,7 @@ pub fn test_genesis_module_publishing() {
 pub fn test_mainnet_end_to_end() {
     use aptos_types::{
         account_address,
-        on_chain_config::{OnChainConfig, ValidatorSet},
+        on_chain_config::ValidatorSet,
         state_store::state_key::StateKey,
         write_set::{TransactionWrite, WriteSet},
     };
@@ -1272,8 +1274,7 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key =
-        StateKey::access_path(ValidatorSet::access_path().expect("access path in test"));
+    let state_key = StateKey::on_chain_config::<ValidatorSet>().unwrap();
     let bytes = writeset
         .get(&state_key)
         .unwrap()

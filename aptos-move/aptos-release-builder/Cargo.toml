@@ -1,0 +1,51 @@
+[package]
+name = "aptos-release-builder"
+description = "Tooling for building the governance proposal script used for the network"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos = { workspace = true, features = [ "no-upload-proposal" ] }
+aptos-api-types = { workspace = true }
+aptos-build-info = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-gas-schedule-updator = { workspace = true }
+aptos-genesis = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-keygen = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-temppath = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+git2 = { workspace = true }
+handlebars = { workspace = true }
+hex = { workspace = true }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
+once_cell = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+sha3 = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
+
+[[bin]]
+name = "aptos-release-builder"
+path = "src/main.rs"

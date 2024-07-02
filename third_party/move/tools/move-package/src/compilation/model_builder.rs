@@ -4,12 +4,14 @@
 
 use crate::{
     compilation::compiled_package::make_source_and_deps_for_compiler,
-    resolution::resolution_graph::ResolvedGraph, ModelConfig,
+    resolution::resolution_graph::ResolvedGraph, CompilerVersion, ModelConfig,
 };
 use anyhow::Result;
 use itertools::Itertools;
 use move_compiler::shared::PackagePaths;
+use move_compiler_v2::Options;
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
+use termcolor::{ColorChoice, StandardStream};
 
 #[derive(Debug, Clone)]
 pub struct ModelBuilder {
@@ -125,12 +127,52 @@ impl ModelBuilder {
             .build_options
             .compiler_config
             .known_attributes;
-        run_model_builder_with_options(
-            all_targets,
-            all_deps,
-            ModelBuilderOptions::default(),
-            skip_attribute_checks,
-            known_attributes,
-        )
+        match self.model_config.compiler_version {
+            CompilerVersion::V1 => run_model_builder_with_options(
+                all_targets,
+                vec![],
+                all_deps,
+                ModelBuilderOptions::default(),
+                skip_attribute_checks,
+                known_attributes,
+            ),
+            CompilerVersion::V2_0 => {
+                let mut options = make_options_for_v2_compiler(all_targets, all_deps);
+                options.language_version = self
+                    .resolution_graph
+                    .build_options
+                    .compiler_config
+                    .language_version;
+                options.known_attributes.clone_from(known_attributes);
+                options.skip_attribute_checks = skip_attribute_checks;
+                let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+                move_compiler_v2::run_move_compiler_for_analysis(&mut error_writer, options)
+            },
+        }
     }
+}
+
+fn make_options_for_v2_compiler(targets: Vec<PackagePaths>, deps: Vec<PackagePaths>) -> Options {
+    let mut options = Options {
+        sources: targets
+            .iter()
+            .flat_map(|p| p.paths.iter().map(|s| s.to_string()).collect_vec())
+            .collect(),
+        ..Options::default()
+    };
+    options.dependencies = deps
+        .iter()
+        .flat_map(|p| p.paths.iter().map(|s| s.to_string()).collect_vec())
+        .collect();
+    options.named_address_mapping = targets
+        .into_iter()
+        .chain(deps)
+        .flat_map(|p| {
+            p.named_address_map
+                .iter()
+                .map(|(n, a)| format!("{}={}", n, a.into_inner()))
+                .collect_vec()
+        })
+        .collect_vec();
+    options
 }

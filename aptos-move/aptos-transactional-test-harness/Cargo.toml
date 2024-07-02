@@ -20,24 +20,28 @@ aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
+aptos-resource-viewer = { workspace = true }
 aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true, features = [ "fuzzing" ] }
+aptos-types = { workspace = true, features = ["fuzzing"] }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
+codespan-reporting = { workspace = true }
 hex = { workspace = true }
-move-binary-format = { workspace = true, features = [ "fuzzing" ] }
+move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }
-move-core-types = { workspace = true, features = [ "fuzzing" ] }
-move-resource-viewer = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-core-types = { workspace = true, features = ["fuzzing"] }
+move-model = { workspace = true }
+move-symbol-pool = { workspace = true }
 move-transactional-test-runner = { workspace = true }
 move-vm-runtime = { workspace = true }
 once_cell = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }

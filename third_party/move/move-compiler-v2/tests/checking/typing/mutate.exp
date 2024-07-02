@@ -14,20 +14,20 @@ module 0x8675309::M {
     }
     private fun t0() {
         Borrow(Mutable)(0) = 1;
-        Borrow(Mutable)(select M::S.f(pack M::S(0))) = 1;
+        Borrow(Mutable)(select M::S.f<M::S>(pack M::S(0))) = 1;
         M::foo(Borrow(Mutable)(0)) = 1;
-        select M::S.f(M::bar(Borrow(Mutable)(pack M::S(0)))) = 1;
-        Borrow(Mutable)(select M::S.f(M::bar(Borrow(Mutable)(pack M::S(0))))) = 1;
-        select M::S.f(M::baz()) = 1;
-        Borrow(Mutable)(select M::S.f(M::baz())) = 1;
+        select M::S.f<&mut M::S>(M::bar(Borrow(Mutable)(pack M::S(0)))) = 1;
+        Borrow(Mutable)(select M::S.f<&mut M::S>(M::bar(Borrow(Mutable)(pack M::S(0))))) = 1;
+        select M::S.f<M::S>(M::baz()) = 1;
+        Borrow(Mutable)(select M::S.f<M::S>(M::baz())) = 1;
         Tuple()
     }
     private fun t1() {
         {
           let r: &mut M::S = Borrow(Mutable)(pack M::S(0));
           r = pack M::S(1);
-          select M::S.f(r) = 1;
-          Borrow(Mutable)(select M::S.f(r)) = 1;
+          select M::S.f<&mut M::S>(r) = 1;
+          Borrow(Mutable)(select M::S.f<&mut M::S>(r)) = 1;
           Tuple()
         }
     }

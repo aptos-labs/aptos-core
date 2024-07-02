@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-block-partitioner = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
@@ -25,7 +24,7 @@ aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-scratchpad = { workspace = true }
-aptos-secure-net = { workspace = true }
+aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
@@ -36,7 +35,6 @@ dashmap = { workspace = true }
 fail = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
-num_cpus = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
@@ -45,6 +43,8 @@ serde = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-db = { workspace = true }
+aptos-db-indexer = { workspace = true, features = ["fuzzing"] }
+aptos-db-indexer-schemas = { workspace = true, features = ["fuzzing"] }
 aptos-executor-test-helpers = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-storage-interface = { workspace = true }

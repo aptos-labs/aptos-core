@@ -5,18 +5,29 @@ on:
   workflow_dispatch:
   pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
-  push:
-    branches:
-      - main
+  schedule: 
+    # Run twice a day at 12PM PT and 8PM PT Monday through Friday
+    - cron: "0 19,3 * * 1-5"
+    # Run once a day at 12PM PT on Saturday and Sunday
+    - cron: "0 19 * * 6,0"
 
 jobs:
   windows-build:
-    runs-on: windows-latest-8-core
+    runs-on: windows-latest
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-windows-tests')
+      )
     defaults:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # Fetch all git history for accurate target determination
 
       # This action will cache ~/.cargo and ./target (or the equivalent on Windows in
       # this case). See more here:
@@ -24,8 +35,11 @@ jobs:
       - name: Run cargo cache
         uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
 
-      - name: Install the developer tools
-        run: PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1
+      - name: Set up WinGet
+        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1
+
+      - name: Install the Developer Tools
+        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1 -t
 
       # This is required for the openssl-sys crate to build.
       # See: https://github.com/sfackler/rust-openssl/issues/1542#issuecomment-1399358351
@@ -34,8 +48,17 @@ jobs:
       - name: Install OpenSSL
         run: vcpkg install openssl:x64-windows-static-md --clean-after-build
 
-      - name: Build the Aptos CLI
-        run: cargo build -p aptos
+      # Output the changed files
+      - name: Output the changed files
+        run: cargo x changed-files -vv
+        shell: bash
 
-      - name: Run the Aptos CLI help command
-        run: cargo run -p aptos -- --help
+      # Output the affected packages
+      - name: Output the affected packages
+        run: cargo x affected-packages -vv
+        shell: bash
+
+      # Build and test the Aptos CLI (if it has changed)
+      - name: Build and test the CLI
+        run: cargo x targeted-cli-tests -vv
+        shell: bash

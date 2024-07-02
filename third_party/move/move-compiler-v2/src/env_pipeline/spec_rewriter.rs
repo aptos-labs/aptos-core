@@ -198,8 +198,8 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         // Store result back
         for qid in scc {
             let decl_mut = env.get_spec_fun_mut(qid);
-            decl_mut.callees = transitive_callees.clone();
-            decl_mut.used_memory = transitive_usage.clone();
+            decl_mut.callees.clone_from(&transitive_callees);
+            decl_mut.used_memory.clone_from(&transitive_usage);
         }
     }
 
@@ -328,7 +328,7 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                     // Reduce to unit
                     Call(*id, Tuple, vec![]).into_exp()
                 },
-                Temporary(id, _) => {
+                Temporary(id, _) | LocalVar(id, _) => {
                     self.reference_strip_exempted.insert(*id);
                     exp
                 },

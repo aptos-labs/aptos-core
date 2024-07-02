@@ -13,23 +13,29 @@ use aptos_types::{account_address::AccountAddress, transaction::EntryABI};
 use clap::Parser;
 use codespan_reporting::{
     diagnostic::Severity,
-    term::termcolor::{ColorChoice, StandardStream},
+    term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
 use move_binary_format::CompiledModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
-use move_model::model::GlobalEnv;
+use move_model::{
+    metadata::{CompilerVersion, LanguageVersion},
+    model::GlobalEnv,
+};
 use move_package::{
     compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
-    source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
-    BuildConfig, CompilerConfig, CompilerVersion, ModelConfig,
+    source_package::{
+        manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+        std_lib::StdVersion,
+    },
+    BuildConfig, CompilerConfig, ModelConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    io::stderr,
+    io::{stderr, Write},
     path::{Path, PathBuf},
 };
 
@@ -70,14 +76,19 @@ pub struct BuildOptions {
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
+    /// Whether to override the standard library with the given version.
+    #[clap(long, value_parser)]
+    pub override_std: Option<StdVersion>,
     #[clap(skip)]
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
     #[clap(long)]
     pub bytecode_version: Option<u32>,
-    #[clap(long)]
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
+    pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
     #[clap(long)]
@@ -99,12 +110,14 @@ impl Default for BuildOptions {
             with_docs: false,
             install_dir: None,
             named_addresses: Default::default(),
+            override_std: None,
             docgen_options: None,
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
             bytecode_version: None,
             compiler_version: None,
+            language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -127,6 +140,7 @@ pub fn build_model(
     target_filter: Option<String>,
     bytecode_version: Option<u32>,
     compiler_version: Option<CompilerVersion>,
+    language_version: Option<LanguageVersion>,
     skip_attribute_checks: bool,
     known_attributes: BTreeSet<String>,
 ) -> anyhow::Result<GlobalEnv> {
@@ -140,19 +154,26 @@ pub fn build_model(
         full_model_generation: false,
         install_dir: None,
         test_mode: false,
+        override_std: None,
         force_recompilation: false,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
         compiler_config: CompilerConfig {
             bytecode_version,
             compiler_version,
+            language_version,
             skip_attribute_checks,
             known_attributes,
         },
     };
+    let compiler_version = compiler_version.unwrap_or_default();
+    let language_version = language_version.unwrap_or_default();
+    compiler_version.check_language_support(language_version)?;
     build_config.move_model_for_package(package_path, ModelConfig {
         target_filter,
         all_files_as_targets: false,
+        compiler_version,
+        language_version,
     })
 }
 
@@ -164,6 +185,8 @@ impl BuiltPackage {
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
         let bytecode_version = options.bytecode_version;
         let compiler_version = options.compiler_version;
+        let language_version = options.language_version;
+        Self::check_versions(&compiler_version, &language_version)?;
         let skip_attribute_checks = options.skip_attribute_checks;
         let build_config = BuildConfig {
             dev_mode: options.dev,
@@ -175,12 +198,14 @@ impl BuiltPackage {
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
             test_mode: false,
+            override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
             compiler_config: CompilerConfig {
                 bytecode_version,
                 compiler_version,
+                language_version,
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
             },
@@ -246,6 +271,38 @@ impl BuiltPackage {
             package_path,
             package,
         })
+    }
+
+    // Check versions and warn user if using unstable ones.
+    fn check_versions(
+        compiler_version: &Option<CompilerVersion>,
+        language_version: &Option<LanguageVersion>,
+    ) -> anyhow::Result<()> {
+        let effective_compiler_version = compiler_version.unwrap_or_default();
+        let effective_language_version = language_version.unwrap_or_default();
+        let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+        if effective_compiler_version.unstable() {
+            error_writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
+            writeln!(
+                &mut error_writer,
+                "Warning: compiler version `{}` is experimental \
+                and should not be used in production",
+                effective_compiler_version
+            )?;
+            error_writer.reset()?;
+        }
+        if effective_language_version.unstable() {
+            error_writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
+            writeln!(
+                &mut error_writer,
+                "Warning: language version `{}` is experimental \
+                and should not be used in production",
+                effective_language_version
+            )?;
+            error_writer.reset()?;
+        }
+        effective_compiler_version.check_language_support(effective_language_version)?;
+        Ok(())
     }
 
     /// Returns the name of this package.

@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, ensure};
 use aptos_keyless_pepper_common::{
     vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
     PepperV0VufPubKey,
 };
+use aptos_logger::warn;
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use log::warn;
 use once_cell::sync::Lazy;
 use sha3::Digest;
 
@@ -53,7 +54,7 @@ pub static VUF_SK: Lazy<ark_bls12_381::Fr> = Lazy::new(|| {
     deserialize_sk_from_env().expect("fallback sk also failed")
 });
 
-pub static PEPPER_V0_VUF_VERIFICATION_KEY_JSON: Lazy<String> = Lazy::new(|| {
+pub static PEPPER_VUF_VERIFICATION_KEY_JSON: Lazy<String> = Lazy::new(|| {
     let pk = Bls12381G1Bls::pk_from_sk(&VUF_SK).expect("bad sk");
     let mut buf = vec![];
     pk.into_affine().serialize_compressed(&mut buf).unwrap();

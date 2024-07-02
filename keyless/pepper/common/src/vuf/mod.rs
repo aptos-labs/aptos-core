@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
 use ark_std::rand::{CryptoRng, RngCore};
@@ -26,3 +27,4 @@ pub trait VUF {
 ///
 /// TODO: better name?
 pub mod bls12381_g1_bls;
+pub mod slip_10;

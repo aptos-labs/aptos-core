@@ -104,6 +104,31 @@ return true.
 -  [Function `keyless_accounts_with_passkeys_feature_enabled`](#0x1_features_keyless_accounts_with_passkeys_feature_enabled)
 -  [Function `get_multisig_v2_enhancement_feature`](#0x1_features_get_multisig_v2_enhancement_feature)
 -  [Function `multisig_v2_enhancement_feature_enabled`](#0x1_features_multisig_v2_enhancement_feature_enabled)
+-  [Function `get_delegation_pool_allowlisting_feature`](#0x1_features_get_delegation_pool_allowlisting_feature)
+-  [Function `delegation_pool_allowlisting_enabled`](#0x1_features_delegation_pool_allowlisting_enabled)
+-  [Function `get_module_event_migration_feature`](#0x1_features_get_module_event_migration_feature)
+-  [Function `module_event_migration_enabled`](#0x1_features_module_event_migration_enabled)
+-  [Function `get_transaction_context_extension_feature`](#0x1_features_get_transaction_context_extension_feature)
+-  [Function `transaction_context_extension_enabled`](#0x1_features_transaction_context_extension_enabled)
+-  [Function `get_coin_to_fungible_asset_migration_feature`](#0x1_features_get_coin_to_fungible_asset_migration_feature)
+-  [Function `coin_to_fungible_asset_migration_feature_enabled`](#0x1_features_coin_to_fungible_asset_migration_feature_enabled)
+-  [Function `get_primary_apt_fungible_store_at_user_address_feature`](#0x1_features_get_primary_apt_fungible_store_at_user_address_feature)
+-  [Function `primary_apt_fungible_store_at_user_address_enabled`](#0x1_features_primary_apt_fungible_store_at_user_address_enabled)
+-  [Function `aggregator_v2_is_at_least_api_enabled`](#0x1_features_aggregator_v2_is_at_least_api_enabled)
+-  [Function `get_object_native_derived_address_feature`](#0x1_features_get_object_native_derived_address_feature)
+-  [Function `object_native_derived_address_enabled`](#0x1_features_object_native_derived_address_enabled)
+-  [Function `get_dispatchable_fungible_asset_feature`](#0x1_features_get_dispatchable_fungible_asset_feature)
+-  [Function `dispatchable_fungible_asset_enabled`](#0x1_features_dispatchable_fungible_asset_enabled)
+-  [Function `get_new_accounts_default_to_fa_apt_store_feature`](#0x1_features_get_new_accounts_default_to_fa_apt_store_feature)
+-  [Function `new_accounts_default_to_fa_apt_store_enabled`](#0x1_features_new_accounts_default_to_fa_apt_store_enabled)
+-  [Function `get_operations_default_to_fa_apt_store_feature`](#0x1_features_get_operations_default_to_fa_apt_store_feature)
+-  [Function `operations_default_to_fa_apt_store_enabled`](#0x1_features_operations_default_to_fa_apt_store_enabled)
+-  [Function `get_concurrent_fungible_balance_feature`](#0x1_features_get_concurrent_fungible_balance_feature)
+-  [Function `concurrent_fungible_balance_enabled`](#0x1_features_concurrent_fungible_balance_enabled)
+-  [Function `get_default_to_concurrent_fungible_balance_feature`](#0x1_features_get_default_to_concurrent_fungible_balance_feature)
+-  [Function `default_to_concurrent_fungible_balance_enabled`](#0x1_features_default_to_concurrent_fungible_balance_enabled)
+-  [Function `get_abort_if_multisig_payload_mismatch_feature`](#0x1_features_get_abort_if_multisig_payload_mismatch_feature)
+-  [Function `abort_if_multisig_payload_mismatch_enabled`](#0x1_features_abort_if_multisig_payload_mismatch_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -112,7 +137,7 @@ return true.
 -  [Function `set`](#0x1_features_set)
 -  [Function `contains`](#0x1_features_contains)
 -  [Function `apply_diff`](#0x1_features_apply_diff)
--  [Function `ensure_vm_or_framework_signer`](#0x1_features_ensure_vm_or_framework_signer)
+-  [Function `ensure_framework_signer`](#0x1_features_ensure_framework_signer)
 -  [Function `change_feature_flags_for_verification`](#0x1_features_change_feature_flags_for_verification)
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
@@ -120,6 +145,7 @@ return true.
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
     -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
     -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
+    -  [Function `abort_if_multisig_payload_mismatch_enabled`](#@Specification_1_abort_if_multisig_payload_mismatch_enabled)
     -  [Function `change_feature_flags_internal`](#@Specification_1_change_feature_flags_internal)
     -  [Function `change_feature_flags_for_next_epoch`](#@Specification_1_change_feature_flags_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
@@ -198,26 +224,24 @@ On epoch change, the updates take effect and this buffer is cleared.
 ## Constants
 
 
-<a id="0x1_features_AGGREGATOR_V2_API"></a>
+<a id="0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH"></a>
 
-Whether the Aggregator V2 API feature is enabled.
-Once enabled, the functions from aggregator_v2.move will be available for use.
+Whether the multisig v2 fix is enabled. Once enabled, the multisig transaction execution will explicitly
+abort if the provided payload does not match the payload stored on-chain.
+
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a>: u64 = 30;
+<pre><code><b>const</b> <a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a>: u64 = 70;
 </code></pre>
 
 
 
-<a id="0x1_features_AGGREGATOR_V2_DELAYED_FIELDS"></a>
-
-Whether the Aggregator V2 delayed fields feature is enabled.
-Once enabled, Aggregator V2 functions become parallel.
-Lifetime: transient
+<a id="0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API"></a>
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_DELAYED_FIELDS">AGGREGATOR_V2_DELAYED_FIELDS</a>: u64 = 36;
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>: u64 = 66;
 </code></pre>
 
 
@@ -316,6 +340,18 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_COIN_TO_FUNGIBLE_ASSET_MIGRATION"></a>
+
+Whether migration from coin to fungible asset feature is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_COIN_TO_FUNGIBLE_ASSET_MIGRATION">COIN_TO_FUNGIBLE_ASSET_MIGRATION</a>: u64 = 60;
+</code></pre>
+
+
+
 <a id="0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES"></a>
 
 Whether gas fees are collected and distributed to the block proposers.
@@ -350,14 +386,14 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_CONCURRENT_TOKEN_V2"></a>
+<a id="0x1_features_CONCURRENT_FUNGIBLE_BALANCE"></a>
 
-Whether enable TokenV2 collection creation and Fungible Asset creation
+Whether enable concurent Fungible Balance
 to create higher throughput concurrent variants.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_TOKEN_V2">CONCURRENT_TOKEN_V2</a>: u64 = 37;
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_BALANCE">CONCURRENT_FUNGIBLE_BALANCE</a>: u64 = 67;
 </code></pre>
 
 
@@ -374,6 +410,17 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE"></a>
+
+Whether to default new Fungible Store to the concurrent variant.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE">DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE</a>: u64 = 68;
+</code></pre>
+
+
+
 <a id="0x1_features_DELEGATION_POOLS"></a>
 
 Whether delegation pools are enabled.
@@ -385,6 +432,17 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_DELEGATION_POOL_ALLOWLISTING"></a>
+
+Whether delegators allowlisting for delegation pools is supported.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>: u64 = 56;
+</code></pre>
+
+
+
 <a id="0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING"></a>
 
 Whether enable paritial governance voting on delegation_pool.
@@ -392,6 +450,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a>: u64 = 21;
+</code></pre>
+
+
+
+<a id="0x1_features_DISPATCHABLE_FUNGIBLE_ASSET"></a>
+
+Whether the dispatchable fungible asset standard feature is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>: u64 = 63;
 </code></pre>
 
 
@@ -412,6 +482,16 @@ Lifetime: ephemeral
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH">ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH</a>: u64 = 14;
+</code></pre>
+
+
+
+<a id="0x1_features_EFEATURE_CANNOT_BE_DISABLED"></a>
+
+Deployed to production, and disabling is deprecated.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_EFEATURE_CANNOT_BE_DISABLED">EFEATURE_CANNOT_BE_DISABLED</a>: u64 = 3;
 </code></pre>
 
 
@@ -532,6 +612,18 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_MODULE_EVENT_MIGRATION"></a>
+
+Whether aptos_framwork enables the behavior of module event migration.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>: u64 = 57;
+</code></pre>
+
+
+
 <a id="0x1_features_MULTISIG_ACCOUNTS"></a>
 
 Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
@@ -566,12 +658,42 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE"></a>
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>: u64 = 64;
+</code></pre>
+
+
+
 <a id="0x1_features_OBJECT_CODE_DEPLOYMENT"></a>
 
 Whether deploying to objects is enabled.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>: u64 = 52;
+</code></pre>
+
+
+
+<a id="0x1_features_OBJECT_NATIVE_DERIVED_ADDRESS"></a>
+
+Whether we use more efficient native implementation of computing object derived address
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_OBJECT_NATIVE_DERIVED_ADDRESS">OBJECT_NATIVE_DERIVED_ADDRESS</a>: u64 = 62;
+</code></pre>
+
+
+
+<a id="0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE"></a>
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a>: u64 = 65;
 </code></pre>
 
 
@@ -605,6 +727,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>: u64 = 16;
+</code></pre>
+
+
+
+<a id="0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>: u64 = 61;
 </code></pre>
 
 
@@ -719,6 +850,19 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_STRUCT_CONSTRUCTORS">STRUCT_CONSTRUCTORS</a>: u64 = 15;
+</code></pre>
+
+
+
+<a id="0x1_features_TRANSACTION_CONTEXT_EXTENSION"></a>
+
+Whether the transaction context extension is enabled. This feature allows the module
+<code>transaction_context</code> to provide contextual information about the user transaction.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_TRANSACTION_CONTEXT_EXTENSION">TRANSACTION_CONTEXT_EXTENSION</a>: u64 = 59;
 </code></pre>
 
 
@@ -1486,7 +1630,9 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_auids">get_auids</a>(): u64 { <a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_auids">get_auids</a>(): u64 {
+    <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EFEATURE_CANNOT_BE_DISABLED">EFEATURE_CANNOT_BE_DISABLED</a>)
+ }
 </code></pre>
 
 
@@ -1508,8 +1654,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_auids_enabled">auids_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_auids_enabled">auids_enabled</a>(): bool {
+    <b>true</b>
 }
 </code></pre>
 
@@ -1670,7 +1816,9 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_v2_api_feature">get_aggregator_v2_api_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_v2_api_feature">get_aggregator_v2_api_feature</a>(): u64 {
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EFEATURE_CANNOT_BE_DISABLED">EFEATURE_CANNOT_BE_DISABLED</a>)
+}
 </code></pre>
 
 
@@ -1692,8 +1840,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>(): bool {
+    <b>true</b>
 }
 </code></pre>
 
@@ -1812,7 +1960,9 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_token_v2_feature">get_concurrent_token_v2_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_TOKEN_V2">CONCURRENT_TOKEN_V2</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_token_v2_feature">get_concurrent_token_v2_feature</a>(): u64 {
+    <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EFEATURE_CANNOT_BE_DISABLED">EFEATURE_CANNOT_BE_DISABLED</a>)
+}
 </code></pre>
 
 
@@ -1834,9 +1984,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_token_v2_enabled">concurrent_token_v2_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    // concurrent token v2 cannot be used <b>if</b> aggregator v2 api is not enabled.
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_TOKEN_V2">CONCURRENT_TOKEN_V2</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_token_v2_enabled">concurrent_token_v2_enabled</a>(): bool {
+    <b>true</b>
 }
 </code></pre>
 
@@ -1861,7 +2010,7 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_assets_feature">get_concurrent_assets_feature</a>(): u64 {
-    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EFEATURE_CANNOT_BE_DISABLED">EFEATURE_CANNOT_BE_DISABLED</a>)
 }
 </code></pre>
 
@@ -1886,7 +2035,7 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool {
-    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EFEATURE_CANNOT_BE_DISABLED">EFEATURE_CANNOT_BE_DISABLED</a>)
 }
 </code></pre>
 
@@ -2254,8 +2403,7 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_assets_enabled">concurrent_fungible_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    // concurrent fungible assets cannot be used <b>if</b> aggregator v2 api is not enabled.
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>)
 }
 </code></pre>
 
@@ -2425,6 +2573,587 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_delegation_pool_allowlisting_feature"></a>
+
+## Function `get_delegation_pool_allowlisting_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64 { <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_delegation_pool_allowlisting_enabled"></a>
+
+## Function `delegation_pool_allowlisting_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_module_event_migration_feature"></a>
+
+## Function `get_module_event_migration_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_event_migration_feature">get_module_event_migration_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_event_migration_feature">get_module_event_migration_feature</a>(): u64 { <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_module_event_migration_enabled"></a>
+
+## Function `module_event_migration_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_migration_enabled">module_event_migration_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_migration_enabled">module_event_migration_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_transaction_context_extension_feature"></a>
+
+## Function `get_transaction_context_extension_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_transaction_context_extension_feature">get_transaction_context_extension_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_transaction_context_extension_feature">get_transaction_context_extension_feature</a>(): u64 { <a href="features.md#0x1_features_TRANSACTION_CONTEXT_EXTENSION">TRANSACTION_CONTEXT_EXTENSION</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_transaction_context_extension_enabled"></a>
+
+## Function `transaction_context_extension_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_transaction_context_extension_enabled">transaction_context_extension_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_transaction_context_extension_enabled">transaction_context_extension_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_TRANSACTION_CONTEXT_EXTENSION">TRANSACTION_CONTEXT_EXTENSION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_coin_to_fungible_asset_migration_feature"></a>
+
+## Function `get_coin_to_fungible_asset_migration_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_coin_to_fungible_asset_migration_feature">get_coin_to_fungible_asset_migration_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_coin_to_fungible_asset_migration_feature">get_coin_to_fungible_asset_migration_feature</a>(): u64 { <a href="features.md#0x1_features_COIN_TO_FUNGIBLE_ASSET_MIGRATION">COIN_TO_FUNGIBLE_ASSET_MIGRATION</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_coin_to_fungible_asset_migration_feature_enabled"></a>
+
+## Function `coin_to_fungible_asset_migration_feature_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">coin_to_fungible_asset_migration_feature_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">coin_to_fungible_asset_migration_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COIN_TO_FUNGIBLE_ASSET_MIGRATION">COIN_TO_FUNGIBLE_ASSET_MIGRATION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_primary_apt_fungible_store_at_user_address_feature"></a>
+
+## Function `get_primary_apt_fungible_store_at_user_address_feature`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_primary_apt_fungible_store_at_user_address_feature">get_primary_apt_fungible_store_at_user_address_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_primary_apt_fungible_store_at_user_address_feature">get_primary_apt_fungible_store_at_user_address_feature</a>(
+): u64 {
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_primary_apt_fungible_store_at_user_address_enabled"></a>
+
+## Function `primary_apt_fungible_store_at_user_address_enabled`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">primary_apt_fungible_store_at_user_address_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">primary_apt_fungible_store_at_user_address_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_aggregator_v2_is_at_least_api_enabled"></a>
+
+## Function `aggregator_v2_is_at_least_api_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_object_native_derived_address_feature"></a>
+
+## Function `get_object_native_derived_address_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_object_native_derived_address_feature">get_object_native_derived_address_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_object_native_derived_address_feature">get_object_native_derived_address_feature</a>(): u64 { <a href="features.md#0x1_features_OBJECT_NATIVE_DERIVED_ADDRESS">OBJECT_NATIVE_DERIVED_ADDRESS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_object_native_derived_address_enabled"></a>
+
+## Function `object_native_derived_address_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_object_native_derived_address_enabled">object_native_derived_address_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_object_native_derived_address_enabled">object_native_derived_address_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OBJECT_NATIVE_DERIVED_ADDRESS">OBJECT_NATIVE_DERIVED_ADDRESS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_dispatchable_fungible_asset_feature"></a>
+
+## Function `get_dispatchable_fungible_asset_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_dispatchable_fungible_asset_feature">get_dispatchable_fungible_asset_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_dispatchable_fungible_asset_feature">get_dispatchable_fungible_asset_feature</a>(): u64 { <a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_dispatchable_fungible_asset_enabled"></a>
+
+## Function `dispatchable_fungible_asset_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dispatchable_fungible_asset_enabled">dispatchable_fungible_asset_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dispatchable_fungible_asset_enabled">dispatchable_fungible_asset_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_new_accounts_default_to_fa_apt_store_feature"></a>
+
+## Function `get_new_accounts_default_to_fa_apt_store_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64 { <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_new_accounts_default_to_fa_apt_store_enabled"></a>
+
+## Function `new_accounts_default_to_fa_apt_store_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">new_accounts_default_to_fa_apt_store_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">new_accounts_default_to_fa_apt_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_operations_default_to_fa_apt_store_feature"></a>
+
+## Function `get_operations_default_to_fa_apt_store_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64 { <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_operations_default_to_fa_apt_store_enabled"></a>
+
+## Function `operations_default_to_fa_apt_store_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operations_default_to_fa_apt_store_enabled">operations_default_to_fa_apt_store_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operations_default_to_fa_apt_store_enabled">operations_default_to_fa_apt_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_concurrent_fungible_balance_feature"></a>
+
+## Function `get_concurrent_fungible_balance_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_fungible_balance_feature">get_concurrent_fungible_balance_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_fungible_balance_feature">get_concurrent_fungible_balance_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_BALANCE">CONCURRENT_FUNGIBLE_BALANCE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_concurrent_fungible_balance_enabled"></a>
+
+## Function `concurrent_fungible_balance_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_balance_enabled">concurrent_fungible_balance_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_balance_enabled">concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_BALANCE">CONCURRENT_FUNGIBLE_BALANCE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_default_to_concurrent_fungible_balance_feature"></a>
+
+## Function `get_default_to_concurrent_fungible_balance_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_default_to_concurrent_fungible_balance_feature">get_default_to_concurrent_fungible_balance_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_default_to_concurrent_fungible_balance_feature">get_default_to_concurrent_fungible_balance_feature</a>(): u64 { <a href="features.md#0x1_features_DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE">DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_default_to_concurrent_fungible_balance_enabled"></a>
+
+## Function `default_to_concurrent_fungible_balance_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_default_to_concurrent_fungible_balance_enabled">default_to_concurrent_fungible_balance_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_default_to_concurrent_fungible_balance_enabled">default_to_concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE">DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_abort_if_multisig_payload_mismatch_feature"></a>
+
+## Function `get_abort_if_multisig_payload_mismatch_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_abort_if_multisig_payload_mismatch_feature">get_abort_if_multisig_payload_mismatch_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_abort_if_multisig_payload_mismatch_feature">get_abort_if_multisig_payload_mismatch_feature</a>(): u64 { <a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_abort_if_multisig_payload_mismatch_enabled"></a>
+
+## Function `abort_if_multisig_payload_mismatch_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">abort_if_multisig_payload_mismatch_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">abort_if_multisig_payload_mismatch_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -2446,7 +3175,7 @@ Governance proposals should use <code><a href="features.md#0x1_features_change_f
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(_framework: &<a href="signer.md#0x1_signer">signer</a>, _enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, _disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
-    <b>abort</b>(<a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="features.md#0x1_features_EAPI_DISABLED">EAPI_DISABLED</a>))
+    <b>abort</b> (<a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="features.md#0x1_features_EAPI_DISABLED">EAPI_DISABLED</a>))
 }
 </code></pre>
 
@@ -2505,7 +3234,11 @@ Enable and disable features for the next epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>, <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(
+    framework: &<a href="signer.md#0x1_signer">signer</a>,
+    enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;
+) <b>acquires</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>, <a href="features.md#0x1_features_Features">Features</a> {
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
 
     // Figure out the baseline feature vec that the diff will be applied <b>to</b>.
@@ -2541,7 +3274,7 @@ While the scope is public, it can only be usd in system transactions like <code>
 who have permission to set the flag that's checked in <code>extract()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -2550,11 +3283,15 @@ who have permission to set the flag that's checked in <code>extract()</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a>, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> {
-    <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(vm_or_framework);
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a>, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> {
+    <a href="features.md#0x1_features_ensure_framework_signer">ensure_framework_signer</a>(framework);
     <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
         <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
-        <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
+        <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+            <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
+        } <b>else</b> {
+            <b>move_to</b>(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a> })
+        }
     }
 }
 </code></pre>
@@ -2680,13 +3417,13 @@ Helper to check whether a feature flag is enabled.
 
 </details>
 
-<a id="0x1_features_ensure_vm_or_framework_signer"></a>
+<a id="0x1_features_ensure_framework_signer"></a>
 
-## Function `ensure_vm_or_framework_signer`
+## Function `ensure_framework_signer`
 
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_framework_signer">ensure_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -2695,9 +3432,9 @@ Helper to check whether a feature flag is enabled.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
+<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_framework_signer">ensure_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
     <b>let</b> addr = <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(account);
-    <b>assert</b>!(addr == @std || addr == @vm, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
+    <b>assert</b>!(addr == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
 }
 </code></pre>
 
@@ -2721,7 +3458,11 @@ Helper to check whether a feature flag is enabled.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_verification">change_feature_flags_for_verification</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_verification">change_feature_flags_for_verification</a>(
+    framework: &<a href="signer.md#0x1_signer">signer</a>,
+    enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;
+) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework, enable, disable)
 }
 </code></pre>
@@ -2852,6 +3593,35 @@ Helper to check whether a feature flag is enabled.
 
 
 
+
+<a id="0x1_features_spec_abort_if_multisig_payload_mismatch_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_abort_if_multisig_payload_mismatch_enabled">spec_abort_if_multisig_payload_mismatch_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a>)
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_abort_if_multisig_payload_mismatch_enabled"></a>
+
+### Function `abort_if_multisig_payload_mismatch_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">abort_if_multisig_payload_mismatch_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_abort_if_multisig_payload_mismatch_enabled">spec_abort_if_multisig_payload_mismatch_enabled</a>();
+</code></pre>
+
+
+
 <a id="@Specification_1_change_feature_flags_internal"></a>
 
 ### Function `change_feature_flags_internal`
@@ -2882,6 +3652,9 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>aborts_if</b> <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) != @std;
+<b>pragma</b> opaque;
+<b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
+<b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
 </code></pre>
 
 
@@ -2903,18 +3676,28 @@ Helper to check whether a feature flag is enabled.
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>let</b> addr = <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(vm_or_framework);
-<b>aborts_if</b> addr != @std && addr != @vm;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std) && !<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
+<pre><code><b>requires</b> @std == <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework);
 <b>let</b> features_pending = <b>global</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
 <b>let</b> <b>post</b> features_std = <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std) ==&gt; features_std == features_pending;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_features_spec_sha_512_and_ripemd_160_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_sha_512_and_ripemd_160_enabled">spec_sha_512_and_ripemd_160_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">SHA_512_AND_RIPEMD_160_NATIVES</a>)
+}
 </code></pre>
 
 

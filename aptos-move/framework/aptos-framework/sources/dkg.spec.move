@@ -23,8 +23,9 @@ spec aptos_framework::dkg {
 
     spec finish(transcript: vector<u8>) {
         use std::option;
-        aborts_if !exists<DKGState>(@aptos_framework);
-        aborts_if option::is_none(global<DKGState>(@aptos_framework).in_progress);
+        requires exists<DKGState>(@aptos_framework);
+        requires option::is_some(global<DKGState>(@aptos_framework).in_progress);
+        aborts_if false;
     }
 
     spec fun has_incomplete_session(): bool {

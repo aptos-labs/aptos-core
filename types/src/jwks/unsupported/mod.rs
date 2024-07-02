@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use aptos_crypto::HashValue;
 use move_core_types::value::{MoveStruct, MoveValue};
+use poem_openapi_derive::Object;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 
 /// Move type `0x1::jwks::UnsupportedJWK` in rust.
 /// See its doc in Move for more details.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct UnsupportedJWK {
     pub id: Vec<u8>,
     pub payload: Vec<u8>,

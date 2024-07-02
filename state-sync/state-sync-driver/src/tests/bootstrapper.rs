@@ -752,6 +752,122 @@ async fn test_data_stream_transactions_or_outputs_fallback() {
 
 #[tokio::test]
 async fn test_fetch_epoch_ending_ledger_infos() {
+    // Create a driver configuration
+    let mut driver_configuration = create_full_node_driver_configuration();
+
+    // Update the driver configuration to use a waypoint in the future
+    let waypoint_version = 100;
+    let waypoint_epoch = 100;
+    let waypoint = create_random_epoch_ending_ledger_info(waypoint_version, waypoint_epoch);
+    driver_configuration.waypoint = Waypoint::new_any(waypoint.ledger_info());
+
+    // Create the mock streaming client
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (mut notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_epoch_ending_ledger_infos()
+        .with(eq(1))
+        .return_once(move |_| Ok(data_stream_listener));
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .return_const(Ok(()));
+
+    // Create the bootstrapper
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
+
+    // Create a global data summary where epoch 100 has ended
+    let global_data_summary =
+        create_global_summary_with_version(waypoint_epoch, waypoint_version + 1);
+
+    // Drive progress to initialize the epoch ending data stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Create the first set of epoch ending ledger infos and send them across the stream
+    let num_ledger_infos_to_send = waypoint_epoch / 2;
+    let mut epoch_ending_ledger_infos = vec![];
+    for index in 0..num_ledger_infos_to_send {
+        epoch_ending_ledger_infos.push(create_random_epoch_ending_ledger_info(index, index));
+    }
+    let data_notification = DataNotification::new(
+        0,
+        DataPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos.clone()),
+    );
+    notification_sender.send(data_notification).await.unwrap();
+
+    // Drive progress to process the first set of epoch ending ledger infos
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::DataStreamNotificationTimeout(_));
+
+    // Verify we're not bootstrapped yet
+    assert!(!bootstrapper.is_bootstrapped());
+
+    // Verify the bootstrapper has not fetched all ledger infos or verified the waypoint
+    let verified_epoch_states = bootstrapper.get_verified_epoch_states().clone();
+    assert!(!verified_epoch_states.fetched_epoch_ending_ledger_infos());
+    assert!(!verified_epoch_states.verified_waypoint());
+
+    // Verify the epoch states contains the first set of epoch ending ledger infos
+    let verified_ledger_infos = verified_epoch_states.all_epoch_ending_ledger_infos();
+    assert_eq!(verified_ledger_infos.len() as u64, num_ledger_infos_to_send);
+    for epoch_ending_ledger_info in epoch_ending_ledger_infos {
+        assert!(verified_ledger_infos.contains(&epoch_ending_ledger_info));
+    }
+
+    // Create the second set of epoch ending ledger infos and send them across the stream
+    let mut epoch_ending_ledger_infos = vec![];
+    for index in num_ledger_infos_to_send..waypoint_epoch + 1 {
+        epoch_ending_ledger_infos.push(create_random_epoch_ending_ledger_info(index, index));
+    }
+    let data_notification = DataNotification::new(
+        1,
+        DataPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos.clone()),
+    );
+    notification_sender.send(data_notification).await.unwrap();
+
+    // Artificially overwrite the waypoint hash so that verification passes
+    let last_ledger_info = epoch_ending_ledger_infos.last().unwrap().ledger_info();
+    bootstrapper.set_waypoint(Waypoint::new_any(last_ledger_info));
+
+    // Drive progress to process the second set of epoch ending ledger infos
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::DataStreamNotificationTimeout(_));
+
+    // Ensure the bootstrapper verified the waypoint
+    let verified_epoch_states = bootstrapper.get_verified_epoch_states().clone();
+    assert!(verified_epoch_states.verified_waypoint());
+
+    // Verify the epoch states contains all epoch ending ledger infos
+    let verified_ledger_infos = verified_epoch_states.all_epoch_ending_ledger_infos();
+    assert_eq!(verified_ledger_infos.len() as u64, waypoint_epoch + 1);
+    for epoch_ending_ledger_info in epoch_ending_ledger_infos {
+        assert!(verified_ledger_infos.contains(&epoch_ending_ledger_info));
+    }
+
+    // Send the end of stream notification
+    let data_notification = DataNotification::new(2, DataPayload::EndOfStream);
+    notification_sender.send(data_notification).await.unwrap();
+
+    // Drive progress to process the end of stream notification
+    for _ in 0..2 {
+        drive_progress(&mut bootstrapper, &global_data_summary, false)
+            .await
+            .unwrap();
+    }
+
+    // Verify the bootstrapper has fetched all ledger infos
+    let verified_epoch_states = bootstrapper.get_verified_epoch_states().clone();
+    assert!(verified_epoch_states.fetched_epoch_ending_ledger_infos());
+}
+
+#[tokio::test]
+async fn test_fetch_epoch_ending_ledger_infos_timeout() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();
     driver_configuration.config.max_stream_wait_time_ms = 1000;
@@ -785,6 +901,56 @@ async fn test_fetch_epoch_ending_ledger_infos() {
         .await
         .unwrap_err();
     assert_matches!(error, Error::DataStreamNotificationTimeout(_));
+}
+
+#[tokio::test]
+#[should_panic(expected = "Failed to verify the waypoint: Waypoint value mismatch")]
+async fn test_fetch_epoch_ending_ledger_infos_waypoint_mismatch() {
+    // Create a driver configuration
+    let mut driver_configuration = create_full_node_driver_configuration();
+
+    // Update the driver configuration to use a waypoint in the future
+    let waypoint_version = 100;
+    let waypoint_epoch = 100;
+    let waypoint = create_random_epoch_ending_ledger_info(waypoint_version, waypoint_epoch);
+    driver_configuration.waypoint = Waypoint::new_any(waypoint.ledger_info());
+
+    // Create the mock streaming client
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (mut notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_epoch_ending_ledger_infos()
+        .with(eq(1))
+        .return_once(move |_| Ok(data_stream_listener));
+
+    // Create the bootstrapper
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
+
+    // Create a global data summary where epoch 100 has ended
+    let global_data_summary =
+        create_global_summary_with_version(waypoint_epoch, waypoint_version + 1);
+
+    // Drive progress to initialize the epoch ending data stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Create a full set of epoch ending ledger infos and send them across the stream
+    let mut epoch_ending_ledger_infos = vec![];
+    for index in 0..waypoint_epoch + 1 {
+        epoch_ending_ledger_infos.push(create_random_epoch_ending_ledger_info(index, index));
+    }
+    let data_notification = DataNotification::new(
+        0,
+        DataPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos.clone()),
+    );
+    notification_sender.send(data_notification).await.unwrap();
+
+    // Drive progress to process the set of epoch ending ledger infos and panic at the waypoint mismatch
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -1446,7 +1612,7 @@ fn create_bootstrapper(
         .expect_get_latest_ledger_info()
         .returning(|| Ok(create_epoch_ending_ledger_info()));
     mock_database_reader
-        .expect_get_latest_version()
+        .expect_get_synced_version()
         .returning(|| Ok(0));
 
     // Create the output fallback handler
@@ -1462,6 +1628,7 @@ fn create_bootstrapper(
         mock_streaming_client,
         Arc::new(mock_database_reader),
         mock_storage_synchronizer,
+        None,
     );
 
     (bootstrapper, output_fallback_handler)
@@ -1503,7 +1670,7 @@ fn create_bootstrapper_with_storage(
         .expect_get_latest_ledger_info()
         .returning(move || Ok(epoch_ending_ledger_info.clone()));
     mock_database_reader
-        .expect_get_latest_version()
+        .expect_get_synced_version()
         .returning(move || Ok(latest_synced_version));
 
     // Create the output fallback handler
@@ -1517,6 +1684,7 @@ fn create_bootstrapper_with_storage(
         mock_streaming_client,
         Arc::new(mock_database_reader),
         mock_storage_synchronizer,
+        None,
     )
 }
 

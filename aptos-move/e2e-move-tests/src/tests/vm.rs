@@ -6,7 +6,7 @@ use aptos_cached_packages::aptos_stdlib::aptos_account_transfer;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::ExecutionStatus, write_set::WriteOp,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::AptosVM;
 use claims::{assert_ok_eq, assert_some};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 use test_case::test_case;
@@ -28,10 +28,7 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
         .sign();
 
     let state_view = h.executor.get_state_view();
-    let vm = AptosVM::new(
-        &state_view.as_move_resolver(),
-        /*override_is_delayed_field_optimization_capable=*/ Some(false),
-    );
+    let vm = AptosVM::new(state_view);
 
     let balance = 10_000;
     let output = vm
@@ -43,8 +40,14 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
         )
         .1;
 
-    assert_some!(output.auxiliary_data().get_detail_error_message());
-    println!("auxiliary data {:?}", output.auxiliary_data());
+    assert_eq!(
+        output
+            .auxiliary_data()
+            .get_detail_error_message()
+            .unwrap()
+            .status_code(),
+        status_code
+    );
     let write_set: Vec<(&StateKey, &WriteOp)> = output
         .change_set()
         .concrete_write_set_iter()
@@ -55,6 +58,6 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
     assert!(!output.status().is_discarded());
     assert_ok_eq!(
         output.status().as_kept_status(),
-        ExecutionStatus::MiscellaneousError(Some(status_code))
+        ExecutionStatus::MiscellaneousError(None)
     );
 }

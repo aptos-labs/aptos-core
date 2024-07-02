@@ -1,0 +1,31 @@
+[package]
+name = "aptos-indexer-grpc-file-store"
+description = "Indexer gRPC file store saves transactions to persistent storage."
+version = "1.0.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-indexer-grpc-server-framework = { workspace = true }
+aptos-indexer-grpc-utils = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-moving-average = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+once_cell = { workspace = true }
+redis = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }

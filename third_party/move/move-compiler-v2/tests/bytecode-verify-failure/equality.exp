@@ -12,38 +12,11 @@ B0:
 	3: Ret
 }
 }
+============ bytecode verification failed ========
+
 Diagnostics:
-bug: BYTECODE VERIFICATION FAILED
-  ┌─ tests/bytecode-verify-failure/equality.move:1:1
+bug: bytecode verification failed with unexpected status code `EQUALITY_OP_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
+  ┌─ tests/bytecode-verify-failure/equality.move:3:9
   │
-1 │ ╭ module 0xc0ffee::m {
-2 │ │   fun equality<T>(x: T, y: T): bool {
-3 │ │         x == y
-4 │ │     }
-5 │ │ }
-  │ ╰─^ ICE failed bytecode verifier: VMError {
-    major_status: EQUALITY_OP_TYPE_MISMATCH_ERROR,
-    sub_status: None,
-    message: None,
-    exec_state: None,
-    location: Module(
-        ModuleId {
-            address: 0000000000000000000000000000000000000000000000000000000000c0ffee,
-            name: Identifier(
-                "m",
-            ),
-        },
-    ),
-    indices: [
-        (
-            FunctionDefinition,
-            0,
-        ),
-    ],
-    offsets: [
-        (
-            FunctionDefinitionIndex(0),
-            2,
-        ),
-    ],
-}
+3 │         x == y
+  │         ^^^^^^

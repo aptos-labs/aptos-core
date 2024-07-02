@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
@@ -82,11 +83,6 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        self.base_executor_view
-            .is_delayed_field_optimization_capable()
-    }
 
     fn get_delayed_field_value(
         &self,
@@ -176,7 +172,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         self.base_executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -363,7 +359,7 @@ mod test {
     }
 
     fn key(s: impl ToString) -> StateKey {
-        StateKey::raw(s.to_string().into_bytes())
+        StateKey::raw(s.to_string().as_bytes())
     }
 
     fn write(v: u128) -> WriteOp {
@@ -401,7 +397,7 @@ mod test {
             address: AccountAddress::ONE,
             module: Identifier::new("a").unwrap(),
             name: Identifier::new("a").unwrap(),
-            type_params: vec![TypeTag::U8],
+            type_args: vec![TypeTag::U8],
         }
     }
 
@@ -410,7 +406,7 @@ mod test {
             address: AccountAddress::ONE,
             module: Identifier::new("abcde").unwrap(),
             name: Identifier::new("fgh").unwrap(),
-            type_params: vec![TypeTag::U64],
+            type_args: vec![TypeTag::U64],
         }
     }
 
@@ -419,7 +415,7 @@ mod test {
             address: AccountAddress::ONE,
             module: Identifier::new("abcdex").unwrap(),
             name: Identifier::new("fghx").unwrap(),
-            type_params: vec![TypeTag::U128],
+            type_args: vec![TypeTag::U128],
         }
     }
 

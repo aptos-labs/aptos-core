@@ -17,7 +17,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+  id-token: write # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
 jobs:
   # Note on the job-level `if` conditions:
@@ -37,7 +37,7 @@ jobs:
   run-tests-devnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
-    runs-on: high-perf-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
@@ -51,13 +51,13 @@ jobs:
       - uses: ./.github/actions/run-faucet-tests
         with:
           NETWORK: devnet
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
 
   # These tests ensure that the faucet works with the nodes running on testnet.
   run-tests-testnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
-    runs-on: high-perf-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
       id-token: write
@@ -74,4 +74,4 @@ jobs:
       - uses: ./.github/actions/run-faucet-tests
         with:
           NETWORK: testnet
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}

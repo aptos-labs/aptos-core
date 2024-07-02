@@ -31,6 +31,16 @@ module aptos_framework::randomness_config {
         reconstruction_threshold: FixedPoint64,
     }
 
+    /// A randomness config variant indicating the feature is enabled with fast path.
+    struct ConfigV2 has copy, drop, store {
+        /// Any validator subset should not be able to reconstruct randomness if `subset_power / total_power <= secrecy_threshold`,
+        secrecy_threshold: FixedPoint64,
+        /// Any validator subset should be able to reconstruct randomness if `subset_power / total_power > reconstruction_threshold`.
+        reconstruction_threshold: FixedPoint64,
+        /// Any validator subset should not be able to reconstruct randomness via the fast path if `subset_power / total_power <= fast_path_secrecy_threshold`,
+        fast_path_secrecy_threshold: FixedPoint64,
+    }
+
     /// Initialize the configuration. Used in genesis or governance.
     public fun initialize(framework: &signer, config: RandomnessConfig) {
         system_addresses::assert_aptos_framework(framework);
@@ -46,10 +56,15 @@ module aptos_framework::randomness_config {
     }
 
     /// Only used in reconfigurations to apply the pending `RandomnessConfig`, if there is any.
-    public(friend) fun on_new_epoch() acquires RandomnessConfig {
+    public(friend) fun on_new_epoch(framework: &signer) acquires RandomnessConfig {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfig>()) {
             let new_config = config_buffer::extract<RandomnessConfig>();
-            borrow_global_mut<RandomnessConfig>(@aptos_framework).variant = new_config.variant;
+            if (exists<RandomnessConfig>(@aptos_framework)) {
+                *borrow_global_mut<RandomnessConfig>(@aptos_framework) = new_config;
+            } else {
+                move_to(framework, new_config);
+            }
         }
     }
 
@@ -84,6 +99,21 @@ module aptos_framework::randomness_config {
         }
     }
 
+    /// Create a `ConfigV2` variant.
+    public fun new_v2(
+        secrecy_threshold: FixedPoint64,
+        reconstruction_threshold: FixedPoint64,
+        fast_path_secrecy_threshold: FixedPoint64,
+    ): RandomnessConfig {
+        RandomnessConfig {
+            variant: copyable_any::pack( ConfigV2 {
+                secrecy_threshold,
+                reconstruction_threshold,
+                fast_path_secrecy_threshold,
+            } )
+        }
+    }
+
     /// Get the currently effective randomness configuration object.
     public fun current(): RandomnessConfig acquires RandomnessConfig {
         if (exists<RandomnessConfig>(@aptos_framework)) {
@@ -112,12 +142,12 @@ module aptos_framework::randomness_config {
             fixed_point64::create_from_rational(2, 3)
         );
         set_for_next_epoch(&framework, config);
-        on_new_epoch();
+        on_new_epoch(&framework);
         assert!(enabled(), 1);
 
         // Disabling.
         set_for_next_epoch(&framework, new_off());
-        on_new_epoch();
+        on_new_epoch(&framework);
         assert!(!enabled(), 2);
     }
 }

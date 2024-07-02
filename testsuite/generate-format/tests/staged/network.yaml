@@ -1,0 +1,203 @@
+---
+BitVec:
+  STRUCT:
+    - inner: BYTES
+ChainId:
+  NEWTYPESTRUCT: U8
+DirectSendMsg:
+  STRUCT:
+    - protocol_id:
+        TYPENAME: ProtocolId
+    - priority: U8
+    - raw_msg: BYTES
+DnsName:
+  NEWTYPESTRUCT: STR
+ErrorCode:
+  ENUM:
+    0:
+      ParsingError:
+        NEWTYPE:
+          TYPENAME: ParsingErrorType
+    1:
+      NotSupported:
+        NEWTYPE:
+          TYPENAME: NotSupportedType
+HandshakeMsg:
+  STRUCT:
+    - supported_protocols:
+        MAP:
+          KEY:
+            TYPENAME: MessagingProtocolVersion
+          VALUE:
+            TYPENAME: ProtocolIdSet
+    - chain_id:
+        TYPENAME: ChainId
+    - network_id:
+        TYPENAME: NetworkId
+MessagingProtocolVersion:
+  ENUM:
+    0:
+      V1: UNIT
+NetworkAddress:
+  NEWTYPESTRUCT: BYTES
+NetworkId:
+  ENUM:
+    0:
+      validator: UNIT
+    1:
+      public: UNIT
+    2:
+      private:
+        NEWTYPE: STR
+    3:
+      vfn: UNIT
+    4:
+      new_public: UNIT
+NetworkMessage:
+  ENUM:
+    0:
+      Error:
+        NEWTYPE:
+          TYPENAME: ErrorCode
+    1:
+      RpcRequest:
+        NEWTYPE:
+          TYPENAME: RpcRequest
+    2:
+      RpcResponse:
+        NEWTYPE:
+          TYPENAME: RpcResponse
+    3:
+      DirectSendMsg:
+        NEWTYPE:
+          TYPENAME: DirectSendMsg
+NotSupportedType:
+  ENUM:
+    0:
+      RpcRequest:
+        NEWTYPE:
+          TYPENAME: ProtocolId
+    1:
+      DirectSendMsg:
+        NEWTYPE:
+          TYPENAME: ProtocolId
+ParsingErrorType:
+  STRUCT:
+    - message: U8
+    - protocol: U8
+Protocol:
+  ENUM:
+    0:
+      Ip4:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 4
+    1:
+      Ip6:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 16
+    2:
+      Dns:
+        NEWTYPE:
+          TYPENAME: DnsName
+    3:
+      Dns4:
+        NEWTYPE:
+          TYPENAME: DnsName
+    4:
+      Dns6:
+        NEWTYPE:
+          TYPENAME: DnsName
+    5:
+      Tcp:
+        NEWTYPE: U16
+    6:
+      Memory:
+        NEWTYPE: U16
+    7:
+      NoiseIK:
+        NEWTYPE:
+          TYPENAME: PublicKey
+    8:
+      Handshake:
+        NEWTYPE: U8
+ProtocolId:
+  ENUM:
+    0:
+      ConsensusRpcBcs: UNIT
+    1:
+      ConsensusDirectSendBcs: UNIT
+    2:
+      MempoolDirectSend: UNIT
+    3:
+      StateSyncDirectSend: UNIT
+    4:
+      DiscoveryDirectSend: UNIT
+    5:
+      HealthCheckerRpc: UNIT
+    6:
+      ConsensusDirectSendJson: UNIT
+    7:
+      ConsensusRpcJson: UNIT
+    8:
+      StorageServiceRpc: UNIT
+    9:
+      MempoolRpc: UNIT
+    10:
+      PeerMonitoringServiceRpc: UNIT
+    11:
+      ConsensusRpcCompressed: UNIT
+    12:
+      ConsensusDirectSendCompressed: UNIT
+    13:
+      NetbenchDirectSend: UNIT
+    14:
+      NetbenchRpc: UNIT
+    15:
+      DKGDirectSendCompressed: UNIT
+    16:
+      DKGDirectSendBcs: UNIT
+    17:
+      DKGDirectSendJson: UNIT
+    18:
+      DKGRpcCompressed: UNIT
+    19:
+      DKGRpcBcs: UNIT
+    20:
+      DKGRpcJson: UNIT
+    21:
+      JWKConsensusDirectSendCompressed: UNIT
+    22:
+      JWKConsensusDirectSendBcs: UNIT
+    23:
+      JWKConsensusDirectSendJson: UNIT
+    24:
+      JWKConsensusRpcCompressed: UNIT
+    25:
+      JWKConsensusRpcBcs: UNIT
+    26:
+      JWKConsensusRpcJson: UNIT
+    27:
+      ConsensusObserver: UNIT
+    28:
+      ConsensusObserverRpc: UNIT
+ProtocolIdSet:
+  NEWTYPESTRUCT:
+    TYPENAME: BitVec
+PublicKey:
+  NEWTYPESTRUCT: BYTES
+RpcRequest:
+  STRUCT:
+    - protocol_id:
+        TYPENAME: ProtocolId
+    - request_id: U32
+    - priority: U8
+    - raw_request: BYTES
+RpcResponse:
+  STRUCT:
+    - request_id: U32
+    - priority: U8
+    - raw_response: BYTES

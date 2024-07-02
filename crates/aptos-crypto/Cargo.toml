@@ -13,11 +13,13 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
+ark-groth16 = { workspace = true }
 ark-std = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
@@ -28,11 +30,13 @@ curve25519-dalek = { workspace = true }
 curve25519-dalek-ng = { workspace = true }
 digest = { workspace = true }
 ed25519-dalek = { workspace = true }
+ff = { workspace = true }
 hex = { workspace = true }
 hkdf = { workspace = true }
 libsecp256k1 = { workspace = true }
 merlin = { workspace = true }
 more-asserts = { workspace = true }
+neptune = { workspace = true }
 num-bigint = { workspace = true }
 num-integer = { workspace = true }
 once_cell = { workspace = true }
@@ -47,10 +51,12 @@ serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
 sha2_0_10_6 = { workspace = true }
+sha3 = { workspace = true }
 signature = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
+typenum = { workspace = true }
 x25519-dalek = { workspace = true }
 
 [dev-dependencies]
@@ -66,7 +72,6 @@ criterion = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 serde_json = { workspace = true }
-sha3 = { workspace = true }
 trybuild = { workspace = true }
 
 [features]
@@ -109,5 +114,5 @@ name = "secp256k1"
 harness = false
 
 [[bench]]
-name = "zk"
+name = "poseidon_bn254"
 harness = false

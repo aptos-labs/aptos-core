@@ -4,27 +4,27 @@ module 0x8675309::M {
         f: u64,
     }
     private fun t0(cond: bool,s: &M::S,s_mut: &mut M::S) {
-        select M::S.f(if cond {
+        select M::S.f<&M::S>(if cond {
           s
         } else {
           s
         });
-        select M::S.f(if cond {
-          s_mut
+        select M::S.f<&M::S>(if cond {
+          Freeze(false)(s_mut)
         } else {
           s
         });
-        select M::S.f(if cond {
+        select M::S.f<&M::S>(if cond {
           s
         } else {
-          s_mut
+          Freeze(false)(s_mut)
         });
-        select M::S.f(if cond {
+        select M::S.f<&mut M::S>(if cond {
           s_mut
         } else {
           s_mut
         });
-        select M::S.f({
+        select M::S.f<&M::S>({
           let s: M::S = pack M::S(0);
           Borrow(Immutable)(s)
         });

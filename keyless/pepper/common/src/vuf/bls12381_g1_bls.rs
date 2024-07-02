@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::vuf::VUF;
 use anyhow::{anyhow, ensure};
+use aptos_crypto::hash::CryptoHash;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_dkg::utils::multi_pairing;
+use aptos_types::keyless::Pepper;
 use ark_bls12_381::{Bls12_381, Fq12, Fr, G1Affine, G2Affine, G2Projective};
 use ark_ec::{
     hashing::HashToCurve, pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup,
@@ -13,11 +18,46 @@ use ark_std::{
     rand::{CryptoRng, RngCore},
     UniformRand,
 };
+use blstrs::{self, Compress};
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 use std::ops::Mul;
 
 pub struct Bls12381G1Bls {}
 
-pub static DST: &[u8] = b"APTOS_PEPPER_SERVICE_BLS12381_VUF_DST";
+pub static DST: &[u8] = b"APTOS_PEPPER_BLS12381_VUF_DST";
+
+pub static PINKAS_DST: &[u8] = b"APTOS_PINKAS_PEPPER_DST";
+
+pub static PINKAS_SECRET_KEY_BASE_SEED: &[u8] = b"APTOS_PINKAS_PEPPER_SECRET_KEY_BASE_SEED";
+
+pub static PINKAS_SECRET_KEY_BASE_G2: Lazy<blstrs::G2Projective> =
+    Lazy::new(|| blstrs::G2Projective::hash_to_curve(PINKAS_SECRET_KEY_BASE_SEED, PINKAS_DST, b""));
+
+#[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct PinkasPepper {
+    #[serde(with = "BigArray")]
+    pub bytes: [u8; 288],
+}
+
+impl PinkasPepper {
+    pub fn from_affine_bytes(input: &[u8]) -> anyhow::Result<PinkasPepper> {
+        let g1 = blstrs::G1Projective::from_compressed(&input[0..48].try_into()?).unwrap();
+        let g2 = *PINKAS_SECRET_KEY_BASE_G2;
+        let pairing = multi_pairing([g1].iter(), [g2].iter());
+        let mut output: Vec<u8> = vec![];
+        pairing.write_compressed(&mut output)?;
+        Ok(PinkasPepper {
+            bytes: output[0..288].try_into()?,
+        })
+    }
+
+    pub fn to_master_pepper(&self) -> Pepper {
+        let bytes = CryptoHash::hash(self).to_vec();
+        Pepper::new(bytes[0..31].try_into().unwrap())
+    }
+}
 
 impl Bls12381G1Bls {
     fn hash_to_g1(input: &[u8]) -> G1Affine {

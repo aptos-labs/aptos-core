@@ -26,7 +26,13 @@ impl<'r, 'l> AbortHookSession<'r, 'l> {
     ) -> Result<Self, VMStatus> {
         let session_id = SessionId::run_on_abort(txn_meta);
 
-        let session = RespawnedSession::spawn(vm, session_id, resolver, prologue_change_set)?;
+        let session = RespawnedSession::spawn(
+            vm,
+            session_id,
+            resolver,
+            prologue_change_set,
+            Some(txn_meta.as_user_transaction_context()),
+        )?;
 
         Ok(Self { session })
     }

@@ -20,14 +20,15 @@ use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_framework::BuiltPackage;
+use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_sdk::{
     bcs,
     transaction_builder::TransactionFactory,
     types::{
-        account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
-        LocalAccount,
+        account_config::aptos_test_root_address, get_apt_primary_store_address,
+        transaction::SignedTransaction, AccountKey, LocalAccount,
     },
 };
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
@@ -94,7 +95,7 @@ impl ApiSpecificConfig {
 
 pub fn new_test_context(
     test_name: String,
-    node_config: NodeConfig,
+    mut node_config: NodeConfig,
     use_db_with_indexer: bool,
 ) -> TestContext {
     // Speculative logging uses a global variable and when many instances use it together, they
@@ -119,14 +120,23 @@ pub fn new_test_context(
     let validator_owner = validator_identity.account_address.unwrap();
 
     let (db, db_rw) = if use_db_with_indexer {
-        DbReaderWriter::wrap(AptosDB::new_for_test_with_indexer(&tmp_dir))
+        DbReaderWriter::wrap(AptosDB::new_for_test_with_indexer(
+            &tmp_dir,
+            node_config.storage.rocksdb_configs.enable_storage_sharding,
+        ))
     } else {
         DbReaderWriter::wrap(
             AptosDB::open(
                 StorageDirPaths::from_path(&tmp_dir),
                 false,                       /* readonly */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-                RocksdbConfigs::default(),
+                RocksdbConfigs {
+                    enable_storage_sharding: node_config
+                        .storage
+                        .rocksdb_configs
+                        .enable_storage_sharding,
+                    ..Default::default()
+                },
                 false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
@@ -140,12 +150,18 @@ pub fn new_test_context(
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
 
+    node_config
+        .storage
+        .set_data_dir(tmp_dir.path().to_path_buf());
+    let mock_indexer_service =
+        MockInternalIndexerDBService::new_for_test(db_rw.reader.clone(), &node_config);
+
     let context = Context::new(
         ChainId::test(),
         db.clone(),
         mempool.ac_client.clone(),
         node_config.clone(),
-        None, /* table info reader */
+        mock_indexer_service.get_indexer_reader(),
     );
 
     // Configure the testing depending on which API version we're testing.
@@ -657,19 +673,42 @@ impl TestContext {
     }
 
     pub async fn get_apt_balance(&self, account: AccountAddress) -> u64 {
-        let coin_balance = self
-            .api_get_account_resource(
+        let coin_balance_option = self
+            .try_api_get_account_resource(
                 account,
                 "0x1",
                 "coin",
                 "CoinStore<0x1::aptos_coin::AptosCoin>",
             )
             .await;
-        coin_balance["data"]["coin"]["value"]
-            .as_str()
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
+        let coin = coin_balance_option.map(|x| {
+            x["data"]["coin"]["value"]
+                .as_str()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+        });
+        if let Some(v) = coin {
+            v
+        } else {
+            let fungible_store_option = self
+                .try_api_get_account_resource(
+                    get_apt_primary_store_address(account),
+                    "0x1",
+                    "fungible_asset",
+                    "FungibleStore",
+                )
+                .await;
+            fungible_store_option
+                .map(|x| {
+                    x["data"]["balance"]
+                        .as_str()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap()
+                })
+                .unwrap_or(0)
+        }
     }
 
     pub async fn gen_events_by_handle(
@@ -717,29 +756,27 @@ impl TestContext {
     }
 
     // TODO: Add support for generic_type_params if necessary.
+    pub async fn try_api_get_account_resource(
+        &self,
+        account: AccountAddress,
+        resource_account_address: &str,
+        module: &str,
+        name: &str,
+    ) -> Option<Value> {
+        let resource = format!("{}::{}::{}", resource_account_address, module, name);
+        self.gen_resource(&account, &resource).await
+    }
+
     pub async fn api_get_account_resource(
         &self,
         account: AccountAddress,
         resource_account_address: &str,
         module: &str,
         name: &str,
-    ) -> serde_json::Value {
-        let resource = format!("{}::{}::{}", resource_account_address, module, name);
-        self.gen_resource(&account, &resource).await.unwrap()
-    }
-
-    // TODO: remove the helper function since we don't publish module directly anymore
-    pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
-        self.api_execute_txn(
-            account,
-            json!({
-                "type": "module_bundle_payload",
-                "modules" : [
-                    {"bytecode": code},
-                ],
-            }),
-        )
-        .await;
+    ) -> Value {
+        self.try_api_get_account_resource(account, resource_account_address, module, name)
+            .await
+            .unwrap()
     }
 
     pub async fn api_execute_entry_function(

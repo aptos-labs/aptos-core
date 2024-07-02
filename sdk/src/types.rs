@@ -15,10 +15,17 @@ use crate::{
     },
 };
 use anyhow::Result;
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::{ed25519::Ed25519Signature, PrivateKey, SigningKey};
 use aptos_ledger::AptosLedgerError;
-use aptos_types::event::EventKey;
 pub use aptos_types::*;
+use aptos_types::{
+    event::EventKey,
+    keyless::{
+        Claims, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
+        KeylessSignature, OpenIdSig, Pepper, TransactionAndProof, ZeroKnowledgeSig,
+    },
+    transaction::authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
+};
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use std::{
@@ -26,6 +33,50 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+#[derive(Debug)]
+enum LocalAccountAuthenticator {
+    PrivateKey(AccountKey),
+    Keyless(KeylessAccount),
+    // TODO: Add support for keyless authentication
+}
+
+impl LocalAccountAuthenticator {
+    pub fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction {
+        match self {
+            LocalAccountAuthenticator::PrivateKey(key) => txn
+                .sign(key.private_key(), key.public_key().clone())
+                .expect("Signing a txn can't fail")
+                .into_inner(),
+            LocalAccountAuthenticator::Keyless(keyless_account) => {
+                let proof = keyless_account.zk_sig.proof;
+                let txn_and_zkp = TransactionAndProof {
+                    message: txn.clone(),
+                    proof: Some(proof),
+                };
+
+                let esk = &keyless_account.ephemeral_key_pair.private_key;
+                let ephemeral_signature =
+                    EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
+
+                let sig = KeylessSignature {
+                    cert: EphemeralCertificate::ZeroKnowledgeSig(keyless_account.zk_sig.clone()),
+                    jwt_header_json: keyless_account.get_jwt_header_json(),
+                    exp_date_secs: keyless_account.ephemeral_key_pair.expiry_date_secs,
+                    ephemeral_pubkey: keyless_account.ephemeral_key_pair.public_key.clone(),
+                    ephemeral_signature,
+                };
+
+                SignedTransaction::new_keyless(txn, keyless_account.public_key.clone(), sig)
+            },
+        }
+    }
+}
+impl<T: Into<AccountKey>> From<T> for LocalAccountAuthenticator {
+    fn from(key: T) -> Self {
+        Self::PrivateKey(key.into())
+    }
+}
 
 /// LocalAccount represents an account on the Aptos blockchain. Internally it
 /// holds the private / public key pair and the address of the account. You can
@@ -35,10 +86,17 @@ use std::{
 pub struct LocalAccount {
     /// Address of the account.
     address: AccountAddress,
-    /// Authentication key of the account.
-    key: AccountKey,
+    /// Authenticator of the account
+    auth: LocalAccountAuthenticator,
     /// Latest known sequence number of the account, it can be different from validator.
     sequence_number: AtomicU64,
+}
+
+pub fn get_apt_primary_store_address(address: AccountAddress) -> AccountAddress {
+    let mut bytes = address.to_vec();
+    bytes.append(&mut AccountAddress::ONE.to_vec());
+    bytes.push(0xFC);
+    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
 }
 
 impl LocalAccount {
@@ -48,7 +106,19 @@ impl LocalAccount {
     pub fn new<T: Into<AccountKey>>(address: AccountAddress, key: T, sequence_number: u64) -> Self {
         Self {
             address,
-            key: key.into(),
+            auth: LocalAccountAuthenticator::from(key),
+            sequence_number: AtomicU64::new(sequence_number),
+        }
+    }
+
+    pub fn new_keyless(
+        address: AccountAddress,
+        keyless_account: KeylessAccount,
+        sequence_number: u64,
+    ) -> Self {
+        Self {
+            address,
+            auth: LocalAccountAuthenticator::Keyless(keyless_account),
             sequence_number: AtomicU64::new(sequence_number),
         }
     }
@@ -69,11 +139,17 @@ impl LocalAccount {
         let key = AccountKey::from(Ed25519PrivateKey::try_from(key.as_bytes().as_ref())?);
         let address = key.authentication_key().account_address();
 
-        Ok(Self {
-            address,
-            key,
-            sequence_number: AtomicU64::new(sequence_number),
-        })
+        Ok(Self::new(address, key, sequence_number))
+    }
+
+    /// Create a new account from the given private key in hex literal.
+    pub fn from_private_key(private_key: &str, sequence_number: u64) -> Result<Self> {
+        let key = AccountKey::from_private_key(Ed25519PrivateKey::try_from(
+            hex::decode(private_key.trim_start_matches("0x"))?.as_ref(),
+        )?);
+        let address = key.authentication_key().account_address();
+
+        Ok(Self::new(address, key, sequence_number))
     }
 
     /// Generate a new account locally. Note: This function does not actually
@@ -90,9 +166,7 @@ impl LocalAccount {
     }
 
     pub fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction {
-        txn.sign(self.private_key(), self.public_key().clone())
-            .expect("Signing a txn can't fail")
-            .into_inner()
+        self.auth.sign_transaction(txn)
     }
 
     pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
@@ -165,15 +239,26 @@ impl LocalAccount {
     }
 
     pub fn private_key(&self) -> &Ed25519PrivateKey {
-        self.key.private_key()
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => key.private_key(),
+            LocalAccountAuthenticator::Keyless(_) => todo!(),
+        }
     }
 
     pub fn public_key(&self) -> &Ed25519PublicKey {
-        self.key.public_key()
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => key.public_key(),
+            LocalAccountAuthenticator::Keyless(_) => todo!(),
+        }
     }
 
     pub fn authentication_key(&self) -> AuthenticationKey {
-        self.key.authentication_key()
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => key.authentication_key(),
+            LocalAccountAuthenticator::Keyless(keyless_account) => {
+                keyless_account.authentication_key()
+            },
+        }
     }
 
     pub fn sequence_number(&self) -> u64 {
@@ -194,7 +279,10 @@ impl LocalAccount {
     }
 
     pub fn rotate_key<T: Into<AccountKey>>(&mut self, new_key: T) -> AccountKey {
-        std::mem::replace(&mut self.key, new_key.into())
+        match &mut self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => std::mem::replace(key, new_key.into()),
+            LocalAccountAuthenticator::Keyless(_) => todo!(),
+        }
     }
 
     pub fn received_event_key(&self) -> EventKey {
@@ -380,6 +468,100 @@ impl From<Ed25519PrivateKey> for AccountKey {
     }
 }
 
+#[derive(Debug)]
+pub struct EphemeralKeyPair {
+    private_key: Ed25519PrivateKey,
+    public_key: EphemeralPublicKey,
+    #[allow(dead_code)]
+    nonce: String,
+    expiry_date_secs: u64,
+    #[allow(dead_code)]
+    blinder: Vec<u8>,
+}
+
+impl EphemeralKeyPair {
+    pub fn new(
+        private_key: Ed25519PrivateKey,
+        expiry_date_secs: u64,
+        blinder: Vec<u8>,
+    ) -> Result<Self> {
+        let epk = EphemeralPublicKey::ed25519(private_key.public_key());
+        let nonce = OpenIdSig::reconstruct_oauth_nonce(
+            &blinder,
+            expiry_date_secs,
+            &epk,
+            &Configuration::new_for_devnet(),
+        )?;
+
+        Ok(Self {
+            private_key,
+            public_key: epk,
+            nonce,
+            expiry_date_secs,
+            blinder,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct KeylessAccount {
+    public_key: KeylessPublicKey,
+    ephemeral_key_pair: EphemeralKeyPair,
+    #[allow(dead_code)]
+    uid_key: String,
+    #[allow(dead_code)]
+    uid_val: String,
+    #[allow(dead_code)]
+    aud: String,
+    #[allow(dead_code)]
+    pepper: Pepper,
+    zk_sig: ZeroKnowledgeSig,
+    jwt: String,
+}
+
+impl KeylessAccount {
+    pub fn new(
+        jwt: String,
+        ephemeral_key_pair: EphemeralKeyPair,
+        pepper: Pepper,
+        zk_sig: ZeroKnowledgeSig,
+    ) -> Result<Self> {
+        let parts: Vec<&str> = jwt.split('.').collect();
+        let jwt_payload_json = base64::decode_config(parts[1], base64::URL_SAFE).unwrap();
+        let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
+
+        let uid_key = "sub".to_owned();
+        let uid_val = claims.get_uid_val(&uid_key)?;
+        let aud = claims.oidc_claims.aud;
+
+        let idc = IdCommitment::new_from_preimage(&pepper, &aud, &uid_key, &uid_val)?;
+        let public_key = KeylessPublicKey {
+            iss_val: claims.oidc_claims.iss,
+            idc,
+        };
+        Ok(Self {
+            public_key,
+            ephemeral_key_pair,
+            uid_key,
+            uid_val,
+            aud,
+            pepper,
+            zk_sig,
+            jwt,
+        })
+    }
+
+    pub fn get_jwt_header_json(&self) -> String {
+        let parts: Vec<&str> = self.jwt.split('.').collect();
+        let header_bytes = base64::decode(parts[0]).unwrap();
+        String::from_utf8(header_bytes).unwrap()
+    }
+
+    pub fn authentication_key(&self) -> AuthenticationKey {
+        AuthenticationKey::any_key(AnyPublicKey::keyless(self.public_key.clone()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,5 +584,26 @@ mod tests {
 
         // Return an error for empty mnemonic phrase.
         assert!(LocalAccount::from_derive_path(derive_path, "", 0).is_err());
+    }
+
+    #[test]
+    fn test_create_account_from_private_key() {
+        let key = AccountKey::generate(&mut rand::rngs::OsRng);
+        let (private_key_hex_literal, public_key_hex_literal) = (
+            hex::encode(key.private_key().to_bytes().as_ref()),
+            key.authentication_key().account_address().to_hex_literal(),
+        );
+
+        // Test private key hex literal without `0x` prefix.
+        let account = LocalAccount::from_private_key(&private_key_hex_literal, 0).unwrap();
+        assert_eq!(account.address().to_hex_literal(), public_key_hex_literal);
+
+        // Test private key hex literal with `0x` prefix.
+        let account =
+            LocalAccount::from_private_key(&format!("0x{}", private_key_hex_literal), 0).unwrap();
+        assert_eq!(account.address().to_hex_literal(), public_key_hex_literal);
+
+        // Test invalid private key hex literal.
+        assert!(LocalAccount::from_private_key("invalid_private_key", 0).is_err());
     }
 }

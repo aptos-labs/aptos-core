@@ -8,17 +8,28 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V20
+///   - Limits for bounding MoveVM type sizes
+/// - V19
+///   - Gas for aggregator_v2::is_at_least native function
+/// - V18
+///   - Separate limits for governance scripts
+///   - Function info & dispatchable token gas params
+/// - V17
+///   - Gas for keyless
+/// - V16
+///   - IO Gas for the transaction itself and events in the transaction output
 /// - V15
 ///   - Gas & limits for dependencies
 /// - V14
 ///   - Gas for type creation
-/// - V13
 ///   - Storage Fee: Make state bytes refundable and remove the per slot free quota, gated by flag REFUNDABLE_BYTES
 /// - V13
 ///   (skipped due to testnet mis-operation)
 /// - V12
 ///   - Added BN254 operations.
 ///   - IO gas change: 1. read bytes charged at 4KB intervals; 2. ignore free_write_bytes_quota
+///   - aggregator v2 gas charges
 /// - V11
 ///   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
 ///   - Hard limit on the number of write ops per transaction
@@ -30,7 +41,7 @@
 /// - V8
 ///   - Added BLS12-381 operations.
 /// - V7
-///   - Native support for exists<T>
+///   - Native support for `exists<T>`
 ///   - New formulae for storage fees based on fixed APT costs
 ///   - Lower gas price (other than the newly introduced storage fees) by upping the scaling factor
 /// - V6
@@ -53,4 +64,16 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 15;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 20;
+
+pub mod gas_feature_versions {
+    pub const RELEASE_V1_8: u64 = 11;
+    pub const RELEASE_V1_9_SKIPPED: u64 = 12;
+    pub const RELEASE_V1_9: u64 = 13;
+    pub const RELEASE_V1_10: u64 = 15;
+    pub const RELEASE_V1_11: u64 = 16;
+    pub const RELEASE_V1_12: u64 = 17;
+    pub const RELEASE_V1_13: u64 = 18;
+    pub const RELEASE_V1_14: u64 = 19;
+    pub const RELEASE_V1_15: u64 = 20;
+}

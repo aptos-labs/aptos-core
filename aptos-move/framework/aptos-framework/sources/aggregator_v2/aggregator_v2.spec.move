@@ -19,6 +19,11 @@ spec aptos_framework::aggregator_v2 {
         pragma opaque;
     }
 
+    spec is_at_least_impl {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
+
     spec read {
         // TODO: temporary mockup.
         pragma opaque;

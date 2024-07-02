@@ -43,7 +43,7 @@ jobs:
   # if there are any changes that would affect it within the PR / commit. If
   # everything is checked in, run tests, build the SDK, and upload it to npmjs.
   node-api-compatibility-tests:
-    runs-on: high-perf-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
       id-token: write
@@ -89,7 +89,7 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
 
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         if: ${{ !inputs.SKIP_JOB }}
@@ -97,7 +97,7 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f json -o /specs/spec.json
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: |

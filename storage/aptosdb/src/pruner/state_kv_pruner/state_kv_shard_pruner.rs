@@ -5,16 +5,17 @@ use crate::{
     pruner::pruner_utils::get_or_initialize_subpruner_progress,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        stale_state_value_index::StaleStateValueIndexSchema,
-        state_value::StateValueSchema,
+        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
+        state_value_by_key_hash::StateValueByKeyHashSchema,
     },
 };
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 
+// This pruner is only used when enable_sharding flag is true
 pub(in crate::pruner) struct StateKvShardPruner {
     shard_id: u8,
     db_shard: Arc<DB>,
@@ -52,15 +53,15 @@ impl StateKvShardPruner {
 
         let mut iter = self
             .db_shard
-            .iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
+            .iter::<StaleStateValueIndexByKeyHashSchema>()?;
         iter.seek(&current_progress)?;
         for item in iter {
             let (index, _) = item?;
             if index.stale_since_version > target_version {
                 break;
             }
-            batch.delete::<StaleStateValueIndexSchema>(&index)?;
-            batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
+            batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
+            batch.delete::<StateValueByKeyHashSchema>(&(index.state_key_hash, index.version))?;
         }
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvShardPrunerProgress(self.shard_id as usize),

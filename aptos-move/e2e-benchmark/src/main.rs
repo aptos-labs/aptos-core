@@ -33,7 +33,11 @@ pub fn execute_txn(
 
     let txn_output = executor.execute_transaction(sign_tx);
     executor.apply_write_set(txn_output.write_set());
-    assert!(txn_output.status().status().unwrap().is_success());
+    assert!(
+        txn_output.status().status().unwrap().is_success(),
+        "txn failed with {:?}",
+        txn_output.status()
+    );
 }
 
 fn execute_and_time_entry_point(
@@ -87,57 +91,59 @@ fn main() {
         //     data_length: Some(32),
         // }),
         // (, EntryPoints::IncGlobal),
-        (32350, EntryPoints::Loop {
+        (32800, EntryPoints::Loop {
             loop_count: Some(100000),
             loop_type: LoopType::NoOp,
         }),
-        (19152, EntryPoints::Loop {
+        (19880, EntryPoints::Loop {
             loop_count: Some(10000),
             loop_type: LoopType::Arithmetic,
         }),
         // This is a cheap bcs (serializing vec<u8>), so not representative of what BCS native call should cost.
         // (, EntryPoints::Loop { loop_count: Some(1000), loop_type: LoopType::BCS { len: 1024 }}),
-        (117, EntryPoints::CreateObjects {
+        (125, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 0,
         }),
-        (6978, EntryPoints::CreateObjects {
+        (7800, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 10 * 1024,
         }),
-        (1187, EntryPoints::CreateObjects {
+        (1250, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 0,
         }),
-        (8676, EntryPoints::CreateObjects {
+        (9000, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 10 * 1024,
         }),
-        (61, EntryPoints::InitializeVectorPicture { length: 40 }),
+        (65, EntryPoints::InitializeVectorPicture { length: 40 }),
         (14, EntryPoints::VectorPicture { length: 40 }),
         (14, EntryPoints::VectorPictureRead { length: 40 }),
-        (27303, EntryPoints::InitializeVectorPicture {
+        (29000, EntryPoints::InitializeVectorPicture {
             length: 30 * 1024,
         }),
-        (4507, EntryPoints::VectorPicture { length: 30 * 1024 }),
-        (4469, EntryPoints::VectorPictureRead { length: 30 * 1024 }),
-        (33129, EntryPoints::SmartTablePicture {
+        (4510, EntryPoints::VectorPicture { length: 30 * 1024 }),
+        (4400, EntryPoints::VectorPictureRead { length: 30 * 1024 }),
+        (33580, EntryPoints::SmartTablePicture {
             length: 30 * 1024,
             num_points_per_txn: 200,
         }),
-        (56464, EntryPoints::SmartTablePicture {
+        (57370, EntryPoints::SmartTablePicture {
             length: 1024 * 1024,
             num_points_per_txn: 300,
         }),
-        (10, EntryPoints::ResourceGroupsSenderWriteTag {
+        (12, EntryPoints::ResourceGroupsSenderWriteTag {
             string_length: 1024,
         }),
-        (24, EntryPoints::ResourceGroupsSenderMultiChange {
+        (26, EntryPoints::ResourceGroupsSenderMultiChange {
             string_length: 1024,
         }),
-        (257, EntryPoints::TokenV1MintAndTransferFT),
-        (412, EntryPoints::TokenV1MintAndTransferNFTSequential),
-        (368, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
+        (350, EntryPoints::TokenV1MintAndTransferFT),
+        (536, EntryPoints::TokenV1MintAndTransferNFTSequential),
+        (401, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
+        (467, EntryPoints::LiquidityPoolSwap { is_stable: true }),
+        (415, EntryPoints::LiquidityPoolSwap { is_stable: false }),
     ];
 
     let mut failures = Vec::new();
@@ -160,6 +166,7 @@ fn main() {
             0,
             package.publish_transaction_payload(),
         );
+        println!("Published package: {:?}", entry_point.package_name());
         if let Some(init_entry_point) = entry_point.initialize_entry_point() {
             execute_txn(
                 &mut executor,
@@ -170,6 +177,10 @@ fn main() {
                     Some(&mut rng),
                     Some(publisher.address()),
                 ),
+            );
+            println!(
+                "Executed init entry point: {:?}",
+                entry_point.initialize_entry_point()
             );
         }
 
@@ -228,4 +239,11 @@ fn main() {
         println!("Failing, there were perf improvements or regressions.");
         exit(1);
     }
+
+    // Assert there were no error log lines in the run.
+    assert_eq!(
+        0,
+        aptos_logger::ERROR_LOG_COUNT.get(),
+        "Error logs were found in the run."
+    );
 }

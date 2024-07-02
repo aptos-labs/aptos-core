@@ -1,0 +1,35 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+        y: u64,
+    }
+    public fun test() {
+        {
+          let s: m::S = pack m::S(3, 4);
+          {
+            let m::S{ x: _, y: _ } = s;
+            Tuple()
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::test() {
+     var $t0: m::S
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t1 := 3
+  1: $t2 := 4
+  2: $t0 := pack m::S($t1, $t2)
+  3: ($t3, $t4) := unpack m::S($t0)
+  4: return ()
+}
+
+
+============ bytecode verification succeeded ========

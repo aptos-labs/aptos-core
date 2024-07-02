@@ -1,22 +1,21 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keyless_pepper_common::{
-    jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey,
+    jwt,
+    vuf::{self, VUF},
+    PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, SignatureResponse,
 };
 use aptos_types::{
-    keyless::{test_utils::get_sample_esk, Configuration, OpenIdSig},
+    keyless::{Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
 };
 use ark_serialize::CanonicalDeserialize;
 use reqwest::StatusCode;
-use std::{
-    fs,
-    io::stdin,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{fs, io::stdin};
 
-const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
+const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImUxYjkzYzY0MDE0NGI4NGJkMDViZjI5NmQ2NzI2MmI2YmM2MWE0ODciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiaG5OWHFJVTZ3dWFPYlVqR05lRVhGQSIsIm5vbmNlIjoiNzQyMDQxODMxNDYwMDk1MDM0MTU3NzQ0MzEzMzY0MTU4OTk0NzYwNTExMjc1MDEwNDIyNjY5MDY3NTc3OTY3NTIyNDAwNjA0OTI0NCIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImlhdCI6MTcxNDQ0MTc4MywiZXhwIjoxNzE0NDQ1MzgzfQ.iNeVzp4BTQj2I_WH6UaUOfUBV4Q_wUriV7jWkh1fUqTPSs30jMMSjEDZml8lQ_NUIpivnGvfEHt_rF9rlrsuRur9pTVKRRKhJUNf5avrAujvLzrz-bwdgKXtTY_nmYisNNNQwmFIVP004ICois4DHD7EmO8PI88CzSzdDbl9qAIoxOP3JRKRwU05wK5qkGz6FpYzTYiG50lQCybSzzUN5Lws49ANCAOZiROG5lmszOW41mAbFSd6MUX469uvyMA2ZZ5av9ArKricHJPutGtLoOSWpzKQ_mlCzofVs5tHoMhGgcOFKuhnEVdY4J7TdcV6pZv9Ih5F8MX3-Wz9Iz9O4w";
 
 fn read_line_from_stdin() -> String {
     let mut line = String::new();
@@ -70,6 +69,7 @@ async fn main() {
     println!();
     let vuf_pub_key_url = format!("{url}/v0/vuf-pub-key");
     let fetch_url = format!("{url}/v0/fetch");
+    let sig_url = format!("{url}/v0/signature");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
@@ -102,14 +102,13 @@ async fn main() {
 
     println!();
     println!("Action 4: decide an expiry unix time.");
-    let epk_expiry_time_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 86400;
+    let epk_expiry_time_secs = 1721397501;
     println!("expiry_time_sec={}", epk_expiry_time_secs);
 
-    let esk = get_sample_esk();
+    let esk_bytes =
+        hex::decode("1111111111111111111111111111111111111111111111111111111111111111").unwrap();
+    let serialized: &[u8] = esk_bytes.as_slice();
+    let esk = Ed25519PrivateKey::try_from(serialized).unwrap();
     let epk = EphemeralPublicKey::ed25519(Ed25519PublicKey::from(&esk));
     println!("esk_hexlified={}", hex::encode(esk.to_bytes()));
     println!("epk_hexlified={}", hex::encode(epk.to_bytes()));
@@ -142,6 +141,7 @@ async fn main() {
         exp_date_secs: epk_expiry_time_secs,
         uid_key: None,
         epk_blinder: blinder.to_vec(),
+        derivation_path: None,
     };
     println!();
     println!(
@@ -149,25 +149,43 @@ async fn main() {
         fetch_url,
         serde_json::to_string_pretty(&pepper_request).unwrap()
     );
-    let raw_response = client
+    let pepper_raw_response = client
         .post(fetch_url)
         .json(&pepper_request)
         .send()
         .await
         .unwrap();
-    assert_eq!(StatusCode::OK, raw_response.status());
-    let pepper_response = raw_response.json::<PepperResponse>().await.unwrap();
+    assert_eq!(StatusCode::OK, pepper_raw_response.status());
+    let pepper_response = pepper_raw_response.json::<PepperResponse>().await.unwrap();
     println!();
     println!(
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse { signature: pepper } = pepper_response;
-    println!();
-    println!("pepper={:?}", pepper);
+    let PepperResponse { pepper, address } = pepper_response;
+
+    let signature_raw_response = client
+        .post(sig_url)
+        .json(&pepper_request)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::OK, signature_raw_response.status());
+    let signature_response = signature_raw_response
+        .json::<SignatureResponse>()
+        .await
+        .unwrap();
+    println!(
+        "signature_response={}",
+        serde_json::to_string_pretty(&signature_response).unwrap()
+    );
+    let SignatureResponse { signature } = signature_response;
+    println!("signature={:?}", hex::encode(signature.clone()));
+    println!("pepper={:?}", hex::encode(pepper.clone()));
+    println!("address={:?}", hex::encode(address.clone()));
     let claims = jwt::parse(jwt.as_str()).unwrap();
     println!();
-    println!("Verify the pepper against the server's verification key and part of the JWT.");
+    println!("Verify the pepper against the server's verification key, part of the JWT, and the actual aud.");
     let pepper_input = PepperInput {
         iss: claims.claims.iss.clone(),
         uid_key: "sub".to_string(),
@@ -175,8 +193,7 @@ async fn main() {
         aud: claims.claims.aud.clone(),
     };
     let pepper_input_bytes = bcs::to_bytes(&pepper_input).unwrap();
-    vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &pepper, &[])
+    vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &signature, &[])
         .unwrap();
-    println!();
     println!("Pepper verification succeeded!");
 }

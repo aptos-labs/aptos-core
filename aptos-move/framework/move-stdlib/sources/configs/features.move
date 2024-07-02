@@ -29,6 +29,8 @@ module std::features {
 
     const EINVALID_FEATURE: u64 = 1;
     const EAPI_DISABLED: u64 = 2;
+    /// Deployed to production, and disabling is deprecated.
+    const EFEATURE_CANNOT_BE_DISABLED: u64 = 3;
 
     // --------------------------------------------------------------------------------------------
     // Code Publishing
@@ -55,7 +57,9 @@ module std::features {
     /// This is needed because of the introduction of new native functions.
     /// Lifetime: transient
     const SHA_512_AND_RIPEMD_160_NATIVES: u64 = 3;
+
     public fun get_sha_512_and_ripemd_160_feature(): u64 { SHA_512_AND_RIPEMD_160_NATIVES }
+
     public fun sha_512_and_ripemd_160_enabled(): bool acquires Features {
         is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
     }
@@ -64,7 +68,9 @@ module std::features {
     /// This is needed because of the introduction of a new native function.
     /// Lifetime: transient
     const APTOS_STD_CHAIN_ID_NATIVES: u64 = 4;
+
     public fun get_aptos_stdlib_chain_id_feature(): u64 { APTOS_STD_CHAIN_ID_NATIVES }
+
     public fun aptos_stdlib_chain_id_enabled(): bool acquires Features {
         is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
     }
@@ -72,7 +78,9 @@ module std::features {
     /// Whether to allow the use of binary format version v6.
     /// Lifetime: transient
     const VM_BINARY_FORMAT_V6: u64 = 5;
+
     public fun get_vm_binary_format_v6(): u64 { VM_BINARY_FORMAT_V6 }
+
     public fun allow_vm_binary_format_v6(): bool acquires Features {
         is_enabled(VM_BINARY_FORMAT_V6)
     }
@@ -80,7 +88,9 @@ module std::features {
     /// Whether gas fees are collected and distributed to the block proposers.
     /// Lifetime: transient
     const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
+
     public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
+
     public fun collect_and_distribute_gas_fees(): bool acquires Features {
         is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
     }
@@ -89,7 +99,9 @@ module std::features {
     /// This is needed because of the introduction of a new native function.
     /// Lifetime: transient
     const MULTI_ED25519_PK_VALIDATE_V2_NATIVES: u64 = 7;
+
     public fun multi_ed25519_pk_validate_v2_feature(): u64 { MULTI_ED25519_PK_VALIDATE_V2_NATIVES }
+
     public fun multi_ed25519_pk_validate_v2_enabled(): bool acquires Features {
         is_enabled(MULTI_ED25519_PK_VALIDATE_V2_NATIVES)
     }
@@ -98,7 +110,9 @@ module std::features {
     /// This is needed because of the introduction of new native function(s).
     /// Lifetime: transient
     const BLAKE2B_256_NATIVE: u64 = 8;
+
     public fun get_blake2b_256_feature(): u64 { BLAKE2B_256_NATIVE }
+
     public fun blake2b_256_enabled(): bool acquires Features {
         is_enabled(BLAKE2B_256_NATIVE)
     }
@@ -106,14 +120,18 @@ module std::features {
     /// Whether resource groups are enabled.
     /// This is needed because of new attributes for structs and a change in storage representation.
     const RESOURCE_GROUPS: u64 = 9;
+
     public fun get_resource_groups_feature(): u64 { RESOURCE_GROUPS }
+
     public fun resource_groups_enabled(): bool acquires Features {
         is_enabled(RESOURCE_GROUPS)
     }
 
     /// Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
     const MULTISIG_ACCOUNTS: u64 = 10;
+
     public fun get_multisig_accounts_feature(): u64 { MULTISIG_ACCOUNTS }
+
     public fun multisig_accounts_enabled(): bool acquires Features {
         is_enabled(MULTISIG_ACCOUNTS)
     }
@@ -121,7 +139,9 @@ module std::features {
     /// Whether delegation pools are enabled.
     /// Lifetime: transient
     const DELEGATION_POOLS: u64 = 11;
+
     public fun get_delegation_pools_feature(): u64 { DELEGATION_POOLS }
+
     public fun delegation_pools_enabled(): bool acquires Features {
         is_enabled(DELEGATION_POOLS)
     }
@@ -204,16 +224,19 @@ module std::features {
     /// Lifetime: transient
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
 
-    public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
+    public fun get_auids(): u64 {
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+     }
 
-    public fun auids_enabled(): bool acquires Features {
-        is_enabled(APTOS_UNIQUE_IDENTIFIERS)
+    public fun auids_enabled(): bool {
+        true
     }
 
     /// Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
     /// available. This is needed because of the introduction of a new native function.
     /// Lifetime: transient
     const BULLETPROOFS_NATIVES: u64 = 24;
+
     public fun get_bulletproofs_feature(): u64 { BULLETPROOFS_NATIVES }
 
     public fun bulletproofs_enabled(): bool acquires Features {
@@ -245,15 +268,12 @@ module std::features {
     /// Lifetime: transient
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
 
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_API: u64 = 30;
+    public fun get_aggregator_v2_api_feature(): u64 {
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
 
-    public fun get_aggregator_v2_api_feature(): u64 { AGGREGATOR_V2_API }
-
-    public fun aggregator_v2_api_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_V2_API)
+    public fun aggregator_v2_api_enabled(): bool {
+        true
     }
 
     #[deprecated]
@@ -284,31 +304,22 @@ module std::features {
 
     const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
 
-    /// Whether the Aggregator V2 delayed fields feature is enabled.
-    /// Once enabled, Aggregator V2 functions become parallel.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_DELAYED_FIELDS: u64 = 36;
+    public fun get_concurrent_token_v2_feature(): u64 {
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
 
-    /// Whether enable TokenV2 collection creation and Fungible Asset creation
-    /// to create higher throughput concurrent variants.
-    /// Lifetime: transient
-    const CONCURRENT_TOKEN_V2: u64 = 37;
-
-    public fun get_concurrent_token_v2_feature(): u64 { CONCURRENT_TOKEN_V2 }
-
-    public fun concurrent_token_v2_enabled(): bool acquires Features {
-        // concurrent token v2 cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_TOKEN_V2) && aggregator_v2_api_enabled()
+    public fun concurrent_token_v2_enabled(): bool {
+        true
     }
 
     #[deprecated]
     public fun get_concurrent_assets_feature(): u64 {
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     #[deprecated]
     public fun concurrent_assets_enabled(): bool {
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
@@ -350,7 +361,9 @@ module std::features {
 
     /// Deprecated by `aptos_framework::randomness_config::RandomnessConfig`.
     const RECONFIGURE_WITH_DKG: u64 = 45;
+
     public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
+
     public fun reconfigure_with_dkg_enabled(): bool acquires Features {
         is_enabled(RECONFIGURE_WITH_DKG)
     }
@@ -394,8 +407,7 @@ module std::features {
     public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
 
     public fun concurrent_fungible_assets_enabled(): bool acquires Features {
-        // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
+        is_enabled(CONCURRENT_FUNGIBLE_ASSETS)
     }
 
     /// Whether deploying to objects is enabled.
@@ -436,6 +448,140 @@ module std::features {
         is_enabled(MULTISIG_V2_ENHANCEMENT)
     }
 
+    /// Whether delegators allowlisting for delegation pools is supported.
+    /// Lifetime: transient
+    const DELEGATION_POOL_ALLOWLISTING: u64 = 56;
+
+    public fun get_delegation_pool_allowlisting_feature(): u64 { DELEGATION_POOL_ALLOWLISTING }
+
+    public fun delegation_pool_allowlisting_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOL_ALLOWLISTING)
+    }
+
+    /// Whether aptos_framwork enables the behavior of module event migration.
+    ///
+    /// Lifetime: transient
+    const MODULE_EVENT_MIGRATION: u64 = 57;
+
+    public fun get_module_event_migration_feature(): u64 { MODULE_EVENT_MIGRATION }
+
+    public fun module_event_migration_enabled(): bool acquires Features {
+        is_enabled(MODULE_EVENT_MIGRATION)
+    }
+
+    /// Whether the transaction context extension is enabled. This feature allows the module
+    /// `transaction_context` to provide contextual information about the user transaction.
+    ///
+    /// Lifetime: transient
+    const TRANSACTION_CONTEXT_EXTENSION: u64 = 59;
+
+    public fun get_transaction_context_extension_feature(): u64 { TRANSACTION_CONTEXT_EXTENSION }
+
+    public fun transaction_context_extension_enabled(): bool acquires Features {
+        is_enabled(TRANSACTION_CONTEXT_EXTENSION)
+    }
+
+    /// Whether migration from coin to fungible asset feature is enabled.
+    ///
+    /// Lifetime: transient
+    const COIN_TO_FUNGIBLE_ASSET_MIGRATION: u64 = 60;
+
+    public fun get_coin_to_fungible_asset_migration_feature(): u64 { COIN_TO_FUNGIBLE_ASSET_MIGRATION }
+
+    public fun coin_to_fungible_asset_migration_feature_enabled(): bool acquires Features {
+        is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
+    }
+
+    const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
+
+    #[deprecated]
+    public fun get_primary_apt_fungible_store_at_user_address_feature(
+    ): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun primary_apt_fungible_store_at_user_address_enabled(): bool acquires Features {
+        is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
+    }
+
+    const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
+
+    public fun aggregator_v2_is_at_least_api_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_V2_IS_AT_LEAST_API)
+    }
+
+    /// Whether we use more efficient native implementation of computing object derived address
+    const OBJECT_NATIVE_DERIVED_ADDRESS: u64 = 62;
+
+    public fun get_object_native_derived_address_feature(): u64 { OBJECT_NATIVE_DERIVED_ADDRESS }
+
+    public fun object_native_derived_address_enabled(): bool acquires Features {
+        is_enabled(OBJECT_NATIVE_DERIVED_ADDRESS)
+    }
+
+    /// Whether the dispatchable fungible asset standard feature is enabled.
+    ///
+    /// Lifetime: transient
+    const DISPATCHABLE_FUNGIBLE_ASSET: u64 = 63;
+
+    public fun get_dispatchable_fungible_asset_feature(): u64 { DISPATCHABLE_FUNGIBLE_ASSET }
+
+    public fun dispatchable_fungible_asset_enabled(): bool acquires Features {
+        is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
+    }
+
+    /// Lifetime: transient
+    const NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE: u64 = 64;
+
+    public fun get_new_accounts_default_to_fa_apt_store_feature(): u64 { NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE }
+
+    public fun new_accounts_default_to_fa_apt_store_enabled(): bool acquires Features {
+        is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
+    }
+
+    /// Lifetime: transient
+    const OPERATIONS_DEFAULT_TO_FA_APT_STORE: u64 = 65;
+
+    public fun get_operations_default_to_fa_apt_store_feature(): u64 { OPERATIONS_DEFAULT_TO_FA_APT_STORE }
+
+    public fun operations_default_to_fa_apt_store_enabled(): bool acquires Features {
+        is_enabled(OPERATIONS_DEFAULT_TO_FA_APT_STORE)
+    }
+
+    /// Whether enable concurent Fungible Balance
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_FUNGIBLE_BALANCE: u64 = 67;
+
+    public fun get_concurrent_fungible_balance_feature(): u64 { CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether to default new Fungible Store to the concurrent variant.
+    /// Lifetime: transient
+    const DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 68;
+
+    public fun get_default_to_concurrent_fungible_balance_feature(): u64 { DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun default_to_concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether the multisig v2 fix is enabled. Once enabled, the multisig transaction execution will explicitly
+    /// abort if the provided payload does not match the payload stored on-chain.
+    ///
+    /// Lifetime: transient
+    const ABORT_IF_MULTISIG_PAYLOAD_MISMATCH: u64 = 70;
+
+    public fun get_abort_if_multisig_payload_mismatch_feature(): u64 { ABORT_IF_MULTISIG_PAYLOAD_MISMATCH }
+
+    public fun abort_if_multisig_payload_mismatch_enabled(): bool acquires Features {
+        is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
@@ -459,7 +605,7 @@ module std::features {
     ///
     /// Governance proposals should use `change_feature_flags_for_next_epoch()` to enable/disable features.
     public fun change_feature_flags(_framework: &signer, _enable: vector<u64>, _disable: vector<u64>) {
-        abort(error::invalid_state(EAPI_DISABLED))
+        abort (error::invalid_state(EAPI_DISABLED))
     }
 
     /// Update feature flags directly. Only used in genesis/tests.
@@ -478,7 +624,11 @@ module std::features {
     }
 
     /// Enable and disable features for the next epoch.
-    public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires PendingFeatures, Features {
+    public fun change_feature_flags_for_next_epoch(
+        framework: &signer,
+        enable: vector<u64>,
+        disable: vector<u64>
+    ) acquires PendingFeatures, Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
 
         // Figure out the baseline feature vec that the diff will be applied to.
@@ -503,11 +653,15 @@ module std::features {
     ///
     /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
     /// who have permission to set the flag that's checked in `extract()`.
-    public fun on_new_epoch(vm_or_framework: &signer) acquires Features, PendingFeatures {
-        ensure_vm_or_framework_signer(vm_or_framework);
+    public fun on_new_epoch(framework: &signer) acquires Features, PendingFeatures {
+        ensure_framework_signer(framework);
         if (exists<PendingFeatures>(@std)) {
             let PendingFeatures { features } = move_from<PendingFeatures>(@std);
-            borrow_global_mut<Features>(@std).features = features;
+            if (exists<Features>(@std)) {
+                borrow_global_mut<Features>(@std).features = features;
+            } else {
+                move_to(framework, Features { features })
+            }
         }
     }
 
@@ -548,18 +702,26 @@ module std::features {
         });
     }
 
-    fun ensure_vm_or_framework_signer(account: &signer) {
+    fun ensure_framework_signer(account: &signer) {
         let addr = signer::address_of(account);
-        assert!(addr == @std || addr == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+        assert!(addr == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
     }
 
     #[verify_only]
-    public fun change_feature_flags_for_verification(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+    public fun change_feature_flags_for_verification(
+        framework: &signer,
+        enable: vector<u64>,
+        disable: vector<u64>
+    ) acquires Features {
         change_feature_flags_internal(framework, enable, disable)
     }
 
     #[test_only]
-    public fun change_feature_flags_for_testing(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+    public fun change_feature_flags_for_testing(
+        framework: &signer,
+        enable: vector<u64>,
+        disable: vector<u64>
+    ) acquires Features {
         change_feature_flags_internal(framework, enable, disable)
     }
 

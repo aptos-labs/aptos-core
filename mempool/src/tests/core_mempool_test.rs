@@ -17,7 +17,7 @@ use aptos_types::{
 };
 use itertools::Itertools;
 use maplit::btreemap;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 #[test]
 fn test_transaction_ordering_only_seqnos() {
@@ -213,7 +213,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
-        &txns[1].clone().committed_hash(), // hash of other txn
+        &txns[1].committed_hash(), // hash of other txn
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -223,7 +223,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         1,
-        &txns[0].clone().committed_hash(), // hash of other txn
+        &txns[0].committed_hash(), // hash of other txn
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -236,7 +236,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
-        &txns[0].clone().committed_hash(),
+        &txns[0].committed_hash(),
         &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
@@ -246,7 +246,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         1,
-        &txns[1].clone().committed_hash(),
+        &txns[1].committed_hash(),
         &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
@@ -258,7 +258,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
-        &txns[0].clone().committed_hash(),
+        &txns[0].committed_hash(),
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -268,7 +268,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         1,
-        &txns[1].clone().committed_hash(),
+        &txns[1].committed_hash(),
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -295,7 +295,7 @@ fn test_system_ttl() {
 
     // GC routine should clear transaction from first insert but keep last one.
     mempool.gc();
-    let batch = mempool.get_batch(1, 1024, true, false, btreemap![]);
+    let batch = mempool.get_batch(1, 1024, true, btreemap![]);
     assert_eq!(vec![transaction.make_signed_transaction()], batch);
 }
 
@@ -307,20 +307,17 @@ fn test_commit_callback() {
     let txns = add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
 
     // Check that pool is empty.
-    assert!(pool.get_batch(1, 1024, true, false, btreemap![]).is_empty());
+    assert!(pool.get_batch(1, 1024, true, btreemap![]).is_empty());
     // Transaction 5 got back from consensus.
     pool.commit_transaction(&TestTransaction::get_address(1), 5);
     // Verify that we can execute transaction 6.
-    assert_eq!(
-        pool.get_batch(1, 1024, true, false, btreemap![])[0],
-        txns[0]
-    );
+    assert_eq!(pool.get_batch(1, 1024, true, btreemap![])[0], txns[0]);
 }
 
 #[test]
 fn test_reset_sequence_number_on_failure() {
     let mut pool = setup_mempool().0;
-    let txns = vec![TestTransaction::new(1, 0, 1), TestTransaction::new(1, 1, 1)];
+    let txns = [TestTransaction::new(1, 0, 1), TestTransaction::new(1, 1, 1)];
     let hashes: Vec<_> = txns
         .iter()
         .cloned()
@@ -367,28 +364,57 @@ fn test_timeline() {
         TestTransaction::new(1, 5, 1),
     ]);
 
-    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10, None);
     assert_eq!(view(timeline), vec![0, 1]);
     // Txns 3 and 5 should be in parking lot.
     assert_eq!(2, pool.get_parking_lot_size());
 
     // Add txn 2 to unblock txn3.
     add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 2, 1)]);
-    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10, None);
     assert_eq!(view(timeline), vec![0, 1, 2, 3]);
     // Txn 5 should be in parking lot.
     assert_eq!(1, pool.get_parking_lot_size());
 
     // Try different start read position.
-    let (timeline, _) = pool.read_timeline(&vec![2].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![2].into(), 10, None);
     assert_eq!(view(timeline), vec![2, 3]);
 
     // Simulate callback from consensus to unblock txn 5.
     pool.commit_transaction(&TestTransaction::get_address(1), 4);
-    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10, None);
     assert_eq!(view(timeline), vec![5]);
     // check parking lot is empty
     assert_eq!(0, pool.get_parking_lot_size());
+}
+
+#[test]
+fn test_timeline_before() {
+    let mut pool = setup_mempool().0;
+    add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(1, 0, 1),
+        TestTransaction::new(1, 1, 1),
+        TestTransaction::new(1, 3, 1),
+        TestTransaction::new(1, 5, 1),
+    ]);
+    let insertion_done_time = Instant::now();
+
+    let (timeline, _) = pool.read_timeline(
+        &vec![0].into(),
+        10,
+        Some(insertion_done_time - Duration::from_millis(200)),
+    );
+    assert!(timeline.is_empty());
+
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10, Some(insertion_done_time));
+    assert_eq!(view(timeline), vec![0, 1]);
+
+    let (timeline, _) = pool.read_timeline(
+        &vec![0].into(),
+        10,
+        Some(insertion_done_time + Duration::from_millis(200)),
+    );
+    assert_eq!(view(timeline), vec![0, 1]);
 }
 
 #[test]
@@ -401,41 +427,41 @@ fn test_multi_bucket_timeline() {
         TestTransaction::new(1, 5, 300), // bucket 2
     ]);
 
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![0, 1]);
     // Txns 3 and 5 should be in parking lot.
     assert_eq!(2, pool.get_parking_lot_size());
 
     // Add txn 2 to unblock txn3.
     add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 2, 1)]);
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![0, 1, 2, 3]);
     // Txn 5 should be in parking lot.
     assert_eq!(1, pool.get_parking_lot_size());
 
     // Try different start read positions. Expected buckets: [[0, 1, 2], [3], []]
-    let (timeline, _) = pool.read_timeline(&vec![1, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![1, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![1, 2, 3]);
-    let (timeline, _) = pool.read_timeline(&vec![2, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![2, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![2, 3]);
-    let (timeline, _) = pool.read_timeline(&vec![0, 1, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 1, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![0, 1, 2]);
-    let (timeline, _) = pool.read_timeline(&vec![1, 1, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![1, 1, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![1, 2]);
-    let (timeline, _) = pool.read_timeline(&vec![2, 1, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![2, 1, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![2]);
-    let (timeline, _) = pool.read_timeline(&vec![3, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![3, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![3]);
-    let (timeline, _) = pool.read_timeline(&vec![3, 1, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![3, 1, 0].into(), 10, None);
     assert!(view(timeline).is_empty());
 
     // Ensure high gas is prioritized.
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 1);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 1, None);
     assert_eq!(view(timeline), vec![3]);
 
     // Simulate callback from consensus to unblock txn 5.
     pool.commit_transaction(&TestTransaction::get_address(1), 4);
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![5]);
     // check parking lot is empty
     assert_eq!(0, pool.get_parking_lot_size());
@@ -452,26 +478,26 @@ fn test_multi_bucket_gas_ranking_update() {
     ]);
 
     // txn 2 and 3 are prioritized
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 2);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 2, None);
     assert_eq!(view(timeline), vec![2, 3]);
     // read only bucket 2
-    let (timeline, _) = pool.read_timeline(&vec![10, 10, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![10, 10, 0].into(), 10, None);
     assert!(view(timeline).is_empty());
 
     // resubmit with higher gas: move txn 2 to bucket 2
     add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 2, 400)]);
 
     // txn 2 is now prioritized
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 1);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 1, None);
     assert_eq!(view(timeline), vec![2]);
     // then txn 3 is prioritized
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 2);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 2, None);
     assert_eq!(view(timeline), vec![2, 3]);
     // read only bucket 2
-    let (timeline, _) = pool.read_timeline(&vec![10, 10, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![10, 10, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![2]);
     // read only bucket 1
-    let (timeline, _) = pool.read_timeline(&vec![10, 0, 10].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![10, 0, 10].into(), 10, None);
     assert_eq!(view(timeline), vec![3]);
 }
 
@@ -485,23 +511,23 @@ fn test_multi_bucket_removal() {
         TestTransaction::new(1, 3, 200), // bucket 1
     ]);
 
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![0, 1, 2, 3]);
 
     pool.commit_transaction(&TestTransaction::get_address(1), 0);
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![1, 2, 3]);
 
     pool.commit_transaction(&TestTransaction::get_address(1), 1);
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![2, 3]);
 
     pool.commit_transaction(&TestTransaction::get_address(1), 2);
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10, None);
     assert_eq!(view(timeline), vec![3]);
 
     pool.commit_transaction(&TestTransaction::get_address(1), 3);
-    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0, 0, 0].into(), 10, None);
     assert!(view(timeline).is_empty());
 }
 
@@ -616,7 +642,7 @@ fn test_parking_lot_eviction() {
     }
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, 5120, true, false, btreemap![])
+        .get_batch(5, 5120, true, btreemap![])
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -645,7 +671,7 @@ fn test_parking_lot_evict_only_for_ready_txn_insertion() {
 
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, 5120, true, false, btreemap![])
+        .get_batch(5, 5120, true, btreemap![])
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -674,18 +700,18 @@ fn test_gc_ready_transaction() {
     add_txn(&mut pool, TestTransaction::new(1, 3, 1)).unwrap();
 
     // Check that all txns are ready.
-    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10, None);
     assert_eq!(timeline.len(), 4);
 
     // GC expired transaction.
     pool.gc_by_expiration_time(Duration::from_secs(1));
 
     // Make sure txns 2 and 3 became not ready and we can't read them from any API.
-    let block = pool.get_batch(1, 1024, true, false, btreemap![]);
+    let block = pool.get_batch(1, 1024, true, btreemap![]);
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 0);
 
-    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10, None);
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline[0].sequence_number(), 0);
 
@@ -693,7 +719,7 @@ fn test_gc_ready_transaction() {
     add_txn(&mut pool, TestTransaction::new(1, 1, 1)).unwrap();
 
     // Make sure txns 2 and 3 can be broadcast after txn 1 is resubmitted
-    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10, None);
     assert_eq!(timeline.len(), 4);
 }
 
@@ -706,7 +732,7 @@ fn test_clean_stuck_transactions() {
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
     pool.add_txn(txn, 1, db_sequence_number, TimelineState::NotReady, false);
-    let block = pool.get_batch(1, 1024, true, false, btreemap![]);
+    let block = pool.get_batch(1, 1024, true, btreemap![]);
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 10);
 }
@@ -723,7 +749,7 @@ fn test_get_transaction_by_hash() {
         TimelineState::NotReady,
         false,
     );
-    let hash = txn.clone().committed_hash();
+    let hash = txn.committed_hash();
     let ret = pool.get_by_hash(hash);
     assert_eq!(ret, Some(txn));
 
@@ -754,7 +780,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         TimelineState::NotReady,
         false,
     );
-    let new_txn_hash = new_txn.clone().committed_hash();
+    let new_txn_hash = new_txn.committed_hash();
 
     let txn_by_old_hash = pool.get_by_hash(hash);
     assert!(txn_by_old_hash.is_none());
@@ -772,15 +798,15 @@ fn test_bytes_limit() {
     for seq in 0..100 {
         add_txn(&mut pool, TestTransaction::new(1, seq, 1)).unwrap();
     }
-    let get_all = pool.get_batch(100, 100 * 1024, true, false, btreemap![]);
+    let get_all = pool.get_batch(100, 100 * 1024, true, btreemap![]);
     assert_eq!(get_all.len(), 100);
     let txn_size = get_all[0].txn_bytes_len() as u64;
     let limit = 10;
-    let hit_limit = pool.get_batch(100, txn_size * limit, true, false, btreemap![]);
+    let hit_limit = pool.get_batch(100, txn_size * limit, true, btreemap![]);
     assert_eq!(hit_limit.len(), limit as usize);
-    let hit_limit = pool.get_batch(100, txn_size * limit + 1, true, false, btreemap![]);
+    let hit_limit = pool.get_batch(100, txn_size * limit + 1, true, btreemap![]);
     assert_eq!(hit_limit.len(), limit as usize);
-    let hit_limit = pool.get_batch(100, txn_size * limit - 1, true, false, btreemap![]);
+    let hit_limit = pool.get_batch(100, txn_size * limit - 1, true, btreemap![]);
     assert_eq!(hit_limit.len(), limit as usize - 1);
 }
 
@@ -803,7 +829,7 @@ fn test_transaction_store_remove_account_if_empty() {
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 
     let txn = TestTransaction::new(2, 2, 1).make_signed_transaction();
-    let hash = txn.clone().committed_hash();
+    let hash = txn.committed_hash();
     add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 
@@ -828,7 +854,7 @@ fn test_sequence_number_behavior_at_capacity() {
     add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
     pool.commit_transaction(&TestTransaction::get_address(2), 0);
 
-    let batch = pool.get_batch(10, 10240, true, false, btreemap![]);
+    let batch = pool.get_batch(10, 10240, true, btreemap![]);
     assert_eq!(batch.len(), 1);
 }
 
@@ -845,48 +871,48 @@ fn test_not_return_non_full() {
     add_txn(&mut pool, txn_1).unwrap();
 
     // doesn't hit any limits
-    let batch = pool.get_batch(10, 10240, true, false, btreemap![]);
+    let batch = pool.get_batch(10, 10240, true, btreemap![]);
     assert_eq!(batch.len(), 2);
 
-    let batch = pool.get_batch(10, 10240, false, false, btreemap![]);
+    let batch = pool.get_batch(10, 10240, false, btreemap![]);
     assert_eq!(batch.len(), 0);
 
     // reaches or close to max_txns
-    let batch = pool.get_batch(txn_num + 1, 10240, false, false, btreemap![]);
+    let batch = pool.get_batch(txn_num + 1, 10240, false, btreemap![]);
     assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(txn_num, 10240, false, false, btreemap![]);
+    let batch = pool.get_batch(txn_num, 10240, false, btreemap![]);
     assert_eq!(batch.len(), 2);
 
-    let batch = pool.get_batch(txn_num - 1, 10240, false, false, btreemap![]);
+    let batch = pool.get_batch(txn_num - 1, 10240, false, btreemap![]);
     assert_eq!(batch.len(), 1);
 
-    let batch = pool.get_batch(txn_num + 1, 10240, true, false, btreemap![]);
+    let batch = pool.get_batch(txn_num + 1, 10240, true, btreemap![]);
     assert_eq!(batch.len(), 2);
 
-    let batch = pool.get_batch(txn_num, 10240, true, false, btreemap![]);
+    let batch = pool.get_batch(txn_num, 10240, true, btreemap![]);
     assert_eq!(batch.len(), 2);
 
-    let batch = pool.get_batch(txn_num - 1, 10240, true, false, btreemap![]);
+    let batch = pool.get_batch(txn_num - 1, 10240, true, btreemap![]);
     assert_eq!(batch.len(), 1);
 
     // reaches or close to max_bytes
-    let batch = pool.get_batch(10, txn_bytes + 1, false, false, btreemap![]);
+    let batch = pool.get_batch(10, txn_bytes + 1, false, btreemap![]);
     assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(10, txn_bytes, false, false, btreemap![]);
+    let batch = pool.get_batch(10, txn_bytes, false, btreemap![]);
     assert_eq!(batch.len(), 2);
 
-    let batch = pool.get_batch(10, txn_bytes - 1, false, false, btreemap![]);
+    let batch = pool.get_batch(10, txn_bytes - 1, false, btreemap![]);
     assert_eq!(batch.len(), 1);
 
-    let batch = pool.get_batch(10, txn_bytes + 1, true, false, btreemap![]);
+    let batch = pool.get_batch(10, txn_bytes + 1, true, btreemap![]);
     assert_eq!(batch.len(), 2);
 
-    let batch = pool.get_batch(10, txn_bytes, true, false, btreemap![]);
+    let batch = pool.get_batch(10, txn_bytes, true, btreemap![]);
     assert_eq!(batch.len(), 2);
 
-    let batch = pool.get_batch(10, txn_bytes - 1, true, false, btreemap![]);
+    let batch = pool.get_batch(10, txn_bytes - 1, true, btreemap![]);
     assert_eq!(batch.len(), 1);
 }
 
@@ -900,30 +926,36 @@ fn test_include_gas_upgraded() {
     let address_index = 0;
 
     let low_gas_price = 1;
-    add_txn(
+    let low_gas_signed_txn = add_txn(
         &mut pool,
         TestTransaction::new(address_index, sequence_number, low_gas_price),
     )
     .unwrap();
 
-    let low_gas_txn =
-        TransactionSummary::new(TestTransaction::get_address(address_index), sequence_number);
-    let batch = pool.get_batch(10, 10240, true, true, btreemap! {
+    let low_gas_txn = TransactionSummary::new(
+        low_gas_signed_txn.sender(),
+        low_gas_signed_txn.sequence_number(),
+        low_gas_signed_txn.committed_hash(),
+    );
+    let batch = pool.get_batch(10, 10240, true, btreemap! {
         low_gas_txn => TransactionInProgress::new(low_gas_price)
     });
     assert_eq!(batch.len(), 0);
 
     let high_gas_price = 100;
-    add_txn(
+    let high_gas_signed_txn = add_txn(
         &mut pool,
         TestTransaction::new(address_index, sequence_number, high_gas_price),
     )
     .unwrap();
-    let high_gas_txn =
-        TransactionSummary::new(TestTransaction::get_address(address_index), sequence_number);
+    let high_gas_txn = TransactionSummary::new(
+        high_gas_signed_txn.sender(),
+        high_gas_signed_txn.sequence_number(),
+        high_gas_signed_txn.committed_hash(),
+    );
 
-    // When gas upgraded is allowed and the low gas txn (but not the high gas txn) is excluded, will the high gas txn be included.
-    let batch = pool.get_batch(10, 10240, true, true, btreemap! {
+    // When the low gas txn (but not the high gas txn) is excluded, will the high gas txn be included.
+    let batch = pool.get_batch(10, 10240, true, btreemap! {
         low_gas_txn => TransactionInProgress::new(low_gas_price)
     });
     assert_eq!(batch.len(), 1);
@@ -933,27 +965,13 @@ fn test_include_gas_upgraded() {
     );
     assert_eq!(batch[0].sequence_number(), sequence_number);
     assert_eq!(batch[0].gas_unit_price(), high_gas_price);
-    // In all other cases, the transaction will be excluded.
-    let batch = pool.get_batch(10, 10240, true, false, btreemap! {
-        low_gas_txn => TransactionInProgress::new(low_gas_price)
-    });
-    assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(10, 10240, true, true, btreemap! {
-        high_gas_txn => TransactionInProgress::new(high_gas_price)
-    });
-    assert_eq!(batch.len(), 0);
-    let batch = pool.get_batch(10, 10240, true, false, btreemap! {
+    let batch = pool.get_batch(10, 10240, true, btreemap! {
         high_gas_txn => TransactionInProgress::new(high_gas_price)
     });
     assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(10, 10240, true, true, btreemap! {
-        low_gas_txn => TransactionInProgress::new(low_gas_price),
-        high_gas_txn => TransactionInProgress::new(high_gas_price)
-    });
-    assert_eq!(batch.len(), 0);
-    let batch = pool.get_batch(10, 10240, true, false, btreemap! {
+    let batch = pool.get_batch(10, 10240, true, btreemap! {
         low_gas_txn => TransactionInProgress::new(low_gas_price),
         high_gas_txn => TransactionInProgress::new(high_gas_price)
     });

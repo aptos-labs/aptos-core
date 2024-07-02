@@ -101,6 +101,8 @@ impl ExecutionAndIOCosts {
 
         lines.push("intrinsic", self.intrinsic_cost);
 
+        lines.push("keyless", self.keyless_cost);
+
         let mut path = vec![];
 
         struct Rec<'a> {
@@ -167,9 +169,22 @@ impl ExecutionAndIOCosts {
         }
         .visit(&self.call_graph);
 
+        if let Some(cost) = &self.transaction_transient {
+            lines.push("ledger_writes;transaction", *cost)
+        }
+        for item in &self.events_transient {
+            lines.push(
+                format!("ledger_writes;events;{}", Render(&item.ty)),
+                item.cost,
+            )
+        }
         for item in &self.write_set_transient {
             lines.push(
-                format!("write_set;{}<{}>", Render(&item.op_type), Render(&item.key)),
+                format!(
+                    "ledger_writes;state_write_ops;{}<{}>",
+                    Render(&item.op_type),
+                    Render(&item.key)
+                ),
                 item.cost,
             )
         }

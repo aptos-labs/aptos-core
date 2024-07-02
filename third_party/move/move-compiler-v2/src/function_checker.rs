@@ -7,7 +7,8 @@ use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedId},
+    ast::{ExpData, Operation, Pattern},
+    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, QualifiedId},
     ty::Type,
 };
 use std::{collections::BTreeSet, iter::Iterator, vec::Vec};
@@ -56,6 +57,123 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     }
 }
 
+fn access_error(
+    env: &GlobalEnv,
+    fun_loc: &Loc,
+    id: &NodeId,
+    oper: &str,
+    msg: String,
+    module_env: &ModuleEnv,
+) {
+    let call_details: Vec<_> = [*id]
+        .iter()
+        .map(|node_id| (env.get_node_loc(*node_id), format!("{} here", oper)))
+        .collect();
+    let msg = format!(
+        "Invalid operation: {} can only be done within the defining module `{}`",
+        msg,
+        module_env.get_full_name_str()
+    );
+    env.diag_with_labels(Severity::Error, fun_loc, &msg, call_details);
+}
+
+/// check privileged operations on a struct such as storage operation, pack/unpack and field accesses
+/// can only be performed within the module that defines it.
+fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv) {
+    if let Some(fun_body) = fun_env.get_def() {
+        let caller_module_id = fun_env.module_env.get_id();
+        fun_body.visit_pre_order(&mut |exp: &ExpData| {
+            match exp {
+                ExpData::Call(id, oper, _) => match oper {
+                    Operation::Exists(_)
+                    | Operation::BorrowGlobal(_)
+                    | Operation::MoveFrom
+                    | Operation::MoveTo => {
+                        let inst = env.get_node_instantiation(*id);
+                        debug_assert!(!inst.is_empty());
+                        if let Some((struct_env, _)) = inst[0].get_struct(env) {
+                            let mid = struct_env.module_env.get_id();
+                            let sid = struct_env.get_id();
+                            if mid != caller_module_id {
+                                let qualified_struct_id = mid.qualified(sid);
+                                let struct_env = env.get_struct(qualified_struct_id);
+                                access_error(
+                                    env,
+                                    &fun_env.get_id_loc(),
+                                    id,
+                                    "called",
+                                    format!(
+                                        "storage operation on type `{}`",
+                                        struct_env.get_full_name_str(),
+                                    ),
+                                    &struct_env.module_env,
+                                );
+                            }
+                        }
+                    },
+                    Operation::Select(mid, sid, fid) if *mid != caller_module_id => {
+                        let qualified_struct_id = mid.qualified(*sid);
+                        let struct_env = env.get_struct(qualified_struct_id);
+                        access_error(
+                            env,
+                            &fun_env.get_id_loc(),
+                            id,
+                            "accessed",
+                            format!(
+                                "access of the field `{}` on type `{}`",
+                                fid.symbol().display(struct_env.symbol_pool()),
+                                struct_env.get_full_name_str(),
+                            ),
+                            &struct_env.module_env,
+                        );
+                    },
+                    Operation::Pack(mid, sid, _) => {
+                        if *mid != caller_module_id {
+                            let qualified_struct_id = mid.qualified(*sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            access_error(
+                                env,
+                                &fun_env.get_id_loc(),
+                                id,
+                                "packed",
+                                format!("pack of `{}`", struct_env.get_full_name_str(),),
+                                &struct_env.module_env,
+                            );
+                        }
+                    },
+                    _ => {},
+                },
+                ExpData::Assign(_, pat, _)
+                | ExpData::Block(_, pat, _, _)
+                | ExpData::Lambda(_, pat, _) => {
+                    pat.visit_pre_post(&mut |_, pat| {
+                        if let Pattern::Struct(id, str, _, _) = pat {
+                            let module_id = str.module_id;
+                            if module_id != caller_module_id {
+                                let struct_env = env.get_struct(str.to_qualified_id());
+                                access_error(
+                                    env,
+                                    &fun_env.get_id_loc(),
+                                    id,
+                                    "unpacked",
+                                    format!("unpack of `{}`", struct_env.get_full_name_str(),),
+                                    &struct_env.module_env,
+                                );
+                            }
+                        }
+                    });
+                },
+                // access in specs is not restricted
+                ExpData::SpecBlock(_, _) => {
+                    return false;
+                },
+                _ => {},
+            }
+            true
+        });
+    }
+}
+
 /// For all function in target modules:
 ///
 /// If `before_inlining`, then
@@ -63,6 +181,7 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
 /// - warn about unused private functions
 /// Otherwise  (`!before_inlining`):
 /// - check that all function calls *not* involving inline functions are accessible.
+/// - check privileged operations on structs cannot be done across module boundary
 pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     // For each function seen, we record whether it has an accessible caller.
     let mut functions_with_callers: BTreeSet<QualifiedFunId> = BTreeSet::new();
@@ -77,6 +196,9 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
             let caller_module_has_friends = !caller_module.has_no_friends();
             let caller_module_is_script = caller_module.get_name().is_script();
             for caller_func in caller_module.get_functions() {
+                if !before_inlining {
+                    check_privileged_operations_on_structs(env, &caller_func);
+                }
                 let caller_qfid = caller_func.get_qualified_id();
 
                 // During first pass, record private functions for later

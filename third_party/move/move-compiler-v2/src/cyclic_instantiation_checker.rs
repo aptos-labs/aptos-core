@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use itertools::Itertools;
 use move_model::{
     ast::{ExpData, Operation, VisitorPosition},
@@ -152,10 +155,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
 
     /// Shortcut for getting the node instantiation
     fn get_inst(&self, nid: NodeId) -> Vec<Type> {
-        self.mod_env
-            .env
-            .get_node_instantiation_opt(nid)
-            .expect("instantiation")
+        self.mod_env.env.get_node_instantiation(nid)
     }
 
     /// Returns true if we are sure the function with given id is not recursive
@@ -173,30 +173,31 @@ impl<'a> CyclicInstantiationChecker<'a> {
     /// Precondition: `callers_chain` is not empty
     fn report_error(
         &self,
-        _nid: NodeId,
+        nid: NodeId,
         callee: QualifiedInstId<FunId>,
-        callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
+        callers_chain: &mut [(Loc, QualifiedInstId<FunId>)],
     ) {
         let root = callers_chain[0].1.id;
         let mut labels = (0..callers_chain.len() - 1)
             .map(|i| {
-                let (caller_loc, caller) = &callers_chain[i];
+                let (_caller_loc, caller) = &callers_chain[i];
                 // callee of `caller`
-                let callee = &callers_chain[i + 1].1;
+                let (callee_loc, callee) = &callers_chain[i + 1];
                 format!(
                     "`{}` calls `{}` {}",
                     self.display_call(caller, root),
                     self.display_call(callee, root),
-                    caller_loc.display_line_only(self.mod_env.env)
+                    callee_loc.display_line_only(self.mod_env.env)
                 )
             })
             .collect_vec();
-        let (caller_loc, caller) = &callers_chain.last().expect("parent");
+        let (_caller_loc, caller) = &callers_chain.last().expect("parent");
+        let callee_loc = self.mod_env.env.get_node_loc(nid);
         labels.push(format!(
             "`{}` calls `{}` {}",
             self.display_call(caller, root),
             self.display_call(&callee, root),
-            caller_loc.display_line_only(self.mod_env.env)
+            callee_loc.display_line_only(self.mod_env.env)
         ));
         let root_loc = self
             .mod_env

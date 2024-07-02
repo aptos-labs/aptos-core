@@ -1,0 +1,32 @@
+name: "Keyless Circuit Daily Test"
+on:
+  # Allow us to manually run this specific workflow without a PR
+  workflow_dispatch:
+  schedule:
+    - cron: "12 12 * * *" # at 12:12 UTC every day
+  pull_request:
+    paths:
+      - ".github/workflows/keyless-circuit-daily-test.yaml"
+      - "keyless/circuit/**"
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  run-all-circuit-tests:
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-setup
+      - run: |
+          . keyless/circuit/tools/install-deps.sh
+          cargo test -p aptos-keyless-circuit -- --nocapture

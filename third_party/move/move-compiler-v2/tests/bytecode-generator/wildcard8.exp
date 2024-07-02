@@ -1,0 +1,38 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    public fun test() {
+        {
+          let x: u64;
+          {
+            let (_: u64, _: u64): (u64, u64) = Tuple(x, x);
+            Tuple()
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t1 := infer($t0)
+  1: $t2 := infer($t0)
+  2: return ()
+}
+
+
+Diagnostics:
+error: use of unassigned local `x`
+  ┌─ tests/bytecode-generator/wildcard8.move:4:14
+  │
+4 │         let (_, _) = (x, x);
+  │              ^
+
+error: use of unassigned local `x`
+  ┌─ tests/bytecode-generator/wildcard8.move:4:17
+  │
+4 │         let (_, _) = (x, x);
+  │                 ^

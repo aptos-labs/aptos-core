@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwk_manager::JWKManager,
@@ -200,6 +201,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.self_sender.clone(),
             );
             let rb = ReliableBroadcast::new(
+                self.my_addr,
                 epoch_state.verifier.get_ordered_account_addresses(),
                 Arc::new(network_sender),
                 ExponentialBackoff::from_millis(5),

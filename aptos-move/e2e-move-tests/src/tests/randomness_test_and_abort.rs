@@ -37,6 +37,9 @@ fn test_and_abort_defense_is_sound_and_correct() {
     // The randomness module is initialized, but the randomness seed is not set.
     set_randomness_seed(&mut h);
 
+    h.set_default_gas_unit_price(100);
+    h.set_max_gas_per_txn(10000); // Should match the default required gas amount.
+
     // This is a safe call that the randomness API should allow through.
     let status = run_entry_func(
         &mut h,
@@ -77,15 +80,20 @@ fn test_only_private_entry_function_can_be_annotated() {
 #[test]
 fn test_unbiasable_annotation() {
     let mut h = MoveHarness::new();
+
     deploy_code(AccountAddress::ONE, "randomness.data/pack", &mut h)
         .expect("building package must succeed");
     set_randomness_seed(&mut h);
+
+    h.set_default_gas_unit_price(100);
+    h.set_max_gas_per_txn(10000); // Should match the default required gas amount.
 
     let should_succeed = [
         "0x1::test::ok_if_not_annotated_and_not_using_randomness",
         "0x1::test::ok_if_annotated_and_not_using_randomness",
         "0x1::test::ok_if_annotated_and_using_randomness",
     ];
+
     for entry_func in should_succeed {
         let status = run_entry_func(&mut h, "0xa11ce", entry_func);
         assert_success!(status);

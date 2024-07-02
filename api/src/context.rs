@@ -18,13 +18,12 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
-use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
-    DbReader, Order, MAX_REQUEST_LIMIT,
+    AptosDbError, DbReader, Order, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -34,18 +33,18 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
+    indexer::indexer_db_reader::IndexerReader,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
     state_store::{
-        state_key::{StateKey, StateKeyInner},
-        state_key_prefix::StateKeyPrefix,
+        state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
         TStateView,
     },
-    transaction::{SignedTransaction, TransactionWithProof, Version},
+    transaction::{
+        block_epilogue::BlockEndInfo, SignedTransaction, Transaction, TransactionWithProof, Version,
+    },
 };
-use aptos_utils::aptos_try;
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
 use futures::{channel::oneshot, SinkExt};
 use mini_moka::sync::Cache;
 use move_core_types::{
@@ -59,7 +58,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc, RwLock, RwLockWriteGuard,
     },
     time::Instant,
@@ -77,7 +76,8 @@ pub struct Context {
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
     view_function_stats: Arc<FunctionStats>,
     simulate_txn_stats: Arc<FunctionStats>,
-    pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    pub indexer_reader: Option<Arc<dyn IndexerReader>>,
+    pub wait_for_hash_active_connections: Arc<AtomicUsize>,
 }
 
 impl std::fmt::Debug for Context {
@@ -92,13 +92,13 @@ impl Context {
         db: Arc<dyn DbReader>,
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
-        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> Self {
         let (view_function_stats, simulate_txn_stats) = {
             let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
             (
                 Arc::new(FunctionStats::new(
-                    FunctionType::ViewFuntion,
+                    FunctionType::ViewFunction,
                     log_per_call_stats,
                 )),
                 Arc::new(FunctionStats::new(
@@ -129,7 +129,8 @@ impl Context {
             })),
             view_function_stats,
             simulate_txn_stats,
-            table_info_reader,
+            indexer_reader,
+            wait_for_hash_active_connections: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -303,8 +304,7 @@ impl Context {
         address: AccountAddress,
         version: Version,
     ) -> Result<Option<T>> {
-        let access_path = AccessPath::resource_access_path(address, T::struct_tag())?;
-        let bytes_opt = self.get_state_value(&StateKey::access_path(access_path), version)?;
+        let bytes_opt = self.get_state_value(&StateKey::resource_typed::<T>(&address)?, version)?;
         bytes_opt
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()
@@ -349,19 +349,26 @@ impl Context {
         address: AccountAddress,
         version: u64,
     ) -> Result<HashMap<StateKey, StateValue>> {
-        let mut iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            None,
-            version,
-        )?;
+        let mut iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        None,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(&StateKeyPrefix::from(address), None, version)?
+        };
 
         let kvs = iter
             .by_ref()
             .take(MAX_REQUEST_LIMIT as usize)
-            .map(|res| match res {
-                Ok((k, v)) => Ok((k, v)),
-                Err(res) => Err(anyhow::Error::from(res)),
-            })
             .collect::<Result<_>>()?;
         if iter.next().transpose()?.is_some() {
             bail!("Too many state items under account ({:?}).", address);
@@ -376,11 +383,26 @@ impl Context {
         version: u64,
         limit: u64,
     ) -> Result<(Vec<(StructTag, Vec<u8>)>, Option<StateKey>)> {
-        let account_iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            prev_state_key,
-            version,
-        )?;
+        let account_iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        prev_state_key,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(
+                    &StateKeyPrefix::from(address),
+                    prev_state_key,
+                    version,
+                )?
+        };
         // TODO: Consider rewriting this to consider resource groups:
         // * If a resource group is found, expand
         // * Return Option<Result<(PathType, StructTag, Vec<u8>)>>
@@ -407,7 +429,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e.into())),
+                Err(e) => Some(Err(e)),
             })
             .take(limit as usize + 1);
         let kvs = resource_iter
@@ -417,38 +439,19 @@ impl Context {
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
         let state_view = self.state_view_at_version(version)?;
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
             .into_iter()
-            .map(|(key, value)| {
-                let is_resource_group =
-                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
-                        aptos_try!({
-                            let md = aptos_framework::get_metadata(
-                                &resolver.get_module_metadata(&struct_tag.module_id()),
-                            )?;
-                            md.struct_attributes
-                                .get(struct_tag.name.as_ident_str().as_str())?
-                                .iter()
-                                .find(|attr| attr.is_resource_group())?;
-                            Some(())
-                        })
-                        .is_some()
-                    };
-
-                let resolver = state_view.as_move_resolver();
-                if is_resource_group(&resolver, &key) {
+            .map(|(tag, value)| {
+                if converter.is_resource_group(&tag) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
-                        .map(|map| {
-                            map.into_iter()
-                                .map(|(key, value)| (key, value))
-                                .collect::<Vec<_>>()
-                        })
+                        .map(|map| map.into_iter().map(|(t, v)| (t, v)).collect::<Vec<_>>())
                         .map_err(|e| e.into())
                 } else {
-                    Ok(vec![(key, value)])
+                    Ok(vec![(tag, value)])
                 }
             })
             .collect::<Result<Vec<Vec<(StructTag, Vec<u8>)>>>>()?
@@ -457,10 +460,7 @@ impl Context {
             .collect();
 
         let next_key = if let Some((struct_tag, _v)) = resource_iter.next().transpose()? {
-            Some(StateKey::access_path(AccessPath::new(
-                address,
-                AccessPath::resource_path_vec(struct_tag)?,
-            )))
+            Some(StateKey::resource(&address, &struct_tag)?)
         } else {
             None
         };
@@ -474,11 +474,26 @@ impl Context {
         version: u64,
         limit: u64,
     ) -> Result<(Vec<(ModuleId, Vec<u8>)>, Option<StateKey>)> {
-        let account_iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            prev_state_key,
-            version,
-        )?;
+        let account_iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        prev_state_key,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(
+                    &StateKeyPrefix::from(address),
+                    prev_state_key,
+                    version,
+                )?
+        };
         let mut module_iter = account_iter
             .filter_map(|res| match res {
                 Ok((k, v)) => match k.inner() {
@@ -494,19 +509,17 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e.into())),
+                Err(e) => Some(Err(e)),
             })
             .take(limit as usize + 1);
         let kvs = module_iter
             .by_ref()
             .take(limit as usize)
             .collect::<Result<_>>()?;
-        let next_key = module_iter.next().transpose()?.map(|(module_id, _v)| {
-            StateKey::access_path(AccessPath::new(
-                address,
-                AccessPath::code_path_vec(module_id),
-            ))
-        });
+        let next_key = module_iter
+            .next()
+            .transpose()?
+            .map(|(module_id, _v)| StateKey::module_id(&module_id));
         Ok((kvs, next_key))
     }
 
@@ -601,7 +614,7 @@ impl Context {
 
         // We can only get the max_transactions page size
         let max_txns = std::cmp::min(
-            self.node_config.api.max_transactions_page_size,
+            self.node_config.api.max_block_transactions_page_size,
             (last_version - first_version + 1) as u16,
         );
         let txns = if with_transactions {
@@ -641,8 +654,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -674,8 +686,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -755,15 +766,31 @@ impl Context {
             .saturating_sub(limit as u64)
         };
 
-        let txns = self
-            .db
-            .get_account_transactions(
+        let txns_res = if !db_sharding_enabled(&self.node_config) {
+            self.db.get_account_transactions(
                 address,
                 start_seq_number,
                 limit as u64,
                 true,
                 ledger_version,
             )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or(anyhow!("Indexer reader is None"))
+                .map_err(|err| {
+                    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
+                })?
+                .get_account_transactions(
+                    address,
+                    start_seq_number,
+                    limit as u64,
+                    true,
+                    ledger_version,
+                )
+                .map_err(|e| AptosDbError::Other(e.to_string()))
+        };
+        let txns = txns_res
             .context("Failed to retrieve account transactions")
             .map_err(|err| {
                 E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
@@ -838,28 +865,25 @@ impl Context {
         limit: u16,
         ledger_version: u64,
     ) -> Result<Vec<EventWithVersion>> {
-        if let Some(start) = start {
-            Ok(self.db.get_events(
-                event_key,
-                start,
-                Order::Ascending,
-                limit as u64,
-                ledger_version,
-            )?)
+        let (start, order) = if let Some(start) = start {
+            (start, Order::Ascending)
         } else {
-            Ok(self
-                .db
-                .get_events(
-                    event_key,
-                    u64::MAX,
-                    Order::Descending,
-                    limit as u64,
-                    ledger_version,
-                )
-                .map(|mut result| {
-                    result.reverse();
-                    result
-                })?)
+            (u64::MAX, Order::Descending)
+        };
+        let mut res = if !db_sharding_enabled(&self.node_config) {
+            self.db
+                .get_events(event_key, start, order, limit as u64, ledger_version)?
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or(anyhow!("Internal indexer reader doesn't exist"))?
+                .get_events(event_key, start, order, limit as u64, ledger_version)?
+        };
+        if order == Order::Descending {
+            res.reverse();
+            Ok(res)
+        } else {
+            Ok(res)
         }
     }
 
@@ -919,29 +943,37 @@ impl Context {
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<Vec<(u64, u64)>> {
+    ) -> Result<(Vec<(u64, u64)>, Vec<BlockEndInfo>)> {
         if start_version > ledger_version || limit == 0 {
-            return Ok(vec![]);
+            return Ok((vec![], vec![]));
         }
 
-        // This is just an estimation, so we cna just skip over errors
+        // This is just an estimation, so we can just skip over errors
         let limit = std::cmp::min(limit, ledger_version - start_version + 1);
         let txns = self.db.get_transaction_iterator(start_version, limit)?;
         let infos = self
             .db
             .get_transaction_info_iterator(start_version, limit)?;
-        let gas_prices: Vec<_> = txns
-            .zip(infos)
-            .filter_map(|(txn, info)| {
-                txn.as_ref()
-                    .ok()
-                    .and_then(|t| t.try_as_signed_user_txn())
-                    .map(|t| (t.gas_unit_price(), info))
-            })
-            .filter_map(|(unit_price, info)| info.as_ref().ok().map(|i| (unit_price, i.gas_used())))
-            .collect();
 
-        Ok(gas_prices)
+        let mut gas_prices = Vec::new();
+        let mut block_end_infos = Vec::new();
+        for (txn, info) in txns.zip(infos) {
+            match txn.as_ref() {
+                Ok(Transaction::UserTransaction(txn)) => {
+                    if let Ok(info) = info.as_ref() {
+                        gas_prices.push((txn.gas_unit_price(), info.gas_used()));
+                    }
+                },
+                Ok(Transaction::BlockEpilogue(txn)) => {
+                    if let Some(block_end_info) = txn.try_as_block_end_info() {
+                        block_end_infos.push(block_end_info.clone());
+                    }
+                },
+                _ => {},
+            }
+        }
+
+        Ok((gas_prices, block_end_infos))
     }
 
     pub fn estimate_gas_price<E: InternalError>(
@@ -1036,20 +1068,17 @@ impl Context {
                 last - first,
                 ledger_info.ledger_version.0,
             ) {
-                Ok(prices_and_used) => {
+                Ok((prices_and_used, block_end_infos)) => {
                     let is_full_block = if prices_and_used.len() >= config.full_block_txns {
                         true
-                    } else if let Some(full_block_gas_used) =
+                    } else if !block_end_infos.is_empty() {
+                        assert_eq!(1, block_end_infos.len());
+                        block_end_infos.first().unwrap().limit_reached()
+                    } else if let Some(block_gas_limit) =
                         block_config.block_gas_limit_type.block_gas_limit()
                     {
-                        // be pessimistic for conflicts, as such information is not onchain
                         let gas_used = prices_and_used.iter().map(|(_, used)| *used).sum::<u64>();
-                        let max_conflict_multiplier = block_config
-                            .block_gas_limit_type
-                            .conflict_penalty_window()
-                            .unwrap_or(1)
-                            as u64;
-                        gas_used * max_conflict_multiplier >= full_block_gas_used
+                        gas_used >= block_gas_limit
                     } else {
                         false
                     };
@@ -1196,19 +1225,23 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
 
-            let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
-                    let feature_version = gas_schedule.feature_version;
-                    let gas_schedule = gas_schedule.to_btree_map();
-                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
+            let gas_schedule_params = {
+                let may_be_params =
+                    GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
+                        let feature_version = gas_schedule.feature_version;
+                        let gas_schedule = gas_schedule.into_btree_map();
+                        AptosGasParameters::from_on_chain_gas_schedule(
+                            &gas_schedule,
+                            feature_version,
+                        )
                         .ok()
-                }) {
+                    });
+                match may_be_params {
                     Some(gas_schedule) => Ok(gas_schedule),
-                    None => GasSchedule::fetch_config(&resolver)
+                    None => GasSchedule::fetch_config(&state_view)
                         .and_then(|gas_schedule| {
-                            let gas_schedule = gas_schedule.to_btree_map();
+                            let gas_schedule = gas_schedule.into_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
                         })
                         .ok_or_else(|| {
@@ -1218,7 +1251,8 @@ impl Context {
                                 ledger_info,
                             )
                         }),
-                }?;
+                }?
+            };
 
             // Update the cache
             cache.gas_schedule_params = Some(gas_schedule_params.clone());
@@ -1261,9 +1295,8 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
 
-            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&resolver)
+            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&state_view)
                 .unwrap_or_else(OnChainExecutionConfig::default_if_missing)
                 .block_executor_onchain_config();
 
@@ -1364,21 +1397,21 @@ pub enum LogEvent {
 }
 
 pub enum FunctionType {
-    ViewFuntion,
+    ViewFunction,
     TxnSimulation,
 }
 
 impl FunctionType {
     fn log_event(&self) -> LogEvent {
         match self {
-            FunctionType::ViewFuntion => LogEvent::ViewFunction,
+            FunctionType::ViewFunction => LogEvent::ViewFunction,
             FunctionType::TxnSimulation => LogEvent::TxnSimulation,
         }
     }
 
     fn operation_id(&self) -> &'static str {
         match self {
-            FunctionType::ViewFuntion => "view_function",
+            FunctionType::ViewFunction => "view_function",
             FunctionType::TxnSimulation => "txn_simulation",
         }
     }
@@ -1459,4 +1492,8 @@ impl FunctionStats {
             stats.invalidate_all();
         }
     }
+}
+
+fn db_sharding_enabled(node_config: &NodeConfig) -> bool {
+    node_config.storage.rocksdb_configs.enable_storage_sharding
 }

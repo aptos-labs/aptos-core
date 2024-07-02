@@ -10,7 +10,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use move_vm_runtime::{config::VMConfig, module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::time::Instant;
@@ -24,12 +24,12 @@ fn get_nested_struct_type(
 ) -> TypeTag {
     let mut ret = TypeTag::Bool;
     for _ in 0..depth {
-        let type_params = std::iter::repeat(ret).take(num_type_args).collect();
+        let type_args = std::iter::repeat(ret).take(num_type_args).collect();
         ret = TypeTag::Struct(Box::new(StructTag {
             address: module_address,
             module: module_identifier.clone(),
             name: struct_identifier.clone(),
-            type_params,
+            type_args,
         }))
     }
     ret
@@ -108,12 +108,10 @@ fn script_large_ty() {
 
     let mut storage = InMemoryStorage::new();
     let move_vm = MoveVM::new_with_config(vec![], VMConfig {
-        verifier: verifier_config,
+        verifier_config,
         paranoid_type_checks: true,
-        type_size_limit: true,
         ..Default::default()
-    })
-    .unwrap();
+    });
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();
@@ -132,12 +130,14 @@ fn script_large_ty() {
     );
 
     let mut session = move_vm.new_session(&storage);
+    let traversal_storage = TraversalStorage::new();
     let res = session
         .execute_script(
             script.as_ref(),
             vec![input_type],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap_err();
 

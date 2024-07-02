@@ -228,8 +228,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         }
 
         self.notifications_to_responses
-            .get(notification_id)
-            .is_some()
+            .contains_key(notification_id)
     }
 
     /// Notifies the Aptos data client of a bad client response
@@ -264,7 +263,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         Ok(())
     }
 
-    /// Creates and sends a batch of aptos data client requests to the network
+    /// Creates and sends a batch of data client requests to the network
     fn create_and_send_client_requests(
         &mut self,
         global_data_summary: &GlobalDataSummary,
@@ -277,26 +276,25 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         // Calculate the max number of requests that can be sent now
         let max_pending_requests = self.streaming_service_config.max_pending_requests;
-        let max_num_requests_to_send = if num_pending_requests >= max_pending_requests {
-            0 // We're already at the max number of pending requests (don't do anything)
-        } else {
-            // Otherwise, calculate the max number of requests to send based on
-            // the max concurrent requests and the number of pending request slots.
-            let remaining_concurrent_requests = self
-                .dynamic_prefetching_state
-                .get_max_concurrent_requests(&self.stream_engine)
-                .saturating_sub(num_in_flight_requests);
-            let remaining_request_slots = max_pending_requests.saturating_sub(num_pending_requests);
-            min(remaining_concurrent_requests, remaining_request_slots)
-        };
+        let max_num_requests_to_send = max_pending_requests.saturating_sub(num_pending_requests);
 
-        // Send the client requests
+        // Send the client requests iff we have enough room in the queue
         if max_num_requests_to_send > 0 {
+            // Get the max number of in-flight requests from the prefetching state
+            let max_in_flight_requests = self
+                .dynamic_prefetching_state
+                .get_max_concurrent_requests(&self.stream_engine);
+
+            // Create the client requests
             let client_requests = self.stream_engine.create_data_client_requests(
                 max_num_requests_to_send,
+                max_in_flight_requests,
+                num_in_flight_requests,
                 global_data_summary,
                 self.notification_id_generator.clone(),
             )?;
+
+            // Add the client requests to the sent data requests queue
             for client_request in &client_requests {
                 // Send the client request
                 let pending_client_response =
@@ -307,6 +305,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                     .push_back(pending_client_response);
             }
 
+            // Log the number of sent data requests
             sample!(
                 SampleRate::Duration(Duration::from_secs(SENT_REQUESTS_LOG_FREQ_SECS)),
                 debug!(

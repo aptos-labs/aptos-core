@@ -12,12 +12,13 @@ use crate::{
         exp_builder::ExpTranslator,
         model_builder::{
             ConstEntry, EntryVisibility, FunEntry, LocalVarEntry, ModelBuilder,
-            SpecOrBuiltinFunEntry,
+            SpecOrBuiltinFunEntry, StructLayout, StructVariant,
         },
     },
     constant_folder::ConstantFolder,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
+    model,
     model::{
         EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, Loc, ModuleId,
         MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId, SpecFunId,
@@ -30,7 +31,8 @@ use crate::{
         CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
+    ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
+    LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -216,30 +218,61 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     pub fn module_access_to_parts(
         &self,
         access: &EA::ModuleAccess,
-    ) -> (Option<ModuleName>, Symbol) {
+    ) -> (Option<ModuleName>, Symbol, Option<Symbol>) {
+        let pool = self.symbol_pool();
         match &access.value {
-            EA::ModuleAccess_::Name(n) => (None, self.symbol_pool().make(n.value.as_str())),
-            EA::ModuleAccess_::ModuleAccess(m, n) => {
+            EA::ModuleAccess_::Name(n) => (None, pool.make(n.value.as_str()), None),
+            EA::ModuleAccess_::ModuleAccess(m, n, v) => {
                 let loc = self.parent.to_loc(&m.loc);
                 let addr_bytes = self.parent.resolve_address(&loc, &m.value.address);
                 let module_name = ModuleName::from_address_bytes_and_name(
                     addr_bytes,
-                    self.symbol_pool().make(m.value.module.0.value.as_str()),
+                    pool.make(m.value.module.0.value.as_str()),
                 );
-                (Some(module_name), self.symbol_pool().make(n.value.as_str()))
+                (
+                    Some(module_name),
+                    pool.make(n.value.as_str()),
+                    v.map(|v| pool.make(v.value.as_str())),
+                )
             },
         }
     }
 
     /// Converts a ModuleAccess into a qualified symbol which can be used for lookup of
-    /// types or functions.
+    /// types or functions. If the access has a struct variant, an error is produced.
     pub fn module_access_to_qualified(&self, access: &EA::ModuleAccess) -> QualifiedSymbol {
-        let (module_name_opt, symbol) = self.module_access_to_parts(access);
-        let module_name = module_name_opt.unwrap_or_else(|| self.module_name.clone());
-        QualifiedSymbol {
-            module_name,
-            symbol,
+        self.check_no_variant(access);
+        let (qsym, _) = self.module_access_to_qualified_with_variant(access);
+        qsym
+    }
+
+    pub fn check_no_variant(&self, maccess: &EA::ModuleAccess) -> bool {
+        if let EA::ModuleAccess_::ModuleAccess(_, _, Some(n)) = &maccess.value {
+            self.parent.env.error(
+                &self.parent.to_loc(&n.loc),
+                "variants not allowed in this context",
+            );
+            false
+        } else {
+            true
         }
+    }
+
+    /// Converts a ModuleAccess into a qualified symbol which can be used for lookup of
+    /// types or functions, plus an optional struct variant.
+    pub fn module_access_to_qualified_with_variant(
+        &self,
+        access: &EA::ModuleAccess,
+    ) -> (QualifiedSymbol, Option<Symbol>) {
+        let (module_name_opt, symbol, variant) = self.module_access_to_parts(access);
+        let module_name = module_name_opt.unwrap_or_else(|| self.module_name.clone());
+        (
+            QualifiedSymbol {
+                module_name,
+                symbol,
+            },
+            variant,
+        )
     }
 
     /// Creates a SpecBlockContext from the given SpecBlockTarget. The context is used during
@@ -360,7 +393,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             None,
                             self.symbol_pool().make(n.value.as_str()),
                         ),
-                        EA::ModuleAccess_::ModuleAccess(mident, n) => {
+                        EA::ModuleAccess_::ModuleAccess(mident, n, _) => {
+                            self.check_no_variant(macc);
                             let addr_bytes = self.parent.resolve_address(
                                 &self.parent.to_loc(&macc.loc),
                                 &mident.value.address,
@@ -444,6 +478,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let attrs = self.translate_attributes(&def.attributes);
         let abilities = self.translate_abilities(&def.abilities);
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun();
         let type_params = et.analyze_and_add_type_params(
             def.type_parameters
                 .iter()
@@ -457,7 +492,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             struct_id,
             abilities,
             type_params,
-            None, // will be filled in during definition analysis
+            StructLayout::None, // will be filled in during definition analysis,
+            matches!(def.layout, EA::StructLayout::Native(_)),
         );
     }
 
@@ -472,6 +508,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let fun_id = FunId::new(qsym.symbol);
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun();
         et.enter_scope();
         let type_params = et.analyze_and_add_type_params(
             def.signature
@@ -483,6 +520,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
         let kind = if def.entry.is_some() {
+            if et.env().language_version.is_at_least(LanguageVersion::V2_0) && def.inline {
+                et.error(&et.to_loc(&def.loc), "An entry function cannot be inlined.");
+            }
             FunctionKind::Entry
         } else if def.inline {
             FunctionKind::Inline
@@ -698,6 +738,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for_move_fun: bool,
     ) -> (Vec<TypeParameter>, Vec<Parameter>, Type) {
         let et = &mut ExpTranslator::new(self);
+        if for_move_fun {
+            et.set_translate_move_fun()
+        }
         let type_params = et.analyze_and_add_type_params(
             signature.type_parameters.iter().map(|(n, a)| (n, a, false)),
         );
@@ -1135,102 +1178,133 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// ## Struct Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    /// Same as ModelBuilder::infer_abilities_may_have
-    fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
-        self.parent.infer_abilities_may_have(ty)
-    }
-
-    /// Checks whether a struct's field type `field_ty` has the abilities required by the declared abilities `struct_abilities` of the struct.
-    fn ability_check_field(
-        &self,
-        struct_abilities: AbilitySet,
-        struct_name: &QualifiedSymbol,
-        field_ty: &Type,
-        field_ty_loc: &Loc,
-    ) {
-        let field_abilities = self.infer_abilities_may_have(field_ty);
-        for ability in field_missing_abilities(struct_abilities, field_abilities) {
-            match ability {
-                Ability::Copy => self.parent.error(
-                    field_ty_loc,
-                    &format!(
-                        "field must have copy ability because {} is declared with copy ability",
-                        struct_name.display_simple(self.parent.env)
-                    ),
-                ),
-                Ability::Drop => self.parent.error(
-                    field_ty_loc,
-                    &format!(
-                        "field must have drop ability because {} is declared with drop ability",
-                        struct_name.display_simple(self.parent.env)
-                    ),
-                ),
-                Ability::Store => {
-                    let mut abilities = Vec::new();
-                    if struct_abilities.has_store() {
-                        abilities.push("store");
-                    }
-                    if struct_abilities.has_key() {
-                        abilities.push("key");
-                    }
-                    self.parent.error(
-                        field_ty_loc,
-                        &format!(
-                            "field must have store ability because {} is declared with {}",
-                            struct_name.display_simple(self.parent.env),
-                            abilities.join(" + ")
-                        ),
-                    );
-                },
-                Ability::Key => panic!("ICE check_field: field missing key ability"),
-            }
-        }
-    }
-
     fn def_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let struct_entry = self.parent.struct_table.get(&qsym).expect("struct invalid");
         let struct_abilities = struct_entry.abilities;
         let type_params = struct_entry.type_params.clone();
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun(); // translating structs counts as move fun, not spec
         let loc = et.to_loc(&name.0.loc);
         et.define_type_params(&loc, &type_params, false);
-        let fields = match &def.fields {
-            EA::StructFields::Defined(fields) => {
-                let mut field_map = BTreeMap::new();
-                let mut field_ty_and_locs = Vec::new(); // fix borrowing issues
-                for (name_loc, field_name_, (idx, ty)) in fields {
-                    let field_loc = et.to_loc(&name_loc);
-                    let field_sym = et.symbol_pool().make(field_name_);
-                    let field_ty = et.translate_type(ty);
-                    let field_ty_loc = et.to_loc(&ty.loc);
-                    // store the `field_ty` and `field_ty_loc` to process with `ability_check_field`
-                    // outside of this loop to avoid borrow issues
-                    field_ty_and_locs.push((field_ty.clone(), field_ty_loc));
-                    field_map.insert(field_sym, (field_loc, *idx, field_ty));
-                }
-                if field_map.is_empty() {
-                    // The legacy Move compiler inserts a `dummy_field: bool` here, we need to
-                    // simulate this behavior for now, as that is what we find in the bytecode
-                    // generated by the compiler.
-                    let field_sym = et.parent.dummy_field_name();
-                    let field_ty = Type::new_prim(PrimitiveType::Bool);
-                    field_map.insert(field_sym, (loc.clone(), 0, field_ty));
-                }
-                for (field_ty, field_ty_loc) in field_ty_and_locs {
-                    self.ability_check_field(struct_abilities, &qsym, &field_ty, &field_ty_loc);
-                }
-                Some(field_map)
+        // Notice: duplicate field and variant declarations are currently checked in
+        // the expansion phase, so don't need to do here again.
+        let (layout, is_empty_struct) = match &def.layout {
+            EA::StructLayout::Singleton(fields) => {
+                let (map, is_struct_empty) =
+                    Self::build_field_map(&mut et, None, struct_abilities, &loc, fields);
+                (StructLayout::Singleton(map), is_struct_empty)
             },
-            EA::StructFields::Native(_) => None,
+            EA::StructLayout::Variants(variants) => {
+                let mut variant_maps = variants
+                    .iter()
+                    .map(|v| {
+                        let variant_loc = et.to_loc(&v.loc);
+                        let variant_name = et.symbol_pool().make(v.name.0.value.as_str());
+                        let attributes = et.parent.translate_attributes(&v.attributes);
+                        let (variant_fields, _) = Self::build_field_map(
+                            &mut et,
+                            Some(variant_name),
+                            struct_abilities,
+                            &variant_loc,
+                            &v.fields,
+                        );
+                        StructVariant {
+                            loc: variant_loc,
+                            name: variant_name,
+                            attributes,
+                            fields: variant_fields,
+                        }
+                    })
+                    .collect_vec();
+                // Identify common fields
+                if !variant_maps.is_empty() {
+                    let mut common_fields = BTreeSet::new();
+                    let main = &variant_maps[0];
+                    for field in main.fields.values() {
+                        let mut common = true;
+                        for other in &variant_maps[1..variant_maps.len()] {
+                            if !other
+                                .fields
+                                .values()
+                                .any(|f| f.name == field.name && f.ty == field.ty)
+                            {
+                                common = false;
+                                break;
+                            }
+                        }
+                        if common {
+                            common_fields.insert(field.name);
+                        }
+                    }
+                    for variant_map in variant_maps.iter_mut() {
+                        for field in variant_map.fields.values_mut() {
+                            field.common_for_variants = common_fields.contains(&field.name)
+                        }
+                    }
+                }
+                (StructLayout::Variants(variant_maps), false)
+            },
+            EA::StructLayout::Native(_) => (StructLayout::None, false),
         };
-        self.parent
+        let entry = self
+            .parent
             .struct_table
             .get_mut(&qsym)
-            .expect("struct invalid")
-            .fields = fields;
-        self.parent
-            .ability_check_struct_def(self.parent.struct_table.get(&qsym).expect("struct invalid"));
+            .expect("struct invalid");
+        entry.layout = layout;
+        entry.is_empty_struct = is_empty_struct;
+    }
+
+    fn build_field_map(
+        et: &mut ExpTranslator,
+        for_variant: Option<Symbol>,
+        struct_abilities: AbilitySet,
+        loc: &Loc,
+        fields: &EA::Fields<EA::Type>,
+    ) -> (BTreeMap<Symbol, FieldData>, bool) {
+        let mut field_map = BTreeMap::new();
+        for (name_loc, field_name_, (idx, ty)) in fields {
+            let field_loc = et.to_loc(&name_loc);
+            let field_sym = et.symbol_pool().make(field_name_);
+            let field_ty = et.translate_type(ty);
+            let field_ty_loc = et.to_loc(&ty.loc);
+            for ctr in Constraint::for_field(struct_abilities, &field_ty) {
+                et.add_constraint_and_report(
+                    &field_ty_loc,
+                    &ErrorMessageContext::General,
+                    &field_ty,
+                    ctr,
+                    Some(ConstraintContext::default().for_field(field_sym)),
+                )
+            }
+            field_map.insert(field_sym, FieldData {
+                name: field_sym,
+                loc: field_loc.clone(),
+                offset: *idx,
+                variant: for_variant,
+                common_for_variants: false,
+                ty: field_ty,
+            });
+        }
+        let mut is_empty_struct = false;
+        if for_variant.is_none() && field_map.is_empty() {
+            // The legacy Move compiler inserts a `dummy_field: bool` here, we need to
+            // simulate this behavior for now, as that is what we find in the bytecode
+            // generated by the v1 compiler and stored on chain.
+            let field_sym = et.parent.dummy_field_name();
+            let field_ty = Type::new_prim(PrimitiveType::Bool);
+            field_map.insert(field_sym, FieldData {
+                name: field_sym,
+                loc: loc.clone(),
+                offset: 0,
+                variant: None,
+                common_for_variants: false,
+                ty: field_ty,
+            });
+            is_empty_struct = true;
+        }
+        (field_map, is_empty_struct)
     }
 
     /// The name of a dummy field the legacy Move compilers adds to zero-arity structs.
@@ -1264,8 +1338,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             et.set_fun_name(full_name.clone());
             et.set_translate_move_fun();
             let loc = et.to_loc(&body.loc);
-            for (pos, TypeParameter(name, _, loc)) in type_params.iter().enumerate() {
-                et.define_type_param(loc, *name, Type::new_param(pos), false);
+            for (pos, TypeParameter(name, kind, loc)) in type_params.iter().enumerate() {
+                et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
@@ -1500,7 +1574,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
             },
             Some(EA::PragmaValue::Ident(ema)) => match self.module_access_to_parts(ema) {
-                (None, sym) => PropertyValue::Symbol(sym),
+                (None, sym, _) => PropertyValue::Symbol(sym),
                 _ => PropertyValue::QualifiedSymbol(self.module_access_to_qualified(ema)),
             },
         };
@@ -1581,11 +1655,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(
                         loc,
                         *name,
                         Type::new_param(pos),
+                        kind.clone(),
                         false, /*report_errors*/
                     );
                 }
@@ -1620,8 +1695,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos), false);
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
+                    et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
                 }
 
                 et.enter_scope();
@@ -1667,8 +1742,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos), false);
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
+                    et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
                 }
 
                 et.enter_scope();
@@ -1687,17 +1762,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 et.define_type_params(loc, &entry.type_params, false);
-                if let Some(fields) = &entry.fields {
+                if let StructLayout::Singleton(fields) = &entry.layout {
                     et.enter_scope();
-                    for (n, (_, _, ty)) in fields {
+                    for f in fields.values() {
                         et.define_local(
                             loc,
-                            *n,
-                            ty.clone(),
+                            f.name,
+                            f.ty.clone(),
                             Some(Operation::Select(
                                 entry.module_id,
                                 entry.struct_id,
-                                FieldId::new(*n),
+                                FieldId::new(f.name),
                             )),
                             None,
                         );
@@ -3332,21 +3407,36 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
             // New struct in this module
             let spec = self.struct_specs.remove(&name.symbol).unwrap_or_default();
-            let field_data = if let Some(fields) = &entry.fields {
-                fields
-                    .iter()
-                    .map(|(name, (loc, offset, ty))| {
-                        (FieldId::new(*name), FieldData {
-                            name: *name,
-                            loc: loc.clone(),
-                            offset: *offset,
-                            ty: ty.clone(),
-                        })
-                    })
-                    .collect::<BTreeMap<_, _>>()
-            } else {
-                BTreeMap::new()
-            };
+            let mut field_data: BTreeMap<FieldId, FieldData> = BTreeMap::new();
+            let mut variants: BTreeMap<Symbol, model::StructVariant> = BTreeMap::new();
+            match &entry.layout {
+                StructLayout::Singleton(fields) => {
+                    field_data.extend(fields.values().map(|f| (FieldId::new(f.name), f.clone())));
+                },
+                StructLayout::Variants(entry_variants) => {
+                    for variant in entry_variants {
+                        variants.insert(variant.name, model::StructVariant {
+                            loc: variant.loc.clone(),
+                            attributes: variant.attributes.clone(),
+                        });
+                        let pool = self.parent.env.symbol_pool();
+                        field_data.extend(variant.fields.values().map(|f| {
+                            let variant_field_name = if !f.common_for_variants {
+                                // If the field is not common between variants, we need to qualify
+                                // the name with the variant for a unique id.
+                                pool.make(&FieldId::make_variant_field_id_str(
+                                    pool.string(variant.name).as_str(),
+                                    pool.string(f.name).as_str(),
+                                ))
+                            } else {
+                                f.name
+                            };
+                            (FieldId::new(variant_field_name), f.clone())
+                        }))
+                    }
+                },
+                StructLayout::None => {},
+            }
             let data = StructData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
@@ -3356,7 +3446,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 abilities: entry.abilities,
                 spec_var_opt: None,
                 field_data,
+                variants: if variants.is_empty() {
+                    None
+                } else {
+                    Some(variants)
+                },
                 spec: RefCell::new(spec),
+                is_native: entry.is_native,
             };
             struct_data.insert(StructId::new(name.symbol), data);
         }
@@ -3461,23 +3557,4 @@ pub(crate) fn extract_schema_access<'a>(exp: &'a EA::Exp, res: &mut Vec<&'a EA::
         },
         _ => {},
     }
-}
-
-/// Returns the abilities that a struct's field should have but does not, based on constraints placed by the containing struct.
-fn field_missing_abilities(
-    struct_abilities: AbilitySet,
-    field_abilities: AbilitySet,
-) -> AbilitySet {
-    let mut missing_abilities = AbilitySet::EMPTY;
-    if struct_abilities.has_copy() && !field_abilities.has_copy() {
-        missing_abilities = missing_abilities.add(Ability::Copy);
-    }
-    if struct_abilities.has_drop() && !field_abilities.has_drop() {
-        missing_abilities = missing_abilities.add(Ability::Drop);
-    }
-    if (struct_abilities.has_store() || struct_abilities.has_key()) && !field_abilities.has_store()
-    {
-        missing_abilities = missing_abilities.add(Ability::Store)
-    }
-    missing_abilities
 }

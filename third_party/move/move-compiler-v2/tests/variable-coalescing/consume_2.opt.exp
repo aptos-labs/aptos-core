@@ -1,0 +1,227 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: m::consume($t1)
+  2: m::consume($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: m::W) {
+     var $t1: m::W
+  0: $t1 := move($t0)
+  1: m::consume_($t1)
+  2: m::consume_($t1)
+  3: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: m::consume($t1)
+  2: m::consume($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: m::W) {
+     var $t1: m::W
+     var $t2: m::W
+  0: $t1 := move($t0)
+  1: $t2 := copy($t1)
+  2: m::consume_($t2)
+  3: m::consume_($t1)
+  4: return ()
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+     # live vars: $t0
+     # events: b:$t0, e:$t0
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+     # live vars: $t0
+     # events: b:$t0, e:$t0
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     # live vars: $t0
+     # events: b:$t0, e:$t0, b:$t1
+  0: $t1 := move($t0)
+     # live vars: $t1
+  1: m::consume($t1)
+     # live vars: $t1
+     # events: e:$t1
+  2: m::consume($t1)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: m::W) {
+     var $t1: m::W
+     var $t2: m::W
+     # live vars: $t0
+     # events: b:$t0, e:$t0, b:$t1
+  0: $t1 := move($t0)
+     # live vars: $t1
+     # events: b:$t2
+  1: $t2 := copy($t1)
+     # live vars: $t1, $t2
+     # events: e:$t2
+  2: m::consume_($t2)
+     # live vars: $t1
+     # events: e:$t1
+  3: m::consume_($t1)
+     # live vars:
+  4: return ()
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64 [unused]
+  0: $t0 := move($t0)
+  1: m::consume($t0)
+  2: m::consume($t0)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: m::W) {
+     var $t1: m::W [unused]
+     var $t2: m::W
+  0: $t0 := move($t0)
+  1: $t2 := copy($t0)
+  2: m::consume_($t2)
+  3: m::consume_($t0)
+  4: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64 [unused]
+  0: m::consume($t0)
+  1: m::consume($t0)
+  2: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: m::W) {
+     var $t1: m::W [unused]
+     var $t2: m::W
+  0: $t2 := copy($t0)
+  1: m::consume_($t2)
+  2: m::consume_($t0)
+  3: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+struct W has copy, drop {
+	x: u64
+}
+
+consume(Arg0: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+consume_(Arg0: W) /* def_idx: 1 */ {
+B0:
+	0: Ret
+}
+public test1(Arg0: u64) /* def_idx: 2 */ {
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: Call consume(u64)
+	2: MoveLoc[0](Arg0: u64)
+	3: Call consume(u64)
+	4: Ret
+}
+public test2(Arg0: W) /* def_idx: 3 */ {
+L1:	loc0: W
+B0:
+	0: CopyLoc[0](Arg0: W)
+	1: StLoc[1](loc0: W)
+	2: MoveLoc[1](loc0: W)
+	3: Call consume_(W)
+	4: MoveLoc[0](Arg0: W)
+	5: Call consume_(W)
+	6: Ret
+}
+}
+============ bytecode verification succeeded ========

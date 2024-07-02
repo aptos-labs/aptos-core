@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::EmitJobRequest;
+use crate::{emitter::local_account_generator::LocalAccountGenerator, EmitJobRequest};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -18,11 +18,12 @@ use aptos_sdk::{
 use aptos_transaction_generator_lib::{
     CounterState, ReliableTransactionSubmitter, RootAccountHandle, SEND_AMOUNT,
 };
+use aptos_types::account_address::AccountAddress;
 use core::{
     cmp::min,
     result::Result::{Err, Ok},
 };
-use futures::{future::try_join_all, StreamExt};
+use futures::StreamExt;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     path::Path,
@@ -31,7 +32,7 @@ use std::{
 };
 
 pub struct SourceAccountManager<'t> {
-    pub source_account: &'t LocalAccount,
+    pub source_account: Arc<LocalAccount>,
     pub txn_executor: &'t dyn ReliableTransactionSubmitter,
     pub req: &'t EmitJobRequest,
     pub txn_factory: TransactionFactory,
@@ -43,17 +44,21 @@ impl<'t> RootAccountHandle for SourceAccountManager<'t> {
         self.check_approve_funds(amount, reason).await.unwrap();
     }
 
-    fn get_root_account(&self) -> &LocalAccount {
-        self.source_account
+    fn get_root_account(&self) -> Arc<LocalAccount> {
+        self.source_account.clone()
     }
 }
 
 impl<'t> SourceAccountManager<'t> {
+    fn source_account_address(&self) -> AccountAddress {
+        self.source_account.address()
+    }
+
     // returns true if we might want to recheck the volume, as it was auto-approved.
     async fn check_approve_funds(&self, amount: u64, reason: &str) -> Result<bool> {
         let balance = self
             .txn_executor
-            .get_account_balance(self.source_account.address())
+            .get_account_balance(self.source_account_address())
             .await?;
         Ok(if self.req.mint_to_root {
             // We have a root account, so amount of funds minted is not a problem
@@ -63,7 +68,7 @@ impl<'t> SourceAccountManager<'t> {
             if balance < amount.checked_mul(100).unwrap_or(u64::MAX / 2) {
                 info!(
                     "Mint account {} current balance is {}, needing {} for {}, minting to refil it fully",
-                    self.source_account.address(),
+                    self.source_account_address(),
                     balance,
                     amount,
                     reason,
@@ -74,7 +79,7 @@ impl<'t> SourceAccountManager<'t> {
             } else {
                 info!(
                     "Mint account {} current balance is {}, needing {} for {}. Proceeding without minting, as balance would overflow otherwise",
-                    self.source_account.address(),
+                    self.source_account_address(),
                     balance,
                     amount,
                     reason,
@@ -85,7 +90,7 @@ impl<'t> SourceAccountManager<'t> {
         } else {
             info!(
                 "Source account {} current balance is {}, needed {} coins for {}, or {:.3}% of its balance",
-                self.source_account.address(),
+                self.source_account_address(),
                 balance,
                 amount,
                 reason,
@@ -95,7 +100,7 @@ impl<'t> SourceAccountManager<'t> {
             if balance < amount {
                 return Err(anyhow!(
                     "Source ({}) doesn't have enough coins, balance {} < needed {} for {}",
-                    self.source_account.address(),
+                    self.source_account_address(),
                     balance,
                     amount,
                     reason
@@ -128,7 +133,7 @@ impl<'t> SourceAccountManager<'t> {
         let txn = self
             .source_account
             .sign_with_transaction_builder(self.txn_factory.payload(
-                aptos_stdlib::aptos_coin_mint(self.source_account.address(), amount),
+                aptos_stdlib::aptos_coin_mint(self.source_account_address(), amount),
             ));
 
         if let Err(e) = txn_executor.execute_transactions(&[txn]).await {
@@ -136,7 +141,7 @@ impl<'t> SourceAccountManager<'t> {
             // so check on failure if another emitter has refilled it instead
 
             let balance = txn_executor
-                .get_account_balance(self.source_account.address())
+                .get_account_balance(self.source_account_address())
                 .await?;
             if balance > u64::MAX / 2 {
                 Ok(())
@@ -250,6 +255,7 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         txn_executor: &dyn ReliableTransactionSubmitter,
         req: &EmitJobRequest,
+        account_generator: Box<dyn LocalAccountGenerator>,
         max_submit_batch_size: usize,
         local_accounts: Vec<Arc<LocalAccount>>,
     ) -> Result<()> {
@@ -316,6 +322,7 @@ impl<'t> AccountMinter<'t> {
             .create_and_fund_seed_accounts(
                 new_source_account,
                 txn_executor,
+                account_generator,
                 expected_num_seed_accounts,
                 coins_per_seed_account,
                 max_submit_batch_size,
@@ -391,8 +398,9 @@ impl<'t> AccountMinter<'t> {
 
     pub async fn create_and_fund_seed_accounts(
         &mut self,
-        mut new_source_account: Option<LocalAccount>,
+        new_source_account: Option<LocalAccount>,
         txn_executor: &dyn ReliableTransactionSubmitter,
+        account_generator: Box<dyn LocalAccountGenerator>,
         seed_account_num: usize,
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
@@ -404,20 +412,22 @@ impl<'t> AccountMinter<'t> {
         );
         let mut i = 0;
         let mut seed_accounts = vec![];
+        let source_account = match new_source_account {
+            None => self.source_account.get_root_account().clone(),
+            Some(param_account) => Arc::new(param_account),
+        };
         while i < seed_account_num {
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
-            let mut batch = gen_reusable_accounts(txn_executor, batch_size, &mut rng).await?;
+            let mut batch = account_generator
+                .gen_local_accounts(txn_executor, batch_size, &mut rng)
+                .await?;
             let txn_factory = &self.txn_factory;
             let create_requests: Vec<_> = batch
                 .iter()
                 .map(|account| {
                     create_and_fund_account_request(
-                        if let Some(account) = &mut new_source_account {
-                            account
-                        } else {
-                            self.source_account.get_root_account()
-                        },
+                        source_account.clone(),
                         coins_per_seed_account,
                         account.public_key(),
                         txn_factory,
@@ -465,16 +475,17 @@ impl<'t> AccountMinter<'t> {
         coins_for_source: u64,
     ) -> Result<LocalAccount> {
         const NUM_TRIES: usize = 3;
+        let root_account = self.source_account.get_root_account();
+        let root_address = root_account.address();
         for i in 0..NUM_TRIES {
-            self.source_account.get_root_account().set_sequence_number(
-                txn_executor
-                    .query_sequence_number(self.source_account.get_root_account().address())
-                    .await?,
-            );
+            {
+                let new_sequence_number = txn_executor.query_sequence_number(root_address).await?;
+                root_account.set_sequence_number(new_sequence_number);
+            }
 
             let new_source_account = LocalAccount::generate(self.rng());
             let txn = create_and_fund_account_request(
-                self.source_account.get_root_account(),
+                root_account.clone(),
                 coins_for_source,
                 new_source_account.public_key(),
                 &self.txn_factory,
@@ -525,12 +536,14 @@ async fn create_and_fund_new_accounts(
         .chunks(max_num_accounts_per_batch)
         .map(|chunk| chunk.to_vec())
         .collect::<Vec<_>>();
+    let source_address = source_account.address();
+    let source_account = Arc::new(source_account);
     for batch in accounts_by_batch {
         let creation_requests: Vec<_> = batch
             .iter()
             .map(|account| {
                 create_and_fund_account_request(
-                    &source_account,
+                    source_account.clone(),
                     coins_per_new_account,
                     account.public_key(),
                     txn_factory,
@@ -541,50 +554,13 @@ async fn create_and_fund_new_accounts(
         txn_executor
             .execute_transactions_with_counter(&creation_requests, counters)
             .await
-            .with_context(|| format!("Account {} couldn't mint", source_account.address()))?;
+            .with_context(|| format!("Account {} couldn't mint", source_address))?;
     }
     Ok(())
 }
 
-pub async fn gen_reusable_accounts<R>(
-    txn_executor: &dyn ReliableTransactionSubmitter,
-    num_accounts: usize,
-    rng: &mut R,
-) -> Result<Vec<LocalAccount>>
-where
-    R: rand_core::RngCore + ::rand_core::CryptoRng,
-{
-    let mut account_keys = vec![];
-    let mut addresses = vec![];
-    let mut i = 0;
-    while i < num_accounts {
-        let account_key = AccountKey::generate(rng);
-        addresses.push(account_key.authentication_key().account_address());
-        account_keys.push(account_key);
-        i += 1;
-    }
-    let result_futures = addresses
-        .iter()
-        .map(|address| txn_executor.query_sequence_number(*address))
-        .collect::<Vec<_>>();
-    let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
-
-    let accounts = account_keys
-        .into_iter()
-        .zip(seq_nums.into_iter())
-        .map(|(account_key, sequence_number)| {
-            LocalAccount::new(
-                account_key.authentication_key().account_address(),
-                account_key,
-                sequence_number,
-            )
-        })
-        .collect();
-    Ok(accounts)
-}
-
 pub fn create_and_fund_account_request(
-    creation_account: &LocalAccount,
+    creation_account: Arc<LocalAccount>,
     amount: u64,
     pubkey: &Ed25519PublicKey,
     txn_factory: &TransactionFactory,

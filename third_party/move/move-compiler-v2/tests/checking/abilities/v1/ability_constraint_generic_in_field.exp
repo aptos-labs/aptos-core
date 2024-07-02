@@ -1,0 +1,22 @@
+
+Diagnostics:
+error: type `T` is missing required ability `copy`
+  ┌─ tests/checking/abilities/v1/ability_constraint_generic_in_field.move:3:24
+  │
+2 │     struct S<T: copy> { v: T }
+  │              - declaration of type parameter `T`
+3 │     struct B<T> { v: S<T> }
+  │                        ^
+  │
+  = required by instantiating type parameter `T:copy` of struct `S`
+
+error: type `T` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_generic_in_field.move:10:24
+   │
+ 7 │     struct A<T: copy> has copy { a: T }
+   │              - declaration of type parameter `T`
+   ·
+10 │         data: vector<A<T>>
+   │                        ^
+   │
+   = required by instantiating type parameter `T:copy` of struct `A`

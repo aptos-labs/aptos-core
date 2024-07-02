@@ -8,7 +8,7 @@ use crate::{
 use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
-use move_vm_runtime::session::LoadedFunctionInstantiation;
+use move_vm_runtime::LoadedFunction;
 
 /// Based on the function attributes in the module metadata, determine whether a
 /// function is a view function.
@@ -32,11 +32,11 @@ pub(crate) fn validate_view_function(
     session: &mut SessionExt,
     args: Vec<Vec<u8>>,
     fun_name: &IdentStr,
-    fun_inst: &LoadedFunctionInstantiation,
+    func: &LoadedFunction,
     module_metadata: Option<&RuntimeModuleMetadataV1>,
     struct_constructors_feature: bool,
 ) -> PartialVMResult<Vec<Vec<u8>>> {
-    // Must be marked as view function
+    // Must be marked as view function.
     let is_view = determine_is_view(module_metadata, fun_name);
     if !is_view {
         return Err(
@@ -45,8 +45,8 @@ pub(crate) fn validate_view_function(
         );
     }
 
-    // Must return values
-    if fun_inst.return_.is_empty() {
+    // Must return values.
+    if func.return_tys().is_empty() {
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
                 .with_message("view function must return values".to_string()),
@@ -56,9 +56,9 @@ pub(crate) fn validate_view_function(
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,
-        &fun_inst.parameters,
+        func.param_tys(),
         args,
-        &fun_inst.type_arguments,
+        func.ty_args(),
         allowed_structs,
         true,
     )

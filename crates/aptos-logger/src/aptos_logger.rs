@@ -8,7 +8,11 @@
 use crate::{
     counters::{STRUCT_LOG_PARSE_ERROR_COUNT, STRUCT_LOG_QUEUE_ERROR_COUNT},
     logger::Logger,
-    Event, Filter, Key, Level, Metadata,
+    sample,
+    sample::SampleRate,
+    telemetry_log_writer::{TelemetryLog, TelemetryLogWriter},
+    Event, Filter, Key, Level, LevelFilter, Metadata, ERROR_LOG_COUNT, INFO_LOG_COUNT,
+    WARN_LOG_COUNT,
 };
 use aptos_infallible::RwLock;
 use backtrace::Backtrace;
@@ -17,8 +21,8 @@ use once_cell::sync::Lazy;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
-    env, fmt,
-    fmt::Debug,
+    env,
+    fmt::{self, Debug},
     io::{Stdout, Write},
     ops::{Deref, DerefMut},
     str::FromStr,
@@ -485,6 +489,88 @@ enum LoggerServiceEvent {
     Flush(sync::mpsc::SyncSender<()>),
 }
 
+<<<<<<< HEAD
+=======
+/// A service for running a log listener, that will continually export logs through a local printer
+/// or to a `AptosData` for external logging.
+struct LoggerService {
+    receiver: sync::mpsc::Receiver<LoggerServiceEvent>,
+    printer: Option<Box<dyn Writer>>,
+    facade: Arc<AptosData>,
+    remote_tx: Option<channel::mpsc::Sender<TelemetryLog>>,
+}
+
+impl LoggerService {
+    pub fn run(mut self) {
+        let mut telemetry_writer = self.remote_tx.take().map(TelemetryLogWriter::new);
+
+        for event in &self.receiver {
+            match event {
+                LoggerServiceEvent::LogEntry(entry) => {
+                    PROCESSED_STRUCT_LOG_COUNT.inc();
+                    match entry.metadata.level() {
+                        Level::Error => ERROR_LOG_COUNT.inc(),
+                        Level::Warn => WARN_LOG_COUNT.inc(),
+                        Level::Info => INFO_LOG_COUNT.inc(),
+                        _ => {},
+                    }
+
+                    if let Some(printer) = &mut self.printer {
+                        if self
+                            .facade
+                            .filter
+                            .read()
+                            .local_filter
+                            .enabled(&entry.metadata)
+                        {
+                            let s = (self.facade.formatter)(&entry).expect("Unable to format");
+                            printer.write_buferred(s);
+                        }
+                    }
+
+                    if let Some(writer) = &mut telemetry_writer {
+                        if self
+                            .facade
+                            .filter
+                            .read()
+                            .telemetry_filter
+                            .enabled(&entry.metadata)
+                        {
+                            let s = json_format(&entry).expect("Unable to format");
+                            let _ = writer.write(s);
+                        }
+                    }
+                },
+                LoggerServiceEvent::Flush(sender) => {
+                    // Flush is only done on TelemetryLogWriter
+                    if let Some(writer) = &mut telemetry_writer {
+                        if self.facade.enable_telemetry_flush {
+                            match writer.flush() {
+                                Ok(rx) => {
+                                    if let Err(err) = rx.recv_timeout(FLUSH_TIMEOUT) {
+                                        sample!(
+                                            SampleRate::Duration(Duration::from_secs(60)),
+                                            eprintln!("Timed out flushing telemetry: {}", err)
+                                        );
+                                    }
+                                },
+                                Err(err) => {
+                                    sample!(
+                                        SampleRate::Duration(Duration::from_secs(60)),
+                                        eprintln!("Failed to flush telemetry: {}", err)
+                                    );
+                                },
+                            }
+                        }
+                    }
+                    let _ = sender.send(());
+                },
+            }
+        }
+    }
+}
+
+>>>>>>> upstream/main
 /// A trait encapsulating the operations required for writing logs.
 pub trait Writer: Send + Sync {
     /// Write the log.
@@ -595,14 +681,25 @@ fn json_format(entry: &LogEntry) -> Result<String, fmt::Error> {
 
 #[cfg(test)]
 mod tests {
+<<<<<<< HEAD
     use super::LogEntry;
+=======
+    use super::{text_format, AptosData, LogEntry};
+>>>>>>> upstream/main
     use crate::{
         aptos_logger::{json_format, TruncatedLogString},
         debug, error, info,
         logger::Logger,
+<<<<<<< HEAD
         trace, warn, Event, Key, KeyValue, Level, Metadata, Schema, Value, Visitor,
+=======
+        telemetry_log_writer::TelemetryLog,
+        trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
+        Schema, Value, Visitor, Writer,
+>>>>>>> upstream/main
     };
     use chrono::{DateTime, Utc};
+    use futures::StreamExt;
     #[cfg(test)]
     use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
@@ -610,10 +707,34 @@ mod tests {
         env,
         sync::{
             mpsc::{self, Receiver, SyncSender},
-            Arc,
+            Arc, Mutex,
         },
         thread,
+        time::Duration,
     };
+    use tokio::time;
+
+    pub struct MockWriter {
+        pub logs: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl Writer for MockWriter {
+        fn write(&self, log: String) {
+            let mut logs = self.logs.lock().unwrap();
+            logs.push(log);
+        }
+
+        fn write_buferred(&mut self, log: String) {
+            self.write(log);
+        }
+    }
+
+    impl MockWriter {
+        pub fn new() -> (Self, Arc<Mutex<Vec<String>>>) {
+            let logs = Arc::new(Mutex::new(Vec::new()));
+            (Self { logs: logs.clone() }, logs)
+        }
+    }
 
     #[derive(serde::Serialize)]
     #[serde(rename_all = "snake_case")]
@@ -817,6 +938,125 @@ mod tests {
         }
     }
 
+<<<<<<< HEAD
+=======
+    fn new_async_logger() -> (AptosDataBuilder, Arc<AptosData>) {
+        let mut logger_builder = AptosDataBuilder::new();
+        let (remote_log_tx, _) = futures::channel::mpsc::channel(10);
+        let logger = logger_builder
+            .remote_log_tx(remote_log_tx)
+            .is_async(true)
+            .build_logger();
+        (logger_builder, logger)
+    }
+
+    fn new_text_logger() -> (
+        Arc<AptosData>,
+        Arc<Mutex<Vec<String>>>,
+        futures::channel::mpsc::Receiver<TelemetryLog>,
+    ) {
+        let (tx, rx) = futures::channel::mpsc::channel(100);
+        let (mock_writer, logs) = MockWriter::new();
+
+        let logger = AptosDataBuilder::new()
+            .level(Level::Debug)
+            .telemetry_level(Level::Debug)
+            .remote_log_tx(tx)
+            .custom_format(text_format)
+            .printer(Box::new(mock_writer))
+            .is_async(true)
+            .build_logger();
+
+        (logger, logs, rx)
+    }
+
+    #[tokio::test]
+    async fn telemetry_logs_always_json_formatted() {
+        let (logger, local_logs, mut rx) = new_text_logger();
+
+        let metadata = Metadata::new(
+            Level::Info,
+            env!("CARGO_CRATE_NAME"),
+            module_path!(),
+            concat!(file!(), ':', line!()),
+        );
+
+        let event = &Event::new(&metadata, Some(format_args!("This is a log message")), &[]);
+        logger.record(event);
+        logger.flush();
+
+        {
+            let local_logs = local_logs.lock().unwrap();
+            assert!(serde_json::from_str::<JsonValue>(&local_logs[0]).is_err());
+        }
+
+        let timeout_duration = Duration::from_secs(5);
+        if let Ok(Some(TelemetryLog::Log(telemetry_log))) =
+            time::timeout(timeout_duration, rx.next()).await
+        {
+            assert!(
+                serde_json::from_str::<JsonValue>(&telemetry_log).is_ok(),
+                "Telemetry logs not in JSON format: {}",
+                telemetry_log
+            );
+        } else {
+            panic!("Timed out waiting for telemetry log");
+        }
+    }
+
+    #[test]
+    fn test_logger_filter_updater() {
+        let (logger_builder, logger) = new_async_logger();
+        let debug_metadata = &Metadata::new(Level::Debug, "target", "module_path", "source_path");
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug");
+
+        let updater = LoggerFilterUpdater::new(logger.clone(), logger_builder);
+        updater.update_filter();
+
+        assert!(logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug;hyper=off"); // log values should be separated by commas not semicolons.
+        updater.update_filter();
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        std::env::set_var(RUST_LOG_TELEMETRY, "debug,hyper=off"); // log values should be separated by commas not semicolons.
+        updater.update_filter();
+
+        assert!(logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(debug_metadata));
+
+        assert!(!logger
+            .filter
+            .read()
+            .telemetry_filter
+            .enabled(&Metadata::new(
+                Level::Error,
+                "target",
+                "hyper",
+                "source_path"
+            )));
+    }
+
+>>>>>>> upstream/main
     #[test]
     fn test_log_event_truncation() {
         let log_entry = LogEntry::new(

@@ -28,3 +28,6 @@ module 0x8675::M {
         }
     }
 } // end 0x8675::M
+
+
+============ bytecode verification succeeded ========

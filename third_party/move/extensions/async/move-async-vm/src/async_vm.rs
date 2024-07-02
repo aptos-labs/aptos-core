@@ -18,6 +18,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    module_traversal::*,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
@@ -67,10 +68,10 @@ impl AsyncVM {
             .collect();
         Ok(AsyncVM {
             move_vm: MoveVM::new(
-                natives.into_iter().chain(
-                    natives::actor_natives(async_lib_addr, actor_gas_parameters).into_iter(),
-                ),
-            )?,
+                natives
+                    .into_iter()
+                    .chain(natives::actor_natives(async_lib_addr, actor_gas_parameters)),
+            ),
             actor_metadata,
             message_table,
         })
@@ -198,6 +199,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
 
         // Execute the initializer.
         let gas_before = gas_status.remaining_gas();
+        let traversal_storage = TraversalStorage::new();
         let result = self
             .vm_session
             .execute_function_bypass_visibility(
@@ -206,6 +208,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 gas_status,
+                &mut TraversalContext::new(&traversal_storage),
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
@@ -294,9 +297,17 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
 
         // Execute the handler.
         let gas_before = gas_status.remaining_gas();
+        let traversal_storage = TraversalStorage::new();
         let result = self
             .vm_session
-            .execute_function_bypass_visibility(module_id, handler_id, vec![], args, gas_status)
+            .execute_function_bypass_visibility(
+                module_id,
+                handler_id,
+                vec![],
+                args,
+                gas_status,
+                &mut TraversalContext::new(&traversal_storage),
+            )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
 
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwks::rsa::RSA_JWK,
@@ -18,10 +19,10 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct OpenIdSig {
-    /// The decoded bytes of the JWS signature in the JWT (https://datatracker.ietf.org/doc/html/rfc7515#section-3)
+    /// The decoded bytes of the JWS signature in the JWT (<https://datatracker.ietf.org/doc/html/rfc7515#section-3>)
     #[serde(with = "serde_bytes")]
     pub jwt_sig: Vec<u8>,
-    /// The decoded/plaintext JSON payload of the JWT (https://datatracker.ietf.org/doc/html/rfc7519#section-3)
+    /// The decoded/plaintext JSON payload of the JWT (<https://datatracker.ietf.org/doc/html/rfc7519#section-3>)
     pub jwt_payload_json: String,
     /// The name of the key in the claim that maps to the user identifier; e.g., "sub" or "email"
     pub uid_key: String,
@@ -38,7 +39,7 @@ pub struct OpenIdSig {
 impl OpenIdSig {
     /// The size of the blinding factor used to compute the nonce commitment to the EPK and expiration
     /// date. This can be upgraded, if the OAuth nonce reconstruction is upgraded carefully.
-    pub const EPK_BLINDER_NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const EPK_BLINDER_NUM_BYTES: usize = poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR;
 
     /// Verifies an `OpenIdSig` by doing the following checks:
     ///  1. Check that the ephemeral public key lifespan is under MAX_EXPIRY_HORIZON_SECS
@@ -125,7 +126,7 @@ impl OpenIdSig {
             base64url_encode_str(&self.jwt_payload_json),
             base64url_encode_bytes(&self.jwt_sig)
         );
-        rsa_jwk.verify_signature(&jwt_b64)?;
+        rsa_jwk.verify_signature_without_exp_check(&jwt_b64)?;
         Ok(())
     }
 
@@ -135,13 +136,15 @@ impl OpenIdSig {
         epk: &EphemeralPublicKey,
         config: &Configuration,
     ) -> anyhow::Result<String> {
-        let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
+        let mut frs = poseidon_bn254::keyless::pad_and_pack_bytes_to_scalars_with_len(
             epk.to_bytes().as_slice(),
             config.max_commited_epk_bytes as usize,
         )?;
 
         frs.push(Fr::from(exp_timestamp_secs));
-        frs.push(poseidon_bn254::pack_bytes_to_one_scalar(epk_blinder)?);
+        frs.push(poseidon_bn254::keyless::pack_bytes_to_one_scalar(
+            epk_blinder,
+        )?);
 
         let nonce_fr = poseidon_bn254::hash_scalars(frs)?;
         Ok(nonce_fr.to_string())
@@ -179,7 +182,7 @@ pub struct Claims {
 }
 
 impl Claims {
-    fn get_uid_val(&self, uid_key: &String) -> anyhow::Result<String> {
+    pub fn get_uid_val(&self, uid_key: &String) -> anyhow::Result<String> {
         match uid_key.as_str() {
             "email" => {
                 let email_verified = self

@@ -8,10 +8,10 @@ use crate::{
         evm_deriver::{add_attributes_for_evm, derive_for_evm},
     },
     parser::ast::{
-        Attribute, AttributeValue, Attribute_, Attributes, Definition, Exp, Exp_, Function,
-        FunctionBody_, FunctionName, FunctionSignature, LeadingNameAccess_, NameAccessChain,
-        NameAccessChain_, StructDefinition, StructFields, StructName, Type, Type_, Value_, Var,
-        Visibility,
+        Attribute, AttributeValue, Attribute_, Attributes, CallKind, Definition, Exp, Exp_,
+        Function, FunctionBody_, FunctionName, FunctionSignature, LeadingNameAccess_,
+        NameAccessChain, NameAccessChain_, StructDefinition, StructLayout, StructName, Type, Type_,
+        Value_, Var, Visibility,
     },
     shared::{
         known_attributes::{AttributeKind, KnownAttribute},
@@ -163,7 +163,7 @@ pub(crate) fn new_fun(
 }
 
 /// Helper to create a new struct declaration.
-pub(crate) fn new_struct(loc: Loc, name: StructName, fields: StructFields) -> StructDefinition {
+pub(crate) fn new_struct(loc: Loc, name: StructName, layout: StructLayout) -> StructDefinition {
     StructDefinition {
         attributes: vec![sp(
             // #[event]
@@ -174,7 +174,7 @@ pub(crate) fn new_struct(loc: Loc, name: StructName, fields: StructFields) -> St
         abilities: vec![],
         name,
         type_parameters: vec![],
-        fields,
+        layout,
     }
 }
 
@@ -218,7 +218,7 @@ pub(crate) fn new_full_name(
 
 /// Helper to create a call exp.
 pub(crate) fn new_call_exp(loc: Loc, fun: NameAccessChain, args: Vec<Exp>) -> Exp {
-    sp(loc, Exp_::Call(fun, false, None, sp(loc, args)))
+    sp(loc, Exp_::Call(fun, CallKind::Regular, None, sp(loc, args)))
 }
 
 pub(crate) fn new_borrow_exp(loc: Loc, arg: Exp) -> Exp {

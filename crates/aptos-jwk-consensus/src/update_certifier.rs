@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     observation_aggregation::ObservationAggregationState,
@@ -63,7 +64,7 @@ impl TUpdateCertifier for UpdateCertifier {
         };
         let agg_state = Arc::new(ObservationAggregationState::new(epoch_state, payload));
         let task = async move {
-            let qc_update = rb.broadcast(req, agg_state).await;
+            let qc_update = rb.broadcast(req, agg_state).await.expect("cannot fail");
             info!(
                 epoch = epoch,
                 issuer = String::from_utf8(issuer.clone()).ok(),

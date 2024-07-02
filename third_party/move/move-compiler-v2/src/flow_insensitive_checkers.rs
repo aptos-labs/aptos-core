@@ -11,8 +11,9 @@ use move_model::{
     ast::{ExpData, TempIndex, VisitorPosition},
     model::{GlobalEnv, Loc, NodeId, Parameter},
     symbol::Symbol,
+    well_known,
 };
-use std::{collections::BTreeSet, iter::Iterator};
+use std::{collections::BTreeSet, fmt, fmt::Formatter, iter::Iterator};
 
 /// Warns about all parameters and local variables that are unused.
 pub fn check_for_unused_vars_and_params(env: &mut GlobalEnv) {
@@ -32,6 +33,25 @@ fn find_unused_params_and_vars(env: &GlobalEnv, params: &[Parameter], exp: &ExpD
     let mut visitor = SymbolVisitor::new(env, params);
     exp.visit_positions(&mut |position, exp_data| visitor.entry(position, exp_data));
     visitor.check_parameter_usage();
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum UsageKind {
+    Parameter,
+    RangeParameter,
+    LocalVar,
+    Lambda,
+}
+
+impl fmt::Display for UsageKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            UsageKind::Parameter => "parameter",
+            UsageKind::RangeParameter => "range parameter",
+            UsageKind::LocalVar => "local variable",
+            UsageKind::Lambda => "anonymous function parameter",
+        })
+    }
 }
 
 /// Tracks things of type `V` which are visible from below in a tree, such as free/used variables,
@@ -108,28 +128,36 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                     BeforeBody => self.seen_uses.enter_scope(),
                     Post => {
                         for (id, var) in pat.vars() {
-                            self.node_symbol_decl_visitor(true, &id, &var, "local variable");
+                            self.node_symbol_decl_visitor(true, &id, &var, UsageKind::LocalVar)
                         }
                         self.seen_uses.exit_scope();
                     },
-                    Pre | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                    Pre | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
+                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
                 };
+            },
+            Match(_, _, arms) => match position {
+                BeforeMatchBody(_) => self.seen_uses.enter_scope(),
+                AfterMatchBody(idx) => {
+                    for (id, var) in arms[idx].pattern.vars() {
+                        self.node_symbol_decl_visitor(true, &id, &var, UsageKind::LocalVar)
+                    }
+                    self.seen_uses.exit_scope();
+                },
+                Pre | Post | BeforeBody | MidMutate | BeforeThen | BeforeElse
+                | PreSequenceValue => {},
             },
             Lambda(_, pat, _) => {
                 match position {
                     Pre => self.seen_uses.enter_scope(),
                     Post => {
                         for (id, var) in pat.vars() {
-                            self.node_symbol_decl_visitor(
-                                true,
-                                &id,
-                                &var,
-                                "anonymous function parameter",
-                            );
+                            self.node_symbol_decl_visitor(true, &id, &var, UsageKind::Lambda);
                         }
                         self.seen_uses.exit_scope();
                     },
-                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
+                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
                 };
             },
             Quant(_, _, ranges, ..) => {
@@ -137,11 +165,17 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                     Pre => self.seen_uses.enter_scope(),
                     Post => {
                         for (id, var) in ranges.iter().flat_map(|(pat, _)| pat.vars().into_iter()) {
-                            self.node_symbol_decl_visitor(true, &id, &var, "range parameter");
+                            self.node_symbol_decl_visitor(
+                                true,
+                                &id,
+                                &var,
+                                UsageKind::RangeParameter,
+                            );
                         }
                         self.seen_uses.exit_scope();
                     },
-                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
+                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
                 };
             },
             Assign(_, pat, _) => {
@@ -166,9 +200,14 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
         true // always continue
     }
 
-    fn check_symbol_usage(&mut self, loc: &Loc, sym: &Symbol, kind: &str) {
+    fn check_symbol_usage(&mut self, loc: &Loc, sym: &Symbol, kind: UsageKind) {
         let symbol_pool = self.env.symbol_pool();
-        if !symbol_pool.symbol_starts_with_underscore(*sym) && !self.seen_uses.contains(sym) {
+        let receiver_param_name = symbol_pool.make(well_known::RECEIVER_PARAM_NAME);
+        if !symbol_pool.symbol_starts_with_underscore(*sym)
+            && !self.seen_uses.contains(sym)
+            // The `self` parameter is exempted from the check
+            && (sym != &receiver_param_name || kind != UsageKind::Parameter)
+        {
             let msg = format!(
                 "Unused {} `{}`. Consider removing or prefixing with an underscore: `_{}`",
                 kind,
@@ -181,11 +220,11 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
 
     fn check_parameter_usage(&mut self) {
         for Parameter(sym, _atype, loc) in self.params.iter() {
-            self.check_symbol_usage(loc, sym, "parameter");
+            self.check_symbol_usage(loc, sym, UsageKind::Parameter);
         }
     }
 
-    fn node_symbol_decl_visitor(&mut self, post: bool, id: &NodeId, sym: &Symbol, kind: &str) {
+    fn node_symbol_decl_visitor(&mut self, post: bool, id: &NodeId, sym: &Symbol, kind: UsageKind) {
         if post {
             let loc = self.env.get_node_loc(*id);
             self.check_symbol_usage(&loc, sym, kind);

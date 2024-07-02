@@ -14,7 +14,6 @@ use aptos_rest_client::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_state::AccountState,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         EntryFunction, ExecutionStatus::MiscellaneousError, Transaction, TransactionInfo,
@@ -23,7 +22,7 @@ use aptos_types::{
 };
 use async_recursion::async_recursion;
 use move_core_types::language_storage::ModuleId;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 pub struct RestDebuggerInterface(Client);
 
@@ -197,24 +196,6 @@ async fn check_and_obtain_source_code(
 
 #[async_trait::async_trait]
 impl AptosValidatorInterface for RestDebuggerInterface {
-    async fn get_account_state_by_version(
-        &self,
-        account: AccountAddress,
-        version: Version,
-    ) -> Result<Option<AccountState>> {
-        let resource = self
-            .0
-            .get_account_resources_at_version_bcs(account, version)
-            .await
-            .map_err(|err| anyhow!("Failed to get account states: {:?}", err))?
-            .into_inner()
-            .into_iter()
-            .map(|(key, value)| (key.access_vector(), value))
-            .collect::<BTreeMap<_, _>>();
-
-        Ok(Some(AccountState::new(account, resource)))
-    }
-
     async fn get_state_value_by_version(
         &self,
         state_key: &StateKey,
@@ -362,7 +343,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         return Ok(txns);
     }
 
-    async fn get_latest_version(&self) -> Result<Version> {
+    async fn get_latest_ledger_info_version(&self) -> Result<Version> {
         Ok(self.0.get_ledger_information().await?.into_inner().version)
     }
 

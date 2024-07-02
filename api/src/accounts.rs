@@ -19,15 +19,12 @@ use aptos_api_types::{
     MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
 };
 use aptos_types::{
-    access_path::AccessPath,
     account_config::{AccountResource, ObjectGroupResource},
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
-    resolver::MoveResolver,
 };
 use poem_openapi::{
     param::{Path, Query},
@@ -269,16 +266,14 @@ impl Account {
     }
 
     pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
-        let state_key = StateKey::access_path(
-            AccessPath::resource_access_path(self.address.into(), AccountResource::struct_tag())
-                .map_err(|e| {
-                    BasicErrorWith404::internal_with_code(
-                        e,
-                        AptosErrorCode::InternalError,
-                        &self.latest_ledger_info,
-                    )
-                })?,
-        );
+        let state_key =
+            StateKey::resource_typed::<AccountResource>(self.address.inner()).map_err(|e| {
+                BasicErrorWith404::internal_with_code(
+                    e,
+                    AptosErrorCode::InternalError,
+                    &self.latest_ledger_info,
+                )
+            })?;
 
         let state_value = self.context.get_state_value_poem(
             &state_key,
@@ -298,10 +293,8 @@ impl Account {
             return Ok(());
         }
 
-        let state_key = StateKey::access_path(AccessPath::resource_group_access_path(
-            self.address.into(),
-            ObjectGroupResource::struct_tag(),
-        ));
+        let state_key =
+            StateKey::resource_group(&self.address.into(), &ObjectGroupResource::struct_tag());
 
         let state_value = self.context.get_state_value_poem(
             &state_key,
@@ -360,12 +353,9 @@ impl Account {
                 let state_view = self
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
-                let converted_resources = state_view
-                    .as_move_resolver()
-                    .as_converter(
-                        self.context.db.clone(),
-                        self.context.table_info_reader.clone(),
-                    )
+                let converter = state_view
+                    .as_converter(self.context.db.clone(), self.context.indexer_reader.clone());
+                let converted_resources = converter
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
                     .map_err(|err| {
@@ -539,10 +529,10 @@ impl Account {
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
-        let resolver = state_view.as_move_resolver();
 
-        let bytes = resolver
-            .get_resource(&self.address.into(), resource_type)
+        let bytes = state_view
+            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
+            .find_resource(&state_view, self.address, resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
                 resource_type, self.address
@@ -558,11 +548,8 @@ impl Account {
                 resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
             })?;
 
-        resolver
-            .as_converter(
-                self.context.db.clone(),
-                self.context.table_info_reader.clone(),
-            )
+        state_view
+            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
             .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {

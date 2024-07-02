@@ -87,12 +87,10 @@ impl BasicApi {
         let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
 
         // If we have a duration, check that it's close to the current time, otherwise it's ok
-        if let Some(duration) = duration_secs.0 {
-            let timestamp = ledger_info.timestamp();
-
-            let timestamp = Duration::from_micros(timestamp);
-            let expectation = SystemTime::now()
-                .sub(Duration::from_secs(duration as u64))
+        if let Some(max_skew) = duration_secs.0 {
+            let ledger_timestamp = Duration::from_micros(ledger_info.timestamp());
+            let skew_threshold = SystemTime::now()
+                .sub(Duration::from_secs(max_skew as u64))
                 .duration_since(UNIX_EPOCH)
                 .context("Failed to determine absolute unix time based on given duration")
                 .map_err(|err| {
@@ -103,9 +101,9 @@ impl BasicApi {
                     )
                 })?;
 
-            if timestamp < expectation {
+            if ledger_timestamp < skew_threshold {
                 return Err(HealthCheckError::service_unavailable_with_code(
-                    "The latest ledger info timestamp is less than the expected timestamp",
+                    format!("The latest ledger info timestamp is {:?}, which is beyond the allowed skew ({}s).", ledger_timestamp, max_skew),
                     AptosErrorCode::HealthCheckFailed,
                     &ledger_info,
                 ));

@@ -8,7 +8,7 @@ use crate::pipeline::{
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
-    unreachable_code_analysis::UnreachableCodeProcessor,
+    unreachable_code_analysis::UnreachableCodeProcessor, variable_coalescing::VariableCoalescing,
 };
 use move_stackless_bytecode::function_target::FunctionTarget;
 
@@ -23,6 +23,7 @@ pub mod split_critical_edges_processor;
 pub mod uninitialized_use_checker;
 pub mod unreachable_code_analysis;
 pub mod unreachable_code_remover;
+pub mod unused_assignment_checker;
 pub mod variable_coalescing;
 pub mod visibility_checker;
 
@@ -36,4 +37,5 @@ pub fn register_formatters(target: &FunctionTarget) {
     AvailCopiesAnalysisProcessor::register_formatters(target);
     UninitializedUseChecker::register_formatters(target);
     UnreachableCodeProcessor::register_formatters(target);
+    VariableCoalescing::register_formatters(target);
 }

@@ -1,230 +1,205 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId};
-use aptos_framework::natives::{
-    aggregator_natives::NativeAggregatorContext,
-    code::NativeCodeContext,
-    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
-    event::NativeEventContext,
-    randomness::RandomnessContext,
-    state_storage::NativeStateStorageContext,
-    transaction_context::NativeTransactionContext,
+use crate::{
+    move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId},
+    natives::aptos_natives_with_builder,
 };
+use aptos_crypto::HashValue;
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{
+    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_native_interface::SafeNativeBuilder;
-use aptos_table_natives::NativeTableContext;
-use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::{
-    deserializer::DeserializerConfig,
-    errors::VMResult,
-    file_format_common,
-    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
+use aptos_types::{
+    chain_id::ChainId,
+    on_chain_config::{FeatureFlag, Features, TimedFeaturesBuilder},
+    transaction::user_transaction_context::UserTransactionContext,
+    vm::configs::aptos_prod_vm_config,
 };
-use move_bytecode_verifier::VerifierConfig;
-use move_vm_runtime::{
-    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+use aptos_vm_types::{
+    environment::{aptos_default_ty_builder, aptos_prod_ty_builder, Environment},
+    storage::change_set_configs::ChangeSetConfigs,
 };
-use std::ops::Deref;
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use std::{ops::Deref, sync::Arc};
 
-pub struct MoveVmExt {
-    inner: MoveVM,
-    chain_id: u8,
+/// MoveVM wrapper which is used to run genesis initializations. Designed as a
+/// stand-alone struct to ensure all genesis configurations are in one place,
+/// and are modified accordingly. The VM is initialized with default parameters,
+/// and should only be used to run genesis sessions.
+pub struct GenesisMoveVM {
+    vm: MoveVM,
+    chain_id: ChainId,
     features: Features,
 }
 
-pub fn get_max_binary_format_version(
-    features: &Features,
-    gas_feature_version_opt: Option<u64>,
-) -> u32 {
-    // For historical reasons, we support still < gas version 5, but if a new caller don't specify
-    // the gas version, we default to 5, which was introduced in late '22.
-    let gas_feature_version = gas_feature_version_opt.unwrap_or(5);
-    if gas_feature_version < 5 {
-        file_format_common::VERSION_5
-    } else if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
-        file_format_common::VERSION_7
-    } else if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-        file_format_common::VERSION_6
-    } else {
-        file_format_common::VERSION_5
+impl GenesisMoveVM {
+    pub fn new(chain_id: ChainId) -> Self {
+        let features = Features::default();
+        let timed_features = TimedFeaturesBuilder::enable_all().build();
+
+        // Genesis runs sessions, where there is no concept of block execution.
+        // Hence, delayed fields are not enabled.
+        let delayed_field_optimization_enabled = false;
+        let vm_config = aptos_prod_vm_config(
+            &features,
+            &timed_features,
+            delayed_field_optimization_enabled,
+            aptos_default_ty_builder(&features),
+        );
+
+        // All genesis sessions run with unmetered gas meter, and here we set
+        // the gas parameters for natives as zeros (because they do not matter).
+        let mut native_builder = SafeNativeBuilder::new(
+            LATEST_GAS_FEATURE_VERSION,
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
+            timed_features.clone(),
+            features.clone(),
+            None,
+        );
+
+        let vm = MoveVM::new_with_config(
+            aptos_natives_with_builder(&mut native_builder),
+            vm_config.clone(),
+        );
+
+        Self {
+            vm,
+            chain_id,
+            features,
+        }
+    }
+
+    pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {
+        // Because genesis sessions are not metered, there are no change set
+        // (storage) costs as well.
+        ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
+    }
+
+    pub fn new_genesis_session<'r, R: AptosMoveResolver>(
+        &self,
+        resolver: &'r R,
+        genesis_id: HashValue,
+    ) -> SessionExt<'r, '_> {
+        let session_id = SessionId::genesis(genesis_id);
+        SessionExt::new(
+            session_id,
+            &self.vm,
+            self.chain_id,
+            &self.features,
+            None,
+            resolver,
+        )
     }
 }
 
-pub fn get_max_identifier_size(features: &Features) -> u64 {
-    if features.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
-        IDENTIFIER_SIZE_MAX
-    } else {
-        LEGACY_IDENTIFIER_SIZE_MAX
-    }
+pub struct MoveVmExt {
+    inner: MoveVM,
+    pub(crate) env: Arc<Environment>,
 }
 
 impl MoveVmExt {
-    fn new_impl<F>(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
+    fn new_impl(
         gas_feature_version: u64,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
-        gas_hook: Option<F>,
+        gas_params: Result<&AptosGasParameters, &String>,
+        env: Arc<Environment>,
+        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self>
-    where
-        F: Fn(DynamicExpression) + Send + Sync + 'static,
-    {
-        // Note: binary format v6 adds a few new integer types and their corresponding instructions.
-        //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
-        //       the gas schedule hasn't been updated yet.
-        let max_binary_format_version =
-            get_max_binary_format_version(&features, Some(gas_feature_version));
+    ) -> Self {
+        // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
+        //            This only happens in a edge case that is probably related to write set transactions or genesis,
+        //            which logically speaking, shouldn't be handled by the VM at all.
+        //            We should clean up the logic here once we get that refactored.
+        let (native_gas_params, misc_gas_params, ty_builder) = match gas_params {
+            Ok(gas_params) => {
+                let ty_builder =
+                    aptos_prod_ty_builder(env.features(), gas_feature_version, gas_params);
+                (
+                    gas_params.natives.clone(),
+                    gas_params.vm.misc.clone(),
+                    ty_builder,
+                )
+            },
+            Err(_) => {
+                let ty_builder = aptos_default_ty_builder(env.features());
+                (
+                    NativeGasParameters::zeros(),
+                    MiscGasParameters::zeros(),
+                    ty_builder,
+                )
+            },
+        };
 
-        let max_identifier_size = get_max_identifier_size(&features);
-
-        let enable_invariant_violation_check_in_swap_loc =
-            !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
-        let type_size_limit = true;
-
-        let verifier_config = verifier_config(&features, &timed_features);
-
-        let mut type_max_cost = 0;
-        let mut type_base_cost = 0;
-        let mut type_byte_cost = 0;
-        if timed_features.is_enabled(TimedFeatureFlag::LimitTypeTagSize) {
-            // 5000 limits type tag total size < 5000 bytes and < 50 nodes
-            type_max_cost = 5000;
-            type_base_cost = 100;
-            type_byte_cost = 1;
-        }
-
-        let mut builder = SafeNativeBuilder::new(
+        let builder = SafeNativeBuilder::new(
             gas_feature_version,
-            native_gas_params.clone(),
-            misc_gas_params.clone(),
-            timed_features.clone(),
-            features.clone(),
+            native_gas_params,
+            misc_gas_params,
+            env.timed_features().clone(),
+            env.features().clone(),
+            gas_hook,
         );
 
-        if let Some(hook) = gas_hook {
-            builder.set_gas_hook(hook);
-        }
+        // TODO(George): Move gas configs to environment to avoid this clone!
+        let vm_config = VMConfig {
+            verifier_config: env.vm_config().verifier_config.clone(),
+            deserializer_config: env.vm_config().deserializer_config.clone(),
+            paranoid_type_checks: env.vm_config().paranoid_type_checks,
+            check_invariant_in_swap_loc: env.vm_config().check_invariant_in_swap_loc,
+            max_value_nest_depth: env.vm_config().max_value_nest_depth,
+            type_max_cost: env.vm_config().type_max_cost,
+            type_base_cost: env.vm_config().type_base_cost,
+            type_byte_cost: env.vm_config().type_byte_cost,
+            delayed_field_optimization_enabled: env.vm_config().delayed_field_optimization_enabled,
+            ty_builder,
+        };
 
-        Ok(Self {
+        Self {
             inner: WarmVmCache::get_warm_vm(
                 builder,
-                VMConfig {
-                    verifier: verifier_config,
-                    deserializer_config: DeserializerConfig::new(
-                        max_binary_format_version,
-                        max_identifier_size,
-                    ),
-                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
-                    enable_invariant_violation_check_in_swap_loc,
-                    type_size_limit,
-                    max_value_nest_depth: Some(128),
-                    type_max_cost,
-                    type_base_cost,
-                    type_byte_cost,
-                    aggregator_v2_type_tagging,
-                },
+                vm_config,
                 resolver,
-            )?,
-            chain_id,
-            features,
-        })
+                env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+            )
+            .expect("should be able to create Move VM; check if there are duplicated natives"),
+            env,
+        }
     }
 
     pub fn new(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
+        gas_params: Result<&AptosGasParameters, &String>,
+        env: Arc<Environment>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self> {
-        Self::new_impl::<fn(DynamicExpression)>(
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-            chain_id,
-            features,
-            timed_features,
-            None,
-            resolver,
-            aggregator_v2_type_tagging,
-        )
+    ) -> Self {
+        Self::new_impl(gas_feature_version, gas_params, env, None, resolver)
     }
 
-    pub fn new_with_gas_hook<F>(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
+    pub fn new_with_gas_hook(
         gas_feature_version: u64,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
-        gas_hook: Option<F>,
+        gas_params: Result<&AptosGasParameters, &String>,
+        env: Arc<Environment>,
+        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self>
-    where
-        F: Fn(DynamicExpression) + Send + Sync + 'static,
-    {
-        Self::new_impl(
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-            chain_id,
-            features,
-            timed_features,
-            gas_hook,
-            resolver,
-            aggregator_v2_type_tagging,
-        )
+    ) -> Self {
+        Self::new_impl(gas_feature_version, gas_params, env, gas_hook, resolver)
     }
 
-    pub fn new_session<'r, S: AptosMoveResolver>(
+    pub fn new_session<'r, R: AptosMoveResolver>(
         &self,
-        resolver: &'r S,
+        resolver: &'r R,
         session_id: SessionId,
+        maybe_user_transaction_context: Option<UserTransactionContext>,
     ) -> SessionExt<'r, '_> {
-        let mut extensions = NativeContextExtensions::default();
-        let txn_hash: [u8; 32] = session_id
-            .as_uuid()
-            .to_vec()
-            .try_into()
-            .expect("HashValue should convert to [u8; 32]");
-
-        extensions.add(NativeTableContext::new(txn_hash, resolver));
-        extensions.add(NativeRistrettoPointContext::new());
-        extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(txn_hash, resolver, resolver));
-        extensions.add(RandomnessContext::new());
-        extensions.add(NativeTransactionContext::new(
-            txn_hash.to_vec(),
-            session_id.into_script_hash(),
-            self.chain_id,
-        ));
-        extensions.add(NativeCodeContext::default());
-        extensions.add(NativeStateStorageContext::new(resolver));
-        extensions.add(NativeEventContext::default());
-
-        // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
-        // cache needs to be flushed to work around those bugs.
-        self.inner.flush_loader_cache_if_invalidated();
-
         SessionExt::new(
-            self.inner.new_session_with_extensions(resolver, extensions),
+            session_id,
+            &self.inner,
+            self.env.chain_id(),
+            self.env.features(),
+            maybe_user_transaction_context,
             resolver,
-            self.features.is_storage_slot_metadata_enabled(),
         )
-    }
-
-    pub(crate) fn features(&self) -> &Features {
-        &self.features
     }
 }
 
@@ -233,29 +208,5 @@ impl Deref for MoveVmExt {
 
     fn deref(&self) -> &Self::Target {
         &self.inner
-    }
-}
-
-pub fn verifier_config(features: &Features, _timed_features: &TimedFeatures) -> VerifierConfig {
-    VerifierConfig {
-        max_loop_depth: Some(5),
-        max_generic_instantiation_length: Some(32),
-        max_function_parameters: Some(128),
-        max_basic_blocks: Some(1024),
-        max_value_stack_size: 1024,
-        max_type_nodes: Some(256),
-        max_dependency_depth: Some(256),
-        max_push_size: Some(10000),
-        max_struct_definitions: None,
-        max_fields_in_struct: None,
-        max_function_definitions: None,
-        max_back_edges_per_function: None,
-        max_back_edges_per_module: None,
-        max_basic_blocks_in_script: None,
-        max_per_fun_meter_units: Some(1000 * 80000),
-        max_per_mod_meter_units: Some(1000 * 80000),
-        use_signature_checker_v2: features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2),
-        sig_checker_v2_fix_script_ty_param_count: features
-            .is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX),
     }
 }

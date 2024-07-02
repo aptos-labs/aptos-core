@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account_minter;
+pub mod local_account_generator;
 pub mod stats;
 pub mod submission_worker;
 pub mod transaction_executor;
 
 use crate::emitter::{
-    account_minter::{gen_reusable_accounts, AccountMinter, SourceAccountManager},
+    account_minter::{AccountMinter, SourceAccountManager},
+    local_account_generator::{create_account_generator, LocalAccountGenerator},
     stats::{DynamicStatsTracking, TxnStats},
     submission_worker::SubmissionWorker,
     transaction_executor::RestApiReliableTransactionSubmitter,
@@ -15,7 +17,7 @@ use crate::emitter::{
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -23,7 +25,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, ReliableTransactionSubmitter, TransactionType,
+    create_txn_generator_creator, AccountType, ReliableTransactionSubmitter, TransactionType,
 };
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
@@ -45,6 +47,10 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 const MAX_TXNS: u64 = 1_000_000_000;
 
 const MAX_RETRIES: usize = 12;
+
+// TODO Transfer cost increases during Coin => FA migration, we can reduce back later.
+const EXPECTED_GAS_PER_TRANSFER: u64 = 10;
+const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 2000 + 8;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -141,7 +147,7 @@ pub struct EmitJobRequest {
     mode: EmitJobMode,
 
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
-
+    account_type: AccountType,
     max_gas_per_txn: u64,
     init_max_gas_per_txn: Option<u64>,
 
@@ -181,6 +187,7 @@ impl Default for EmitJobRequest {
                 mempool_backlog: 3000,
             },
             transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
+            account_type: AccountType::Local,
             max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             init_max_gas_per_txn: None,
@@ -193,8 +200,8 @@ impl Default for EmitJobRequest {
             num_accounts_mode: NumAccountsMode::TransactionsPerAccount(20),
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: None,
-            expected_gas_per_transfer: 7,
-            expected_gas_per_account_create: 2000 + 5,
+            expected_gas_per_transfer: EXPECTED_GAS_PER_TRANSFER,
+            expected_gas_per_account_create: EXPECTED_GAS_PER_ACCOUNT_CREATE,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
             latency_polling_interval: Duration::from_millis(300),
@@ -274,6 +281,11 @@ impl EmitJobRequest {
         transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
     ) -> Self {
         self.transaction_mix_per_phase = transaction_mix_per_phase;
+        self
+    }
+
+    pub fn account_type(mut self, account_type: AccountType) -> Self {
+        self.account_type = account_type;
         self
     }
 
@@ -452,7 +464,7 @@ impl EmitJobRequest {
                 };
 
                 info!(
-                    " Transaction emitter targetting {} TPS, expecting {} TPS",
+                    " Transaction emitter targeting {} TPS, expecting {} TPS",
                     tps,
                     num_accounts * transactions_per_account / wait_seconds as usize
                 );
@@ -637,7 +649,7 @@ impl EmitJob {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TxnEmitter {
     txn_factory: TransactionFactory,
     rng: StdRng,
@@ -661,7 +673,7 @@ impl TxnEmitter {
 
     pub async fn start_job(
         &mut self,
-        root_account: &LocalAccount,
+        root_account: Arc<LocalAccount>,
         req: EmitJobRequest,
         stats_tracking_phases: usize,
     ) -> Result<EmitJob> {
@@ -693,9 +705,12 @@ impl TxnEmitter {
             usize::try_from(init_expiration_time / req.init_retry_interval.as_secs()).unwrap();
         let seed = req.account_minter_seed.unwrap_or_else(|| self.rng.gen());
 
+        let account_generator = create_account_generator(req.account_type);
+
         let mut all_accounts = create_accounts(
-            root_account,
+            root_account.clone(),
             &init_txn_factory,
+            account_generator,
             &req,
             mode_params.max_submit_batch_size,
             req.skip_minting_accounts,
@@ -715,7 +730,7 @@ impl TxnEmitter {
             retry_after: req.init_retry_interval,
         };
         let source_account_manager = SourceAccountManager {
-            source_account: root_account,
+            source_account: root_account.clone(),
             txn_executor: &txn_executor,
             req: &req,
             txn_factory: init_txn_factory.clone(),
@@ -804,7 +819,7 @@ impl TxnEmitter {
 
     async fn emit_txn_for_impl(
         mut self,
-        source_account: &LocalAccount,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         print_stats_interval: Option<u64>,
@@ -840,7 +855,7 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for(
         self,
-        source_account: &mut LocalAccount,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
@@ -850,7 +865,7 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for_with_stats(
         self,
-        source_account: &LocalAccount,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         interval_secs: u64,
@@ -967,78 +982,6 @@ async fn wait_for_accounts_sequence(
     (latest_fetched_counts, sum_of_completion_timestamps_millis)
 }
 
-fn update_seq_num_and_get_num_expired(
-    accounts: &mut [LocalAccount],
-    account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
-    latest_fetched_counts: HashMap<AccountAddress, u64>,
-) -> (usize, usize) {
-    accounts.iter_mut().for_each(|account| {
-        let (start_seq_num, end_seq_num) =
-            if let Some(pair) = account_to_start_and_end_seq_num.get(&account.address()) {
-                pair
-            } else {
-                return;
-            };
-        assert!(account.sequence_number() == *end_seq_num);
-
-        match latest_fetched_counts.get(&account.address()) {
-            Some(count) => {
-                if *count != account.sequence_number() {
-                    assert!(account.sequence_number() > *count);
-                    debug!(
-                        "Stale sequence_number for {}, expected {}, setting to {}",
-                        account.address(),
-                        account.sequence_number(),
-                        count
-                    );
-                    account.set_sequence_number(*count);
-                }
-            },
-            None => {
-                debug!(
-                    "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
-                    account.address(),
-                    account.sequence_number(),
-                    start_seq_num
-                );
-                account.set_sequence_number(*start_seq_num);
-            },
-        }
-    });
-
-    account_to_start_and_end_seq_num
-        .iter()
-        .map(
-            |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
-                Some(count) => {
-                    assert!(
-                        *count <= *end_seq_num,
-                        "{address} :: {count} > {end_seq_num}"
-                    );
-                    if *count >= *start_seq_num {
-                        (
-                            (*count - *start_seq_num) as usize,
-                            (*end_seq_num - *count) as usize,
-                        )
-                    } else {
-                        debug!(
-                            "Stale sequence_number fetched for {}, start_seq_num {}, fetched {}",
-                            address, start_seq_num, *count
-                        );
-                        (0, (*end_seq_num - *start_seq_num) as usize)
-                    }
-                },
-                None => (0, (end_seq_num - start_seq_num) as usize),
-            },
-        )
-        .fold(
-            (0, 0),
-            |(committed, expired), (cur_committed, cur_expired)| {
-                (committed + cur_committed, expired + cur_expired)
-            },
-        )
-}
-
 pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
     Ok(query_sequence_numbers(client, [address].iter()).await?.0[0].1)
 }
@@ -1118,8 +1061,9 @@ pub fn parse_seed(seed_string: &str) -> [u8; 32] {
 }
 
 pub async fn create_accounts(
-    root_account: &LocalAccount,
+    root_account: Arc<LocalAccount>,
     txn_factory: &TransactionFactory,
+    account_generator: Box<dyn LocalAccountGenerator>,
     req: &EmitJobRequest,
     max_submit_batch_size: usize,
     skip_minting_accounts: bool,
@@ -1151,7 +1095,10 @@ pub async fn create_accounts(
 
     let mut rng = StdRng::from_seed(seed);
 
-    let accounts = gen_reusable_accounts(&txn_executor, num_accounts, &mut rng).await?;
+    let accounts = account_generator
+        .gen_local_accounts(&txn_executor, num_accounts, &mut rng)
+        .await?;
+
     info!("Generated re-usable accounts for seed {:?}", seed);
 
     let all_accounts_already_exist = accounts.iter().all(|account| account.sequence_number() > 0);
@@ -1170,7 +1117,13 @@ pub async fn create_accounts(
     if !skip_minting_accounts {
         let accounts: Vec<_> = accounts.into_iter().map(Arc::new).collect();
         account_minter
-            .create_and_fund_accounts(&txn_executor, req, max_submit_batch_size, accounts.clone())
+            .create_and_fund_accounts(
+                &txn_executor,
+                req,
+                account_generator,
+                max_submit_batch_size,
+                accounts.clone(),
+            )
             .await?;
         let accounts: Vec<_> = accounts
             .into_iter()

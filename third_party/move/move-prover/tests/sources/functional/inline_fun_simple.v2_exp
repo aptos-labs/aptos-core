@@ -1,0 +1,36 @@
+Move prover returns: exiting with verification errors
+warning: Unused assignment to `r1`. Consider removing or prefixing with an underscore: `_r1`
+   ┌─ tests/sources/functional/inline_fun_simple.move:10:32
+   │
+10 │         let r1 = apply(42, |v| v >= 1);
+   │                                ^^^^^^
+
+warning: Unused assignment to `r2`. Consider removing or prefixing with an underscore: `_r2`
+   ┌─ tests/sources/functional/inline_fun_simple.move:15:32
+   │
+15 │         let r2 = apply(43, |v| v <= 2);
+   │                                ^^^^^^
+
+warning: Unused assignment to `r1`. Consider removing or prefixing with an underscore: `_r1`
+   ┌─ tests/sources/functional/inline_fun_simple.move:22:32
+   │
+22 │         let r1 = apply(42, |v| v >= 1);
+   │                                ^^^^^^
+
+warning: Unused assignment to `r2`. Consider removing or prefixing with an underscore: `_r2`
+   ┌─ tests/sources/functional/inline_fun_simple.move:27:31
+   │
+27 │         let r2 = apply(3, |v| v <= 2);
+   │                               ^^^^^^
+
+error: unknown assertion failed
+  ┌─ tests/sources/functional/inline_fun_simple.move:4:13
+  │
+4 │             assert v >= 42;
+  │             ^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/inline_fun_simple.move:4: apply
+  =     at tests/sources/functional/inline_fun_simple.move:22: test_apply_error
+  =         r1 = <redacted>
+  =     at tests/sources/functional/inline_fun_simple.move:24: test_apply_error
+  =     at tests/sources/functional/inline_fun_simple.move:4: apply

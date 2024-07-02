@@ -49,7 +49,7 @@ jobs:
   # be compatible in production.
   run-tests-main:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
-    runs-on: high-perf-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v3
         if: ${{ !inputs.SKIP_JOB }}
@@ -71,4 +71,4 @@ jobs:
         with:
           NETWORK: custom
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}

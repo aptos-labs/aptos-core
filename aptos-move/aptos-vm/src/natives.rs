@@ -85,10 +85,6 @@ impl TDelayedFieldView for AptosBlankStorage {
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        false
-    }
-
     fn get_delayed_field_value(
         &self,
         _id: &Self::Identifier,
@@ -129,7 +125,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         unimplemented!()
     }
 }
@@ -163,6 +159,7 @@ pub fn aptos_natives(
         misc_gas_params,
         timed_features,
         features,
+        None,
     );
 
     aptos_natives_with_builder(&mut builder)
@@ -223,6 +220,7 @@ pub fn configure_for_unit_test() {
 
 #[cfg(feature = "testing")]
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
+    use aptos_framework::natives::object::NativeObjectContext;
     use aptos_table_natives::NativeTableContext;
 
     exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
@@ -231,15 +229,18 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
         vec![1],
         vec![1],
         ChainId::test().id(),
+        None,
     ));
     exts.add(NativeAggregatorContext::new(
         [0; 32],
         &*DUMMY_RESOLVER,
+        false,
         &*DUMMY_RESOLVER,
     ));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
+    exts.add(NativeObjectContext::default());
 
     let mut randomness_ctx = RandomnessContext::new();
     randomness_ctx.mark_unbiasable();

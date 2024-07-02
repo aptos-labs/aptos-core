@@ -23,7 +23,10 @@ aptos-logger = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+fail = { workspace = true }
+futures = { workspace = true }
 itertools = { workspace = true }
+mini-moka = { workspace = true }
 mirai-annotations = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
@@ -38,4 +41,5 @@ serde_json = { workspace = true }
 
 [features]
 default = []
+failpoints = ["fail/failpoints"]
 fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-crypto/fuzzing"]

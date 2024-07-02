@@ -16,6 +16,7 @@
 # fast fail.
 set -eo pipefail
 
+NODE_MAJOR_VERSION=20
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
 KUBECTL_VERSION=1.18.6
@@ -497,6 +498,12 @@ function install_cargo_sort {
   fi
 }
 
+function install_cargo_machete {
+  if ! command -v cargo-machete &>/dev/null; then
+    cargo install cargo-machete --locked
+  fi
+}
+
 function install_cargo_nextest {
   if ! command -v cargo-nextest &>/dev/null; then
     cargo install cargo-nextest --locked
@@ -536,7 +543,7 @@ function install_dotnet {
     # Below we need to (a) set TERM variable because the .net installer expects it and it is not set
     # in some environments (b) use bash not sh because the installer uses bash features.
     # NOTE: use wget to better follow the redirect
-    wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+    wget --tries 10 --retry-connrefused --waitretry=5 https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
     chmod +x dotnet-install.sh
     ./dotnet-install.sh --channel $DOTNET_VERSION --install-dir "${DOTNET_INSTALL_DIR}" --version latest
     rm dotnet-install.sh
@@ -649,9 +656,8 @@ function install_xsltproc {
 
 function install_nodejs {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    # install via nodesource: https://github.com/nodesource/distributions/issues/1709#issuecomment-1788473588
-    NODE_MAJOR=18
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | "${PRE_COMMAND[@]}" tee /etc/apt/sources.list.d/nodesource.list
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" -o nodesource_setup.sh
+    "${PRE_COMMAND[@]}" -E bash nodesource_setup.sh
   fi
   install_pkg nodejs "$PACKAGE_MANAGER"
   install_pkg npm "$PACKAGE_MANAGER"
@@ -1010,6 +1016,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_rustup_components_and_nightly
 
   install_cargo_sort
+  install_cargo_machete
   install_cargo_nextest
   install_grcov
   install_pkg git "$PACKAGE_MANAGER"

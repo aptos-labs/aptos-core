@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: value of type `M::R` does not have the `drop` ability
+  ┌─ tests/ability-check/v1-typing/bind_pop_resource.move:5:13
+  │
+5 │         let _: R = R{};
+  │             ^ implicitly dropped here since it is no longer used
+
+error: local `_r` of type `M::R` does not have the `drop` ability
+  ┌─ tests/ability-check/v1-typing/bind_pop_resource.move:8:21
+  │
+8 │         let _r: R = R{};
+  │                     ^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+  ┌─ tests/ability-check/v1-typing/bind_pop_resource.move:9:14
+  │
+9 │         let (_, _):(R, R) = (R{}, R{});
+  │              ^ implicitly dropped here since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+  ┌─ tests/ability-check/v1-typing/bind_pop_resource.move:9:17
+  │
+9 │         let (_, _):(R, R) = (R{}, R{});
+  │                 ^ implicitly dropped here since it is no longer used

@@ -4,11 +4,11 @@
 use crate::{
     emitter::{
         stats::{DynamicStatsTracking, StatsAccumulator},
-        update_seq_num_and_get_num_expired, wait_for_accounts_sequence,
+        wait_for_accounts_sequence,
     },
     EmitModeParams,
 };
-use aptos_logger::{info, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -25,6 +25,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use rand::seq::IteratorRandom;
 use std::{
+    borrow::Borrow,
     collections::HashMap,
     sync::{atomic::AtomicU64, Arc},
     time::Instant,
@@ -32,7 +33,7 @@ use std::{
 use tokio::time::sleep;
 
 pub struct SubmissionWorker {
-    pub(crate) accounts: Vec<LocalAccount>,
+    pub(crate) accounts: Vec<Arc<LocalAccount>>,
     client: RestClient,
     stop: Arc<AtomicBool>,
     params: EmitModeParams,
@@ -55,6 +56,7 @@ impl SubmissionWorker {
         skip_latency_stats: bool,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
+        let accounts = accounts.into_iter().map(Arc::new).collect();
         Self {
             accounts,
             client,
@@ -200,6 +202,9 @@ impl SubmissionWorker {
         }
 
         self.accounts
+            .into_iter()
+            .map(|account_arc_mutex| Arc::into_inner(account_arc_mutex).unwrap())
+            .collect()
     }
 
     // returns true if it returned early
@@ -243,11 +248,15 @@ impl SubmissionWorker {
             )
             .await;
 
-        let (num_committed, num_expired) = update_seq_num_and_get_num_expired(
-            &mut self.accounts,
-            account_to_start_and_end_seq_num,
-            latest_fetched_counts,
-        );
+        for account in self.accounts.iter_mut() {
+            update_account_seq_num(
+                Arc::get_mut(account).unwrap(),
+                &account_to_start_and_end_seq_num,
+                &latest_fetched_counts,
+            );
+        }
+        let (num_committed, num_expired) =
+            count_committed_expired_stats(account_to_start_and_end_seq_num, latest_fetched_counts);
 
         if num_expired > 0 {
             loop_stats
@@ -268,14 +277,14 @@ impl SubmissionWorker {
         }
 
         if num_committed > 0 {
-            let sum_latency = sum_of_completion_timestamps_millis
-                - (avg_txn_offset_time as u128 * num_committed as u128);
-            let avg_latency = (sum_latency / num_committed as u128) as u64;
             loop_stats
                 .committed
                 .fetch_add(num_committed as u64, Ordering::Relaxed);
 
             if !skip_latency_stats {
+                let sum_latency = sum_of_completion_timestamps_millis
+                    - (avg_txn_offset_time as u128 * num_committed as u128);
+                let avg_latency = (sum_latency / num_committed as u128) as u64;
                 loop_stats
                     .latency
                     .fetch_add(sum_latency as u64, Ordering::Relaxed);
@@ -306,10 +315,85 @@ impl SubmissionWorker {
             .into_iter()
             .flat_map(|account| {
                 self.txn_generator
-                    .generate_transactions(account, self.params.transactions_per_account)
+                    .generate_transactions(account.borrow(), self.params.transactions_per_account)
             })
             .collect()
     }
+}
+
+fn update_account_seq_num(
+    account: &mut LocalAccount,
+    account_to_start_and_end_seq_num: &HashMap<AccountAddress, (u64, u64)>,
+    latest_fetched_counts: &HashMap<AccountAddress, u64>,
+) {
+    let (start_seq_num, end_seq_num) =
+        if let Some(pair) = account_to_start_and_end_seq_num.get(&account.address()) {
+            pair
+        } else {
+            return;
+        };
+    assert!(account.sequence_number() == *end_seq_num);
+
+    match latest_fetched_counts.get(&account.address()) {
+        Some(count) => {
+            if *count != account.sequence_number() {
+                assert!(account.sequence_number() > *count);
+                debug!(
+                    "Stale sequence_number for {}, expected {}, setting to {}",
+                    account.address(),
+                    account.sequence_number(),
+                    count
+                );
+                account.set_sequence_number(*count);
+            }
+        },
+        None => {
+            debug!(
+                "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
+                account.address(),
+                account.sequence_number(),
+                start_seq_num
+            );
+            account.set_sequence_number(*start_seq_num);
+        },
+    }
+}
+
+fn count_committed_expired_stats(
+    account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
+    latest_fetched_counts: HashMap<AccountAddress, u64>,
+) -> (usize, usize) {
+    account_to_start_and_end_seq_num
+        .iter()
+        .map(
+            |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
+                Some(count) => {
+                    assert!(
+                        *count <= *end_seq_num,
+                        "{address} :: {count} > {end_seq_num}"
+                    );
+                    if *count >= *start_seq_num {
+                        (
+                            (*count - *start_seq_num) as usize,
+                            (*end_seq_num - *count) as usize,
+                        )
+                    } else {
+                        debug!(
+                            "Stale sequence_number fetched for {}, start_seq_num {}, fetched {}",
+                            address, start_seq_num, *count
+                        );
+                        (0, (*end_seq_num - *start_seq_num) as usize)
+                    }
+                },
+                None => (0, (end_seq_num - start_seq_num) as usize),
+            },
+        )
+        .fold(
+            (0, 0),
+            |(committed, expired), (cur_committed, cur_expired)| {
+                (committed + cur_committed, expired + cur_expired)
+            },
+        )
 }
 
 pub async fn submit_transactions(

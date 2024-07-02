@@ -1,0 +1,114 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t2 := +($t1, $t3)
+  3: $t1 := infer($t2)
+  4: $t0 := 2
+  5: return $t0
+}
+
+
+Diagnostics:
+warning: Unused assignment to `t`. Consider removing or prefixing with an underscore: `_t`
+  ┌─ tests/variable-coalescing/intermingled_3.move:5:9
+  │
+5 │         t = t + 1;
+  │         ^^^^^^^^^
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t2 := +($t1, $t3)
+  3: $t0 := 2
+  4: return $t0
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars:
+     # events: b:$t1
+  0: $t1 := 1
+     # live vars: $t1
+     # events: b:$t3
+  1: $t3 := 1
+     # live vars: $t1, $t3
+     # events: e:$t1, e:$t2, e:$t3, b:$t2
+  2: $t2 := +($t1, $t3)
+     # live vars:
+     # events: b:$t0
+  3: $t0 := 2
+     # live vars: $t0
+     # events: e:$t0
+  4: return $t0
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t1 := +($t1, $t3)
+  3: $t2 := 2
+  4: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t1 := +($t1, $t3)
+  3: $t2 := 2
+  4: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(): u64 /* def_idx: 0 */ {
+L0:	loc0: u64
+B0:
+	0: LdU64(1)
+	1: LdU64(1)
+	2: Add
+	3: LdU64(2)
+	4: StLoc[0](loc0: u64)
+	5: Pop
+	6: MoveLoc[0](loc0: u64)
+	7: Ret
+}
+}
+============ bytecode verification succeeded ========

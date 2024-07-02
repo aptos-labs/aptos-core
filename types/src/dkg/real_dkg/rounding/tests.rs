@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::dkg::real_dkg::rounding::{
     is_valid_profile, total_weight_lower_bound, total_weight_upper_bound, DKGRounding,
-    DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
+    DKGRoundingProfile, DEFAULT_FAST_PATH_SECRECY_THRESHOLD, DEFAULT_RECONSTRUCT_THRESHOLD,
+    DEFAULT_SECRECY_THRESHOLD,
 };
 use aptos_dkg::pvss::WeightedConfig;
+use claims::assert_le;
 use fixed::types::U64F64;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use std::ops::Deref;
 
 #[test]
@@ -16,10 +19,11 @@ fn compute_mainnet_rounding() {
         &validator_stakes,
         *DEFAULT_SECRECY_THRESHOLD.deref(),
         *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+        Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
     );
-    // println!("mainnet rounding profile: {:?}", dkg_rounding.profile);
+    println!("mainnet rounding profile: {:?}", dkg_rounding.profile);
     // Result:
-    // mainnet rounding profile: total_weight: 437, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.5859020899996102, reconstruct_threshold_in_weights: 237, validator_weights: [10, 1, 9, 9, 1, 1, 9, 9, 1, 7, 8, 5, 2, 1, 9, 7, 1, 2, 1, 9, 2, 1, 1, 9, 1, 8, 10, 1, 1, 9, 1, 1, 1, 7, 9, 1, 1, 9, 1, 9, 1, 3, 1, 8, 1, 1, 7, 10, 3, 2, 1, 9, 1, 9, 1, 3, 8, 1, 10, 1, 1, 1, 9, 3, 8, 8, 3, 10, 1, 1, 7, 9, 2, 5, 2, 9, 9, 1, 4, 1, 1, 1, 1, 1, 2, 10, 1, 1, 9, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 9, 8, 1, 1, 9, 2, 1]
+    // mainnet rounding profile: total_weight: 414, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.60478401144595166257, reconstruct_threshold_in_weights: 228, fast_reconstruct_threshold_in_stake_ratio: Some(0.7714506781126183292), fast_reconstruct_threshold_in_weights: Some(335), validator_weights: [7, 5, 6, 6, 5, 1, 6, 6, 1, 5, 6, 5, 1, 7, 1, 6, 6, 1, 2, 1, 6, 3, 2, 1, 1, 4, 3, 2, 5, 5, 5, 1, 1, 4, 1, 1, 1, 7, 5, 1, 1, 2, 6, 1, 6, 1, 3, 5, 5, 1, 5, 5, 3, 2, 5, 1, 6, 3, 6, 1, 1, 3, 1, 5, 1, 9, 1, 1, 1, 6, 1, 5, 7, 4, 6, 1, 5, 6, 5, 5, 3, 1, 6, 7, 6, 1, 3, 1, 1, 1, 1, 1, 1, 7, 2, 1, 6, 7, 1, 1, 1, 1, 5, 3, 1, 2, 3, 1, 1, 1, 1, 4, 1, 1, 1, 2, 1, 6, 7, 5, 1, 5, 1, 6, 1, 2, 3, 2, 2]
 
     let total_weight_min = total_weight_lower_bound(&validator_stakes);
     let total_weight_max = total_weight_upper_bound(
@@ -44,6 +48,7 @@ fn test_rounding_single_validator() {
         &validator_stakes,
         *DEFAULT_SECRECY_THRESHOLD.deref(),
         *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+        Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
     );
     let wconfig = WeightedConfig::new(1, vec![1]).unwrap();
     assert_eq!(dkg_rounding.wconfig, wconfig);
@@ -60,11 +65,13 @@ fn test_rounding_equal_stakes() {
             &validator_stakes,
             *DEFAULT_SECRECY_THRESHOLD.deref(),
             *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
         );
         let wconfig = WeightedConfig::new(
             (U64F64::from_num(validator_num) * *DEFAULT_SECRECY_THRESHOLD.deref())
                 .ceil()
-                .to_num::<usize>(),
+                .to_num::<usize>()
+                + 1,
             vec![1; validator_num],
         )
         .unwrap();
@@ -86,6 +93,7 @@ fn test_rounding_small_stakes() {
             &validator_stakes,
             *DEFAULT_SECRECY_THRESHOLD.deref(),
             *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
@@ -120,6 +128,7 @@ fn test_rounding_uniform_distribution() {
             &validator_stakes,
             *DEFAULT_SECRECY_THRESHOLD.deref(),
             *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
@@ -167,6 +176,7 @@ fn test_rounding_zipf_distribution() {
             &validator_stakes,
             *DEFAULT_SECRECY_THRESHOLD.deref(),
             *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
@@ -186,117 +196,207 @@ fn test_rounding_zipf_distribution() {
 }
 
 #[cfg(test)]
-pub const MAINNET_STAKES: [u64; 112] = [
-    210500217584363000,
-    19015034427309200,
-    190269409955015000,
-    190372712607660000,
-    13695461583653900,
-    23008441599765600,
-    190710275073260000,
-    190710280752007000,
-    10610983628971600,
-    154224802732739000,
-    175900128414965000,
-    99375343208846800,
-    33975409124588400,
-    10741696639154700,
-    190296758443194000,
-    146931795395201000,
-    17136059081003400,
-    50029051467899600,
-    10610346785890000,
-    190293387423510000,
-    38649607904320700,
-    10599959445206200,
-    10741007619737700,
-    181012458336443000,
-    12476986507395000,
-    162711519739867000,
-    210473652405885000,
-    17652549388174200,
-    10602173827686000,
-    181016968624497000,
-    10741717083802200,
-    10601364932429600,
-    10626550439528100,
-    157588554433899000,
-    190368494070257000,
-    10602102958015200,
-    10659605390935200,
-    190296749885358000,
-    10602246540607000,
-    190691643530347000,
-    10741129232477400,
-    71848511917757900,
-    10741464265442800,
-    167168618455916000,
-    10626776626668800,
-    10899006338732500,
-    154355154034690000,
-    200386024285735000,
-    53519567070710700,
-    49607201233899200,
-    10601653390317000,
-    190575467847849000,
-    16797596395552600,
-    190366710793058000,
-    10602477251277100,
-    62443725129072300,
-    163816210803988000,
-    10610954198660500,
-    201023046191587000,
-    10601464591446000,
-    10609852486777200,
-    10601487012558200,
-    180360219576606000,
-    70316229167094400,
-    163090136300726000,
-    165716856572893000,
-    64007132243756300,
-    210458282376492000,
-    12244035421744000,
-    10601711009001400,
-    156908154902803000,
-    190688831761348000,
-    40078251173380300,
-    110184163534171000,
-    38221801093982600,
-    190373486881563000,
-    191035674729349000,
-    10602120712089200,
-    76636833488874800,
-    10602114283230900,
-    12257823010913900,
-    10741509540453600,
-    10602136737656500,
-    10602078523390900,
-    38222380945714300,
-    210500003057396000,
-    10789031621748400,
-    10741733031173300,
-    183655787790140000,
-    10610791490932400,
-    10602182576946400,
-    10741639855953200,
-    10602203255280800,
-    11938813410693300,
-    10741355256561700,
-    68993421760499900,
-    10610344082022600,
-    25112384536164900,
-    22886710016497000,
-    10602439528909000,
-    10602834493124000,
-    10602101852821800,
-    16812894183934200,
-    46140391561066400,
-    16579223362042600,
-    191035150659780000,
-    169268334324248000,
-    10600667662818000,
-    10625918567828000,
-    180685941615229000,
-    38221788594331900,
-    10516889883063100,
+pub const MAINNET_STAKES: [u64; 129] = [
+    145363920367444000,
+    100779935896493000,
+    134154255721034000,
+    134234783226671000,
+    103686549105772000,
+    23681356495150300,
+    134577645972875000,
+    134580712197205000,
+    10857449995312600,
+    105977831715137000,
+    120872333189108000,
+    102057954967375000,
+    25968006480319300,
+    150210261808047000,
+    11047428320304400,
+    134184685206018000,
+    128117795425337000,
+    12497398680912800,
+    50533200268704000,
+    10856898438192700,
+    134176595090811000,
+    60011869592362800,
+    39694335719301200,
+    12863458468719700,
+    11046541966772300,
+    94427102742955200,
+    58714132394437700,
+    40145680094791300,
+    100137028609146000,
+    111809600151787000,
+    114998912365121000,
+    17951622559336400,
+    10857216258421800,
+    94429160256130900,
+    11047450111666100,
+    10856891072965200,
+    10857020952663600,
+    162161975531451000,
+    104073248041097000,
+    10857355385008300,
+    10901683472171900,
+    50198365896562800,
+    134182311143049000,
+    10857000567453500,
+    134562155405120000,
+    11046814332439800,
+    60322390260321900,
+    101055534219498000,
+    114872371828424000,
+    10929001624435000,
+    106067388838015000,
+    100152796096971000,
+    54964069016926100,
+    34040647636753800,
+    102049697282067000,
+    10856874306102900,
+    134514110645862000,
+    70499650588096400,
+    134224065841861000,
+    10857370648417500,
+    28409091651485400,
+    64302033587393400,
+    16659350234613100,
+    112568696851409000,
+    10857782940276500,
+    200882335168720000,
+    10856846459964200,
+    10856305691600600,
+    10856576121655500,
+    123961368695808000,
+    20275491671732600,
+    112069796227716000,
+    148078356637657000,
+    76893226659146600,
+    135298123702389000,
+    10856788596777500,
+    107821720522194000,
+    134626203055928000,
+    106466193065101000,
+    102103040930732000,
+    62682920098289700,
+    26223235705449200,
+    134234424849999000,
+    150210282994581000,
+    134913703983987000,
+    10857227273097400,
+    57413947132891200,
+    10900450777364100,
+    12022049676664200,
+    11047053887431400,
+    10857590490261700,
+    10857257627847700,
+    26223774458854400,
+    145363467800313000,
+    49332020110088600,
+    11047476999099800,
+    126201751573407000,
+    150458532010203000,
+    10856470759531000,
+    10857203409232300,
+    11047327948099800,
+    10856521489540500,
+    99511242999587700,
+    74202213386306600,
+    11047051193450900,
+    32601393370365500,
+    70855459554627300,
+    10857401127909800,
+    25271130862928600,
+    18684565615586300,
+    10876016328079300,
+    95866473180260000,
+    10857461985291600,
+    10857176446687100,
+    17291414467856800,
+    47528452645556600,
+    17051109168257700,
+    134912746458206000,
+    150461059796590000,
+    116315225160302000,
+    10855453497812600,
+    100865713263752000,
+    10928177475521100,
+    124293961561247000,
+    26223786196810300,
+    39221522777191400,
+    73810826128117800,
+    53685896908423700,
+    40216803848486900,
 ];
+
+#[test]
+fn test_infallible_rounding_with_mainnet() {
+    let profile = DKGRoundingProfile::infallible(
+        &MAINNET_STAKES.to_vec(),
+        *DEFAULT_SECRECY_THRESHOLD,
+        *DEFAULT_RECONSTRUCT_THRESHOLD,
+        Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
+    );
+    println!("profile={:?}", profile);
+}
+
+#[test]
+fn test_infallible_rounding_brute_force() {
+    let mut rng = thread_rng();
+    let two = U64F64::from_num(2);
+    for n in 1..=20 {
+        let n_fixed = U64F64::from_num(n);
+        let n_halved = n_fixed / 2;
+        for _ in 0..10 {
+            let stakes: Vec<u64> = (0..n).map(|_| rng.gen_range(1, 100)).collect();
+            let stake_total = U64F64::from_num(stakes.clone().into_iter().sum::<u64>());
+            let stake_secrecy_threshold = stake_total * *DEFAULT_SECRECY_THRESHOLD;
+            let stake_reconstruct_threshold = stake_total * *DEFAULT_RECONSTRUCT_THRESHOLD;
+            let fast_path_stake_secrecy_threshold =
+                stake_total * *DEFAULT_FAST_PATH_SECRECY_THRESHOLD;
+            let profile = DKGRoundingProfile::infallible(
+                &stakes,
+                *DEFAULT_SECRECY_THRESHOLD,
+                *DEFAULT_RECONSTRUCT_THRESHOLD,
+                Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
+            );
+            println!("n={}, stakes={:?}, profile={:?}", n, stakes, profile);
+            let num_subsets: u64 = 1 << n;
+            let weight_total = U64F64::from_num(profile.validator_weights.iter().sum::<u64>());
+
+            // With default thresholds, weight_total <= (n/2 + 2)/(recon_threshold - secrecy_threshold) + rounding_weight_gain_total <= ceil((n/2 + 2)/(recon_threshold - secrecy_threshold)) + n/2
+            assert_le!(
+                weight_total,
+                ((n_halved + two) / (*DEFAULT_RECONSTRUCT_THRESHOLD - *DEFAULT_SECRECY_THRESHOLD))
+                    .ceil()
+                    + n_halved
+            );
+
+            for subset in 0..num_subsets {
+                let stake_sub_total = U64F64::from(get_sub_total(stakes.as_slice(), subset));
+                let weight_sub_total = get_sub_total(profile.validator_weights.as_slice(), subset);
+                if stake_sub_total <= stake_secrecy_threshold
+                    && weight_sub_total >= profile.reconstruct_threshold_in_weights
+                {
+                    unreachable!();
+                }
+                if stake_sub_total > stake_reconstruct_threshold
+                    && weight_sub_total < profile.reconstruct_threshold_in_weights
+                {
+                    unreachable!();
+                }
+                if stake_sub_total <= fast_path_stake_secrecy_threshold
+                    && weight_sub_total >= profile.fast_reconstruct_threshold_in_weights.unwrap()
+                {
+                    unreachable!();
+                }
+            }
+        }
+    }
+}
+
+fn get_sub_total(vals: &[u64], subset: u64) -> u64 {
+    vals.iter()
+        .enumerate()
+        .map(|(idx, &val)| val * ((subset >> idx) & 1))
+        .sum()
+}

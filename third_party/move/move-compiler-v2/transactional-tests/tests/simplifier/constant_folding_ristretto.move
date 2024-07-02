@@ -1,4 +1,4 @@
-//# publish --print-bytecode
+//# publish
 module 0xcafe::Ristretto {
     public fun test() {
         let non_canonical_highbit = vector[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128];

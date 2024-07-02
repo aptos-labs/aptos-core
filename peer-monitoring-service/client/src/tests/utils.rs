@@ -10,7 +10,7 @@ use crate::{
 use aptos_config::{
     config::{
         LatencyMonitoringConfig, NetworkMonitoringConfig, NodeConfig, NodeMonitoringConfig,
-        PeerMonitoringServiceConfig, PeerRole, PerformanceMonitoringConfig,
+        PeerMonitoringServiceConfig, PeerRole,
     },
     network_id::{NetworkId, PeerNetworkId},
 };
@@ -50,7 +50,6 @@ pub fn config_with_latency_ping_requests() -> NodeConfig {
         peer_monitoring_service: PeerMonitoringServiceConfig {
             network_monitoring: disabled_network_monitoring_config(),
             node_monitoring: disabled_node_monitoring_config(),
-            performance_monitoring: disabled_performance_monitoring_config(),
             ..Default::default()
         },
         ..Default::default()
@@ -63,7 +62,6 @@ pub fn config_with_network_info_requests() -> NodeConfig {
         peer_monitoring_service: PeerMonitoringServiceConfig {
             latency_monitoring: disabled_latency_monitoring_config(),
             node_monitoring: disabled_node_monitoring_config(),
-            performance_monitoring: disabled_performance_monitoring_config(),
             ..Default::default()
         },
         ..Default::default()
@@ -76,7 +74,6 @@ pub fn config_with_node_info_requests() -> NodeConfig {
         peer_monitoring_service: PeerMonitoringServiceConfig {
             latency_monitoring: disabled_latency_monitoring_config(),
             network_monitoring: disabled_network_monitoring_config(),
-            performance_monitoring: disabled_performance_monitoring_config(),
             ..Default::default()
         },
         ..Default::default()
@@ -88,7 +85,6 @@ pub fn config_with_only_latency_and_network_requests() -> NodeConfig {
     NodeConfig {
         peer_monitoring_service: PeerMonitoringServiceConfig {
             node_monitoring: disabled_node_monitoring_config(),
-            performance_monitoring: disabled_performance_monitoring_config(),
             ..Default::default()
         },
         ..Default::default()
@@ -171,15 +167,6 @@ pub fn disabled_network_monitoring_config() -> NetworkMonitoringConfig {
 pub fn disabled_node_monitoring_config() -> NodeMonitoringConfig {
     NodeMonitoringConfig {
         node_info_request_interval_ms: UNREALISTIC_INTERVAL_MS,
-        ..Default::default()
-    }
-}
-
-/// Returns a performance monitoring config where performance monitoring is disabled
-pub fn disabled_performance_monitoring_config() -> PerformanceMonitoringConfig {
-    PerformanceMonitoringConfig {
-        direct_send_interval_usec: UNREALISTIC_INTERVAL_MS * 1000,
-        rpc_interval_usec: UNREALISTIC_INTERVAL_MS * 1000,
         ..Default::default()
     }
 }
@@ -654,14 +641,6 @@ pub async fn verify_all_requests_and_respond(
                         ping_counter: latency_ping.ping_counter,
                     })
                 },
-                #[cfg(feature = "network-perf-test")] // Disabled by default
-                PeerMonitoringServiceRequest::PerformanceMonitoringRequest(request) => {
-                    PeerMonitoringServiceResponse::PerformanceMonitoring(
-                        aptos_peer_monitoring_service_types::response::PerformanceMonitoringResponse {
-                            response_counter: request.request_counter,
-                        },
-                    )
-                },
                 request => panic!("Unexpected monitoring request received: {:?}", request),
             };
 
@@ -1035,7 +1014,7 @@ pub async fn wait_for_monitoring_network_update(
             let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
 
             // Check if the distance from validators matches the expected value
-            if let Some(latest_network_info_response) =
+            if let Some(ref latest_network_info_response) =
                 peer_monitoring_metadata.latest_network_info_response
             {
                 if latest_network_info_response.distance_from_validators

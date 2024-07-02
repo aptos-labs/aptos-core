@@ -9,7 +9,6 @@ anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 bcs =  { workspace = true }
-bellman = { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
@@ -54,3 +53,6 @@ harness = false
 [[bench]]
 name = "weighted_vuf"
 harness = false
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]

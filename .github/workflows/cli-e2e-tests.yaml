@@ -25,7 +25,7 @@ jobs:
   # we ensure that the Aptos CLI works with all 3 prod networks, at least
   # based on the tests in the test suite.
   run-cli-tests:
-    runs-on: high-perf-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
       id-token: write
@@ -57,7 +57,7 @@ jobs:
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network devnet --image-repo-with-project ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-devnet
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network devnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-devnet
 
       # Run CLI tests against local testnet built from testnet branch.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
@@ -66,7 +66,7 @@ jobs:
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network testnet --image-repo-with-project ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-testnet
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network testnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-testnet
 
       # Run CLI tests against local testnet built from mainnet branch.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
@@ -75,7 +75,7 @@ jobs:
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network mainnet --image-repo-with-project ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-mainnet
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network mainnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-mainnet
 
       - name: Print local testnet logs on failure
         if: ${{ !inputs.SKIP_JOB && failure() }}

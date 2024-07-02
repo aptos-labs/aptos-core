@@ -25,11 +25,11 @@
 // 5. AWS CLI credentials configured
 //
 // Once you have all prerequisites fulfilled, you can run this script via:
-// GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}" AWS_ACCOUNT_ID="${{ secrets.AWS_ECR_ACCOUNT_NUM }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
+// GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ vars.GCP_DOCKER_ARTIFACT_REPO }}" AWS_ACCOUNT_ID="${{ secrets.AWS_ECR_ACCOUNT_NUM }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
 //
 //
 // You can also run this script locally with the DRY_RUN flag to test it out:
-// IMAGE_TAG_PREFIX=devnet AWS_ACCOUNT_ID=bla GCP_DOCKER_ARTIFACT_REPO_US=bla GCP_DOCKER_ARTIFACT_REPO=bla GIT_SHA=bla ./docker/release-images.mjs --wait-for-image-seconds=3600 --dry-run
+// IMAGE_TAG_PREFIX=devnet AWS_ACCOUNT_ID=bla GCP_DOCKER_ARTIFACT_REPO=bla GIT_SHA=bla ./docker/release-images.mjs --wait-for-image-seconds=3600 --dry-run
 //
 // You can also run unittests by running docker/__tests__/release-images.test.js
 
@@ -179,7 +179,7 @@ function reportError(message, opts={throwOnFailure: false}) {
 }
 
 async function main() {
-  const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "GCP_DOCKER_ARTIFACT_REPO_US", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
+  const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN"];
 
   const parsedArgs = {};
@@ -204,14 +204,9 @@ async function main() {
 
   const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
   const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
-  const GCP_ARTIFACT_REPO_US = parsedArgs.GCP_DOCKER_ARTIFACT_REPO_US;
   const DOCKERHUB = "docker.io/aptoslabs";
 
-  const INTERNAL_TARGET_REGISTRIES = [
-    GCP_ARTIFACT_REPO,
-    GCP_ARTIFACT_REPO_US,
-    AWS_ECR,
-  ];
+  const INTERNAL_TARGET_REGISTRIES = [GCP_ARTIFACT_REPO, AWS_ECR];
 
   const ALL_TARGET_REGISTRIES = [
     ...INTERNAL_TARGET_REGISTRIES,
@@ -223,11 +218,6 @@ async function main() {
 
   // dry run
   console.log(`INFO: dry run: ${parsedArgs.DRY_RUN}`);
-
-  // Assert if we have a release version that the version matches the cargo version
-  if (isReleaseImage(parsedArgs.IMAGE_TAG_PREFIX)) {
-    assertTagMatchesSourceVersion(parsedArgs.IMAGE_TAG_PREFIX);
-  }
 
   // get the appropriate release group based on the image tag prefix
   const imageReleaseGroup = getImageReleaseGroupByImageTagPrefix(parsedArgs.IMAGE_TAG_PREFIX);

@@ -12,17 +12,14 @@ use crate::{
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
+        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::{
-        gen_get_ty_param_kinds, infer_abilities, infer_and_check_abilities, is_phantom_type_arg,
-        Constraint, Type,
-    },
+    ty::{Constraint, Type, TypeDisplayContext},
+    well_known,
 };
 use codespan_reporting::diagnostic::Severity;
-use itertools::Itertools;
 use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
@@ -53,6 +50,9 @@ pub(crate) struct ModelBuilder<'env> {
     pub reverse_struct_table: BTreeMap<(ModuleId, StructId), QualifiedSymbol>,
     /// A symbol table for functions.
     pub fun_table: BTreeMap<QualifiedSymbol, FunEntry>,
+    /// A mapping from simple names of receiver functions for the builtin vector type to full names
+    /// which can be used to index `fun_table`.
+    pub vector_receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
     /// A symbol table for constants.
     pub const_table: BTreeMap<QualifiedSymbol, ConstEntry>,
     /// A list of intrinsic declarations
@@ -119,8 +119,30 @@ pub(crate) struct StructEntry {
     pub struct_id: StructId,
     pub type_params: Vec<TypeParameter>,
     pub abilities: AbilitySet,
-    pub fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+    pub layout: StructLayout,
     pub attributes: Vec<Attribute>,
+    /// Maps simple function names to the qualified symbols of receiver functions. The
+    /// symbol can be used to index the global function table.
+    pub receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
+    /// Whether the struct is originally empty
+    /// always false when it is enum
+    pub is_empty_struct: bool,
+    pub is_native: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum StructLayout {
+    Singleton(BTreeMap<Symbol, FieldData>),
+    Variants(Vec<StructVariant>),
+    None,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct StructVariant {
+    pub loc: Loc,
+    pub name: Symbol,
+    pub attributes: Vec<Attribute>,
+    pub fields: BTreeMap<Symbol, FieldData>,
 }
 
 /// A declaration of a function.
@@ -204,6 +226,7 @@ impl<'env> ModelBuilder<'env> {
             struct_table: BTreeMap::new(),
             reverse_struct_table: BTreeMap::new(),
             fun_table: BTreeMap::new(),
+            vector_receiver_functions: BTreeMap::new(),
             const_table: BTreeMap::new(),
             intrinsics: Vec::new(),
             module_table: BTreeMap::new(),
@@ -230,6 +253,19 @@ impl<'env> ModelBuilder<'env> {
     /// Shortcut for a diagnosis note.
     pub fn note(&mut self, loc: &Loc, msg: &str) {
         self.env.diag(Severity::Note, loc, msg)
+    }
+
+    /// Constructs a type display context used to visualize types in error messages.
+    pub(crate) fn type_display_context(&self) -> TypeDisplayContext<'_> {
+        TypeDisplayContext {
+            env: self.env,
+            type_param_names: None,
+            subs_opt: None,
+            // For types which are not yet in the GlobalEnv
+            builder_struct_table: Some(&self.reverse_struct_table),
+            module_name: None,
+            display_type_vars: false,
+        }
     }
 
     /// Defines a spec function, adding it to the spec fun table.
@@ -318,7 +354,8 @@ impl<'env> ModelBuilder<'env> {
         struct_id: StructId,
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
-        fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+        layout: StructLayout,
+        is_native: bool,
     ) {
         let entry = StructEntry {
             loc,
@@ -327,7 +364,10 @@ impl<'env> ModelBuilder<'env> {
             struct_id,
             abilities,
             type_params,
-            fields,
+            layout,
+            receiver_functions: BTreeMap::new(),
+            is_empty_struct: false,
+            is_native,
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
@@ -336,6 +376,96 @@ impl<'env> ModelBuilder<'env> {
 
     /// Defines a function.
     pub fn define_fun(&mut self, name: QualifiedSymbol, entry: FunEntry) {
+        // Add to receiver functions of type if applicable
+        if let Some(param) = entry.params.first() {
+            let self_sym = self.env.symbol_pool.make(well_known::RECEIVER_PARAM_NAME);
+            if param.0 == self_sym && !param.1.is_error() {
+                // Receiver function. Check whether the parameter has the right type.
+                let base_type = param.1.skip_reference();
+                let type_ctx = || {
+                    let mut ctx = self.type_display_context();
+                    ctx.type_param_names = Some(entry.type_params.iter().map(|p| p.0).collect());
+                    ctx
+                };
+                let diag = |reason: &str| {
+                    self.env.diag(
+                        Severity::Warning,
+                        &entry.name_loc,
+                        &format!(
+                            "parameter name `{}` indicates a receiver function but \
+                        the type `{}` {}. Consider using a different name.",
+                            well_known::RECEIVER_PARAM_NAME,
+                            base_type.display(&type_ctx()),
+                            reason
+                        ),
+                    )
+                };
+                let check_generics = |tys: &[Type]| {
+                    // TODO(#12221): Determine whether we may want to relax this check
+                    let mut seen = BTreeSet::new();
+                    for ty in tys {
+                        if !matches!(ty, Type::TypeParameter(_)) {
+                            diag(&format!(
+                                "must only use type parameters \
+                            but instead uses `{}`",
+                                ty.display(&type_ctx())
+                            ))
+                        } else if !seen.insert(ty) {
+                            // We cannot repeat type parameters
+                            diag(&format!(
+                                "cannot use type parameter `{}` more than once",
+                                ty.display(&type_ctx())
+                            ))
+                        }
+                    }
+                };
+                match &base_type {
+                    Type::Struct(mid, sid, inst) => {
+                        // The struct should be defined in the same module as the function. Otherwise it will
+                        // be ignored. Warn about this.
+                        // TODO(#12219): we would like to error but can't because of downwards compatibility
+                        if &entry.module_id != mid {
+                            diag(
+                                "is declared outside of this module \
+                            and new receiver functions cannot be added",
+                            )
+                        } else {
+                            // The instantiation must be fully generic.
+                            check_generics(inst);
+                            // At this point, there cannot be any other function in the module of the type
+                            // which has the same name, as function overloading in a module is not allowed.
+                            // We insert an entry which allows us to redirect from the simple name the FQN
+                            // for indexing the global function table.
+                            let struct_entry = self.lookup_struct_entry_mut(mid.qualified(*sid));
+                            struct_entry
+                                .receiver_functions
+                                .insert(name.symbol, name.clone());
+                        }
+                    },
+                    Type::Vector(elem_ty) => {
+                        // Vector receiver functions can only be defined in the well-known vector module
+                        if name.module_name.addr() != &self.env.get_stdlib_address()
+                            || name.module_name.name()
+                                != self.env.symbol_pool.make(well_known::VECTOR_MODULE)
+                        {
+                            diag(
+                                "is associated with the standard vector module \
+                                and new receiver functions cannot be added",
+                            )
+                        } else {
+                            // See above  for structs
+                            check_generics(&[*elem_ty.clone()]);
+                            self.vector_receiver_functions
+                                .insert(name.symbol, name.clone());
+                        }
+                    },
+                    _ => diag(
+                        "is not suitable for receiver functions. \
+                    Only structs and vectors can have receiver functions",
+                    ),
+                }
+            }
+        }
         self.fun_table.insert(name, entry);
     }
 
@@ -375,102 +505,78 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
-    /// Looks up the fields of a structure, with instantiated field types.
-    pub fn lookup_struct_fields(&self, id: QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+    /// Looks up the fields of a structure, with instantiated field types. Returns empty
+    /// map if the struct has variants.
+    pub fn lookup_struct_fields(
+        &self,
+        id: &QualifiedInstId<StructId>,
+    ) -> (BTreeMap<Symbol, Type>, bool) {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        entry
-            .fields
-            .as_ref()
-            .map(|f| {
-                f.iter()
-                    .map(|(n, (_, _, field_ty))| (*n, field_ty.instantiate(&id.inst)))
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .unwrap_or_default()
+        let instantiate_fields = |fields: &BTreeMap<Symbol, FieldData>, common_only: bool| {
+            fields
+                .values()
+                .filter_map(|f| {
+                    if !common_only || f.common_for_variants {
+                        Some((f.name, f.ty.instantiate(&id.inst)))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+        match &entry.layout {
+            StructLayout::Singleton(fields) => (instantiate_fields(fields, false), false),
+            StructLayout::Variants(variants) => (
+                if variants.is_empty() {
+                    BTreeMap::new()
+                } else {
+                    instantiate_fields(&variants[0].fields, true)
+                },
+                true,
+            ),
+            _ => (BTreeMap::new(), false),
+        }
     }
 
-    /// Looks up the abilities of a struct.
-    /// TODO(#12437): get rid of this once we have new UnificationContext
-    pub fn lookup_struct_abilities(&self, id: QualifiedId<StructId>) -> AbilitySet {
-        let entry = self.lookup_struct_entry(id);
-        entry.abilities
-    }
-
-    /// Get all the structs which have been build so far.
-    pub fn get_struct_ids(&self) -> impl Iterator<Item = QualifiedId<StructId>> + '_ {
-        self.struct_table
-            .values()
-            .map(|e| e.module_id.qualified(e.struct_id))
+    /// Looks up a receiver function for a given type.
+    pub fn lookup_receiver_function(&self, ty: &Type, name: Symbol) -> Option<&FunEntry> {
+        let qualified_fun_name = match ty.skip_reference() {
+            Type::Struct(mid, sid, _) => self
+                .lookup_struct_entry(mid.qualified(*sid))
+                .receiver_functions
+                .get(&name),
+            Type::Vector(_) => self.vector_receiver_functions.get(&name),
+            _ => None,
+        };
+        qualified_fun_name.and_then(|qn| self.fun_table.get(qn))
     }
 
     /// Looks up the StructEntry for a qualified id.
     pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
         let struct_name = self.get_struct_name(id);
+        self.lookup_struct_entry_by_name(struct_name)
+    }
+
+    /// Looks up the StructEntry by `struct_name`
+    pub fn lookup_struct_entry_by_name(&self, struct_name: &QualifiedSymbol) -> &StructEntry {
         self.struct_table
             .get(struct_name)
             .expect("invalid Type::Struct")
     }
 
-    /// returns the type parameter kinds and the abilities of the struct
-    fn get_struct_sig(&self, mid: ModuleId, sid: StructId) -> (Vec<TypeParameterKind>, AbilitySet) {
-        let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
-        let struct_abilities = struct_entry.abilities;
-        let ty_param_kinds = struct_entry
-            .type_params
-            .iter()
-            .map(|tp| tp.1.clone())
-            .collect_vec();
-        (ty_param_kinds, struct_abilities)
-    }
-
-    fn gen_get_struct_sig(
-        &self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
-        |mid, sid| self.get_struct_sig(mid, sid)
-    }
-
-    /// Specialized `ty::infer_and_check_abilities`
-    /// where the abilities of type arguments are given by `ty_params`
-    pub fn check_instantiation(&self, ty: &Type, ty_params: &[TypeParameter], loc: &Loc) {
-        infer_and_check_abilities(
-            ty,
-            gen_get_ty_param_kinds(ty_params),
-            self.gen_get_struct_sig(),
-            loc,
-            |loc, _, err| self.error(loc, err),
-        );
-    }
-
-    /// Infers the abilities the given type may have,
-    /// if all type params have all abilities.
-    pub fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
-        // since all type params have all abilities, it doesn't matter whether it's phantom or not
-        infer_abilities(
-            ty,
-            |_| TypeParameterKind {
-                abilities: AbilitySet::ALL,
-                is_phantom: false,
-            },
-            self.gen_get_struct_sig(),
-        )
-    }
-
-    /// Checks whether a struct is well defined.
-    pub fn ability_check_struct_def(&self, struct_entry: &StructEntry) {
-        if let Some(fields) = &struct_entry.fields {
-            let ty_params = &struct_entry.type_params;
-            for (_field_name, (loc, _field_idx, field_ty)) in fields.iter() {
-                // check fields are properly instantiated
-                self.check_instantiation(field_ty, ty_params, loc);
-                if is_phantom_type_arg(gen_get_ty_param_kinds(ty_params), field_ty) {
-                    self.error(loc, "phantom type arguments cannot be used")
-                }
-            }
-        }
+    /// Looks up the StructEntry for a qualified id for mutation.
+    pub fn lookup_struct_entry_mut(&mut self, id: QualifiedId<StructId>) -> &mut StructEntry {
+        let struct_name = self
+            .reverse_struct_table
+            .get(&(id.module_id, id.id))
+            .expect("invalid Type::Struct");
+        self.struct_table
+            .get_mut(struct_name)
+            .expect("invalid Type::Struct")
     }
 
     /// Gets the name of the struct
-    fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
+    pub fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
         self.reverse_struct_table
             .get(&(qid.module_id, qid.id))
             .expect("invalid Type::Struct")

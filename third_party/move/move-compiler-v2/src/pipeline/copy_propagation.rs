@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! NOTE: Until the bug #12068 is fixed, we should not use this module.
+//!
 //! Implements copy propagation transformation.
 //!
 //! prerequisite: the `AvailCopiesAnnotation` should already be computed by running the `AvailCopiesAnalysis`.

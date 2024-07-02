@@ -626,7 +626,7 @@ impl<'env> SpecTranslator<'env> {
         } else {
             // Use a clone with the given type instantiation.
             let mut trans = self.clone();
-            trans.type_inst = type_inst.to_owned();
+            type_inst.clone_into(&mut trans.type_inst);
             trans.translate_exp(exp)
         }
     }
@@ -698,6 +698,10 @@ impl<'env> SpecTranslator<'env> {
                 self.translate_exp_parenthesised(on_false);
                 emit!(self.writer, ")");
             },
+            ExpData::Match(node_id, ..) => self.error(
+                &self.env.get_node_loc(*node_id),
+                "match not yet implemented",
+            ),
             ExpData::Invalid(_) => panic!("unexpected error expression"),
             ExpData::Sequence(_, exp_vec) if exp_vec.len() == 1 => {
                 // Single-element sequence is just a wrapped value.
@@ -825,7 +829,10 @@ impl<'env> SpecTranslator<'env> {
             Operation::SpecFunction(module_id, fun_id, memory_labels) => {
                 self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, memory_labels)
             },
-            Operation::Pack(mid, sid) => self.translate_pack(node_id, *mid, *sid, args),
+            Operation::Pack(_, _, Some(_)) => {
+                self.error(&loc, "variants not yet supported");
+            },
+            Operation::Pack(mid, sid, None) => self.translate_pack(node_id, *mid, *sid, args),
             Operation::Tuple if args.len() == 1 => self.translate_exp(&args[0]),
             Operation::Tuple => self.error(&loc, "Tuple not yet supported"),
             Operation::Select(module_id, struct_id, field_id) => {
@@ -939,7 +946,7 @@ impl<'env> SpecTranslator<'env> {
                     "currently `TRACE(..)` cannot be used in spec functions or in lets",
                 )
             },
-            Operation::Freeze => {
+            Operation::Freeze(_) => {
                 // Skip freeze operation
                 self.translate_exp(&args[0])
             },
@@ -952,7 +959,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Abort
             | Operation::Vector
             | Operation::Old => {
-                panic!("operation unexpected: {:?}", oper)
+                panic!("operation unexpected: {}", oper.display(self.env, node_id))
             },
         }
     }
@@ -1535,7 +1542,7 @@ impl<'env> SpecTranslator<'env> {
             .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
             .collect_vec();
         let used_temps = range_and_body
-            .used_temporaries(self.env)
+            .used_temporaries_with_types(self.env)
             .into_iter()
             .collect_vec();
         let used_memory = range_and_body

@@ -13,10 +13,10 @@ module 0x8675309::M {
         false;
         false;
         Gt<u64>(Copy(x), Move(x));
-        Gt<u64>(select M::R.f(r), select M::R.f(r));
-        And(Gt<u64>(1, select M::R.f(r)), Gt<u64>(select M::R.f(r), 0));
+        Gt<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        And(Gt<u64>(1, select M::R.f<M::R>(r)), Gt<u64>(select M::R.f<M::R>(r), 0));
         {
-          let M::R{ f: _ }: M::R = r;
+          let M::R{ f: _ } = r;
           Tuple()
         }
     }

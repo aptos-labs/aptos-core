@@ -20,6 +20,7 @@ use move_binary_format::{
 };
 use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 
 //
 // Contains all the code to work on the Simple package
@@ -94,6 +95,12 @@ pub enum MultiSigConfig {
     Random(usize),
     Publisher,
     FeePayerPublisher,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BCSStream {
+    data: Vec<u8>,
+    cursor: u64,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -174,13 +181,20 @@ pub enum EntryPoints {
         max_offset: u64,
         max_count: u64,
     },
-    /// Increment global (publisher) resource - COUNTER_STEP
+    /// Increment global (publisher) resource
     IncGlobal,
-    /// Increment global (publisher) AggregatorV2 resource - COUNTER_STEP
+    /// Increment global (publisher) AggregatorV2 resource
     IncGlobalAggV2,
     /// Modify (try_add(step) or try_sub(step)) AggregatorV2 bounded counter (counter with max_value=100)
     ModifyGlobalBoundedAggV2 {
         step: u64,
+    },
+    /// Increment global (publisher) AggregatorV2 resource with Milestone (and conflict) every `milestone_every` increments.
+    IncGlobalMilestoneAggV2 {
+        milestone_every: u64,
+    },
+    CreateGlobalMilestoneAggV2 {
+        milestone_every: u64,
     },
 
     /// Modifying a single random tag in a resource group (which contains 8 tags),
@@ -221,12 +235,22 @@ pub enum EntryPoints {
     TokenV1MintAndTransferNFTSequential,
     TokenV1MintAndStoreFT,
     TokenV1MintAndTransferFT,
+    // register if not registered already
+    CoinInitAndMint,
+    FungibleAssetMint,
 
     TokenV2AmbassadorMint {
         numbered: bool,
     },
     /// Burn an NFT token, only works with numbered=false tokens.
     TokenV2AmbassadorBurn,
+
+    LiquidityPoolSwapInit {
+        is_stable: bool,
+    },
+    LiquidityPoolSwap {
+        is_stable: bool,
+    },
 
     InitializeVectorPicture {
         length: u64,
@@ -242,6 +266,7 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    DeserializeU256,
 }
 
 impl EntryPoints {
@@ -282,15 +307,22 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
-            | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "framework_usecases",
+            | EntryPoints::ResourceGroupsSenderMultiChange { .. }
+            | EntryPoints::CoinInitAndMint
+            | EntryPoints::FungibleAssetMint => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
-            EntryPoints::InitializeVectorPicture { .. }
+            EntryPoints::LiquidityPoolSwapInit { .. }
+            | EntryPoints::LiquidityPoolSwap { .. }
+            | EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::IncGlobalMilestoneAggV2 { .. }
+            | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
+            EntryPoints::DeserializeU256 => "bcs_stream",
         }
     }
 
@@ -333,8 +365,13 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
+            EntryPoints::CoinInitAndMint => "coin_example",
+            EntryPoints::FungibleAssetMint => "fungible_asset_example",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador"
+            },
+            EntryPoints::LiquidityPoolSwapInit { .. } | EntryPoints::LiquidityPoolSwap { .. } => {
+                "liquidity_pool_wrapper"
             },
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
@@ -342,6 +379,9 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::IncGlobalMilestoneAggV2 { .. }
+            | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
+            EntryPoints::DeserializeU256 => "bcs_stream",
         }
     }
 
@@ -447,10 +487,32 @@ impl EntryPoints {
                     ],
                 )
             },
-            EntryPoints::IncGlobal => inc_global(module_id),
-            EntryPoints::IncGlobalAggV2 => inc_global_agg_v2(module_id),
+            EntryPoints::IncGlobal => {
+                get_payload(module_id, ident_str!("increment").to_owned(), vec![])
+            },
+            EntryPoints::IncGlobalAggV2 => {
+                get_payload(module_id, ident_str!("increment_agg_v2").to_owned(), vec![])
+            },
             EntryPoints::ModifyGlobalBoundedAggV2 { step } => {
-                modify_bounded_agg_v2(module_id, rng.expect("Must provide RNG"), *step)
+                let rng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("modify_bounded_agg_v2").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
+                        bcs::to_bytes(&step).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::IncGlobalMilestoneAggV2 { .. } => get_payload(
+                module_id,
+                ident_str!("increment_milestone").to_owned(),
+                vec![],
+            ),
+            EntryPoints::CreateGlobalMilestoneAggV2 { milestone_every } => {
+                get_payload(module_id, ident_str!("create").to_owned(), vec![
+                    bcs::to_bytes(&milestone_every).unwrap(),
+                ])
             },
             EntryPoints::CreateObjects {
                 num_objects,
@@ -548,6 +610,16 @@ impl EntryPoints {
                     bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
                 ])
             },
+            EntryPoints::CoinInitAndMint => {
+                get_payload(module_id, ident_str!("mint_p").to_owned(), vec![
+                    bcs::to_bytes(&1000u64).unwrap(), // amount
+                ])
+            },
+            EntryPoints::FungibleAssetMint => {
+                get_payload(module_id, ident_str!("mint_p").to_owned(), vec![
+                    bcs::to_bytes(&1000u64).unwrap(), // amount
+                ])
+            },
             EntryPoints::TokenV2AmbassadorMint { numbered: true } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
@@ -576,6 +648,20 @@ impl EntryPoints {
                 ident_str!("burn_named_by_user").to_owned(),
                 vec![],
             ),
+
+            EntryPoints::LiquidityPoolSwapInit { is_stable } => get_payload(
+                module_id,
+                ident_str!("initialize_liquid_pair").to_owned(),
+                vec![bcs::to_bytes(&is_stable).unwrap()],
+            ),
+            EntryPoints::LiquidityPoolSwap { is_stable } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let from_1: bool = (rng.gen_range(0, 2) == 1);
+                get_payload(module_id, ident_str!("swap").to_owned(), vec![
+                    bcs::to_bytes(&rng.gen_range(1000u64, 2000u64)).unwrap(), // amount_in
+                    bcs::to_bytes(&from_1).unwrap(),                          // from_1
+                ])
+            },
             EntryPoints::InitializeVectorPicture { length } => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![
                     bcs::to_bytes(&length).unwrap(), // length
@@ -623,6 +709,19 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
+            EntryPoints::DeserializeU256 => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let mut u256_bytes = [0u8; 32];
+                rng.fill_bytes(&mut u256_bytes);
+                get_payload(
+                    module_id,
+                    ident_str!("deserialize_u256_entry").to_owned(),
+                    vec![
+                        bcs::to_bytes(&u256_bytes.to_vec()).unwrap(),
+                        bcs::to_bytes(&0u64).unwrap(),
+                    ],
+                )
+            },
         }
     }
 
@@ -636,10 +735,20 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferFT => {
                 Some(EntryPoints::TokenV1InitializeCollection)
             },
+            EntryPoints::LiquidityPoolSwap { is_stable } => {
+                Some(EntryPoints::LiquidityPoolSwapInit {
+                    is_stable: *is_stable,
+                })
+            },
             EntryPoints::VectorPicture { length } | EntryPoints::VectorPictureRead { length } => {
                 Some(EntryPoints::InitializeVectorPicture { length: *length })
             },
             EntryPoints::SmartTablePicture { .. } => Some(EntryPoints::InitializeSmartTablePicture),
+            EntryPoints::IncGlobalMilestoneAggV2 { milestone_every } => {
+                Some(EntryPoints::CreateGlobalMilestoneAggV2 {
+                    milestone_every: *milestone_every,
+                })
+            },
             _ => None,
         }
     }
@@ -651,9 +760,14 @@ impl EntryPoints {
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
+            EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
+                MultiSigConfig::Publisher
+            },
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 MultiSigConfig::Publisher
             },
+            EntryPoints::LiquidityPoolSwap { .. } => MultiSigConfig::Publisher,
+            EntryPoints::CreateGlobalMilestoneAggV2 { .. } => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }
     }
@@ -698,15 +812,23 @@ impl EntryPoints {
             },
             EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => AutomaticArgs::Signer,
+            EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
+                AutomaticArgs::SignerAndMultiSig
+            },
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 AutomaticArgs::SignerAndMultiSig
             },
+            EntryPoints::LiquidityPoolSwapInit { .. } => AutomaticArgs::Signer,
+            EntryPoints::LiquidityPoolSwap { .. } => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
             EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
                 AutomaticArgs::None
             },
             EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
             EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
+            EntryPoints::DeserializeU256 => AutomaticArgs::None,
+            EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
+            EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
         }
     }
 }
@@ -796,31 +918,6 @@ fn maximize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
 fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
     get_payload(module_id, ident_str!("minimize").to_owned(), vec![
         bcs::to_bytes(other).unwrap(),
-    ])
-}
-
-fn inc_global(module_id: ModuleId) -> TransactionPayload {
-    get_payload(module_id, ident_str!("increment").to_owned(), vec![])
-}
-
-fn inc_global_agg_v2(module_id: ModuleId) -> TransactionPayload {
-    get_payload(module_id, ident_str!("increment_agg_v2").to_owned(), vec![])
-}
-
-fn modify_bounded_agg_v2(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
-    get_payload(
-        module_id,
-        ident_str!("modify_bounded_agg_v2").to_owned(),
-        vec![
-            bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
-            bcs::to_bytes(&step).unwrap(),
-        ],
-    )
-}
-
-fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("mint_new_token").to_owned(), vec![
-        bcs::to_bytes(&other).unwrap(),
     ])
 }
 

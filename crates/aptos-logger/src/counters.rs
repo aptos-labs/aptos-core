@@ -11,6 +11,26 @@ pub static STRUCT_LOG_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_struct_log_count", "Count of the struct logs.").unwrap()
 });
 
+<<<<<<< HEAD
+=======
+/// Count of struct logs processed, but not necessarily sent
+pub static PROCESSED_STRUCT_LOG_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_struct_log_processed_count",
+        "Count of the struct logs received by the sender."
+    )
+    .unwrap()
+});
+
+/// Counts of logs
+pub static ERROR_LOG_COUNT: Lazy<IntCounter> =
+    Lazy::new(|| register_int_counter!("aptos_error_log_count", "Count of error!() logs").unwrap());
+pub static WARN_LOG_COUNT: Lazy<IntCounter> =
+    Lazy::new(|| register_int_counter!("aptos_warn_log_count", "Count of warn!() logs").unwrap());
+pub static INFO_LOG_COUNT: Lazy<IntCounter> =
+    Lazy::new(|| register_int_counter!("aptos_info_log_count", "Count of info!() logs").unwrap());
+
+>>>>>>> upstream/main
 /// Metric for when we fail to log during sending to the queue
 pub static STRUCT_LOG_QUEUE_ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

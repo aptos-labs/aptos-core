@@ -13,14 +13,14 @@ jobs:
   cargo-metadata:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
       - id: auth
-        uses: "google-github-actions/auth@v1"
+        uses: "google-github-actions/auth@v2"
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-      - uses: "google-github-actions/setup-gcloud@v1"
+      - uses: "google-github-actions/setup-gcloud@v2"
       - shell: bash
         run: |
           cargo metadata --all-features | gsutil cp - gs://aptos-core-cargo-metadata-public/metadata-${{ github.sha }}.json

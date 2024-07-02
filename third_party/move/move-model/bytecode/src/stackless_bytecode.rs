@@ -9,9 +9,10 @@ use move_binary_format::file_format::CodeOffset;
 use move_core_types::{u256, value::MoveValue};
 use move_model::{
     ast,
-    ast::{Address, Exp, ExpData, MemoryLabel, TempIndex, TraceKind},
+    ast::{Address, Exp, ExpData, MemoryLabel, Spec, TempIndex, TraceKind},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
+    symbol::Symbol,
     ty::{Type, TypeDisplayContext},
 };
 use std::{
@@ -159,6 +160,13 @@ pub enum Operation {
     MoveFrom(ModuleId, StructId, Vec<Type>),
     Exists(ModuleId, StructId, Vec<Type>),
 
+    // Variants
+    // Below the `Symbol` is the name of the variant.
+    TestVariant(ModuleId, StructId, Symbol, Vec<Type>),
+    PackVariant(ModuleId, StructId, Symbol, Vec<Type>),
+    UnpackVariant(ModuleId, StructId, Symbol, Vec<Type>),
+    BorrowFieldVariant(ModuleId, StructId, Symbol, Vec<Type>, usize),
+
     // Borrow
     BorrowLoc,
     BorrowField(ModuleId, StructId, Vec<Type>, usize),
@@ -172,7 +180,7 @@ pub enum Operation {
 
     ReadRef,
     WriteRef,
-    FreezeRef,
+    FreezeRef(/*explicit*/ bool),
     Vector,
 
     // Unary
@@ -252,6 +260,10 @@ impl Operation {
             Operation::OpaqueCallEnd(_, _, _) => false,
             Operation::Pack(_, _, _) => false,
             Operation::Unpack(_, _, _) => false,
+            Operation::TestVariant(_, _, _, _) => false,
+            Operation::PackVariant(_, _, _, _) => false,
+            Operation::UnpackVariant(_, _, _, _) => true, // aborts if not given variant
+            Operation::BorrowFieldVariant(_, _, _, _, _) => true, // aborts if not given variant
             Operation::MoveTo(_, _, _) => true,
             Operation::MoveFrom(_, _, _) => true,
             Operation::Exists(_, _, _) => false,
@@ -265,7 +277,7 @@ impl Operation {
             Operation::Release => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
-            Operation::FreezeRef => false,
+            Operation::FreezeRef(_) => false,
             Operation::Vector => false,
             Operation::Havoc(_) => false,
             Operation::Stop => false,
@@ -417,8 +429,9 @@ pub enum Bytecode {
     Label(AttrId, Label),
     Abort(AttrId, TempIndex),
     Nop(AttrId),
+    SpecBlock(AttrId, Spec),
 
-    // Extended bytecode: spec-only.
+    // Extended bytecode: spec-instrumentation only.
     SaveMem(AttrId, MemoryLabel, QualifiedInstId<StructId>),
     SaveSpecVar(AttrId, MemoryLabel, QualifiedInstId<SpecVarId>),
     Prop(AttrId, PropKind, Exp),
@@ -437,6 +450,7 @@ impl Bytecode {
             | Label(id, ..)
             | Abort(id, ..)
             | Nop(id)
+            | SpecBlock(id, ..)
             | SaveMem(id, ..)
             | SaveSpecVar(id, ..)
             | Prop(id, ..) => *id,
@@ -455,6 +469,7 @@ impl Bytecode {
             | Label(id, ..)
             | Abort(id, ..)
             | Nop(id)
+            | SpecBlock(id, ..)
             | SaveMem(id, ..)
             | SaveSpecVar(id, ..)
             | Prop(id, ..) => id,
@@ -519,6 +534,10 @@ impl Bytecode {
             | Bytecode::Nop(_) => {
                 vec![]
             },
+            Bytecode::SpecBlock(_, _) => {
+                // Specifications are not contributing to read variables
+                vec![]
+            },
             // Note that for all spec-only instructions, we currently return no sources.
             Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
@@ -552,6 +571,7 @@ impl Bytecode {
             | Bytecode::Nop(_)
             | Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
+            | Bytecode::SpecBlock(..)
             | Bytecode::Prop(_, _, _) => Vec::new(),
         }
     }
@@ -969,6 +989,9 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
             Nop(_) => {
                 write!(f, "nop")?;
             },
+            SpecBlock(_, spec) => {
+                write!(f, "{}", self.func_target.global_env().display(spec))?;
+            },
             SaveMem(_, label, qid) => {
                 let env = self.func_target.global_env();
                 write!(f, "@{} := save_mem({})", label.as_usize(), env.display(qid))?;
@@ -1089,12 +1112,57 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                 write!(f, "unpack {}", self.struct_str(*mid, *sid, targs))?;
             },
 
+            // Variants
+            TestVariant(mid, sid, variant, targs) => {
+                write!(
+                    f,
+                    "test_variant {}::{}",
+                    self.struct_str(*mid, *sid, targs),
+                    variant.display(self.func_target.symbol_pool())
+                )?;
+            },
+            PackVariant(mid, sid, variant, targs) => {
+                write!(
+                    f,
+                    "pack_variant {}::{}",
+                    self.struct_str(*mid, *sid, targs),
+                    variant.display(self.func_target.symbol_pool())
+                )?;
+            },
+            UnpackVariant(mid, sid, variant, targs) => {
+                write!(
+                    f,
+                    "unpack_variant {}::{}",
+                    self.struct_str(*mid, *sid, targs),
+                    variant.display(self.func_target.symbol_pool())
+                )?;
+            },
+
             // Borrow
             BorrowLoc => {
                 write!(f, "borrow_local")?;
             },
             BorrowField(mid, sid, targs, offset) => {
                 write!(f, "borrow_field<{}>", self.struct_str(*mid, *sid, targs))?;
+                let struct_env = self
+                    .func_target
+                    .global_env()
+                    .get_module(*mid)
+                    .into_struct(*sid);
+                let field_env = struct_env.get_field_by_offset(*offset);
+                write!(
+                    f,
+                    ".{}",
+                    field_env.get_name().display(struct_env.symbol_pool())
+                )?;
+            },
+            BorrowFieldVariant(mid, sid, variant, targs, offset) => {
+                write!(
+                    f,
+                    "borrow_field_variant<{}::{}>",
+                    self.struct_str(*mid, *sid, targs),
+                    variant.display(self.func_target.symbol_pool())
+                )?;
                 let struct_env = self
                     .func_target
                     .global_env()
@@ -1155,8 +1223,12 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             WriteRef => {
                 write!(f, "write_ref")?;
             },
-            FreezeRef => {
-                write!(f, "freeze_ref")?;
+            FreezeRef(explicit) => {
+                if *explicit {
+                    write!(f, "freeze_ref")?;
+                } else {
+                    write!(f, "freeze_ref(implicit)")?;
+                }
             },
             Vector => {
                 write!(f, "vector")?;

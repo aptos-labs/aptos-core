@@ -13,17 +13,16 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
 aptos-cached-packages =  { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework =  { workspace = true }
 aptos-gas-schedule = { workspace = true } 
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }

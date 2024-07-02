@@ -907,7 +907,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                             let new_node = env.new_node(exp_loc, new_type.clone());
                             let new_exp_vec: Vec<Exp> = vec![exp.clone()];
                             (
-                                Exp::from(ExpData::Call(new_node, Operation::Freeze, new_exp_vec)),
+                                Exp::from(ExpData::Call(
+                                    new_node,
+                                    Operation::Freeze(false),
+                                    new_exp_vec,
+                                )),
                                 new_type,
                             )
                         } else {
@@ -974,7 +978,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     ///
     /// (Helper for check_pattern_args_types_need_freezeref)
     fn check_params_args_types_vectors_need_freezeref(
-        params_types: &Vec<Type>,
+        params_types: &[Type],
         args_types: &Vec<Type>,
     ) -> Option<Vec<bool>> {
         // element is Some(true) if a FreezeRef is needed, Some(false) if not, and None if types
@@ -1187,9 +1191,14 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 .map(|new_sym| Pattern::Var(new_id, new_sym))
                 .or_else(|| new_id_opt.map(|id| Pattern::Var(id, *sym))),
             Pattern::Tuple(_, pattern_vec) => Some(Pattern::Tuple(new_id, pattern_vec.clone())),
-            Pattern::Struct(_, struct_id, pattern_vec) => {
+            Pattern::Struct(_, struct_id, variant, pattern_vec) => {
                 let new_struct_id = struct_id.clone().instantiate(self.type_args);
-                Some(Pattern::Struct(new_id, new_struct_id, pattern_vec.clone()))
+                Some(Pattern::Struct(
+                    new_id,
+                    new_struct_id,
+                    *variant,
+                    pattern_vec.clone(),
+                ))
             },
             Pattern::Wildcard(_) => None,
             Pattern::Error(_) => None,

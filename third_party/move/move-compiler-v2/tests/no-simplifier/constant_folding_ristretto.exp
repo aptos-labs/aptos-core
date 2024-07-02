@@ -15,3 +15,6 @@ module 0xcafe::Ristretto {
         }
     }
 } // end 0xcafe::Ristretto
+
+
+============ bytecode verification succeeded ========

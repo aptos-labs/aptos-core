@@ -3,7 +3,7 @@
 
 use crate::{
     access_path::AccessPath,
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::{inner::StateKeyInner, StateKey},
 };
 use aptos_crypto::HashValue;
 use std::sync::Arc;
