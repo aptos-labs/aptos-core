@@ -3,7 +3,7 @@
 
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary},
+    common::{TransactionInProgress, TransactionSummary, TxnSummaryWithExpiration},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_logger::prelude::*;
@@ -198,10 +198,10 @@ pub struct ProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // ProofOfStore and insertion_time. None if committed
     batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
-    // Number of batches in which the txn_summary = (sender, sequence number, hash) has been included
-    txn_summary_num_occurrences: HashMap<TransactionSummary, u64>,
+    // Number of batches in which the txn_synopsis = (sender, sequence number, hash, expiration) has been included
+    txn_summary_num_occurrences: HashMap<TxnSummaryWithExpiration, u64>,
     // List of transaction summaries for each batch
-    batch_to_txn_summaries: HashMap<BatchKey, Vec<TransactionSummary>>,
+    batch_to_txn_summaries: HashMap<BatchKey, Vec<TxnSummaryWithExpiration>>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -301,7 +301,7 @@ impl ProofQueue {
 
     pub(crate) fn add_batch_summaries(
         &mut self,
-        batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
+        batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
         let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {
@@ -412,7 +412,11 @@ impl ProofQueue {
                             cur_unique_txns
                                 + txn_summaries
                                     .iter()
-                                    .filter(|txn_summary| !filtered_txns.contains(txn_summary))
+                                    .filter(|txn_summary| {
+                                        !filtered_txns.contains(txn_summary)
+                                            && txn_summary.expiration_timestamp_secs
+                                                > self.latest_block_timestamp
+                                    })
                                     .count() as u64
                         } else {
                             cur_unique_txns + batch.num_txns()
@@ -435,7 +439,11 @@ impl ProofQueue {
                             .map_or(batch.num_txns(), |summaries| {
                                 summaries
                                     .iter()
-                                    .filter(|summary| filtered_txns.insert(**summary))
+                                    .filter(|summary| {
+                                        filtered_txns.insert(**summary)
+                                            && summary.expiration_timestamp_secs
+                                                > self.latest_block_timestamp
+                                    })
                                     .count() as u64
                             });
                         let bucket = proof.gas_bucket_start();

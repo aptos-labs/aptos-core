@@ -79,7 +79,7 @@ impl BatchCoordinator {
                 .map(|persisted_value| {
                     (
                         persisted_value.batch_info().clone(),
-                        persisted_value.summary(),
+                        persisted_value.synopsis(),
                     )
                 })
                 .collect();
