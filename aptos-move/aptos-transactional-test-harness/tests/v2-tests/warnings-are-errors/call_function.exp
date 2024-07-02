@@ -9,7 +9,7 @@ Error: compilation errors:
    │             ^
 
 
-Exiting: Warnings found, and configuration requests that warnings be treated as errors
+Exiting: Warnings found, and configuration requests that warnings be treated as errors.
 
 
 task 2 'run'. lines 33-33:

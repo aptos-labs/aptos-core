@@ -19,7 +19,7 @@ use itertools::Itertools;
 use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::{env::bool_to_str, files::MOVE_COMPILED_EXTENSION};
 use move_compiler::{
-    command_line::{MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG, WARN_UNUSED_FLAG},
+    command_line::MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG,
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::move_compiler_warnings_are_errors_env_var,
 };
@@ -139,7 +139,6 @@ impl Default for BuildOptions {
             experiments: vec![],
             move_2: false,
             warnings_are_errors: move_compiler_warnings_are_errors_env_var(),
-            warn_unused: false,
         }
     }
 }

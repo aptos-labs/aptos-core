@@ -8,7 +8,7 @@ use move_command_line_common::{
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
-    diagnostics::*,
+    diagnostics::{codes::Severity, *},
     shared::{known_attributes::KnownAttribute, Flags, NumericalAddress},
     unit_test, CommentMap, Compiler, SteppedCompiler, PASS_CFGIR, PASS_PARSER,
 };
@@ -146,14 +146,25 @@ fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyh
         KnownAttribute::get_all_attribute_names(),
     )
     .run::<PASS_PARSER>()?;
-    let diags = move_check_for_errors(comments_and_compiler_res, warnings_are_errors);
+    let diags = move_check_for_errors(comments_and_compiler_res);
+    let warning_was_promoted = if warnings_are_errors {
+        match diags.max_severity() {
+            Some(max) if max == Severity::Warning => true,
+            _ => false,
+        }
+    } else {
+        false
+    };
 
     let has_diags = !diags.is_empty();
-    let diag_buffer = if has_diags {
+    let mut diag_buffer = if has_diags {
         move_compiler::diagnostics::report_diagnostics_to_buffer(&files, diags)
     } else {
         vec![]
     };
+    if warning_was_promoted {
+        diag_buffer.extend("Exiting: Warnings found, and configuration requests that warnings be treated as errors.\n".as_bytes());
+    }
 
     let save_diags = read_bool_env_var(KEEP_TMP);
     let update_baseline = read_env_update_baseline();
@@ -206,7 +217,6 @@ fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyh
 
 fn move_check_for_errors(
     comments_and_compiler_res: Result<(CommentMap, SteppedCompiler<'_, PASS_PARSER>), Diagnostics>,
-    warnings_are_errors: bool,
 ) -> Diagnostics {
     fn try_impl(
         comments_and_compiler_res: Result<
@@ -220,6 +230,7 @@ fn move_check_for_errors(
         if compilation_env.flags().is_testing() {
             unit_test::plan_builder::construct_test_plan(compilation_env, None, &cfgir);
         }
+
         let (units, diags) = compiler.at_cfgir(cfgir).build()?;
         Ok((units, diags))
     }
@@ -228,13 +239,9 @@ fn move_check_for_errors(
         Ok((units, inner_diags)) => (units, inner_diags),
         Err(inner_diags) => return inner_diags,
     };
-    if inner_diags.is_empty() || !warnings_are_errors {
-        let mut diags = move_compiler::compiled_unit::verify_units(&units);
-        diags.extend(inner_diags);
-        diags
-    } else {
-        inner_diags
-    }
+    let mut diags = move_compiler::compiled_unit::verify_units(&units);
+    diags.extend(inner_diags);
+    diags
 }
 
 datatest_stable::harness!(move_check_testsuite, "tests/move_check", r".*\.move$");

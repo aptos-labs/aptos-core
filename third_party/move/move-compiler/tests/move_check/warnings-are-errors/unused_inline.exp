@@ -8,3 +8,4 @@ warning[W09004]: unnecessary trailing semicolon
    │                 │    A trailing ';' in an expression block implicitly adds a '()' value after the semicolon. That '()' value will not be reachable
    │                 Any code after this expression will not be reached
 
+Exiting: Warnings found, and configuration requests that warnings be treated as errors.

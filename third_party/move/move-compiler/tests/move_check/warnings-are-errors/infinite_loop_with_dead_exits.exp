@@ -22,3 +22,4 @@ warning[W09005]: dead or unreachable code
 13 │             if (return) break;
    │                         ^^^^^ Unreachable code. This statement (and any following statements) will not be executed.
 
+Exiting: Warnings found, and configuration requests that warnings be treated as errors.

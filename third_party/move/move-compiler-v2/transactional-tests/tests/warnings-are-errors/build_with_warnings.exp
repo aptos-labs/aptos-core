@@ -12,7 +12,7 @@ comparison between v1 and v2 failed:
 +   │                    ^
 = 
 = 
-+ Exiting: Warnings found, and configuration requests that warnings be treated as errors
++ Exiting: Warnings found, and configuration requests that warnings be treated as errors.
 = 
 + 
 = task 1 'run'. lines 12-12:

@@ -91,6 +91,8 @@ pub fn report_diagnostics_exit_on_error(
     );
 }
 
+// Report any warning diagnostics, and if the worst has `Warning` severity, and
+// `warnings_are_errors` is set, then exit and
 pub fn report_warnings(files: &FilesSourceText, warnings: Diagnostics, warnings_are_errors: bool) {
     if warnings.is_empty() {
         return;
@@ -100,6 +102,8 @@ pub fn report_warnings(files: &FilesSourceText, warnings: Diagnostics, warnings_
     report_diagnostics_impl(files, warnings, should_exit, warnings_are_errors);
 }
 
+// If `should_exit` and `exiting_due_to_warnings`, then append some useful message
+// to indicate that were are exiting due to config setting `warnings_are_errors`.
 fn report_diagnostics_impl(
     files: &FilesSourceText,
     diags: Diagnostics,
@@ -117,9 +121,10 @@ fn report_diagnostics_impl(
     if should_exit {
         if exiting_due_to_warnings {
             let _ = writer.write(
-                b"Exiting due to configuration requesting treatment of Warnings as Errors\n",
+                b"Exiting: Warnings found, and configuration requests that warnings be treated as errors\n",
             );
         }
+        let _ = writer.flush();
         std::process::exit(1);
     }
 }
