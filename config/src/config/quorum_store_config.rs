@@ -91,6 +91,10 @@ pub struct QuorumStoreConfig {
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
     pub allow_batches_without_pos_in_proposal: bool,
+    /// If this flag is enabled, then the proof queue will store txn summaries for all the proofs.
+    /// When counting the number of txns in the pipeline for QS backpressure, we can ignore the duplicates and count
+    /// the number of unique txns in the proof queue.
+    pub intelligent_proof_queue: bool,
 }
 
 impl Default for QuorumStoreConfig {
@@ -129,6 +133,7 @@ impl Default for QuorumStoreConfig {
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
             allow_batches_without_pos_in_proposal: true,
+            intelligent_proof_queue: false,
         }
     }
 }

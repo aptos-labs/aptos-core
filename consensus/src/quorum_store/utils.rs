@@ -209,10 +209,14 @@ pub struct ProofQueue {
     remaining_proofs: u64,
     remaining_local_txns: u64,
     remaining_local_proofs: u64,
+    /// If this flag is enabled, then the proof queue will store txn summaries for all the proofs.
+    /// When counting the number of txns in the pipeline for QS backpressure, we can ignore the duplicates and count
+    /// the number of unique txns in the proof queue.
+    intelligent_proof_queue: bool,
 }
 
 impl ProofQueue {
-    pub(crate) fn new(my_peer_id: PeerId) -> Self {
+    pub(crate) fn new(my_peer_id: PeerId, intelligent_proof_queue: bool) -> Self {
         Self {
             my_peer_id,
             author_to_batches: HashMap::new(),
@@ -225,6 +229,7 @@ impl ProofQueue {
             remaining_proofs: 0,
             remaining_local_txns: 0,
             remaining_local_proofs: 0,
+            intelligent_proof_queue,
         }
     }
 
@@ -303,6 +308,9 @@ impl ProofQueue {
         &mut self,
         batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
     ) {
+        if !self.intelligent_proof_queue {
+            return;
+        }
         let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {
             let batch_key = BatchKey::from_info(&batch_info);
@@ -539,6 +547,11 @@ impl ProofQueue {
         counters::NUM_TOTAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_proofs as f64);
         counters::NUM_LOCAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_local_txns as f64);
         counters::NUM_LOCAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_local_proofs as f64);
+        if !self.intelligent_proof_queue {
+            counters::PROOF_QUEUE_REMAINING_TXNS_DURATION.observe_duration(start.elapsed());
+            return (self.remaining_txns_with_duplicates, self.remaining_proofs);
+        }
+
         let remaining_txns_without_duplicates = self.remaining_txns_without_duplicates();
         counters::NUM_UNIQUE_TOTAL_TXNS_LEFT_ON_UPDATE
             .observe(remaining_txns_without_duplicates as f64);

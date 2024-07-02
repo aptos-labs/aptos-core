@@ -31,7 +31,7 @@ fn proof_of_store(author: PeerId, batch_id: BatchId, gas_bucket_start: u64) -> P
 #[test]
 fn test_proof_queue_sorting() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id);
+    let mut proof_queue = ProofQueue::new(my_peer_id, true);
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
@@ -103,7 +103,7 @@ fn test_proof_queue_sorting() {
 #[test]
 fn test_proof_calculate_remaining_txns_and_proofs() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id);
+    let mut proof_queue = ProofQueue::new(my_peer_id, true);
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
@@ -166,7 +166,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
 #[test]
 fn test_proof_pull_proofs_with_duplicates() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id);
+    let mut proof_queue = ProofQueue::new(my_peer_id, true);
 
     let txns = vec![
         TransactionSummary::new(PeerId::ONE, 0, HashValue::zero()),

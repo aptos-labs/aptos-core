@@ -364,6 +364,7 @@ impl InnerBuilder {
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
+            self.config.intelligent_proof_queue,
         );
         spawn_named!(
             "proof_manager",
