@@ -68,6 +68,10 @@ transforms:
           }
         }
       }
+      if exists(.fields) {
+        . = merge!(., .fields)
+        del(.fields)
+      }
       if exists(.level) && is_string(.level) {
         .level = downcase!(.level);
       }
@@ -78,3 +82,22 @@ transforms:
       if err == null {
         .timestamp = parsed_timestamp
       }
+
+  uptrace_logs:
+    type: remap
+    inputs:
+      - final_logs
+    source: |
+      . = flatten(., ".") # in order for fields to become individual, filterable top-level fields in uptrace we need to flatten nested objects into top-level keys.
+      .service.name = .k8s.labels.app
+
+  datadog_logs:
+    type: remap
+    inputs:
+      - final_logs
+    source: |
+      .ddsource = "k8s"
+      if is_string(.k8s.labels.app) {
+        .service = .k8s.labels.app
+      }
+      .ddtags, _ = "kube_cluster_name:" + .k8s.cluster + ",kube_namespace:" + .k8s.namespace + ",pod_name:" + .k8s.pod_name
