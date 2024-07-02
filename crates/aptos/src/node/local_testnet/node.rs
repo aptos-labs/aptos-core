@@ -141,6 +141,59 @@ impl NodeManager {
         })
     }
 
+    /// Creates a new NodeManager for indexer testing purposes.
+    /// An indexer testing node includes:
+    ///  - Constant seed: [123, 123, ..., 123]
+    ///  - Non-performance mode
+    ///  - No test config override supported
+    ///  - Endpoints are only avaialble on the same host
+    ///  - Txn stream enabled at default port
+    pub fn new_for_indexer_testing(config: &Option<PathBuf>, test_dir: PathBuf) -> Result<Self> {
+        const DEFAULT_SEED: [u8; 32] = [123; 32];
+        let rng = StdRng::from_seed(DEFAULT_SEED);
+
+        let mut node_config = load_node_config(
+            config,
+            &None,
+            &test_dir,
+            false,
+            false,
+            false,
+            aptos_cached_packages::head_release_bundle(),
+            rng,
+        )
+        .context("Failed to load / create config for node")?;
+
+        eprintln!();
+
+        // Always enable the grpc stream.
+        node_config.indexer_grpc.enabled = true;
+        node_config.indexer_grpc.use_data_service_interface = true;
+        node_config
+            .indexer_grpc
+            .address
+            .set_port(DEFAULT_GRPC_STREAM_PORT);
+        node_config.storage.enable_indexer = true;
+
+        // Bind to the requested address.
+        node_config
+            .api
+            .address
+            .set_ip(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        node_config
+            .indexer_grpc
+            .address
+            .set_ip(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        node_config.admin_service.address = Ipv4Addr::LOCALHOST.to_string();
+        node_config.inspection_service.address = Ipv4Addr::LOCALHOST.to_string();
+
+        Ok(NodeManager {
+            config: node_config,
+            test_dir,
+            no_node: false,
+        })
+    }
+
     pub fn get_node_api_url(&self) -> Url {
         socket_addr_to_url(&self.config.api.address, "http").unwrap()
     }
