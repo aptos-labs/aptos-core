@@ -835,48 +835,6 @@ impl Loader {
         Ok(())
     }
 
-    /// Similar to `check_dependencies_and_charge_gas`, except that this does not recurse
-    /// into transitive dependencies and allows non-existent modules.
-    pub(crate) fn check_dependencies_and_charge_gas_non_recursive_optional<'a, I>(
-        &self,
-        module_store: &ModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
-        ids: I,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-    {
-        for (addr, name) in ids.into_iter() {
-            // TODO: Allow the check of special addresses to be customized.
-            if addr.is_special() || visited.insert((addr, name), ()).is_some() {
-                continue;
-            }
-
-            // Load and deserialize the module only if it has not been cached by the loader.
-            // Otherwise this will cause a significant regression in performance.
-            let size = match module_store.module_at_by_ref(addr, name) {
-                Some(module) => module.size,
-                None => match data_store
-                    .load_compiled_module_to_cache(ModuleId::new(*addr, name.to_owned()), true)
-                {
-                    Ok((_module, size, _hash)) => size,
-                    Err(err) if err.major_status() == StatusCode::LINKER_ERROR => continue,
-                    Err(err) => return Err(err),
-                },
-            };
-
-            gas_meter
-                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
-                .map_err(|err| {
-                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                })?;
-        }
-
-        Ok(())
-    }
-
     // The interface for module loading. Aligned with `load_type` and `load_function`, this function
     // verifies that the module is OK instead of expect it.
     pub(crate) fn load_module(
