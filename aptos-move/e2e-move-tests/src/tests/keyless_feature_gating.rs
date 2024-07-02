@@ -79,13 +79,12 @@ fn test_feature_gating(
 }
 
 // TODO: I shouldn't have to import arkworks to use the proof simulation APIs here.
-//  - One sub-problem is that the exported types are generic, which forces an import of ark to
+//  1 One sub-problem is that the exported types are generic, which forces an import of ark to
 //    instantiate them. That can be fixed by keeping the generic types (which are nice) but wrapping
 //    them in another layer for BN254.
-//  - You should also expose an API that allows simulating keyless proofs and takes the actual keyless
-//    inputs, not field elements as inputs. Again, to avoid dependency on ark.
-//  - Another sub-problem is the RNG, which is not the right version... so we cannot pass our RNG
+//  2 Another sub-problem is the RNG, which is not the right version... so we cannot pass our RNG
 //    from aptos-core into your functions.
+//  3 The proof simulation API should take a `Trapdoor` and an `ark_bn254::Fr` and return a `aptos_types::keyless::Groth16Proof`
 fn generate_vk() -> (Trapdoor, Groth16VerificationKey) {
     let mut rng = thread_rng();
     let (prk, vrk) = bn254_circuit_agnostic_setup_with_trapdoor(&mut rng, 1);
