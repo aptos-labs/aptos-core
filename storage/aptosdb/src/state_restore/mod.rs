@@ -259,8 +259,6 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
                 .unwrap()
                 .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)
         };
-        // Write KV out first because we are likely to resume according to the rightmost key in the
-        // tree after crashing.
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => kv_fn()?,
             StateSnapshotRestoreMode::TreeOnly => tree_fn()?,
