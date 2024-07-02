@@ -54,7 +54,7 @@ pub fn make_all(
         ("dispatchable_withdraw", native_dispatch as RawSafeNative),
         ("dispatchable_deposit", native_dispatch),
         ("dispatchable_derived_balance", native_dispatch),
-        ("dispatchable_derived_supply", native_dispatch)
+        ("dispatchable_derived_supply", native_dispatch),
     ];
 
     builder.make_named_natives(natives)
