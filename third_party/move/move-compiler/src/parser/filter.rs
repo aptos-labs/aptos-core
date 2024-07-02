@@ -2,8 +2,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::parser::ast as P;
+use crate::parser::{
+    ast as P,
+    ast::{ModuleMember, SpecBlockTarget_},
+};
 use move_ir_types::location::sp;
+use move_symbol_pool::Symbol;
+use std::collections::BTreeSet;
 
 /// A trait that decides whether to include a parsed element in the compilation
 pub trait FilterContext {
@@ -56,8 +61,10 @@ pub trait FilterContext {
         &mut self,
         function_def: P::Function,
         is_source_def: bool,
+        filtered_members: &mut BTreeSet<Symbol>,
     ) -> Option<P::Function> {
         if self.should_remove_by_attributes(&function_def.attributes, is_source_def) {
+            filtered_members.insert(function_def.name.0.value);
             None
         } else {
             Some(function_def)
@@ -68,8 +75,10 @@ pub trait FilterContext {
         &mut self,
         struct_def: P::StructDefinition,
         is_source_def: bool,
+        filtered_members: &mut BTreeSet<Symbol>,
     ) -> Option<P::StructDefinition> {
         if self.should_remove_by_attributes(&struct_def.attributes, is_source_def) {
+            filtered_members.insert(struct_def.name.0.value);
             None
         } else {
             Some(struct_def)
@@ -233,7 +242,8 @@ fn filter_script<T: FilterContext>(
 
     // This is a bit weird, if the only function in the script is filtered, we consider
     // the whole script is filtered as well
-    let new_function = context.filter_map_function(function, is_source_def)?;
+    let new_function =
+        context.filter_map_function(function, is_source_def, &mut BTreeSet::new())?;
 
     let new_uses = uses
         .into_iter()
@@ -278,9 +288,29 @@ fn filter_module<T: FilterContext>(
         members,
     } = module_def;
 
+    // Collected filtered members in this set (functions and structs)
+    let mut filtered_members = BTreeSet::new();
+
     let new_members: Vec<_> = members
         .into_iter()
-        .filter_map(|member| filter_module_member(context, member, is_source_def))
+        .filter_map(|member| {
+            filter_module_member(context, member, is_source_def, &mut filtered_members)
+        })
+        .collect();
+
+    // Now remove all spec blocks for members which are filtered out
+    let new_members_filtered_spec_blocks = new_members
+        .into_iter()
+        .filter(|mem| {
+            if let ModuleMember::Spec(spec) = mem {
+                if let SpecBlockTarget_::Member(name, _) = &spec.value.target.value {
+                    if filtered_members.contains(&name.value) {
+                        return false;
+                    }
+                }
+            }
+            true
+        })
         .collect();
 
     Some(P::ModuleDefinition {
@@ -289,7 +319,7 @@ fn filter_module<T: FilterContext>(
         address,
         name,
         is_spec_module,
-        members: new_members,
+        members: new_members_filtered_spec_blocks,
     })
 }
 
@@ -297,15 +327,16 @@ fn filter_module_member<T: FilterContext>(
     context: &mut T,
     module_member: P::ModuleMember,
     is_source_def: bool,
+    filtered_members: &mut BTreeSet<Symbol>,
 ) -> Option<P::ModuleMember> {
     use P::ModuleMember as PM;
 
     match module_member {
         PM::Function(func_def) => context
-            .filter_map_function(func_def, is_source_def)
+            .filter_map_function(func_def, is_source_def, filtered_members)
             .map(PM::Function),
         PM::Struct(struct_def) => context
-            .filter_map_struct(struct_def, is_source_def)
+            .filter_map_struct(struct_def, is_source_def, filtered_members)
             .map(PM::Struct),
         PM::Spec(sp!(spec_loc, spec)) => context
             .filter_map_spec(spec, is_source_def)

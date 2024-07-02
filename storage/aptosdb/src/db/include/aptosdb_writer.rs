@@ -355,7 +355,6 @@ impl AptosDB {
             sharded_state_cache,
             &ledger_metadata_batch,
             &sharded_state_kv_batches,
-            &state_kv_metadata_batch,
             // Always put in state value index for now.
             // TODO(grao): remove after APIs migrated off the DB to the indexer.
             self.state_store.state_kv_db.enabled_sharding(),

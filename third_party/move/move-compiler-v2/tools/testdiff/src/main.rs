@@ -83,6 +83,7 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         ("typing/v1-naming", "naming"),
         ("typing/v1-operators", "operators"),
         ("typing/v1-signer", "signer"),
+        ("typing/v1-examples", "examples"),
         ("live-var/v1-commands", "commands"),
         ("live-var", "liveness"),
         ("visibility-checker/v1-typing", "typing"),
@@ -97,8 +98,8 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         ("acquires-checker/v1-borrow-tests", "borrow_tests"),
         ("attributes", "parser"),
         ("unit_test/notest", "unit_test"),
-        // Map file v2../unit_test/test/foo.move
-        //   to file v1../unit_test/foo.unit_test.move.
+        // Map file v2../unit_test/test/foo.exp
+        //   to file v1../unit_test/foo.unit_test.exp.
         ("unit_test/test", "unit_test.unit_test"),
         ("unused-assignment/v1-locals", "locals"),
         ("unused-assignment/v1-liveness", "liveness"),
@@ -108,6 +109,10 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         ("ability-check/v1-signer", "signer"),
         ("ability-check/v1-borrow-tests", "commands"),
         ("ability-check/v1-locals", "locals"),
+        ("verification/noverify", "verification"),
+        // Map file v2../verification/verify/foo.exp
+        //   to file v1../verification/foo.verification.exp.
+        ("verification/verify", "verification.verification"),
     ]
 });
 
@@ -205,7 +210,7 @@ fn collect_tests(root: &str) -> anyhow::Result<BTreeSet<PathBuf>> {
         let path_str = path.display().to_string();
         if path_str.ends_with(".move") {
             result.insert(path);
-        } else if path_str.ends_with(".unit_test") {
+        } else if path_str.ends_with(".unit_test") || path_str.ends_with(".verification") {
             result.insert(PathBuf::from(format!("{}.{}", path_str, "move")));
         }
     }

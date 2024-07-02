@@ -58,6 +58,7 @@ impl PayloadClient for MockPayloadManager {
         &self,
         _max_poll_time: Duration,
         _max_size: u64,
+        _max_unique_size: u64,
         _max_bytes: u64,
         _max_inline_size: u64,
         _max_inline_bytes: u64,

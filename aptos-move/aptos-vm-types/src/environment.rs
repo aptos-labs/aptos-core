@@ -89,16 +89,6 @@ impl Environment {
         ))
     }
 
-    pub fn with_features_for_testing(self, features: Features) -> Arc<Self> {
-        let ty_builder = aptos_default_ty_builder(&features);
-        Arc::new(Self::initialize(
-            features,
-            self.timed_features,
-            self.chain_id,
-            ty_builder,
-        ))
-    }
-
     pub fn try_enable_delayed_field_optimization(mut self) -> Self {
         if self.features.is_aggregator_v2_delayed_fields_enabled() {
             self.vm_config.delayed_field_optimization_enabled = true;
@@ -132,14 +122,12 @@ impl Environment {
         chain_id: ChainId,
         ty_builder: TypeBuilder,
     ) -> Self {
-        // By default, do not use delayed field optimization. Instead, clients should enable it
-        // manually where applicable.
-        let delayed_field_optimization_enabled = false;
+        let pseudo_meter_vector_ty_to_ty_tag_construction = true;
 
         let vm_config = aptos_prod_vm_config(
             &features,
             &timed_features,
-            delayed_field_optimization_enabled,
+            pseudo_meter_vector_ty_to_ty_tag_construction,
             ty_builder,
         );
 

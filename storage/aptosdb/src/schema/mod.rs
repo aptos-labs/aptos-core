@@ -20,7 +20,6 @@ pub(crate) mod stale_state_value_index;
 pub(crate) mod stale_state_value_index_by_key_hash;
 pub(crate) mod state_value;
 pub(crate) mod state_value_by_key_hash;
-pub(crate) mod state_value_index;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
 pub(crate) mod transaction_auxiliary_data;
@@ -110,7 +109,6 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::state_value_by_key_hash::StateValueByKeyHashSchema>(
                 data,
             );
-            assert_no_panic_decoding::<super::state_value_index::StateValueIndexSchema>(data);
             assert_no_panic_decoding::<super::transaction::TransactionSchema>(data);
             assert_no_panic_decoding::<super::transaction_accumulator::TransactionAccumulatorSchema>(
                 data,

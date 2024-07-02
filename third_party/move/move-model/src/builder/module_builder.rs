@@ -32,6 +32,7 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
+    LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -491,7 +492,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             struct_id,
             abilities,
             type_params,
-            StructLayout::None, // will be filled in during definition analysis
+            StructLayout::None, // will be filled in during definition analysis,
+            matches!(def.layout, EA::StructLayout::Native(_)),
         );
     }
 
@@ -518,6 +520,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
         let kind = if def.entry.is_some() {
+            if et.env().language_version.is_at_least(LanguageVersion::V2_0) && def.inline {
+                et.error(&et.to_loc(&def.loc), "An entry function cannot be inlined.");
+            }
             FunctionKind::Entry
         } else if def.inline {
             FunctionKind::Inline
@@ -3447,6 +3452,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     Some(variants)
                 },
                 spec: RefCell::new(spec),
+                is_native: entry.is_native,
             };
             struct_data.insert(StructId::new(name.symbol), data);
         }

@@ -9,7 +9,9 @@ use std::{fmt, fmt::Formatter};
 pub enum GetPayloadCommand {
     /// Request to pull block to submit to consensus.
     GetPayloadRequest(
-        // max block size
+        // max number of transactions in the block
+        u64,
+        // max number of unique transactions in the block
         u64,
         // max byte size
         u64,
@@ -31,6 +33,7 @@ impl fmt::Display for GetPayloadCommand {
         match self {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
+                max_unique_txns,
                 max_bytes,
                 max_inline_txns,
                 max_inline_bytes,
@@ -40,8 +43,8 @@ impl fmt::Display for GetPayloadCommand {
             ) => {
                 write!(
                     f,
-                    "GetPayloadRequest [max_txns: {}, max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}]",
-                    max_txns, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded
+                    "GetPayloadRequest [max_txns: {}, max_unique_txns: {}, max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}]",
+                    max_txns, max_unique_txns, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded
                 )
             },
         }

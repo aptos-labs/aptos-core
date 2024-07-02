@@ -161,7 +161,7 @@ fn test_db_indexer_data() {
     assert_eq!(db_indexer.get_persisted_version().unwrap(), total_version);
 
     let txn_iter = db_indexer
-        .get_account_transaction_version_iter(core_account.address(), 0, 1000, 1000)
+        .get_account_transaction_version_iter(core_account.address(), 0, 1000, total_version)
         .unwrap();
     let res: Vec<_> = txn_iter.collect();
 
@@ -174,7 +174,11 @@ fn test_db_indexer_data() {
     assert_eq!(res.len(), 27);
 
     let core_kv_iter = db_indexer
-        .get_prefixed_state_value_iterator(&StateKeyPrefix::from(core_account.address()), None, 12)
+        .get_prefixed_state_value_iterator(
+            &StateKeyPrefix::from(core_account.address()),
+            None,
+            total_version,
+        )
         .unwrap();
     let core_kv_res: Vec<_> = core_kv_iter.collect();
     assert_eq!(core_kv_res.len(), 5);
@@ -182,7 +186,7 @@ fn test_db_indexer_data() {
         .get_prefixed_state_value_iterator(
             &StateKeyPrefix::from(AccountAddress::from_hex_literal("0x1").unwrap()),
             None,
-            12,
+            total_version,
         )
         .unwrap();
     let address_one_kv_res: Vec<_> = address_one_kv_iter.collect();

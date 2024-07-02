@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{
-        account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
-        TransactionOptions, TransactionSummary,
+    common::{
+        init::Network,
+        types::{
+            account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
+            TransactionOptions, TransactionSummary,
+        },
     },
     config::GlobalConfig,
     CliResult,
@@ -561,5 +564,33 @@ pub fn view_json_option_str(option_ref: &serde_json::Value) -> CliTypedResult<Op
             "JSON field does not have an inner `vec` field: {}",
             option_ref
         )))
+    }
+}
+
+pub fn explorer_account_link(hash: AccountAddress, network: Option<Network>) -> String {
+    // For now, default to what the browser is already on, though the link could be wrong
+    if let Some(network) = network {
+        format!(
+            "https://explorer.aptoslabs.com/account/{}?network={}",
+            hash, network
+        )
+    } else {
+        format!("https://explorer.aptoslabs.com/account/{}", hash)
+    }
+}
+
+pub fn explorer_transaction_link(
+    hash: aptos_crypto::HashValue,
+    network: Option<Network>,
+) -> String {
+    // For now, default to what the browser is already on, though the link could be wrong
+    if let Some(network) = network {
+        format!(
+            "https://explorer.aptoslabs.com/txn/{}?network={}",
+            hash.to_hex_literal(),
+            network
+        )
+    } else {
+        format!("https://explorer.aptoslabs.com/txn/{}", hash)
     }
 }
