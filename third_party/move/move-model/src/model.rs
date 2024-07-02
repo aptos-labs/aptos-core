@@ -3519,7 +3519,7 @@ impl<'env> StructEnv<'env> {
         variant: Option<Symbol>,
         offset: usize,
     ) -> FieldEnv<'env> {
-        // TODO: speed this up via a cache RefCell<BTreeMap<(variant, offset), FieldId>>
+        // We may speed this up via a cache RefCell<BTreeMap<(variant, offset), FieldId>>
         for field in self.get_fields_optional_variant(variant) {
             if field.get_offset() == offset {
                 return field;

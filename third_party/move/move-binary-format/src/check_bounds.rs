@@ -599,7 +599,18 @@ impl<'a> BoundsChecker<'a> {
                         &self.view.struct_variant_instantiations(),
                         *idx,
                         bytecode_offset,
-                    )?
+                    )?;
+                    // check type parameters
+                    if let Some(struct_variant_inst) = self
+                        .view
+                        .struct_variant_instantiations()
+                        .and_then(|s| s.get(idx.into_index()))
+                    {
+                        self.check_type_parameters_in_signature(
+                            struct_variant_inst.type_parameters,
+                            type_param_count,
+                        )?;
+                    }
                 },
                 // Instructions that refer to this code block.
                 BrTrue(offset) | BrFalse(offset) | Branch(offset) => {

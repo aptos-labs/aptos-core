@@ -485,6 +485,8 @@ pub fn compile_module<'a>(
         metadata: vec![],
         struct_defs,
         function_defs,
+        // TODO(#13806): Move IR does not support enums and it is likely be retired. Decide
+        //    whether we want to support this here.
         struct_variant_handles: vec![],
         struct_variant_instantiations: vec![],
         variant_field_handles: vec![],

@@ -167,7 +167,8 @@ fn test_variant(
     offset: CodeOffset,
 ) -> PartialVMResult<()> {
     let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
-    let value = state.test_variant(offset, id)?;
+    // Testing a variant behaves like a read operation on the reference
+    let value = state.read_ref(offset, id)?;
     verifier.stack.push(value);
     Ok(())
 }

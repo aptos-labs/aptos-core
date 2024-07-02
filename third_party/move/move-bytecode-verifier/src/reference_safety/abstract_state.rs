@@ -406,19 +406,6 @@ impl AbstractState {
         Ok(AbstractValue::NonReference)
     }
 
-    pub fn test_variant(
-        &mut self,
-        offset: CodeOffset,
-        id: RefID,
-    ) -> PartialVMResult<AbstractValue> {
-        if !self.is_readable(id, None) {
-            return Err(self.error(StatusCode::READREF_EXISTS_MUTABLE_BORROW_ERROR, offset));
-        }
-
-        self.release(id);
-        Ok(AbstractValue::NonReference)
-    }
-
     pub fn write_ref(&mut self, offset: CodeOffset, id: RefID) -> PartialVMResult<()> {
         if !self.is_writable(id) {
             return Err(self.error(StatusCode::WRITEREF_EXISTS_BORROW_ERROR, offset));

@@ -191,6 +191,9 @@ fn borrow_field(
                 } else {
                     field_ty = Some(ty)
                 }
+            } else {
+                // If the struct variant has no field at this idx, this is an error
+                return Err(verifier.error(StatusCode::BORROWFIELD_BAD_FIELD_ERROR, offset));
             }
         }
         field_ty
