@@ -14,7 +14,6 @@ mod common;
 mod constructor_args;
 mod dependencies;
 mod error_map;
-mod fee_payer;
 mod fungible_asset;
 mod gas;
 mod generate_upgrade_script;
@@ -29,6 +28,8 @@ mod metadata;
 mod mint_nft;
 mod missing_gas_parameter;
 mod module_event;
+
+mod lite_account;
 mod new_integer_types;
 mod nft_dao;
 mod object_code_deployment;

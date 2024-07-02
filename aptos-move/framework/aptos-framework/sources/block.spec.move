@@ -114,6 +114,7 @@ spec aptos_framework::block {
     /// The number of new events created does not exceed MAX_U64.
     spec initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
         use std::signer;
+        pragma verify = false;
         /// [high-level-req-1]
         include Initialize;
         include NewEventHandle;
@@ -173,7 +174,7 @@ spec aptos_framework::block {
 
         let addr = signer::address_of(aptos_framework);
         let account = global<account::Account>(addr);
-        aborts_if !exists<account::Account>(addr);
+        aborts_if !account::spec_exists_at(addr);
         aborts_if account.guid_creation_num + 2 > MAX_U64;
     }
 

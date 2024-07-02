@@ -121,6 +121,7 @@ pub enum FeatureFlag {
     DefaultToConcurrentFungibleBalance,
     LimitVMTypeSize,
     AbortIfMultisigPayloadMismatch,
+    LiteAccount,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -316,6 +317,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AbortIfMultisigPayloadMismatch => {
                 AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
             },
+            FeatureFlag::LiteAccount => AptosFeatureFlag::LITE_ACCOUNT,
         }
     }
 }
@@ -440,6 +442,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH => {
                 FeatureFlag::AbortIfMultisigPayloadMismatch
             },
+            AptosFeatureFlag::LITE_ACCOUNT => FeatureFlag::LiteAccount,
         }
     }
 }

@@ -15,6 +15,8 @@ fn test_metadata_tracking() {
     let timestamp = CurrentTimeMicroseconds {
         microseconds: 7200000001,
     };
+    // Disable lite account
+    harness.enable_features(vec![], vec![FeatureFlag::LITE_ACCOUNT]);
 
     let coin_store = parse_struct_tag("0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>").unwrap();
 

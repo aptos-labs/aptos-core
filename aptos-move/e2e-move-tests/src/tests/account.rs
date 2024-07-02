@@ -1,11 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::MoveHarness;
+use crate::{assert_abort, MoveHarness};
 use aptos_cached_packages::aptos_stdlib::aptos_account_transfer;
 use aptos_language_e2e_tests::account::Account;
-use claims::assert_err_eq;
-use move_core_types::vm_status::StatusCode;
 
 #[test]
 fn non_existent_sender() {
@@ -20,6 +18,8 @@ fn non_existent_sender() {
         .sequence_number(0)
         .sign();
 
+    // lite_account will be created automatically.
     let status = h.run(txn);
-    assert_err_eq!(status.status(), StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST);
+
+    assert_abort!(status, 65542);
 }

@@ -1222,6 +1222,16 @@ Event emitted when a transaction's metadata is updated.
 ## Constants
 
 
+<a id="0x1_multisig_account_ENOT_OWNER"></a>
+
+Account executing this operation is not an owner of the multisig account.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_OWNER">ENOT_OWNER</a>: u64 = 2003;
+</code></pre>
+
+
+
 <a id="0x1_multisig_account_ZERO_AUTH_KEY"></a>
 
 
@@ -1359,16 +1369,6 @@ Transaction has not received enough rejections to be officially rejected.
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_REJECTIONS">ENOT_ENOUGH_REJECTIONS</a>: u64 = 10;
-</code></pre>
-
-
-
-<a id="0x1_multisig_account_ENOT_OWNER"></a>
-
-Account executing this operation is not an owner of the multisig account.
-
-
-<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_OWNER">ENOT_OWNER</a>: u64 = 2003;
 </code></pre>
 
 
@@ -4055,8 +4055,7 @@ Add new owners, remove owners to remove, update signatures required.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator);
-<b>let</b> owner_nonce = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator).sequence_number;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator) && !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_lite_account_enabled">features::spec_lite_account_enabled</a>();
 </code></pre>
 
 

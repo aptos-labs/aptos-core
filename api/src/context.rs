@@ -28,7 +28,9 @@ use aptos_storage_interface::{
 use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
-    account_config::{AccountResource, NewBlockEvent},
+    account_config::{
+        lite_account, lite_account::LiteAccountGroup, AccountResource, NewBlockEvent,
+    },
     block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     contract_event::EventWithVersion,
@@ -50,7 +52,7 @@ use mini_moka::sync::Cache;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    move_resource::MoveResource,
+    move_resource::{MoveResource, MoveStructType},
 };
 use serde::Serialize;
 use std::{
@@ -312,6 +314,25 @@ impl Context {
             .map_err(|err| anyhow!(format!("Failed to deserialize resource: {}", err)))
     }
 
+    pub fn get_resource_from_group<T: MoveResource>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+        resource_group_tag: &StructTag,
+    ) -> Result<Option<T>> {
+        let bytes_opt = self.get_state_value(
+            &StateKey::resource_group(&address, resource_group_tag),
+            version,
+        )?;
+        let group: Option<BTreeMap<StructTag, Vec<u8>>> = bytes_opt
+            .map(|bytes| bcs::from_bytes(&bytes))
+            .transpose()
+            .map_err(|err| anyhow!(format!("Failed to deserialize resource group: {}", err)))?;
+        Ok(group
+            .and_then(|g| g.get(&T::struct_tag()).map(|b| bcs::from_bytes(b)))
+            .transpose()?)
+    }
+
     pub fn get_resource_poem<T: MoveResource, E: InternalError>(
         &self,
         address: AccountAddress,
@@ -325,6 +346,20 @@ impl Context {
             })
     }
 
+    pub fn get_resource_from_group_poem<T: MoveResource, E: InternalError>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+        resource_group_tag: &StructTag,
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<Option<T>, E> {
+        self.get_resource_from_group(address, version, resource_group_tag)
+            .context("Failed to read account resource.")
+            .map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+            })
+    }
+
     pub fn expect_resource_poem<T: MoveResource, E: InternalError + NotFoundError>(
         &self,
         address: AccountAddress,
@@ -332,6 +367,27 @@ impl Context {
         latest_ledger_info: &LedgerInfo,
     ) -> Result<T, E> {
         self.get_resource_poem(address, version, latest_ledger_info)?
+            .ok_or_else(|| {
+                E::not_found_with_code(
+                    format!(
+                        "{} not found under address {}",
+                        T::struct_identifier(),
+                        address,
+                    ),
+                    AptosErrorCode::ResourceNotFound,
+                    latest_ledger_info,
+                )
+            })
+    }
+
+    pub fn expect_resource_from_group_poem<T: MoveResource, E: InternalError + NotFoundError>(
+        &self,
+        address: AccountAddress,
+        version: Version,
+        resource_group_tag: &StructTag,
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<T, E> {
+        self.get_resource_from_group_poem(address, version, resource_group_tag, latest_ledger_info)?
             .ok_or_else(|| {
                 E::not_found_with_code(
                     format!(
@@ -757,13 +813,20 @@ impl Context {
     ) -> Result<Vec<TransactionOnChainData>, E> {
         let start_seq_number = if let Some(start_seq_number) = start_seq_number {
             start_seq_number
+        } else if let Ok(account_v1) = self.expect_resource_poem::<AccountResource, E>(
+            address,
+            ledger_info.version(),
+            ledger_info,
+        ) {
+            account_v1.sequence_number().saturating_sub(limit as u64)
         } else {
-            self.expect_resource_poem::<AccountResource, E>(
+            self.expect_resource_from_group_poem::<lite_account::AccountResource, E>(
                 address,
                 ledger_info.version(),
+                &LiteAccountGroup::struct_tag(),
                 ledger_info,
             )?
-            .sequence_number()
+            .sequence_number
             .saturating_sub(limit as u64)
         };
 

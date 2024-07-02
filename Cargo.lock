@@ -4106,6 +4106,7 @@ dependencies = [
  "move-transactional-test-runner",
  "move-vm-runtime",
  "once_cell",
+ "serde",
  "serde_json",
  "tempfile",
 ]

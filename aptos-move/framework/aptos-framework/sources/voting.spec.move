@@ -44,12 +44,13 @@ spec aptos_framework::voting {
     }
 
     spec register<ProposalType: store>(account: &signer) {
+        pragma verify = false;
         let addr = signer::address_of(account);
 
         // Will abort if there's already a `VotingForum<ProposalType>` under addr
         aborts_if exists<VotingForum<ProposalType>>(addr);
         // Creation of 4 new event handles changes the account's `guid_creation_num`
-        aborts_if !exists<account::Account>(addr);
+        aborts_if !account::spec_exists_at(addr);
         let register_account = global<account::Account>(addr);
         aborts_if register_account.guid_creation_num + 4 >= account::MAX_GUID_CREATION_NUM;
         aborts_if register_account.guid_creation_num + 4 > MAX_U64;

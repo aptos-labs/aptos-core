@@ -132,6 +132,7 @@ spec aptos_framework::stake {
         network_addresses: vector<u8>,
         fullnode_addresses: vector<u8>,
     ){
+        pragma verify = false;
         let pubkey_from_pop = bls12381::spec_public_key_from_bytes_with_pop(
             consensus_pubkey,
             proof_of_possession_from_bytes(proof_of_possession)

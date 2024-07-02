@@ -40,6 +40,7 @@ move-symbol-pool = { workspace = true }
 move-transactional-test-runner = { workspace = true }
 move-vm-runtime = { workspace = true }
 once_cell = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 

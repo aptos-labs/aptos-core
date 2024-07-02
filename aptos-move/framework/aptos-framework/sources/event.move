@@ -8,6 +8,7 @@ module aptos_framework::event {
     use aptos_framework::guid::GUID;
 
     friend aptos_framework::account;
+    friend aptos_framework::lite_account;
     friend aptos_framework::object;
 
     /// Emit a module event with payload `msg`.

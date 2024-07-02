@@ -13,8 +13,11 @@ use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use arr_macro::arr;
 use bytes::Bytes;
-use move_core_types::move_resource::MoveResource;
-use std::{collections::HashMap, ops::Deref};
+use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Deref,
+};
 
 pub mod errors;
 pub mod in_memory_state_view;
@@ -135,6 +138,24 @@ pub trait MoveResourceExt: MoveResource {
             .get_state_value_bytes(&state_key)?
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()?)
+    }
+
+    fn fetch_move_resource_from_group(
+        state_view: &dyn StateView,
+        address: &AccountAddress,
+        resource_group_tag: &StructTag,
+    ) -> Result<Option<Self>> {
+        let state_key = StateKey::resource_group(address, resource_group_tag);
+        Ok(match state_view.get_state_value_bytes(&state_key)? {
+            Some(group_bytes) => {
+                let group: BTreeMap<StructTag, Bytes> = bcs::from_bytes(&group_bytes)?;
+                group
+                    .get(&Self::struct_tag())
+                    .map(|bytes| bcs::from_bytes(bytes.as_ref()))
+                    .transpose()?
+            },
+            None => None,
+        })
     }
 }
 
