@@ -73,7 +73,7 @@ permissions:
 
 jobs:
   rust-all:
-    runs-on: experimental-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v3
         with:
