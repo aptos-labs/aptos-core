@@ -120,6 +120,7 @@ impl Env {
     }
 
     /// Check if the current generation has reached the timeout
+    #[inline]
     pub fn check_timeout(&self) -> bool {
         self.start_time.elapsed() > self.timeout
     }
@@ -190,6 +191,7 @@ impl Env {
     }
 
     /// Return the current expression depth
+    #[inline]
     pub fn curr_expr_depth(&self) -> usize {
         self.expr_depth
     }
@@ -209,6 +211,7 @@ impl Env {
 
     /// Randomly choose a number of depth to increase the expression depth.
     /// This allows us to end early in some cases.
+    #[inline]
     pub fn increase_expr_depth(&mut self, u: &mut Unstructured) {
         let inc = u.choose(&[1, 2, 3]).unwrap();
         self.expr_depth += *inc;
@@ -219,6 +222,7 @@ impl Env {
     /// Decrease the expression depth by the last increased amount.
     /// This should be called after `increase_expr_depth` and
     /// they should always be in pairs.
+    #[inline]
     pub fn decrease_expr_depth(&mut self) {
         let dec = self.expr_depth_history.pop().unwrap();
         self.expr_depth -= dec;
@@ -227,6 +231,7 @@ impl Env {
 
     /// Randomly choose a number of depth to increase the type depth.
     /// This allows us to end early in some cases.
+    #[inline]
     pub fn increase_type_depth(&mut self, u: &mut Unstructured) {
         let inc = u.choose(&[1, 2, 3]).unwrap();
         self.type_depth += *inc;
@@ -237,6 +242,7 @@ impl Env {
     /// Decrease the type depth by the last increased amount.
     /// This should be called after `increase_type_depth` and
     /// they should always be in pairs.
+    #[inline]
     pub fn decrease_type_depth(&mut self) {
         let dec = self.type_depth_history.pop().unwrap();
         self.type_depth -= dec;
@@ -244,6 +250,7 @@ impl Env {
     }
 
     /// Check if the current type depth has reached the limit
+    #[inline]
     pub fn reached_type_depth_limit(&self) -> bool {
         self.type_depth >= self.max_expr_depth
     }

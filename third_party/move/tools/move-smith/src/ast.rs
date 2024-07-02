@@ -51,7 +51,6 @@ pub struct Script {
 pub struct Function {
     pub visibility: Visibility,
     pub signature: FunctionSignature,
-    // pub inline: bool,
     pub body: Option<Block>,
 }
 
@@ -64,6 +63,7 @@ pub struct Visibility {
 /// A function signature.
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
+    pub inline: bool,
     pub type_parameters: TypeParameters,
     pub name: Identifier,
     pub parameters: Vec<(Identifier, Type)>,
@@ -131,6 +131,7 @@ pub struct Declaration {
     pub typ: Type,
     pub name: Identifier,
     pub value: Option<Expression>,
+    pub emit_type: bool,
 }
 
 /// An expression.

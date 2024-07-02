@@ -122,6 +122,42 @@ impl MoveSmith {
         // we use `//# run`` to execute the functions instead
         self.script = None;
 
+        self.post_process(u)?;
+
+        Ok(())
+    }
+
+    /// Post process the generated Move module to fix simple errors
+    pub fn post_process(&self, u: &mut Unstructured) -> Result<()> {
+        for m in self.modules.iter() {
+            self.post_process_module(u, m)?;
+        }
+        Ok(())
+    }
+
+    pub fn post_process_module(
+        &self,
+        u: &mut Unstructured,
+        module: &RefCell<Module>,
+    ) -> Result<()> {
+        for f in module.borrow().functions.iter() {
+            self.post_process_function(u, f)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn post_process_function(
+        &self,
+        _u: &mut Unstructured,
+        function: &RefCell<Function>,
+    ) -> Result<()> {
+        let body_code = function.borrow().body.as_ref().unwrap().inline();
+        let self_name = function.borrow().signature.name.inline();
+
+        if body_code.contains(&self_name) {
+            function.borrow_mut().signature.inline = false;
+        }
         Ok(())
     }
 
@@ -282,6 +318,7 @@ impl MoveSmith {
             // should not be used elsewhere other than with `//# run`
             let runner = Function {
                 signature: FunctionSignature {
+                    inline: false,
                     type_parameters: TypeParameters::default(),
                     name: Identifier::new(
                         format!("{}_runner_{}", signature.name.name, i),
@@ -619,7 +656,10 @@ impl MoveSmith {
             }
         }
 
+        let inline = bool::arbitrary(u)?;
+
         Ok(FunctionSignature {
+            inline,
             type_parameters: TypeParameters { type_parameters },
             name,
             parameters,
@@ -808,7 +848,20 @@ impl MoveSmith {
         let value = Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?);
         // Keeps track of the type of the newly created variable
         self.env_mut().type_pool.insert_mapping(&name, &typ);
-        Ok(Declaration { typ, name, value })
+
+        // Only ignore small portion of type annotations
+        let emit_type = match u.int_in_range(0..=3)? {
+            0..=2 => true,
+            3 => false,
+            _ => panic!("Invalid number for choosing emit_type"),
+        };
+
+        Ok(Declaration {
+            typ,
+            name,
+            value,
+            emit_type,
+        })
     }
 
     /// Generate a random expression.
@@ -965,7 +1018,7 @@ impl MoveSmith {
 
             // Try to concretize the type and check if the concretized type
             // will create a cycle, if so, retry concretziation
-            let concretized = loop {
+            let concretized: Option<Type> = loop {
                 let candidate = self.concretize_type(
                     u,
                     &Type::TypeParameter(tp.clone()),

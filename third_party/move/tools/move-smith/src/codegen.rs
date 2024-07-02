@@ -96,6 +96,7 @@ impl CodeGenerator for Script {
         let mut code = vec!["//# run".to_string(), "script {".to_string()];
         let main = Function {
             signature: FunctionSignature {
+                inline: false,
                 name: Identifier::new_str("main", IDKind::Function),
                 parameters: Vec::new(),
                 type_parameters: TypeParameters::default(),
@@ -249,11 +250,14 @@ impl CodeGenerator for Function {
             ""
         };
 
+        let inline = if self.signature.inline { "inline " } else { "" };
+
         let type_params = self.signature.type_parameters.inline();
 
         let mut code = vec![format!(
-            "{}fun {}{}({}){}",
+            "{}{}fun {}{}({}){}",
             visibility,
+            inline,
             self.signature.name.emit_code(),
             type_params,
             parameters,
@@ -307,11 +311,11 @@ impl CodeGenerator for Statement {
 }
 impl CodeGenerator for Declaration {
     fn emit_code_lines(&self) -> Vec<String> {
-        let mut code = vec![format!(
-            "let {}: {}",
-            self.name.emit_code(),
-            self.typ.emit_code()
-        )];
+        let type_anno = match self.emit_type {
+            true => format!(": {}", self.typ.emit_code()),
+            false => "".to_string(),
+        };
+        let mut code = vec![format!("let {}{}", self.name.emit_code(), type_anno,)];
         if let Some(ref expr) = self.value {
             code[0].push_str(" = ");
             let rhs = expr.emit_code_lines();

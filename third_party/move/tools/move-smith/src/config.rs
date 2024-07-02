@@ -54,6 +54,7 @@ impl Default for Config {
                 "unassigned variable".to_string(),
                 "unbound type".to_string(),
                 "incompatible types".to_string(),
+                "recursion during function inlining".to_string(),
             ],
 
             experiment_combos: vec![

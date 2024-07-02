@@ -19,6 +19,7 @@ fn simple_module() -> Module {
         name: Identifier::new_str("SimpleModule", IDKind::Module),
         functions: vec![RefCell::new(Function {
             signature: FunctionSignature {
+                inline: false,
                 type_parameters: TypeParameters::default(),
                 name: Identifier::new_str("fun1", IDKind::Function),
                 parameters: vec![
