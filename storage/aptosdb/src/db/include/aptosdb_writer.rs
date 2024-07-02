@@ -220,6 +220,10 @@ impl DbWriter for AptosDB {
         let latest_version = self.get_latest_ledger_info_version()?;
         let target_version = ledger_info_with_sigs.ledger_info().version();
 
+        // Update in-memory state first, as this is what
+        // concurrent readers would use for the latest ledger info.
+        self.pre_revert(latest_version, &ledger_info_with_sigs);
+
         // Update the provided ledger info and the overall commit progress
         let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
         self.commit_ledger_info(target_version, new_root_hash, Some(&ledger_info_with_sigs))?;
