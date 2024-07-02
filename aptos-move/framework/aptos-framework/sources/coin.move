@@ -783,7 +783,10 @@ module aptos_framework::coin {
     #[view]
     /// Returns `true` if `account_addr` is registered to receive `CoinType`.
     public fun is_account_registered<CoinType>(account_addr: address): bool acquires CoinConversionMap {
-        assert!(is_coin_initialized<CoinType>(), error::invalid_argument(ECOIN_INFO_NOT_PUBLISHED));
+        // If the coin doesn't exist, then it can't be registered
+        if (!is_coin_initialized<CoinType>()) {
+            return false
+        };
         if (exists<CoinStore<CoinType>>(account_addr)) {
             true
         } else {
