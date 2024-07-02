@@ -546,6 +546,9 @@ impl ProofQueue {
                                     self.txn_summary_num_occurrences.get_mut(txn_summary)
                                 {
                                     *count -= 1;
+                                    if *count == 0 {
+                                        self.txn_summary_num_occurrences.remove(txn_summary);
+                                    }
                                 };
                             }
                         }
@@ -559,8 +562,6 @@ impl ProofQueue {
                 }
             }
         }
-        self.txn_summary_num_occurrences
-            .retain(|_, count| *count > 0);
         counters::PROOF_QUEUE_UPDATE_TIMESTAMP_DURATION.observe_duration(start.elapsed());
         counters::NUM_PROOFS_EXPIRED_WHEN_COMMIT.inc_by(num_expired_but_not_committed);
     }
@@ -630,8 +631,8 @@ impl ProofQueue {
 
         // Number of txns in unexpired and uncommitted proofs without summaries in batch_to_txn_summaries
         counters::TXNS_IN_PROOFS_WITHOUT_SUMMARIES.observe(
-            (remaining_txns_without_duplicates - self.txn_summary_num_occurrences.len() as u64)
-                as f64,
+            remaining_txns_without_duplicates
+                .saturating_sub(self.txn_summary_num_occurrences.len() as u64) as f64,
         );
 
         counters::PROOFS_WITHOUT_BATCH_SUMMARY
@@ -659,13 +660,14 @@ impl ProofQueue {
                 for txn_summary in txn_summaries {
                     if let Some(count) = self.txn_summary_num_occurrences.get_mut(txn_summary) {
                         *count -= 1;
+                        if *count == 0 {
+                            self.txn_summary_num_occurrences.remove(txn_summary);
+                        }
                     };
                 }
             }
             self.batch_to_txn_summaries.remove(&batch_key);
         }
-        self.txn_summary_num_occurrences
-            .retain(|_, count| *count > 0);
         counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
     }
 }
