@@ -6,8 +6,9 @@ use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_ff::Field;
 use ark_relations::r1cs::{ConstraintSynthesizer, SynthesisError};
+use rand::RngCore;
 use ark_std::{
-    rand::{RngCore, SeedableRng},
+    rand::SeedableRng,
     test_rng, UniformRand,
 };
 use ark_std::{marker::PhantomData, vec::Vec};
@@ -41,7 +42,7 @@ pub struct Groth16Simulator<E: Pairing, QAP: R1CSToQAP = LibsnarkReduction> {
 /// The simulation prover key for for the Groth16 zkSNARK, used only for simulating proofs with the
 /// secret trapdoor information
 #[derive(Clone, Debug, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct ProvingKeyWithTrapdoor<E: Pairing> {
+pub struct Trapdoor<E: Pairing> {
     /// Vector of elements from the verifying key
     pub gamma_abc_g1: Vec<E::G1Affine>,
     /// Trapdoor alpha
@@ -63,13 +64,31 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     fn circuit_agnostic_setup_with_trapdoor<R: RngCore>(
         rng: &mut R,
         num_public_inputs: u32,
-    ) -> Result<(ProvingKeyWithTrapdoor<E>, VerifyingKey<E>), SynthesisError> {
-        let alpha = E::ScalarField::rand(rng);
+    ) -> Result<(Trapdoor<E>, VerifyingKey<E>), SynthesisError> {
+        let mut alpha_bytes: [u8; 32];
+        rng.fill_bytes(&mut alpha_bytes);
+        let alpha = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
+        let beta_bytes: [u8; 32];
+        rng.fill_bytes(&mut beta_bytes);
+        let beta = E::ScalarField::from_random_bytes(&beta_bytes).unwrap();
+        let gamma_bytes: [u8; 32];
+        rng.fill_bytes(&mut gamma_bytes);
+        let gamma = E::ScalarField::from_random_bytes(&gamma_bytes).unwrap();
+        let delta_bytes: [u8; 32];
+        rng.fill_bytes(&mut delta_bytes);
+        let delta = E::ScalarField::from_random_bytes(&delta_bytes).unwrap();
+        let g1_gen_bytes: [u8; 32];
+        rng.fill_bytes(&mut g1_gen_bytes);
+        let g1_generator = E::G1Affine::from_random_bytes(&g1_gen_bytes).unwrap();
+        let g2_gen_bytes: [u8; 32];
+        rng.fill_bytes(&mut g2_gen_bytes);
+        let g2_generator = E::G2Affine::from_random_bytes(&g2_gen_bytes).unwrap();
+        /*let alpha = E::ScalarField::rand(rng);
         let beta = E::ScalarField::rand(rng);
         let gamma = E::ScalarField::rand(rng);
         let delta = E::ScalarField::rand(rng);
         let g1_generator = E::G1::rand(rng);
-        let g2_generator = E::G2::rand(rng);
+        let g2_generator = E::G2::rand(rng);*/
         let alpha_g1 = g1_generator * alpha;
         let beta_g2 = g2_generator * beta;
         let gamma_g2 = g2_generator * gamma;
@@ -78,9 +97,18 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         let mut gamma_abc_g1 = Vec::new();
 
         for _i in 0..num_public_inputs+1 {
-            let a = E::ScalarField::rand(rng);
-            let b = E::ScalarField::rand(rng);
-            let c = E::ScalarField::rand(rng);
+            let mut a_bytes: [u8; 32];
+            rng.fill_bytes(&mut a_bytes);
+            let a = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
+            let mut b_bytes: [u8; 32];
+            rng.fill_bytes(&mut b_bytes);
+            let b = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
+            let mut c_bytes: [u8; 32];
+            rng.fill_bytes(&mut c_bytes);
+            let c = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
+            //let a = E::ScalarField::rand(rng);
+            //let b = E::ScalarField::rand(rng);
+            //let c = E::ScalarField::rand(rng);
             let mut acc = beta * a + alpha * b + c;
             acc = acc * gamma.inverse().unwrap();
             let gamma_abc_g1_i = g1_generator * acc;
@@ -95,14 +123,14 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
             gamma_abc_g1: gamma_abc_g1.clone(),
         };
 
-        let pk = ProvingKeyWithTrapdoor {
+        let pk = Trapdoor {
             gamma_abc_g1: gamma_abc_g1.clone(),
             alpha,
             beta,
             delta,
             gamma,
-            g1: g1_generator.into_affine(),
-            g2: g2_generator.into_affine(),
+            g1: g1_generator,
+            g2: g2_generator,
         };
 
         Ok((pk, vk))
@@ -111,7 +139,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     fn circuit_specific_setup_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
         circuit: C,
         rng: &mut R,
-    ) -> Result<(ProvingKeyWithTrapdoor<E>, VerifyingKey<E>), SynthesisError> {
+    ) -> Result<(Trapdoor<E>, VerifyingKey<E>), SynthesisError> {
         let (pk, vk) = Self::generate_random_parameters_and_trapdoor_with_reduction(circuit, rng)?;
 
         Ok((pk, vk))
@@ -123,7 +151,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     pub fn generate_random_parameters_and_trapdoor_with_reduction<C>(
         circuit: C,
         rng: &mut impl Rng,
-    ) -> R1CSResult<(ProvingKeyWithTrapdoor<E>, VerifyingKey<E>)>
+    ) -> R1CSResult<(Trapdoor<E>, VerifyingKey<E>)>
     where
         C: ConstraintSynthesizer<E::ScalarField>,
     {
@@ -147,7 +175,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         ).unwrap();
 
         Ok((
-        ProvingKeyWithTrapdoor {
+        Trapdoor {
             gamma_abc_g1: pk.vk.gamma_abc_g1.clone(),
             alpha,
             beta,
@@ -165,7 +193,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     #[inline]
     pub fn create_random_proof_with_trapdoor(
         public_inputs: &[E::ScalarField],
-        pk: &ProvingKeyWithTrapdoor<E>,
+        pk: &Trapdoor<E>,
         rng: &mut impl Rng,
     ) -> R1CSResult<Proof<E>>
     where
@@ -179,7 +207,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     /// Creates proof using the trapdoor
     #[cfg(test)]
     pub fn create_proof_with_trapdoor(
-        pk: &ProvingKeyWithTrapdoor<E>,
+        pk: &Trapdoor<E>,
         a: E::ScalarField,
         b: E::ScalarField,
         input_assignment: &[E::ScalarField],
@@ -270,7 +298,7 @@ where
     let beta = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(beta).unwrap();
     let delta = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(delta).unwrap();
     let gamma = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(gamma).unwrap();
-    let pk =  ProvingKeyWithTrapdoor {
+    let pk =  Trapdoor {
         gamma_abc_g1: gamma_abc_g1.clone(),
         alpha,
         beta,
@@ -301,7 +329,7 @@ where
     }
 }
 
-pub fn bn254_circuit_agnostic_setup_with_trapdoor<R>(mut rng: &mut R, num_public_inputs: usize) -> (Trapdoor, Groth16VerificationKey)
+/*pub fn bn254_circuit_agnostic_setup_with_trapdoor<R>(mut rng: &mut R, num_public_inputs: usize) -> (Trapdoor<E>, Groth16VerificationKey)
     where R: RngCore
 {
     let (prk, vk) = Groth16Simulator::<Bn254>::circuit_agnostic_setup_with_trapdoor(&mut rng, num_public_inputs as u32).unwrap();
@@ -310,7 +338,7 @@ pub fn bn254_circuit_agnostic_setup_with_trapdoor<R>(mut rng: &mut R, num_public
     let vk = Groth16VerificationKey::from(&pvk);
 
     (prk, vk)
-}
+}*/
 
 fn test_prove_and_verify_circuit_agnostic<E>(n_iters: usize)
 where
