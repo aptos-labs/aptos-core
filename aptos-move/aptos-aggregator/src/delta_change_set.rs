@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Parallel data aggregation uses a `Delta` op. Every delta is is a state key
+//! Parallel data aggregation uses a `Delta` op. Every delta is a state key
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
