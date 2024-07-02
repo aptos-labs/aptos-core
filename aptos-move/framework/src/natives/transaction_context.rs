@@ -368,6 +368,25 @@ fn native_multisig_payload_internal(
     }
 }
 
+fn native_raw_txn_hash_internal(
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_SENDER_BASE)?;
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+    if let Some(transaction_context) = user_transaction_context_opt {
+        Ok(smallvec![Value::vector_u8(
+            transaction_context.raw_txn_hash()
+        )])
+    } else {
+        Err(SafeNativeError::Abort {
+            abort_code: error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+        })
+    }
+}
+
 fn get_user_transaction_context_opt_from_context<'a>(
     context: &'a SafeNativeContext,
 ) -> &'a Option<UserTransactionContext> {
@@ -405,6 +424,7 @@ pub fn make_all(
             "multisig_payload_internal",
             native_multisig_payload_internal,
         ),
+        ("raw_txn_hash_internal", native_raw_txn_hash_internal),
     ];
 
     builder.make_named_natives(natives)

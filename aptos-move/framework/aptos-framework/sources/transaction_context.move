@@ -182,6 +182,12 @@ module aptos_framework::transaction_context {
         payload.entry_function_payload
     }
 
+    /// Returns the hash of the current raw transaction.
+    public fun raw_txn_hash(): vector<u8> {
+        raw_txn_hash_internal()
+    }
+    native fun raw_txn_hash_internal(): vector<u8>;
+
     #[test()]
     fun test_auid_uniquess() {
         use std::vector;
@@ -256,6 +262,13 @@ module aptos_framework::transaction_context {
     #[test]
     #[expected_failure(abort_code=196609, location = Self)]
     fun test_call_multisig_payload() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _multisig = multisig_payload();
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_raw_txn_hash() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _multisig = multisig_payload();
     }
