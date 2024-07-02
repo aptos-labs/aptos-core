@@ -78,12 +78,9 @@ members = [
     "crates/aptos-retrier",
     "crates/aptos-runtimes",
     "crates/aptos-speculative-state-helper",
-<<<<<<< HEAD
-=======
     "crates/aptos-system-utils",
     "crates/aptos-telemetry",
     "crates/aptos-telemetry-service",
->>>>>>> upstream/main
     "crates/aptos-temppath",
     "crates/aptos-time-service",
     "crates/aptos-warp-webserver",
@@ -104,12 +101,6 @@ members = [
     "crates/validator-transaction-pool",
     "devtools/aptos-cargo-cli",
     "dkg",
-<<<<<<< HEAD
-    "ecosystem/indexer-grpc/indexer-grpc-data-access",
-    "ecosystem/indexer-grpc/indexer-grpc-fullnode",
-    "ecosystem/indexer-grpc/indexer-grpc-table-info",
-    "ecosystem/indexer-grpc/indexer-grpc-utils",
-=======
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
@@ -121,7 +112,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/nft-metadata-crawler-parser",
->>>>>>> upstream/main
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
@@ -182,13 +172,10 @@ members = [
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
     "testsuite/module-publish",
-<<<<<<< HEAD
-=======
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/evm/exec-utils",
     "third_party/move/evm/extract-ethereum-abi",
->>>>>>> upstream/main
     # third_party/move
     "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
@@ -341,13 +328,9 @@ aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
-<<<<<<< HEAD
-aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-data-access" }
-=======
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
->>>>>>> upstream/main
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
@@ -415,13 +398,10 @@ aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
 aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
-<<<<<<< HEAD
-=======
 aptos-system-utils = { path = "crates/aptos-system-utils" }
 aptos-transaction-filter = { path = "ecosystem/indexer-grpc/transaction-filter" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
->>>>>>> upstream/main
 aptos-temppath = { path = "crates/aptos-temppath" }
 aptos-testcases = { path = "testsuite/testcases" }
 aptos-time-service = { path = "crates/aptos-time-service", features = [
@@ -529,11 +509,7 @@ derivation-path = "0.2.0"
 derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
-<<<<<<< HEAD
 diesel = "=2.1.1"
-diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
-=======
-diesel = "2.1"
 # Use the crate version once this feature gets released on crates.io:
 # https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
 diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = [
@@ -542,7 +518,6 @@ diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d0
     "bb8",
     "tokio",
 ] }
->>>>>>> upstream/main
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 difference = "2.0.0"
 digest = "0.9.0"
@@ -789,14 +764,10 @@ walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
-<<<<<<< HEAD
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" } #Set to this version to be compatible with Sovereign Labs
 zeroize = "1.6.0" #Set to this version to be compatible with Sovereign Labs
-=======
 whoami = "1.5.0"
-x25519-dalek = "1.2.0"
 z3tracer = "0.8.0"
->>>>>>> upstream/main
 
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
