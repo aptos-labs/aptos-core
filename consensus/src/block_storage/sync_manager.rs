@@ -452,6 +452,14 @@ impl BlockStore {
                 )
             })?;
 
+        info!(
+            "fast_forward_sync: blocks: {:?}",
+            blocks
+                .iter()
+                .map(|b| format!("\n\t{}", b))
+                .collect::<Vec<String>>()
+        );
+
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
         execution_client
