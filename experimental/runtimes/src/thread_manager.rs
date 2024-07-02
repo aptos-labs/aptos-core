@@ -74,6 +74,5 @@ impl ThreadManagerBuilder {
 /// too few tasks which leads to under utilization of threads.
 static OPTIMAL_MAX_PARALLELISM: usize = MAX_THREAD_POOL_SIZE * 4;
 pub fn optimal_min_len(num_tasks: usize, min_threshold: usize) -> usize {
-    16
-    //max(min_threshold, num_tasks / OPTIMAL_MAX_PARALLELISM)
+    max(min_threshold, num_tasks / OPTIMAL_MAX_PARALLELISM)
 }
