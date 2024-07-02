@@ -46,6 +46,7 @@ whoami = { workspace = true }
 [dev-dependencies]
 datatest-stable = { workspace = true }
 move-stdlib = { path = "../../move-stdlib" }
+aptos-framework = { path = "../../../../aptos-move/framework" }
 
 [[test]]
 name = "test_runner"

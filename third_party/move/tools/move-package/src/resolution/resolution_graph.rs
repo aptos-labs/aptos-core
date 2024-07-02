@@ -212,19 +212,28 @@ impl ResolvingGraph {
         writer: &mut W,
     ) -> Result<()> {
         let package_name = package.package.name;
-        let package_node_id = match self.package_table.get(&package_name) {
-            None => self.get_or_add_node(package_name)?,
-            // Same package and we've already resolved it: OK, return early
-            Some(other) if other.source_package == package => return Ok(()),
-            // Different packages, with same name: Not OK
-            Some(other) => {
-                bail!(
-                    "Conflicting dependencies found: package '{}' conflicts with '{}'",
-                    other.source_package.package.name,
-                    package.package.name,
-                )
-            },
-        };
+        let package_node_id =
+            match self.package_table.get(&package_name) {
+                None => self.get_or_add_node(package_name)?,
+                // Same package and we've already resolved it: OK, return early
+                Some(other)
+                    if other.package_path.canonicalize().with_context(|| {
+                        format!("Cannot canonicalize {:?}", other.package_path)
+                    })? == package_path
+                        .canonicalize()
+                        .with_context(|| format!("Cannot canonicalize {:?}", package_path))? =>
+                {
+                    return Ok(());
+                },
+                // Different packages, with same name: Not OK
+                Some(other) => {
+                    bail!(
+                        "Conflicting dependencies found: package '{}' conflicts with '{}'",
+                        other.source_package.package.name,
+                        package.package.name,
+                    )
+                },
+            };
 
         let mut renaming = BTreeMap::new();
         let mut resolution_table = self
