@@ -2,13 +2,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
+use bytes::Bytes;
+use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     value::MoveTypeLayout,
 };
-use bytes::Bytes;
 use std::fmt::Debug;
 
 /// Traits for resolving Move modules and resources from persistent storage

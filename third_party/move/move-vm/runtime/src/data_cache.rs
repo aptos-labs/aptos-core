@@ -19,12 +19,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
-    resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    resolver::MoveResolver,
     value_serde::deserialize_and_allow_delayed_values,
     values::{GlobalValue, Value},
 };

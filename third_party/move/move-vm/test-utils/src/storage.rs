@@ -16,12 +16,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
+use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
