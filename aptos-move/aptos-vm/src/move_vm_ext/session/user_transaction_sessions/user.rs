@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{session::respawned_session::RespawnedSession, AptosMoveResolver, SessionId},
+    move_vm_ext::{
+        session::{
+            respawned_session::RespawnedSession,
+            user_transaction_sessions::session_change_sets::UserSessionChangeSet,
+        },
+        AptosMoveResolver, SessionId,
+    },
     transaction_metadata::TransactionMetadata,
     AptosVM,
 };
@@ -23,7 +29,7 @@ impl<'r, 'l> UserSession<'r, 'l> {
         txn_meta: &'l TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         prologue_change_set: VMChangeSet,
-    ) -> Result<Self, VMStatus> {
+    ) -> Self {
         let session_id = SessionId::txn_meta(txn_meta);
 
         let session = RespawnedSession::spawn(
@@ -32,9 +38,9 @@ impl<'r, 'l> UserSession<'r, 'l> {
             resolver,
             prologue_change_set,
             Some(txn_meta.as_user_transaction_context()),
-        )?;
+        );
 
-        Ok(Self { session })
+        Self { session }
     }
 
     pub fn legacy_inherit_prologue_session(prologue_session: RespawnedSession<'r, 'l>) -> Self {
@@ -43,8 +49,13 @@ impl<'r, 'l> UserSession<'r, 'l> {
         }
     }
 
-    pub fn finish(self, change_set_configs: &ChangeSetConfigs) -> Result<VMChangeSet, VMStatus> {
+    pub fn finish(
+        self,
+        change_set_configs: &ChangeSetConfigs,
+    ) -> Result<UserSessionChangeSet, VMStatus> {
         let Self { session } = self;
-        session.finish_with_squashed_change_set(change_set_configs, false)
+        let (change_set, module_write_set) =
+            session.finish_with_squashed_change_set(change_set_configs, false)?;
+        UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
     }
 }

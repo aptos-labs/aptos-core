@@ -42,6 +42,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{GenesisMoveVM, SessionExt},
 };
+use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -161,7 +162,11 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = vm.genesis_change_set_configs();
-    let mut change_set = session.finish(&configs).unwrap();
+    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
+    assert_ok!(
+        module_write_set.is_empty_or_invariant_violation(),
+        "Modules cannot be published in this session"
+    );
 
     // Publish the framework, using a different session id, in case both scripts create tables.
     let state_view = GenesisStateView::new();
@@ -171,9 +176,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&configs).unwrap();
+    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
     change_set
-        .squash_additional_change_set(additional_change_set, &configs)
+        .squash_additional_change_set(additional_change_set)
         .unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -189,7 +194,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     verify_genesis_write_set(change_set.events());
 
     let change_set = change_set
-        .try_into_storage_change_set()
+        .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
@@ -288,7 +293,11 @@ pub fn encode_genesis_change_set(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = vm.genesis_change_set_configs();
-    let mut change_set = session.finish(&configs).unwrap();
+    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
+    assert_ok!(
+        module_write_set.is_empty_or_invariant_violation(),
+        "Modules cannot be published in this session"
+    );
 
     let state_view = GenesisStateView::new();
     let resolver = state_view.as_move_resolver();
@@ -298,9 +307,9 @@ pub fn encode_genesis_change_set(
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&configs).unwrap();
+    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
     change_set
-        .squash_additional_change_set(additional_change_set, &configs)
+        .squash_additional_change_set(additional_change_set)
         .unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -315,8 +324,9 @@ pub fn encode_genesis_change_set(
         .concrete_write_set_iter()
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
+
     change_set
-        .try_into_storage_change_set()
+        .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
 }
 

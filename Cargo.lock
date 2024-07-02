@@ -4315,6 +4315,7 @@ dependencies = [
  "aptos-vm",
  "bcs 0.1.4",
  "bytes",
+ "claims",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",

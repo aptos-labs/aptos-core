@@ -124,7 +124,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output must be set to get resource group writes")
-            .change_set()
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -153,7 +152,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output must be set to get metadata ops")
-            .change_set()
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -172,7 +170,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output must be set to get resource writes")
-            .change_set()
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| match write {
@@ -195,7 +192,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output must be set to get module writes")
-            .change_set()
             .module_write_set()
             .clone()
     }
@@ -206,7 +202,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output must be set to get aggregator V1 writes")
-            .change_set()
             .aggregator_v1_write_set()
             .clone()
     }
@@ -217,7 +212,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output must be set to get deltas")
-            .change_set()
             .aggregator_v1_delta_set()
             .iter()
             .map(|(key, op)| (key.clone(), *op))
@@ -230,7 +224,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output must be set to get aggregator change set")
-            .change_set()
             .delayed_field_change_set()
             .clone()
     }
@@ -242,7 +235,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output to be set to get reads")
-            .change_set()
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -260,7 +252,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output to be set to get reads")
-            .change_set()
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -281,7 +272,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output must be set to get events")
-            .change_set()
             .events()
             .to_vec()
     }
@@ -349,33 +339,21 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     fn output_approx_size(&self) -> u64 {
         let vm_output = self.vm_output.lock();
-        let change_set = vm_output
+        vm_output
             .as_ref()
-            .expect("Output to be set to get write summary")
-            .change_set();
-
-        let mut size = 0;
-        for (state_key, write_size) in change_set.write_set_size_iter() {
-            size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
-        }
-
-        for (event, _) in change_set.events() {
-            size += event.size() as u64;
-        }
-
-        size
+            .expect("Output to be set to get approximate size")
+            .materialized_size()
     }
 
     fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag, DelayedFieldID>> {
         let vm_output = self.vm_output.lock();
-        let change_set = vm_output
+        let output = vm_output
             .as_ref()
-            .expect("Output to be set to get write summary")
-            .change_set();
+            .expect("Output to be set to get write summary");
 
         let mut writes = HashSet::new();
 
-        for (state_key, write) in change_set.resource_write_set() {
+        for (state_key, write) in output.resource_write_set() {
             match write {
                 AbstractResourceWriteOp::Write(_)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(_) => {
@@ -395,7 +373,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             }
         }
 
-        for identifier in change_set.delayed_field_change_set().keys() {
+        for identifier in output.delayed_field_change_set().keys() {
             writes.insert(InputOutputKey::DelayedField(*identifier));
         }
 
@@ -403,7 +381,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 }
 
-pub struct BlockAptosVM();
+pub struct BlockAptosVM;
 
 impl BlockAptosVM {
     pub fn execute_block_on_thread_pool<

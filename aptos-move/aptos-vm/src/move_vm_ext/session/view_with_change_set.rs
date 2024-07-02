@@ -315,10 +315,7 @@ impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        match self.change_set.module_write_set().get(state_key) {
-            Some(write_op) => Ok(write_op.as_state_value()),
-            None => self.base_executor_view.get_module_state_value(state_key),
-        }
+        self.base_executor_view.get_module_state_value(state_key)
     }
 }
 
@@ -344,19 +341,11 @@ mod test {
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
-    use aptos_vm_types::{abstract_write_op::GroupWrite, check_change_set::CheckChangeSet};
+    use aptos_vm_types::abstract_write_op::GroupWrite;
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-
-    struct NoOpChangeSetChecker;
-
-    impl CheckChangeSet for NoOpChangeSetChecker {
-        fn check_change_set(&self, _change_set: &VMChangeSet) -> PartialVMResult<()> {
-            Ok(())
-        }
-    }
 
     fn key(s: impl ToString) -> StateKey {
         StateKey::raw(s.to_string().as_bytes())
@@ -423,7 +412,6 @@ mod test {
     fn test_change_set_state_view() {
         let mut state_view = FakeDataStore::default();
         state_view.set_legacy(key("module_base"), serialize(&10));
-        state_view.set_legacy(key("module_both"), serialize(&20));
 
         state_view.set_legacy(key("resource_base"), serialize(&30));
         state_view.set_legacy(key("resource_both"), serialize(&40));
@@ -442,11 +430,6 @@ mod test {
         let resource_write_set = BTreeMap::from([
             (key("resource_both"), (write(80), None)),
             (key("resource_write_set"), (write(90), None)),
-        ]);
-
-        let module_write_set = BTreeMap::from([
-            (key("module_both"), write(100)),
-            (key("module_write_set"), write(110)),
         ]);
 
         let aggregator_v1_write_set = BTreeMap::from([
@@ -494,14 +477,12 @@ mod test {
         let change_set = VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
-            module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
             vec![],
-            &NoOpChangeSetChecker,
         )
         .unwrap();
 
@@ -513,8 +494,6 @@ mod test {
         );
 
         assert_eq!(read_module(&view, "module_base"), 10);
-        assert_eq!(read_module(&view, "module_both"), 100);
-        assert_eq!(read_module(&view, "module_write_set"), 110);
 
         assert_eq!(read_resource(&view, "resource_base"), 30);
         assert_eq!(read_resource(&view, "resource_both"), 80);

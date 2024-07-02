@@ -1,17 +1,29 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::change_set::VMChangeSet;
-use aptos_aggregator::{resolver::AggregatorV1Resolver, types::code_invariant_error};
-use aptos_types::fee_statement::FeeStatement;
+use crate::{
+    abstract_write_op::AbstractResourceWriteOp,
+    change_set::{ChangeSetInterface, VMChangeSet},
+    module_write_set::ModuleWriteSet,
+};
+use aptos_aggregator::{
+    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::AggregatorV1Resolver,
+    types::code_invariant_error,
+};
 use aptos_types::{
-    contract_event::ContractEvent, //contract_event::ContractEvent,
+    contract_event::ContractEvent,
     delayed_fields::PanicError,
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
 };
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    value::MoveTypeLayout,
+    vm_status::{StatusCode, VMStatus},
+};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use std::collections::BTreeMap;
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -20,6 +32,7 @@ use move_core_types::vm_status::{StatusCode, VMStatus};
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMOutput {
     change_set: VMChangeSet,
+    module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
@@ -28,12 +41,14 @@ pub struct VMOutput {
 impl VMOutput {
     pub fn new(
         change_set: VMChangeSet,
+        module_write_set: ModuleWriteSet,
         fee_statement: FeeStatement,
         status: TransactionStatus,
         auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {
         Self {
             change_set,
+            module_write_set,
             fee_statement,
             status,
             auxiliary_data,
@@ -43,50 +58,37 @@ impl VMOutput {
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
             change_set: VMChangeSet::empty(),
+            module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
             auxiliary_data: TransactionAuxiliaryData::default(),
         }
     }
 
-    pub fn unpack(
-        self,
-    ) -> (
-        VMChangeSet,
-        u64,
-        TransactionStatus,
-        TransactionAuxiliaryData,
-    ) {
-        (
-            self.change_set,
-            self.fee_statement.gas_used(),
-            self.status,
-            self.auxiliary_data,
-        )
+    pub fn aggregator_v1_delta_set(&self) -> &BTreeMap<StateKey, DeltaOp> {
+        self.change_set.aggregator_v1_delta_set()
     }
 
-    pub fn unpack_with_fee_statement(
-        self,
-    ) -> (
-        VMChangeSet,
-        FeeStatement,
-        TransactionStatus,
-        TransactionAuxiliaryData,
-    ) {
-        (
-            self.change_set,
-            self.fee_statement,
-            self.status,
-            self.auxiliary_data,
-        )
+    pub fn aggregator_v1_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+        self.change_set.aggregator_v1_write_set()
     }
 
-    pub fn change_set(&self) -> &VMChangeSet {
-        &self.change_set
+    pub fn resource_write_set(&self) -> &BTreeMap<StateKey, AbstractResourceWriteOp> {
+        self.change_set.resource_write_set()
     }
 
-    pub fn change_set_mut(&mut self) -> &mut VMChangeSet {
-        &mut self.change_set
+    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+        self.module_write_set.write_ops()
+    }
+
+    pub fn delayed_field_change_set(
+        &self,
+    ) -> &BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        self.change_set.delayed_field_change_set()
+    }
+
+    pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
+        self.change_set.events()
     }
 
     pub fn gas_used(&self) -> u64 {
@@ -105,6 +107,31 @@ impl VMOutput {
         &self.auxiliary_data
     }
 
+    pub fn materialized_size(&self) -> u64 {
+        let mut size = 0;
+        for (state_key, write_size) in self
+            .change_set
+            .write_set_size_iter()
+            .chain(self.module_write_set.write_set_size_iter())
+        {
+            size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
+        }
+
+        for event in self.change_set.events_iter() {
+            size += event.size() as u64;
+        }
+        size
+    }
+
+    pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
+        self.change_set.concrete_write_set_iter().chain(
+            self.module_write_set
+                .write_ops()
+                .iter()
+                .map(|(k, v)| (k, Some(v))),
+        )
+    }
+
     /// Materializes delta sets.
     /// Guarantees that if deltas are materialized successfully, the output
     /// has an empty delta set.
@@ -120,8 +147,8 @@ impl VMOutput {
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
         if self.status().is_discarded()
-            || (self.change_set().aggregator_v1_delta_set().is_empty()
-                && self.change_set().delayed_field_change_set().is_empty())
+            || (self.aggregator_v1_delta_set().is_empty()
+                && self.delayed_field_change_set().is_empty())
         {
             return Ok(());
         }
@@ -138,7 +165,7 @@ impl VMOutput {
         resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
         self.try_materialize(resolver)?;
-        Self::convert_to_transaction_output(self).map_err(|e| {
+        self.into_transaction_output().map_err(|e| {
             VMStatus::error(
                 StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                 Some(e.to_string()),
@@ -146,27 +173,22 @@ impl VMOutput {
         })
     }
 
-    /// Constructs `TransactionOutput`, without doing `try_materialize`
-    pub fn into_transaction_output(self) -> anyhow::Result<TransactionOutput, VMStatus> {
-        let (change_set, fee_statement, status, auxiliary_data) = self.unpack_with_fee_statement();
-        let output = VMOutput::new(change_set, fee_statement, status, auxiliary_data);
-        Self::convert_to_transaction_output(output).map_err(|e| {
-            VMStatus::error(
-                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
-                Some(e.to_string()),
-            )
-        })
-    }
-
-    fn convert_to_transaction_output(
-        materialized_output: VMOutput,
-    ) -> Result<TransactionOutput, PanicError> {
-        let (vm_change_set, gas_used, status, auxiliary_data) = materialized_output.unpack();
-        let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();
+    /// Constructs `TransactionOutput`, without doing `try_materialize`.
+    pub fn into_transaction_output(self) -> Result<TransactionOutput, PanicError> {
+        let Self {
+            change_set,
+            module_write_set,
+            fee_statement,
+            status,
+            auxiliary_data,
+        } = self;
+        let (write_set, events) = change_set
+            .try_combine_into_storage_change_set(module_write_set)?
+            .into_inner();
         Ok(TransactionOutput::new(
             write_set,
             events,
-            gas_used,
+            fee_statement.gas_used(),
             status,
             auxiliary_data,
         ))
@@ -181,16 +203,14 @@ impl VMOutput {
         patched_events: Vec<ContractEvent>,
     ) -> Result<TransactionOutput, PanicError> {
         // materialize aggregator V1 deltas into writes
-        if materialized_aggregator_v1_deltas.len()
-            != self.change_set().aggregator_v1_delta_set().len()
-        {
+        if materialized_aggregator_v1_deltas.len() != self.aggregator_v1_delta_set().len() {
             return Err(code_invariant_error(
                 "Different number of materialized deltas and deltas in the output.",
             ));
         }
         if !materialized_aggregator_v1_deltas
             .iter()
-            .all(|(k, _)| self.change_set().aggregator_v1_delta_set().contains_key(k))
+            .all(|(k, _)| self.aggregator_v1_delta_set().contains_key(k))
         {
             return Err(code_invariant_error(
                 "Materialized aggregator writes contain a key which does not exist in delta set.",
@@ -207,13 +227,13 @@ impl VMOutput {
         let _ = self.change_set.drain_delayed_field_change_set();
 
         // materialize delayed fields into events
-        if patched_events.len() != self.change_set().events().len() {
+        if patched_events.len() != self.events().len() {
             return Err(code_invariant_error(
                 "Different number of events and patched events in the output.",
             ));
         }
         self.change_set.set_events(patched_events.into_iter());
 
-        Self::convert_to_transaction_output(self)
+        self.into_transaction_output()
     }
 }
