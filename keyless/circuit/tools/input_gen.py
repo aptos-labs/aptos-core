@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-# TODO: update `input_gen.py` to match the latest circuit, then provide instructions.
-# WARNING: This code is guaranteed to work only for the hardcoded JWT present, and is planned to be deprecated soon
+# WARNING: This code is guaranteed to work only for the hardcoded JWT present, and is meant only to be used to provide a quick and easy way to run the full Keyless circuit. Detailed unit tests can be found in `circuit/src`.
 
 import json
 import os
@@ -16,8 +15,20 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.Hash import SHA256
 import Crypto
-import pprint
+import pprint 
 
+def calc_string_bodies(string):
+    string_bodies = [0] * len(string)
+    string_bodies[1] = int(string[0] == '"')
+
+    for i in range(2,len(string)):
+        if not string_bodies[i-2] and string[i-1] == '"' and string[i-2] != '\\':
+            string_bodies[i] = 1
+        elif string_bodies[i-1] and string[i] == '"' and string[i-1] != '\\':
+            string_bodies[i] = 0
+        else:
+            string_bodies[i] = string_bodies[i-1]
+    return string_bodies
 
 # Returns JSON array of bytes representing the input `string`, 0 padded to `maxLen`
 def pad_string_new(string, maxLen, n="", use_ord=False):
@@ -42,13 +53,16 @@ def pad_string_new(string, maxLen, n="", use_ord=False):
 
 
 # Returns JSON array of bytes representing the input `string`, 0 padded to `maxLen`
-def pad_string(string, maxLen, n="", use_ord=False):
+def pad_string(string, maxLen, n="", use_ord=True):
     string_len = len(string)
     string_to_pad = maxLen - string_len
 
     result = "["
     for c in string:
-        result = result + '"' + str(ord(c)) + '",'
+        if use_ord:
+            result = result + '"' + str(ord(c)) + '",'
+        else:
+            result = result + '"' + str(c) + '",'
 
     for i in range(string_to_pad):
         result = result + '"' + '0' + '",'
@@ -61,7 +75,7 @@ def pad_string(string, maxLen, n="", use_ord=False):
 def format_output(dictionary):
     res = "{"
     for key in dictionary:
-        res = res + key + " : " + dictionary[key] + ","
+        res = res + key + " : " + str(dictionary[key]) + ","
     res = res[:-1] + "}"
     return res
 
@@ -91,39 +105,21 @@ def limbs_to_long(limbs):
 
 
 # iat_value = "1700255944" # Friday, November 17, 2023
-iat_value = "1711552630"
+iat_value = "1719866138"
 
 exp_date_num = 111_111_111_111
 exp_date = str(exp_date_num)  # 12-21-5490
 exp_horizon_num = 999_999_999_999  # ~31,710 years
 exp_horizon = str(exp_horizon_num)
 # nonce_value = "2284473333442251804379681643965308154311773667525398119496797545594705356495"
-nonce_value = "12772123150809496860193457976937182964297283633705872391534946866719681904311"
+nonce_value = "2284473333442251804379681643965308154311773667525398119496797545594705356495"
 public_inputs_hash_value = '"' + str(
-    20184347722831264297183009689956363527052066666845340178129495539169215716642) + '"'
+    990250399590304032496786539443088814495837679250179990478424822100531016130) + '"'
 
 nonce = int(nonce_value)
 
 jwt_max_len = 192 * 8
 
-# Dictionary encoding of the JWT
-# jwt_dict = {
-#    "iss": "https://accounts.google.com",
-#    "azp": "407408718192.apps.googleusercontent.com",
-#    "aud": "407408718192.apps.googleusercontent.com",
-#    "sub": "113990307082899718775",
-#    "hd": "aptoslabs.com",
-#    "email": "michael@aptoslabs.com",
-#    "email_verified": True,
-#    "at_hash": "bxIESuI59IoZb5alCASqBg",
-#    "name": "Michael Straka",
-#    "picture": "https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c",
-#    "given_name": "Michael",
-#    "family_name": "Straka",
-#    "locale": "en",
-#    "exp":2700259544
-# }
-#
 # jwt_dict = {
 #  "iss": "test.oidc.provider",
 #  "azp": "511276456880-i7i4787c1863damto6899ts989j2e35r.apps.googleusercontent.com",
@@ -141,13 +137,30 @@ jwt_max_len = 192 * 8
 #  "exp": 1911556230
 # }
 
-original_b64 = "eyJpc3MiOiJ0ZXN0Lm9pZGMucHJvdmlkZXIiLCJhenAiOiI1MTEyNzY0NTY4ODAtaTdpNDc4N2MxODYzZGFtdG82ODk5dHM5ODlqMmUzNXIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI1MTEyNzY0NTY4ODAtaTdpNDc4N2MxODYzZGFtdG82ODk5dHM5ODlqMmUzNXIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDI5MDQ2MzAxNzE1OTI1MjA1OTIiLCJlbWFpbCI6Imhlcm8xMjAwMDkxQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJub25jZSI6IjEyNzcyMTIzMTUwODA5NDk2ODYwMTkzNDU3OTc2OTM3MTgyOTY0Mjk3MjgzNjMzNzA1ODcyMzkxNTM0OTQ2ODY2NzE5NjgxOTA0MzExIiwibmJmIjoxNzExNTUyMzMwLCJuYW1lIjoi44Kz44Oz44OJ44Km44OP44Or44KtIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lNWmZJa05XR1JCVEQ5MjR4bF9pZWZwTWNjTGd1d2RNSWluTVB6YWo1TDRRPXM5Ni1jIiwiZ2l2ZW5fbmFtZSI6IuODq-OCrSIsImZhbWlseV9uYW1lIjoi44Kz44Oz44OJ44KmIiwiaWF0IjoxNzExNTUyNjMwLCJleHAiOjE5MTE1NTYyMzB9"
+#jwt_dict = {
+#        "iss":"https://accounts.google.com",
+#        "azp":"407408718192.apps.googleusercontent.com",
+#        "aud":"407408718192.apps.googleusercontent.com",
+#        "sub":"113990307082899718775",
+#        "at_hash":"lVeD4xP6Q1ZGrL3gFcCQLQ",
+#        "name":"Michael Straka",
+#        "picture":"https://lh3.googleusercontent.com/a/ACg8ocLVn8F8VnXKNNJhROhTpQuLLjFEdv_uhoe-DUaRTlxKEy9e4w=s96-c",
+#        "given_name":"Michael",
+#        "family_name":"Straka",
+#        "iat":1719866138,
+#        "exp":1719869738,
+#        "nonce":"2284473333442251804379681643965308154311773667525398119496797545594705356495"
+#        }
+
+
+#original_b64 = "eyJpc3MiOiJ0ZXN0Lm9pZGMucHJvdmlkZXIiLCJhenAiOiI1MTEyNzY0NTY4ODAtaTdpNDc4N2MxODYzZGFtdG82ODk5dHM5ODlqMmUzNXIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI1MTEyNzY0NTY4ODAtaTdpNDc4N2MxODYzZGFtdG82ODk5dHM5ODlqMmUzNXIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDI5MDQ2MzAxNzE1OTI1MjA1OTIiLCJlbWFpbCI6Imhlcm8xMjAwMDkxQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJub25jZSI6IjEyNzcyMTIzMTUwODA5NDk2ODYwMTkzNDU3OTc2OTM3MTgyOTY0Mjk3MjgzNjMzNzA1ODcyMzkxNTM0OTQ2ODY2NzE5NjgxOTA0MzExIiwibmJmIjoxNzExNTUyMzMwLCJuYW1lIjoi44Kz44Oz44OJ44Km44OP44Or44KtIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lNWmZJa05XR1JCVEQ5MjR4bF9pZWZwTWNjTGd1d2RNSWluTVB6YWo1TDRRPXM5Ni1jIiwiZ2l2ZW5fbmFtZSI6IuODq-OCrSIsImZhbWlseV9uYW1lIjoi44Kz44Oz44OJ44KmIiwiaWF0IjoxNzExNTUyNjMwLCJleHAiOjE5MTE1NTYyMzB9"
+original_b64 = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTM5OTAzMDcwODI4OTk3MTg3NzUiLCJhdF9oYXNoIjoibFZlRDR4UDZRMVpHckwzZ0ZjQ1FMUSIsIm5hbWUiOiJNaWNoYWVsIFN0cmFrYSIsInBpY3R1cmUiOiJodHRwczovL2xoMy5nb29nbGV1c2VyY29udGVudC5jb20vYS9BQ2c4b2NMVm44RjhWblhLTk5KaFJPaFRwUXVMTGpGRWR2X3Vob2UtRFVhUlRseEtFeTllNHc9czk2LWMiLCJnaXZlbl9uYW1lIjoiTWljaGFlbCIsImZhbWlseV9uYW1lIjoiU3RyYWthIiwiaWF0IjoxNzE5ODY2MTM4LCJleHAiOjE3MTk4Njk3MzgsIm5vbmNlIjoiMjI4NDQ3MzMzMzQ0MjI1MTgwNDM3OTY4MTY0Mzk2NTMwODE1NDMxMTc3MzY2NzUyNTM5ODExOTQ5Njc5NzU0NTU5NDcwNTM1NjQ5NSJ9"
 original_str = base64.urlsafe_b64decode(original_b64)
 print("original_str bytes", original_str)
 jwt_dict = json.loads(original_str)
 
-jwt_dict['iat'] = int(iat_value)  # WARNING: the code assumes this is NOT the last field
-jwt_dict['nonce'] = nonce_value  # WARNING: the code assumes this is the last field
+#jwt_dict['iat'] = int(iat_value)  # WARNING: the code assumes this is NOT the last field
+#jwt_dict['nonce'] = nonce_value  # WARNING: the code assumes this is the last field
 
 secret = rsa.generate_private_key(
     backend=crypto_default_backend(),
@@ -174,6 +187,7 @@ unsigned_b64_jwt_string = signed_b64_jwt_string[:signed_b64_jwt_string.rfind("."
 #    crypto_serialization.PublicFormat.OpenSSH
 # )
 jwt_payload_b64 = unsigned_b64_jwt_string[unsigned_b64_jwt_string.rfind(".") + 1:]
+print(jwt_payload_b64)
 jwt_payload = base64.urlsafe_b64decode(jwt_payload_b64)
 jwt_payload = jwt_payload.decode('utf-8')
 print("\njwt_payload bytes  ", jwt_payload, "\n")
@@ -187,8 +201,10 @@ header_len_with_separator_value = '"' + str(len(jwt_header_string)) + '"'
 maxAudKVPairLen = 140
 maxAudNameLen = 40
 maxAudValueLen = 120
-# aud_field_string = "\"aud\":\"407408718192.apps.googleusercontent.com\","
-aud_field_string = "\"aud\":\"511276456880-i7i4787c1863damto6899ts989j2e35r.apps.googleusercontent.com\","
+aud_field_string = "\"aud\":\"407408718192.apps.googleusercontent.com\","
+#aud_field_string = "\"aud\":\"511276456880-i7i4787c1863damto6899ts989j2e35r.apps.googleusercontent.com\","
+aud_string_bodies = calc_string_bodies(aud_field_string)
+aud_string_bodies_value = pad_string(aud_string_bodies, maxAudKVPairLen, use_ord=False)
 aud_field_value = pad_string(aud_field_string, maxAudKVPairLen)
 aud_field_len_value = '"' + str(len(aud_field_string)) + '"'
 aud_index_value = '"' + str(jwt_payload.index("aud") - 1) + '"'  # First '"' character in aud field index in payload
@@ -196,8 +212,8 @@ aud_colon_index = aud_field_string.index(":")
 aud_colon_index_value = '"' + str(aud_colon_index) + '"'
 aud_value_index_value = '"' + str(aud_colon_index + 2) + '"'  # TODO: This doesn't work if there's whitespace
 aud_name = "aud"
-# aud_value = "407408718192.apps.googleusercontent.com"
-aud_value = "511276456880-i7i4787c1863damto6899ts989j2e35r.apps.googleusercontent.com"
+aud_value = "407408718192.apps.googleusercontent.com"
+#aud_value = "511276456880-i7i4787c1863damto6899ts989j2e35r.apps.googleusercontent.com"
 aud_name_value = pad_string(aud_name, maxAudNameLen)
 aud_value_value = pad_string(aud_value, maxAudValueLen)
 aud_value_len_value = '"' + str(len(aud_value)) + '"'
@@ -230,8 +246,10 @@ exp_horizon_value = '"' + exp_horizon + '"'
 maxUidKVPairLen = 350
 maxUidNameLen = 30
 maxUidValueLen = 330
-# uid_field_string = "\"sub\":\"113990307082899718775\","
-uid_field_string = "\"sub\":\"102904630171592520592\","
+uid_field_string = "\"sub\":\"113990307082899718775\","
+#uid_field_string = "\"sub\":\"102904630171592520592\","
+uid_string_bodies = calc_string_bodies(uid_field_string)
+uid_string_bodies_value = pad_string(uid_string_bodies, maxUidKVPairLen, use_ord=False)
 uid_field_value = pad_string(uid_field_string, maxUidKVPairLen)
 uid_field_len_value = '"' + str(len(uid_field_string)) + '"'
 uid_index_value = '"' + str(jwt_payload.index("sub") - 1) + '"'  # This doesn't work for non-sub user id fields
@@ -241,8 +259,8 @@ uid_colon_index = uid_field_string.index(":")
 uid_colon_index_value = '"' + str(uid_colon_index) + '"'
 uid_value_index_value = '"' + str(uid_colon_index + 2) + '"'
 uid_name = "sub"
-# uid_value = "113990307082899718775"
-uid_value = "102904630171592520592"
+uid_value = "113990307082899718775"
+#uid_value = "102904630171592520592"
 uid_name_value = pad_string(uid_name, maxUidNameLen)
 uid_value_value = pad_string(uid_value, maxUidValueLen)
 uid_value_len_value = '"' + str(len(uid_value)) + '"'
@@ -261,8 +279,8 @@ extra_colon_index = extra_field_string.index(":")
 extra_colon_index_value = '"' + str(extra_colon_index) + '"'
 extra_value_index_value = '"' + str(extra_colon_index + 2) + '"'
 extra_name = "family_name"
-# extra_value = "Straka";
-extra_value = "コンドウ"
+extra_value = "Straka";
+#extra_value = "コンドウ"
 extra_name_value = pad_string_new(extra_name, maxEFNameLen)
 extra_value_value = pad_string_new(extra_value, maxEFValueLen)
 extra_value_len_value = '"' + str(len(extra_value)) + '"'
@@ -288,8 +306,10 @@ ev_value_len_value = '"' + str(len(ev_value)) + '"'
 maxIssKVPairLen = 140
 maxIssNameLen = 40
 maxIssValueLen = 120
-# iss_field_string = "\"iss\":\"https://accounts.google.com\","
-iss_field_string = "\"iss\":\"test.oidc.provider\","
+iss_field_string = "\"iss\":\"https://accounts.google.com\","
+#iss_field_string = "\"iss\":\"test.oidc.provider\","
+iss_string_bodies = calc_string_bodies(iss_field_string)
+iss_string_bodies_value = pad_string(iss_string_bodies, maxIssKVPairLen, use_ord=False)
 iss_field_value = pad_string(iss_field_string, maxIssKVPairLen)
 iss_field_len_value = '"' + str(len(iss_field_string)) + '"'
 iss_index_value = '"' + str(jwt_payload.index("iss") - 1) + '"'
@@ -298,8 +318,8 @@ iss_colon_index = iss_field_string.index(":")
 iss_colon_index_value = '"' + str(iss_colon_index) + '"'
 iss_value_index_value = '"' + str(iss_colon_index + 2) + '"'  # TODO: Doesn't work with whitespace
 iss_name = "iss"
-# iss_value = "https://accounts.google.com"
-iss_value = "test.oidc.provider"
+iss_value = "https://accounts.google.com"
+#iss_value = "test.oidc.provider"
 iss_name_value = pad_string(iss_name, maxIssNameLen)
 iss_value_value = pad_string(iss_value, maxIssValueLen)
 iss_value_len_value = '"' + str(len(iss_value)) + '"'
@@ -320,6 +340,8 @@ maxNonceKVPairLen = 105
 maxNonceNameLen = 10
 maxNonceValueLen = 100
 nonce_field_string = "\"nonce\":\"" + nonce_value + "\"}"
+nonce_string_bodies = calc_string_bodies(nonce_field_string)
+nonce_string_bodies_value = pad_string(nonce_string_bodies, maxNonceKVPairLen, use_ord=False)
 nonce_field_value = pad_string(nonce_field_string, maxNonceKVPairLen)
 nonce_field_len_value = '"' + str(len(nonce_field_string)) + '"'
 nonce_index_value = '"' + str(jwt_payload.index("nonce") - 1) + '"'
@@ -463,13 +485,14 @@ json_dict = {
     "\"signature\"": sig_value,
     "\"pubkey_modulus\"": mod_value,
     "\"aud_field\"": aud_field_value,
-    "\"aud_field_string_bodies\"": 0,
+    "\"aud_field_string_bodies\"": aud_string_bodies_value,
     "\"aud_field_len\"": aud_field_len_value,
     "\"aud_index\"": aud_index_value,
     "\"aud_value_index\"": aud_value_index_value,
     "\"aud_colon_index\"": aud_colon_index_value,
     "\"aud_name\"": aud_name_value,
     "\"uid_field\"": uid_field_value,
+    "\"uid_field_string_bodies\"": uid_string_bodies_value,
     "\"uid_field_len\"": uid_field_len_value,
     "\"uid_index\"": uid_index_value,
     "\"uid_name_len\"": uid_name_len_value,
@@ -487,6 +510,7 @@ json_dict = {
     "\"ev_name\"": ev_name_value,
     "\"ev_value\"": ev_value_value,
     "\"iss_field\"": iss_field_value,
+    "\"iss_field_string_bodies\"": iss_string_bodies_value,
     "\"iss_field_len\"": iss_field_len_value,
     "\"iss_index\"": iss_index_value,
     "\"iss_value_index\"": iss_value_index_value,
@@ -495,6 +519,7 @@ json_dict = {
     "\"iss_name\"": iss_name_value,
     "\"iss_value\"": iss_value_value,
     "\"nonce_field\"": nonce_field_value,
+    "\"nonce_field_string_bodies\"": nonce_string_bodies_value,
     "\"nonce_field_len\"": nonce_field_len_value,
     "\"nonce_index\"": nonce_index_value,
     "\"nonce_value_index\"": nonce_value_index_value,
@@ -591,4 +616,3 @@ print(jwt_payload)
 
 print("\nPretty-printed JWT payload:")
 jwt_parsed = json.loads(jwt_payload)
-pprint.pprint(jwt_parsed)
