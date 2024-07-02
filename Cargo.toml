@@ -470,9 +470,12 @@ arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
 ark-bn254 = "0.4.0"
+ark-circom = { git = "https://github.com/aptos-labs/circom-compat", rev = "e3d686641a3dd9d66087a74acdc20dc2a3c24f63" }
+ark-crypto-primitives = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-groth16 = "0.4.0"
+ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
@@ -638,6 +641,7 @@ neptune = { version = "13.0.0", default_features = false }
 ntest = "0.9.0"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
+num-bigint-v4 = { package = "num-bigint", version = "0.4.5" }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
