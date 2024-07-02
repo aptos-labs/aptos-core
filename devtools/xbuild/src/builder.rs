@@ -1,5 +1,11 @@
 use crate::flags;
-use std::{ffi::OsString, str::FromStr};
+use std::{
+    ffi::OsString,
+    os::unix::process::CommandExt,
+    process::{Command, Stdio},
+    str::FromStr,
+    thread,
+};
 use xshell::{cmd, Shell};
 
 pub(crate) fn build(
@@ -15,6 +21,17 @@ pub(crate) fn build(
         .map(|package| vec!["-p".into(), package])
         .flatten()
         .collect();
+
+    sh.set_var(
+        "CARGO_TARGET_DIR",
+        format!(
+            "target/{}/{}",
+            feature.clone().into_string().unwrap(),
+            profile.clone().into_string().unwrap(),
+        ),
+    );
+
+    cmd!(sh, "printenv").run().unwrap();
 
     cmd!(
         sh,
@@ -52,14 +69,23 @@ impl flags::Group {
 
 impl flags::Forge {
     pub(crate) fn run(self, sh: Shell) {
-        build(
-            &sh,
-            vec!["aptos-node".into()],
-            self.node_profile.clone(),
-            self.node_feature,
-        );
-        build(&sh, vec!["aptos-forge-cli".into()], self.node_profile, None);
+        let sh1 = sh.clone();
+        let node_profile = self.node_profile.clone();
+        let node_feature = self.node_feature.clone();
+        let t1 = thread::spawn(move || {
+            build(&sh1, vec!["aptos-node".into()], node_profile, node_feature);
+        });
 
-        build(&sh, vec!["aptos".into()], Some("ci".into()), None)
+        let sh2 = sh.clone();
+        let node_profile = self.node_profile.clone();
+        let t2 = thread::spawn(move || {
+            build(&sh2, vec!["aptos-forge-cli".into()], node_profile, None);
+        });
+
+        let t3 = thread::spawn(move || build(&sh, vec!["aptos".into()], Some("ci".into()), None));
+
+        t1.join().unwrap();
+        t2.join().unwrap();
+        t3.join().unwrap();
     }
 }

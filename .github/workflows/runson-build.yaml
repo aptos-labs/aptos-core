@@ -38,15 +38,19 @@ jobs:
         with:
           ref: ${{ env.GIT_SHA }}
 
-      - name: Build Rust
+      - name: Install libs
         run: |
           sudo apt update && sudo apt install -y libudev-dev
+        
+      - name: Cache Rust dependencies
+        uses: runs-on/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ hashFiles('Cargo.lock') }}
+
+      - name: Build Rust
+        run: |
           cargo xbuild group forge
-
-      - name: Build Tools
-        run: |
-          CARGO_TARGET_DIR=./target/tools ./docker/builder/build-tools.sh
-
-      - name: Build Indexer
-        run: |
-          CARGO_TARGET_DIR=./target/indexer ./docker/builder/build-indexer.sh
