@@ -80,7 +80,7 @@ fn test_validate_transaction() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_test_root_address();
-    let program = aptos_stdlib::aptos_coin_mint(address, 100);
+    let program = aptos_stdlib::supra_coin_mint(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
