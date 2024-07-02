@@ -68,13 +68,6 @@ impl LinkableBlock {
 pub struct BlockTree {
     /// All the blocks known to this replica (with parent links)
     id_to_block: HashMap<HashValue, LinkableBlock>,
-    /// Root of the tree. This is the root of ordering phase
-    ordered_root_id: HashValue,
-    /// Commit Root id: this is the root of commit phase
-    commit_root_id: HashValue,
-    /// A certified block id with highest round
-    highest_certified_block_id: HashValue,
-
     /// The quorum certificate of highest_certified_block
     highest_quorum_cert: Arc<QuorumCert>,
     /// The highest 2-chain timeout certificate (if any).
@@ -122,9 +115,6 @@ impl BlockTree {
 
         BlockTree {
             id_to_block,
-            ordered_root_id: root_id,
-            commit_root_id: root_id, // initially we set commit_root_id = root_id
-            highest_certified_block_id: root_id,
             highest_quorum_cert: Arc::clone(&root_quorum_cert),
             highest_ordered_cert: Arc::new(root_ordered_cert),
             highest_commit_cert: Arc::new(root_commit_cert),
@@ -159,7 +149,7 @@ impl BlockTree {
     // This method is used in pruning and length query,
     // to reflect the actual root, we use commit root
     fn linkable_root(&self) -> &LinkableBlock {
-        self.get_linkable_block(&self.commit_root_id)
+        self.get_linkable_block(&self.commit_root_id())
             .expect("Root must exist")
     }
 
@@ -179,17 +169,25 @@ impl BlockTree {
     }
 
     pub(super) fn ordered_root(&self) -> Arc<PipelinedBlock> {
-        self.get_block(&self.ordered_root_id)
+        self.get_block(&self.highest_ordered_cert.commit_info().id())
             .expect("Root must exist")
     }
 
+    pub(super) fn ordered_root_id(&self) -> HashValue {
+        self.highest_ordered_cert.commit_info().id()
+    }
+
     pub(super) fn commit_root(&self) -> Arc<PipelinedBlock> {
-        self.get_block(&self.commit_root_id)
+        self.get_block(&self.highest_commit_cert.commit_info().id())
             .expect("Commit root must exist")
     }
 
+    pub(super) fn commit_root_id(&self) -> HashValue {
+        self.highest_commit_cert.commit_info().id()
+    }
+
     pub(super) fn highest_certified_block(&self) -> Arc<PipelinedBlock> {
-        self.get_block(&self.highest_certified_block_id)
+        self.get_block(&self.highest_quorum_cert().certified_block().id())
             .expect("Highest cerfified block must exist")
     }
 
@@ -249,7 +247,6 @@ impl BlockTree {
     fn update_highest_commit_cert(&mut self, new_commit_cert: WrappedLedgerInfo) {
         if new_commit_cert.commit_info().round() > self.highest_commit_cert.commit_info().round() {
             self.highest_commit_cert = Arc::new(new_commit_cert);
-            self.update_commit_root(self.highest_commit_cert.commit_info().id());
         }
     }
 
@@ -273,7 +270,6 @@ impl BlockTree {
         match self.get_block(&block_id) {
             Some(block) => {
                 if block.round() > self.highest_certified_block().round() {
-                    self.highest_certified_block_id = block.id();
                     self.highest_quorum_cert = Arc::clone(&qc);
                 }
             },
@@ -311,7 +307,7 @@ impl BlockTree {
     /// Note this function is read-only, use with process_pruned_blocks to do the actual prune.
     pub(super) fn find_blocks_to_prune(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
         // Nothing to do if this is the commit root
-        if next_root_id == self.commit_root_id {
+        if next_root_id == self.commit_root_id() {
             return VecDeque::new();
         }
 
@@ -333,16 +329,6 @@ impl BlockTree {
             blocks_pruned.push_back(block_to_remove.id());
         }
         blocks_pruned
-    }
-
-    pub(super) fn update_ordered_root(&mut self, root_id: HashValue) {
-        assert!(self.block_exists(&root_id));
-        self.ordered_root_id = root_id;
-    }
-
-    pub(super) fn update_commit_root(&mut self, root_id: HashValue) {
-        assert!(self.block_exists(&root_id));
-        self.commit_root_id = root_id;
     }
 
     /// Process the data returned by the prune_tree, they're separated because caller might
@@ -406,14 +392,18 @@ impl BlockTree {
         &self,
         block_id: HashValue,
     ) -> Option<Vec<Arc<PipelinedBlock>>> {
-        self.path_from_root_to_block(block_id, self.ordered_root_id, self.ordered_root().round())
+        self.path_from_root_to_block(
+            block_id,
+            self.ordered_root_id(),
+            self.ordered_root().round(),
+        )
     }
 
     pub(super) fn path_from_commit_root(
         &self,
         block_id: HashValue,
     ) -> Option<Vec<Arc<PipelinedBlock>>> {
-        self.path_from_root_to_block(block_id, self.commit_root_id, self.commit_root().round())
+        self.path_from_root_to_block(block_id, self.commit_root_id(), self.commit_root().round())
     }
 
     pub(super) fn max_pruned_blocks_in_mem(&self) -> usize {
@@ -436,6 +426,12 @@ impl BlockTree {
         update_counters_for_committed_blocks(blocks_to_commit);
         let current_round = self.commit_root().round();
         let committed_round = block_to_commit.round();
+
+        // Question: Is it generally okay to have an assert statement in code?
+        assert!(
+            commit_proof.commit_info().id() == block_to_commit.id(),
+            "Commit proof does not match the block to commit."
+        );
         debug!(
             LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
             committed_round = committed_round,

@@ -59,26 +59,30 @@ pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) 
     assert_eq!(block_store.child_links(), block_store.len() - 1);
     assert!(block_store.block_exists(genesis_block.id()));
 
-    //       ╭--> A1--> A2--> A3
-    // Genesis--> B1--> B2
+    //       ╭--> A1--> A2--> A3--> A4
+    // Genesis--> B1--> B2 --> B3
     //             ╰--> C1
     let a1 = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 1)
         .await;
     let a2 = inserter.insert_block(&a1, 2, None).await;
-    let a3 = inserter
-        .insert_block(&a2, 3, Some(genesis.block_info()))
-        .await;
+    let a3 = inserter.insert_block(&a2, 3, None).await;
+    let a4 = inserter.insert_block(&a3, 4, None).await;
+
     let b1 = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 4)
         .await;
     let b2 = inserter.insert_block(&b1, 5, None).await;
+    let b3 = inserter.insert_block(&b2, 7, None).await;
     let c1 = inserter.insert_block(&b1, 6, None).await;
 
-    assert_eq!(block_store.len(), 7);
+    assert_eq!(block_store.len(), 9);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
 
-    (vec![genesis_block, a1, a2, a3, b1, b2, c1], block_store)
+    (
+        vec![genesis_block, a1, a2, a3, a4, b1, b2, b3, c1],
+        block_store,
+    )
 }
 
 pub fn build_empty_tree() -> Arc<BlockStore> {
