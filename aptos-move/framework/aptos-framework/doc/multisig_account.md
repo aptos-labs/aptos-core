@@ -48,14 +48,23 @@ and implement the governance voting logic on top.
 -  [Struct `MultisigAccountCreationMessage`](#0x1_multisig_account_MultisigAccountCreationMessage)
 -  [Struct `MultisigAccountCreationWithAuthKeyRevocationMessage`](#0x1_multisig_account_MultisigAccountCreationWithAuthKeyRevocationMessage)
 -  [Struct `AddOwnersEvent`](#0x1_multisig_account_AddOwnersEvent)
+-  [Struct `AddOwners`](#0x1_multisig_account_AddOwners)
 -  [Struct `RemoveOwnersEvent`](#0x1_multisig_account_RemoveOwnersEvent)
+-  [Struct `RemoveOwners`](#0x1_multisig_account_RemoveOwners)
 -  [Struct `UpdateSignaturesRequiredEvent`](#0x1_multisig_account_UpdateSignaturesRequiredEvent)
+-  [Struct `UpdateSignaturesRequired`](#0x1_multisig_account_UpdateSignaturesRequired)
 -  [Struct `CreateTransactionEvent`](#0x1_multisig_account_CreateTransactionEvent)
+-  [Struct `CreateTransaction`](#0x1_multisig_account_CreateTransaction)
 -  [Struct `VoteEvent`](#0x1_multisig_account_VoteEvent)
+-  [Struct `Vote`](#0x1_multisig_account_Vote)
 -  [Struct `ExecuteRejectedTransactionEvent`](#0x1_multisig_account_ExecuteRejectedTransactionEvent)
+-  [Struct `ExecuteRejectedTransaction`](#0x1_multisig_account_ExecuteRejectedTransaction)
 -  [Struct `TransactionExecutionSucceededEvent`](#0x1_multisig_account_TransactionExecutionSucceededEvent)
+-  [Struct `TransactionExecutionSucceeded`](#0x1_multisig_account_TransactionExecutionSucceeded)
 -  [Struct `TransactionExecutionFailedEvent`](#0x1_multisig_account_TransactionExecutionFailedEvent)
+-  [Struct `TransactionExecutionFailed`](#0x1_multisig_account_TransactionExecutionFailed)
 -  [Struct `MetadataUpdatedEvent`](#0x1_multisig_account_MetadataUpdatedEvent)
+-  [Struct `MetadataUpdated`](#0x1_multisig_account_MetadataUpdated)
 -  [Constants](#@Constants_0)
 -  [Function `metadata`](#0x1_multisig_account_metadata)
 -  [Function `num_signatures_required`](#0x1_multisig_account_num_signatures_required)
@@ -497,6 +506,40 @@ Event emitted when new owners are added to the multisig account.
 
 </details>
 
+<a id="0x1_multisig_account_AddOwners"></a>
+
+## Struct `AddOwners`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_AddOwners">AddOwners</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>owners_added: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_multisig_account_RemoveOwnersEvent"></a>
 
 ## Struct `RemoveOwnersEvent`
@@ -525,6 +568,40 @@ Event emitted when new owners are removed from the multisig account.
 
 </details>
 
+<a id="0x1_multisig_account_RemoveOwners"></a>
+
+## Struct `RemoveOwners`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_RemoveOwners">RemoveOwners</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>owners_removed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_multisig_account_UpdateSignaturesRequiredEvent"></a>
 
 ## Struct `UpdateSignaturesRequiredEvent`
@@ -542,6 +619,46 @@ Event emitted when the number of signatures required is updated.
 
 
 <dl>
+<dt>
+<code>old_num_signatures_required: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_num_signatures_required: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_multisig_account_UpdateSignaturesRequired"></a>
+
+## Struct `UpdateSignaturesRequired`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_UpdateSignaturesRequired">UpdateSignaturesRequired</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>old_num_signatures_required: u64</code>
 </dt>
@@ -599,6 +716,52 @@ Event emitted when a transaction is created.
 
 </details>
 
+<a id="0x1_multisig_account_CreateTransaction"></a>
+
+## Struct `CreateTransaction`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_CreateTransaction">CreateTransaction</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>creator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>transaction: <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">multisig_account::MultisigTransaction</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_multisig_account_VoteEvent"></a>
 
 ## Struct `VoteEvent`
@@ -616,6 +779,52 @@ Event emitted when an owner approves or rejects a transaction.
 
 
 <dl>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>approved: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_multisig_account_Vote"></a>
+
+## Struct `Vote`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_Vote">Vote</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>owner: <b>address</b></code>
 </dt>
@@ -680,6 +889,52 @@ number of signatures required.
 
 </details>
 
+<a id="0x1_multisig_account_ExecuteRejectedTransaction"></a>
+
+## Struct `ExecuteRejectedTransaction`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_ExecuteRejectedTransaction">ExecuteRejectedTransaction</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>num_rejections: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>executor: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_multisig_account_TransactionExecutionSucceededEvent"></a>
 
 ## Struct `TransactionExecutionSucceededEvent`
@@ -697,6 +952,58 @@ Event emitted when a transaction is executed.
 
 
 <dl>
+<dt>
+<code>executor: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>transaction_payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>num_approvals: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_multisig_account_TransactionExecutionSucceeded"></a>
+
+## Struct `TransactionExecutionSucceeded`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionSucceeded">TransactionExecutionSucceeded</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>executor: <b>address</b></code>
 </dt>
@@ -778,6 +1085,64 @@ Event emitted when a transaction's execution failed.
 
 </details>
 
+<a id="0x1_multisig_account_TransactionExecutionFailed"></a>
+
+## Struct `TransactionExecutionFailed`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionFailed">TransactionExecutionFailed</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>executor: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>transaction_payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>num_approvals: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>execution_error: <a href="multisig_account.md#0x1_multisig_account_ExecutionError">multisig_account::ExecutionError</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_multisig_account_MetadataUpdatedEvent"></a>
 
 ## Struct `MetadataUpdatedEvent`
@@ -795,6 +1160,46 @@ Event emitted when a transaction's metadata is updated.
 
 
 <dl>
+<dt>
+<code>old_metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_multisig_account_MetadataUpdated"></a>
+
+## Struct `MetadataUpdated`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="multisig_account.md#0x1_multisig_account_MetadataUpdated">MetadataUpdated</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>old_metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
@@ -1008,6 +1413,16 @@ Transaction payload cannot be empty.
 
 
 
+<a id="0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH"></a>
+
+Provided target function does not match the payload stored in the on-chain transaction.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH">EPAYLOAD_DOES_NOT_MATCH</a>: u64 = 2010;
+</code></pre>
+
+
+
 <a id="0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH_HASH"></a>
 
 Provided target function does not match the hash stored in the on-chain transaction.
@@ -1193,7 +1608,9 @@ Return all pending transactions.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_get_pending_transactions">get_pending_transactions</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>&gt; <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_get_pending_transactions">get_pending_transactions</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>
+): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>&gt; <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> pending_transactions: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>&gt; = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> <a href="multisig_account.md#0x1_multisig_account">multisig_account</a> = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     <b>let</b> i = <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.last_executed_sequence_number + 1;
@@ -2222,6 +2639,15 @@ maliciously alter the number of signatures required.
     };
 
     <b>if</b> (emit_event) {
+        <b>if</b> (std::features::module_event_migration_enabled()) {
+            emit(
+                <a href="multisig_account.md#0x1_multisig_account_MetadataUpdated">MetadataUpdated</a> {
+                    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: multisig_address,
+                    old_metadata,
+                    new_metadata: multisig_account_resource.metadata,
+                }
+            )
+        };
         emit_event(
             &<b>mut</b> multisig_account_resource.metadata_updated_events,
             <a href="multisig_account.md#0x1_multisig_account_MetadataUpdatedEvent">MetadataUpdatedEvent</a> {
@@ -2261,8 +2687,7 @@ Create a multisig transaction, which will have one approval initially (from the 
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&payload) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_CANNOT_BE_EMPTY">EPAYLOAD_CANNOT_BE_EMPTY</a>));
 
     <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_exists">assert_multisig_account_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <a href="multisig_account.md#0x1_multisig_account_assert_is_owner_internal">assert_is_owner_internal</a>(owner, multisig_account_resource);
+    <a href="multisig_account.md#0x1_multisig_account_assert_is_owner">assert_is_owner</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
 
     <b>let</b> creator = address_of(owner);
     <b>let</b> transaction = <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a> {
@@ -2272,7 +2697,7 @@ Create a multisig transaction, which will have one approval initially (from the 
         creator,
         creation_time_secs: now_seconds(),
     };
-    <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(creator, multisig_account_resource, transaction);
+    <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(creator, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, transaction);
 }
 </code></pre>
 
@@ -2307,8 +2732,7 @@ to provide the full payload, which will be validated against the hash stored on-
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&payload_hash) == 32, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EINVALID_PAYLOAD_HASH">EINVALID_PAYLOAD_HASH</a>));
 
     <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_exists">assert_multisig_account_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <a href="multisig_account.md#0x1_multisig_account_assert_is_owner_internal">assert_is_owner_internal</a>(owner, multisig_account_resource);
+    <a href="multisig_account.md#0x1_multisig_account_assert_is_owner">assert_is_owner</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
 
     <b>let</b> creator = address_of(owner);
     <b>let</b> transaction = <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a> {
@@ -2318,7 +2742,7 @@ to provide the full payload, which will be validated against the hash stored on-
         creator,
         creation_time_secs: now_seconds(),
     };
-    <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(creator, multisig_account_resource, transaction);
+    <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(creator, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, transaction);
 }
 </code></pre>
 
@@ -2416,6 +2840,16 @@ will continue to be an accessible entry point.
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(votes, owner_addr, approved);
     };
 
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        emit(
+            <a href="multisig_account.md#0x1_multisig_account_Vote">Vote</a> {
+                <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+                owner: owner_addr,
+                sequence_number,
+                approved,
+            }
+        );
+    };
     emit_event(
         &<b>mut</b> multisig_account_resource.vote_events,
         <a href="multisig_account.md#0x1_multisig_account_VoteEvent">VoteEvent</a> {
@@ -2510,10 +2944,11 @@ Remove the next transaction if it has sufficient owner rejections.
     <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>,
 ) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_exists">assert_multisig_account_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> sequence_number = <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1;
+    <a href="multisig_account.md#0x1_multisig_account_assert_is_owner">assert_is_owner</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
 
+    <b>let</b> sequence_number = <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1;
     <b>let</b> owner_addr = address_of(owner);
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
         // Implicitly vote for rejection <b>if</b> the owner <b>has</b> not voted for rejection yet.
         <b>if</b> (!<a href="multisig_account.md#0x1_multisig_account_has_voted_for_rejection">has_voted_for_rejection</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number, owner_addr)) {
             <a href="multisig_account.md#0x1_multisig_account_reject_transaction">reject_transaction</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
@@ -2527,6 +2962,16 @@ Remove the next transaction if it has sufficient owner rejections.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_REJECTIONS">ENOT_ENOUGH_REJECTIONS</a>),
     );
 
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        emit(
+            <a href="multisig_account.md#0x1_multisig_account_ExecuteRejectedTransaction">ExecuteRejectedTransaction</a> {
+                <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+                sequence_number,
+                num_rejections,
+                executor: address_of(owner),
+            }
+        );
+    };
     emit_event(
         &<b>mut</b> multisig_account_resource.execute_rejected_transaction_events,
         <a href="multisig_account.md#0x1_multisig_account_ExecuteRejectedTransactionEvent">ExecuteRejectedTransactionEvent</a> {
@@ -2602,7 +3047,7 @@ Transaction payload is optional if it's already stored on chain for the transact
     <b>let</b> sequence_number = <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1;
     <a href="multisig_account.md#0x1_multisig_account_assert_transaction_exists">assert_transaction_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
 
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
         <b>assert</b>!(
             <a href="multisig_account.md#0x1_multisig_account_can_execute">can_execute</a>(address_of(owner), <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_APPROVALS">ENOT_ENOUGH_APPROVALS</a>),
@@ -2626,6 +3071,19 @@ Transaction payload is optional if it's already stored on chain for the transact
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH_HASH">EPAYLOAD_DOES_NOT_MATCH_HASH</a>),
         );
     };
+
+    // If the transaction payload is stored on chain and there is a provided payload,
+    // verify that the provided payload matches the stored payload.
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">features::abort_if_multisig_payload_mismatch_enabled</a>()
+        && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&transaction.payload)
+        && !<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&payload)
+    ) {
+        <b>let</b> stored_payload = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&transaction.payload);
+        <b>assert</b>!(
+            payload == *stored_payload,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH">EPAYLOAD_DOES_NOT_MATCH</a>),
+        );
+    }
 }
 </code></pre>
 
@@ -2657,6 +3115,17 @@ This function is private so no other code can call this beside the VM itself as 
 ) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> num_approvals = <a href="multisig_account.md#0x1_multisig_account_transaction_execution_cleanup_common">transaction_execution_cleanup_common</a>(executor, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        emit(
+            <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionSucceeded">TransactionExecutionSucceeded</a> {
+                <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+                sequence_number: multisig_account_resource.last_executed_sequence_number,
+                transaction_payload,
+                num_approvals,
+                executor,
+            }
+        );
+    };
     emit_event(
         &<b>mut</b> multisig_account_resource.execute_transaction_events,
         <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionSucceededEvent">TransactionExecutionSucceededEvent</a> {
@@ -2698,6 +3167,18 @@ This function is private so no other code can call this beside the VM itself as 
 ) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> num_approvals = <a href="multisig_account.md#0x1_multisig_account_transaction_execution_cleanup_common">transaction_execution_cleanup_common</a>(executor, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        emit(
+            <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionFailed">TransactionExecutionFailed</a> {
+                <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+                executor,
+                sequence_number: multisig_account_resource.last_executed_sequence_number,
+                transaction_payload,
+                num_approvals,
+                execution_error,
+            }
+        );
+    };
     emit_event(
         &<b>mut</b> multisig_account_resource.transaction_execution_failed_events,
         <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionFailedEvent">TransactionExecutionFailedEvent</a> {
@@ -2737,7 +3218,17 @@ This function is private so no other code can call this beside the VM itself as 
     <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
 
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>() && implicit_approval) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>() && implicit_approval) {
+        <b>if</b> (std::features::module_event_migration_enabled()) {
+            emit(
+                <a href="multisig_account.md#0x1_multisig_account_Vote">Vote</a> {
+                    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+                    owner: executor,
+                    sequence_number,
+                    approved: <b>true</b>,
+                }
+            );
+        };
         num_approvals = num_approvals + 1;
         emit_event(
             &<b>mut</b> multisig_account_resource.vote_events,
@@ -2790,7 +3281,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 
 
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(creator: <b>address</b>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<b>mut</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">multisig_account::MultisigAccount</a>, transaction: <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">multisig_account::MultisigTransaction</a>)
+<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(creator: <b>address</b>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, transaction: <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">multisig_account::MultisigTransaction</a>)
 </code></pre>
 
 
@@ -2799,23 +3290,33 @@ This function is private so no other code can call this beside the VM itself as 
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(creator: <b>address</b>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<b>mut</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>, transaction: <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>) {
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
-        <b>let</b> num_pending_transactions = <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.next_sequence_number - (<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.last_executed_sequence_number + 1);
+<pre><code>inline <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(
+    creator: <b>address</b>,
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>,
+    transaction: <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>
+) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
         <b>assert</b>!(
-            num_pending_transactions &lt; <a href="multisig_account.md#0x1_multisig_account_MAX_PENDING_TRANSACTIONS">MAX_PENDING_TRANSACTIONS</a>,
+            <a href="multisig_account.md#0x1_multisig_account_available_transaction_queue_capacity">available_transaction_queue_capacity</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &gt; 0,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_EMAX_PENDING_TRANSACTIONS_EXCEEDED">EMAX_PENDING_TRANSACTIONS_EXCEEDED</a>)
         );
     };
 
+    <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+
     // The transaction creator also automatically votes for the transaction.
     <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> transaction.votes, creator, <b>true</b>);
 
-    <b>let</b> sequence_number = <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.next_sequence_number;
-    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.next_sequence_number = sequence_number + 1;
-    <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(&<b>mut</b> <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.transactions, sequence_number, transaction);
+    <b>let</b> sequence_number = multisig_account_resource.next_sequence_number;
+    multisig_account_resource.next_sequence_number = sequence_number + 1;
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(&<b>mut</b> multisig_account_resource.transactions, sequence_number, transaction);
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        emit(
+            <a href="multisig_account.md#0x1_multisig_account_CreateTransaction">CreateTransaction</a> { <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, creator, sequence_number, transaction }
+        );
+    };
     emit_event(
-        &<b>mut</b> <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.create_transaction_events,
+        &<b>mut</b> multisig_account_resource.create_transaction_events,
         <a href="multisig_account.md#0x1_multisig_account_CreateTransactionEvent">CreateTransactionEvent</a> { creator, sequence_number, transaction },
     );
 }
@@ -3203,6 +3704,9 @@ Add new owners, remove owners to remove, update signatures required.
             &multisig_account_ref_mut.owners,
             multisig_address
         );
+        <b>if</b> (std::features::module_event_migration_enabled()) {
+            emit(<a href="multisig_account.md#0x1_multisig_account_AddOwners">AddOwners</a> { <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: multisig_address, owners_added: new_owners });
+        };
         emit_event(
             &<b>mut</b> multisig_account_ref_mut.add_owners_events,
             <a href="multisig_account.md#0x1_multisig_account_AddOwnersEvent">AddOwnersEvent</a> { owners_added: new_owners }
@@ -3224,6 +3728,11 @@ Add new owners, remove owners to remove, update signatures required.
         });
         // Only emit <a href="event.md#0x1_event">event</a> <b>if</b> owner(s) actually removed.
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&owners_removed) &gt; 0) {
+            <b>if</b> (std::features::module_event_migration_enabled()) {
+                emit(
+                    <a href="multisig_account.md#0x1_multisig_account_RemoveOwners">RemoveOwners</a> { <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: multisig_address, owners_removed }
+                );
+            };
             emit_event(
                 &<b>mut</b> multisig_account_ref_mut.remove_owners_events,
                 <a href="multisig_account.md#0x1_multisig_account_RemoveOwnersEvent">RemoveOwnersEvent</a> { owners_removed }
@@ -3244,6 +3753,15 @@ Add new owners, remove owners to remove, update signatures required.
         <b>if</b> (new_num_signatures_required != old_num_signatures_required) {
             multisig_account_ref_mut.num_signatures_required =
                 new_num_signatures_required;
+            <b>if</b> (std::features::module_event_migration_enabled()) {
+                emit(
+                    <a href="multisig_account.md#0x1_multisig_account_UpdateSignaturesRequired">UpdateSignaturesRequired</a> {
+                        <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: multisig_address,
+                        old_num_signatures_required,
+                        new_num_signatures_required,
+                    }
+                );
+            };
             emit_event(
                 &<b>mut</b> multisig_account_ref_mut.update_signature_required_events,
                 <a href="multisig_account.md#0x1_multisig_account_UpdateSignaturesRequiredEvent">UpdateSignaturesRequiredEvent</a> {
@@ -3374,7 +3892,7 @@ Add new owners, remove owners to remove, update signatures required.
 <td>12</td>
 <td>Performing any changes on the list of owners such as adding new owners, removing owners, swapping owners should ensure that the number of required signature, for the multi-signature account remains valid.</td>
 <td>Critical</td>
-<td>The following function as used to modify the owners list and the required signature of the swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_signatures_required. All of these functions use update_owner_schema function to process these changes, the function validates the owner list while adding and verifies that the account has enough required signatures and updates the owner's schema.</td>
+<td>The following function as used to modify the owners list and the required signature of the account: add_owner, add_owners, add_owners_and_update_signatures_required, remove_owner, remove_owners, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_signatures_required. All of these functions use update_owner_schema function to process these changes, the function validates the owner list while adding and verifies that the account has enough required signatures and updates the owner's schema.</td>
 <td>Audited that the owners are added successfully. (add_owner, add_owners, add_owners_and_update_signatures_required, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_owner_schema) Audited that the owners are removed successfully. (remove_owner, remove_owners, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_owner_schema) Audited that the num_signatures_required is updated successfully. (add_owners_and_update_signatures_required, swap_owners_and_update_signatures_required, update_signatures_required, update_owner_schema)</td>
 </tr>
 
@@ -3382,7 +3900,7 @@ Add new owners, remove owners to remove, update signatures required.
 <td>13</td>
 <td>The creation of a transaction should be limited to an account owner, which should be automatically considered a voter; additionally, the account's sequence should increase monotonically.</td>
 <td>Critical</td>
-<td>The following functions can only be called by the owners of the account and create a transaction and uses add_transaction function to gives approval on behalf of the creator and increments the create_transaction.</td>
+<td>The following functions can only be called by the owners of the account and create a transaction and uses add_transaction function to gives approval on behalf of the creator and increments the next_sequence_number and finally adds the transaction to the MultsigAccount: create_transaction_with_hash, create_transaction.</td>
 <td>Audited it aborts if the caller is not in the owner's list of the account. (create_transaction_with_hash, create_transaction) Audited that the transaction is successfully stored in the MultisigAccount.(create_transaction_with_hash, create_transaction, add_transaction) Audited that the creators voted to approve the transaction. (create_transaction_with_hash, create_transaction, add_transaction) Audited that the next_sequence_number increases monotonically. (create_transaction_with_hash, create_transaction, add_transaction)</td>
 </tr>
 

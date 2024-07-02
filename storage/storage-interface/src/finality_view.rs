@@ -64,7 +64,7 @@ impl<Db: DbReader> DbReader for FinalityView<Db> {
         Ok(fin_ledger_info.clone())
     }
 
-    fn get_latest_version(&self) -> Result<Version> {
+    fn get_synced_version(&self) -> Result<Version> {
         let fin_ledger_info = self.finalized_ledger_info.read().unwrap();
         fin_ledger_info
             .as_ref()

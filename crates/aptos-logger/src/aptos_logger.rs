@@ -6,7 +6,9 @@
 //! (e.g. Logstash)
 
 use crate::{
-    counters::{STRUCT_LOG_PARSE_ERROR_COUNT, STRUCT_LOG_QUEUE_ERROR_COUNT},
+    counters::{
+        PROCESSED_STRUCT_LOG_COUNT, STRUCT_LOG_PARSE_ERROR_COUNT, STRUCT_LOG_QUEUE_ERROR_COUNT,
+    },
     logger::Logger,
     sample,
     sample::SampleRate,
@@ -17,6 +19,7 @@ use crate::{
 use aptos_infallible::RwLock;
 use backtrace::Backtrace;
 use chrono::{SecondsFormat, Utc};
+use futures::channel;
 use once_cell::sync::Lazy;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use std::{
@@ -27,9 +30,11 @@ use std::{
     ops::{Deref, DerefMut},
     str::FromStr,
     sync::{self, Arc},
+    thread,
     time::Duration,
 };
 use strum_macros::EnumString;
+use tokio::time;
 
 const RUST_LOG: &str = "RUST_LOG";
 pub const RUST_LOG_TELEMETRY: &str = "RUST_LOG_TELEMETRY";
@@ -37,6 +42,8 @@ const RUST_LOG_FORMAT: &str = "RUST_LOG_FORMAT";
 /// Default size of log write channel, if the channel is full, logs will be dropped
 pub const CHANNEL_SIZE: usize = 10000;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
+const FILTER_REFRESH_INTERVAL: Duration =
+    Duration::from_secs(5 /* minutes */ * 60 /* seconds */);
 
 /// Note: To disable length limits, set `RUST_LOG_FIELD_MAX_LEN` to -1.
 const RUST_LOG_FIELD_MAX_LEN_ENV_VAR: &str = "RUST_LOG_FIELD_MAX_LEN";
@@ -197,8 +204,8 @@ impl LogEntry {
 
         let hostname = HOSTNAME.as_deref();
         let namespace = NAMESPACE.as_deref();
-        let peer_id = None;
-        let chain_id = None;
+        let peer_id = aptos_node_identity::peer_id_as_str();
+        let chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
 
         let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
             let mut backtrace = Backtrace::new();
@@ -281,6 +288,9 @@ pub struct AptosDataBuilder {
     remote_level: Level,
     telemetry_level: Level,
     printer: Option<Box<dyn Writer>>,
+    remote_log_tx: Option<channel::mpsc::Sender<TelemetryLog>>,
+    is_async: bool,
+    enable_telemetry_flush: bool,
     custom_format: Option<fn(&LogEntry) -> Result<String, fmt::Error>>,
 }
 
@@ -295,6 +305,9 @@ impl AptosDataBuilder {
             remote_level: Level::Info,
             telemetry_level: Level::Warn,
             printer: Some(Box::new(StdoutWriter::new())),
+            remote_log_tx: None,
+            is_async: false,
+            enable_telemetry_flush: true,
             custom_format: None,
         }
     }
@@ -334,6 +347,24 @@ impl AptosDataBuilder {
         self
     }
 
+    pub fn remote_log_tx(
+        &mut self,
+        remote_log_tx: channel::mpsc::Sender<TelemetryLog>,
+    ) -> &mut Self {
+        self.remote_log_tx = Some(remote_log_tx);
+        self
+    }
+
+    pub fn is_async(&mut self, is_async: bool) -> &mut Self {
+        self.is_async = is_async;
+        self
+    }
+
+    pub fn enable_telemetry_flush(&mut self, enable_telemetry_flush: bool) -> &mut Self {
+        self.enable_telemetry_flush = enable_telemetry_flush;
+        self
+    }
+
     pub fn custom_format(
         &mut self,
         format: fn(&LogEntry) -> Result<String, fmt::Error>,
@@ -346,8 +377,7 @@ impl AptosDataBuilder {
         self.build();
     }
 
-    fn build_filter(&self) -> Filter {
-        // Keep this block same as upstream, which also builds a telemetry filter
+    fn build_filter(&self) -> FilterTuple {
         let local_filter = {
             let mut filter_builder = Filter::builder();
 
@@ -359,8 +389,26 @@ impl AptosDataBuilder {
 
             filter_builder.build()
         };
+        let telemetry_filter = {
+            let mut filter_builder = Filter::builder();
 
-        local_filter
+            if self.is_async && self.remote_log_tx.is_some() {
+                if env::var(RUST_LOG_TELEMETRY).is_ok() {
+                    filter_builder.with_env(RUST_LOG_TELEMETRY);
+                } else {
+                    filter_builder.filter_level(self.telemetry_level.into());
+                }
+            } else {
+                filter_builder.filter_level(LevelFilter::Off);
+            }
+
+            filter_builder.build()
+        };
+
+        FilterTuple {
+            local_filter,
+            telemetry_filter,
+        }
     }
 
     fn build_logger(&mut self) -> Arc<AptosData> {
@@ -374,13 +422,40 @@ impl AptosDataBuilder {
             }
         }
 
-        Arc::new(AptosData {
-            enable_backtrace: self.enable_backtrace,
-            sender: None,
-            printer: self.printer.take(),
-            filter: RwLock::new(filter),
-            formatter: self.custom_format.take().unwrap_or(text_format),
-        })
+        if self.is_async {
+            let (sender, receiver) = sync::mpsc::sync_channel(self.channel_size);
+            let mut remote_tx = None;
+            if let Some(tx) = &self.remote_log_tx {
+                remote_tx = Some(tx.clone());
+            }
+
+            let logger = Arc::new(AptosData {
+                enable_backtrace: self.enable_backtrace,
+                sender: Some(sender),
+                printer: None,
+                filter: RwLock::new(filter),
+                enable_telemetry_flush: self.enable_telemetry_flush,
+                formatter: self.custom_format.take().unwrap_or(text_format),
+            });
+            let service = LoggerService {
+                receiver,
+                printer: self.printer.take(),
+                facade: logger.clone(),
+                remote_tx,
+            };
+
+            thread::spawn(move || service.run());
+            logger
+        } else {
+            Arc::new(AptosData {
+                enable_backtrace: self.enable_backtrace,
+                sender: None,
+                printer: self.printer.take(),
+                filter: RwLock::new(filter),
+                enable_telemetry_flush: self.enable_telemetry_flush,
+                formatter: self.custom_format.take().unwrap_or(text_format),
+            })
+        }
     }
 
     pub fn build(&mut self) -> Arc<AptosData> {
@@ -397,11 +472,26 @@ impl AptosDataBuilder {
     }
 }
 
+/// A combination of `Filter`s to control where logs are written
+pub struct FilterTuple {
+    /// The local printer `Filter` to control what is logged in text output
+    local_filter: Filter,
+    /// The logging `Filter` to control what is sent to telemetry service
+    telemetry_filter: Filter,
+}
+
+impl FilterTuple {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        self.local_filter.enabled(metadata) || self.telemetry_filter.enabled(metadata)
+    }
+}
+
 pub struct AptosData {
     enable_backtrace: bool,
     sender: Option<sync::mpsc::SyncSender<LoggerServiceEvent>>,
     printer: Option<Box<dyn Writer>>,
-    filter: RwLock<Filter>,
+    filter: RwLock<FilterTuple>,
+    enable_telemetry_flush: bool,
     pub(crate) formatter: fn(&LogEntry) -> Result<String, fmt::Error>,
 }
 
@@ -419,6 +509,7 @@ impl AptosData {
         // Create the Aptos Data Builder
         let mut builder = Self::builder();
         builder
+            .is_async(false)
             .enable_backtrace()
             .printer(Box::new(StdoutWriter::new()));
 
@@ -430,8 +521,16 @@ impl AptosData {
         builder.build();
     }
 
+    pub fn set_filter(&self, filter_tuple: FilterTuple) {
+        *self.filter.write() = filter_tuple;
+    }
+
     pub fn set_local_filter(&self, filter: Filter) {
-        *self.filter.write() = filter;
+        self.filter.write().local_filter = filter;
+    }
+
+    pub fn set_telemetry_filter(&self, filter: Filter) {
+        self.filter.write().telemetry_filter = filter;
     }
 
     fn send_entry(&self, entry: LogEntry) {
@@ -489,8 +588,6 @@ enum LoggerServiceEvent {
     Flush(sync::mpsc::SyncSender<()>),
 }
 
-<<<<<<< HEAD
-=======
 /// A service for running a log listener, that will continually export logs through a local printer
 /// or to a `AptosData` for external logging.
 struct LoggerService {
@@ -570,7 +667,6 @@ impl LoggerService {
     }
 }
 
->>>>>>> upstream/main
 /// A trait encapsulating the operations required for writing logs.
 pub trait Writer: Send + Sync {
     /// Write the log.
@@ -679,24 +775,48 @@ fn json_format(entry: &LogEntry) -> Result<String, fmt::Error> {
     }
 }
 
+/// Periodically rebuilds the filter and replaces the current logger filter.
+/// This is useful for dynamically changing log levels at runtime via existing
+/// environment variables such as `RUST_LOG_TELEMETRY`.
+pub struct LoggerFilterUpdater {
+    logger: Arc<AptosData>,
+    logger_builder: AptosDataBuilder,
+}
+
+impl LoggerFilterUpdater {
+    pub fn new(logger: Arc<AptosData>, logger_builder: AptosDataBuilder) -> Self {
+        Self {
+            logger,
+            logger_builder,
+        }
+    }
+
+    pub async fn run(self) {
+        let mut interval = time::interval(FILTER_REFRESH_INTERVAL);
+        loop {
+            interval.tick().await;
+
+            self.update_filter();
+        }
+    }
+
+    fn update_filter(&self) {
+        // TODO: check for change to env var before rebuilding filter.
+        let filter = self.logger_builder.build_filter();
+        self.logger.set_filter(filter);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-<<<<<<< HEAD
-    use super::LogEntry;
-=======
     use super::{text_format, AptosData, LogEntry};
->>>>>>> upstream/main
     use crate::{
-        aptos_logger::{json_format, TruncatedLogString},
+        aptos_logger::{json_format, TruncatedLogString, RUST_LOG_TELEMETRY},
         debug, error, info,
         logger::Logger,
-<<<<<<< HEAD
-        trace, warn, Event, Key, KeyValue, Level, Metadata, Schema, Value, Visitor,
-=======
         telemetry_log_writer::TelemetryLog,
         trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
         Schema, Value, Visitor, Writer,
->>>>>>> upstream/main
     };
     use chrono::{DateTime, Utc};
     use futures::StreamExt;
@@ -938,8 +1058,6 @@ mod tests {
         }
     }
 
-<<<<<<< HEAD
-=======
     fn new_async_logger() -> (AptosDataBuilder, Arc<AptosData>) {
         let mut logger_builder = AptosDataBuilder::new();
         let (remote_log_tx, _) = futures::channel::mpsc::channel(10);
@@ -1056,7 +1174,6 @@ mod tests {
             )));
     }
 
->>>>>>> upstream/main
     #[test]
     fn test_log_event_truncation() {
         let log_entry = LogEntry::new(

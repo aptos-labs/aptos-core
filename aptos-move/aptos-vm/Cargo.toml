@@ -44,6 +44,7 @@ claims = { workspace = true }
 crossbeam-channel = { workspace = true }
 derive_more = { workspace = true }
 fail = { workspace = true }
+futures = { workspace = true }
 hex = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }

@@ -52,7 +52,7 @@ proptest-derive = { workspace = true, optional = true }
 quick_cache = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
-ring = { workspace = true, optional = true }
+ring = { workspace = true }
 rsa = { workspace = true }
 serde = { workspace = true }
 serde-big-array = { workspace = true }
@@ -88,7 +88,7 @@ url = { workspace = true }
 
 [features]
 default = []
-testing = ["ring"]
+testing = []
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing"]
 
 [[bench]]
