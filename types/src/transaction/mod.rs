@@ -876,25 +876,24 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 
+    pub fn aug_with_aux_data(self, aux_data: &TransactionAuxiliaryData) -> Self {
+        if let Some(aux_error) = aux_data.get_detail_error_message() {
+            if let ExecutionStatus::MiscellaneousError(status_code) = self {
+                if status_code.is_none() {
+                    return ExecutionStatus::MiscellaneousError(Some(aux_error.status_code()));
+                }
+            }
+        }
+        self
+    }
+
     // Used by simulation API for showing detail error message. Should not be used by production code.
     pub fn conmbine_vm_status_for_simulation(
         aux_data: &TransactionAuxiliaryData,
         partial_status: TransactionStatus,
     ) -> Self {
         match partial_status {
-            TransactionStatus::Keep(exec_status) => {
-                if let Some(aux_error) = aux_data.get_detail_error_message() {
-                    let status_code = aux_error.status_code;
-                    match exec_status {
-                        ExecutionStatus::MiscellaneousError(_) => {
-                            ExecutionStatus::MiscellaneousError(Some(status_code))
-                        },
-                        _ => exec_status,
-                    }
-                } else {
-                    exec_status
-                }
-            },
+            TransactionStatus::Keep(exec_status) => exec_status.aug_with_aux_data(aux_data),
             TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
         }
