@@ -8,7 +8,7 @@ use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GcsFileStore {
     pub gcs_file_store_bucket_name: String,
-    pub gcs_file_store_bucket_sub_dir: Option<String>,
+    pub gcs_file_store_bucket_sub_dir: Option<PathBuf>,
     // Required to operate on GCS.
     pub gcs_file_store_service_account_key_path: String,
     #[serde(default = "default_enable_compression")]

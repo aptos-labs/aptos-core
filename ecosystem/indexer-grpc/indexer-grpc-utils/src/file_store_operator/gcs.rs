@@ -9,7 +9,7 @@ use crate::{
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use cloud_storage::{Bucket, Object};
-use std::env;
+use std::{env, path::PathBuf};
 
 const JSON_FILE_TYPE: &str = "application/json";
 // The environment variable to set the service account path.
@@ -19,16 +19,16 @@ const FILE_STORE_METADATA_TIMEOUT_MILLIS: u128 = 200;
 #[derive(Clone)]
 pub struct GcsFileStoreOperator {
     bucket_name: String,
-    bucket_sub_dir: Option<String>,
+    bucket_sub_dir: Option<PathBuf>,
     file_store_metadata_last_updated: std::time::Instant,
     storage_format: StorageFormat,
-    metadata_file_path: String,
+    metadata_file_path: PathBuf,
 }
 
 impl GcsFileStoreOperator {
     pub fn new(
         bucket_name: String,
-        bucket_sub_dir: Option<String>,
+        bucket_sub_dir: Option<PathBuf>,
         service_account_path: String,
         enable_compression: bool,
     ) -> Self {
@@ -39,8 +39,16 @@ impl GcsFileStoreOperator {
             StorageFormat::JsonBase64UncompressedProto
         };
         let metadata_file_path = match &bucket_sub_dir {
-            Some(sub_dir) => format!("{}/{}", sub_dir, METADATA_FILE_NAME),
-            None => METADATA_FILE_NAME.to_string(),
+            Some(sub_dir) => {
+                let mut metadata_file_path = sub_dir.clone();
+                metadata_file_path.push(METADATA_FILE_NAME);
+                metadata_file_path
+            },
+            None => {
+                let mut metadata_file_path = PathBuf::new();
+                metadata_file_path.push(METADATA_FILE_NAME);
+                metadata_file_path
+            },
         };
         Self {
             bucket_name,
@@ -57,7 +65,11 @@ impl GcsFileStoreOperator {
         let file_entry_key = FileEntry::build_key(version, self.storage_format).to_string();
         // If the sub directory is set, the file entry key will be prefixed with the sub directory.
         match &self.bucket_sub_dir {
-            Some(sub_dir) => format!("{}/{}", sub_dir, file_entry_key),
+            Some(sub_dir) => {
+                let mut file_entry_key_path = sub_dir.clone();
+                file_entry_key_path.push(file_entry_key);
+                file_entry_key_path.to_string_lossy().into_owned()
+            },
             None => file_entry_key,
         }
     }
@@ -110,7 +122,14 @@ impl FileStoreOperator for GcsFileStoreOperator {
 
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
     async fn get_file_store_metadata(&self) -> Option<FileStoreMetadata> {
-        match Object::download(&self.bucket_name, &self.metadata_file_path).await {
+        match Object::download(
+            &self.bucket_name,
+            self.metadata_file_path
+                .to_str()
+                .expect("Expected metadata file path to be valid."),
+        )
+        .await
+        {
             Ok(metadata) => {
                 let metadata: FileStoreMetadata =
                     serde_json::from_slice(&metadata).expect("Expected metadata to be valid JSON.");
@@ -170,7 +189,9 @@ impl FileStoreOperator for GcsFileStoreOperator {
         Object::create(
             self.bucket_name.as_str(),
             serde_json::to_vec(&metadata).unwrap(),
-            &self.metadata_file_path,
+            self.metadata_file_path
+                .to_str()
+                .expect("Expected metadata file path to be valid."),
             JSON_FILE_TYPE,
         )
         .await?;
