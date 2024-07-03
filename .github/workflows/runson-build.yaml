@@ -55,4 +55,5 @@ jobs:
         run: |
           ls -la target/
           find target/ -maxdepth 2 || true
-          cargo xbuild group forge
+          # cargo xbuild group forge
+          ./docker/builder/build-tools.sh
