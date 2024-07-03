@@ -148,6 +148,7 @@ pub enum Expression {
     IfElse(Box<IfExpr>),
     Reference(Box<Expression>),
     Dereference(Box<Expression>),
+    MutReference(Box<Expression>),
 }
 
 /// Represents a variable access

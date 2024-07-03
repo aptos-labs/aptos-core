@@ -340,6 +340,7 @@ impl CodeGenerator for Expression {
             Expression::IfElse(if_expr) => if_expr.emit_code_lines(),
             Expression::Reference(expr) => vec![format!("&({})", expr.inline())],
             Expression::Dereference(expr) => vec![format!("*({})", expr.inline())],
+            Expression::MutReference(expr) => vec![format!("&mut ({})", expr.inline())],
         }
     }
 }
@@ -544,6 +545,7 @@ impl CodeGenerator for Type {
             T::U256 => "u256".to_string(),
             T::Bool => "bool".to_string(),
             T::Ref(t) => format!("&{}", t.inline()),
+            T::MutRef(t) => format!("&mut {}", t.inline()),
             T::Struct(st) => st.name.inline(),
             T::StructConcrete(st) => st.inline(),
             T::TypeParameter(tp) => tp.name.inline(),

@@ -662,6 +662,7 @@ impl MoveSmith {
         let ret_ty_to_check = match &return_type {
             Some(ret_ty @ Type::TypeParameter(_)) => Some(ret_ty),
             Some(Type::Ref(ret_ty)) => Some(ret_ty.as_ref()),
+            Some(Type::MutRef(ret_ty)) => Some(ret_ty.as_ref()),
             _ => None,
         };
 
@@ -1012,6 +1013,12 @@ impl MoveSmith {
                     None => Type::Ref(inner.clone()),
                 }
             },
+            Type::MutRef(inner) => {
+                match self.concretize_type(u, inner, parent_scope, constraints, parent_type) {
+                    Some(concrete_inner) => Type::MutRef(Box::new(concrete_inner)),
+                    None => Type::Ref(inner.clone()),
+                }
+            },
             _ => panic!("{:?} cannot be concretized.", typ),
         };
 
@@ -1146,6 +1153,7 @@ impl MoveSmith {
             },
             Type::Struct(st) => !st.type_parameters.type_parameters.is_empty(),
             Type::Ref(inner) => self.is_type_concretizable(inner, parent_scope),
+            Type::MutRef(inner) => self.is_type_concretizable(inner, parent_scope),
             _ => false,
         }
     }
@@ -1186,10 +1194,31 @@ impl MoveSmith {
         };
         trace!("Concretized type is: {:?}", typ);
 
-        if let Type::Ref(inner) = typ {
-            return Ok(Expression::Reference(Box::new(
-                self.generate_expression_of_type(u, parent_scope, inner, allow_var, allow_call)?,
-            )));
+        // Check for reference types
+        match typ {
+            Type::Ref(inner) => {
+                return Ok(Expression::Reference(Box::new(
+                    self.generate_expression_of_type(
+                        u,
+                        parent_scope,
+                        inner,
+                        allow_var,
+                        allow_call,
+                    )?,
+                )));
+            },
+            Type::MutRef(inner) => {
+                return Ok(Expression::MutReference(Box::new(
+                    self.generate_expression_of_type(
+                        u,
+                        parent_scope,
+                        inner,
+                        allow_var,
+                        allow_call,
+                    )?,
+                )));
+            },
+            _ => (),
         }
 
         // Store default choices that do not require recursion
@@ -2048,6 +2077,7 @@ impl MoveSmith {
                         panic!("Reference type should not be in the category");
                     }
                     refs.push((Type::Ref(Box::new(typ.clone())), 1));
+                    refs.push((Type::MutRef(Box::new(typ.clone())), 1));
                 }
             }
             // We cannot create a reference to a non_instantiatable type parameter

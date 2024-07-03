@@ -90,7 +90,7 @@ fn test_emit_code() {
 
 #[test]
 fn test_generation_and_compile() {
-    let raw_data = get_random_bytes(12345, 4096);
+    let raw_data = get_random_bytes(12345, 8192);
     let mut u = Unstructured::new(&raw_data);
     let mut smith = MoveSmith::default();
     smith.generate(&mut u).unwrap();
