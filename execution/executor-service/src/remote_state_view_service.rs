@@ -17,6 +17,8 @@ use cpq::ConcurrentPriorityQueue;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
+use rayon::iter::IndexedParallelIterator;
 use tokio::runtime;
 use tokio::runtime::Runtime;
 use aptos_drop_helper::DEFAULT_DROPPER;
