@@ -8,7 +8,7 @@ use crate::{
     monitor,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
 };
-use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{block::Block, pipelined_block::OrderedBlockWindow};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
@@ -64,6 +64,7 @@ impl ExecutionPipeline {
     pub async fn queue(
         &self,
         block: Block,
+        block_window: OrderedBlockWindow,
         metadata: BlockMetadataExt,
         parent_block_id: HashValue,
         txn_generator: BlockPreparer,
@@ -74,6 +75,7 @@ impl ExecutionPipeline {
         self.prepare_block_tx
             .send(PrepareBlockCommand {
                 block,
+                block_window,
                 metadata,
                 block_executor_onchain_config,
                 parent_block_id,
@@ -100,6 +102,7 @@ impl ExecutionPipeline {
     ) {
         let PrepareBlockCommand {
             block,
+            block_window,
             metadata,
             block_executor_onchain_config,
             parent_block_id,
@@ -108,7 +111,7 @@ impl ExecutionPipeline {
         } = command;
 
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer.prepare_block(&block).await;
+        let input_txns = block_preparer.prepare_block(&block, &block_window).await;
         if let Err(e) = input_txns {
             result_tx.send(Err(e)).unwrap_or_else(|err| {
                 error!(
@@ -247,6 +250,7 @@ impl ExecutionPipeline {
 
 struct PrepareBlockCommand {
     block: Block,
+    block_window: OrderedBlockWindow,
     metadata: BlockMetadataExt,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     // The parent block id.

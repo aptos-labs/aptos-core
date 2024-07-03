@@ -11,6 +11,7 @@ use crate::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_executor_types::StateComputeResult;
+use aptos_logger::info;
 use aptos_types::{
     block_info::BlockInfo, contract_event::ContractEvent, randomness::Randomness,
     transaction::SignedTransaction, validator_txn::ValidatorTransaction,
@@ -23,6 +24,29 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OrderedBlockWindow {
+    blocks: Vec<Block>,
+}
+
+impl OrderedBlockWindow {
+    pub fn new(blocks: Vec<Block>) -> Self {
+        Self { blocks }
+    }
+
+    pub fn empty() -> Self {
+        Self { blocks: vec![] }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self.blocks.is_empty()
+    }
+
+    pub fn blocks(&self) -> &Vec<Block> {
+        &self.blocks
+    }
+}
+
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered
 /// or in executed state. In the ordered state, the block is waiting to be executed. In the executed state,
 /// the block has been executed and the output is available.
@@ -30,6 +54,8 @@ use std::{
 pub struct PipelinedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
+    /// A window of blocks that are needed for execution with the execution pool, excluding the current block
+    block_window: OrderedBlockWindow,
     /// Input transactions in the order of execution
     input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
@@ -49,6 +75,7 @@ impl Serialize for PipelinedBlock {
         #[serde(rename = "PipelineBlock")]
         struct SerializedBlock<'a> {
             block: &'a Block,
+            block_window: &'a OrderedBlockWindow,
             input_transactions: &'a Vec<SignedTransaction>,
             state_compute_result: &'a StateComputeResult,
             randomness: Option<&'a Randomness>,
@@ -56,6 +83,7 @@ impl Serialize for PipelinedBlock {
 
         let serialized = SerializedBlock {
             block: &self.block,
+            block_window: &self.block_window,
             input_transactions: &self.input_transactions,
             state_compute_result: &self.state_compute_result,
             randomness: self.randomness.get(),
@@ -73,6 +101,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
         #[serde(rename = "PipelineBlock")]
         struct SerializedBlock {
             block: Block,
+            block_window: OrderedBlockWindow,
             input_transactions: Vec<SignedTransaction>,
             state_compute_result: StateComputeResult,
             randomness: Option<Randomness>,
@@ -80,6 +109,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
 
         let SerializedBlock {
             block,
+            block_window,
             input_transactions,
             state_compute_result,
             randomness,
@@ -87,6 +117,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
 
         let block = PipelinedBlock {
             block,
+            block_window,
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
@@ -107,6 +138,20 @@ impl PipelinedBlock {
     ) -> Self {
         self.state_compute_result = result;
         self.input_transactions = input_transactions;
+        self
+    }
+
+    pub fn set_block_window(mut self, block_window: OrderedBlockWindow) -> Self {
+        info!(
+            "set_block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}",
+            self.block.id(),
+            self.block.parent_id(),
+            self.block.round(),
+            self.block.epoch(),
+            block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
+        );
+
+        self.block_window = block_window;
         self
     }
 
@@ -137,8 +182,18 @@ impl PipelinedBlock {
         input_transactions: Vec<SignedTransaction>,
         state_compute_result: StateComputeResult,
     ) -> Self {
+        info!(
+            "New PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block.payload().map_or(0, |p| p.len())
+        );
+
         Self {
             block,
+            block_window: OrderedBlockWindow::new(vec![]),
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
@@ -147,8 +202,17 @@ impl PipelinedBlock {
     }
 
     pub fn new_ordered(block: Block) -> Self {
+        info!(
+            "New Ordered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block.payload().map_or(0, |p| p.len())
+        );
         Self {
             block,
+            block_window: OrderedBlockWindow::new(vec![]),
             input_transactions: vec![],
             state_compute_result: StateComputeResult::new_dummy(),
             randomness: OnceCell::new(),
@@ -158,6 +222,10 @@ impl PipelinedBlock {
 
     pub fn block(&self) -> &Block {
         &self.block
+    }
+
+    pub fn block_window(&self) -> &OrderedBlockWindow {
+        &self.block_window
     }
 
     pub fn id(&self) -> HashValue {
