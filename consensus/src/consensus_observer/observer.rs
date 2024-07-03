@@ -6,6 +6,7 @@ use crate::{
         error::Error,
         logging::{LogEntry, LogSchema},
         metrics,
+        missing_blocks::MissingBlockStore,
         network_client::ConsensusObserverClient,
         network_events::{ConsensusObserverNetworkEvents, NetworkMessage, ResponseSender},
         network_message::{
@@ -77,7 +78,9 @@ pub struct ConsensusObserver {
 
     // The payload store holds block transaction payloads
     block_payload_store: BlockPayloadStore,
-    // The pending ordered blocks (these are also buffered when in state sync mode)
+    // The missing block store holds pending ordered blocks that are missing payloads
+    missing_block_store: MissingBlockStore,
+    // The pending ordered blocks (these are also ordered when in state sync mode)
     pending_ordered_blocks: PendingOrderedBlocks,
     // The execution client to the buffer manager
     execution_client: Arc<dyn TExecutionClient>,
@@ -122,9 +125,10 @@ impl ConsensusObserver {
             consensus_observer_client,
             epoch_state: None,
             root: Arc::new(Mutex::new(root)),
+            block_payload_store: BlockPayloadStore::new(),
+            missing_block_store: MissingBlockStore::new(consensus_observer_config),
             pending_ordered_blocks: PendingOrderedBlocks::new(consensus_observer_config),
             execution_client,
-            block_payload_store: BlockPayloadStore::new(),
             sync_handle: None,
             sync_notification_sender,
             reconfig_events,
@@ -437,10 +441,14 @@ impl ConsensusObserver {
         }
     }
 
-    /// Processes the block payload
-    fn process_block_payload(&mut self, block_payload: BlockPayload) {
-        // Unpack the block payload
+    /// Processes the block payload message
+    async fn process_block_payload_message(&mut self, block_payload: BlockPayload) {
+        // Unpack the block round and epoch
         let block = block_payload.block;
+        let block_round = block.round();
+        let block_epoch = block.epoch();
+
+        // Unpack the block payload
         let transactions = block_payload.transactions;
         let limit = block_payload.limit;
 
@@ -449,10 +457,21 @@ impl ConsensusObserver {
         // Update the payload store with the payload
         self.block_payload_store
             .insert_block_payload(block, transactions, limit);
+
+        // Check if there are blocks that were missing payloads
+        // but are now ready because of the new payload.
+        if let Some(ordered_block) = self.missing_block_store.remove_ready_block(
+            block_epoch,
+            block_round,
+            &self.block_payload_store,
+        ) {
+            // Process the ordered block
+            self.process_ordered_block(ordered_block).await;
+        }
     }
 
-    /// Processes the commit decision
-    fn process_commit_decision(&mut self, commit_decision: CommitDecision) {
+    /// Processes the commit decision message
+    fn process_commit_decision_message(&mut self, commit_decision: CommitDecision) {
         // If the commit decision is for the current epoch, verify it
         let commit_decision_epoch = commit_decision.epoch();
         if commit_decision_epoch == self.get_epoch_state().epoch {
@@ -597,7 +616,7 @@ impl ConsensusObserver {
                         peer_network_id
                     ))
                 );
-                self.process_ordered_block(ordered_block).await;
+                self.process_ordered_block_message(ordered_block).await;
             },
             ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
                 debug!(
@@ -607,7 +626,7 @@ impl ConsensusObserver {
                         peer_network_id
                     ))
                 );
-                self.process_commit_decision(commit_decision);
+                self.process_commit_decision_message(commit_decision);
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
                 debug!(
@@ -616,13 +635,13 @@ impl ConsensusObserver {
                         block_payload.block, peer_network_id
                     ))
                 );
-                self.process_block_payload(block_payload);
+                self.process_block_payload_message(block_payload).await;
             },
         }
     }
 
-    /// Processes the ordered block
-    async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
+    /// Processes the ordered block message
+    async fn process_ordered_block_message(&mut self, ordered_block: OrderedBlock) {
         // Unpack the ordered block
         let OrderedBlock {
             blocks,
@@ -640,6 +659,24 @@ impl ConsensusObserver {
             );
             return;
         };
+
+        // If all the payloads exist, process the ordered block.
+        // Otherwise, store the block in the missing block store.
+        if self.block_payload_store.all_payloads_exist(&blocks) {
+            self.process_ordered_block(ordered_block).await;
+        } else {
+            self.missing_block_store.insert_missing_block(ordered_block);
+        }
+    }
+
+    /// Processes the ordered block. This assumes the ordered block
+    /// has been sanity checked and that all payloads exist.
+    async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
+        // Unpack the ordered block
+        let OrderedBlock {
+            blocks,
+            ordered_proof,
+        } = ordered_block.clone();
 
         // If the ordered block is for the current epoch, verify the proof
         let verified_ordered_proof =
