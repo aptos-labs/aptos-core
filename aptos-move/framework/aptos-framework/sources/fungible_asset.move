@@ -1429,8 +1429,8 @@ module aptos_framework::fungible_asset {
             option::none(),
             option::none()
         );
-        assert!(name(metadata) == string::utf8(b"m_name"), 8);
-        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
+        assert!(name(metadata) == string::utf8(b"mutated_name"), 8);
+        assert!(symbol(metadata) == string::utf8(b"m_symbol"), 9);
         assert!(decimals(metadata) == 0, 10);
         assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
