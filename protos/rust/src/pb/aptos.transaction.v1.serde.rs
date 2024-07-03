@@ -7943,10 +7943,16 @@ impl serde::Serialize for ValidatorTransaction {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
+        if !self.events.is_empty() {
+            len += 1;
+        }
         if self.validator_transaction_type.is_some() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction", len)?;
+        if !self.events.is_empty() {
+            struct_ser.serialize_field("events", &self.events)?;
+        }
         if let Some(v) = self.validator_transaction_type.as_ref() {
             match v {
                 validator_transaction::ValidatorTransactionType::ObservedJwkUpdate(v) => {
@@ -7967,6 +7973,7 @@ impl<'de> serde::Deserialize<'de> for ValidatorTransaction {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "events",
             "observed_jwk_update",
             "observedJwkUpdate",
             "dkg_update",
@@ -7975,6 +7982,7 @@ impl<'de> serde::Deserialize<'de> for ValidatorTransaction {
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
+            Events,
             ObservedJwkUpdate,
             DkgUpdate,
         }
@@ -7998,6 +8006,7 @@ impl<'de> serde::Deserialize<'de> for ValidatorTransaction {
                         E: serde::de::Error,
                     {
                         match value {
+                            "events" => Ok(GeneratedField::Events),
                             "observedJwkUpdate" | "observed_jwk_update" => Ok(GeneratedField::ObservedJwkUpdate),
                             "dkgUpdate" | "dkg_update" => Ok(GeneratedField::DkgUpdate),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -8019,9 +8028,16 @@ impl<'de> serde::Deserialize<'de> for ValidatorTransaction {
                 where
                     V: serde::de::MapAccess<'de>,
             {
+                let mut events__ = None;
                 let mut validator_transaction_type__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
+                        GeneratedField::Events => {
+                            if events__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("events"));
+                            }
+                            events__ = Some(map.next_value()?);
+                        }
                         GeneratedField::ObservedJwkUpdate => {
                             if validator_transaction_type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("observedJwkUpdate"));
@@ -8039,6 +8055,7 @@ impl<'de> serde::Deserialize<'de> for ValidatorTransaction {
                     }
                 }
                 Ok(ValidatorTransaction {
+                    events: events__.unwrap_or_default(),
                     validator_transaction_type: validator_transaction_type__,
                 })
             }

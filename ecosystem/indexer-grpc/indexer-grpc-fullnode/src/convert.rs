@@ -1,13 +1,24 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::{transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, MultiKeySignature, MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature, SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature, WriteSet, WriteSetChange
+use aptos_api_types::{
+    transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
+    DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
+    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
+    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
+    MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, MultiKeySignature,
+    MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature,
+    SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
+    WriteSet, WriteSetChange,
 };
-use aptos_protos::transaction::v1::validator_transaction::observed_jwk_update::exported_provider_jw_ks::Jwk as ProtoJwk;
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
 use aptos_protos::{
-    transaction::v1::{self as transaction, any_signature, validator_transaction, Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn},
+    transaction::v1::{
+        self as transaction, any_signature, validator_transaction,
+        validator_transaction::observed_jwk_update::exported_provider_jw_ks::Jwk as ProtoJwk,
+        Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
+    },
     util::timestamp,
 };
 use aptos_types::jwks::jwk::JWK;
@@ -892,7 +903,8 @@ pub fn convert_transaction(
                             )
                         )
                     },
-                }
+                },
+                events: convert_events(api_validator_txn.events()),
             })
         },
     };

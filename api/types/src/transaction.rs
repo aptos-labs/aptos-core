@@ -621,6 +621,13 @@ impl ValidatorTransaction {
             ValidatorTransaction::DkgResult(t) => t.timestamp,
         }
     }
+
+    pub fn events(&self) -> &[Event] {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(t) => &t.events,
+            ValidatorTransaction::DkgResult(t) => &t.events,
+        }
+    }
 }
 
 impl

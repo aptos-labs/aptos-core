@@ -201,7 +201,7 @@ class StateCheckpointTransaction(_message.Message):
     def __init__(self) -> None: ...
 
 class ValidatorTransaction(_message.Message):
-    __slots__ = ["observed_jwk_update", "dkg_update"]
+    __slots__ = ["observed_jwk_update", "dkg_update", "events"]
 
     class ObservedJwkUpdate(_message.Message):
         __slots__ = ["quorum_certified_update"]
@@ -357,14 +357,17 @@ class ValidatorTransaction(_message.Message):
         ) -> None: ...
     OBSERVED_JWK_UPDATE_FIELD_NUMBER: _ClassVar[int]
     DKG_UPDATE_FIELD_NUMBER: _ClassVar[int]
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
     observed_jwk_update: ValidatorTransaction.ObservedJwkUpdate
     dkg_update: ValidatorTransaction.DkgUpdate
+    events: _containers.RepeatedCompositeFieldContainer[Event]
     def __init__(
         self,
         observed_jwk_update: _Optional[
             _Union[ValidatorTransaction.ObservedJwkUpdate, _Mapping]
         ] = ...,
         dkg_update: _Optional[_Union[ValidatorTransaction.DkgUpdate, _Mapping]] = ...,
+        events: _Optional[_Iterable[_Union[Event, _Mapping]]] = ...,
     ) -> None: ...
 
 class BlockEpilogueTransaction(_message.Message):

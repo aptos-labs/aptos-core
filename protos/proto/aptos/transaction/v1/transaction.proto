@@ -138,6 +138,8 @@ message ValidatorTransaction {
     }
     DkgTranscript dkg_transcript = 1;
   }
+
+  repeated Event events = 3;
 }
 
 message BlockEpilogueTransaction {

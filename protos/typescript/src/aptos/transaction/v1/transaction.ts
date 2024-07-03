@@ -318,6 +318,7 @@ export interface StateCheckpointTransaction {
 export interface ValidatorTransaction {
   observedJwkUpdate?: ValidatorTransaction_ObservedJwkUpdate | undefined;
   dkgUpdate?: ValidatorTransaction_DkgUpdate | undefined;
+  events?: Event[] | undefined;
 }
 
 export interface ValidatorTransaction_ObservedJwkUpdate {
@@ -2027,7 +2028,7 @@ export const StateCheckpointTransaction = {
 };
 
 function createBaseValidatorTransaction(): ValidatorTransaction {
-  return { observedJwkUpdate: undefined, dkgUpdate: undefined };
+  return { observedJwkUpdate: undefined, dkgUpdate: undefined, events: [] };
 }
 
 export const ValidatorTransaction = {
@@ -2037,6 +2038,11 @@ export const ValidatorTransaction = {
     }
     if (message.dkgUpdate !== undefined) {
       ValidatorTransaction_DkgUpdate.encode(message.dkgUpdate, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.events !== undefined && message.events.length !== 0) {
+      for (const v of message.events) {
+        Event.encode(v!, writer.uint32(26).fork()).ldelim();
+      }
     }
     return writer;
   },
@@ -2061,6 +2067,13 @@ export const ValidatorTransaction = {
           }
 
           message.dkgUpdate = ValidatorTransaction_DkgUpdate.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.events!.push(Event.decode(reader, reader.uint32()));
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -2111,6 +2124,7 @@ export const ValidatorTransaction = {
         ? ValidatorTransaction_ObservedJwkUpdate.fromJSON(object.observedJwkUpdate)
         : undefined,
       dkgUpdate: isSet(object.dkgUpdate) ? ValidatorTransaction_DkgUpdate.fromJSON(object.dkgUpdate) : undefined,
+      events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
     };
   },
 
@@ -2121,6 +2135,9 @@ export const ValidatorTransaction = {
     }
     if (message.dkgUpdate !== undefined) {
       obj.dkgUpdate = ValidatorTransaction_DkgUpdate.toJSON(message.dkgUpdate);
+    }
+    if (message.events?.length) {
+      obj.events = message.events.map((e) => Event.toJSON(e));
     }
     return obj;
   },
@@ -2136,6 +2153,7 @@ export const ValidatorTransaction = {
     message.dkgUpdate = (object.dkgUpdate !== undefined && object.dkgUpdate !== null)
       ? ValidatorTransaction_DkgUpdate.fromPartial(object.dkgUpdate)
       : undefined;
+    message.events = object.events?.map((e) => Event.fromPartial(e)) || [];
     return message;
   },
 };
