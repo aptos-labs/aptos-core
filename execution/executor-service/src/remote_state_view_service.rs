@@ -42,7 +42,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = 60;//remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = 120;//remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
         let num_kv_req_threads = 16; //= num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -99,7 +99,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-        let num_handlers = 60;
+        let num_handlers = 120;
         info!("Num handlers created is {}", num_handlers);
         for i in 0..num_handlers {
             let state_view_clone = self.state_view.clone();
@@ -191,7 +191,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             if pq.is_empty() {
                 lg = cvar.wait(lg).unwrap();
             }
-            let maybe_message = pq.pop();
+            //let maybe_message = pq.pop();
             drop(lg);
             curr_time = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -201,7 +201,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                         .with_label_values(&["0", "kv_proc_thread_waiting_time"])
                         .observe(((curr_time - prev_time) / 1000) as f64);
 
-            if let Some(message) = maybe_message {
+            if let Some(message) = pq.pop() {
                 let state_view = state_view.clone();
                 let kv_txs = kv_tx.clone();
 
