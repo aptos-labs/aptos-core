@@ -223,6 +223,7 @@ pub enum EqualityBinaryOperator {
 pub struct Assignment {
     pub name: Identifier,
     pub value: Expression,
+    pub deref: bool,
 }
 
 /// A number literal.

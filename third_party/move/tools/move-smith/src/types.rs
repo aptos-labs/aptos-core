@@ -140,6 +140,11 @@ impl Type {
         matches!(self, Type::Ref(_))
     }
 
+    /// Check if the type is a mutable reference
+    pub fn is_mut_ref(&self) -> bool {
+        matches!(self, Type::MutRef(_))
+    }
+
     /// Check if the type is a type parameter
     pub fn is_type_parameter(&self) -> bool {
         matches!(self, Type::TypeParameter(_))

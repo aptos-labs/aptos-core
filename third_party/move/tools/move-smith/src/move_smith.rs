@@ -816,6 +816,8 @@ impl MoveSmith {
     ///
     /// There must be at least one variable in the scope and the type of the variable
     /// must have been decided.
+    ///
+    /// TODO: LHS can be an expression!!!
     fn generate_assignment(
         &self,
         u: &mut Unstructured,
@@ -830,10 +832,22 @@ impl MoveSmith {
         }
         let ident = u.choose(&idents)?.clone();
         let typ = self.env().type_pool.get_type(&ident).unwrap();
-        let expr = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
+
+        let mut deref = false;
+        let rhs_typ = match typ {
+            Type::MutRef(inner) => {
+                deref = true;
+                inner.as_ref().clone()
+            },
+            _ => typ,
+        };
+
+        let expr = self.generate_expression_of_type(u, parent_scope, &rhs_typ, true, true)?;
+
         Ok(Some(Assignment {
             name: ident,
             value: expr,
+            deref,
         }))
     }
 
