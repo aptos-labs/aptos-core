@@ -701,7 +701,9 @@ impl MoveSmith {
             }
         }
 
-        let inline = bool::arbitrary(u)?;
+        // 20% chance we label a function as inline
+        // Inline functions can make compilation super slow so we don't want too many of them
+        let inline = u.int_in_range(0..=10)? > 8;
 
         Ok(FunctionSignature {
             inline,
