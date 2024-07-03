@@ -1011,11 +1011,11 @@ module aptos_framework::fungible_asset {
 
     public(friend) fun deposit_internal(store_addr: address, fa: FungibleAsset) acquires FungibleStore, ConcurrentFungibleBalance {
         let FungibleAsset { metadata, amount } = fa;
-        if (amount == 0) return;
-
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(metadata == store.metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
+
+        if (amount == 0) return;
 
         if (store.balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
             let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
