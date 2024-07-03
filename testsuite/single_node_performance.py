@@ -59,8 +59,8 @@ NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
 NOISE_LOWER_LIMIT_WARN = None if IS_MAINNET else 0.9
 # If you want to calibrate the upper limit for perf improvement, you can
 # increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
-NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.15
-NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
+NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.2  # TODO reduce to 1.15
+NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.1  # TODO reduce to 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
@@ -118,7 +118,6 @@ class RunGroupConfig:
     key: RunGroupKey
     included_in: Flow
     expected_tps: Optional[float] = field(default=None)
-    block_size: Optional[float] = field(default=None)
     key_extra: RunGroupKeyExtra = field(default_factory=RunGroupKeyExtra)
     waived: bool = field(default=False)
 
@@ -141,53 +140,54 @@ CALIBRATION_SEPARATOR = " "
 
 # transaction_type                                 module_working_set  executor      block_size    expected t/s    t/s
 CALIBRATION = """
-no-op                                                             1  VM                 10000           46213  39672
-no-op                                                          1000  VM                 10000           24829  21087
-coin-transfer                                                     1  VM                 10000           30914  25665
-coin-transfer                                                     1  native             10000           46476  33570
-account-generation                                                1  VM                 10000           23172  19242
-account-generation                                                1  native             10000           37468  29020
-account-resource32-b                                              1  VM                 10000           37801  32416
-modify-global-resource                                            1  VM                  3283            3283   2959
-modify-global-resource                                           10  VM                 10000           18722  16789
-publish-package                                                   1  VM                   150             150    139
-mix_publish_transfer                                              1  VM                  2238            2238   2216
-batch100-transfer                                                 1  VM                   651             651    614
-batch100-transfer                                                 1  native              1316            1316   1425
-vector-picture30k                                                 1  VM                   147             147    135
-vector-picture30k                                                20  VM                  1373            1373   1159
-smart-table-picture30-k-with200-change                            1  VM                    22              22     21
-smart-table-picture30-k-with200-change                           20  VM                   165             165    180
-modify-global-resource-agg-v2                                     1  VM                 10000           38218  32962
-modify-global-flag-agg-v2                                         1  VM                  6312            6312   6020
-modify-global-bounded-agg-v2                                      1  VM                 10000           10904  10439
-modify-global-milestone-agg-v2                                    1  VM                 10000           30004  27341
-resource-groups-global-write-tag1-kb                              1  VM                  6491            6491   9138
-resource-groups-global-write-and-read-tag1-kb                     1  VM                  6367            6367   6057
-resource-groups-sender-write-tag1-kb                              1  VM                 10000           19391  19986
-resource-groups-sender-multi-change1-kb                           1  VM                 10000           15270  15374
-token-v1ft-mint-and-transfer                                      1  VM                  1265            1265   1252
-token-v1ft-mint-and-transfer                                     20  VM                 10000           12404  11270
-token-v1nft-mint-and-transfer-sequential                          1  VM                   837             837    783
-token-v1nft-mint-and-transfer-sequential                         20  VM                  7744            7744   7359
-coin-init-and-mint                                                1  VM                 10000           32006  29354
-coin-init-and-mint                                               20  VM                 10000           26882  22691
-fungible-asset-mint                                               1  VM                 10000           26315  22920
-fungible-asset-mint                                              20  VM                 10000           24750  21716
-no-op5-signers                                                    1  VM                 10000           44554  37885
-token-v2-ambassador-mint                                          1  VM                 10000           18786  16363
-token-v2-ambassador-mint                                         20  VM                 10000           18453  16231
-liquidity-pool-swap                                               1  VM                   963             963    953
-liquidity-pool-swap                                              20  VM                  8231            8231   8028
-liquidity-pool-swap-stable                                        1  VM                   920             920    926
-liquidity-pool-swap-stable                                       20  VM                  7844            7844   7755
-deserialize-u256                                                  1  VM                 10000           43961  35448
-no-op-fee-payer                                                   1  VM                  2251            2251   2305
-no-op-fee-payer                                                  50  VM                 10000           29265  26756
+warmup                                                            1  VM                 10000               0  20409
+no-op                                                             1  VM                 10000           39672  38887
+no-op                                                          1000  VM                 10000           21087  21951
+coin-transfer                                                     1  VM                 10000           25665  27000
+coin-transfer                                                     1  native             10000           33570  40000
+account-generation                                                1  VM                 10000           19242  22135
+account-generation                                                1  native             10000           29020  33290
+account-resource32-b                                              1  VM                 10000           32416  38017
+modify-global-resource                                            1  VM                  2959            2959   3107
+modify-global-resource                                           10  VM                 10000           16789  17390
+publish-package                                                   1  VM                   139             139    143
+mix_publish_transfer                                              1  VM                  2216            2216   2200
+batch100-transfer                                                 1  VM                   614             614    653
+batch100-transfer                                                 1  native              1425            1425   1900
+vector-picture30k                                                 1  VM                   135             135    139
+vector-picture30k                                                20  VM                  1159            1159   1326
+smart-table-picture30-k-with200-change                            1  VM                    21              21     21
+smart-table-picture30-k-with200-change                           20  VM                   180             180    180
+modify-global-resource-agg-v2                                     1  VM                 10000           32962  37474
+modify-global-flag-agg-v2                                         1  VM                  6020            6020   6128
+modify-global-bounded-agg-v2                                      1  VM                 10000           10439  10604
+modify-global-milestone-agg-v2                                    1  VM                 10000           27341  28477
+resource-groups-global-write-tag1-kb                              1  VM                  9138            9138   9182
+resource-groups-global-write-and-read-tag1-kb                     1  VM                  6057            6057   6430
+resource-groups-sender-write-tag1-kb                              1  VM                 10000           19986  20000
+resource-groups-sender-multi-change1-kb                           1  VM                 10000           15374  17000
+token-v1ft-mint-and-transfer                                      1  VM                  1252            1252   1327
+token-v1ft-mint-and-transfer                                     20  VM                 10000           11270  11947
+token-v1nft-mint-and-transfer-sequential                          1  VM                   783             783    816
+token-v1nft-mint-and-transfer-sequential                         20  VM                  7359            7359   7726
+coin-init-and-mint                                                1  VM                 10000           29354  29709
+coin-init-and-mint                                               20  VM                 10000           22691  24694
+fungible-asset-mint                                               1  VM                 10000           22920  25291
+fungible-asset-mint                                              20  VM                 10000           21716  22463
+no-op5-signers                                                    1  VM                 10000           37885  42482
+token-v2-ambassador-mint                                          1  VM                 10000           16363  17119
+token-v2-ambassador-mint                                         20  VM                 10000           16231  17204
+liquidity-pool-swap                                               1  VM                   953             953    979
+liquidity-pool-swap                                              20  VM                  8028            8028   8339
+liquidity-pool-swap-stable                                        1  VM                   926             926    954
+liquidity-pool-swap-stable                                       20  VM                  7755            7755   8005
+deserialize-u256                                                  1  VM                 10000           35448  38913
+no-op-fee-payer                                                   1  VM                  2305            2305   2356
+no-op-fee-payer                                                  50  VM                 10000           26756  28196
 """
 
-# when adding a new test, put block_size (which waives the results of the run, until recalibration), 
-# and then after a day or two - add calibration result for it above.
+# when adding a new test, add estimated expected_tps to it, as well as waived=True.
+# And then after a day or two - add calibration result for it above, removing expected_tps/waived fields.
 
 TESTS = [
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
@@ -207,8 +207,8 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
-    RunGroupConfig(block_size=100, key=RunGroupKey("vector-picture40"), included_in=Flow(0)),
-    RunGroupConfig(block_size=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0)),
+    RunGroupConfig(expected_tps=100, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
     RunGroupConfig(key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
@@ -217,28 +217,28 @@ TESTS = [
     # RunGroupConfig(expected_tps=40, key=RunGroupKey("smart-table-picture1-m-with256-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2 | LAND_BLOCKING_AND_C),
-    RunGroupConfig(block_size=10000, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2, waived=True),
     RunGroupConfig(key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
-    RunGroupConfig(block_size=10000, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2, waived=True),
     RunGroupConfig(key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
-    RunGroupConfig(block_size=10000, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2, waived=True),
     RunGroupConfig(key=RunGroupKey("modify-global-milestone-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
-    RunGroupConfig(block_size=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS),
-    RunGroupConfig(block_size=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS),
-    RunGroupConfig(block_size=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
-    RunGroupConfig(block_size=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     
     RunGroupConfig(key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(block_size=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
-    RunGroupConfig(block_size=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0)),
+    RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0), waived=True),
 
     RunGroupConfig(key=RunGroupKey("coin-init-and-mint", module_working_set_size=1), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("coin-init-and-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
@@ -266,8 +266,8 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS),
 
-    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
+    RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
 
     # setting separately for previewnet, as we run on a different number of cores.
     RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer"), key_extra=RunGroupKeyExtra(smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
@@ -554,16 +554,11 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
         if test.key in calibrated_expected_tps:
             expected_tps = calibrated_expected_tps[test.key]
-            cur_block_size = int(min([expected_tps, MAX_BLOCK_SIZE]))
         else:
             print(f"WARNING: Couldn't find {test.key} in calibration results")
-            if test.expected_tps is not None:
-                expected_tps = test.block_size
-                cur_block_size = int(min([expected_tps, MAX_BLOCK_SIZE]))
-            else:
-                assert test.block_size is not None, test
-                cur_block_size = int(min([test.block_size, MAX_BLOCK_SIZE]))
-                expected_tps = None
+            assert test.expected_tps is not None, test
+            expected_tps = test.expected_tps
+        cur_block_size = int(min([expected_tps, MAX_BLOCK_SIZE]))
 
         print(f"Testing {test.key}")
         if test.key_extra.transaction_type_override == "":
