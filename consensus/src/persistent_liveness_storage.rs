@@ -263,7 +263,13 @@ impl RecoveryData {
         //     &mut blocks,
         //     &mut quorum_certs,
         // ));
-        let blocks_to_prune = Some(vec![]);
+        let blocks_to_prune: Option<Vec<_>> = Some(
+            blocks
+                .iter()
+                .filter(|block| block.epoch() < root.0.epoch())
+                .map(|block| block.id())
+                .collect(),
+        );
         info!(
             "RecoveryData blocks_to_prune: {:?}",
             blocks_to_prune.as_ref().map(|ids| ids
