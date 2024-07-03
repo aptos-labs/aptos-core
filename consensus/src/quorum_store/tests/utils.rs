@@ -42,19 +42,19 @@ fn test_proof_queue_sorting() {
     let author_1 = PeerId::random();
 
     let author_0_batches = vec![
-        proof_of_store(author_0, BatchId::new_for_test(0), 100, 0),
-        proof_of_store(author_0, BatchId::new_for_test(1), 200, 0),
-        proof_of_store(author_0, BatchId::new_for_test(2), 50, 0),
-        proof_of_store(author_0, BatchId::new_for_test(3), 300, 0),
+        proof_of_store(author_0, BatchId::new_for_test(0), 100, 1),
+        proof_of_store(author_0, BatchId::new_for_test(1), 200, 1),
+        proof_of_store(author_0, BatchId::new_for_test(2), 50, 1),
+        proof_of_store(author_0, BatchId::new_for_test(3), 300, 1),
     ];
     for batch in author_0_batches {
         proof_queue.push(batch);
     }
     let author_1_batches = vec![
-        proof_of_store(author_1, BatchId::new_for_test(4), 500, 0),
-        proof_of_store(author_1, BatchId::new_for_test(5), 400, 0),
-        proof_of_store(author_1, BatchId::new_for_test(6), 600, 0),
-        proof_of_store(author_1, BatchId::new_for_test(7), 50, 0),
+        proof_of_store(author_1, BatchId::new_for_test(4), 500, 1),
+        proof_of_store(author_1, BatchId::new_for_test(5), 400, 1),
+        proof_of_store(author_1, BatchId::new_for_test(6), 600, 1),
+        proof_of_store(author_1, BatchId::new_for_test(7), 50, 1),
     ];
     for batch in author_1_batches {
         proof_queue.push(batch);
@@ -165,13 +165,27 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     // batch_summaries: [1 -> txn_0, 2 -> txn_1]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
-    proof_queue.add_batch_summaries(vec![(info_3, vec![txns[0]])]);
+    proof_queue.add_batch_summaries(vec![(info_3.clone(), vec![txns[0]])]);
+    // txns: [txn_0, txn_1]
+    // proofs: [1, 2]
+    // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
+
+    // Adding the batch again shouldn't have an effect
+    proof_queue.add_batch_summaries(vec![(info_3.clone(), vec![txns[0]])]);
     // txns: [txn_0, txn_1]
     // proofs: [1, 2]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
     proof_queue.push(author_0_batches[2].clone());
+    // txns: [txn_0, txn_1]
+    // proofs: [1, 2, 3]
+    // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 3));
+
+    // Adding the batch again shouldn't have an effect
+    proof_queue.add_batch_summaries(vec![(info_3.clone(), vec![txns[0]])]);
     // txns: [txn_0, txn_1]
     // proofs: [1, 2, 3]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
@@ -220,56 +234,77 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     // batch_summaries: [2 -> txn_1]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
+    // Adding an expired batch again
+    proof_queue.add_batch_summaries(vec![(info_3, vec![txns[0]])]);
+    // txns: [txn_1] + txns(proof_6)
+    // proofs: [2, 6]
+    // batch_summaries: [2 -> txn_1, 3 -> txn_0]
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
+
+    // Adding an expired proof again. Should have no effect
+    proof_queue.push(author_0_batches[2].clone());
+    // txns: [txn_1] + txns(proof_6)
+    // proofs: [2, 6]
+    // batch_summaries: [2 -> txn_1, 3 -> txn_0]
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
+
     proof_queue.add_batch_summaries(vec![(info_7, vec![txns[3]])]);
     // txns: [txn_1] + txns(proof_6)
     // proofs: [2, 6]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
     proof_queue.handle_updated_block_timestamp(3);
     // Expires info_6
     // txns: [txn_1]
     // proofs: [2]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (1, 1));
 
     proof_queue.add_batch_summaries(vec![(info_6, vec![txns[0]])]);
     // Expired batch not added to batch summaries
     // txns: [txn_1]
     // proofs: [2]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (1, 1));
 
     proof_queue.push(author_1_batches[2].clone());
     // txns: [txn_1, txn_3]
     // proofs: [2, 7]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
     proof_queue.push(author_1_batches[3].clone());
     // txns: [txn_1, txn_3] + txns(proof_8)
     // proofs: [2, 7, 8]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (3, 3));
 
     proof_queue.mark_committed(vec![info_8.clone()]);
     // txns: [txn_1, txn_3]
     // proofs: [2, 7]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
     proof_queue.add_batch_summaries(vec![(info_8, vec![txns[0]])]);
     // Committed batch not added to batch summaries
     // txns: [txn_1, txn_3]
     // proofs: [2, 7]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
+
+    proof_queue.push(author_1_batches[3].clone());
+    // Committed proof added again. Should have no effect
+    // txns: [txn_1, txn_3]
+    // proofs: [2, 7, 8]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
     proof_queue.handle_updated_block_timestamp(7);
     // Expires info_2, info_7
     // txns: []
     // proofs: []
-    // batch_summaries: []
+    // batch_summaries: [3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (0, 0));
 }
 
@@ -289,10 +324,10 @@ fn test_proof_pull_proofs_with_duplicates() {
     let author_1 = PeerId::random();
 
     let author_0_batches = vec![
-        proof_of_store(author_0, BatchId::new_for_test(0), 100, 0),
-        proof_of_store(author_0, BatchId::new_for_test(1), 200, 0),
-        proof_of_store(author_0, BatchId::new_for_test(2), 50, 0),
-        proof_of_store(author_0, BatchId::new_for_test(3), 300, 0),
+        proof_of_store(author_0, BatchId::new_for_test(0), 100, 1),
+        proof_of_store(author_0, BatchId::new_for_test(1), 200, 1),
+        proof_of_store(author_0, BatchId::new_for_test(2), 50, 1),
+        proof_of_store(author_0, BatchId::new_for_test(3), 300, 1),
     ];
     let info_0 = author_0_batches[0].info().clone();
     proof_queue.add_batch_summaries(vec![(author_0_batches[0].info().clone(), vec![txns[0]])]);
@@ -305,10 +340,10 @@ fn test_proof_pull_proofs_with_duplicates() {
     }
 
     let author_1_batches = vec![
-        proof_of_store(author_1, BatchId::new_for_test(4), 500, 0),
-        proof_of_store(author_1, BatchId::new_for_test(5), 400, 0),
-        proof_of_store(author_1, BatchId::new_for_test(6), 600, 0),
-        proof_of_store(author_1, BatchId::new_for_test(7), 50, 0),
+        proof_of_store(author_1, BatchId::new_for_test(4), 500, 1),
+        proof_of_store(author_1, BatchId::new_for_test(5), 400, 1),
+        proof_of_store(author_1, BatchId::new_for_test(6), 600, 1),
+        proof_of_store(author_1, BatchId::new_for_test(7), 50, 1),
     ];
     proof_queue.add_batch_summaries(vec![(author_1_batches[0].info().clone(), vec![txns[1]])]);
     proof_queue.add_batch_summaries(vec![(author_1_batches[1].info().clone(), vec![txns[2]])]);
