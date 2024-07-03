@@ -258,10 +258,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                             == caller_func.module_env.self_address()
                                         {
                                             // if callee is also a primary target, then they are in the same package
-                                            if callee_func
-                                                .module_env
-                                                .is_primary_target()
-                                            {
+                                            if callee_func.module_env.is_primary_target() {
                                                 // we should've inferred the friend declaration
                                                 panic!(
                                                     "{} should have friend {}",
