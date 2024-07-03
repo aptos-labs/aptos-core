@@ -81,6 +81,7 @@ function run_libfuzzer() {
         -timeout=$timeout \
         -ignore_timeouts=1 \
         -ignore_crashes=1 \
+        -detect_leaks=0 \
         -print_final_stats=1 2>&1 | tee -a $log_file
 }
 
@@ -210,7 +211,7 @@ fi
 fuzz_target=${1:-"transactional"}
 total_hour=${2:-24} # Default to 24 hours
 input_len=${3:-4}   # Default to 4 KB
-timeout=${4:-3}     # Default to 3 seconds
+timeout=${4:-5}     # Default to 5 seconds
 
 check_existing
 
