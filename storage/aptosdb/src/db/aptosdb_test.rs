@@ -217,27 +217,6 @@ fn test_get_latest_executed_trees() {
     );
 }
 
-fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-    let public_key = private_key.public_key();
-
-    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
-    let raw_transaction = RawTransaction::new(
-        AccountAddress::random(),
-        0,
-        transaction_payload,
-        0,
-        gas_unit_price,
-        0,
-        ChainId::new(10), // This is the value used in aptos testing code.
-    );
-    SignedTransaction::new(
-        raw_transaction,
-        public_key,
-        Ed25519Signature::dummy_signature(),
-    )
-}
-
 #[test]
 fn test_revert_single_commit() {
     aptos_logger::Logger::new().init();
