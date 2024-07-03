@@ -4,7 +4,6 @@ module 0xCAFE::basic_coin {
     }
 
     public entry fun mint(account: &signer, value: u64) {
-        let x = 3;
         move_to(account, Coin { value })
     }
 }
