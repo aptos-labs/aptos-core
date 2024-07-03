@@ -348,10 +348,13 @@ impl BlockStore {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
-        ensure!(
-            self.inner.read().ordered_root().round() < block.round(),
-            "Block with old round"
-        );
+        if self.inner.read().ordered_root().round() >= block.round() {
+            warn!(
+                "Block with old round: {} >= {}",
+                block.round(),
+                self.inner.read().ordered_root().round()
+            );
+        }
 
         let pipelined_block = PipelinedBlock::new_ordered(block.clone());
         // ensure local time past the block time
