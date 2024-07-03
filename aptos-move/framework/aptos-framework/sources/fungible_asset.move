@@ -960,19 +960,29 @@ module aptos_framework::fungible_asset {
         let mutable_metadata = borrow_global_mut<Metadata>(metadata_address);
 
         if (option::is_some(&name)){
-            mutable_metadata.name = option::extract(&mut name);
+            let name = option::extract(&mut name);
+            assert!(string::length(&name) <= MAX_NAME_LENGTH, error::out_of_range(ENAME_TOO_LONG));
+            mutable_metadata.name = name;
         };
         if (option::is_some(&symbol)){
-            mutable_metadata.symbol = option::extract(&mut symbol);
+            let symbol = option::extract(&mut symbol);
+            assert!(string::length(&symbol) <= MAX_SYMBOL_LENGTH, error::out_of_range(ESYMBOL_TOO_LONG));
+            mutable_metadata.symbol = symbol;
         };
         if (option::is_some(&decimals)){
-            mutable_metadata.decimals = option::extract(&mut decimals);
+            let decimals = option::extract(&mut decimals);
+            assert!(decimals <= MAX_DECIMALS, error::out_of_range(EDECIMALS_TOO_LARGE));
+            mutable_metadata.decimals = decimals;
         };
         if (option::is_some(&icon_uri)){
-            mutable_metadata.icon_uri = option::extract(&mut icon_uri);
+            let icon_uri = option::extract(&mut icon_uri);
+            assert!(string::length(&icon_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+            mutable_metadata.icon_uri = icon_uri;
         };
         if (option::is_some(&project_uri)){
-            mutable_metadata.project_uri = option::extract(&mut project_uri);
+            let project_uri = option::extract(&mut project_uri);
+            assert!(string::length(&project_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+            mutable_metadata.project_uri = project_uri;
         };
     }
 
