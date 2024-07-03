@@ -366,25 +366,37 @@ impl ProofQueue {
             .iter()
             .map(BatchKey::from_info)
             .collect::<HashSet<_>>();
-        let mut remaining_proofs = vec![];
-        for (batch_key, proof) in &self.batch_to_proof {
-            if proof.is_some()
-                && !pulled_proofs
-                    .iter()
-                    .any(|p| BatchKey::from_info(p.info()) == *batch_key)
-                && !excluded_batch_keys.contains(batch_key)
-            {
-                num_proofs_remaining_after_pull += 1;
-                num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
-                remaining_proofs.push(proof.as_ref().unwrap().0.clone());
-            }
+
+        let remaining_batches = self
+            .author_to_batches
+            .iter()
+            .flat_map(|(_, batches)| batches)
+            .filter(|(batch_sort_key, _)| {
+                !excluded_batch_keys.contains(&batch_sort_key.batch_key)
+                    && !pulled_proofs
+                        .iter()
+                        .any(|p| BatchKey::from_info(p.info()) == batch_sort_key.batch_key)
+            })
+            .filter_map(|(batch_sort_key, batch)| {
+                if let Some(Some(_)) = self.batch_to_proof.get(&batch_sort_key.batch_key) {
+                    Some(batch)
+                } else {
+                    None
+                }
+            });
+
+        for batch in remaining_batches {
+            num_proofs_remaining_after_pull += 1;
+            num_txns_remaining_after_pull += batch.num_txns();
         }
+
         let pulled_txns = pulled_proofs.iter().map(|p| p.num_txns()).sum::<u64>();
         info!(
-            "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}",
+            "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}, remaining_txns: {:?}",
             pulled_proofs.len(),
             pulled_txns,
-            remaining_proofs
+            num_proofs_remaining_after_pull,
+            num_txns_remaining_after_pull,
         );
         counters::NUM_PROOFS_IN_PROOF_QUEUE_AFTER_PULL
             .observe(num_proofs_remaining_after_pull as f64);

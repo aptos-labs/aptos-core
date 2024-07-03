@@ -830,6 +830,7 @@ fn optimize_for_maximum_throughput(
     mempool_config_practically_non_expiring(&mut config.mempool);
 
     config.consensus.max_sending_block_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_unique_txns = max_txns_per_block as u64;
     config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
