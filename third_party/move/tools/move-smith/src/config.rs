@@ -61,24 +61,25 @@ impl Default for Config {
                 "unbound type".to_string(),
                 "incompatible types".to_string(),
                 "recursion during function inlining".to_string(),
+                "still mutably borrowed".to_string(),
             ],
 
             experiment_combos: vec![
-                // ("optimize".to_string(), vec![
-                //     (Experiment::OPTIMIZE.to_string(), true),
-                //     (Experiment::ACQUIRES_CHECK.to_string(), false),
-                // ]),
+                // TODO: comment out for now for performance
+                // TODO: should read configs from a file or command line arguments
+                ("optimize".to_string(), vec![(
+                    Experiment::OPTIMIZE.to_string(),
+                    true,
+                )]),
                 // ("no-optimize".to_string(), vec![
                 //     (Experiment::OPTIMIZE.to_string(), false),
                 //     (Experiment::ACQUIRES_CHECK.to_string(), false),
                 // ]),
-                // TODO: comment out for now for performance
-                // TODO: should read configs from a file or command line arguments
-                ("optimize-no-simplify".to_string(), vec![
-                    (Experiment::OPTIMIZE.to_string(), true),
-                    (Experiment::AST_SIMPLIFY.to_string(), false),
-                    (Experiment::ACQUIRES_CHECK.to_string(), false),
-                ]),
+                // ("optimize-no-simplify".to_string(), vec![
+                //     (Experiment::OPTIMIZE.to_string(), true),
+                //     (Experiment::AST_SIMPLIFY.to_string(), false),
+                //     (Experiment::ACQUIRES_CHECK.to_string(), false),
+                // ]),
             ],
 
             num_runs_per_func: 3,
