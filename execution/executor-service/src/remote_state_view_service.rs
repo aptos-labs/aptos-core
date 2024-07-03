@@ -260,24 +260,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             shard_id,
             state_keys.len()
         );
-        // let resp = state_keys
-        //     .into_iter()
-        //     .map(|state_key| {
-        //         let state_value = state_view
-        //             .read()
-        //             .unwrap()
-        //             .as_ref()
-        //             .unwrap()
-        //             .get_state_value(&state_key)
-        //             .unwrap();
-        //         (state_key, state_value)
-        //     })
-        //     .collect_vec();
-        // drop(timer_2);
-
-        let mut resp = vec![];
-        state_keys
-            .into_par_iter()
+        let resp = state_keys
+            .into_iter()
             .map(|state_key| {
                 let state_value = state_view
                     .read()
@@ -288,8 +272,24 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                     .unwrap();
                 (state_key, state_value)
             })
-            .collect_into_vec(&mut resp);
+            .collect_vec();
         drop(timer_2);
+
+        // let mut resp = vec![];
+        // state_keys
+        //     .into_par_iter()
+        //     .map(|state_key| {
+        //         let state_value = state_view
+        //             .read()
+        //             .unwrap()
+        //             .as_ref()
+        //             .unwrap()
+        //             .get_state_value(&state_key)
+        //             .unwrap();
+        //         (state_key, state_value)
+        //     })
+        //     .collect_into_vec(&mut resp);
+        // drop(timer_2);
 
         let timer_3 = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests_3"])

@@ -108,7 +108,7 @@ impl ChunkOutput {
                 .collect();
             sender.send(flattened_txns).unwrap();
         });
-
+        let transactions = receiver.recv().unwrap();
         let transaction_outputs = Self::execute_block_sharded::<V>(
             transactions_arc,
             state_view_arc.clone(),
@@ -124,7 +124,7 @@ impl ChunkOutput {
             .with_label_values(&["flatten_results"])
             .start_timer();
         Ok(Self {
-            transactions: receiver.recv().unwrap(),
+            transactions: transactions, //receiver.recv().unwrap(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })
