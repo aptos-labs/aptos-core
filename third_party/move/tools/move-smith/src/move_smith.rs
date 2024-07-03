@@ -140,10 +140,37 @@ impl MoveSmith {
         u: &mut Unstructured,
         module: &RefCell<Module>,
     ) -> Result<()> {
+        for s in module.borrow().structs.iter() {
+            self.post_process_struct(u, s)?;
+        }
+
         for f in module.borrow().functions.iter() {
             self.post_process_function(u, f)?;
         }
 
+        Ok(())
+    }
+
+    pub fn post_process_struct(
+        &self,
+        u: &mut Unstructured,
+        st: &RefCell<StructDefinition>,
+    ) -> Result<()> {
+        let types_code = st
+            .borrow()
+            .fields
+            .iter()
+            .map(|(_, ty)| ty.inline())
+            .collect::<Vec<String>>()
+            .join(",");
+
+        for tp in st.borrow_mut().type_parameters.type_parameters.iter_mut() {
+            let tp_name = tp.name.name.clone();
+            tp.is_phantom = bool::arbitrary(u)?;
+            if types_code.contains(&tp_name) {
+                tp.is_phantom = false;
+            }
+        }
         Ok(())
     }
 

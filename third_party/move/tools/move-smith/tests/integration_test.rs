@@ -103,7 +103,7 @@ fn test_generation_and_compile() {
 
 #[test]
 fn test_generation_and_check_compile() {
-    let raw_data = get_random_bytes(54321, 4096 * 3);
+    let raw_data = get_random_bytes(54321, 1024 * 16);
     let mut u = Unstructured::new(&raw_data);
     let mut smith = MoveSmith::default();
     smith.generate(&mut u).unwrap();

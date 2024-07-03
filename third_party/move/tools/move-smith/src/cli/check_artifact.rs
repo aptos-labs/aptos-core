@@ -36,10 +36,10 @@ fn main() {
     println!("Loaded code from file: {:?}", args.input_file);
 
     compile_move_code(code.clone(), true, false);
-    println!("Compiled code with V1 successfully");
+    println!("Compiled code with V1 did not panic");
 
     compile_move_code(code.clone(), false, true);
-    println!("Compiled code with V2 successfully");
+    println!("Compiled code with V2 did not panic");
 
     match run_transactional_test(code, &smith.config.take()) {
         Ok(_) => println!("Running as transactional test passed"),
