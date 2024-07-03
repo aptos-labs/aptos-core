@@ -2677,13 +2677,6 @@ impl<'env> ModuleEnv<'env> {
         self.env.file_id_is_primary_target.contains(&file_id)
     }
 
-    /// Returns true if both modules are defined in the same package.
-    /// Requires: one of the modules is a primary target.
-    pub fn in_same_package(&self, other: &'env Self) -> bool {
-        debug_assert!(self.is_primary_target() || other.is_primary_target());
-        self.is_primary_target() == other.is_primary_target()
-    }
-
     /// Returns the path to source file of this module.
     pub fn get_source_path(&self) -> &OsStr {
         let file_id = self.data.loc.file_id;
@@ -2754,7 +2747,9 @@ impl<'env> ModuleEnv<'env> {
 
     /// Returns the set of modules in the current package,
     /// whose public(package) functions are called in the current module.
+    /// Requires: `self` is a primary target.
     pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
+        debug_assert!(self.is_primary_target());
         let mut deps = BTreeSet::new();
         if self.is_script_module() {
             return deps;
@@ -2778,10 +2773,12 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true if functions in the current module can call a public(package) function in the given module.
-    pub fn can_call_package_fun_in(&self, other: &Self) -> bool {
+    /// Requires: `self` is a primary target.
+    fn can_call_package_fun_in(&self, other: &Self) -> bool {
+        debug_assert!(self.is_primary_target());
         !self.is_script_module()
             && !other.is_script_module()
-            && self.in_same_package(other)
+            && other.is_primary_target()
             && self.self_address() == other.self_address()
     }
 
