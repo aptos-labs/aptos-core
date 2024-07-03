@@ -191,7 +191,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             if pq.is_empty() {
                 lg = cvar.wait(lg).unwrap();
             }
-            //let maybe_message = pq.pop();
+            let maybe_message = pq.pop();
             drop(lg);
             curr_time = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -201,7 +201,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                         .with_label_values(&["0", "kv_proc_thread_waiting_time"])
                         .observe(((curr_time - prev_time) / 1000) as f64);
 
-            if let Some(message) = pq.pop() {
+            if let Some(message) = maybe_message {
                 let state_view = state_view.clone();
                 let kv_txs = kv_tx.clone();
 
