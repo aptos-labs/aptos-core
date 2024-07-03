@@ -257,9 +257,17 @@ impl RecoveryData {
                 .collect::<Vec<String>>()
         );
         blocks.retain(|block| block.epoch() == root.0.epoch());
+        quorum_certs.retain(|qc| qc.certified_block().epoch() == root.0.epoch());
         info!(
             "RecoveryData blocks after removing wrong epoch: {:?}",
             blocks
+                .iter()
+                .map(|b| format!("\n\t{}", b))
+                .collect::<Vec<String>>()
+        );
+        info!(
+            "RecoveryData quorum certs after removing wrong epoch: {:?}",
+            quorum_certs
                 .iter()
                 .map(|b| format!("\n\t{}", b))
                 .collect::<Vec<String>>()
