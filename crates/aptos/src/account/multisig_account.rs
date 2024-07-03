@@ -38,10 +38,12 @@ pub struct Create {
     /// Addresses of additional owners for the new multisig, beside the transaction sender.
     #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
     pub(crate) additional_owners: Vec<AccountAddress>,
-    /// The number of signatures (approvals or rejections) required to execute or remove a proposed
-    /// transaction.
+	/// account level timeout_duration in seconds, all created Tx must be approved and 
+	/// executed before this timeout (from its creation) otherwise the Tx is marked for rejection
 	#[clap(long)]
 	pub(crate) timeout_duration: u64,
+    /// The number of signatures (approvals or rejections) required to execute or remove a proposed
+    /// transaction.
     #[clap(long)]
     pub(crate) num_signatures_required: u64,
     #[clap(flatten)]
