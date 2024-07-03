@@ -9,7 +9,7 @@ use crate::{
             ConfigSearchMode, EncodingOptions, HardwareWalletOptions, PrivateKeyInputOptions,
             ProfileConfig, ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
         },
-        utils::{fund_account, prompt_yes_with_override, read_line},
+        utils::{explorer_account_link, fund_account, prompt_yes_with_override, read_line},
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
@@ -22,7 +22,11 @@ use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, str::FromStr};
+use std::{
+    collections::BTreeMap,
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
@@ -121,6 +125,9 @@ impl CliCommand<()> for InitTool {
                 Network::from_str(input)?
             }
         };
+
+        // Ensure the config contains the network used
+        profile_config.network = Some(network);
 
         // Ensure that there is at least a REST URL set for the network
         match network {
@@ -337,7 +344,16 @@ impl CliCommand<()> for InitTool {
             .expect("Must have profiles, as created above")
             .insert(profile_name.to_string(), profile_config);
         config.save()?;
-        eprintln!("\n---\nAptos CLI is now set up for account {} as profile {}!  Run `aptos --help` for more information about commands", address, self.profile_options.profile_name().unwrap_or(DEFAULT_PROFILE));
+        let profile_name = self
+            .profile_options
+            .profile_name()
+            .unwrap_or(DEFAULT_PROFILE);
+        eprintln!(
+            "\n---\nAptos CLI is now set up for account {} as profile {}!\n See the account here: {}\n Run `aptos --help` for more information about commands",
+            address,
+            profile_name,
+            explorer_account_link(address, Some(network))
+        );
         Ok(())
     }
 }
@@ -429,6 +445,18 @@ pub enum Network {
     Devnet,
     Local,
     Custom,
+}
+
+impl Display for Network {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Network::Mainnet => "mainnet",
+            Network::Testnet => "testnet",
+            Network::Devnet => "devnet",
+            Network::Local => "local",
+            Network::Custom => "custom",
+        })
+    }
 }
 
 impl FromStr for Network {

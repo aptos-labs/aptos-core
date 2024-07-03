@@ -26,7 +26,7 @@ To generate a sample prover and verifier key pair, run the following commands:
 
 ## Testing
 
-TODO: update `input_gen.py` to match the latest circuit, then provide instructions.
+Unit testing located in `src` may be run using `cargo test`. 
 
 ## Generating a sample proof
 

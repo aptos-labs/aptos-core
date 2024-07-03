@@ -447,6 +447,8 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
     // After all specs have been processed, warn about any unused schemas.
     builder.warn_unused_schemas();
 
+    builder.add_friend_decl_for_package_visibility();
+
     // Perform any remaining friend-declaration checks and update friend module id information.
     check_and_update_friend_info(builder);
 }
