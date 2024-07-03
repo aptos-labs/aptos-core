@@ -7,6 +7,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Add network to config file
 - Add explorer links to initialized accounts, and transaction submissions
 
+- Alias some move commands as common misnomers (e.g. build -> compile, deploy -> publish)
+- Add "hello_blockchain" template to move init command
+
 ## [3.4.1] - 2024/05/31
 - Upgraded indexer processors for localnet from ca60e51b53c3be6f9517de7c73d4711e9c1f7236 to 5244b84fa5ed872e5280dc8df032d744d62ad29d. Upgraded Hasura metadata accordingly.
 

@@ -23,19 +23,23 @@ See AIP-73 for further discussion
 -  [Resource `TransferRefStore`](#0x1_dispatchable_fungible_asset_TransferRefStore)
 -  [Constants](#@Constants_0)
 -  [Function `register_dispatch_functions`](#0x1_dispatchable_fungible_asset_register_dispatch_functions)
+-  [Function `register_derive_supply_dispatch_function`](#0x1_dispatchable_fungible_asset_register_derive_supply_dispatch_function)
 -  [Function `withdraw`](#0x1_dispatchable_fungible_asset_withdraw)
 -  [Function `deposit`](#0x1_dispatchable_fungible_asset_deposit)
 -  [Function `transfer`](#0x1_dispatchable_fungible_asset_transfer)
 -  [Function `transfer_assert_minimum_deposit`](#0x1_dispatchable_fungible_asset_transfer_assert_minimum_deposit)
 -  [Function `derived_balance`](#0x1_dispatchable_fungible_asset_derived_balance)
+-  [Function `derived_supply`](#0x1_dispatchable_fungible_asset_derived_supply)
 -  [Function `borrow_transfer_ref`](#0x1_dispatchable_fungible_asset_borrow_transfer_ref)
 -  [Function `dispatchable_withdraw`](#0x1_dispatchable_fungible_asset_dispatchable_withdraw)
 -  [Function `dispatchable_deposit`](#0x1_dispatchable_fungible_asset_dispatchable_deposit)
 -  [Function `dispatchable_derived_balance`](#0x1_dispatchable_fungible_asset_dispatchable_derived_balance)
+-  [Function `dispatchable_derived_supply`](#0x1_dispatchable_fungible_asset_dispatchable_derived_supply)
 -  [Specification](#@Specification_1)
     -  [Function `dispatchable_withdraw`](#@Specification_1_dispatchable_withdraw)
     -  [Function `dispatchable_deposit`](#@Specification_1_dispatchable_deposit)
     -  [Function `dispatchable_derived_balance`](#@Specification_1_dispatchable_derived_balance)
+    -  [Function `dispatchable_derived_supply`](#@Specification_1_dispatchable_derived_supply)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -154,6 +158,36 @@ TransferRefStore doesn't exist on the fungible asset type.
         <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> {
             transfer_ref: <a href="fungible_asset.md#0x1_fungible_asset_generate_transfer_ref">fungible_asset::generate_transfer_ref</a>(constructor_ref),
         }
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_dispatchable_fungible_asset_register_derive_supply_dispatch_function"></a>
+
+## Function `register_derive_supply_dispatch_function`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_derive_supply_dispatch_function">register_derive_supply_dispatch_function</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, dispatch_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_derive_supply_dispatch_function">register_derive_supply_dispatch_function</a>(
+    constructor_ref: &ConstructorRef,
+    dispatch_function: Option&lt;FunctionInfo&gt;
+) {
+    <a href="fungible_asset.md#0x1_fungible_asset_register_derive_supply_dispatch_function">fungible_asset::register_derive_supply_dispatch_function</a>(
+        constructor_ref,
+        dispatch_function
     );
 }
 </code></pre>
@@ -366,6 +400,45 @@ The semantics of value will be governed by the function specified in DispatchFun
 
 </details>
 
+<a id="0x1_dispatchable_fungible_asset_derived_supply"></a>
+
+## Function `derived_supply`
+
+Get the derived supply of the fungible asset using the overloaded hook.
+
+The semantics of supply will be governed by the function specified in DeriveSupplyDispatch.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_supply">derived_supply</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_supply">derived_supply</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): Option&lt;u128&gt; {
+    <b>let</b> func_opt = <a href="fungible_asset.md#0x1_fungible_asset_derived_supply_dispatch_function">fungible_asset::derived_supply_dispatch_function</a>(metadata);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&func_opt)) {
+        <b>assert</b>!(
+            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
+        );
+        <b>let</b> func = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&func_opt);
+        <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);
+        <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>(metadata, func)
+    } <b>else</b> {
+        <a href="fungible_asset.md#0x1_fungible_asset_supply">fungible_asset::supply</a>(metadata)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_dispatchable_fungible_asset_borrow_transfer_ref"></a>
 
 ## Function `borrow_transfer_ref`
@@ -476,6 +549,31 @@ The semantics of value will be governed by the function specified in DispatchFun
 
 </details>
 
+<a id="0x1_dispatchable_fungible_asset_dispatchable_derived_supply"></a>
+
+## Function `dispatchable_derived_supply`
+
+
+
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>&lt;T: key&gt;(
+    store: Object&lt;T&gt;,
+    function: &FunctionInfo,
+): Option&lt;u128&gt;;
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -525,6 +623,22 @@ The semantics of value will be governed by the function specified in DispatchFun
 
 
 <pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_dispatchable_derived_supply"></a>
+
+### Function `dispatchable_derived_supply`
+
+
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_supply">dispatchable_derived_supply</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
 </code></pre>
 
 
