@@ -674,8 +674,6 @@ module supra_framework::genesis {
     }
 
     #[test_only]
-    use std::features;
-    #[test_only]
     const ONE_APT: u64 = 100000000;
     #[test_only]
     public fun setup() {
@@ -758,6 +756,7 @@ module supra_framework::genesis {
 
     #[test(supra_framework = @0x1)]
     fun test_create_delegation_pool(supra_framework: &signer) {
+		use std::features;
         setup();
 		features::change_feature_flags(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
@@ -803,6 +802,7 @@ module supra_framework::genesis {
 
     #[test(supra_framework = @0x1)]
     fun test_create_delegation_pools(supra_framework: &signer) {
+		use std::features;
         setup();
 		features::change_feature_flags(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
@@ -881,6 +881,7 @@ module supra_framework::genesis {
 
     #[test(supra_framework = @0x1)]
     fun test_create_pbo_delegation_pool(supra_framework: &signer) {
+		use std::features;
         setup();
 		
 		features::change_feature_flags(supra_framework,vector[11],vector[]);
@@ -932,6 +933,7 @@ module supra_framework::genesis {
 
     #[test(supra_framework = @0x1)]
     fun test_create_pbo_delegation_pools(supra_framework: &signer) {
+		use std::features;
         setup();
 		features::change_feature_flags(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
