@@ -279,9 +279,9 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
+        // let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         // First check if the cache has the state value.
-        let _timer_get = TIMER.with_label_values(&["get_state_value_get_from_cache"]).start_timer();
+        // let _timer_get = TIMER.with_label_values(&["get_state_value_get_from_cache"]).start_timer();
         if let Some(version_and_value_opt) = self
             .sharded_state_cache
             .shard(state_key.get_shard_id())
@@ -289,10 +289,10 @@ impl TStateView for CachedStateView {
         {
             // This can return None, which means the value has been deleted from the DB.
             let value_opt = &version_and_value_opt.1;
-            drop(_timer_get);
+            // drop(_timer_get);
             return Ok(value_opt.clone());
         }
-        let _timer_get = TIMER.with_label_values(&["get_state_value_get_and_state"]).start_timer();
+        // let _timer_get = TIMER.with_label_values(&["get_state_value_get_and_state"]).start_timer();
         let version_and_state_value_option =
             self.get_version_and_state_value_internal(state_key)?;
         // Update the cache if still empty
