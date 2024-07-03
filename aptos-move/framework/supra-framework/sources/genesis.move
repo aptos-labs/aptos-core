@@ -617,9 +617,8 @@ module supra_framework::genesis {
         chain_status::set_genesis_end(supra_framework);
     }
 
-    #[test_only]
+    #[verify_only]
     use std::features;
-
     #[verify_only]
     fun initialize_for_verification(
         gas_schedule: vector<u8>,
@@ -674,6 +673,8 @@ module supra_framework::genesis {
         set_genesis_end(supra_framework);
     }
 
+    #[test_only]
+    use std::features;
     #[test_only]
     const ONE_APT: u64 = 100000000;
     #[test_only]
