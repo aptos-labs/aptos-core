@@ -73,6 +73,7 @@ impl StateKvDb {
         );
 
         let mut shard_id: usize = 0;
+        // NOTE Check this later
         let state_kv_db_shards = {
             arr![{
                 let shard_root_path = db_paths.state_kv_db_shard_root_path(shard_id as u8);
