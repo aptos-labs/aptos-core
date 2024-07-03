@@ -19,6 +19,12 @@ fn main() {
     println!("Loaded code from file: {:?}", file_path);
 
     println!("Running the transactional test");
-    run_transactional_test(code, &Config::default()).unwrap();
-    println!("Transactional test passed");
+    match run_transactional_test(code, &Config::default()) {
+        Ok(_) => println!("Transactional test passed"),
+        Err(e) => {
+            println!("Transactional test failed: {:?}", file_path);
+            println!("{}", e.to_string());
+            std::process::exit(1);
+        },
+    }
 }

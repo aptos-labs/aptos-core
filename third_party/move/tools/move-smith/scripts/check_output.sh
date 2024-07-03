@@ -17,7 +17,12 @@ APTOS_DIR=$(realpath $MOVE_SMITH_DIR/../../../..)
 
 source $MOVE_SMITH_DIR/scripts/argparse.sh
 
-function get_error() {
+RED="\033[0;31m"
+NOCOLOR="\033[0m"
+YELLOW="\033[1;33m"
+GREEN="\033[1;32m"
+
+function get_compile_error() {
   find $1 -name compile.log | while read f; do
     grep "error\[E" $f
   done | sort | uniq -c | sort -nr
@@ -32,7 +37,7 @@ function check_compile() {
       aptos move compile > compile.log 2>&1
       if [ $? -ne 0 ]; then
         echo "Compile $1: failed"
-        get_error .
+        get_compile_error .
       else
         echo "Compile $1: success"
       fi
@@ -40,11 +45,30 @@ function check_compile() {
   fi
 }
 
+function get_failed_files() {
+  local wkd=$1
+  local fn=$2
+  local pattern=$3
+  find $wkd -name $fn | while read f; do
+    if grep -q "$pattern" $f; then
+      echo $(dirname $f)
+    fi
+  done
+}
+
 function check_run_transactional() {
   RT_BIN=$2
-  if [ -d "$p" ]; then
+  if [ -d "$1" ]; then
     move_file=$(realpath $(find "$1/sources" -name "*.move"))
-    timeout 3 $RT_BIN "$move_file"
+    (
+      cd "$1"
+      timeout 3 $RT_BIN "$move_file" | tee run.log 2>&1
+      if [ $? -ne 0 ]; then
+        echo "Run $1: failed"
+      else
+        echo "Run $1: success"
+      fi
+    )
   fi
 }
 
@@ -98,17 +122,30 @@ end_time=$(date +%s)
 
 
 echo
-printf "\033[1;32mChecking stats:\n"
+printf "${GREEN}Checking stats:\n"
 num_succ=$(find output -type d -name build | wc -l | xargs)
 echo "Out out $num_prog packages, $num_succ can be compiled successfully."
+printf $NOCOLOR
 
-errors=$(get_error $OUTPUT_DIR)
+errors=$(get_compile_error $OUTPUT_DIR)
 if [ -z "$errors" ]; then
   echo "No errors found"
 else
-  printf "Errors are:\033[0m\n"
+  printf $RED
+  echo "Errors are:"
+  printf $NOCOLOR
   echo "$errors"
 fi
+
+echo "Packages failed to compile:"
+printf $RED
+get_failed_files $OUTPUT_DIR compile.log "error\[E"
+printf $NOCOLOR
+
+echo "Packages failed to run transactional test:"
+printf $RED
+get_failed_files $OUTPUT_DIR run.log "Transactional test failed"
+printf $NOCOLOR
 
 total_time=$((end_time - start_time))
 cargo_time=$((cargo_end_time - cargo_start_time))
@@ -117,9 +154,10 @@ transactional_time=$((end_time - transactional_start_time))
 
 # Print out time profiling results
 echo
-printf "\033[1;33mTime profiling results:\n"
+printf $YELLOW
+echo "Time profiling results:"
 echo "Total time: $total_time seconds"
 echo "Time to generate $num_prog packages: $cargo_time seconds x 1 thread"
 echo "Time to compile $num_prog packages: $compile_time seconds x $jobs threads"
 echo "Time to run $num_prog transactional: $transactional_time seconds x $jobs threads"
-printf "\033[0m\n"
+printf $NOCOLOR
