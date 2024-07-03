@@ -39,10 +39,16 @@ pub struct Config {
     // Maximum depth of nested type instantiation
     pub max_type_depth: usize,
 
+    // Maximum number of type parameters in a function
     pub max_num_type_params_in_func: usize,
+    // Maximum number of type parameters in a struct definition
     pub max_num_type_params_in_struct: usize,
 
+    // Timeout in seconds
     pub timeout_sec: usize,
+
+    // Allow recursive calls in the generated code
+    pub allow_recursive_calls: bool,
 }
 
 impl Default for Config {
@@ -96,6 +102,8 @@ impl Default for Config {
             max_num_type_params_in_struct: 2,
 
             timeout_sec: 5,
+
+            allow_recursive_calls: false,
         }
     }
 }

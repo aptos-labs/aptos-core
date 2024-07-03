@@ -4,7 +4,7 @@
 //! Manages identifiers and scope information during generation.
 
 use arbitrary::Arbitrary;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 /// Represents a Move identifier.
 /// Key invariant: each identifier is globally unique.
@@ -34,6 +34,12 @@ impl Identifier {
 
     pub fn is_var(&self) -> bool {
         self.kind == IdentifierKind::Var
+    }
+}
+
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 

@@ -2141,13 +2141,37 @@ impl MoveSmith {
     /// If `ret_type` is specified, only functions that can return the given type
     /// will be returned.
     fn get_callable_functions(&self, scope: &Scope) -> Vec<FunctionSignature> {
+        let caller_num: usize = self.get_function_num(&scope.clone().0.unwrap_or("".to_string()));
         let mut callable = Vec::new();
         for f in self.function_signatures.borrow().iter() {
             if self.env().id_pool.is_id_in_scope(&f.name, scope) {
+                // Note: heuristic hack to avoid recursive calls
+                // Only allow function with smaller name to call function with larger name
+                // While recursive calls are interesting, they waste fuzzing time
+                // e.g function0 can call function1, but function1 cannot call function0
+                if !self.config.borrow().allow_recursive_calls {
+                    let callee_num = self.get_function_num(&f.name.to_string());
+                    if caller_num >= callee_num {
+                        continue;
+                    }
+                }
                 callable.push(f.clone());
             }
         }
         callable
+    }
+
+    // Hacky way to get the sequence number of a function
+    fn get_function_num(&self, s: &str) -> usize {
+        s.split("::")
+            .filter(|s| s.starts_with("function"))
+            .last()
+            .unwrap()
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .collect::<String>()
+            .parse::<usize>()
+            .unwrap()
     }
 
     /// Finds all registered types that contains all the required abilities
