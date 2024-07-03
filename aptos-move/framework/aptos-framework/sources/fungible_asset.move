@@ -1321,13 +1321,13 @@ module aptos_framework::fungible_asset {
         mutate_metadata(
             &mutate_metadata_ref,
             option::some(string::utf8(b"mutated_name")),
-            option::some(string::utf8(b"mutated_symbol")),
+            option::some(string::utf8(b"m_symbol")),
             option::none(),
             option::none(),
             option::none()
         );
         assert!(name(metadata) == string::utf8(b"mutated_name"), 8);
-        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
+        assert!(symbol(metadata) == string::utf8(b"m_symbol"), 9);
         assert!(decimals(metadata) == 0, 10);
         assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
@@ -1402,13 +1402,13 @@ module aptos_framework::fungible_asset {
         mutate_metadata(
             &mutate_metadata_ref,
             option::some(string::utf8(b"mutated_name")),
-            option::some(string::utf8(b"mutated_symbol")),
+            option::some(string::utf8(b"m_symbol")),
             option::some(10),
             option::some(string::utf8(b"http://www.mutated-example.com/favicon.ico")),
             option::some(string::utf8(b"http://www.mutated-example.com"))
         );
         assert!(name(metadata) == string::utf8(b"mutated_name"), 1);
-        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 2);
+        assert!(symbol(metadata) == string::utf8(b"m_symbol"), 2);
         assert!(decimals(metadata) == 10, 3);
         assert!(icon_uri(metadata) == string::utf8(b"http://www.mutated-example.com/favicon.ico"), 4);
         assert!(project_uri(metadata) == string::utf8(b"http://www.mutated-example.com"), 5);
@@ -1424,12 +1424,12 @@ module aptos_framework::fungible_asset {
         mutate_metadata(
             &mutate_metadata_ref,
             option::some(string::utf8(b"mutated_name")),
-            option::some(string::utf8(b"mutated_symbol")),
+            option::some(string::utf8(b"m_symbol")),
             option::none(),
             option::none(),
             option::none()
         );
-        assert!(name(metadata) == string::utf8(b"mutated_name"), 8);
+        assert!(name(metadata) == string::utf8(b"m_name"), 8);
         assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
         assert!(decimals(metadata) == 0, 10);
         assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
