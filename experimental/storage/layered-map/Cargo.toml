@@ -21,4 +21,12 @@ bitvec = "1.0.1"
 once_cell = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
+itertools = { workspace = true }
+jemallocator = { workspace = true }
 proptest = { workspace = true }
+rand = { workspace = true }
+
+[[bench]]
+name = "sorting"
+harness = false

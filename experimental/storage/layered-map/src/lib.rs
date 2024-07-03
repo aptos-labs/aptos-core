@@ -10,6 +10,7 @@ use aptos_crypto::HashValue;
 use aptos_drop_helper::ArcAsyncDrop;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
+pub use key::Key;
 use std::sync::Arc;
 
 mod dropper;
@@ -17,17 +18,9 @@ mod metrics;
 mod node;
 pub(crate) mod r#ref;
 
+mod key;
 #[cfg(test)]
 mod tests;
-
-/// When recursively creating a new `MapLayer` (a crit bit tree overlay), passing down `Vec<(K, Option<V>)>`
-/// That's why we require `Key: Clone` and clone the key and value only when the leaf node is
-/// created.
-pub trait Key: Clone + Eq {
-    fn iter_bits(&self) -> impl Iterator<Item = bool>;
-
-    fn bit(&self, depth: usize) -> bool;
-}
 
 /// Similar to `Key`, we require `Value: Clone`, another reason being it's tricky to figure out the
 /// lifetime if `get()` returns a reference to the value -- we simply clone the value.
