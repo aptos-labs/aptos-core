@@ -170,10 +170,11 @@ impl UnitTestingConfig {
 
         let (mut compiler, cfgir) = compiler.into_ast();
         let compilation_env = compiler.compilation_env();
+        let warnings_are_errors = compilation_env.flags().warnings_are_errors();
         let test_plan = unit_test::plan_builder::construct_test_plan(compilation_env, None, &cfgir);
 
         if let Err(diags) = compilation_env.check_diags_at_or_above_severity(
-            if self.ignore_compile_warnings {
+            if self.ignore_compile_warnings && !warnings_are_errors {
                 Severity::NonblockingError
             } else {
                 Severity::Warning
@@ -186,7 +187,7 @@ impl UnitTestingConfig {
 
         let (units, warnings) =
             diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
-        diagnostics::report_warnings(&files, warnings, false);
+        diagnostics::report_warnings(&files, warnings, warnings_are_errors);
         test_plan.map(|tests| TestPlan::new(tests, files, units))
     }
 

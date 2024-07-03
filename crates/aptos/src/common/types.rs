@@ -49,6 +49,11 @@ use aptos_vm_types::output::VMOutput;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
+use move_command_line_common::env::bool_to_str;
+use move_compiler::{
+    command_line::MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG,
+    shared::move_compiler_warnings_are_errors_env_var,
+};
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
@@ -1123,9 +1128,9 @@ pub struct MovePackageDir {
 
     /// Treat warnings as errors: stop compilation if warnings occur.
     /// Note that current value of this constant is "Werror"
-    #[clap(long = cli::MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG,
+    #[clap(long = MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG,
            default_value=bool_to_str(move_compiler_warnings_are_errors_env_var()))]
-    warnings_are_errors: bool,
+    pub warnings_are_errors: bool,
 
     /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
@@ -1199,7 +1204,8 @@ impl MovePackageDir {
             compiler_version: None,
             language_version: None,
             skip_attribute_checks: false,
-            check_test_code: false,
+            warnings_are_errors: Default::default(),
+            check_test_code: Default::default(),
             move_2: false,
             optimize: None,
             experiments: vec![],

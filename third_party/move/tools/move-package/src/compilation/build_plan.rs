@@ -141,6 +141,7 @@ impl BuildPlan {
         config: &CompilerConfig,
         writer: &mut W,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
+        let warnings_are_errors = config.warnings_are_errors;
         self.compile_with_driver(
             writer,
             config,
@@ -148,7 +149,7 @@ impl BuildPlan {
                 let (files, units_res) = compiler.build()?;
                 match units_res {
                     Ok((units, warning_diags)) => {
-                        report_warnings(&files, warning_diags, false);
+                        report_warnings(&files, warning_diags, warnings_are_errors);
                         Ok((files, units, None))
                     },
                     Err(error_diags) => {

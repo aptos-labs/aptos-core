@@ -565,8 +565,6 @@ impl CliCommand<&'static str> for TestPackage {
                 language_version: self.move_options.language_version,
                 experiments: experiments_from_opt_level(&self.move_options.optimize),
             },
-            warn_unused: self.move_options.warn_unused,
-            warnings_are_errors: self.move_options.warnings_are_errors,
             ..Default::default()
         };
 
