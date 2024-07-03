@@ -310,7 +310,7 @@ module aptos_framework::coin {
                 };
             primary_fungible_store::create_primary_store_enabled_fungible_asset(
                 &metadata_object_cref,
-                option::map(coin_supply<CoinType>(), |_| MAX_U128),
+                option::none(),
                 name<CoinType>(),
                 symbol<CoinType>(),
                 decimals<CoinType>(),

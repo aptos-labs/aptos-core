@@ -1356,7 +1356,7 @@ Create APT pairing by passing <code>AptosCoin</code>.
             };
         <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset">primary_fungible_store::create_primary_store_enabled_fungible_asset</a>(
             &metadata_object_cref,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_map">option::map</a>(<a href="coin.md#0x1_coin_coin_supply">coin_supply</a>&lt;CoinType&gt;(), |_| <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
             <a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;(),
             <a href="coin.md#0x1_coin_symbol">symbol</a>&lt;CoinType&gt;(),
             <a href="coin.md#0x1_coin_decimals">decimals</a>&lt;CoinType&gt;(),
