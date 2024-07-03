@@ -256,6 +256,14 @@ impl RecoveryData {
                 .map(|b| format!("\n\t{}", b))
                 .collect::<Vec<String>>()
         );
+        blocks.retain(|block| block.epoch() == root.0.epoch());
+        info!(
+            "RecoveryData blocks after removing wrong epoch: {:?}",
+            blocks
+                .iter()
+                .map(|b| format!("\n\t{}", b))
+                .collect::<Vec<String>>()
+        );
 
         // TODO: is pruning an optimization or a necessity?
         // let blocks_to_prune = Some(Self::find_blocks_to_prune(
@@ -263,13 +271,15 @@ impl RecoveryData {
         //     &mut blocks,
         //     &mut quorum_certs,
         // ));
-        let blocks_to_prune: Option<Vec<_>> = Some(
-            blocks
-                .iter()
-                .filter(|block| block.epoch() < root.0.epoch())
-                .map(|block| block.id())
-                .collect(),
-        );
+        // TODO: this still requires the block with bad window to get initialized
+        // let blocks_to_prune: Option<Vec<_>> = Some(
+        //     blocks
+        //         .iter()
+        //         .filter(|block| block.epoch() < root.0.epoch())
+        //         .map(|block| block.id())
+        //         .collect(),
+        // );
+        let blocks_to_prune = Some(vec![]);
         info!(
             "RecoveryData blocks_to_prune: {:?}",
             blocks_to_prune.as_ref().map(|ids| ids
