@@ -11,11 +11,6 @@ datatest_stable::harness!(runner, "tests", r".*\.(mvir|move)$");
 
 fn runner(path: &Path) -> anyhow::Result<(), Box<dyn std::error::Error>> {
     let warnings_are_errors = path.to_str().unwrap().contains("/warnings-are-errors/");
-    eprintln!(
-        "Path is {}, warnings_are_errors is {}",
-        path.to_str().unwrap(),
-        warnings_are_errors
-    );
     if path.to_str().unwrap().contains("v2-tests/") {
         // TODO: we may later want to change this to comparison testing. For now we are mostly
         //    interested in debugging v2 bytecode.

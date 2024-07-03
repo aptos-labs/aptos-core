@@ -1135,12 +1135,6 @@ pub fn run_aptos_test_with_config(
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let warnings_are_errors = path.to_str().unwrap().contains("/warnings-are-errors/");
-    eprintln!(
-        "Path is {}, warnings_are_errors is {}, config.warnings_are_errors is {}",
-        path.to_str().unwrap(),
-        warnings_are_errors,
-        config.get_warnings_are_errors(),
-    );
     let (suffix, config) =
         if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
             (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {

@@ -897,10 +897,6 @@ fn compile_source_unit(
         .set_sources_shadow_deps(true)
         .set_skip_attribute_checks(false)
         .set_warnings_are_errors(warnings_are_errors);
-    eprintln!(
-        "at 901: Path is {}, warnings_are_errors is {}",
-        path, warnings_are_errors
-    );
 
     let (mut files, comments_and_compiler_res) = move_compiler::Compiler::from_files(
         vec![path.clone()],
