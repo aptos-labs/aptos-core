@@ -4,21 +4,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-import subprocess
 import shutil
+import subprocess
 import sys
-from multiprocessing import Pool, freeze_support
-from typing import Tuple
 from collections import deque
+from multiprocessing import Pool, freeze_support
+from typing import List, Tuple
 
+from verify_core.common import clear_artifacts, warm_cache_and_get_latest_backup_version
 
-from verify_core.common import (
-    clear_artifacts,
-    warm_cache_and_get_latest_backup_version,
-)
-
-
-TESTNET_RANGES = [
+TESTNET_RANGES: List[Tuple[int, int]] = [
     (862_000_000, 878_000_000),
     (878_000_000, 894_000_000),
     (894_000_000, 910_000_000),
@@ -40,8 +35,7 @@ TESTNET_RANGES = [
     (1_154_000_000, 1_167_000_000),
 ]
 
-MAINNET_RANGES = [
-    (392_000_000, 408_000_000),
+MAINNET_RANGES: List[Tuple[int, int]] = [
     (408_000_000, 424_000_000),
     (424_000_000, 439_000_000),
     (439_000_000, 455_000_000),
@@ -60,7 +54,8 @@ MAINNET_RANGES = [
     # Skip tapos range
     (949_000_000, 954_000_000),
     (954_000_000, 969_000_000),
-    (969_000_000, sys.maxsize),
+    (969_000_000, 984_000_000),
+    (984_000_000, 1_000_000_000),
 ]
 
 
@@ -199,10 +194,11 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
     ), "runner_cnt must match the number of runners in the mapping"
     runner_start = runner_mapping[runner_no][0]
     runner_end = runner_mapping[runner_no][1]
-    warm_cache_and_get_latest_backup_version(BACKUP_CONFIG_TEMPLATE_PATH)
+    latest_version = warm_cache_and_get_latest_backup_version(
+        BACKUP_CONFIG_TEMPLATE_PATH
+    )
     if runner_no == runner_cnt - 1:
-        if runner_end is None:
-            raise Exception("Failed to query latest version from backup")
+        runner_end = min(runner_end, latest_version)
     print("runner start %d end %d" % (runner_start, runner_end))
     if start_version is not None and end_version is not None:
         runner_start = start_version
