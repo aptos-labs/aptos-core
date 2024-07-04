@@ -103,6 +103,7 @@ pub fn aptos_prod_vm_config(
         // manually where applicable.
         delayed_field_optimization_enabled: false,
         ty_builder,
+        disallow_dispatch_for_native: false,
     }
 }
 
