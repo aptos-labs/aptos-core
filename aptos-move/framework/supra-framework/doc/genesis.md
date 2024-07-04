@@ -135,7 +135,7 @@
 
 </dd>
 <dt>
-<code>vesting_percentage: u8</code>
+<code>vpool_locking_percentage: u8</code>
 </dt>
 <dd>
 
@@ -486,20 +486,20 @@
 
 
 
+<a id="0x1_genesis_EPERCENTAGE_INVALID"></a>
+
+
+
+<pre><code><b>const</b> <a href="genesis.md#0x1_genesis_EPERCENTAGE_INVALID">EPERCENTAGE_INVALID</a>: u64 = 6;
+</code></pre>
+
+
+
 <a id="0x1_genesis_EVESTING_SCHEDULE_IS_ZERO"></a>
 
 
 
 <pre><code><b>const</b> <a href="genesis.md#0x1_genesis_EVESTING_SCHEDULE_IS_ZERO">EVESTING_SCHEDULE_IS_ZERO</a>: u64 = 3;
-</code></pre>
-
-
-
-<a id="0x1_genesis_PERCENTAGE_INVALID"></a>
-
-
-
-<pre><code><b>const</b> <a href="genesis.md#0x1_genesis_PERCENTAGE_INVALID">PERCENTAGE_INVALID</a>: u64 = 6;
 </code></pre>
 
 
@@ -1057,6 +1057,8 @@ encoded in a single BCS byte array.
         delegator_config.delegation_pool_creation_seed,
     );
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">delegation_pool::get_owned_pool_address</a>(delegator_config.owner_address);
+		<a href="delegation_pool.md#0x1_delegation_pool_set_operator">delegation_pool::set_operator</a>(&owner_signer,delegator_config.validator.validator_config.operator_address);
+		<a href="delegation_pool.md#0x1_delegation_pool_set_delegated_voter">delegation_pool::set_delegated_voter</a>(&owner_signer,delegator_config.validator.validator_config.voter_address);
 
     <b>let</b> i = 0;
     <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&delegator_config.delegator_addresses)) {
@@ -1101,7 +1103,7 @@ encoded in a single BCS byte array.
     delegation_percentage: u64,
 ) {
 		<b>let</b> unique_accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <b>assert</b>!(delegation_percentage &gt; 0 && delegation_percentage &lt;= 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="genesis.md#0x1_genesis_PERCENTAGE_INVALID">PERCENTAGE_INVALID</a>));
+    <b>assert</b>!(delegation_percentage &gt; 0 && delegation_percentage &lt;= 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="genesis.md#0x1_genesis_EPERCENTAGE_INVALID">EPERCENTAGE_INVALID</a>));
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&pbo_delegator_configs, |pbo_delegator_config| {
         <b>let</b> pbo_delegator_config: &<a href="genesis.md#0x1_genesis_PboDelegatorConfiguration">PboDelegatorConfiguration</a> = pbo_delegator_config;
 			<b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(&unique_accounts,&pbo_delegator_config.delegator_config.owner_address),
@@ -1135,6 +1137,7 @@ encoded in a single BCS byte array.
     pbo_delegator_config: &<a href="genesis.md#0x1_genesis_PboDelegatorConfiguration">PboDelegatorConfiguration</a>,
     delegation_percentage: u64,
 ) {
+		<b>assert</b>!(delegation_percentage&gt;0 && delegation_percentage&lt;=100,<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="genesis.md#0x1_genesis_EPERCENTAGE_INVALID">EPERCENTAGE_INVALID</a>));
     <b>let</b> unique_accounts:<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&pbo_delegator_config.delegator_config.delegator_addresses, |delegator_address| {
         <b>let</b> delegator_address: &<b>address</b> = delegator_address;
@@ -1165,14 +1168,15 @@ encoded in a single BCS byte array.
         pbo_delegator_config.principle_lockup_time,
     );
 
-    <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">delegation_pool::get_owned_pool_address</a>(pbo_delegator_config.delegator_config.owner_address);
+    <b>let</b> pool_address = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_get_owned_pool_address">pbo_delegation_pool::get_owned_pool_address</a>(pbo_delegator_config.delegator_config.owner_address);
 		<b>let</b> validator = pbo_delegator_config.delegator_config.validator.validator_config;
+		<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_set_operator">pbo_delegation_pool::set_operator</a>(&owner_signer,validator.operator_address);
+		<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_set_delegated_voter">pbo_delegation_pool::set_delegated_voter</a>(&owner_signer,validator.voter_address);
 		<a href="genesis.md#0x1_genesis_assert_validator_addresses_check">assert_validator_addresses_check</a>(&validator);
 
 		<b>if</b> (pbo_delegator_config.delegator_config.validator.join_during_genesis) {
-            <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address,&validator);
-        };
-
+        <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address,&validator);
+    };
 }
 </code></pre>
 
@@ -1195,21 +1199,19 @@ encoded in a single BCS byte array.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_assert_validator_addresses_check">assert_validator_addresses_check</a>(validator: &<a href="genesis.md#0x1_genesis_ValidatorConfiguration">ValidatorConfiguration</a>)
-	{
-		 <b>assert</b>!(
-               <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.owner_address),
-               <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
-           );
-           <b>assert</b>!(
-               <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.operator_address),
-               <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
-           );
-           <b>assert</b>!(
-               <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.voter_address),
-               <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
-           );
-
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_assert_validator_addresses_check">assert_validator_addresses_check</a>(validator: &<a href="genesis.md#0x1_genesis_ValidatorConfiguration">ValidatorConfiguration</a>) {
+       <b>assert</b>!(
+           <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.owner_address),
+           <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
+       );
+       <b>assert</b>!(
+           <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.operator_address),
+           <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
+       );
+       <b>assert</b>!(
+           <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.voter_address),
+           <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
+       );
 	}
 </code></pre>
 
@@ -1242,8 +1244,8 @@ encoded in a single BCS byte array.
         <b>let</b> schedule_length = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pool_config.vesting_numerators);
         <b>assert</b>!(schedule_length &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="genesis.md#0x1_genesis_EVESTING_SCHEDULE_IS_ZERO">EVESTING_SCHEDULE_IS_ZERO</a>));
         <b>assert</b>!(pool_config.vesting_denominator &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="genesis.md#0x1_genesis_EDENOMINATOR_IS_ZERO">EDENOMINATOR_IS_ZERO</a>));
-        <b>assert</b>!(pool_config.vesting_percentage &gt; 0 && pool_config.vesting_percentage &lt;=100 ,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="genesis.md#0x1_genesis_PERCENTAGE_INVALID">PERCENTAGE_INVALID</a>));
+        <b>assert</b>!(pool_config.vpool_locking_percentage &gt; 0 && pool_config.vpool_locking_percentage &lt;=100 ,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="genesis.md#0x1_genesis_EPERCENTAGE_INVALID">EPERCENTAGE_INVALID</a>));
         //check the sum of numerator are &lt;= denominator.
         <b>let</b> sum = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_fold">vector::fold</a>(pool_config.vesting_numerators,0,|acc, x| acc + x);
         // Check that total of all fraction in `vesting_schedule` is not greater than 1
@@ -1280,7 +1282,7 @@ encoded in a single BCS byte array.
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> unique_accounts,shareholder);
             <b>let</b> shareholder_signer = <a href="create_signer.md#0x1_create_signer">create_signer</a>(shareholder);
             <b>let</b> amount = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(shareholder);
-            <b>let</b> amount_to_extract = (amount * (pool_config.vesting_percentage <b>as</b> u64)) / 100;
+            <b>let</b> amount_to_extract = (amount * (pool_config.vpool_locking_percentage <b>as</b> u64)) / 100;
             <b>let</b> coin_share = <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;SupraCoin&gt;(&shareholder_signer, amount_to_extract);
             <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> buy_ins,shareholder,coin_share);
             j = j + 1;
@@ -1417,7 +1419,7 @@ The last step of genesis.
         rewards_rate_denominator,
         voting_power_increase_limit
     );
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags">features::change_feature_flags</a>(supra_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags">features::change_feature_flags</a>(supra_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2, 11], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
     <a href="genesis.md#0x1_genesis_initialize_supra_coin">initialize_supra_coin</a>(supra_framework);
     <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">aptos_governance::initialize_for_verification</a>(
         supra_framework,
