@@ -421,7 +421,7 @@ impl ProposalGenerator {
         timestamp: Duration,
         round: Round,
     ) -> (u64, u64, Option<usize>, Duration) {
-        let mut values_max_block_txns = vec![self.max_block_txns];
+        let mut values_max_block_txns = vec![self.max_block_unique_txns];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
         let mut values_max_txns_from_block_to_execute = vec![];

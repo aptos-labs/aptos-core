@@ -18,7 +18,7 @@ type QualifiedFunId = QualifiedId<FunId>;
 /// check that non-inline function parameters do not have function type.
 pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     for caller_module in env.get_modules() {
-        if caller_module.is_target() {
+        if caller_module.is_primary_target() {
             for caller_func in caller_module.get_functions() {
                 // Check that non-inline function parameters don't have function type
                 if !caller_func.is_inline() {
@@ -191,7 +191,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
 
     for caller_module in env.get_modules() {
-        if caller_module.is_target() {
+        if caller_module.is_primary_target() {
             let caller_module_id = caller_module.get_id();
             let caller_module_has_friends = !caller_module.has_no_friends();
             let caller_module_is_script = caller_module.get_name().is_script();
@@ -253,6 +253,36 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                 Visibility::Friend => {
                                     if callee_func.module_env.has_friend(&caller_module_id) {
                                         true
+                                    } else if callee_func.has_package_visibility() {
+                                        if callee_func.module_env.self_address()
+                                            == caller_func.module_env.self_address()
+                                        {
+                                            // if callee is also a primary target, then they are in the same package
+                                            if callee_func.module_env.is_primary_target() {
+                                                // we should've inferred the friend declaration
+                                                panic!(
+                                                    "{} should have friend {}",
+                                                    callee_func.module_env.get_full_name_str(),
+                                                    caller_func.module_env.get_full_name_str()
+                                                );
+                                            } else {
+                                                call_package_fun_from_diff_package_error(
+                                                    env,
+                                                    sites,
+                                                    &caller_func,
+                                                    &callee_func,
+                                                );
+                                                false
+                                            }
+                                        } else {
+                                            call_package_fun_from_diff_addr_error(
+                                                env,
+                                                sites,
+                                                &caller_func,
+                                                &callee_func,
+                                            );
+                                            false
+                                        }
                                     } else {
                                         not_a_friend_error(env, sites, &caller_func, &callee_func);
                                         false
@@ -336,7 +366,13 @@ fn generic_error(
     let msg = format!(
         "{}function `{}` cannot be called from {}\
          because {}",
-        if callee.is_inline() { "inline " } else { "" },
+        if callee.is_inline() {
+            "inline "
+        } else if callee.has_package_visibility() {
+            "public(package) "
+        } else {
+            ""
+        },
         callee_name,
         called_from,
         why,
@@ -390,4 +426,24 @@ fn not_a_friend_error(
         callee.module_env.get_full_name_str()
     );
     cannot_call_error(env, &why, sites, caller, callee);
+}
+
+fn call_package_fun_from_diff_package_error(
+    env: &GlobalEnv,
+    sites: &BTreeSet<NodeId>,
+    caller: &FunctionEnv,
+    callee: &FunctionEnv,
+) {
+    let why = "they are from different packages";
+    cannot_call_error(env, why, sites, caller, callee);
+}
+
+fn call_package_fun_from_diff_addr_error(
+    env: &GlobalEnv,
+    sites: &BTreeSet<NodeId>,
+    caller: &FunctionEnv,
+    callee: &FunctionEnv,
+) {
+    let why = "they are from different addresses";
+    cannot_call_error(env, why, sites, caller, callee);
 }
