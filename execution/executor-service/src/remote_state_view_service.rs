@@ -181,11 +181,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                             recv_condition: Arc<(Mutex<bool>, Condvar)>,
                             outbound_rpc_runtime: Arc<Runtime>) {
         let mut rng = StdRng::from_entropy();
-        let mut curr_time;
-            let mut prev_time = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
+        // let mut curr_time;
+        // let mut prev_time = SystemTime::now()
+        //     .duration_since(SystemTime::UNIX_EPOCH)
+        //     .unwrap()
+        //     .as_millis() as u64;
         loop {
 
             let (lock, cvar) = &*recv_condition;
