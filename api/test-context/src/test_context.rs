@@ -184,6 +184,8 @@ pub struct TestContext {
 }
 
 impl TestContext {
+    const DEFAULT_MULTISIG_TX_TIMEOUT_SECS: u64 = 1000;
+
     pub fn new(
         context: Context,
         rng: rand::rngs::StdRng,
@@ -413,13 +415,18 @@ impl TestContext {
         additional_owners: Vec<AccountAddress>,
         signatures_required: u64,
         initial_balance: u64,
+        override_default_timeout: Option<u64>,
     ) -> AccountAddress {
         let factory = self.transaction_factory();
         let multisig_address =
             create_multisig_account_address(account.address(), account.sequence_number());
         let create_multisig_txn = account.sign_with_transaction_builder(
             factory
-                .create_multisig_account(additional_owners, signatures_required)
+                .create_multisig_account(
+                    additional_owners,
+                    signatures_required,
+                    override_default_timeout.unwrap_or(Self::DEFAULT_MULTISIG_TX_TIMEOUT_SECS),
+                )
                 .expiration_timestamp_secs(u64::MAX),
         );
         self.commit_block(&vec![

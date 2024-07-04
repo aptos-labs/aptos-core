@@ -485,6 +485,7 @@ pub enum EntryFunctionCall {
         num_signatures_required: u64,
         metadata_keys: Vec<Vec<u8>>,
         metadata_values: Vec<Vec<u8>>,
+        timeout_duration: u64,
     },
 
     /// Create a multisig transaction, which will have one approval initially (from the creator).
@@ -519,6 +520,7 @@ pub enum EntryFunctionCall {
         create_multisig_account_signed_message: Vec<u8>,
         metadata_keys: Vec<Vec<u8>>,
         metadata_values: Vec<Vec<u8>>,
+        timeout_duration: u64,
     },
 
     /// Creates a new multisig account on top of an existing account and immediately rotate the origin auth key to 0x0.
@@ -535,6 +537,7 @@ pub enum EntryFunctionCall {
         create_multisig_account_signed_message: Vec<u8>,
         metadata_keys: Vec<Vec<u8>>,
         metadata_values: Vec<Vec<u8>>,
+        timeout_duration: u64,
     },
 
     /// Creates a new multisig account with the specified additional owner list and signatures required.
@@ -548,6 +551,7 @@ pub enum EntryFunctionCall {
         num_signatures_required: u64,
         metadata_keys: Vec<Vec<u8>>,
         metadata_values: Vec<Vec<u8>>,
+        timeout_duration: u64,
     },
 
     /// Like `create_with_owners`, but removes the calling account after creation.
@@ -559,6 +563,7 @@ pub enum EntryFunctionCall {
         num_signatures_required: u64,
         metadata_keys: Vec<Vec<u8>>,
         metadata_values: Vec<Vec<u8>>,
+        timeout_duration: u64,
     },
 
     /// Remove the next transaction if it has sufficient owner rejections.
@@ -627,6 +632,11 @@ pub enum EntryFunctionCall {
     /// maliciously alter the number of signatures required.
     MultisigAccountUpdateSignaturesRequired {
         new_num_signatures_required: u64,
+    },
+
+    /// Update the timeout duration for the multisig account.
+    MultisigAccountUpdateTimeoutDuration {
+        timeout_duration: u64,
     },
 
     /// Generic function that can be used to either approve or reject a multisig transaction
@@ -1456,7 +1466,13 @@ impl EntryFunctionCall {
                 num_signatures_required,
                 metadata_keys,
                 metadata_values,
-            } => multisig_account_create(num_signatures_required, metadata_keys, metadata_values),
+                timeout_duration,
+            } => multisig_account_create(
+                num_signatures_required,
+                metadata_keys,
+                metadata_values,
+                timeout_duration,
+            ),
             MultisigAccountCreateTransaction {
                 multisig_account,
                 payload,
@@ -1474,6 +1490,7 @@ impl EntryFunctionCall {
                 create_multisig_account_signed_message,
                 metadata_keys,
                 metadata_values,
+                timeout_duration,
             } => multisig_account_create_with_existing_account(
                 multisig_address,
                 owners,
@@ -1483,6 +1500,7 @@ impl EntryFunctionCall {
                 create_multisig_account_signed_message,
                 metadata_keys,
                 metadata_values,
+                timeout_duration,
             ),
             MultisigAccountCreateWithExistingAccountAndRevokeAuthKey {
                 multisig_address,
@@ -1493,6 +1511,7 @@ impl EntryFunctionCall {
                 create_multisig_account_signed_message,
                 metadata_keys,
                 metadata_values,
+                timeout_duration,
             } => multisig_account_create_with_existing_account_and_revoke_auth_key(
                 multisig_address,
                 owners,
@@ -1502,28 +1521,33 @@ impl EntryFunctionCall {
                 create_multisig_account_signed_message,
                 metadata_keys,
                 metadata_values,
+                timeout_duration,
             ),
             MultisigAccountCreateWithOwners {
                 additional_owners,
                 num_signatures_required,
                 metadata_keys,
                 metadata_values,
+                timeout_duration,
             } => multisig_account_create_with_owners(
                 additional_owners,
                 num_signatures_required,
                 metadata_keys,
                 metadata_values,
+                timeout_duration,
             ),
             MultisigAccountCreateWithOwnersThenRemoveBootstrapper {
                 owners,
                 num_signatures_required,
                 metadata_keys,
                 metadata_values,
+                timeout_duration,
             } => multisig_account_create_with_owners_then_remove_bootstrapper(
                 owners,
                 num_signatures_required,
                 metadata_keys,
                 metadata_values,
+                timeout_duration,
             ),
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
@@ -1561,6 +1585,9 @@ impl EntryFunctionCall {
             MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required,
             } => multisig_account_update_signatures_required(new_num_signatures_required),
+            MultisigAccountUpdateTimeoutDuration { timeout_duration } => {
+                multisig_account_update_timeout_duration(timeout_duration)
+            },
             MultisigAccountVoteTransanction {
                 multisig_account,
                 sequence_number,
@@ -3124,6 +3151,7 @@ pub fn multisig_account_create(
     num_signatures_required: u64,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
+    timeout_duration: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -3139,6 +3167,7 @@ pub fn multisig_account_create(
             bcs::to_bytes(&num_signatures_required).unwrap(),
             bcs::to_bytes(&metadata_keys).unwrap(),
             bcs::to_bytes(&metadata_values).unwrap(),
+            bcs::to_bytes(&timeout_duration).unwrap(),
         ],
     ))
 }
@@ -3207,6 +3236,7 @@ pub fn multisig_account_create_with_existing_account(
     create_multisig_account_signed_message: Vec<u8>,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
+    timeout_duration: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -3227,6 +3257,7 @@ pub fn multisig_account_create_with_existing_account(
             bcs::to_bytes(&create_multisig_account_signed_message).unwrap(),
             bcs::to_bytes(&metadata_keys).unwrap(),
             bcs::to_bytes(&metadata_values).unwrap(),
+            bcs::to_bytes(&timeout_duration).unwrap(),
         ],
     ))
 }
@@ -3245,6 +3276,7 @@ pub fn multisig_account_create_with_existing_account_and_revoke_auth_key(
     create_multisig_account_signed_message: Vec<u8>,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
+    timeout_duration: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -3265,6 +3297,7 @@ pub fn multisig_account_create_with_existing_account_and_revoke_auth_key(
             bcs::to_bytes(&create_multisig_account_signed_message).unwrap(),
             bcs::to_bytes(&metadata_keys).unwrap(),
             bcs::to_bytes(&metadata_values).unwrap(),
+            bcs::to_bytes(&timeout_duration).unwrap(),
         ],
     ))
 }
@@ -3280,6 +3313,7 @@ pub fn multisig_account_create_with_owners(
     num_signatures_required: u64,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
+    timeout_duration: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -3296,6 +3330,7 @@ pub fn multisig_account_create_with_owners(
             bcs::to_bytes(&num_signatures_required).unwrap(),
             bcs::to_bytes(&metadata_keys).unwrap(),
             bcs::to_bytes(&metadata_values).unwrap(),
+            bcs::to_bytes(&timeout_duration).unwrap(),
         ],
     ))
 }
@@ -3309,6 +3344,7 @@ pub fn multisig_account_create_with_owners_then_remove_bootstrapper(
     num_signatures_required: u64,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
+    timeout_duration: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -3325,6 +3361,7 @@ pub fn multisig_account_create_with_owners_then_remove_bootstrapper(
             bcs::to_bytes(&num_signatures_required).unwrap(),
             bcs::to_bytes(&metadata_keys).unwrap(),
             bcs::to_bytes(&metadata_values).unwrap(),
+            bcs::to_bytes(&timeout_duration).unwrap(),
         ],
     ))
 }
@@ -3523,6 +3560,22 @@ pub fn multisig_account_update_signatures_required(
         ident_str!("update_signatures_required").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_num_signatures_required).unwrap()],
+    ))
+}
+
+/// Update the timeout duration for the multisig account.
+pub fn multisig_account_update_timeout_duration(timeout_duration: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("update_timeout_duration").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&timeout_duration).unwrap()],
     ))
 }
 
@@ -5865,6 +5918,7 @@ mod decoder {
                 num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
                 metadata_keys: bcs::from_bytes(script.args().get(1)?).ok()?,
                 metadata_values: bcs::from_bytes(script.args().get(2)?).ok()?,
+                timeout_duration: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -5914,6 +5968,7 @@ mod decoder {
                         .ok()?,
                     metadata_keys: bcs::from_bytes(script.args().get(6)?).ok()?,
                     metadata_values: bcs::from_bytes(script.args().get(7)?).ok()?,
+                    timeout_duration: bcs::from_bytes(script.args().get(8)?).ok()?,
                 },
             )
         } else {
@@ -5936,6 +5991,7 @@ mod decoder {
                         .ok()?,
                     metadata_keys: bcs::from_bytes(script.args().get(6)?).ok()?,
                     metadata_values: bcs::from_bytes(script.args().get(7)?).ok()?,
+                    timeout_duration: bcs::from_bytes(script.args().get(8)?).ok()?,
                 },
             )
         } else {
@@ -5952,6 +6008,7 @@ mod decoder {
                 num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
                 metadata_keys: bcs::from_bytes(script.args().get(2)?).ok()?,
                 metadata_values: bcs::from_bytes(script.args().get(3)?).ok()?,
+                timeout_duration: bcs::from_bytes(script.args().get(4)?).ok()?,
             })
         } else {
             None
@@ -5968,6 +6025,7 @@ mod decoder {
                     num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
                     metadata_keys: bcs::from_bytes(script.args().get(2)?).ok()?,
                     metadata_values: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    timeout_duration: bcs::from_bytes(script.args().get(4)?).ok()?,
                 },
             )
         } else {
@@ -6083,6 +6141,18 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_update_timeout_duration(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountUpdateTimeoutDuration {
+                timeout_duration: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -7358,6 +7428,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_update_signatures_required".to_string(),
             Box::new(decoder::multisig_account_update_signatures_required),
+        );
+        map.insert(
+            "multisig_account_update_timeout_duration".to_string(),
+            Box::new(decoder::multisig_account_update_timeout_duration),
         );
         map.insert(
             "multisig_account_vote_transanction".to_string(),

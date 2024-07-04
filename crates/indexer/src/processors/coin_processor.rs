@@ -280,7 +280,7 @@ impl TransactionProcessor for CoinTransactionProcessor {
         // get aptos_coin info for supply tracking
         // TODO: This only needs to be fetched once. Need to persist somehow
         let maybe_aptos_coin_info =
-            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE.to_string(), &mut conn).unwrap();
+            &CoinInfoQuery::get_by_coin_type(SUPRA_COIN_TYPE.to_string(), &mut conn).unwrap();
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];

@@ -187,7 +187,7 @@ impl<'t> AptosPublicInfo<'t> {
     pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
         let mint_txn = self.root_account.sign_with_transaction_builder(
             self.transaction_factory()
-                .payload(aptos_stdlib::aptos_coin_mint(addr, amount)),
+                .payload(aptos_stdlib::supra_coin_mint(addr, amount)),
         );
         self.rest_client.submit_and_wait(&mint_txn).await?;
         Ok(())

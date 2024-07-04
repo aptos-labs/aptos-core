@@ -700,11 +700,11 @@ module supra_framework::vesting_without_staking {
 
 
     #[test_only]
-    public entry fun setup(supra_framework: &signer, accounts: &vector<address>) {
+    public entry fun setup(supra_framework: &signer, accounts: vector<address>) {
         use supra_framework::aptos_account::create_account;
         timestamp::set_time_has_started_for_testing(supra_framework);
         stake::initialize_for_test(supra_framework);
-        vector::for_each_ref(accounts, |addr| {
+        vector::for_each_ref(&accounts, |addr| {
             let addr: address = *addr;
             if (!account::exists_at(addr)) {
                 create_account(addr);
@@ -782,7 +782,7 @@ module supra_framework::vesting_without_staking {
         let shares = &vector[shareholder_1_share, shareholder_2_share];
         // Create the vesting contract.
         setup(
-            supra_framework, &vector[admin_address, withdrawal_address, shareholder_1_address, shareholder_2_address]);
+            supra_framework, vector[admin_address, withdrawal_address, shareholder_1_address, shareholder_2_address]);
         // let contract_address = setup_vesting_contract(admin, shareholders, shares, withdrawal_address);
         let contract_address = setup_vesting_contract_with_schedule(
             admin,
@@ -828,7 +828,7 @@ module supra_framework::vesting_without_staking {
         let shares = &vector[shareholder_1_share, shareholder_2_share];
         // Create the vesting contract.
         setup(
-            supra_framework, &vector[admin_address, withdrawal_address, shareholder_1_address, shareholder_2_address]);
+            supra_framework, vector[admin_address, withdrawal_address, shareholder_1_address, shareholder_2_address]);
         let contract_address = setup_vesting_contract(admin, shareholders, shares, withdrawal_address);
         assert!(vector::length(&borrow_global<AdminStore>(admin_address).vesting_contracts) == 1, 0);
         let vested_amount_1 = 0;
@@ -911,7 +911,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address]);
+        setup(supra_framework, vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1], &vector[0], admin_address);
     }
 
@@ -922,7 +922,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address]);
+        setup(supra_framework, vector[admin_address]);
         setup_vesting_contract(admin, &vector[], &vector[], admin_address);
     }
 
@@ -933,7 +933,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address]);
+        setup(supra_framework, vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @5);
     }
 
@@ -944,7 +944,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address]);
+        setup(supra_framework, vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11);
     }
 
@@ -955,7 +955,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address]);
+        setup(supra_framework, vector[admin_address]);
         create_account_for_test(@11);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11);
     }
@@ -964,35 +964,35 @@ module supra_framework::vesting_without_staking {
     #[test(supra_framework = @0x1)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_create_empty_vesting_schedule_should_fail(supra_framework: &signer) {
-        setup(supra_framework, &vector[]);
+        setup(supra_framework, vector[]);
         create_vesting_schedule(vector[], 1, 1);
     }
 
     #[test(supra_framework = @0x1)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_create_first_element_zero_vesting_schedule_should_fail(supra_framework: &signer) {
-        setup(supra_framework, &vector[]);
+        setup(supra_framework, vector[]);
         create_vesting_schedule(vector[fixed_point32::create_from_raw_value(0), fixed_point32::create_from_raw_value(8)], 1, 1);
     }
 
     #[test(supra_framework = @0x1)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_create_last_element_zero_vesting_schedule_should_fail(supra_framework: &signer) {
-        setup(supra_framework, &vector[]);
+        setup(supra_framework, vector[]);
         create_vesting_schedule(vector[ fixed_point32::create_from_raw_value(8), fixed_point32::create_from_raw_value(0)], 1, 1);
     }
 
     #[test(supra_framework = @0x1)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
     public entry fun test_create_vesting_schedule_with_zero_period_duration_should_fail(supra_framework: &signer) {
-        setup(supra_framework, &vector[]);
+        setup(supra_framework, vector[]);
         create_vesting_schedule(vector[fixed_point32::create_from_rational(1, 1)], 1, 0);
     }
 
     #[test(supra_framework = @0x1, admin = @0x123)]
     #[expected_failure(abort_code = 0x10006, location = Self)]
     public entry fun test_create_vesting_schedule_with_invalid_vesting_start_should_fail(supra_framework: &signer) {
-        setup(supra_framework, &vector[]);
+        setup(supra_framework, vector[]);
         timestamp::update_global_time_for_test_secs(1000);
         create_vesting_schedule(
             vector[fixed_point32::create_from_rational(1, 1)],
@@ -1008,7 +1008,7 @@ module supra_framework::vesting_without_staking {
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
         let shareholder_address = signer::address_of(shareholder);
-        setup(supra_framework, &vector[admin_address, shareholder_address]);
+        setup(supra_framework, vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract_with_schedule(
             admin,
             &vector[shareholder_address],
@@ -1042,7 +1042,7 @@ module supra_framework::vesting_without_staking {
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
         let shareholder_address = signer::address_of(shareholder);
-        setup(supra_framework, &vector[admin_address, shareholder_address]);
+        setup(supra_framework, vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address);
 
@@ -1060,7 +1060,7 @@ module supra_framework::vesting_without_staking {
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
         let shareholder_address = signer::address_of(shareholder);
-        setup(supra_framework, &vector[admin_address, shareholder_address]);
+        setup(supra_framework, vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address);
 
@@ -1078,7 +1078,7 @@ module supra_framework::vesting_without_staking {
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
         let shareholder_address = signer::address_of(shareholder);
-        setup(supra_framework, &vector[admin_address, shareholder_address]);
+        setup(supra_framework, vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address);
 
@@ -1093,7 +1093,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address]);
+        setup(supra_framework, vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1, @2], &vector[GRANT_AMOUNT, GRANT_AMOUNT], admin_address);
         set_beneficiary(admin, contract_address, @1, @11);
@@ -1106,7 +1106,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address]);
+        setup(supra_framework, vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1, @2], &vector[GRANT_AMOUNT, GRANT_AMOUNT], admin_address);
         create_account_for_test(@11);
@@ -1119,7 +1119,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address, @11]);
+        setup(supra_framework, vector[admin_address, @11]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1], &vector[GRANT_AMOUNT], admin_address);
         set_beneficiary(admin, contract_address, @1, @11);
@@ -1140,7 +1140,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address]);
+        setup(supra_framework, vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
         let role = utf8(b"RANDOM");
@@ -1156,7 +1156,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address, @11, @12]);
+        setup(supra_framework, vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
         set_beneficiary(admin, contract_address, @11, @12);
@@ -1181,7 +1181,7 @@ module supra_framework::vesting_without_staking {
         resetter: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address, @11, @12]);
+        setup(supra_framework, vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
         set_beneficiary(admin, contract_address, @11, @12);
@@ -1204,7 +1204,7 @@ module supra_framework::vesting_without_staking {
         random: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address, @11]);
+        setup(supra_framework, vector[admin_address, @11]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
 
@@ -1219,7 +1219,7 @@ module supra_framework::vesting_without_staking {
         admin: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(supra_framework, &vector[admin_address, @11, @12]);
+        setup(supra_framework, vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
 

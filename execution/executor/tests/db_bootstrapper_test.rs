@@ -135,7 +135,7 @@ fn get_aptos_coin_mint_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::aptos_coin_mint(*account, amount)),
+        Some(aptos_stdlib::supra_coin_mint(*account, amount)),
     )
 }
 

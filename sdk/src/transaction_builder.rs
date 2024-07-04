@@ -174,12 +174,14 @@ impl TransactionFactory {
         &self,
         additional_owners: Vec<AccountAddress>,
         signatures_required: u64,
+		timeout_duration: u64,
     ) -> TransactionBuilder {
         self.payload(aptos_stdlib::multisig_account_create_with_owners(
             additional_owners,
             signatures_required,
             vec![],
             vec![],
+			timeout_duration,
         ))
     }
 
