@@ -155,7 +155,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let cmd_tx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("rmt-exe-cli-cmd-tx-{}", index))
-                .num_threads(60)//num_cpus::get() / 2)
+                .num_threads(16)//num_cpus::get() / 2)
                 .build()
                 .unwrap(),
         );
@@ -552,8 +552,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         drop(timer);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["9_8_execute_remote_block_done"]).observe(get_delta_time(duration_since_epoch) as f64);
-        drop(transactions);
-        //DEFAULT_DROPPER.schedule_drop(transactions);
+        //drop(transactions);
+        DEFAULT_DROPPER.schedule_drop(transactions);
         results
         //Ok(ShardedExecutionOutput::new(execution_results, vec![]))
     }
