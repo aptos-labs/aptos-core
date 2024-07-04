@@ -281,6 +281,7 @@ fn parse_expression_and_find_mutants(function: &FunctionEnv<'_>, exp: &ExpData) 
         | ExpData::SpecBlock(_, _)
         | ExpData::Sequence(_, _)
         | ExpData::Quant(_, _, _, _, _, _)
+        | ExpData::Match(_, _, _)
         | ExpData::Invalid(_) => vec![],
     }
 }
