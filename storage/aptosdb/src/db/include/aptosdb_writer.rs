@@ -22,9 +22,9 @@ impl DbWriter for AptosDB {
         sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
-            // Executing and committing from more than one threads not allowed -- consensus and
-            // state sync must hand over to each other after all pending execution and committing
-            // complete.
+            // Executing, committing, or reverting from more than one threads not allowed --
+            // consensus and state sync must hand over to each other after all pending execution
+            // and committing complete.
             let _lock = self
                 .ledger_commit_lock
                 .try_lock()
@@ -210,7 +210,15 @@ impl DbWriter for AptosDB {
             .with_label_values(&["revert_commit"])
             .start_timer();
 
-        let latest_version = self.get_synced_version()?;
+        // Executing, committing, or reverting from more than one threads not allowed --
+        // consensus and state sync must hand over to each other after all pending execution
+        // and committing complete.
+        let _lock = self
+            .ledger_commit_lock
+            .try_lock()
+            .expect("Concurrent committing detected.");
+
+        let latest_version = self.get_latest_version()?;
         let target_version = ledger_info_with_sigs.ledger_info().version();
 
         // Update in-memory state first, as this is what
