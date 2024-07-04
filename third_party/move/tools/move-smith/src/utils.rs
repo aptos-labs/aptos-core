@@ -24,6 +24,37 @@ name = "test"
 version = "0.0.0"
 "#;
 
+/// The result of running a transactional test.
+pub enum TransactionalResult {
+    // The test framework did not report error
+    Ok,
+    // The test framework reported warnings only
+    WarningsOnly,
+    // The test framework reported an error, but it is in the ignore list
+    IgnoredErr(String),
+    // The test framework reported an error
+    Err(String),
+}
+
+impl TransactionalResult {
+    pub fn unwrap(&self) {
+        match self {
+            TransactionalResult::Ok => {},
+            TransactionalResult::WarningsOnly => {},
+            TransactionalResult::IgnoredErr(msg) => {
+                info!("Ignored error: {}", msg);
+            },
+            TransactionalResult::Err(msg) => {
+                panic!("Unwrapping transactional test error: {}", msg);
+            },
+        }
+    }
+
+    pub fn is_err(&self) -> bool {
+        matches!(self, TransactionalResult::Err(_))
+    }
+}
+
 /// Choose a random index based on the given probabilities.
 /// e.g. if `weights` has [10, 20, 20], there are 3 options,
 /// so this function will return 0, 1, or 2.
@@ -163,7 +194,7 @@ pub fn compile_move_code(code: String, v1: bool, v2: bool) -> bool {
 }
 
 /// Runs the given Move code as a transactional test.
-pub fn run_transactional_test(code: String, config: &Config) -> Result<(), Box<dyn Error>> {
+pub fn run_transactional_test(code: String, config: &Config) -> TransactionalResult {
     let (file_path, dir) = create_tmp_move_file(code, None);
 
     let ignores = config.known_error.clone();
@@ -173,13 +204,13 @@ pub fn run_transactional_test(code: String, config: &Config) -> Result<(), Box<d
 
         let processed_result = process_transactional_test_result(name, &ignores, result);
         match &processed_result {
-            Ok(_) => {},
-            Err(_) => return processed_result,
+            TransactionalResult::Ok => {},
+            _ => return processed_result,
         };
     }
 
     dir.close().unwrap();
-    Ok(())
+    TransactionalResult::Ok
 }
 
 fn run_transactional_test_with_experiments(
@@ -200,25 +231,22 @@ fn process_transactional_test_result(
     name: &String,
     ignores: &[String],
     result: Result<(), Box<dyn Error>>,
-) -> Result<(), Box<dyn Error>> {
+) -> TransactionalResult {
     if result.is_ok() {
-        return Ok(());
+        return TransactionalResult::Ok;
     }
     let err = result.unwrap_err();
-    let msg = format!("{:}", err);
+    let msg = format!("{}", err);
     for ignore in ignores.iter() {
         if msg.contains(ignore) {
-            return Ok(());
+            return TransactionalResult::IgnoredErr(msg);
         }
     }
     if msg.contains("error[E") || msg.contains("error:") || msg.contains("bug") {
         // Raise an error with the name of the experiment
-        Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("error with experiment: {:?}, {:?}", name, err),
-        )))
+        TransactionalResult::Err(format!("error with experiment: {:?}, {}", name, err))
     } else {
-        Ok(())
+        TransactionalResult::WarningsOnly
     }
 }
 #[cfg(test)]

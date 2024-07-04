@@ -73,6 +73,8 @@ def get_run_name(f: Path):
 
 def extract_date(fpath: Path):
     base_name = get_run_name(fpath)
+    if base_name == "running":
+        return datetime.now()
     date_part = base_name.split("-")[:2]  # Extract the month and day part
     date_str = "-".join(date_part)
     return datetime.strptime(date_str, "%b-%d")
