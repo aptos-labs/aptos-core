@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::utils::truncation_helper::{truncate_ledger_db, truncate_state_kv_db_shards};
+use crate::utils::truncation_helper::{truncate_ledger_db, truncate_state_kv_db_shards, truncate_state_merkle_db};
 
 impl DbWriter for AptosDB {
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
@@ -223,12 +223,22 @@ impl DbWriter for AptosDB {
         // concurrent readers would use for the latest ledger info.
         self.pre_revert(latest_version, &ledger_info_with_sigs);
 
+        // Lock buffered state in the state store
+        let state_lock = self.state_store.reset_lock();
+
         // Update the provided ledger info and the overall commit progress
         let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
         self.commit_ledger_info(target_version, new_root_hash, Some(&ledger_info_with_sigs))?;
 
         truncate_ledger_db(self.ledger_db.clone(), target_version)?;
-        truncate_state_kv_db_shards(&self.state_kv_db, target_version)?;
+        truncate_state_kv_db_shards(
+            &self.state_store.state_kv_db,
+            target_version,
+        )?;
+        truncate_state_merkle_db(&self.state_store.state_merkle_db, target_version)?;
+
+        // Reset buffered state after truncation
+        state_lock.reset();
 
         // Revert block index if event index is skipped.
         if self.skip_index_and_usage {
