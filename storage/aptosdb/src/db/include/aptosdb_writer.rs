@@ -217,6 +217,9 @@ impl DbWriter for AptosDB {
         // concurrent readers would use for the latest ledger info.
         self.pre_revert(latest_version, &ledger_info_with_sigs);
 
+        // Lock buffered state in the state store
+        let state_lock = self.state_store.reset_lock();
+
         // Update the provided ledger info and the overall commit progress
         let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
         self.commit_ledger_info(target_version, new_root_hash, Some(&ledger_info_with_sigs))?;
@@ -231,7 +234,7 @@ impl DbWriter for AptosDB {
         truncate_state_merkle_db(&self.state_store.state_merkle_db, target_version)?;
 
         // Reset buffered state after truncation
-        self.state_store.reset();
+        state_lock.reset();
 
         // Revert block index if event index is skipped.
         if self.skip_index_and_usage {
