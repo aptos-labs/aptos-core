@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_observer::logging::{LogEntry, LogSchema};
+use crate::consensus_observer::{
+    logging::{LogEntry, LogSchema},
+    metrics,
+};
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -104,6 +107,18 @@ impl BlockPayloadStore {
         for block in blocks.iter() {
             block_transaction_payloads.remove(&block.id());
         }
+    }
+
+    /// Updates the metrics for the payload store
+    pub fn update_payload_store_metrics(&self) {
+        // Update the number of block transaction payloads
+        let block_transaction_payloads = self.block_transaction_payloads.lock();
+        let num_payloads = block_transaction_payloads.len() as u64;
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
+            metrics::STORED_PAYLOADS_LABEL,
+            num_payloads,
+        );
     }
 }
 

@@ -63,6 +63,9 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
+// Whether to log messages at the info level (useful for debugging)
+const LOG_MESSAGES_AT_INFO_LEVEL: bool = false;
+
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
     // The configuration of the consensus observer
@@ -443,14 +446,21 @@ impl ConsensusObserver {
 
     /// Processes the block payload message
     async fn process_block_payload_message(&mut self, block_payload: BlockPayload) {
-        // Unpack the block round and epoch
+        // Get the block round and epoch
         let block = block_payload.block;
         let block_round = block.round();
         let block_epoch = block.epoch();
 
-        // Unpack the block payload
+        // Get the block transactions and limit
         let transactions = block_payload.transactions;
         let limit = block_payload.limit;
+
+        // Update the metrics for the received block payload
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
+            metrics::BLOCK_PAYLOAD_LABEL,
+            block_round,
+        );
 
         // TODO: verify the block payload!
 
@@ -472,6 +482,13 @@ impl ConsensusObserver {
 
     /// Processes the commit decision message
     fn process_commit_decision_message(&mut self, commit_decision: CommitDecision) {
+        // Update the metrics for the received commit decision
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
+            metrics::COMMIT_DECISION_LABEL,
+            commit_decision.round(),
+        );
+
         // If the commit decision is for the current epoch, verify it
         let commit_decision_epoch = commit_decision.epoch();
         if commit_decision_epoch == self.get_epoch_state().epoch {
@@ -609,35 +626,44 @@ impl ConsensusObserver {
         // Process the message based on the type
         match message {
             ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
-                debug!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Received ordered block: {}, from peer: {}!",
-                        ordered_block.ordered_proof.commit_info(),
-                        peer_network_id
-                    ))
+                // Log the received ordered block message
+                let log_message = format!(
+                    "Received ordered block: {}, from peer: {}!",
+                    ordered_block.ordered_proof.commit_info(),
+                    peer_network_id
                 );
+                log_received_message(log_message);
+
+                // Process the ordered block message
                 self.process_ordered_block_message(ordered_block).await;
             },
             ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
-                debug!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Received commit decision: {}, from peer: {}!",
-                        commit_decision.ledger_info().commit_info(),
-                        peer_network_id
-                    ))
+                // Log the received commit decision message
+                let log_message = format!(
+                    "Received commit decision: {}, from peer: {}!",
+                    commit_decision.ledger_info().commit_info(),
+                    peer_network_id
                 );
+                log_received_message(log_message);
+
+                // Process the commit decision message
                 self.process_commit_decision_message(commit_decision);
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
-                debug!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Received block payload: {}, from peer: {}!",
-                        block_payload.block, peer_network_id
-                    ))
+                // Log the received block payload message
+                let log_message = format!(
+                    "Received block payload: {}, from peer: {}!",
+                    block_payload.block, peer_network_id
                 );
+                log_received_message(log_message);
+
+                // Process the block payload message
                 self.process_block_payload_message(block_payload).await;
             },
         }
+
+        // Update the metrics for the processed blocks
+        self.update_processed_blocks_metrics();
     }
 
     /// Processes the ordered block message
@@ -647,6 +673,15 @@ impl ConsensusObserver {
             blocks,
             ordered_proof,
         } = ordered_block.clone();
+
+        // Update the metrics for the received ordered block
+        if let Some(last_block) = blocks.last() {
+            metrics::set_gauge_with_label(
+                &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
+                metrics::ORDERED_MESSAGE_LABEL,
+                last_block.round(),
+            );
+        }
 
         // Verify the ordered blocks before processing
         if let Err(error) = self.verify_ordered_blocks(&blocks, &ordered_proof) {
@@ -892,6 +927,18 @@ impl ConsensusObserver {
                 },
             }
         });
+    }
+
+    /// Updates the metrics for the processed blocks
+    fn update_processed_blocks_metrics(&self) {
+        // Update the missing block metrics
+        self.missing_block_store.update_missing_blocks_metrics();
+
+        // Update the payload store metrics
+        self.block_payload_store.update_payload_store_metrics();
+
+        // Update the pending block metrics
+        self.pending_ordered_blocks.update_pending_blocks_metrics();
     }
 
     /// Updates the subscription creation metrics for the given peer
@@ -1256,6 +1303,17 @@ async fn extract_on_chain_configs(
         execution_config,
         onchain_randomness_config,
     )
+}
+
+/// Logs the received message using an appropriate log level
+fn log_received_message(message: String) {
+    // Log the message at the appropriate level
+    let log_schema = LogSchema::new(LogEntry::ConsensusObserver).message(&message);
+    if LOG_MESSAGES_AT_INFO_LEVEL {
+        info!(log_schema);
+    } else {
+        debug!(log_schema);
+    }
 }
 
 /// Spawns a task to sync to the given commit decision and notifies

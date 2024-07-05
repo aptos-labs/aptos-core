@@ -3,6 +3,7 @@
 
 use crate::consensus_observer::{
     logging::{LogEntry, LogSchema},
+    metrics,
     network_message::OrderedBlock,
 };
 use aptos_config::config::ConsensusObserverConfig;
@@ -151,6 +152,51 @@ impl PendingOrderedBlocks {
         {
             *existing_commit_decision = Some(commit_decision.clone());
         }
+    }
+
+    /// Updates the metrics for the pending blocks
+    pub fn update_pending_blocks_metrics(&self) {
+        // Update the number of verified pending blocks
+        let verified_pending_blocks = self.verified_pending_blocks.lock();
+        let num_verified_blocks = verified_pending_blocks.len() as u64;
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
+            metrics::VERIFIED_PENDING_BLOCKS_LABEL,
+            num_verified_blocks,
+        );
+
+        // Update the highest round for the verified pending blocks
+        let highest_verified_round = verified_pending_blocks
+            .last_key_value()
+            .map(|(_, (ordered_block, _))| ordered_block.blocks.last())
+            .and_then(|last_block| last_block.map(|block| block.round()))
+            .unwrap_or(0);
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
+            metrics::VERIFIED_PENDING_BLOCKS_LABEL,
+            highest_verified_round,
+        );
+
+        // Update the number of unverified pending blocks
+        let unverified_pending_blocks = self.unverified_pending_blocks.lock();
+        let num_unverified_blocks = unverified_pending_blocks.len() as u64;
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
+            metrics::UNVERIFIED_PENDING_BLOCKS_LABEL,
+            num_unverified_blocks,
+        );
+
+        // Update the highest round for the unverified pending blocks
+        let highest_unverified_round = unverified_pending_blocks
+            .last_key_value()
+            .map(|(_, (ordered_block, _))| ordered_block.blocks.last())
+            .and_then(|last_block| last_block.map(|block| block.round()))
+            .unwrap_or(0);
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
+            metrics::UNVERIFIED_PENDING_BLOCKS_LABEL,
+            highest_unverified_round,
+        );
     }
 
     /// Verifies the pending blocks against the given epoch state.
