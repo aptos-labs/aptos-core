@@ -385,11 +385,11 @@ impl DbReader for AptosDB {
 
     /// Gets ledger info at specified version and ensures it's an epoch ending.
     fn get_epoch_ending_ledger_info(&self, version: u64) -> Result<LedgerInfoWithSignatures> {
-        gauged_api("get_epoch_ending_ledger_info", || {
+        //gauged_api("get_epoch_ending_ledger_info", || {
             self.ledger_db
                 .metadata_db()
                 .get_epoch_ending_ledger_info(version)
-        })
+        //})
     }
 
     fn get_state_proof_with_ledger_info(
@@ -397,7 +397,7 @@ impl DbReader for AptosDB {
         known_version: u64,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> Result<StateProof> {
-        gauged_api("get_state_proof_with_ledger_info", || {
+        //gauged_api("get_state_proof_with_ledger_info", || {
             let ledger_info = ledger_info_with_sigs.ledger_info();
             ensure!(
                 known_version <= ledger_info.version(),
@@ -416,14 +416,14 @@ impl DbReader for AptosDB {
             };
 
             Ok(StateProof::new(ledger_info_with_sigs, epoch_change_proof))
-        })
+        //})
     }
 
     fn get_state_proof(&self, known_version: u64) -> Result<StateProof> {
-        gauged_api("get_state_proof", || {
+        //gauged_api("get_state_proof", || {
             let ledger_info_with_sigs = self.ledger_db.metadata_db().get_latest_ledger_info()?;
             self.get_state_proof_with_ledger_info(known_version, ledger_info_with_sigs)
-        })
+        //})
     }
 
     fn get_state_value_by_version(
@@ -431,12 +431,12 @@ impl DbReader for AptosDB {
         state_store_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        gauged_api("get_state_value_by_version", || {
+        //gauged_api("get_state_value_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             self.state_store
                 .get_state_value_by_version(state_store_key, version)
-        })
+        //})
     }
 
     fn get_state_value_with_version_by_version(
@@ -444,12 +444,12 @@ impl DbReader for AptosDB {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        gauged_api("get_state_value_with_version_by_version", || {
+        //gauged_api("get_state_value_with_version_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             self.state_store
                 .get_state_value_with_version_by_version(state_key, version)
-        })
+        //})
     }
 
     /// Returns the proof of the given state key and version.
@@ -459,12 +459,12 @@ impl DbReader for AptosDB {
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
-        gauged_api("get_state_proof_by_version_ext", || {
+        //gauged_api("get_state_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
             self.state_store
                 .get_state_proof_by_version_ext(state_key, version, root_depth)
-        })
+        //})
     }
 
     fn get_state_value_with_proof_by_version_ext(
@@ -473,12 +473,12 @@ impl DbReader for AptosDB {
         version: Version,
         root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        gauged_api("get_state_value_with_proof_by_version_ext", || {
+        //gauged_api("get_state_value_with_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
             self.state_store
                 .get_state_value_with_proof_by_version_ext(state_store_key, version, root_depth)
-        })
+        //})
     }
 
     fn get_latest_epoch_state(&self) -> Result<EpochState> {

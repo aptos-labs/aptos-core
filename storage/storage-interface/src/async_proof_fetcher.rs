@@ -124,9 +124,9 @@ impl AsyncProofFetcher {
         subtree_root_hash: Option<HashValue>,
         value_hash: Option<HashValue>,
     ) {
-        let _timer = TIMER
-            .with_label_values(&["schedule_async_proof_read"])
-            .start_timer();
+        // let _timer = TIMER
+        //     .with_label_values(&["schedule_async_proof_read"])
+        //     .start_timer();
         self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
         let reader = self.reader.clone();
         let data_sender = self.data_sender.clone();
