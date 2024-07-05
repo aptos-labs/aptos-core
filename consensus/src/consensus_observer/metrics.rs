@@ -9,7 +9,13 @@ use aptos_metrics_core::{
 use once_cell::sync::Lazy;
 
 // Useful metric labels
+pub const BLOCK_PAYLOAD_LABEL: &str = "block_payload";
+pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
+pub const MISSING_BLOCKS_LABEL: &str = "missing_blocks";
+pub const ORDERED_MESSAGE_LABEL: &str = "ordered_message";
+pub const PENDING_ORDERED_BLOCKS_LABEL: &str = "pending_ordered_blocks";
+pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
 
 /// Counter for tracking created subscriptions for the consensus observer
 pub static OBSERVER_CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -21,12 +27,32 @@ pub static OBSERVER_CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counter for tracking the number of active subscriptions for the consensus observer
+/// Gauge for tracking the number of active subscriptions for the consensus observer
 pub static OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "consensus_observer_num_active_subscriptions",
         "Gauge related to active subscriptions for the consensus observer",
         &["network_id"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the number of processed blocks by the consensus observer
+pub static OBSERVER_NUM_PROCESSED_BLOCKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_num_processed_blocks",
+        "Gauge for tracking the number of processed blocks by the consensus observer",
+        &["processed_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the processed block rounds by the consensus observer
+pub static OBSERVER_PROCESSED_BLOCK_ROUNDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_processed_block_rounds",
+        "Gauge for tracking the processed block rounds by the consensus observer",
+        &["processed_type"]
     )
     .unwrap()
 });
@@ -47,6 +73,16 @@ pub static OBSERVER_RECEIVED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
         "consensus_observer_received_messages",
         "Counters related to received (direct send) messages by the consensus observer",
         &["message_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the rounds of received messages by the consensus observer
+pub static OBSERVER_RECEIVED_MESSAGE_ROUNDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_received_message_rounds",
+        "Gauge for tracking the rounds of received messages by the consensus observer",
+        &["message_type"]
     )
     .unwrap()
 });
@@ -101,7 +137,7 @@ pub static PENDING_CONSENSUS_OBSERVER_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy
     .unwrap()
 });
 
-/// Counter for tracking the number of active subscribers for the consensus publisher
+/// Gauge for tracking the number of active subscribers for the consensus publisher
 pub static PUBLISHER_NUM_ACTIVE_SUBSCRIBERS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "consensus_publisher_num_active_subscribers",
@@ -166,7 +202,12 @@ pub fn observe_value_with_label(
         .observe(value)
 }
 
-/// Sets the gauge with the specific label and value
+/// Sets the gauge with the specific network ID and value
 pub fn set_gauge(counter: &Lazy<IntGaugeVec>, network_id: &NetworkId, value: i64) {
     counter.with_label_values(&[network_id.as_str()]).set(value);
+}
+
+/// Sets the gauge with the specific label and value
+pub fn set_gauge_with_label(counter: &Lazy<IntGaugeVec>, label: &str, value: u64) {
+    counter.with_label_values(&[label]).set(value as i64);
 }
