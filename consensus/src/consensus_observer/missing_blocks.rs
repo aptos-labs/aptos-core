@@ -3,6 +3,7 @@
 
 use crate::consensus_observer::{
     logging::{LogEntry, LogSchema},
+    metrics,
     network_message::OrderedBlock,
     payload_store::BlockPayloadStore,
 };
@@ -124,6 +125,29 @@ impl MissingBlockStore {
 
         // Return the ready block (if one exists)
         ready_block
+    }
+
+    /// Updates the metrics for the missing blocks
+    pub fn update_missing_blocks_metrics(&self) {
+        // Update the number of missing blocks
+        let blocks_missing_payloads = self.blocks_missing_payloads.lock();
+        let num_missing_blocks = blocks_missing_payloads.len() as u64;
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
+            metrics::MISSING_BLOCKS_LABEL,
+            num_missing_blocks,
+        );
+
+        // Update the highest round for the missing blocks
+        let highest_missing_round = blocks_missing_payloads
+            .last_key_value()
+            .map(|(_, missing_block)| missing_block.last_block().round())
+            .unwrap_or(0);
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
+            metrics::MISSING_BLOCKS_LABEL,
+            highest_missing_round,
+        );
     }
 }
 

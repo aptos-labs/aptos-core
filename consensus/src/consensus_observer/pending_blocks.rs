@@ -3,6 +3,7 @@
 
 use crate::consensus_observer::{
     logging::{LogEntry, LogSchema},
+    metrics,
     network_message::{CommitDecision, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
@@ -150,6 +151,30 @@ impl PendingOrderedBlocks {
                 );
             }
         }
+    }
+
+    /// Updates the metrics for the pending blocks
+    pub fn update_pending_blocks_metrics(&self) {
+        // Update the number of pending blocks
+        let num_pending_blocks = self.pending_blocks.lock().len() as u64;
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
+            metrics::PENDING_ORDERED_BLOCKS_LABEL,
+            num_pending_blocks,
+        );
+
+        // Update the highest round for the pending blocks
+        let highest_pending_round = self
+            .pending_blocks
+            .lock()
+            .last_key_value()
+            .map(|(_, (ordered_block, _, _))| ordered_block.last_block().round())
+            .unwrap_or(0);
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
+            metrics::PENDING_ORDERED_BLOCKS_LABEL,
+            highest_pending_round,
+        );
     }
 
     /// Verifies the pending blocks against the given epoch state.
