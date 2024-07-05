@@ -1258,8 +1258,7 @@ module supra_framework::pbo_delegation_pool {
     }
 
     /// Add `amount` of coins to the delegation pool `pool_address`.
-    /// TODO After initialization amount
-    fun add_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+    public fun add_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         // short-circuit if amount to add is 0 so no event is emitted
         if (amount == 0) { return };
         // synchronize delegation and stake pools before any user operation
@@ -4692,5 +4691,39 @@ module supra_framework::pbo_delegation_pool {
         // There is fee apply when unlock stake
         unlock(delegator1, pool_address, 200 * ONE_APT);
         unlock(delegator1, pool_address, 600 * ONE_APT);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
+    #[expected_failure(abort_code=65561, location = Self)]
+    public entry fun test_multiple_users(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator1: &signer,
+        delegator2: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        let delegator_address = vector[@0x010];
+        let principle_stake = vector[1000 * ONE_APT];
+        let coin = stake::mint_coins(1000 * ONE_APT);
+        let principle_lockup_time = 1000000;
+        let delegator1_address = signer::address_of(delegator1);
+        let delegator2_address = signer::address_of(delegator2);
+        aptos_account::create_account(delegator1_address);
+        aptos_account::create_account(delegator2_address);
+        initialize_test_validator(validator, 0, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+        stake::mint(delegator1, 1000 * ONE_APT);
+        add_stake(delegator1, pool_address, 1000 * ONE_APT);
+        stake::mint(delegator2, 1000 * ONE_APT);
+        add_stake(delegator2, pool_address, 1000 * ONE_APT);
+        end_aptos_epoch();
+        assert_delegation(delegator2_address, pool_address, 1000 * ONE_APT, 0, 0);
+        assert_delegation(delegator1_address, pool_address, 200999999999, 0, 0);
+        unlock(delegator2, pool_address, 1000 * ONE_APT);
+        assert_delegation(delegator2_address, pool_address, 0, 0, 1000 * ONE_APT);
+        unlock(delegator1, pool_address, 1000 * ONE_APT);
+        assert_delegation(delegator1_address, pool_address, 101000000001, 0, 99999999999);
+        unlock(delegator1, pool_address, 1000 * ONE_APT);
     }
 }
