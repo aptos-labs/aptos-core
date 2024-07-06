@@ -1,21 +1,47 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::Test {
     use std::vector;
+    public inline fun filter<X>(v: &mut vector<#0>,predicate: |&#0|bool) {
+        {
+          let i: u64 = 0;
+          loop {
+            if spec {
+              invariant forall k: num: Range(0, i): Not((predicate)(Index($t0, k)));
+            }
+            ;
+            Lt<u64>(i, vector::length<X>(Freeze(false)(v))) {
+              if (predicate)(vector::borrow<X>(Freeze(false)(v), i)) {
+                vector::swap_remove<X>(v, i);
+                Tuple()
+              } else {
+                i: u64 = Add<u64>(i, 1);
+                Tuple()
+              };
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
     public fun test_filter(): vector<u64> {
         {
-          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          let v: vector<u64> = [Number(1), Number(2), Number(3)];
           {
-            let (v: &mut vector<u64>) = Tuple(Borrow(Mutable)(v));
+            let (v: &mut vector<u64>): (&mut vector<u64>) = Tuple(Borrow(Mutable)(v));
             {
               let i: u64 = 0;
               loop {
                 if spec {
-                  invariant forall k: num: Range(0, i): Not((predicate)(Index($t0, k)));
+                  invariant forall k: num: Range(0, i): Not({
+                  let (e: &u64): (&u64) = Tuple(Index(v, k));
+                  Gt<u64>(e, 1)
+                });
                 }
                 ;
-                Lt<u64>(i, vector::length<u64>(v)) {
+                Lt<u64>(i, vector::length<u64>(Freeze(false)(v))) {
                   if {
-                    let (e: &u64) = Tuple(vector::borrow<u64>(v, i));
+                    let (e: &u64): (&u64) = Tuple(vector::borrow<u64>(Freeze(false)(v), i));
                     Gt<u64>(Deref(e), 1)
                   } {
                     vector::swap_remove<u64>(v, i);
@@ -34,6 +60,10 @@ module 0x42::Test {
           v
         }
     }
-    spec fun $filter<X>(v: &mut vector<#0>,predicate: |&#0|bool);
-    spec fun $test_filter(): vector<u64>;
+    spec {
+    }
+
 } // end 0x42::Test
+
+
+============ bytecode verification succeeded ========
