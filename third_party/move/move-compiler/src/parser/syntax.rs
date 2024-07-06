@@ -2621,6 +2621,7 @@ fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Bo
 //      StructDecl =
 //          native struct <StructDefName> <Abilities>? ";"
 //        | "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}"
+//        | "struct" <StructDefName> <Abilities>? "(" Comma<Type> ")" ";"
 //        | "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}"
 //      StructDefName =
 //          <Identifier> <OptionalTypeParameters>
@@ -2722,13 +2723,19 @@ fn parse_struct_decl(
                 consume_token(context.tokens, Tok::RBrace)?;
                 StructLayout::Variants(list)
             } else {
-                let list = parse_comma_list(
-                    context,
-                    Tok::LBrace,
-                    Tok::RBrace,
-                    parse_field_annot,
-                    "a field",
-                )?;
+                let list = if context.tokens.peek() == Tok::LParen {
+                    let list = parse_anonymous_fields(context)?;
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    list
+                } else {
+                    parse_comma_list(
+                        context,
+                        Tok::LBrace,
+                        Tok::RBrace,
+                        parse_field_annot,
+                        "a field",
+                    )?
+                };
                 StructLayout::Singleton(list)
             }
         },
@@ -2767,6 +2774,8 @@ fn parse_struct_variant(context: &mut Context) -> Result<(StructVariant, bool), 
             )?,
             true,
         )
+    } else if context.tokens.peek() == Tok::LParen {
+        (parse_anonymous_fields(context)?, true)
     } else {
         (vec![], false)
     };
@@ -2794,6 +2803,28 @@ fn parse_field_annot(context: &mut Context) -> Result<(Field, Type), Box<Diagnos
     consume_token(context.tokens, Tok::Colon)?;
     let st = parse_type(context)?;
     Ok((f, st))
+}
+
+/// Parse a comma list of types surrounded by parenthesis into a vector of `(Field, Type)` pairs
+/// where the fields are named "0", "1", ... with location the location of the type in the second field
+fn parse_anonymous_fields(context: &mut Context) -> Result<Vec<(Field, Type)>, Box<Diagnostic>> {
+    let field_types = parse_comma_list(
+        context,
+        Tok::LParen,
+        Tok::RParen,
+        parse_type,
+        "a field type",
+    )?;
+    Ok(field_types
+        .into_iter()
+        .enumerate()
+        .map(|(field_offset, st)| {
+            let field_name_ = Symbol::from(field_offset.to_string());
+            let field_name = Spanned::new(st.loc, field_name_);
+            let field = Field(field_name);
+            (field, st)
+        })
+        .collect())
 }
 
 //**************************************************************************************************
