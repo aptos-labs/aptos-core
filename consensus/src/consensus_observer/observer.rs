@@ -29,9 +29,12 @@ use crate::{
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::{
-    pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
+    common::{BatchPayload, ProofWithData},
+    pipeline::commit_decision::CommitDecision,
+    pipelined_block::PipelinedBlock,
+    proof_of_store::{BatchInfo, ProofCache},
 };
-use aptos_crypto::{bls12381, Genesis};
+use aptos_crypto::{bls12381, hash::CryptoHash, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, info, warn};
@@ -51,6 +54,7 @@ use aptos_types::{
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
         RandomnessConfigMoveStruct, ValidatorSet,
     },
+    transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
 };
 use futures::{
@@ -59,7 +63,11 @@ use futures::{
 };
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
@@ -131,7 +139,7 @@ impl ConsensusObserver {
             epoch_state: None,
             quorum_store_enabled: false, // Updated on epoch changes
             root: Arc::new(Mutex::new(root)),
-            block_payload_store: BlockPayloadStore::new(),
+            block_payload_store: BlockPayloadStore::new(consensus_observer_config),
             missing_block_store: MissingBlockStore::new(consensus_observer_config),
             pending_ordered_blocks: PendingOrderedBlocks::new(consensus_observer_config),
             execution_client,
@@ -160,6 +168,17 @@ impl ConsensusObserver {
     async fn check_progress(&mut self) {
         debug!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("Checking consensus observer progress!"));
+
+        // If we're in state sync mode, we should wait for state sync to complete
+        if self.in_state_sync_mode() {
+            info!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Waiting for state sync to reach target: {:?}!",
+                    self.root.lock().commit_info()
+                ))
+            );
+            return;
+        }
 
         // Get the peer ID of the currently active subscription (if any)
         let active_subscription_peer = self
@@ -195,8 +214,12 @@ impl ConsensusObserver {
             self.create_new_observer_subscription(active_subscription_peer)
                 .await;
 
-            // If we successfully created a new subscription, update the subscription creation metrics
+            // If we successfully created a new subscription, clear the state and update the metrics
             if let Some(active_subscription) = &self.active_observer_subscription {
+                // Clear the block state
+                self.clear_pending_block_state().await;
+
+                // Update the subscription creation metrics
                 self.update_subscription_creation_metrics(
                     active_subscription.get_peer_network_id(),
                 );
@@ -226,8 +249,7 @@ impl ConsensusObserver {
             // Verify the subscription has not timed out
             active_subscription.check_subscription_timeout()?;
 
-            // Verify that the DB is continuing to sync and commit new data.
-            // Note: we should only do this if we're not waiting for state sync.
+            // Verify that the DB is continuing to sync and commit new data
             active_subscription.check_syncing_progress()?;
 
             // Verify that the subscription peer is optimal
@@ -242,6 +264,30 @@ impl ConsensusObserver {
         Ok(())
     }
 
+    /// Clears the pending block state (this is useful for changing
+    /// subscriptions, where we want to wipe all state and restart).
+    async fn clear_pending_block_state(&self) {
+        // Clear the missing blocks
+        self.missing_block_store.clear_missing_blocks();
+
+        // Clear the payload store
+        self.block_payload_store.clear_all_payloads();
+
+        // Clear the pending blocks
+        self.pending_ordered_blocks.clear_all_pending_blocks();
+
+        // Reset the execution pipeline for the root
+        let root = self.root.lock().clone();
+        if let Err(error) = self.execution_client.reset(&root).await {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to reset the execution pipeline for the root! Error: {:?}",
+                    error
+                ))
+            );
+        }
+    }
+
     /// Creates and returns a commit callback (to be called after the execution pipeline)
     fn create_commit_callback(&self) -> StateComputerCommitCallBackType {
         // Clone the root, pending blocks and payload store
@@ -251,10 +297,8 @@ impl ConsensusObserver {
 
         // Create the commit callback
         Box::new(move |blocks, ledger_info: LedgerInfoWithSignatures| {
-            // Remove the committed blocks from the payload store
-            block_payload_store.remove_blocks(blocks);
-
-            // Remove the committed blocks from the pending blocks
+            // Remove the committed blocks from the payload and pending stores
+            block_payload_store.remove_committed_blocks(blocks);
             pending_ordered_blocks.remove_blocks_for_commit(&ledger_info);
 
             // Verify the ledger info is for the same epoch
@@ -458,16 +502,18 @@ impl ConsensusObserver {
         }
     }
 
+    /// Returns true iff we are waiting for state sync to complete
+    fn in_state_sync_mode(&self) -> bool {
+        self.sync_handle.is_some()
+    }
+
     /// Processes the block payload message
     async fn process_block_payload_message(&mut self, block_payload: BlockPayload) {
-        // Get the block round and epoch
+        // Get the block, round, epoch and transaction payload
         let block = block_payload.block;
         let block_round = block.round();
         let block_epoch = block.epoch();
-
-        // Get the block transactions and limit
-        let transactions = block_payload.transactions;
-        let limit = block_payload.limit;
+        let transaction_payload = block_payload.transaction_payload;
 
         // Update the metrics for the received block payload
         metrics::set_gauge_with_label(
@@ -476,11 +522,43 @@ impl ConsensusObserver {
             block_round,
         );
 
-        // TODO: verify the block payload!
+        // Verify the block payload digests
+        if let Err(error) = self.verify_payload_digests(
+            &transaction_payload.transactions,
+            &transaction_payload.proof_with_data,
+            &transaction_payload.inline_batches,
+        ) {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify block payload digests! Ignoring block: {:?}. Error: {:?}",
+                    block, error
+                ))
+            );
+            return;
+        }
+
+        // If the payload is for the current epoch, verify the proof signatures
+        let verified_payload = if block.epoch() == self.get_epoch_state().epoch {
+            // Verify the block proof signatures
+            if let Err(error) = self.verify_payload_signatures(&transaction_payload.proof_with_data)
+            {
+                error!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Failed to verify block payload signatures! Ignoring block: {:?}. Error: {:?}",
+                        block, error
+                    ))
+                );
+                return;
+            }
+
+            true // We have successfully verified the signatures
+        } else {
+            false // We can't verify the signatures yet
+        };
 
         // Update the payload store with the payload
         self.block_payload_store
-            .insert_block_payload(block, transactions, limit);
+            .insert_block_payload(block, transaction_payload, verified_payload);
 
         // Check if there are blocks that were missing payloads
         // but are now ready because of the new payload.
@@ -503,7 +581,7 @@ impl ConsensusObserver {
             commit_decision.round(),
         );
 
-        // If the commit decision is for the current epoch, verify it
+        // If the commit decision is for the current epoch, verify and process it
         let commit_decision_epoch = commit_decision.epoch();
         if commit_decision_epoch == self.get_epoch_state().epoch {
             // Verify the commit decision
@@ -533,6 +611,20 @@ impl ConsensusObserver {
         let last_block = self.get_last_block();
         if commit_decision_epoch > last_block.epoch() || commit_decision_round > last_block.round()
         {
+            // If we're already in state sync mode, we should wait. This
+            // avoids sending multiple state sync requests concurrently.
+            if self.in_state_sync_mode() {
+                info!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Waiting for state sync to get to target: {:?}. Dropping commit decision: {:?}!",
+                        self.root.lock().commit_info(),
+                        commit_decision.ledger_info().commit_info()
+                    ))
+                );
+                return;
+            }
+
+            // Otherwise, we can start the state sync process
             info!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Started syncing to {}!",
@@ -540,8 +632,12 @@ impl ConsensusObserver {
                 ))
             );
 
-            // Update the root and clear the pending blocks (up to the commit)
+            // Update the root
             *self.root.lock() = commit_decision.ledger_info().clone();
+
+            // Remove the payloads and blocks (up to the commit)
+            self.block_payload_store
+                .remove_blocks_for_epoch_round(commit_decision_epoch, commit_decision_round);
             self.pending_ordered_blocks
                 .remove_blocks_for_commit(commit_decision.ledger_info());
 
@@ -577,7 +673,7 @@ impl ConsensusObserver {
                     .update_commit_decision(commit_decision);
 
                 // If we are not in sync mode, forward the commit decision to the execution pipeline
-                if self.sync_handle.is_none() {
+                if !self.in_state_sync_mode() {
                     debug!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                             "Forwarding commit decision to the execution pipeline: {}",
@@ -751,7 +847,7 @@ impl ConsensusObserver {
                 .insert_ordered_block(ordered_block, verified_ordered_proof);
 
             // If we verified the proof, and we're not in sync mode, finalize the ordered blocks
-            if verified_ordered_proof && self.sync_handle.is_none() {
+            if verified_ordered_proof && !self.in_state_sync_mode() {
                 debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Forwarding blocks to the execution pipeline: {}",
@@ -829,6 +925,10 @@ impl ConsensusObserver {
             // Wait for the next epoch to start
             self.execution_client.end_epoch().await;
             self.wait_for_epoch_start().await;
+
+            // Verify the block payloads for the new epoch
+            self.block_payload_store
+                .verify_payload_signatures(&self.get_epoch_state());
 
             // Verify the pending blocks for the new epoch
             self.pending_ordered_blocks
@@ -990,6 +1090,56 @@ impl ConsensusObserver {
         );
     }
 
+    /// Verifies the block payload digests and returns an error if the data is invalid
+    fn verify_payload_digests(
+        &self,
+        transactions: &[SignedTransaction],
+        proof_with_data: &ProofWithData,
+        inline_batches: &[BatchInfo],
+    ) -> Result<(), Error> {
+        // Verify the proof of store digests against the transactions
+        let mut transactions = transactions.iter().cloned().collect::<VecDeque<_>>();
+        for proof_of_store in &proof_with_data.proofs {
+            reconstruct_and_verify_batch(&mut transactions, proof_of_store.info())?;
+        }
+
+        // Verify the inline batch digests against the inline batches
+        for batch_info in inline_batches {
+            reconstruct_and_verify_batch(&mut transactions, batch_info)?;
+        }
+
+        // Verify that there are no transactions remaining
+        if !transactions.is_empty() {
+            return Err(Error::InvalidMessageError(format!(
+                "Failed to verify payload transactions! Transactions remaining: {:?}. Expected: 0",
+                transactions.len()
+            )));
+        }
+
+        Ok(()) // All digests match
+    }
+
+    /// Verifies that the block payload proofs are correctly signed according
+    /// to the current epoch state. Returns an error if the data is invalid.
+    fn verify_payload_signatures(&self, proof_with_data: &ProofWithData) -> Result<(), Error> {
+        // Create a dummy proof cache to verify the proofs
+        let proof_cache = ProofCache::new(1);
+
+        // Verify each of the proof signatures
+        let validator_verifier = &self.get_epoch_state().verifier;
+        for proof_of_store in &proof_with_data.proofs {
+            if let Err(error) = proof_of_store.verify(validator_verifier, &proof_cache) {
+                return Err(Error::InvalidMessageError(format!(
+                    "Failed to verify the proof of store for batch: {:?}, Error: {:?}",
+                    proof_of_store.info(),
+                    error
+                )));
+            }
+        }
+
+        Ok(()) // All proofs are correctly signed
+    }
+
     /// Verifies the commit decision and returns an error if the decision is invalid
     fn verify_commit_decision(&self, commit_decision: &CommitDecision) -> Result<(), Error> {
         self.get_epoch_state()
@@ -1089,7 +1239,7 @@ impl ConsensusObserver {
         // Create the payload manager
         let payload_manager = if self.quorum_store_enabled {
             PayloadManager::ConsensusObserver(
-                self.block_payload_store.get_block_payloads(),
+                self.block_payload_store.get_verified_block_payloads(),
                 self.consensus_publisher.clone(),
             )
         } else {
@@ -1326,6 +1476,44 @@ fn log_received_message(message: String) {
     } else {
         debug!(log_schema);
     }
+}
+
+/// Reconstructs and verifies the batch using the
+/// given transactions and the expected batch info.
+fn reconstruct_and_verify_batch(
+    transactions: &mut VecDeque<SignedTransaction>,
+    expected_batch_info: &BatchInfo,
+) -> Result<(), Error> {
+    // Gather the transactions for the batch
+    let mut batch_transactions = vec![];
+    for i in 0..expected_batch_info.num_txns() {
+        let batch_transaction = match transactions.pop_front() {
+            Some(transaction) => transaction,
+            None => {
+                return Err(Error::InvalidMessageError(format!(
+                    "Failed to extract transaction during batch reconstruction! Batch: {:?}, transaction index: {:?}",
+                    expected_batch_info, i
+                )));
+            },
+        };
+        batch_transactions.push(batch_transaction);
+    }
+
+    // Calculate the batch digest
+    let batch_payload = BatchPayload::new(expected_batch_info.author(), batch_transactions);
+    let batch_digest = batch_payload.hash();
+
+    // Verify the reconstructed digest against the expected digest
+    let expected_digest = expected_batch_info.digest();
+    if batch_digest != *expected_digest {
+        return Err(Error::InvalidMessageError(format!(
+            "The reconstructed inline batch digest does not match the expected digest!\
+             Batch: {:?}, Expected digest: {:?}, Reconstructed digest: {:?}",
+            expected_batch_info, expected_digest, batch_digest
+        )));
+    }
+
+    Ok(())
 }
 
 /// Spawns a task to sync to the given commit decision and notifies

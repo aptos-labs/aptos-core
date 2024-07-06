@@ -30,7 +30,7 @@ pub struct ConsensusObserverConfig {
 
     /// Interval (in milliseconds) to garbage collect peer state
     pub garbage_collection_interval_ms: u64,
-    /// Maximum number of pending blocks to keep in memory
+    /// Maximum number of pending blocks to keep in memory (including payloads, ordered blocks, etc.)
     pub max_num_pending_blocks: u64,
     /// Maximum timeout (in milliseconds) for active subscriptions
     pub max_subscription_timeout_ms: u64,

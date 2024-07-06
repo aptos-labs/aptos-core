@@ -14,9 +14,10 @@ pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 pub const MISSING_BLOCKS_LABEL: &str = "missing_blocks";
 pub const ORDERED_MESSAGE_LABEL: &str = "ordered_message";
-pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
 pub const UNVERIFIED_PENDING_BLOCKS_LABEL: &str = "unverified_pending_blocks";
 pub const VERIFIED_PENDING_BLOCKS_LABEL: &str = "verified_pending_blocks";
+pub const VERIFIED_STORED_PAYLOADS_LABEL: &str = "verified_stored_payloads";
+pub const UNVERIFIED_STORED_PAYLOADS_LABEL: &str = "unverified_stored_payloads";
 
 /// Counter for tracking created subscriptions for the consensus observer
 pub static OBSERVER_CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {

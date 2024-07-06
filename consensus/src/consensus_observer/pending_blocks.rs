@@ -40,6 +40,12 @@ impl PendingOrderedBlocks {
         }
     }
 
+    /// Clears all pending blocks (both verified and unverified)
+    pub fn clear_all_pending_blocks(&self) {
+        self.verified_pending_blocks.lock().clear();
+        self.unverified_pending_blocks.lock().clear();
+    }
+
     /// Returns a copy of the verified pending blocks
     pub fn get_all_verified_pending_blocks(
         &self,
@@ -70,8 +76,8 @@ impl PendingOrderedBlocks {
 
     /// Returns the verified pending ordered block (if any)
     pub fn get_verified_pending_block(&self, epoch: u64, round: Round) -> Option<OrderedBlock> {
-        let pending_ordered_blocks = self.verified_pending_blocks.lock();
-        pending_ordered_blocks
+        self.verified_pending_blocks
+            .lock()
             .get(&(epoch, round))
             .map(|(ordered_block, _)| ordered_block.clone())
     }
@@ -89,7 +95,7 @@ impl PendingOrderedBlocks {
         if pending_ordered_blocks.lock().len() >= max_num_pending_blocks {
             warn!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Exceeded the maximum number of pending blocks: {:?}. Block verification: {:?}, block: {:?}.",
+                    "Exceeded the maximum number of pending blocks: {:?}. Block verification: {:?}. Dropping block: {:?}!",
                     max_num_pending_blocks,
                     verified_ordered_proof,
                     ordered_block.ordered_proof.commit_info()
@@ -127,15 +133,14 @@ impl PendingOrderedBlocks {
         let split_off_epoch = commit_ledger_info.ledger_info().epoch();
         let split_off_round = commit_ledger_info.commit_info().round().saturating_add(1);
 
-        // Remove the blocks from the verified pending blocks
-        let mut verified_pending_blocks = self.verified_pending_blocks.lock();
-        *verified_pending_blocks =
-            verified_pending_blocks.split_off(&(split_off_epoch, split_off_round));
-
-        // Remove the blocks from the unverified pending blocks
-        let mut unverified_pending_blocks = self.unverified_pending_blocks.lock();
-        *unverified_pending_blocks =
-            unverified_pending_blocks.split_off(&(split_off_epoch, split_off_round));
+        // Remove the blocks from both the verified and unverified pending blocks
+        for pending_blocks in [
+            self.verified_pending_blocks.clone(),
+            self.unverified_pending_blocks.clone(),
+        ] {
+            let mut pending_blocks = pending_blocks.lock();
+            *pending_blocks = pending_blocks.split_off(&(split_off_epoch, split_off_round));
+        }
     }
 
     /// Updates the commit decision of the pending ordered block (if found).
@@ -157,8 +162,7 @@ impl PendingOrderedBlocks {
     /// Updates the metrics for the pending blocks
     pub fn update_pending_blocks_metrics(&self) {
         // Update the number of verified pending blocks
-        let verified_pending_blocks = self.verified_pending_blocks.lock();
-        let num_verified_blocks = verified_pending_blocks.len() as u64;
+        let num_verified_blocks = self.verified_pending_blocks.lock().len() as u64;
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
             metrics::VERIFIED_PENDING_BLOCKS_LABEL,
@@ -166,11 +170,7 @@ impl PendingOrderedBlocks {
         );
 
         // Update the highest round for the verified pending blocks
-        let highest_verified_round = verified_pending_blocks
-            .last_key_value()
-            .map(|(_, (ordered_block, _))| ordered_block.blocks.last())
-            .and_then(|last_block| last_block.map(|block| block.round()))
-            .unwrap_or(0);
+        let highest_verified_round = get_highest_round(self.verified_pending_blocks.clone());
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
             metrics::VERIFIED_PENDING_BLOCKS_LABEL,
@@ -178,8 +178,7 @@ impl PendingOrderedBlocks {
         );
 
         // Update the number of unverified pending blocks
-        let unverified_pending_blocks = self.unverified_pending_blocks.lock();
-        let num_unverified_blocks = unverified_pending_blocks.len() as u64;
+        let num_unverified_blocks = self.unverified_pending_blocks.lock().len() as u64;
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
             metrics::UNVERIFIED_PENDING_BLOCKS_LABEL,
@@ -187,11 +186,7 @@ impl PendingOrderedBlocks {
         );
 
         // Update the highest round for the unverified pending blocks
-        let highest_unverified_round = unverified_pending_blocks
-            .last_key_value()
-            .map(|(_, (ordered_block, _))| ordered_block.blocks.last())
-            .and_then(|last_block| last_block.map(|block| block.round()))
-            .unwrap_or(0);
+        let highest_unverified_round = get_highest_round(self.unverified_pending_blocks.clone());
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
             metrics::UNVERIFIED_PENDING_BLOCKS_LABEL,
@@ -218,7 +213,6 @@ impl PendingOrderedBlocks {
             match epoch_state.verify(&ordered_block.ordered_proof) {
                 Ok(_) => {
                     // Insert the ordered block into the verified pending blocks
-                    // Get the epoch and round of the last ordered block
                     let last_block_round = ordered_block.blocks.last().unwrap().round();
                     self.verified_pending_blocks.lock().insert(
                         (current_epoch, last_block_round),
@@ -253,6 +247,18 @@ impl PendingOrderedBlocks {
     }
 }
 
+/// Returns the highest block round from the given map
+fn get_highest_round(
+    pending_blocks: Arc<Mutex<BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)>>>,
+) -> Round {
+    pending_blocks
+        .lock()
+        .last_key_value()
+        .map(|(_, (ordered_block, _))| ordered_block.blocks.last())
+        .and_then(|last_block| last_block.map(|block| block.round()))
+        .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -272,7 +278,44 @@ mod test {
     };
 
     #[test]
-    pub fn test_get_last_pending_block() {
+    fn test_clear_all_pending_blocks() {
+        // Create new pending ordered blocks
+        let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
+
+        // Insert several verified blocks for the current epoch
+        let current_epoch = 0;
+        let num_verified_blocks = 10;
+        create_and_add_pending_blocks(
+            &pending_ordered_blocks,
+            num_verified_blocks,
+            current_epoch,
+            true,
+        );
+
+        // Insert several unverified blocks for the next epoch
+        let next_epoch = current_epoch + 1;
+        let num_unverified_blocks = 20;
+        create_and_add_pending_blocks(
+            &pending_ordered_blocks,
+            num_unverified_blocks,
+            next_epoch,
+            false,
+        );
+
+        // Clear all pending blocks
+        pending_ordered_blocks.clear_all_pending_blocks();
+
+        // Check all the verified pending blocks were removed
+        let all_verified_blocks = pending_ordered_blocks.get_all_verified_pending_blocks();
+        assert!(all_verified_blocks.is_empty());
+
+        // Check all the unverified pending blocks were removed
+        let num_pending_blocks = get_num_unverified_blocks(&pending_ordered_blocks);
+        assert_eq!(num_pending_blocks, 0);
+    }
+
+    #[test]
+    fn test_get_last_pending_block() {
         // Create new pending ordered blocks
         let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
@@ -326,7 +369,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_get_verified_pending_block() {
+    fn test_get_verified_pending_block() {
         // Create new pending ordered blocks
         let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
@@ -364,7 +407,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_insert_ordered_block_limit() {
+    fn test_insert_ordered_block_limit() {
         // Create a consensus observer config with a maximum of 10 pending blocks
         let max_num_pending_blocks = 10;
         let consensus_observer_config = ConsensusObserverConfig {
@@ -418,7 +461,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_remove_blocks_for_commit() {
+    fn test_remove_blocks_for_commit() {
         // Create new pending ordered blocks
         let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
@@ -517,7 +560,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_update_commit_decision() {
+    fn test_update_commit_decision() {
         // Create new pending ordered blocks
         let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 

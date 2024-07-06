@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::{
-    pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
+    common::ProofWithData, pipeline::commit_decision::CommitDecision,
+    pipelined_block::PipelinedBlock, proof_of_store::BatchInfo,
 };
 use aptos_types::{
     block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
@@ -43,13 +44,11 @@ impl ConsensusObserverMessage {
     /// Creates and returns a new block payload message using the given block, transactions and limit
     pub fn new_block_payload_message(
         block: BlockInfo,
-        transactions: Vec<SignedTransaction>,
-        limit: Option<usize>,
+        transaction_payload: BlockTransactionPayload,
     ) -> ConsensusObserverDirectSend {
         ConsensusObserverDirectSend::BlockPayload(BlockPayload {
             block,
-            transactions,
-            limit,
+            transaction_payload,
         })
     }
 }
@@ -153,10 +152,11 @@ impl ConsensusObserverDirectSend {
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
                 format!(
-                    "BlockPayload: {} {} {:?}",
-                    block_payload.block.id(),
-                    block_payload.transactions.len(),
-                    block_payload.limit
+                    "BlockPayload: {}. Number of transactions: {}, limit: {:?}, proofs: {:?}",
+                    block_payload.block,
+                    block_payload.transaction_payload.transactions.len(),
+                    block_payload.transaction_payload.limit,
+                    block_payload.transaction_payload.proof_with_data.proofs,
                 )
             },
         }
@@ -170,10 +170,45 @@ pub struct OrderedBlock {
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
-/// Payload message contains the block, transactions and the limit of the block
+/// The transaction payload of each block
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BlockTransactionPayload {
+    pub transactions: Vec<SignedTransaction>,
+    pub limit: Option<usize>,
+    pub proof_with_data: ProofWithData,
+    pub inline_batches: Vec<BatchInfo>,
+}
+
+impl BlockTransactionPayload {
+    pub fn new(
+        transactions: Vec<SignedTransaction>,
+        limit: Option<usize>,
+        proof_with_data: ProofWithData,
+        inline_batches: Vec<BatchInfo>,
+    ) -> Self {
+        Self {
+            transactions,
+            limit,
+            proof_with_data,
+            inline_batches,
+        }
+    }
+
+    #[cfg(test)]
+    /// Returns an empty transaction payload (for testing)
+    pub fn empty() -> Self {
+        Self {
+            transactions: vec![],
+            limit: None,
+            proof_with_data: ProofWithData::empty(),
+            inline_batches: vec![],
+        }
+    }
+}
+
+/// Payload message contains the block and transaction payload
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockPayload {
     pub block: BlockInfo,
-    pub transactions: Vec<SignedTransaction>,
-    pub limit: Option<usize>,
+    pub transaction_payload: BlockTransactionPayload,
 }

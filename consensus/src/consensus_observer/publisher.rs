@@ -314,8 +314,9 @@ fn spawn_message_serializer_and_sender(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::consensus_observer::network_message::BlockTransactionPayload;
     use aptos_config::network_id::NetworkId;
-    use aptos_consensus_types::pipeline::commit_decision::CommitDecision;
+    use aptos_consensus_types::{common::ProofWithData, pipeline::commit_decision::CommitDecision};
     use aptos_crypto::HashValue;
     use aptos_network::{
         application::{metadata::ConnectionState, storage::PeersAndMetadata},
@@ -492,10 +493,11 @@ mod test {
         }
 
         // Publish a message to the active subscribers
+        let transaction_payload =
+            BlockTransactionPayload::new(vec![], Some(10), ProofWithData::empty(), vec![]);
         let block_payload_message = ConsensusObserverMessage::new_block_payload_message(
             BlockInfo::empty(),
-            vec![],
-            Some(10),
+            transaction_payload,
         );
         consensus_publisher
             .publish_message(block_payload_message.clone())
@@ -539,8 +541,10 @@ mod test {
         }
 
         // Publish another message to the active subscribers
-        let block_payload_message =
-            ConsensusObserverMessage::new_block_payload_message(BlockInfo::empty(), vec![], None);
+        let block_payload_message = ConsensusObserverMessage::new_block_payload_message(
+            BlockInfo::empty(),
+            BlockTransactionPayload::empty(),
+        );
         consensus_publisher
             .publish_message(block_payload_message.clone())
             .await;

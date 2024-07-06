@@ -135,6 +135,10 @@ impl ProofWithData {
         }
     }
 
+    pub fn empty() -> Self {
+        Self::new(vec![])
+    }
+
     pub fn extend(&mut self, other: ProofWithData) {
         let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);
