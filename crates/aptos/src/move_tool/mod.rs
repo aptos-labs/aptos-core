@@ -67,6 +67,7 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
+use crate::common::supra::{SupraCommand, SupraCommandArguments};
 
 /// Tool for Move related operations
 ///
@@ -804,6 +805,17 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 }
 
+impl SupraCommand for PublishPackage {
+    fn supra_command_arguments(self) -> CliTypedResult<SupraCommandArguments> {
+        let package_publication_data: PackagePublicationData = (&self).try_into()?;
+        Ok(SupraCommandArguments {
+            payload: package_publication_data.payload,
+            profile: self.txn_options.profile_options.profile,
+            rpc: self.txn_options.rest_options.url ,
+        })
+    }
+}
+
 #[async_trait]
 impl CliCommand<String> for BuildPublishPayload {
     fn command_name(&self) -> &'static str {
@@ -1138,6 +1150,79 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
     }
 }
 
+impl SupraCommand for CreateResourceAccountAndPublishPackage {
+    fn supra_command_arguments(self) -> CliTypedResult<SupraCommandArguments> {
+        let CreateResourceAccountAndPublishPackage {
+            address_name,
+            mut move_options,
+            txn_options,
+            override_size_check_option,
+            included_artifacts_args,
+            seed_args,
+        } = self;
+
+        let account = if let Some(Some(account)) = CliConfig::load_profile(
+            txn_options.profile_options.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+            .map(|p| p.account)
+        {
+            account
+        } else {
+            return Err(CliError::CommandArgumentError(
+                "Please provide an account using --profile or run aptos init".to_string(),
+            ));
+        };
+        let seed = seed_args.seed()?;
+
+        let resource_address = create_resource_address(account, &seed);
+        move_options.add_named_address(address_name, resource_address.to_string());
+
+        let package_path = move_options.get_package_path()?;
+        let options = included_artifacts_args.included_artifacts.build_options(
+            move_options.dev,
+            move_options.skip_fetch_latest_git_deps,
+            move_options.named_addresses(),
+            move_options.bytecode_version,
+            move_options.compiler_version,
+            move_options.skip_attribute_checks,
+            move_options.check_test_code,
+        );
+        let package = BuiltPackage::build(package_path, options)?;
+        let compiled_units = package.extract_code();
+
+        // Send the compiled module and metadata using the code::publish_package_txn.
+        let metadata = package.extract_metadata()?;
+
+        let message = format!(
+            "Do you want to publish this package under the resource account's address {}?",
+            resource_address
+        );
+        prompt_yes_with_override(&message, txn_options.prompt_options)?;
+
+        let payload = aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+            seed,
+            bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+            compiled_units,
+        );
+        let size = bcs::serialized_size(&payload)?;
+        println!("package size {} bytes", size);
+        if !override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+            return Err(CliError::UnexpectedError(format!(
+                "The package is larger than {} bytes ({} bytes)! To lower the size \
+                you may want to include less artifacts via `--included-artifacts`. \
+                You can also override this check with `--override-size-check",
+                MAX_PUBLISH_PACKAGE_SIZE, size
+            )));
+        }
+        Ok(SupraCommandArguments {
+            payload,
+            profile: txn_options.profile_options.profile,
+            rpc: txn_options.rest_options.url,
+        })
+    }
+}
+
 /// Downloads a package and stores it in a directory named after the package
 ///
 /// This lets you retrieve packages directly from the blockchain for inspection
@@ -1407,6 +1492,16 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 }
 
+impl SupraCommand for RunFunction {
+    fn supra_command_arguments(self) -> CliTypedResult<SupraCommandArguments> {
+        Ok(SupraCommandArguments {
+            payload: TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
+            profile: self.txn_options.profile_options.profile,
+            rpc: self.txn_options.rest_options.url,
+        })
+    }
+}
+
 /// Run a view function
 #[derive(Parser)]
 pub struct ViewFunction {
@@ -1456,6 +1551,19 @@ impl CliCommand<TransactionSummary> for RunScript {
             &self.txn_options,
         )
         .await
+    }
+}
+
+impl SupraCommand for RunScript {
+    fn supra_command_arguments(self) -> CliTypedResult<SupraCommandArguments> {
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile("RunScript", self.txn_options.prompt_options)?;
+        Ok(SupraCommandArguments {
+            payload: self.script_function_args.create_script_payload(bytecode)?,
+            profile: self.txn_options.profile_options.profile,
+            rpc: self.txn_options.rest_options.url,
+        })
     }
 }
 
