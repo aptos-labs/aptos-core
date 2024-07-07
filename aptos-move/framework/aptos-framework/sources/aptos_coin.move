@@ -41,8 +41,8 @@ module aptos_framework::aptos_coin {
 
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize_with_parallelizable_supply<AptosCoin>(
             aptos_framework,
-            string::utf8(b"Aptos Coin"),
-            string::utf8(b"APT"),
+            string::utf8(b"Move Coin"),
+            string::utf8(b"MOVE"),
             8, // decimals
             true, // monitor_supply
         );

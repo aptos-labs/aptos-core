@@ -99,8 +99,8 @@ impl CoinInfoResource {
             integer: None,
         };
         Self {
-            name: "AptosCoin".to_string().into_bytes(),
-            symbol: "APT".to_string().into_bytes(),
+            name: "MoveCoin".to_string().into_bytes(),
+            symbol: "MOVE".to_string().into_bytes(),
             decimals: 8,
             supply: Some(aggregator),
         }

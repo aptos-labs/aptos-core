@@ -347,12 +347,12 @@ module example_addr::managed_fungible_asset {
 
     #[test_only]
     fun create_test_mfa(creator: &signer): Object<Metadata> {
-        let constructor_ref = &object::create_named_object(creator, b"APT");
+        let constructor_ref = &object::create_named_object(creator, b"MOVE");
         initialize(
             constructor_ref,
             0,
-            utf8(b"Aptos Token"), /* name */
-            utf8(b"APT"), /* symbol */
+            utf8(b"Move Token"), /* name */
+            utf8(b"MOVE"), /* symbol */
             8, /* decimals */
             utf8(b"http://example.com/favicon.ico"), /* icon */
             utf8(b"http://example.com"), /* project */
