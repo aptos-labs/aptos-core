@@ -600,6 +600,13 @@ impl AptosVM {
             resolver,
             previous_session_change_set,
         );
+
+        // Abort information is injected using the user defined error in the Move contract.
+        // DO NOT move abort info injection before we create an epilogue session, because if
+        // there is a code publishing transaction that fails, it will invalidate VM loader
+        // cache which is flushed ONLY WHEN THE NEXT SESSION IS CREATED!
+        let status = self.inject_abort_info_if_available(status);
+
         epilogue_session.execute(|session| {
             transaction_validation::run_failure_epilogue(
                 session,
@@ -612,8 +619,6 @@ impl AptosVM {
             )
         })?;
 
-        // Abort information is injected using the user defined error in the Move contract.
-        let status = self.inject_abort_info_if_available(status);
         epilogue_session.finish(fee_statement, status, txn_aux_data, change_set_configs)
     }
 
