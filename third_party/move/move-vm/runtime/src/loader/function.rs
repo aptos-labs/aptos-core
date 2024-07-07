@@ -244,7 +244,7 @@ impl Function {
         }
     }
 
-    pub(crate) fn is_native(&self) -> bool {
+    pub fn is_native(&self) -> bool {
         self.is_native
     }
 
