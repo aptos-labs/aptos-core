@@ -517,9 +517,9 @@ impl DbReader for AptosDB {
     }
 
     fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        gauged_api("get_buffered_state_base", || {
+        //gauged_api("get_buffered_state_base", || {
             self.state_store.get_buffered_state_base()
-        })
+        //})
     }
 
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
@@ -609,9 +609,9 @@ impl DbReader for AptosDB {
         next_version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
         self.error_if_state_merkle_pruned("State merkle", next_version)?;
-        gauged_api("get_state_snapshot_before", || {
+        //gauged_api("get_state_snapshot_before", || {
             self.state_store.get_state_snapshot_before(next_version)
-        })
+        //})
     }
 
     fn get_accumulator_root_hash(&self, version: Version) -> Result<HashValue> {
