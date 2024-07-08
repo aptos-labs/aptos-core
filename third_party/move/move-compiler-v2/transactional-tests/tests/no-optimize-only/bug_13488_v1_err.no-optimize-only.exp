@@ -32,7 +32,7 @@ comparison between v1 and v2 failed:
 -    │              Try an explicit annotation, e.g. 'move x' or 'copy x'
 -    │
 -    = Ambiguous inference of 'move' or 'copy' for a borrowed variable's last usage: A 'move' would invalidate the borrowing reference, but a 'copy' might not be the expected implicit behavior since this the last direct usage of the variable.
-+    │         ^^^^^^ ambiguous usage here, try an explicit annotation, e.g. 'move x' or 'copy x'
++    │         ^^^^^^ ambiguous usage here, try an explicit annotation, e.g. 'move `x`' or 'copy `x`'
 = 
 - error[E07006]: ambiguous usage of variable
 -    ┌─ TEMPFILE:27:19
@@ -61,7 +61,7 @@ comparison between v1 and v2 failed:
 -    │                        Try an explicit annotation, e.g. 'move x' or 'copy x'
 -    │
 -    = Ambiguous inference of 'move' or 'copy' for a borrowed variable's last usage: A 'move' would invalidate the borrowing reference, but a 'copy' might not be the expected implicit behavior since this the last direct usage of the variable.
-+    │                 ^^^^^^ ambiguous usage here, try an explicit annotation, e.g. 'move x' or 'copy x'
++    │                 ^^^^^^ ambiguous usage here, try an explicit annotation, e.g. 'move `x`' or 'copy `x`'
 = 
 = 
 = 

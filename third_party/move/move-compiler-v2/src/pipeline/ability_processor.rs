@@ -361,40 +361,12 @@ impl<'a> Transformer<'a> {
     /// During translation of `Call`, walks over the argument list and inserts copies if needed.
     fn translate_bytecode_call(&mut self, bc: &Bytecode, code_offset: CodeOffset) -> Bytecode {
         if let Bytecode::Call(id, dests, op, srcs, ai) = bc {
-            if op.can_take_non_ref_primitive_as_args() {
-                if op.function_call_or_primitive_operations() {
-                    let mut new_srcs = vec![];
-                    for src in srcs.iter() {
-                        new_srcs.push(self.copy_arg_if_needed(code_offset, *id, *src));
-                    }
-                    return Bytecode::Call(*id, dests.clone(), op.clone(), new_srcs, ai.clone());
-                } else {
-                    let skip_index = if matches!(op, Operation::WriteRef) {
-                        1
-                    } else {
-                        0
-                    };
-                    for src in srcs.iter().skip(skip_index) {
-                        let lifetime = self.lifetime.get_info_at(code_offset);
-                        if lifetime.before.is_borrowed(*src) {
-                            let local_var = self
-                                .builder
-                                .get_target()
-                                .get_local_name_for_error_message(*src);
-                            let var = self.builder.get_target().get_local_name_opt(*src).unwrap();
-                            self.error_with_hints(
-                                self.loc(*id),
-                                format!(
-                                    "ambiguous usage of {} since it is still being borrowed",
-                                    local_var
-                                ),
-                                format!("ambiguous usage here, try an explicit annotation, e.g. 'move {}' or 'copy {}'", var, var),
-                                self.make_hints_from_usage(code_offset, *src).into_iter(),
-                            );
-                            break;
-                        }
-                    }
+            if op.function_call_or_primitive_operations() {
+                let mut new_srcs = vec![];
+                for src in srcs.iter() {
+                    new_srcs.push(self.copy_arg_if_needed(code_offset, *id, *src));
                 }
+                return Bytecode::Call(*id, dests.clone(), op.clone(), new_srcs, ai.clone());
             }
         }
         bc.clone()
