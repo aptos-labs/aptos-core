@@ -83,6 +83,10 @@ impl LoadedFunction {
     pub fn ty_param_abilities(&self) -> &[AbilitySet] {
         self.function.ty_param_abilities()
     }
+
+    pub fn is_native(&self) -> bool {
+        self.function.is_native()
+    }
 }
 
 impl Debug for Function {
