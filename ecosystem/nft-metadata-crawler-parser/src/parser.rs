@@ -122,6 +122,7 @@ impl ParserContext {
 
         let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
             error!(
+                pubsub_message = pubsub_message,
                 error = ?e,
                 "[NFT Metadata Crawler] Failed to parse chain id from PubSub message"
             );
@@ -134,6 +135,7 @@ impl ParserContext {
         // Spawn worker
         let last_transaction_version = parts[2].to_string().parse().unwrap_or_else(|e| {
             error!(
+                pubsub_message = pubsub_message,
                 error = ?e,
                 "[NFT Metadata Crawler] Failed to parse last transaction version from PubSub message"
             );
@@ -145,6 +147,7 @@ impl ParserContext {
                 chrono::NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")
                     .unwrap_or_else(|e| {
                         error!(
+                            pubsub_message = pubsub_message,
                             error = ?e,
                             "[NFT Metadata Crawler] Failed to parse timestamp from PubSub message"
                         );
