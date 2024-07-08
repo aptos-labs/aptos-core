@@ -1,11 +1,5 @@
 use crate::flags;
-use std::{
-    ffi::OsString,
-    os::unix::process::CommandExt,
-    process::{Command, Stdio},
-    str::FromStr,
-    thread,
-};
+use std::{collections::BTreeMap, ffi::OsString, str::FromStr};
 use xshell::{cmd, Shell};
 
 pub(crate) fn build(
@@ -30,8 +24,6 @@ pub(crate) fn build(
             profile.clone().into_string().unwrap(),
         ),
     );
-
-    cmd!(sh, "printenv").run().unwrap();
 
     cmd!(
         sh,
@@ -69,28 +61,57 @@ impl flags::Group {
 
 impl flags::Forge {
     pub(crate) fn run(self, sh: Shell) {
-        let sh1 = sh.clone();
-        let node_profile = self.node_profile.clone();
-        let node_feature = self.node_feature.clone();
-        let t1 = thread::spawn(move || {
-            build(
-                &sh1,
-                vec!["aptos-node".into(), "aptos-forge-cli".into()],
-                node_profile,
-                node_feature,
-            );
-        });
+        build_multiple(sh, vec![
+            BuildTarget {
+                package: "aptos-node".into(),
+                feature: "".into(),
+                profile: "release".into(),
+            },
+            BuildTarget {
+                package: "aptos".into(),
+                feature: "".into(),
+                profile: "cli".into(),
+            },
+            BuildTarget {
+                package: "aptos-forge-cli".into(),
+                feature: "".into(),
+                profile: "release".into(),
+            },
+        ])
+    }
+}
 
-        // let sh2 = sh.clone();
-        // let node_profile = self.node_profile.clone();
-        // let t2 = thread::spawn(move || {
-        //     build(&sh2, vec!["aptos-forge-cli".into()], node_profile, None);
-        // });
+struct BuildTarget {
+    package: OsString,
+    feature: OsString,
+    profile: OsString,
+}
 
-        let t3 = thread::spawn(move || build(&sh, vec!["aptos".into()], Some("cli".into()), None));
+fn build_multiple(sh: Shell, targets: Vec<BuildTarget>) {
+    let mut targets_by_profile_feature = BTreeMap::new();
+    for target in targets.into_iter() {
+        targets_by_profile_feature
+            .entry(target.profile)
+            .or_insert_with(|| BTreeMap::new())
+            .entry(target.feature)
+            .or_insert_with(|| Vec::new())
+            .push(target.package);
+    }
 
-        t1.join().unwrap();
-        // t2.join().unwrap();
-        t3.join().unwrap();
+    let commands: Vec<_> = targets_by_profile_feature
+        .into_iter()
+        .flat_map(|(profile, targets_by_feature)| {
+            targets_by_feature
+                .into_iter()
+                .map(move |(feature, targets)| (profile.clone(), feature, targets))
+        })
+        .map(|(profile, feature, targets)| {
+            let sh = sh.clone();
+            std::thread::spawn(move || build(&sh, targets, Some(profile), Some(feature)))
+        })
+        .collect();
+
+    for command in commands {
+        let _ = command.join();
     }
 }
