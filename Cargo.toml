@@ -864,7 +864,7 @@ debug = false
 opt-level = "z"
 lto = "thin"
 strip = true
-codegen-units = 1
+# codegen-units = 1
 
 [profile.ci]
 inherits = "release"
