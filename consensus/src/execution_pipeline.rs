@@ -15,18 +15,26 @@ use aptos_executor_types::{
     ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info};
+use aptos_mempool::counters;
+use aptos_storage_interface::{
+    state_view::{DbStateView, LatestDbStateCheckpointView},
+    DbReader,
+};
 use aptos_types::{
+    account_config::AccountResource,
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata_ext::BlockMetadataExt,
+    state_store::MoveResourceExt,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
     },
 };
 use fail::fail_point;
+use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use tokio::sync::{mpsc, oneshot};
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -44,13 +52,18 @@ pub struct ExecutionPipeline {
 }
 
 impl ExecutionPipeline {
-    pub fn spawn(executor: Arc<dyn BlockExecutorTrait>, runtime: &tokio::runtime::Handle) -> Self {
+    pub fn spawn(
+        db: Arc<dyn DbReader>,
+        executor: Arc<dyn BlockExecutorTrait>,
+        runtime: &tokio::runtime::Handle,
+    ) -> Self {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
         runtime.spawn(Self::prepare_block_stage(
             prepare_block_rx,
             execute_block_tx,
+            db,
         ));
         runtime.spawn(Self::execute_stage(
             execute_block_rx,
@@ -96,9 +109,28 @@ impl ExecutionPipeline {
         })
     }
 
+    /// returns account's sequence number from storage
+    fn get_account_sequence_number(
+        state_view: &DbStateView,
+        address: AccountAddress,
+    ) -> anyhow::Result<u64> {
+        fail_point!("vm_validator::get_account_sequence_number", |_| {
+            Err(anyhow::anyhow!(
+                "Injected error in get_account_sequence_number"
+            ))
+        });
+
+        match AccountResource::fetch_move_resource(state_view, &address)? {
+            Some(account_resource) => Ok(account_resource.sequence_number()),
+            None => Ok(0),
+        }
+    }
+
+    // TODO: basically copy-paste mempool vm validator
     async fn prepare_block(
         execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
         command: PrepareBlockCommand,
+        db: Arc<dyn DbReader>,
     ) {
         let PrepareBlockCommand {
             block,
@@ -128,6 +160,45 @@ impl ExecutionPipeline {
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
+
+            // TODO: basically copy-paste from mempool process_incoming_transactions
+            let start_storage_read = Instant::now();
+            let txns_to_execute_len = txns_to_execute.len();
+            let state_view = db
+                .latest_state_checkpoint_view()
+                .expect("Failed to get latest state checkpoint view.");
+            let txns_to_execute = SIG_VERIFY_POOL.install(|| {
+                txns_to_execute
+                    .into_par_iter()
+                    .filter(|t| match t.try_as_signed_user_txn() {
+                        Some(signed_txn) => {
+                            match Self::get_account_sequence_number(
+                                &state_view,
+                                signed_txn.sender(),
+                            ) {
+                                Ok(sequence_number) => {
+                                    signed_txn.sequence_number() >= sequence_number
+                                },
+                                Err(e) => {
+                                    error!("Failed to get sequence number: {:?}", e);
+                                    false
+                                },
+                            }
+                        },
+                        None => true,
+                    })
+                    .collect::<Vec<_>>()
+            });
+            // Track latency for storage read fetching sequence number
+            let storage_read_latency = start_storage_read.elapsed();
+            // TODO: convert into proper stats
+            info!(
+                "txns filtered by sequence number: {}/{}, in {} ms",
+                txns_to_execute.len(),
+                txns_to_execute_len,
+                storage_read_latency.as_millis()
+            );
+
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
                 SIG_VERIFY_POOL.install(|| {
                     let num_txns = txns_to_execute.len();
@@ -154,11 +225,12 @@ impl ExecutionPipeline {
     async fn prepare_block_stage(
         mut prepare_block_rx: mpsc::UnboundedReceiver<PrepareBlockCommand>,
         execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
+        db: Arc<dyn DbReader>,
     ) {
         while let Some(command) = prepare_block_rx.recv().await {
             monitor!(
                 "prepare_block",
-                Self::prepare_block(execute_block_tx.clone(), command).await
+                Self::prepare_block(execute_block_tx.clone(), command, db.clone()).await
             );
         }
         debug!("prepare_block_stage quitting.");

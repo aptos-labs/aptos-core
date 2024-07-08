@@ -27,6 +27,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
     block_executor::config::BlockExecutorConfigFromOnchain,
@@ -98,6 +99,7 @@ pub struct ExecutionProxy {
 
 impl ExecutionProxy {
     pub fn new(
+        db: Arc<dyn DbReader>,
         executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
@@ -119,7 +121,7 @@ impl ExecutionProxy {
                 callback();
             }
         });
-        let execution_pipeline = ExecutionPipeline::spawn(executor.clone(), handle);
+        let execution_pipeline = ExecutionPipeline::spawn(db, executor.clone(), handle);
         Self {
             executor,
             txn_notifier,

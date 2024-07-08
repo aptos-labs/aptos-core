@@ -62,6 +62,7 @@ pub fn start_consensus(
     ));
 
     let execution_proxy = ExecutionProxy::new(
+        aptos_db.reader.clone(),
         Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
@@ -166,6 +167,7 @@ pub fn start_consensus_observer(
             node_config.consensus.mempool_executed_txn_timeout_ms,
         ));
         let execution_proxy = ExecutionProxy::new(
+            aptos_db.reader.clone(),
             Arc::new(BlockExecutor::<AptosVM>::new(aptos_db.clone())),
             txn_notifier,
             state_sync_notifier,
