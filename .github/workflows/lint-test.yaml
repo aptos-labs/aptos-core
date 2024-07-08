@@ -83,6 +83,19 @@ jobs:
       - run: echo "Skipping rust lints! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
+  # Run cargo deny. This is a PR required job.
+  rust-cargo-deny:
+    needs: file_change_determinator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check licenses
+      - run: echo "Skipping cargo deny! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+
   # Run all rust smoke tests. This is a PR required job.
   rust-smoke-tests:
     needs: file_change_determinator
