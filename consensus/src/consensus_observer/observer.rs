@@ -128,7 +128,7 @@ impl ConsensusObserver {
             epoch_state: None,
             quorum_store_enabled: false, // Updated on epoch changes
             root: Arc::new(Mutex::new(root)),
-            block_payload_store: BlockPayloadStore::new(),
+            block_payload_store: BlockPayloadStore::new(consensus_observer_config),
             missing_block_store: MissingBlockStore::new(consensus_observer_config),
             pending_ordered_blocks: PendingOrderedBlocks::new(consensus_observer_config),
             execution_client,
@@ -286,10 +286,8 @@ impl ConsensusObserver {
 
         // Create the commit callback
         Box::new(move |blocks, ledger_info: LedgerInfoWithSignatures| {
-            // Remove the committed blocks from the payload store
-            block_payload_store.remove_blocks(blocks);
-
-            // Remove the committed blocks from the pending blocks
+            // Remove the committed blocks from the payload and pending stores
+            block_payload_store.remove_committed_blocks(blocks);
             pending_ordered_blocks.remove_blocks_for_commit(&ledger_info);
 
             // Verify the ledger info is for the same epoch
@@ -502,14 +500,9 @@ impl ConsensusObserver {
 
     /// Processes the block payload message
     async fn process_block_payload_message(&mut self, block_payload: BlockPayload) {
-        // Get the block round and epoch
-        let block = block_payload.block;
-        let block_round = block.round();
-        let block_epoch = block.epoch();
-
-        // Get the block transactions and limit
-        let transactions = block_payload.transactions;
-        let limit = block_payload.limit;
+        // Get the epoch and round for the block
+        let block_epoch = block_payload.block.epoch();
+        let block_round = block_payload.block.round();
 
         // Update the metrics for the received block payload
         metrics::set_gauge_with_label(
@@ -518,21 +511,52 @@ impl ConsensusObserver {
             block_round,
         );
 
-        // TODO: verify the block payload!
+        // Verify the block payload digests
+        if let Err(error) = block_payload.verify_payload_digests() {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify block payload digests! Ignoring block: {:?}. Error: {:?}",
+                    block_payload.block, error
+                ))
+            );
+            return;
+        }
+
+        // If the payload is for the current epoch, verify the proof signatures
+        let epoch_state = self.get_epoch_state();
+        let verified_payload = if block_epoch == epoch_state.epoch {
+            // Verify the block proof signatures
+            if let Err(error) = block_payload.verify_payload_signatures(&epoch_state) {
+                error!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Failed to verify block payload signatures! Ignoring block: {:?}. Error: {:?}",
+                        block_payload.block, error
+                    ))
+                );
+                return;
+            }
+
+            true // We have successfully verified the signatures
+        } else {
+            false // We can't verify the signatures yet
+        };
 
         // Update the payload store with the payload
         self.block_payload_store
-            .insert_block_payload(block, transactions, limit);
+            .insert_block_payload(block_payload, verified_payload);
 
-        // Check if there are blocks that were missing payloads
-        // but are now ready because of the new payload.
-        if let Some(ordered_block) = self.missing_block_store.remove_ready_block(
-            block_epoch,
-            block_round,
-            &self.block_payload_store,
-        ) {
-            // Process the ordered block
-            self.process_ordered_block(ordered_block).await;
+        // Check if there are blocks that were missing payloads but are
+        // now ready because of the new payload. Note: this should only
+        // be done if the payload has been verified correctly.
+        if verified_payload {
+            if let Some(ordered_block) = self.missing_block_store.remove_ready_block(
+                block_epoch,
+                block_round,
+                &self.block_payload_store,
+            ) {
+                // Process the ordered block
+                self.process_ordered_block(ordered_block).await;
+            }
         }
     }
 
@@ -545,7 +569,7 @@ impl ConsensusObserver {
             commit_decision.round(),
         );
 
-        // If the commit decision is for the current epoch, verify it
+        // If the commit decision is for the current epoch, verify and process it
         let epoch_state = self.get_epoch_state();
         let commit_decision_epoch = commit_decision.epoch();
         if commit_decision_epoch == epoch_state.epoch {
@@ -576,6 +600,20 @@ impl ConsensusObserver {
         let last_block = self.get_last_block();
         if commit_decision_epoch > last_block.epoch() || commit_decision_round > last_block.round()
         {
+            // If we're already in state sync mode, we should wait. This
+            // avoids sending multiple state sync requests concurrently.
+            if self.in_state_sync_mode() {
+                info!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Already waiting for state sync to reach target: {:?}. Dropping commit decision: {:?}!",
+                        self.root.lock().commit_info(),
+                        commit_decision.proof_block_info()
+                    ))
+                );
+                return;
+            }
+
+            // Otherwise, we can start the state sync process
             info!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Started syncing to {}!",
@@ -585,6 +623,8 @@ impl ConsensusObserver {
 
             // Update the root and clear the pending blocks (up to the commit)
             *self.root.lock() = commit_decision.commit_proof().clone();
+            self.block_payload_store
+                .remove_blocks_for_epoch_round(commit_decision_epoch, commit_decision_round);
             self.pending_ordered_blocks
                 .remove_blocks_for_commit(commit_decision.commit_proof());
 
@@ -856,6 +896,10 @@ impl ConsensusObserver {
             // Wait for the next epoch to start
             self.execution_client.end_epoch().await;
             self.wait_for_epoch_start().await;
+
+            // Verify the block payloads for the new epoch
+            self.block_payload_store
+                .verify_payload_signatures(&self.get_epoch_state());
 
             // Verify the pending blocks for the new epoch
             self.pending_ordered_blocks

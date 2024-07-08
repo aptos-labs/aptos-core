@@ -757,8 +757,8 @@ mod test {
             validator_signer.public_key(),
             100,
         );
-        let validator_verified = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(next_epoch, validator_verified);
+        let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
+        let epoch_state = EpochState::new(next_epoch, validator_verifier);
 
         // Verify the pending blocks for the next epoch
         pending_ordered_blocks.verify_pending_blocks(&epoch_state);

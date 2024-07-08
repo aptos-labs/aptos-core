@@ -159,6 +159,7 @@ impl MissingBlockStore {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::consensus_observer::network_message::{BlockPayload, BlockTransactionPayload};
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
@@ -378,7 +379,7 @@ mod test {
         );
 
         // Create a new block payload store and insert payloads for the second block
-        let mut block_payload_store = BlockPayloadStore::new();
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
         let second_block = missing_blocks[1].clone();
         insert_payloads_for_ordered_block(&mut block_payload_store, &second_block);
 
@@ -439,13 +440,15 @@ mod test {
         );
 
         // Create an empty block payload store
-        let mut block_payload_store = BlockPayloadStore::new();
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Incrementally insert and process each payload for the first block
         let first_block = missing_blocks.first().unwrap().clone();
         for block in first_block.blocks().clone() {
             // Insert the block
-            block_payload_store.insert_block_payload(block.block_info(), vec![], None);
+            let block_payload =
+                BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
+            block_payload_store.insert_block_payload(block_payload, true);
 
             // Attempt to remove the block (which might not be ready)
             let payload_round = block.round();
@@ -486,7 +489,9 @@ mod test {
             // Insert the block only if this is not the first block
             let payload_round = block.round();
             if payload_round != last_block.first_block().round() {
-                block_payload_store.insert_block_payload(block.block_info(), vec![], None);
+                let block_payload =
+                    BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
+                block_payload_store.insert_block_payload(block_payload, true);
             }
 
             // Attempt to remove the block (which might not be ready)
@@ -533,7 +538,7 @@ mod test {
         );
 
         // Create a new block payload store and insert payloads for the first block
-        let mut block_payload_store = BlockPayloadStore::new();
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
         let first_block = missing_blocks.first().unwrap().clone();
         insert_payloads_for_ordered_block(&mut block_payload_store, &first_block);
 
@@ -614,7 +619,7 @@ mod test {
         );
 
         // Create an empty block payload store
-        let block_payload_store = BlockPayloadStore::new();
+        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Remove the third block (which is not ready)
         let third_block = missing_blocks[2].clone();
@@ -716,7 +721,9 @@ mod test {
         ordered_block: &OrderedBlock,
     ) {
         for block in ordered_block.blocks() {
-            block_payload_store.insert_block_payload(block.block_info(), vec![], None);
+            let block_payload =
+                BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
+            block_payload_store.insert_block_payload(block_payload, true);
         }
     }
 
