@@ -45,7 +45,7 @@ def plot_coverage(time_pass, coverage):
 
 
 def draw_comparison(wkd: Path):
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 6))
     plt.xlabel("Hours")
     plt.ylabel("Block Coverage")
     plt.title("Coverage Over Time")
@@ -59,7 +59,8 @@ def draw_comparison(wkd: Path):
         output = open(log).readlines()
         time_pass, coverage = parse_libfuzzer_output(output)
         plt.plot(time_pass, coverage, marker="o", linestyle="-", label=run_name)
-    plt.legend()
+    plt.legend(loc=(1.04, 0))
+    plt.tight_layout(rect=[0, 0, 0.9, 1])
     plt.savefig("coverage-comparison.svg")
     plt.close()
     print("Coverage graph saved as 'coverage-comparison.svg'")
