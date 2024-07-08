@@ -145,6 +145,9 @@ impl MoveVmExt {
         vm_config.pseudo_meter_vector_ty_to_ty_tag_construction =
             gas_feature_version >= RELEASE_V1_16;
         vm_config.ty_builder = ty_builder;
+        vm_config.disallow_dispatch_for_native = env
+            .features()
+            .is_enabled(FeatureFlag::DISALLOW_NATIVE_DISPATCH);
 
         Self {
             inner: WarmVmCache::get_warm_vm(
