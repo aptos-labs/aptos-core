@@ -3,10 +3,7 @@
 
 //! Simple CLI tool that reads transactional test from a file and runs it.
 
-use move_smith::{
-    config::Config,
-    utils::{run_transactional_test, TransactionalResult},
-};
+use move_smith::{config::Config, utils::run_transactional_test};
 use std::{fs, path::PathBuf};
 
 fn main() {
@@ -22,17 +19,12 @@ fn main() {
     println!("Loaded code from file: {:?}", file_path);
 
     println!("Running the transactional test");
-    match run_transactional_test(code, &Config::default()) {
-        TransactionalResult::Ok => println!("Running as transactional test passed"),
-        TransactionalResult::WarningsOnly => {
-            println!("Running as transactional test passed with all warnings")
-        },
-        TransactionalResult::IgnoredErr(_) => {
-            println!("Running as transactional test passed with errors ignored")
-        },
-        TransactionalResult::Err(msg) => {
-            println!("Transactional test failed: {}", msg);
-            std::process::exit(1);
-        },
+    let start = std::time::Instant::now();
+    let result = run_transactional_test(code, &Config::default());
+    let elapsed = start.elapsed();
+    println!("Elapsed time: {}s", elapsed.as_millis() / 1000);
+    println!("{}", result);
+    if result.is_err() {
+        std::process::exit(1);
     }
 }

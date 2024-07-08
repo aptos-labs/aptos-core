@@ -11008,6 +11008,7 @@ dependencies = [
  "num-bigint 0.3.3",
  "rand 0.7.3",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]

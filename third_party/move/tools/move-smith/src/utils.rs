@@ -12,12 +12,14 @@ use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunCo
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     error::Error,
-    fs,
+    fmt, fs,
     fs::File,
     io::{stderr, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 use tempfile::{tempdir, TempDir};
+use tokio::runtime::Runtime;
 
 const MOVE_TOML_TEMPLATE: &str = r#"[package]
 name = "test"
@@ -28,6 +30,8 @@ version = "0.0.0"
 pub enum TransactionalResult {
     // The test framework did not report error
     Ok,
+    // Takes too long to execute the transactional test
+    Timeout,
     // The test framework reported warnings only
     WarningsOnly,
     // The test framework reported an error, but it is in the ignore list
@@ -40,6 +44,7 @@ impl TransactionalResult {
     pub fn unwrap(&self) {
         match self {
             TransactionalResult::Ok => {},
+            TransactionalResult::Timeout => {},
             TransactionalResult::WarningsOnly => {},
             TransactionalResult::IgnoredErr(msg) => {
                 info!("Ignored error: {}", msg);
@@ -52,6 +57,22 @@ impl TransactionalResult {
 
     pub fn is_err(&self) -> bool {
         matches!(self, TransactionalResult::Err(_))
+    }
+}
+
+impl fmt::Display for TransactionalResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TransactionalResult::Ok => write!(f, "Transactional test passed"),
+            TransactionalResult::Timeout => write!(f, "Transactional test timed out"),
+            TransactionalResult::WarningsOnly => {
+                write!(f, "Transactional test passed with only warnings")
+            },
+            TransactionalResult::IgnoredErr(msg) => {
+                write!(f, "Transactional test passed with errors ignored: {}", msg)
+            },
+            TransactionalResult::Err(msg) => write!(f, "Transactional test failed: {}", msg),
+        }
     }
 }
 
@@ -195,6 +216,30 @@ pub fn compile_move_code(code: String, v1: bool, v2: bool) -> bool {
 
 /// Runs the given Move code as a transactional test.
 pub fn run_transactional_test(code: String, config: &Config) -> TransactionalResult {
+    // Create a tokio runtime
+    let rt = Runtime::new().unwrap();
+    let timeout_duration = Duration::new(config.transactional_timeout_sec as u64, 0); // 10 seconds
+
+    let config_clone = config.clone();
+    let result = rt.block_on(async {
+        let handle = tokio::spawn(run_transactional_test_no_timeout(code, config_clone));
+        tokio::select! {
+            res = handle => match res {
+                Ok(res) => res,
+                Err(e) => TransactionalResult::Err(format!("Error running transactional test: {:?}", e)),
+            },
+            _ = tokio::time::sleep(timeout_duration) => TransactionalResult::Timeout,
+        }
+    });
+
+    rt.shutdown_background();
+    result
+}
+
+pub async fn run_transactional_test_no_timeout(
+    code: String,
+    config: Config,
+) -> TransactionalResult {
     let (file_path, dir) = create_tmp_move_file(code, None);
 
     let ignores = config.known_error.clone();

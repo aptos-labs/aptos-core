@@ -17,6 +17,7 @@ move-transactional-test-runner = { path = "../../testing-infra/transactional-tes
 num-bigint = { workspace = true }
 rand = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true }
 
 [lib]
 name = "move_smith"

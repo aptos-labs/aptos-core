@@ -115,7 +115,7 @@ impl Env {
             type_depth_history: vec![],
 
             start_time: std::time::Instant::now(),
-            timeout: std::time::Duration::from_secs(config.timeout_sec as u64),
+            timeout: std::time::Duration::from_secs(config.generation_timeout_sec as u64),
         }
     }
 

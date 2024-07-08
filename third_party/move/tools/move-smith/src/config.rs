@@ -7,6 +7,7 @@ use move_compiler_v2::Experiment;
 
 /// The configuration for the MoveSmith fuzzer.
 /// MoveSmith will randomly pick within [0..max_num_XXX] during generation.
+#[derive(Debug, Clone)]
 pub struct Config {
     // The list of known errors to ignore
     // This is aggresive: if the diff contains any of these strings,
@@ -45,7 +46,8 @@ pub struct Config {
     pub max_num_type_params_in_struct: usize,
 
     // Timeout in seconds
-    pub timeout_sec: usize,
+    pub generation_timeout_sec: usize, // MoveSmith generation timeout
+    pub transactional_timeout_sec: usize, // Transactional test timeout
 
     // Allow recursive calls in the generated code
     pub allow_recursive_calls: bool,
@@ -62,6 +64,7 @@ impl Default for Config {
                 "incompatible types".to_string(),
                 "recursion during function inlining".to_string(),
                 "still mutably borrowed".to_string(),
+                "known issue".to_string(),
             ],
 
             experiment_combos: vec![
@@ -102,7 +105,8 @@ impl Default for Config {
             max_num_type_params_in_func: 3,
             max_num_type_params_in_struct: 2,
 
-            timeout_sec: 5,
+            generation_timeout_sec: 5,
+            transactional_timeout_sec: 10,
 
             allow_recursive_calls: false,
         }

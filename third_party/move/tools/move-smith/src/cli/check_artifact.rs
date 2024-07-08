@@ -6,7 +6,7 @@
 use arbitrary::Unstructured;
 use clap::Parser;
 use move_smith::{
-    utils::{compile_move_code, run_transactional_test, TransactionalResult},
+    utils::{compile_move_code, run_transactional_test},
     CodeGenerator, MoveSmith,
 };
 use std::{fs, path::PathBuf};
@@ -41,17 +41,9 @@ fn main() {
     compile_move_code(code.clone(), false, true);
     println!("Compiled code with V2 did not panic");
 
-    match run_transactional_test(code, &smith.config.take()) {
-        TransactionalResult::Ok => println!("Running as transactional test passed"),
-        TransactionalResult::WarningsOnly => {
-            println!("Running as transactional test passed with all warnings")
-        },
-        TransactionalResult::IgnoredErr(_) => {
-            println!("Running as transactional test passed with errors ignored")
-        },
-        TransactionalResult::Err(msg) => {
-            println!("Transactional test failed: {}", msg);
-            std::process::exit(1);
-        },
+    let result = run_transactional_test(code, &smith.config.take());
+    println!("{}", result);
+    if result.is_err() {
+        std::process::exit(1);
     }
 }
