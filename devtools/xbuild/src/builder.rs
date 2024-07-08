@@ -73,19 +73,24 @@ impl flags::Forge {
         let node_profile = self.node_profile.clone();
         let node_feature = self.node_feature.clone();
         let t1 = thread::spawn(move || {
-            build(&sh1, vec!["aptos-node".into()], node_profile, node_feature);
+            build(
+                &sh1,
+                vec!["aptos-node".into(), "aptos-forge-cli".into()],
+                node_profile,
+                node_feature,
+            );
         });
 
-        let sh2 = sh.clone();
-        let node_profile = self.node_profile.clone();
-        let t2 = thread::spawn(move || {
-            build(&sh2, vec!["aptos-forge-cli".into()], node_profile, None);
-        });
+        // let sh2 = sh.clone();
+        // let node_profile = self.node_profile.clone();
+        // let t2 = thread::spawn(move || {
+        //     build(&sh2, vec!["aptos-forge-cli".into()], node_profile, None);
+        // });
 
-        let t3 = thread::spawn(move || build(&sh, vec!["aptos".into()], Some("ci".into()), None));
+        let t3 = thread::spawn(move || build(&sh, vec!["aptos".into()], Some("cli".into()), None));
 
         t1.join().unwrap();
-        t2.join().unwrap();
+        // t2.join().unwrap();
         t3.join().unwrap();
     }
 }
