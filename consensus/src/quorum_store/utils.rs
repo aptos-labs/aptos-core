@@ -73,6 +73,8 @@ impl<I: Ord + Hash> TimeExpirations<I> {
     }
 
     /// Expire and return items corresponding to expiration <= given certified time.
+    /// Unwrap is safe because peek() is called in loop condition.
+    #[allow(clippy::unwrap_used)]
     pub(crate) fn expire(&mut self, certified_time: u64) -> HashSet<I> {
         let mut ret = HashSet::new();
         while let Some((Reverse(t), _)) = self.expiries.peek() {
@@ -251,14 +253,16 @@ impl ProofQueue {
     fn remaining_txns_without_duplicates(&self) -> u64 {
         let mut remaining_txns = self.txn_summary_num_occurrences.len() as u64;
 
-        // If a batch_key is not in batches_with_txn_summary, it means we've received the proof but haven't receive the
-        // transaction summary of the batch from batch coordinator. Add the number of txns in the batch to remaining_txns.
         remaining_txns += self
             .batch_to_proof
             .iter()
             .filter_map(|(batch_key, proof)| {
-                if proof.is_some() && !self.batch_to_txn_summaries.contains_key(batch_key) {
-                    Some(proof.as_ref().unwrap().0.num_txns())
+                if let Some(proof) = proof {
+                    if !self.batch_to_txn_summaries.contains_key(batch_key) {
+                        Some(proof.0.num_txns())
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -335,16 +339,17 @@ impl ProofQueue {
             .map(BatchKey::from_info)
             .collect::<HashSet<_>>();
         let mut remaining_proofs = vec![];
-        for (batch_key, proof) in &self.batch_to_proof {
-            if proof.is_some()
-                && !pulled_proofs
+        for (batch_key, proof_option) in &self.batch_to_proof {
+            if let Some(proof) = proof_option {
+                if !pulled_proofs
                     .iter()
                     .any(|p| BatchKey::from_info(p.info()) == *batch_key)
-                && !excluded_batch_keys.contains(batch_key)
-            {
-                num_proofs_remaining_after_pull += 1;
-                num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
-                remaining_proofs.push(proof.as_ref().unwrap().0.clone());
+                    && !excluded_batch_keys.contains(batch_key)
+                {
+                    num_proofs_remaining_after_pull += 1;
+                    num_txns_remaining_after_pull += proof.0.num_txns();
+                    remaining_proofs.push(proof.0.clone());
+                }
             }
         }
         let pulled_txns = pulled_proofs.iter().map(|p| p.num_txns()).sum::<u64>();

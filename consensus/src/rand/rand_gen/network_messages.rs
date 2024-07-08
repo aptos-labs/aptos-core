@@ -82,6 +82,7 @@ impl<S: TShare, D: TAugmentedData> TConsensusMsg for RandMessage<S, D> {
         }
     }
 
+    #[allow(clippy::unwrap_used)]
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::RandGenMessage(RandGenMessage {
             epoch: self.epoch(),

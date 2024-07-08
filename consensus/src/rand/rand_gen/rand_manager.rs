@@ -212,7 +212,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         message: RandMessage<S, D>,
     ) {
         let msg = message.into_network_message();
-        let _ = sender.send(Ok(protocol.to_bytes(&msg).unwrap().into()));
+        let _ = sender.send(Ok(protocol.to_bytes(&msg).expect("Message should be serializable into protocol").into()));
     }
 
     async fn verification_task(

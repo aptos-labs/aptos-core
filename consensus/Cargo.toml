@@ -116,3 +116,6 @@ failpoints = ["fail/failpoints"]
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
+
+[lints.clippy]
+unwrap_used = "deny"

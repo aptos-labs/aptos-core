@@ -296,16 +296,8 @@ impl NewBlockEventAggregation {
 
             &history[start..]
         } else {
-            if !history.is_empty() {
-                assert!(
-                    (
-                        history.first().unwrap().epoch(),
-                        history.first().unwrap().round()
-                    ) >= (
-                        history.last().unwrap().epoch(),
-                        history.last().unwrap().round()
-                    )
-                );
+            if let (Some(first), Some(last)) = (history.first(), history.last()) {
+                assert!((first.epoch(), first.round()) >= (last.epoch(), last.round()));
             }
             let end = if history.len() > window_size {
                 window_size
@@ -594,7 +586,7 @@ impl LeaderReputation {
         history: &[NewBlockEvent],
         round: Round,
     ) -> VotingPowerRatio {
-        let candidates = self.epoch_to_proposers.get(&self.epoch).unwrap();
+        let candidates = self.epoch_to_proposers.get(&self.epoch).expect("Epoch should always map to proposers");
         // use f64 counter, as total voting power is u128
         let total_voting_power = self.voting_powers.iter().map(|v| *v as f64).sum();
         CHAIN_HEALTH_TOTAL_VOTING_POWER.set(total_voting_power);

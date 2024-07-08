@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     consensusdb::ConsensusDB,
     quorum_store::{
@@ -44,6 +46,7 @@ impl Command {
         let mut txns = Vec::new();
         for block in blocks {
             let id = block.id();
+            #[allow(clippy::unwrap_in_result)]
             if self.block_id.is_none() || id == self.block_id.unwrap() {
                 txns.extend(
                     extract_txns_from_block(&block, &all_batches)?

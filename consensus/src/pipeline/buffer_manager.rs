@@ -382,7 +382,7 @@ impl BufferManager {
             }
             if item.block_id() == target_block_id {
                 let aggregated_item = item.unwrap_aggregated();
-                let block = aggregated_item.executed_blocks.last().unwrap().block();
+                let block = aggregated_item.executed_blocks.last().expect("executed_blocks should be not empty").block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // As all the validators broadcast commit votes directly to all other validators,
                 // the proposer do not have to broadcast commit decision again.
@@ -488,6 +488,7 @@ impl BufferManager {
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
+    #[allow(clippy::unwrap_used)]
     async fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { block_id, inner } = response;
         // find the corresponding item, may not exist if a reset or aggregated happened

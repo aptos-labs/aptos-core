@@ -431,7 +431,7 @@ impl ConsensusObserver {
     fn get_last_block(&self) -> BlockInfo {
         if let Some((_, (last_blocks, _))) = self.pending_blocks.lock().last_key_value() {
             // Return the last block in the pending blocks
-            last_blocks.blocks.last().unwrap().block_info()
+            last_blocks.blocks.last().expect("blocks should not be empty").block_info()
         } else {
             // Return the root ledger info
             self.root.lock().commit_info().clone()
@@ -652,10 +652,7 @@ impl ConsensusObserver {
     /// Processes the ordered block
     async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
         // Unpack the ordered block
-        let OrderedBlock {
-            blocks,
-            ordered_proof,
-        } = ordered_block.clone();
+        let OrderedBlock { blocks, ordered_proof, } = ordered_block.clone();
 
         // Verify that we have at least one ordered block
         if blocks.is_empty() {
@@ -669,38 +666,49 @@ impl ConsensusObserver {
         }
 
         // If the block is a child of our last block, we can insert it
-        if self.get_last_block().id() == blocks.first().unwrap().parent_id() {
-            debug!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Adding ordered block to the pending blocks: {}",
-                    ordered_proof.commit_info()
-                ))
-            );
-
-            // Insert the ordered block into the pending blocks
-            self.pending_blocks
-                .lock()
-                .insert(blocks.last().unwrap().round(), (ordered_block, None));
-
-            // If we are not in sync mode, forward the blocks to the execution pipeline
-            if self.sync_handle.is_none() {
+        if let Some(first_block) = blocks.first() {
+            if self.get_last_block().id() == first_block.parent_id() {
                 debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Forwarding blocks to the execution pipeline: {}",
+                        "Adding ordered block to the pending blocks: {}",
                         ordered_proof.commit_info()
                     ))
                 );
 
-                // Finalize the ordered block
-                self.finalize_ordered_block(&blocks, ordered_proof).await;
+                // Insert the ordered block into the pending blocks
+                if let Some(last_block) = blocks.last() {
+                    self.pending_blocks
+                        .lock()
+                        .insert(last_block.round(), (ordered_block, None));
+                } else {
+                    // Handle the case where last block is unexpectedly missing
+                    warn!("Expected to find a last block but none was found.");
+                    return;
+                }
+
+                // If we are not in sync mode, forward the blocks to the execution pipeline
+                if self.sync_handle.is_none() {
+                    debug!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Forwarding blocks to the execution pipeline: {}",
+                            ordered_proof.commit_info()
+                        ))
+                    );
+
+                    // Finalize the ordered block
+                    self.finalize_ordered_block(&blocks, ordered_proof).await;
+                }
+            } else {
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Parent block is missing! Ignoring: {:?}",
+                        ordered_proof.commit_info()
+                    ))
+                );
             }
         } else {
-            warn!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Parent block is missing! Ignoring: {:?}",
-                    ordered_proof.commit_info()
-                ))
-            );
+            // Handle the case where first block is unexpectedly missing
+            warn!("Expected to find a first block but none was found.");
         }
     }
 
@@ -1178,6 +1186,7 @@ fn remove_pending_blocks(
 
 /// Spawns a task to sync to the given commit decision and notifies
 /// the consensus observer. Also, returns an abort handle to cancel the task.
+#[allow(clippy::unwrap_used)]
 fn sync_to_commit_decision(
     commit_decision: CommitDecision,
     decision_epoch: u64,

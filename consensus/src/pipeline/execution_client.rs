@@ -343,19 +343,19 @@ impl TExecutionClient for ExecutionProxyClient {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
-        let execute_tx = self.handle.read().execute_tx.clone();
-
-        if execute_tx.is_none() {
-            debug!("Failed to send to buffer manager, maybe epoch ends");
-            return Ok(());
-        }
+        let mut execute_tx = match self.handle.read().execute_tx.clone() {
+            Some(tx) => tx,
+            None => {
+                debug!("Failed to send to buffer manager, maybe epoch ends");
+                return Ok(());
+            }
+        };
 
         for block in blocks {
             block.set_insertion_time();
         }
 
         if execute_tx
-            .unwrap()
             .send(OrderedBlocks {
                 ordered_blocks: blocks
                     .iter()

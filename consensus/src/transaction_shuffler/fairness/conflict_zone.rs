@@ -57,11 +57,12 @@ impl<'a> ConflictZone<'a> {
         *self.counts_by_id.get_mut(key_id) += 1;
         self.sliding_window.push_back(key_id);
         if self.sliding_window.len() > self.sliding_window_size {
-            let removed_key_id = self.sliding_window.pop_front().unwrap();
-            let count = self.counts_by_id.get_mut(removed_key_id);
-            *count -= 1;
-            if *count == 0 && !self.key_registry.is_conflict_exempt(removed_key_id) {
-                return Some(removed_key_id);
+            if let Some(removed_key_id) = self.sliding_window.pop_front() {
+                let count = self.counts_by_id.get_mut(removed_key_id);
+                *count -= 1;
+                if *count == 0 && !self.key_registry.is_conflict_exempt(removed_key_id) {
+                    return Some(removed_key_id);
+                }
             }
         }
         None
