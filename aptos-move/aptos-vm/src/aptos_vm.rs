@@ -219,21 +219,37 @@ impl AptosVM {
     /// Creates a new VM instance, initializing the runtime environment from the state.
     pub fn new(state_view: &impl StateView) -> Self {
         let env = Arc::new(Environment::new(state_view));
-        Self::new_with_environment(env, state_view)
+        Self::new_with_environment(env, state_view, false)
+    }
+
+    pub fn new_for_gov_sim(state_view: &impl StateView) -> Self {
+        let env = Arc::new(Environment::new(state_view));
+        Self::new_with_environment(env, state_view, true)
     }
 
     /// Creates a new VM instance based on the runtime environment, and used by block
     /// executor to create multiple tasks sharing the same execution configurations.
     // TODO: Passing `state_view` is not needed once we move keyless and gas-related
     //       configs to the environment.
-    pub(crate) fn new_with_environment(env: Arc<Environment>, state_view: &impl StateView) -> Self {
+    pub(crate) fn new_with_environment(
+        env: Arc<Environment>,
+        state_view: &impl StateView,
+        inject_create_signer_for_gov_sim: bool,
+    ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let (gas_params, storage_gas_params, gas_feature_version) =
             get_gas_parameters(env.features(), state_view);
 
         let resolver = state_view.as_move_resolver();
-        let move_vm = MoveVmExt::new(gas_feature_version, gas_params.as_ref(), env, &resolver);
+        let move_vm = MoveVmExt::new_with_extended_options(
+            gas_feature_version,
+            gas_params.as_ref(),
+            env,
+            None,
+            inject_create_signer_for_gov_sim,
+            &resolver,
+        );
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).
