@@ -124,7 +124,9 @@ impl VMRuntime {
                     self.loader
                         .load_module(&module_id, data_store, module_store)?;
                 let old_module = old_module_ref.module();
+                #[allow(deprecated)]
                 let old_m = normalized::Module::new(old_module);
+                #[allow(deprecated)]
                 let new_m = normalized::Module::new(module);
                 compat
                     .check(&old_m, &new_m)
