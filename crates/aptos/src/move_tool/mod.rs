@@ -164,10 +164,10 @@ impl FrameworkPackageArgs {
         addresses: BTreeMap<String, ManifestNamedAddress>,
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
-        const APTOS_FRAMEWORK: &str = "AptosFramework";
-        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
-        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
-        const DEFAULT_BRANCH: &str = "mainnet";
+        const SUPRA_FRAMEWORK: &str = "SupraFramework";
+        const SUPRA_FRAMEWORK_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
+        const SUBDIR_PATH: &str = "aptos-move/framework/supra-framework";
+        const DEFAULT_BRANCH: &str = "devnet";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), prompt_options)?;
@@ -190,7 +190,7 @@ impl FrameworkPackageArgs {
         // Add the framework dependency if it's provided
         let mut dependencies = BTreeMap::new();
         if let Some(ref path) = self.framework_local_dir {
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
+            dependencies.insert(SUPRA_FRAMEWORK.to_string(), Dependency {
                 local: Some(path.display().to_string()),
                 git: None,
                 rev: None,
@@ -200,9 +200,9 @@ impl FrameworkPackageArgs {
             });
         } else {
             let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
+            dependencies.insert(SUPRA_FRAMEWORK.to_string(), Dependency {
                 local: None,
-                git: Some(APTOS_GIT_PATH.to_string()),
+                git: Some(SUPRA_FRAMEWORK_GIT_PATH.to_string()),
                 rev: Some(git_rev.to_string()),
                 subdir: Some(SUBDIR_PATH.to_string()),
                 aptos: None,
