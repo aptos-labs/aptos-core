@@ -10,7 +10,7 @@ import subprocess
 import traceback
 from dataclasses import dataclass
 
-from aptos_sdk.async_client import RestClient
+from aptos_sdk.client import RestClient
 from common import METRICS_PORT, NODE_PORT, AccountInfo, Network, build_image_name
 
 LOG = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class RunHelper:
 
     test_count: int
 
-    # This can be used by the tests to query the localnet node.
+    # This can be used by the tests to query the local testnet node.
     api_client: RestClient
 
     def __init__(

@@ -280,7 +280,7 @@ rust-version = "1.78.0"
 [workspace.dependencies]
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
-aptos = { path = "crates/aptos" }
+movement = { path = "crates/aptos" }
 aptos-accumulator = { path = "storage/accumulator" }
 aptos-admin-service = { path = "crates/aptos-admin-service" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }

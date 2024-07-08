@@ -1,17 +1,11 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
-import asyncio
 import json
-import logging
 
-from aptos_sdk.account_address import AccountAddress
 from common import TestError
 from test_helpers import RunHelper
 from test_results import test_case
-
-
-LOG = logging.getLogger(__name__)
 
 
 @test_case
@@ -33,7 +27,7 @@ def test_stake_initialize_stake_owner(run_helper: RunHelper, test_name=None):
     if result.get("success") != True:
         raise TestError("Did not initialize stake owner successfully")
 
-    # make sure the stake pool initialized on chain
+    # make sure the the stake pool initialized on chain
     response = run_helper.run_command(
         test_name,
         [
@@ -206,13 +200,36 @@ def test_stake_set_voter(run_helper: RunHelper, test_name=None):
 
 
 @test_case
-async def test_stake_create_staking_contract(run_helper: RunHelper, test_name=None):
-    # First wait for reconfiguration to finish.
-    await wait_for_reconfiguration(run_helper)
-
+def test_stake_create_staking_contract(run_helper: RunHelper, test_name=None):
     # run the set-operator command
     # Note: This command has to run after set-operator and set-voter
     # because it needs to know the operator and voter addresses
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "stake",
+            "create-staking-contract",
+            "--operator",
+            "operator",
+            "--voter",
+            "voter",
+            "--amount",
+            "1000000",
+            "--commission-percentage",
+            "1",
+            "--assume-yes",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result.get("success") != True:
+        raise TestError("Did not set create staking contract successfully")
+
+
+@test_case
+def test_stake_create_staking_contract(run_helper: RunHelper, test_name=None):
+    # run the set-operator command
     response = run_helper.run_command(
         test_name,
         [
@@ -268,9 +285,7 @@ def test_stake_unlock_stake(run_helper: RunHelper, test_name=None):
 
 
 @test_case
-async def test_stake_withdraw_stake_after_unlock(run_helper: RunHelper, test_name=None):
-    await wait_for_reconfiguration(run_helper)
-
+def test_stake_withdraw_stake_after_unlock(run_helper: RunHelper, test_name=None):
     # get the current stake amount
     response = run_helper.run_command(
         test_name,
@@ -401,21 +416,3 @@ def test_stake_request_commission(run_helper: RunHelper, test_name=None):
     result = json.loads(response.stdout)["Result"]
     if result.get("success") != True:
         raise TestError("Did not execute [request-commission] successfully")
-
-
-async def wait_for_reconfiguration(run_helper: RunHelper):
-    # First wait for reconfiguration to finish.
-    LOG.info("Waiting for reconfiguration to finish...")
-    attempts = 0
-    while True:
-        response = await run_helper.api_client.account_resource(
-            AccountAddress.from_str("0x1"),
-            "0x1::reconfiguration_state::State",
-        )
-        if response["data"]["variant"]["data"] == "0x00":
-            break
-        attempts += 1
-        if attempts > 20:
-            raise TestError("Reconfiguration did not finish in time")
-        await asyncio.sleep(0.5)
-    LOG.info("Reconfiguration finished")
