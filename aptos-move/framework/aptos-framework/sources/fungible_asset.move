@@ -1437,6 +1437,103 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x2000f, location = Self)]
+    fun test_mutate_metadata_name_over_maximum_length(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::some(string::utf8(b"mutated_name_will_be_too_long_for_the_maximum_length_check")),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none()
+        );
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20010, location = Self)]
+    fun test_mutate_metadata_symbol_over_maximum_length(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::none(),
+            option::some(string::utf8(b"mutated_symbol_will_be_too_long_for_the_maximum_length_check")),
+            option::none(),
+            option::none(),
+            option::none()
+        );
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20011, location = Self)]
+    fun test_mutate_metadata_decimals_over_maximum_amount(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::none(),
+            option::none(),
+            option::some(50),
+            option::none(),
+            option::none()
+        );
+    }
+
+    #[test_only]
+    fun create_exceedingly_long_uri(): vector<u8> {
+        use std::vector;
+
+        let too_long_of_uri = b"mutated_uri_will_be_too_long_for_the_maximum_length_check.com/";
+        for (i in 0..50) {
+            vector::append(&mut too_long_of_uri, b"too_long_of_uri");
+        };
+
+        too_long_of_uri
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20013, location = Self)]
+    fun test_mutate_metadata_icon_uri_over_maximum_length(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+        let too_long_of_uri = create_exceedingly_long_uri();
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::none(),
+            option::none(),
+            option::none(),
+            option::some(string::utf8(too_long_of_uri)),
+            option::none()
+        );
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20013, location = Self)]
+    fun test_mutate_metadata_project_uri_over_maximum_length(
+        creator: &signer
+    ) acquires Metadata {
+        let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+        let too_long_of_uri = create_exceedingly_long_uri();
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::some(string::utf8(too_long_of_uri))
+        );
+    }
+
+    #[test(creator = @0xcafe)]
     fun test_merge_and_exact(creator: &signer) acquires Supply, ConcurrentSupply {
         let (mint_ref, _transfer_ref, burn_ref, _mutate_metadata_ref, _) = create_fungible_asset(creator);
         let fa = mint(&mint_ref, 100);
