@@ -135,7 +135,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 let (lock, cvar) = &*self.recv_condition;
                 let _lg = lock.lock().unwrap();
                 self.kv_unprocessed_pq.push(message, priority);
-                self.recv_condition.1.notify_all();
+                //self.recv_condition.1.notify_all();
+                self.recv_condition.1.notify_one();
             }
             REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_req_pq_size"])
