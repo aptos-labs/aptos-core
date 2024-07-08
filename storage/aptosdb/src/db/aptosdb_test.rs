@@ -23,33 +23,26 @@ use aptos_crypto::{
     hash::CryptoHash,
     HashValue, PrivateKey, Uniform,
 };
-use aptos_executor_types::StateComputeResult;
 use aptos_proptest_helpers::ValueGenerator;
-use aptos_storage_interface::{DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order};
+use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
     chain_id::ChainId,
-    ledger_info::{generate_ledger_info_with_sig, LedgerInfoWithSignatures},
-    on_chain_config::ValidatorSet,
-    proof::{position::Position, SparseMerkleLeafNode},
-    proptest_types::{
-        AccountInfoUniverse, BlockInfoGen, LedgerInfoGen, LedgerInfoWithSignaturesGen,
-        ValidatorSetGen,
-    },
+    ledger_info::LedgerInfoWithSignatures,
+    proof::SparseMerkleLeafNode,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo, TransactionPayload,
-        TransactionToCommit, VMErrorDetail, Version,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
+        TransactionAuxiliaryDataV1, TransactionInfo, TransactionPayload, TransactionToCommit,
+        VMErrorDetail, Version,
     },
     vm_status::StatusCode,
-    write_set::WriteSet,
 };
-use move_core_types::{account_address::AccountAddress, vm_status::StatusType::Execution};
-use proptest::{prelude::*, std_facade::HashMap, test_runner::TestRunner};
-use std::{collections::HashSet, default, ops::DerefMut, sync::Arc};
+use move_core_types::account_address::AccountAddress;
+use proptest::{prelude::*, std_facade::HashMap};
+use std::{collections::HashSet, sync::Arc};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {
@@ -224,27 +217,6 @@ fn test_get_latest_executed_trees() {
     );
 }
 
-fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-    let public_key = private_key.public_key();
-
-    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
-    let raw_transaction = RawTransaction::new(
-        AccountAddress::random(),
-        0,
-        transaction_payload,
-        0,
-        gas_unit_price,
-        0,
-        ChainId::new(10), // This is the value used in aptos testing code.
-    );
-    SignedTransaction::new(
-        raw_transaction,
-        public_key,
-        Ed25519Signature::dummy_signature(),
-    )
-}
-
 #[test]
 fn test_revert_single_commit() {
     aptos_logger::Logger::new().init();
@@ -272,8 +244,8 @@ fn test_revert_single_commit() {
     }
 
     // Check expected before revert commit
-    let expected_version = cur_ver - 1;
-    assert_eq!(db.get_latest_version().unwrap(), expected_version);
+    let pre_revert_version = cur_ver - 1;
+    assert_eq!(db.get_latest_version().unwrap(), pre_revert_version);
 
     // Get the latest ledger info before revert
     let latest_ledger_info_before_revert = blocks[1].1.clone();
@@ -283,6 +255,21 @@ fn test_revert_single_commit() {
     db.revert_commit(&latest_ledger_info_before_revert).unwrap();
 
     assert_eq!(db.get_latest_version().unwrap(), version_to_revert_to);
+    let ledger_info = db.get_latest_ledger_info().unwrap();
+    assert_eq!(ledger_info, latest_ledger_info_before_revert);
+    let tx_acc_db = db.ledger_db.transaction_accumulator_db();
+    for i in version_to_revert_to + 1..=pre_revert_version {
+        let _ = tx_acc_db
+            .get_root_hash(i)
+            .expect_err(&format!("expected no state for {i}"));
+    }
+    let root_hash = tx_acc_db.get_root_hash(version_to_revert_to).unwrap();
+    assert_eq!(
+        root_hash,
+        latest_ledger_info_before_revert
+            .commit_info()
+            .executed_state_id()
+    );
 }
 
 #[test]

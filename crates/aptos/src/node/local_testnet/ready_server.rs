@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
+use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalTestnet};
 use anyhow::Result;
 use async_trait::async_trait;
 use clap::Parser;
@@ -22,13 +22,13 @@ use std::{
 };
 use tokio::time::timeout;
 
-/// Args related to running a ready server in the localnet. The ready server lets
-/// users / clients check that if all the services in the localnet are ready
+/// Args related to running a ready server in the local testnet. The ready server lets
+/// users / clients check that if all the services in the local testnet are ready
 /// without having to ping each service individually.
 #[derive(Debug, Clone, Parser)]
 pub struct ReadyServerArgs {
     /// The port to run the ready server. This exposes an endpoint at `/` that you can
-    /// use to check if the entire localnet is ready.
+    /// use to check if the entire local testnet is ready.
     #[clap(long, default_value_t = 8070)]
     pub ready_server_listen_port: u16,
 }
@@ -42,7 +42,7 @@ pub struct ReadyServerManager {
 
 impl ReadyServerManager {
     pub fn new(
-        args: &RunLocalnet,
+        args: &RunLocalTestnet,
         bind_to: Ipv4Addr,
         health_checkers: HashSet<HealthChecker>,
     ) -> Result<Self> {

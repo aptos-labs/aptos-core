@@ -9,7 +9,7 @@
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-use aptos::{move_tool, Tool};
+use movement::{move_tool, Tool};
 use clap::Parser;
 use std::{process::exit, time::Duration};
 
@@ -28,7 +28,7 @@ fn main() {
 
     // Shutdown the runtime with a timeout. We do this to make sure that we don't sit
     // here waiting forever waiting for tasks that sometimes don't want to exit on
-    // their own (e.g. telemetry, containers spawned by the localnet, etc).
+    // their own (e.g. telemetry, containers spawned by the local testnet, etc).
     runtime.shutdown_timeout(Duration::from_millis(50));
 
     match result {

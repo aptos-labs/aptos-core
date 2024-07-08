@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos = { workspace = true, features = [ "no-upload-proposal" ] }
+movement = { workspace = true, features = [ "no-upload-proposal" ] }
 aptos-api-types = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-crypto = { workspace = true }

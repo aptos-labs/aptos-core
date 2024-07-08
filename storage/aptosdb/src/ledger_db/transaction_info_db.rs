@@ -98,12 +98,4 @@ impl TransactionInfoDb {
         }
         Ok(())
     }
-
-    pub(crate) fn delete_transaction_info(
-        &self,
-        version: Version,
-        batch: &SchemaBatch,
-    ) -> Result<()> {
-        batch.delete::<TransactionInfoSchema>(&version)
-    }
 }

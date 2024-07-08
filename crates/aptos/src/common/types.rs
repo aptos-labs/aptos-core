@@ -5,7 +5,6 @@ use super::utils::fund_account;
 use crate::{
     common::{
         init::Network,
-        local_simulation,
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
             get_account_with_state, get_auth_key, get_sequence_number, parse_json_file,
@@ -19,12 +18,12 @@ use crate::{
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
 use anyhow::Context;
-use aptos_api_types::ViewFunction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
+use aptos_gas_profiling::FrameName;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -45,15 +44,11 @@ use aptos_types::{
         SignedTransaction, TransactionArgument, TransactionPayload, TransactionStatus,
     },
 };
-use aptos_vm_types::output::VMOutput;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
-use move_core_types::{
-    account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
-};
-use move_model::metadata::{CompilerVersion, LanguageVersion};
-use move_package::source_package::std_lib::StdVersion;
+use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
+use move_package::CompilerVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -62,7 +57,7 @@ use std::{
     convert::TryFrom,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -684,8 +679,8 @@ pub struct HardwareWalletOptions {
 
     /// Index of your account in hardware wallet
     ///
-    /// This is the simpler version of derivation path e.g `format - [0]`
-    /// we will translate this index into `[m/44'/637'/0'/0'/0]`
+    /// This is the simpler version of derivation path e.g format - [0]
+    /// we will translate this index into [m/44'/637'/0'/0'/0]
     #[clap(long)]
     pub derivation_index: Option<String>,
 }
@@ -1049,10 +1044,6 @@ pub struct MovePackageDir {
     #[clap(long, value_parser = crate::common::utils::parse_map::<String, AccountAddressWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 
-    /// Override the standard library version by mainnet/testnet/devnet
-    #[clap(long, value_parser)]
-    pub override_std: Option<StdVersion>,
-
     /// Skip pulling the latest git dependencies
     ///
     /// If you don't have a network connection, the compiler may fail due
@@ -1066,14 +1057,10 @@ pub struct MovePackageDir {
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
-    /// Currently, default to `v1`
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
+    ///
+    /// Currently hidden until the official launch of Compiler V2
+    #[clap(long, hide = true)]
     pub compiler_version: Option<CompilerVersion>,
-
-    /// Specify the language version to be supported.
-    /// Currently, default to `v1`
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
-    pub language_version: Option<LanguageVersion>,
 
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
@@ -1081,7 +1068,7 @@ pub struct MovePackageDir {
 
     /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
-    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
+    /// See https://github.com/aptos-labs/aptos-core/issues/10335
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
 }
@@ -1093,11 +1080,9 @@ impl MovePackageDir {
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
-            override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
-            language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
         }
@@ -1352,29 +1337,17 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
             },
-            Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
+            Transaction::ValidatorTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sender: None,
+                sequence_number: None,
                 success: Some(txn.info.success),
+                timestamp_us: Some(txn.timestamp.0),
                 version: Some(txn.info.version.0),
                 vm_status: Some(txn.info.vm_status.clone()),
-                timestamp_us: Some(txn.timestamp.0),
-                sender: None,
-                gas_used: None,
-                gas_unit_price: None,
-                pending: None,
-                sequence_number: None,
-            },
-            Transaction::ValidatorTransaction(txn) => TransactionSummary {
-                transaction_hash: txn.transaction_info().hash,
-                gas_used: None,
-                gas_unit_price: None,
-                pending: None,
-                sender: None,
-                sequence_number: None,
-                success: Some(txn.transaction_info().success),
-                timestamp_us: Some(txn.timestamp().0),
-                version: Some(txn.transaction_info().version.0),
-                vm_status: Some(txn.transaction_info().vm_status.clone()),
             },
         }
     }
@@ -1528,14 +1501,6 @@ pub struct TransactionOptions {
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 
-    /// If this option is set, simulate the transaction locally.
-    #[clap(long)]
-    pub(crate) local: bool,
-
-    /// If this option is set, benchmark the transaction locally.
-    #[clap(long)]
-    pub(crate) benchmark: bool,
-
     /// If this option is set, simulate the transaction locally using the debugger and generate
     /// flamegraphs that reflect the gas usage.
     #[clap(long)]
@@ -1612,12 +1577,9 @@ impl TransactionOptions {
         get_sequence_number(&client, sender_address).await
     }
 
-    pub async fn view(&self, payload: ViewFunction) -> CliTypedResult<Vec<serde_json::Value>> {
+    pub async fn view(&self, payload: ViewRequest) -> CliTypedResult<Vec<serde_json::Value>> {
         let client = self.rest_client()?;
-        Ok(client
-            .view_bcs_with_json_response(&payload, None)
-            .await?
-            .into_inner())
+        Ok(client.view(&payload, None).await?.into_inner())
     }
 
     /// Submit a transaction
@@ -1760,20 +1722,14 @@ impl TransactionOptions {
         }
     }
 
-    /// Simulates a transaction locally, using the debugger to fetch required data from remote.
-    async fn simulate_using_debugger<F>(
+    /// Simulate the transaction locally using the debugger, with the gas profiler enabled.
+    pub async fn profile_gas(
         &self,
         payload: TransactionPayload,
-        execute: F,
-    ) -> CliTypedResult<TransactionSummary>
-    where
-        F: FnOnce(
-            &AptosDebugger,
-            u64,
-            SignedTransaction,
-            aptos_crypto::HashValue,
-        ) -> CliTypedResult<(VMStatus, VMOutput)>,
-    {
+    ) -> CliTypedResult<TransactionSummary> {
+        println!();
+        println!("Simulating transaction locally with the gas profiler...");
+
         let client = self.rest_client()?;
 
         // Fetch the chain states required for the simulation
@@ -1805,6 +1761,7 @@ impl TransactionOptions {
             }
         });
 
+        // Create and sign the transaction
         let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
@@ -1812,19 +1769,49 @@ impl TransactionOptions {
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-        let hash = transaction.committed_hash();
+        let hash = transaction.clone().committed_hash();
 
+        // Execute the transaction using the debugger
         let debugger = AptosDebugger::rest_client(client).unwrap();
-        let (vm_status, vm_output) = execute(&debugger, version, transaction, hash)?;
+        let res = debugger.execute_transaction_at_version_with_gas_profiler(version, transaction);
+        let (vm_status, output, gas_log) = res.map_err(|err| {
+            CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
+        })?;
 
-        let success = match vm_output.status() {
+        // Generate a humen-readable name for the report
+        let entry_point = gas_log.entry_point();
+
+        let human_readable_name = match entry_point {
+            FrameName::Script => "script".to_string(),
+            FrameName::Function {
+                module_id, name, ..
+            } => {
+                let addr_short = module_id.address().short_str_lossless();
+                let addr_truncated = if addr_short.len() > 4 {
+                    &addr_short[..4]
+                } else {
+                    addr_short.as_str()
+                };
+                format!("0x{}-{}-{}", addr_truncated, module_id.name(), name)
+            },
+        };
+        let raw_file_name = format!("txn-{}-{}", hash, human_readable_name);
+
+        // Generate the report
+        let path = Path::new("gas-profiling").join(raw_file_name);
+        gas_log.generate_html_report(path, format!("Gas Report - {}", human_readable_name))?;
+
+        // Generate the transaction summary
+
+        // TODO(Gas): double check if this is correct.
+        let success = match output.status() {
             TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
             TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
         };
 
-        let summary = TransactionSummary {
+        Ok(TransactionSummary {
             transaction_hash: hash.into(),
-            gas_used: Some(vm_output.gas_used()),
+            gas_used: Some(output.gas_used()),
             gas_unit_price: Some(gas_unit_price),
             pending: None,
             sender: Some(sender_address),
@@ -1833,53 +1820,7 @@ impl TransactionOptions {
             timestamp_us: None,
             version: Some(version), // The transaction is not comitted so there is no new version.
             vm_status: Some(vm_status.to_string()),
-        };
-
-        Ok(summary)
-    }
-
-    /// Simulates a transaction locally.
-    pub async fn simulate_locally(
-        &self,
-        payload: TransactionPayload,
-    ) -> CliTypedResult<TransactionSummary> {
-        println!();
-        println!("Simulating transaction locally...");
-
-        self.simulate_using_debugger(payload, local_simulation::run_transaction_using_debugger)
-            .await
-    }
-
-    /// Benchmarks the transaction payload locally.
-    /// The transaction is executed multiple times, and the median value is calculated to improve
-    /// the accuracy of the measurement results.
-    pub async fn benchmark_locally(
-        &self,
-        payload: TransactionPayload,
-    ) -> CliTypedResult<TransactionSummary> {
-        println!();
-        println!("Benchmarking transaction locally...");
-
-        self.simulate_using_debugger(
-            payload,
-            local_simulation::benchmark_transaction_using_debugger,
-        )
-        .await
-    }
-
-    /// Simulates the transaction locally with the gas profiler enabled.
-    pub async fn profile_gas(
-        &self,
-        payload: TransactionPayload,
-    ) -> CliTypedResult<TransactionSummary> {
-        println!();
-        println!("Simulating transaction locally using the gas profiler...");
-
-        self.simulate_using_debugger(
-            payload,
-            local_simulation::profile_transaction_using_debugger,
-        )
-        .await
+        })
     }
 
     pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {
@@ -2082,21 +2023,6 @@ impl TryInto<EntryFunction> for EntryFunctionArguments {
     }
 }
 
-impl TryInto<ViewFunction> for EntryFunctionArguments {
-    type Error = CliError;
-
-    fn try_into(self) -> Result<ViewFunction, Self::Error> {
-        let view_function_args = self.check_input_style()?;
-        let function_id: MemberId = (&view_function_args).try_into()?;
-        Ok(ViewFunction {
-            module: function_id.module_id,
-            function: function_id.member_id,
-            ty_args: view_function_args.type_arg_vec.try_into()?,
-            args: view_function_args.arg_vec.try_into()?,
-        })
-    }
-}
-
 impl TryInto<MultisigTransactionPayload> for EntryFunctionArguments {
     type Error = CliError;
 
@@ -2213,14 +2139,4 @@ impl TryInto<ScriptFunctionArguments> for ScriptFunctionArgumentsJSON {
             json_file: None,
         })
     }
-}
-
-#[derive(Parser)]
-pub struct OverrideSizeCheckOption {
-    /// Whether to override the check for maximal size of published data
-    ///
-    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
-    /// will still be blocked from publishing.
-    #[clap(long)]
-    pub(crate) override_size_check: bool,
 }

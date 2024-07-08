@@ -288,7 +288,7 @@ pub fn setup_docker_logging(test_dir: &Path, dir_name: &str, container_name: &st
 /// This shutdown step stops a container with the given name. If no container is found
 /// we continue without error. We choose to stop the container on shutdown rather than
 /// totally delete it so the user can check the logs if it was an unexpected shutdown.
-/// When the localnet is started again, any leftover container will be deleted.
+/// When the local testnet is started again, any leftover container will be deleted.
 #[derive(Clone, Debug)]
 pub struct StopContainerShutdownStep {
     container_name: &'static str,

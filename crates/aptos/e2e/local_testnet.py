@@ -1,7 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
-# This file contains functions for running the localnet.
+# This file contains functions for running the local testnet.
 
 import logging
 import subprocess
@@ -12,12 +12,12 @@ from common import FAUCET_PORT, METRICS_PORT, NODE_PORT, Network, build_image_na
 
 LOG = logging.getLogger(__name__)
 
-# Run a localnet in a docker container. We choose to detach here and we'll
+# Run a local testnet in a docker container. We choose to detach here and we'll
 # stop running it later using the container name.
 def run_node(network: Network, image_repo_with_project: str, pull=True):
     image_name = build_image_name(image_repo_with_project, network)
     container_name = f"aptos-tools-{network}"
-    LOG.info(f"Trying to run aptos CLI localnet from image: {image_name}")
+    LOG.info(f"Trying to run aptos CLI local testnet from image: {image_name}")
 
     # Confirm that the Docker daemon is running.
     try:
@@ -69,13 +69,12 @@ def run_node(network: Network, image_repo_with_project: str, pull=True):
     ]
 
     # Run the container.
-    LOG.debug("Running command: %s", " ".join(args))
     subprocess.run(
         args,
         **kwargs,
     )
 
-    LOG.info(f"Running aptos CLI localnet from image: {image_name}. Container name: {container_name}")
+    LOG.info(f"Running aptos CLI local testnet from image: {image_name}")
     return container_name
 
 
@@ -96,7 +95,7 @@ def wait_for_startup(container_name: str, timeout: int):
         try:
             api_response = requests.get(f"http://127.0.0.1:{NODE_PORT}/v1")
             # Try to query the legacy faucet health endpoint first. TODO: Remove this
-            # once all localnet images we use have the new faucet in them.
+            # once all local testnet images we use have the new faucet in them.
             faucet_response = requests.get(f"http://127.0.0.1:{FAUCET_PORT}/health")
             if faucet_response.status_code == 404:
                 # If that fails, try the new faucet health endpoint.

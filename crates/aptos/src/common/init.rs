@@ -27,7 +27,7 @@ use std::{collections::BTreeMap, str::FromStr};
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
 
-/// Tool to initialize current directory for the aptos tool
+/// Tool to initialize current directory for the Movement tool
 ///
 /// Configuration will be pushed into .aptos/config.yaml
 #[derive(Debug, Parser)]
@@ -183,7 +183,7 @@ impl CliCommand<()> for InitTool {
         };
 
         // Set the derivation_path to the one user chose
-        profile_config.derivation_path.clone_from(&derivation_path);
+        profile_config.derivation_path = derivation_path.clone();
 
         // Private key
         let private_key = if self.is_hardware_wallet() {

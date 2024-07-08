@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
+use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalTestnet};
 use crate::node::local_testnet::utils::socket_addr_to_url;
 use anyhow::{anyhow, Context, Result};
 use aptos_config::config::{NodeConfig, DEFAULT_GRPC_STREAM_PORT};
@@ -20,12 +20,12 @@ use std::{
 };
 
 /// Args specific to running a node (and its components, e.g. the txn stream) in the
-/// localnet.
+/// local testnet.
 #[derive(Debug, Parser)]
 pub struct NodeArgs {
     /// An overridable config template for the test node
     ///
-    /// If provided, the config will be used, and any needed configuration for the localnet
+    /// If provided, the config will be used, and any needed configuration for the local testnet
     /// will override the config's values
     #[clap(long, value_parser)]
     pub config_path: Option<PathBuf>,
@@ -36,12 +36,6 @@ pub struct NodeArgs {
     /// Cannot be used with --config-path
     #[clap(long, value_parser, conflicts_with("config_path"))]
     pub test_config_override: Option<PathBuf>,
-
-    /// Optimize the node for higher performance.
-    ///
-    /// Note: This is only useful for e2e performance testing, and should not be used in production.
-    #[clap(long)]
-    pub performance: bool,
 
     /// Random seed for key generation in test mode
     ///
@@ -63,7 +57,7 @@ pub struct NodeArgs {
 
     /// If set we won't run the node at all.
     //
-    // Note: I decided that since running multiple partial localnets is a rare
+    // Note: I decided that since running multiple partial local testnets is a rare
     // case that only core devs would ever really want, it wasn't worth making the code
     // much more complex to support that case "first class". Instead, we have this flag
     // that does everything else to set up running the node, but never actually runs
@@ -71,7 +65,7 @@ pub struct NodeArgs {
     // and invoke it again to run processors + indexer API. You might want to do this
     // for compatibility testing. If you use this flag and there _isn't_ a node already
     // running at the expected port, the processors will fail to connect to the txn
-    // stream (since there isn't one) and the localnet will crash.
+    // stream (since there isn't one) and the local testnet will crash.
     //
     // If we do change our minds on this one day, the correct way to do this would be
     // to let the user instead pass in a bunch of flags that declare where an existing
@@ -91,7 +85,7 @@ pub struct NodeManager {
 }
 
 impl NodeManager {
-    pub fn new(args: &RunLocalnet, bind_to: Ipv4Addr, test_dir: PathBuf) -> Result<Self> {
+    pub fn new(args: &RunLocalTestnet, bind_to: Ipv4Addr, test_dir: PathBuf) -> Result<Self> {
         let rng = args
             .node_args
             .seed
@@ -107,7 +101,6 @@ impl NodeManager {
             &test_dir,
             false,
             false,
-            args.node_args.performance,
             aptos_cached_packages::head_release_bundle(),
             rng,
         )
