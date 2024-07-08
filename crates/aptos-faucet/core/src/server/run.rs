@@ -276,7 +276,9 @@ impl RunConfig {
             handler_config: HandlerConfig {
                 use_helpful_errors: true,
                 return_rejections_early: false,
-                max_concurrent_requests: None,
+                // Replace None to Some(1) to force to send one Tx at a time.
+                // Patch to avoid sequence number mix issue.
+                max_concurrent_requests: Some(1),
             },
         }
     }
