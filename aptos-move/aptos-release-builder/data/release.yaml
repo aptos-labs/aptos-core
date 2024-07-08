@@ -15,5 +15,5 @@ proposals:
           new: current
       - FeatureFlag:
           enabled:
-            - disallow_native_dispatch
+            - disallow_user_native
 
