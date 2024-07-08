@@ -40,7 +40,7 @@ pub struct Worker {
     model: NFTMetadataCrawlerURIs,
     asset_data_id: String,
     asset_uri: String,
-    last_transaction_version: i32,
+    last_transaction_version: i64,
     last_transaction_timestamp: chrono::NaiveDateTime,
     force: bool,
 }
@@ -53,7 +53,7 @@ impl Worker {
         pubsub_message: &str,
         asset_data_id: &str,
         asset_uri: &str,
-        last_transaction_version: i32,
+        last_transaction_version: i64,
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
     ) -> Self {
