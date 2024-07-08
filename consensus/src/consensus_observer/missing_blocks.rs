@@ -36,6 +36,11 @@ impl MissingBlockStore {
         }
     }
 
+    /// Clears all missing blocks from the store
+    pub fn clear_missing_blocks(&self) {
+        self.blocks_missing_payloads.lock().clear();
+    }
+
     /// Inserts a block (with missing payloads) into the store
     pub fn insert_missing_block(&self, ordered_block: OrderedBlock) {
         // Get the epoch and round of the first block
@@ -167,6 +172,42 @@ mod test {
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     };
     use rand::Rng;
+
+    #[test]
+    fn test_clear_missing_blocks() {
+        // Create a new missing block store
+        let max_num_pending_blocks = 10;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks: max_num_pending_blocks as u64,
+            ..ConsensusObserverConfig::default()
+        };
+        let missing_block_store = MissingBlockStore::new(consensus_observer_config);
+
+        // Insert the maximum number of blocks into the store
+        let current_epoch = 0;
+        let starting_round = 0;
+        let missing_blocks = create_and_add_missing_blocks(
+            &missing_block_store,
+            max_num_pending_blocks,
+            current_epoch,
+            starting_round,
+            5,
+        );
+
+        // Verify that the store is not empty
+        verify_missing_blocks(
+            &missing_block_store,
+            max_num_pending_blocks,
+            &missing_blocks,
+        );
+
+        // Clear the missing blocks from the store
+        missing_block_store.clear_missing_blocks();
+
+        // Verify that the store is now empty
+        let blocks_missing_payloads = missing_block_store.blocks_missing_payloads.lock();
+        assert!(blocks_missing_payloads.is_empty());
+    }
 
     #[test]
     fn test_insert_missing_block() {
@@ -379,7 +420,7 @@ mod test {
     #[test]
     fn test_remove_ready_block_multiple_blocks_missing() {
         // Create a new missing block store
-        let max_num_pending_blocks = 4;
+        let max_num_pending_blocks = 10;
         let consensus_observer_config = ConsensusObserverConfig {
             max_num_pending_blocks: max_num_pending_blocks as u64,
             ..ConsensusObserverConfig::default()

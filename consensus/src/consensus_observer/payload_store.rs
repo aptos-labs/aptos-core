@@ -65,6 +65,11 @@ impl BlockPayloadStore {
         })
     }
 
+    /// Clears all the payloads from the block payload store
+    pub fn clear_all_payloads(&self) {
+        self.block_transaction_payloads.lock().clear();
+    }
+
     /// Returns a reference to the block transaction payloads
     pub fn get_block_payloads(&self) -> Arc<Mutex<HashMap<HashValue, BlockPayloadStatus>>> {
         self.block_transaction_payloads.clone()
