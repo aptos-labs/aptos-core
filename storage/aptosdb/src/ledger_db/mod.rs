@@ -103,6 +103,7 @@ pub struct LedgerDb {
     transaction_db: TransactionDb,
     transaction_info_db: TransactionInfoDb,
     write_set_db: WriteSetDb,
+    enable_storage_sharding: bool,
 }
 
 impl LedgerDb {
@@ -147,6 +148,7 @@ impl LedgerDb {
                 transaction_db: TransactionDb::new(Arc::clone(&ledger_metadata_db)),
                 transaction_info_db: TransactionInfoDb::new(Arc::clone(&ledger_metadata_db)),
                 write_set_db: WriteSetDb::new(Arc::clone(&ledger_metadata_db)),
+                enable_storage_sharding: false,
             });
         }
 
@@ -206,7 +208,12 @@ impl LedgerDb {
             transaction_db,
             transaction_info_db,
             write_set_db,
+            enable_storage_sharding: true,
         })
+    }
+
+    pub(crate) fn enable_storage_sharding(&self) -> bool {
+        self.enable_storage_sharding
     }
 
     pub(crate) fn create_checkpoint(

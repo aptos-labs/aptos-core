@@ -27,6 +27,7 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use anyhow::anyhow;
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_storage_interface::Result;
@@ -112,7 +113,10 @@ impl DBPruner for LedgerPruner {
 }
 
 impl LedgerPruner {
-    pub fn new(ledger_db: Arc<LedgerDb>) -> Result<Self> {
+    pub fn new(
+        ledger_db: Arc<LedgerDb>,
+        internal_indexer_db: Option<InternalIndexerDB>,
+    ) -> Result<Self> {
         info!(name = LEDGER_PRUNER_NAME, "Initializing...");
 
         let ledger_metadata_pruner = Box::new(
@@ -132,6 +136,7 @@ impl LedgerPruner {
         let event_store_pruner = Box::new(EventStorePruner::new(
             Arc::clone(&ledger_db),
             metadata_progress,
+            internal_indexer_db.clone(),
         )?);
         let transaction_accumulator_pruner = Box::new(TransactionAccumulatorPruner::new(
             Arc::clone(&ledger_db),
@@ -151,6 +156,7 @@ impl LedgerPruner {
             Arc::clone(&transaction_store),
             Arc::clone(&ledger_db),
             metadata_progress,
+            internal_indexer_db,
         )?);
         let write_set_pruner = Box::new(WriteSetPruner::new(
             Arc::clone(&ledger_db),

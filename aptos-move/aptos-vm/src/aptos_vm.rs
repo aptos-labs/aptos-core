@@ -50,7 +50,7 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
-        OnChainConfig, TimedFeatures,
+        OnChainConfig, TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -759,6 +759,22 @@ impl AptosVM {
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
 
+        // Native entry function is forbidden.
+        if self
+            .features()
+            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES)
+            && function.is_native()
+        {
+            return Err(
+                PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
+                    .with_message(
+                        "Executing user defined native entry function is not allowed".to_string(),
+                    )
+                    .finish(Location::Module(entry_fn.module().clone()))
+                    .into_vm_status(),
+            );
+        }
+
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
         if function.is_friend_or_private()
             && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
@@ -1420,6 +1436,18 @@ impl AptosVM {
                 // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
             }
 
+            if self
+                .timed_features()
+                .is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
+            {
+                for (module, blob) in modules.iter().zip(bundle.iter()) {
+                    // TODO(Gas): Make budget configurable.
+                    let budget = 2048 + blob.code().len() as u64 * 20;
+                    move_binary_format::check_complexity::check_module_complexity(module, budget)
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                }
+            }
+
             // Validate the module bundle
             self.validate_publish_request(session, modules, expected_modules, allowed_deps)?;
 
@@ -1476,6 +1504,14 @@ impl AptosVM {
         {
             self.reject_unstable_bytecode(modules)?;
         }
+
+        if self
+            .features()
+            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES)
+        {
+            verifier::native_validation::validate_module_natives(modules)?;
+        }
+
         for m in modules {
             if !expected_modules.remove(m.self_id().name().as_str()) {
                 return Err(Self::metadata_validation_error(&format!(

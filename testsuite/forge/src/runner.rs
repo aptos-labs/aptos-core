@@ -124,6 +124,7 @@ pub type OverrideNodeConfigFn = Arc<dyn Fn(&mut NodeConfig, &mut NodeConfig) + S
 pub struct NodeResourceOverride {
     pub cpu_cores: Option<usize>,
     pub memory_gib: Option<usize>,
+    pub storage_gib: Option<usize>,
 }
 
 pub struct ForgeConfig {
@@ -270,6 +271,7 @@ impl ForgeConfig {
         let validator_resource_override = self.validator_resource_override;
         let fullnode_resource_override = self.fullnode_resource_override;
 
+        // Override specific helm values. See reference: terraform/helm/aptos-node/values.yaml
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
             if let Some(override_config) = &validator_override_node_config {
                 helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
@@ -304,6 +306,9 @@ impl ForgeConfig {
                 helm_values["validator"]["resources"]["limits"]["memory"] =
                     format!("{}Gi", memory_gib).into();
             }
+            if let Some(storage_gib) = validator_resource_override.storage_gib {
+                helm_values["validator"]["storage"]["size"] = format!("{}Gi", storage_gib).into();
+            }
             // fullnode resource overrides
             if let Some(cpu_cores) = fullnode_resource_override.cpu_cores {
                 helm_values["fullnode"]["resources"]["requests"]["cpu"] = cpu_cores.into();
@@ -314,6 +319,9 @@ impl ForgeConfig {
                     format!("{}Gi", memory_gib).into();
                 helm_values["fullnode"]["resources"]["limits"]["memory"] =
                     format!("{}Gi", memory_gib).into();
+            }
+            if let Some(storage_gib) = fullnode_resource_override.storage_gib {
+                helm_values["fullnode"]["storage"]["size"] = format!("{}Gi", storage_gib).into();
             }
         }))
     }

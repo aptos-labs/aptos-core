@@ -7,7 +7,7 @@ import os
 import shutil
 import subprocess
 
-from verify_core.common import query_backup_latest_version, clear_artifacts
+from verify_core.common import warm_cache_and_get_latest_backup_version, clear_artifacts
 
 
 def main():

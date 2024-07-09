@@ -829,7 +829,11 @@ fn optimize_for_maximum_throughput(
 ) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_unique_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_txns = config
+        .consensus
+        .max_sending_block_txns
+        .max(max_txns_per_block as u64);
     config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
@@ -1948,6 +1952,16 @@ fn realistic_env_max_load_test(
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
 
+    // resource override for long_running tests
+    let resource_override = if long_running {
+        NodeResourceOverride {
+            storage_gib: Some(1000), // long running tests need more storage
+            ..NodeResourceOverride::default()
+        }
+    } else {
+        NodeResourceOverride::default() // no overrides
+    };
+
     let mut success_criteria = SuccessCriteria::new(95)
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 10% of the time.
@@ -2024,6 +2038,8 @@ fn realistic_env_max_load_test(
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)
+        .with_validator_resource_override(resource_override)
+        .with_fullnode_resource_override(resource_override)
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
@@ -2081,11 +2097,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                    config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
-                        sender_conflict_window_size: 256,
-                        module_conflict_window_size: 2,
-                        entry_fun_conflict_window_size: 3,
-                    };
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -2114,10 +2126,12 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_validator_resource_override(NodeResourceOverride {
                 cpu_cores: Some(58),
                 memory_gib: Some(200),
+                storage_gib: Some(500), // assuming we're using these large marchines for long-running or expensive tests which need more disk
             })
             .with_fullnode_resource_override(NodeResourceOverride {
                 cpu_cores: Some(58),
                 memory_gib: Some(200),
+                storage_gib: Some(500),
             })
             .with_success_criteria(
                 SuccessCriteria::new(25000)
