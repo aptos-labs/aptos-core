@@ -20,13 +20,12 @@ use futures::{
 use pin_project::pin_project;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     io,
     pin::Pin,
     task::{Context, Poll},
 };
-use serde::de::DeserializeOwned;
 use thiserror::Error;
 use tokio_util::{
     codec::{FramedRead, FramedWrite, LengthDelimitedCodec},

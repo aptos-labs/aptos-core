@@ -2,47 +2,20 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// use crate::{
-//     core_mempool::CoreMempool,
-//     network::MempoolSyncMsg,
-//     shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
-// };
-// use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
-// use aptos_crypto::{x25519::PrivateKey, Uniform};
-// use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
-// use aptos_infallible::{Mutex, RwLock};
-// use aptos_network::{
-//     application::{
-//         interface::{NetworkClient, NetworkServiceEvents},
-//         storage::PeersAndMetadata,
-//     },
-// };
-// use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::{
-    // on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
-    PeerId,
-};
-// use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use aptos_types::PeerId;
 use enum_dispatch::enum_dispatch;
-// use futures::{
-//     channel::mpsc::{self, unbounded, UnboundedReceiver},
-// };
-// use rand::rngs::StdRng;
-use std::{
-    collections::HashSet,
-    // sync::Arc,
-};
-// use tokio::runtime::Runtime;
+use std::collections::HashSet;
 
-// type MempoolNetworkHandle = (
-//     NetworkId,
-//     NetworkSender<MempoolSyncMsg>,
-//     NetworkEvents<MempoolSyncMsg>,
-// );
+#[cfg(wrong_network_abstraction)]
+type MempoolNetworkHandle = (
+    NetworkId,
+    NetworkSender<MempoolSyncMsg>,
+    NetworkEvents<MempoolSyncMsg>,
+);
 
 /// This is a simple node identifier for testing
 /// This keeps track of the `NodeType` and a simple index
@@ -52,7 +25,7 @@ pub struct NodeId {
     num: u32,
 }
 
-#[cfg(unused)]
+#[cfg(wrong_network_abstraction)]
 impl NodeId {
     pub(crate) fn new(node_type: NodeType, num: u32) -> Self {
         NodeId { node_type, num }
@@ -126,7 +99,7 @@ pub struct ValidatorNodeInfo {
     vfn_peer_id: PeerId,
 }
 
-#[cfg(unused)]
+#[cfg(wrong_network_abstraction)]
 impl ValidatorNodeInfo {
     fn new(peer_id: PeerId, vfn_peer_id: PeerId) -> Self {
         ValidatorNodeInfo {
@@ -232,7 +205,7 @@ impl NodeInfoTrait for FullNodeInfo {
 }
 
 /// Provides a `NodeInfo` and `NodeConfig` for a validator
-#[cfg(unused)]
+#[cfg(wrong_network_abstraction)]
 pub fn validator_config(rng: &mut StdRng) -> (ValidatorNodeInfo, NodeConfig) {
     let config = NodeConfig::generate_random_config_with_template(
         &NodeConfig::get_default_validator_config(),
@@ -465,8 +438,7 @@ pub struct NodeNetworkInterface {
     /// Peer request receiver for messages
     pub(crate) network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Peer notification sender for sending outgoing messages to other peers
-    pub(crate) network_notifs_tx:
-        aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+    pub(crate) network_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
 }
 
 #[cfg(wrong_network_abstraction)]

@@ -8,6 +8,7 @@ use crate::{
     protocols::{
         network::ReceivedMessage,
         rpc::OutboundRpcRequest,
+        wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
     },
     transport::ConnectionMetadata,
     ProtocolId,
@@ -21,7 +22,6 @@ use aptos_types::PeerId;
 use async_trait::async_trait;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 
 /// A sender to a node to mock an inbound network message from [`PeerManager`]
 pub type InboundMessageSender =
@@ -310,8 +310,8 @@ pub trait TestNode: ApplicationNode + Sync {
         // let (remote_peer_id, protocol_id, data, maybe_rpc_info) = match request {
         let (remote_peer_id, protocol_id, rmsg) = match request {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
-                let rmsg = ReceivedMessage{
-                    message: NetworkMessage::RpcRequest(RpcRequest{
+                let rmsg = ReceivedMessage {
+                    message: NetworkMessage::RpcRequest(RpcRequest {
                         protocol_id: msg.protocol_id,
                         request_id: 0, // TODO: rand? seq?
                         priority: 0,
@@ -330,8 +330,8 @@ pub trait TestNode: ApplicationNode + Sync {
                 )
             },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                let rmsg = ReceivedMessage{
-                    message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                let rmsg = ReceivedMessage {
+                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
                         protocol_id: msg.protocol_id,
                         priority: 0,
                         raw_msg: msg.mdata.into(),

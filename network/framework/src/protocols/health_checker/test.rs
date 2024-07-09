@@ -6,23 +6,25 @@ use super::*;
 use crate::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::{
-        self, ConnectionRequest, ConnectionRequestSender,
-        PeerManagerRequest, PeerManagerRequestSender,
+        self, ConnectionRequest, ConnectionRequestSender, PeerManagerRequest,
+        PeerManagerRequestSender,
     },
     protocols::{
         network::{NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage},
-        wire::handshake::v1::{ProtocolId::HealthCheckerRpc, ProtocolIdSet},
+        wire::{
+            handshake::v1::{ProtocolId::HealthCheckerRpc, ProtocolIdSet},
+            messaging::v1::{NetworkMessage, RpcRequest},
+        },
     },
     transport::ConnectionMetadata,
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::network_id::NetworkId;
 use aptos_time_service::{MockTimeService, TimeService};
 use futures::future;
 use maplit::hashmap;
 use std::sync::Arc;
-use aptos_config::network_id::NetworkId;
-use crate::protocols::wire::messaging::v1::{NetworkMessage, RpcRequest};
 
 const PING_INTERVAL: Duration = Duration::from_secs(1);
 const PING_TIMEOUT: Duration = Duration::from_millis(500);
@@ -133,9 +135,8 @@ impl TestHarness {
         ping: u32,
     ) -> oneshot::Receiver<Result<Bytes, RpcError>> {
         let protocol_id = ProtocolId::HealthCheckerRpc;
-        let data = bcs::to_bytes(&HealthCheckerMsg::Ping(Ping(ping)))
-            .unwrap();
-            // .into();
+        let data = bcs::to_bytes(&HealthCheckerMsg::Ping(Ping(ping))).unwrap();
+        // .into();
         let (res_tx, res_rx) = oneshot::channel();
         // let inbound_rpc_req = InboundRpcRequest {
         //     protocol_id,
@@ -148,8 +149,8 @@ impl TestHarness {
             .push_with_feedback(
                 key,
                 // PeerManagerNotification::RecvRpc(peer_id, inbound_rpc_req),
-                ReceivedMessage{
-                    message: NetworkMessage::RpcRequest(RpcRequest{
+                ReceivedMessage {
+                    message: NetworkMessage::RpcRequest(RpcRequest {
                         protocol_id,
                         request_id: 0,
                         priority: 0,

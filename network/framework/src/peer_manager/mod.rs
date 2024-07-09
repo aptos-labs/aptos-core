@@ -56,13 +56,12 @@ pub use self::error::PeerManagerError;
 use crate::{
     application::{error::Error, storage::PeersAndMetadata},
     peer_manager::transport::{TransportHandler, TransportRequest},
-    protocols::network::SerializedRequest,
+    protocols::network::{ReceivedMessage, SerializedRequest},
 };
 use aptos_config::config::PeerRole;
 use aptos_types::account_address::AccountAddress;
 pub use senders::*;
 pub use types::*;
-use crate::protocols::network::ReceivedMessage;
 
 /// Responsible for handling and maintaining connections to other Peers
 pub struct PeerManager<TTransport, TSocket>

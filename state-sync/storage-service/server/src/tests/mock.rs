@@ -9,14 +9,17 @@ use anyhow::Result;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{StateSyncConfig, StorageServiceConfig},
-    network_id::NetworkId,
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::HashValue;
 use aptos_network::{
     application::{interface::NetworkServiceEvents, storage::PeersAndMetadata},
     protocols::{
-        network::{NetworkEvents, NewNetworkEvents},
-        wire::handshake::v1::ProtocolId,
+        network::{NetworkEvents, NewNetworkEvents, ReceivedMessage},
+        wire::{
+            handshake::v1::ProtocolId,
+            messaging::v1::{NetworkMessage, RpcRequest},
+        },
     },
 };
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
@@ -49,9 +52,6 @@ use mockall::mock;
 use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::timeout;
-use aptos_config::network_id::PeerNetworkId;
-use aptos_network::protocols::network::ReceivedMessage;
-use aptos_network::protocols::wire::messaging::v1::{NetworkMessage, RpcRequest};
 
 // Useful test constants
 const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
@@ -163,7 +163,7 @@ impl MockClient {
             .unwrap();
         let (res_tx, res_rx) = oneshot::channel();
         let notification = ReceivedMessage {
-            message: NetworkMessage::RpcRequest(RpcRequest{
+            message: NetworkMessage::RpcRequest(RpcRequest {
                 protocol_id,
                 request_id: 0, // TODO: rand? inc?
                 priority: 0,

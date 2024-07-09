@@ -11,7 +11,7 @@ use crate::{
         PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{
-        network::{NetworkClientConfig, NetworkServiceConfig},
+        network::{NetworkClientConfig, NetworkServiceConfig, ReceivedMessage},
         wire::handshake::v1::ProtocolIdSet,
     },
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
@@ -31,7 +31,6 @@ use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use std::{clone::Clone, collections::HashMap, fmt::Debug, sync::Arc};
 use tokio::runtime::Handle;
-use crate::protocols::network::ReceivedMessage;
 
 /// Inbound and Outbound connections are always secured with NoiseIK.  The dialer
 /// will always verify the listener.

@@ -52,7 +52,7 @@ use crate::{
     },
     logging::NetworkSchema,
     protocols::{
-        network::SerializedRequest,
+        network::{ReceivedMessage, SerializedRequest},
         wire::messaging::v1::{NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse},
     },
     ProtocolId,
@@ -73,9 +73,7 @@ use futures::{
     stream::{FuturesUnordered, StreamExt},
 };
 use serde::Serialize;
-use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, time::Duration};
-use std::sync::Arc;
-use crate::protocols::network::ReceivedMessage;
+use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 pub mod error;
 
@@ -227,7 +225,7 @@ impl InboundRpcs {
 
         let peer_id = request.sender.peer_id();
         let NetworkMessage::RpcRequest(rpc_request) = &request.message else {
-            return Err(RpcError::InvalidRpcResponse)
+            return Err(RpcError::InvalidRpcResponse);
         };
         let protocol_id = rpc_request.protocol_id;
         let request_id = rpc_request.request_id;

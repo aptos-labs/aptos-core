@@ -16,6 +16,10 @@ use aptos_config::{
 use aptos_crypto::HashValue;
 use aptos_logger::Level;
 use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::protocols::{
+    network::ReceivedMessage,
+    wire::messaging::v1::{NetworkMessage, RpcRequest},
+};
 use aptos_network::{
     application::{
         interface::NetworkServiceEvents, metadata::ConnectionState, storage::PeersAndMetadata,
@@ -69,8 +73,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_network::protocols::network::ReceivedMessage;
-use aptos_network::protocols::wire::messaging::v1::{NetworkMessage, RpcRequest};
 
 // Useful test constants
 const LOCAL_HOST_NET_ADDR: &str = "/ip4/127.0.0.1/tcp/8081";
@@ -563,7 +565,7 @@ impl MockClient {
         // };
         // let request_notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
         let request_notification = ReceivedMessage {
-            message: NetworkMessage::RpcRequest(RpcRequest{
+            message: NetworkMessage::RpcRequest(RpcRequest {
                 protocol_id,
                 request_id: 42, // TODO? count? rand?
                 priority: 0,

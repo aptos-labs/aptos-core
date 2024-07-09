@@ -8,8 +8,8 @@ pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+    protocols::wire::messaging::v1::{IncomingRequest, NetworkMessage},
     ProtocolId,
-    protocols::wire::messaging::v1::NetworkMessage,
 };
 use aptos_channels::aptos_channel;
 use aptos_config::network_id::PeerNetworkId;
@@ -25,9 +25,7 @@ use futures::{
 use futures_util::ready;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{cmp::min, fmt::Debug, future, marker::PhantomData, pin::Pin, time::Duration};
-use std::sync::Arc;
-use crate::protocols::wire::messaging::v1::IncomingRequest;
+use std::{cmp::min, fmt::Debug, future, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -187,7 +185,9 @@ impl ReceivedMessage {
 
 impl PartialEq for ReceivedMessage {
     fn eq(&self, other: &Self) -> bool {
-        (self.message == other.message) && (self.rx_at == other.rx_at) && (self.sender == other.sender)
+        (self.message == other.message)
+            && (self.rx_at == other.rx_at)
+            && (self.sender == other.sender)
     }
 }
 
@@ -278,7 +278,12 @@ fn received_message_to_event<TMessage: Message>(
     message: ReceivedMessage,
 ) -> Option<Event<TMessage>> {
     let peer_id = message.sender.peer_id();
-    let ReceivedMessage { message, sender: _sender, rx_at: _rx_at, rpc_replier } = message;
+    let ReceivedMessage {
+        message,
+        sender: _sender,
+        rx_at: _rx_at,
+        rpc_replier,
+    } = message;
     match message {
         NetworkMessage::RpcRequest(rpc_req) => {
             let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();

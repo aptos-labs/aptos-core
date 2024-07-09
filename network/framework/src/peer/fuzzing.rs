@@ -2,12 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use crate::{constants, peer::Peer, protocols::wire::{
-    handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
-    messaging::v1::{MultiplexMessage, MultiplexMessageSink},
-}, testutils::fake_socket::ReadOnlyTestSocketVec, transport::{Connection, ConnectionId, ConnectionMetadata}};
+use crate::{
+    constants,
+    peer::Peer,
+    protocols::wire::{
+        handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
+        messaging::v1::{MultiplexMessage, MultiplexMessageSink},
+    },
+    testutils::fake_socket::ReadOnlyTestSocketVec,
+    transport::{Connection, ConnectionId, ConnectionMetadata},
+};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::PeerRole, network_id::NetworkContext};
 use aptos_memsocket::MemorySocket;
@@ -17,7 +21,7 @@ use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{executor::block_on, future, io::AsyncReadExt, sink::SinkExt, stream::StreamExt};
 use proptest::{arbitrary::any, collection::vec};
-use std::time::Duration;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// Generate a sequence of `MultiplexMessage`, bcs serialize them, and write them
 /// out to a buffer using our length-prefixed message codec.

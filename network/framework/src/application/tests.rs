@@ -10,12 +10,18 @@ use crate::{
         storage::PeersAndMetadata,
     },
     peer_manager::{
-        ConnectionNotification, ConnectionRequestSender,
-        PeerManagerRequest, PeerManagerRequestSender,
+        ConnectionNotification, ConnectionRequestSender, PeerManagerRequest,
+        PeerManagerRequestSender,
     },
     protocols::{
-        network::{Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage},
-        wire::handshake::v1::{ProtocolId, ProtocolIdSet},
+        network::{
+            Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender,
+            ReceivedMessage,
+        },
+        wire::{
+            handshake::v1::{ProtocolId, ProtocolIdSet},
+            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+        },
     },
     transport::ConnectionMetadata,
 };
@@ -38,7 +44,6 @@ use std::{
     time::Duration,
 };
 use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
-use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 
 // Useful test constants for timeouts
 const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
@@ -1205,11 +1210,6 @@ async fn wait_for_network_event(
                     assert_eq!(outbound_rpc_request.timeout, message_wait_time);
 
                     // Create and return the peer manager notification
-                    // let inbound_rpc_request = InboundRpcRequest {
-                    //     protocol_id: outbound_rpc_request.protocol_id,
-                    //     data: outbound_rpc_request.data,
-                    //     res_tx: oneshot::channel().0,
-                    // };
                     let rmsg = ReceivedMessage {
                         message: NetworkMessage::RpcRequest(RpcRequest{
                             protocol_id: outbound_rpc_request.protocol_id,
