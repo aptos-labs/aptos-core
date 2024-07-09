@@ -27,7 +27,7 @@ pub enum ServerType {
 /// Trait for handling requests to the server
 #[async_trait::async_trait]
 trait Server: Send + Sync {
-    async fn handle_request(self: Arc<Self>, bytes: Bytes) -> Response;
+    async fn handle_request(self: Arc<Self>, bytes: Bytes) -> Response<String>;
 }
 
 /// HEAD request to get MIME type and size of content

@@ -13,7 +13,7 @@ use crate::{
     worker::Worker,
     Server,
 };
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use bytes::Bytes;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
@@ -191,18 +191,25 @@ impl ParserContext {
 #[async_trait::async_trait]
 impl Server for ParserContext {
     /// Handles calling parser for the root endpoint
-    async fn handle_request(self: Arc<Self>, msg: Bytes) -> Response {
+    async fn handle_request(self: Arc<Self>, msg: Bytes) -> Response<String> {
         self.spawn_parser(msg).await;
 
         if !get_parser_config(self.nft_metadata_crawler_config.clone())
             .unwrap()
             .ack_parsed_uris
         {
-            return StatusCode::BAD_REQUEST.into_response();
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body("".to_string())
+                .unwrap();
         }
 
         PUBSUB_ACK_SUCCESS_COUNT.inc();
-        StatusCode::OK.into_response()
+
+        Response::builder()
+            .status(StatusCode::OK)
+            .body("".to_string())
+            .unwrap()
     }
 }
 
