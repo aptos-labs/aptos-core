@@ -187,6 +187,7 @@ impl Server for AssetUploaderContext {
 
                 Response::builder()
                     .status(StatusCode::OK)
+                    .header("Content-Type", "application/json")
                     .body(
                         serde_json::to_string(&AssetUploaderResponse {
                             successes,
