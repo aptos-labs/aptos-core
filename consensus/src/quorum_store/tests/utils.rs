@@ -109,10 +109,9 @@ fn test_proof_queue_sorting() {
 fn test_proof_calculate_remaining_txns_and_proofs() {
     let my_peer_id = PeerId::random();
     let mut proof_queue = ProofQueue::new(my_peer_id);
-
+    let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
-
     let txns = vec![
         TransactionSummary::new(PeerId::ONE, 0, HashValue::zero()),
         TransactionSummary::new(PeerId::ONE, 1, HashValue::zero()),
@@ -121,17 +120,17 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     ];
 
     let author_0_batches = vec![
-        proof_of_store(author_0, BatchId::new_for_test(0), 100, 5),
-        proof_of_store(author_0, BatchId::new_for_test(1), 200, 7),
-        proof_of_store(author_0, BatchId::new_for_test(2), 50, 2),
-        proof_of_store(author_0, BatchId::new_for_test(3), 300, 1),
+        proof_of_store(author_0, BatchId::new_for_test(0), 100, now + 50000),
+        proof_of_store(author_0, BatchId::new_for_test(1), 200, now + 70000),
+        proof_of_store(author_0, BatchId::new_for_test(2), 50, now + 20000),
+        proof_of_store(author_0, BatchId::new_for_test(3), 300, now + 10000),
     ];
 
     let author_1_batches = vec![
-        proof_of_store(author_1, BatchId::new_for_test(4), 500, 2),
-        proof_of_store(author_1, BatchId::new_for_test(5), 400, 3),
-        proof_of_store(author_1, BatchId::new_for_test(6), 600, 5),
-        proof_of_store(author_1, BatchId::new_for_test(7), 50, 6),
+        proof_of_store(author_1, BatchId::new_for_test(4), 500, now + 20000),
+        proof_of_store(author_1, BatchId::new_for_test(5), 400, now + 30000),
+        proof_of_store(author_1, BatchId::new_for_test(6), 600, now + 50000),
+        proof_of_store(author_1, BatchId::new_for_test(7), 50, now + 60000),
     ];
 
     let info_1 = author_0_batches[0].info().clone();
@@ -227,7 +226,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     // batch_summaries: [2 -> txn_1, 3 -> txn_0, 4 -> txn_2, 5 -> txn_1]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (4, 5));
 
-    proof_queue.handle_updated_block_timestamp(2);
+    proof_queue.handle_updated_block_timestamp(now + 20000);
     // Expires info_3, info_4, info_5
     // txns: [txn_1] + txns(proof_6)
     // proofs: [2, 6]
@@ -254,7 +253,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
-    proof_queue.handle_updated_block_timestamp(3);
+    proof_queue.handle_updated_block_timestamp(now + 30000);
     // Expires info_6
     // txns: [txn_1]
     // proofs: [2]
@@ -300,7 +299,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
 
-    proof_queue.handle_updated_block_timestamp(7);
+    proof_queue.handle_updated_block_timestamp(now + 70000);
     // Expires info_2, info_7
     // txns: []
     // proofs: []
@@ -312,6 +311,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
 fn test_proof_pull_proofs_with_duplicates() {
     let my_peer_id = PeerId::random();
     let mut proof_queue = ProofQueue::new(my_peer_id);
+    let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
 
     let txns = vec![
         TransactionSummary::new(PeerId::ONE, 0, HashValue::zero()),
@@ -324,10 +324,10 @@ fn test_proof_pull_proofs_with_duplicates() {
     let author_1 = PeerId::random();
 
     let author_0_batches = vec![
-        proof_of_store(author_0, BatchId::new_for_test(0), 100, 1),
-        proof_of_store(author_0, BatchId::new_for_test(1), 200, 1),
-        proof_of_store(author_0, BatchId::new_for_test(2), 50, 1),
-        proof_of_store(author_0, BatchId::new_for_test(3), 300, 1),
+        proof_of_store(author_0, BatchId::new_for_test(0), 100, now + 5000),
+        proof_of_store(author_0, BatchId::new_for_test(1), 200, now + 5000),
+        proof_of_store(author_0, BatchId::new_for_test(2), 50, now + 5000),
+        proof_of_store(author_0, BatchId::new_for_test(3), 300, now + 5000),
     ];
     let info_0 = author_0_batches[0].info().clone();
     proof_queue.add_batch_summaries(vec![(author_0_batches[0].info().clone(), vec![txns[0]])]);
@@ -340,10 +340,10 @@ fn test_proof_pull_proofs_with_duplicates() {
     }
 
     let author_1_batches = vec![
-        proof_of_store(author_1, BatchId::new_for_test(4), 500, 1),
-        proof_of_store(author_1, BatchId::new_for_test(5), 400, 1),
-        proof_of_store(author_1, BatchId::new_for_test(6), 600, 1),
-        proof_of_store(author_1, BatchId::new_for_test(7), 50, 1),
+        proof_of_store(author_1, BatchId::new_for_test(4), 500, now + 5000),
+        proof_of_store(author_1, BatchId::new_for_test(5), 400, now + 5000),
+        proof_of_store(author_1, BatchId::new_for_test(6), 600, now + 5000),
+        proof_of_store(author_1, BatchId::new_for_test(7), 50, now + 5000),
     ];
     proof_queue.add_batch_summaries(vec![(author_1_batches[0].info().clone(), vec![txns[1]])]);
     proof_queue.add_batch_summaries(vec![(author_1_batches[1].info().clone(), vec![txns[2]])]);
