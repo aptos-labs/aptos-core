@@ -192,6 +192,23 @@ pub static CORE_MEMPOOL_GAS_UPGRADED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static MEMPOOL_READ_TIMELINE_FREQUENCY: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_read_timeline",
+        "Number of times core mempool read_timeline is invoked"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_READ_TIMELINE_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_max_txns",
+        "Number of max txns being pulled in read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 pub fn core_mempool_txn_commit_latency(
     stage: &'static str,
     submitted_by: &'static str,
