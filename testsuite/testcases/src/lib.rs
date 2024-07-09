@@ -488,7 +488,7 @@ impl dyn NetworkLoadTest + '_ {
         duration: Duration,
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
-        mut synchronized_with_job: Option<&mut EmitJob>,
+        synchronized_with_job: Option<&mut EmitJob>,
     ) -> Result<Vec<LoadTestPhaseStats>> {
         let destination = self.setup(ctx).await.context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm.clone()).await;

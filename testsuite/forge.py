@@ -190,7 +190,6 @@ class ForgeResult:
                 )
             )
         except Exception as e:
-            print(e)
             result.set_state(ForgeState.FAIL)
             result.set_debugging_output(
                 "{}\n{}\n".format(
