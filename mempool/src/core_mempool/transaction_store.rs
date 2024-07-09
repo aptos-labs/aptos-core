@@ -357,44 +357,43 @@ impl TransactionStore {
         false
     }
 
-    fn log_ready_transaction(
+    fn log_broadcast_ready_transaction(
         ranking_score: u64,
         bucket: &str,
         insertion_info: &mut InsertionInfo,
-        broadcast_ready: bool,
     ) {
         insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             let submitted_by = insertion_info.submitted_by_label();
-            if broadcast_ready {
-                counters::core_mempool_txn_commit_latency(
-                    CONSENSUS_READY_LABEL,
-                    submitted_by,
-                    bucket,
-                    time_delta,
-                );
-                counters::core_mempool_txn_commit_latency(
-                    BROADCAST_READY_LABEL,
-                    submitted_by,
-                    bucket,
-                    time_delta,
-                );
-            } else {
-                counters::core_mempool_txn_commit_latency(
-                    CONSENSUS_READY_LABEL,
-                    submitted_by,
-                    bucket,
-                    time_delta,
-                );
-            }
+            counters::core_mempool_txn_commit_latency(
+                BROADCAST_READY_LABEL,
+                submitted_by,
+                bucket,
+                time_delta,
+            );
         }
 
-        if broadcast_ready {
-            counters::core_mempool_txn_ranking_score(
-                BROADCAST_READY_LABEL,
-                BROADCAST_READY_LABEL,
+        counters::core_mempool_txn_ranking_score(
+            BROADCAST_READY_LABEL,
+            BROADCAST_READY_LABEL,
+            bucket,
+            ranking_score,
+        );
+    }
+
+    fn log_consensus_ready_transaction(
+        ranking_score: u64,
+        bucket: &str,
+        insertion_info: &mut InsertionInfo,
+    ) {
+        insertion_info.ready_time = SystemTime::now();
+        if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
+            let submitted_by = insertion_info.submitted_by_label();
+            counters::core_mempool_txn_commit_latency(
+                CONSENSUS_READY_LABEL,
+                submitted_by,
                 bucket,
-                ranking_score,
+                time_delta,
             );
         }
         counters::core_mempool_txn_ranking_score(
@@ -413,25 +412,33 @@ impl TransactionStore {
     fn process_ready_transactions(&mut self, address: &AccountAddress, sequence_num: u64) {
         if let Some(txns) = self.transactions.get_mut(address) {
             let mut min_seq = sequence_num;
-
-            while let Some(txn) = txns.get_mut(&min_seq) {
-                let process_ready = !self.priority_index.contains(txn);
-                self.priority_index.insert(txn);
-
-                let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
-                if process_broadcast_ready {
+            let input_seq = sequence_num;
+            for (_, txn) in
+                txns.range_mut((Bound::Excluded(input_seq), Bound::Included(input_seq + 50)))
+            {
+                if txn.timeline_state == TimelineState::NotReady {
                     self.timeline_index.insert(txn);
-                }
-
-                if process_ready {
-                    Self::log_ready_transaction(
+                    Self::log_broadcast_ready_transaction(
                         txn.ranking_score,
                         self.timeline_index.get_bucket(txn.ranking_score),
                         &mut txn.insertion_info,
-                        process_broadcast_ready,
                     );
                 }
+                // Remove txn from parking lot after it has been promoted to
+                // priority_index / timeline_index, i.e., txn status is ready.
+                self.parking_lot_index.remove(txn);
+            }
 
+            while let Some(txn) = txns.get_mut(&min_seq) {
+                if !self.priority_index.contains(txn) {
+                    self.priority_index.insert(txn);
+
+                    Self::log_consensus_ready_transaction(
+                        txn.ranking_score,
+                        self.timeline_index.get_bucket(txn.ranking_score),
+                        &mut txn.insertion_info,
+                    );
+                }
                 // Remove txn from parking lot after it has been promoted to
                 // priority_index / timeline_index, i.e., txn status is ready.
                 self.parking_lot_index.remove(txn);
@@ -439,7 +446,7 @@ impl TransactionStore {
             }
 
             let mut parking_lot_txns = 0;
-            for (_, txn) in txns.range_mut((Bound::Excluded(min_seq), Bound::Unbounded)) {
+            for (_, txn) in txns.range_mut((Bound::Excluded(input_seq + 50), Bound::Unbounded)) {
                 match txn.timeline_state {
                     TimelineState::Ready(_) => {},
                     _ => {
