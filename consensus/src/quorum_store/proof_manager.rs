@@ -323,10 +323,9 @@ impl ProofManager {
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
                             back_pressure = updated_back_pressure;
-                            // commented for testing
-                            // if back_pressure_tx.send(back_pressure).await.is_err() {
-                            //     debug!("Failed to send back_pressure for proposal");
-                            // }
+                            if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("Failed to send back_pressure for proposal");
+                            }
                         }
                     }),
                     Some(msg) = proof_rx.recv() => {
@@ -354,10 +353,9 @@ impl ProofManager {
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
                             back_pressure = updated_back_pressure;
-                            // commented for testing
-                            // if back_pressure_tx.send(back_pressure).await.is_err() {
-                            //     debug!("Failed to send back_pressure for commit notification");
-                            // }
+                            if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("Failed to send back_pressure for commit notification");
+                            }
                         }
                     })
                 }
