@@ -4,5 +4,10 @@
 *.profdata
 *.log
 *.svg
-coverage/
+*.txt
+coverage*/
 output/
+*logs/
+*results/
+afl*/
+fuzz/afl*/

@@ -2,34 +2,44 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use arbitrary::Unstructured;
-use move_smith::{ast::*, codegen::*, move_smith::*, names::Identifier, types::*, utils::*};
+use move_smith::{
+    ast::*,
+    codegen::*,
+    config::*,
+    move_smith::*,
+    names::{Identifier, IdentifierKind as IDKind},
+    types::*,
+    utils::*,
+};
 use num_bigint::BigUint;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::cell::RefCell;
 
 fn simple_module() -> Module {
     Module {
-        name: Identifier(String::from("SimpleModule")),
-        functions: vec![Function {
+        name: Identifier::new_str("SimpleModule", IDKind::Module),
+        functions: vec![RefCell::new(Function {
             signature: FunctionSignature {
+                inline: false,
+                type_parameters: TypeParameters::default(),
+                name: Identifier::new_str("fun1", IDKind::Function),
                 parameters: vec![
-                    (Identifier(String::from("param1")), Type::U64),
-                    (Identifier(String::from("param2")), Type::U8),
+                    (Identifier::new_str("param1", IDKind::Var), Type::U64),
+                    (Identifier::new_str("param2", IDKind::Var), Type::U8),
                 ],
                 return_type: Some(Type::U32),
             },
             visibility: Visibility { public: true },
-            name: Identifier(String::from("fun1")),
-            body: Some(FunctionBody {
+            body: Some(Block {
                 stmts: vec![Statement::Expr(Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(42u32),
                     typ: Type::U32,
                 }))],
+                return_expr: Some(Expression::NumberLiteral(NumberLiteral {
+                    value: BigUint::from(111u32),
+                    typ: Type::U32,
+                })),
             }),
-            return_stmt: Some(Expression::NumberLiteral(NumberLiteral {
-                value: BigUint::from(111u32),
-                typ: Type::U32,
-            })),
-        }],
+        })],
         structs: Vec::new(),
     }
 }
@@ -37,7 +47,8 @@ fn simple_module() -> Module {
 fn simple_script() -> Script {
     Script {
         main: vec![FunctionCall {
-            name: Identifier(String::from("0xCAFE::SimpleModule::fun1")),
+            name: Identifier::new_str("0xCAFE::SimpleModule::fun1", IDKind::Function),
+            type_args: TypeArgs::default(),
             args: vec![
                 Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(555u64),
@@ -56,15 +67,8 @@ fn simple_compile_unit() -> CompileUnit {
     CompileUnit {
         modules: vec![simple_module()],
         scripts: vec![simple_script()],
+        runs: vec![],
     }
-}
-
-fn get_raw_data() -> Vec<u8> {
-    let seed: u64 = 12345;
-    let mut rng = StdRng::seed_from_u64(seed);
-    let mut buffer = vec![0u8; 4096];
-    rng.fill(&mut buffer[..]);
-    buffer
 }
 
 #[test]
@@ -86,7 +90,7 @@ fn test_emit_code() {
 
 #[test]
 fn test_generation_and_compile() {
-    let raw_data = get_raw_data();
+    let raw_data = get_random_bytes(12345, 8192);
     let mut u = Unstructured::new(&raw_data);
     let mut smith = MoveSmith::default();
     smith.generate(&mut u).unwrap();
@@ -94,11 +98,52 @@ fn test_generation_and_compile() {
     let lines = compile_unit.emit_code();
     println!("{}", lines);
 
-    compile_modules(lines);
+    assert!(compile_move_code(lines, true, true));
+}
+
+#[test]
+fn test_generation_and_check_compile() {
+    let raw_data = get_random_bytes(54321, 1024 * 16);
+    let mut u = Unstructured::new(&raw_data);
+    let mut smith = MoveSmith::default();
+    smith.generate(&mut u).unwrap();
+    let compile_unit = smith.get_compile_unit();
+    let code = compile_unit.emit_code();
+    println!("{}", code);
+
+    let (package_path, dir) = create_tmp_move_package(code.clone());
+    let config = create_compiler_config_v1();
+    let result = compile_with_config(&package_path, config, "v1");
+    assert!(result);
+
+    let config = create_compiler_config_v2();
+    let result = compile_with_config(&package_path, config, "v2");
+    assert!(result);
+    dir.close().unwrap();
 }
 
 #[test]
 fn test_run_transactional_test() {
     let code = simple_compile_unit().emit_code();
-    run_transactional_test(code).unwrap();
+    run_transactional_test(code, &Config::default()).unwrap();
+}
+
+#[test]
+fn test_run_transactional_test_should_fail() {
+    let code = r#" //# publish
+module 0xCAFE::Module0 {
+    struct HasCopyDrop has copy, drop {}
+
+    struct C2<T1: drop, T2: copy> has copy, drop, store {}
+
+    fun m1<T1: copy+drop, T2: copy+drop>(x: T1) {
+        m2<C2<HasCopyDrop, T2>, HasCopyDrop>(C2{});
+    }
+    fun m2<T3: copy+drop, T4: copy+drop>(x: T3): T3 {
+        m1<T3, T4>(x);
+        x
+    }
+}"#;
+    let result = run_transactional_test(code.to_string(), &Config::default());
+    assert!(result.is_err());
 }
