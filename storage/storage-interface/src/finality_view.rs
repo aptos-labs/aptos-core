@@ -134,13 +134,13 @@ mod tests {
     }
 
     #[test]
-    fn test_get_latest_version() -> anyhow::Result<()> {
+    fn test_get_synced_version() -> anyhow::Result<()> {
         let view = FinalityView::new(MockDbReaderWriter);
-        let res = view.get_latest_version();
+        let res = view.get_synced_version();
         assert!(res.is_err());
         let blockheight = 1;
         view.set_finalized_block_height(blockheight)?;
-        let version = view.get_latest_version()?;
+        let version = view.get_synced_version()?;
         assert_eq!(version, 1);
         Ok(())
     }
@@ -163,7 +163,7 @@ mod tests {
         view.set_finalized_block_height(1)?;
         let latest_state_view = reader.latest_state_checkpoint_view()?;
         // TODO: modify mock so we get different states for different versions
-        let key = StateKey::raw(vec![1]);
+        let key = StateKey::raw(&[1]);
         let value = latest_state_view.get_state_value(&key)?.unwrap();
         assert_eq!(value.bytes(), &vec![1]);
         Ok(())

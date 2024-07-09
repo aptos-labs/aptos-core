@@ -3503,6 +3503,7 @@ dependencies = [
  "bcs 0.1.4",
  "crossbeam-channel",
  "dashmap",
+ "move-core-types",
  "once_cell",
  "parking_lot 0.12.3",
  "proptest",
