@@ -304,7 +304,7 @@ impl ProofManager {
 
     pub async fn start(
         mut self,
-        _back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
+        back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
         mut proposal_rx: Receiver<GetPayloadCommand>,
         mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
     ) {
