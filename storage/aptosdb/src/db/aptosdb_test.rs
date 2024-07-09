@@ -18,29 +18,22 @@ use aptos_config::config::{
     StateMerklePrunerConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519Signature},
-    hash::CryptoHash,
-    HashValue, PrivateKey, Uniform,
-};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_proptest_helpers::ValueGenerator;
 use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
-    chain_id::ChainId,
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleLeafNode,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
-        TransactionAuxiliaryDataV1, TransactionInfo, TransactionPayload, TransactionToCommit,
-        VMErrorDetail, Version,
+        ExecutionStatus, TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo,
+        TransactionToCommit, VMErrorDetail, Version,
     },
     vm_status::StatusCode,
 };
-use move_core_types::account_address::AccountAddress;
 use proptest::{prelude::*, std_facade::HashMap};
 use std::{collections::HashSet, sync::Arc};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
@@ -245,7 +238,7 @@ fn test_revert_single_commit() {
 
     // Check expected before revert commit
     let pre_revert_version = cur_ver - 1;
-    assert_eq!(db.get_latest_version().unwrap(), pre_revert_version);
+    assert_eq!(db.get_synced_version().unwrap(), pre_revert_version);
 
     // Get the latest ledger info before revert
     let latest_ledger_info_before_revert = blocks[1].1.clone();
@@ -254,7 +247,7 @@ fn test_revert_single_commit() {
     // Revert the last commit
     db.revert_commit(&latest_ledger_info_before_revert).unwrap();
 
-    assert_eq!(db.get_latest_version().unwrap(), version_to_revert_to);
+    assert_eq!(db.get_synced_version().unwrap(), version_to_revert_to);
     let ledger_info = db.get_latest_ledger_info().unwrap();
     assert_eq!(ledger_info, latest_ledger_info_before_revert);
     let tx_acc_db = db.ledger_db.transaction_accumulator_db();
@@ -323,7 +316,7 @@ fn test_revert_nth_commit() {
 
     // Check expected before revert commit
     let expected_version = cur_ver - 1;
-    assert_eq!(db.get_latest_version().unwrap(), expected_version);
+    assert_eq!(db.get_synced_version().unwrap(), expected_version);
 
     // Get the 3rd block back from the latest block
     let revert_block_num = blockheight - 3;
@@ -335,7 +328,7 @@ fn test_revert_nth_commit() {
 
     db.revert_commit(&pre_revert_ledger_info).unwrap();
 
-    assert_eq!(db.get_latest_version().unwrap(), version_to_revert - 1);
+    assert_eq!(db.get_synced_version().unwrap(), version_to_revert - 1);
 }
 
 pub fn test_state_merkle_pruning_impl(
