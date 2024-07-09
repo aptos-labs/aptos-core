@@ -130,8 +130,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let _timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_requests_handler_timer"])
                 .start_timer();
-            received_msg[message.shard_id] += 1;
-            let priority = message.seq_num.unwrap() * received_msg[message.shard_id];
+            received_msg[message.shard_id.unwrap() as usize] += 1;
+            let priority = message.seq_num.unwrap() * received_msg[message.shard_id.unwrap() as usize];
             {
                 let (lock, cvar) = &*self.recv_condition;
                 let _lg = lock.lock().unwrap();
