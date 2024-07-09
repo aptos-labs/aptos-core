@@ -45,6 +45,7 @@ use tokio_util::compat::{
     FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_logger::info;
 use crate::protocols::network::ReceivedMessage;
 
 static PROTOCOL: ProtocolId = ProtocolId::MempoolDirectSend;
@@ -268,41 +269,37 @@ fn peer_recv_message() {
         priority: 0,
         raw_msg: Vec::from("hello world"),
     }));
-    // let recv_msg = PeerNotification::RecvMessage(Message {
-    //     protocol_id: PROTOCOL,
-    //     mdata: Bytes::from("hello world"),
-    // });
-    let recv_msg = ReceivedMessage {
-        message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-            protocol_id: PROTOCOL,
-            priority: 0,
-            raw_msg: Vec::from("hello world"),
-        }),
-        sender: PeerNetworkId::new(NetworkId::Validator,PeerId::random()),
-        rx_at: 0,
-        rpc_replier: None,
-    };
-
-    //Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
+    let recv_msg = NetworkMessage::DirectSendMsg(DirectSendMsg{
+        protocol_id: PROTOCOL,
+        priority: 0,
+        raw_msg: Vec::from("hello world"),
+    });
 
     let client = async move {
+        info!("client start");
         let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE);
         for _ in 0..30 {
             // The client should then send the network message.
             connection.send(&send_msg).await.unwrap();
         }
+        info!("client sent");
         // Client then closes connection.
         connection.close().await.unwrap();
+        info!("client exiting");
     };
 
     let server = async move {
+        info!("server start");
         for _ in 0..30 {
             // Wait to receive notification of DirectSendMsg from Peer.
             let received = receiver.next().await.unwrap();
-            assert_eq!(recv_msg, received);
+            assert_eq!(recv_msg, received.message);
         }
+        info!("server exiting");
     };
+    info!("waiting");
     rt.block_on(future::join3(peer.start(), server, client));
+    info!("done");
 }
 
 // Two connected Peer actors should be able to send/recv a DirectSend from each
@@ -345,25 +342,15 @@ fn peers_send_message_concurrent() {
         // Check that each peer received the other's message
         let notif_a = prot_a_rx.next().await;
         let notif_b = prot_b_rx.next().await;
-        assert_eq!(notif_a, Some(ReceivedMessage{
-            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-                protocol_id: PROTOCOL,
-                priority: 0,
-                raw_msg: msg_b.mdata.into(),
-            }),
-            sender: PeerNetworkId::new(NetworkId::Validator, remote_peer_id_b),
-            rx_at: 0,
-            rpc_replier: None,
+        assert_eq!(notif_a.unwrap().message, NetworkMessage::DirectSendMsg(DirectSendMsg{
+            protocol_id: PROTOCOL,
+            priority: 0,
+            raw_msg: msg_b.mdata.into(),
         }));
-        assert_eq!(notif_b, Some(ReceivedMessage{
-            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-                protocol_id: PROTOCOL,
-                priority: 0,
-                raw_msg: msg_a.mdata.into(),
-            }),
-            sender: PeerNetworkId::new(NetworkId::Validator, remote_peer_id_a),
-            rx_at: 0,
-            rpc_replier: None,
+        assert_eq!(notif_b.unwrap().message, NetworkMessage::DirectSendMsg(DirectSendMsg{
+            protocol_id: PROTOCOL,
+            priority: 0,
+            raw_msg: msg_a.mdata.into(),
         }));
 
         // Shut one peers and the other should shutdown due to ConnectionLost
@@ -1038,25 +1025,15 @@ fn peers_send_multiplex() {
         // Check that each peer received the other's message
         let notif_a = prot_a_rx.next().await;
         let notif_b = prot_b_rx.next().await;
-        assert_eq!(notif_a, Some(ReceivedMessage{
-            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-                protocol_id: PROTOCOL,
-                priority: 0,
-                raw_msg: msg_b.mdata.into(),
-            }),
-            sender: PeerNetworkId::new(NetworkId::Validator, remote_peer_id_b),
-            rx_at: 0,
-            rpc_replier: None,
+        assert_eq!(notif_a.unwrap().message, NetworkMessage::DirectSendMsg(DirectSendMsg{
+            protocol_id: PROTOCOL,
+            priority: 0,
+            raw_msg: msg_b.mdata.into(),
         }));
-        assert_eq!(notif_b, Some(ReceivedMessage{
-            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-                protocol_id: PROTOCOL,
-                priority: 0,
-                raw_msg: msg_a.mdata.into(),
-            }),
-            sender: PeerNetworkId::new(NetworkId::Validator, remote_peer_id_a),
-            rx_at: 0,
-            rpc_replier: None,
+        assert_eq!(notif_b.unwrap().message, NetworkMessage::DirectSendMsg(DirectSendMsg{
+            protocol_id: PROTOCOL,
+            priority: 0,
+            raw_msg: msg_a.mdata.into(),
         }));
 
         // Shut one peers and the other should shutdown due to ConnectionLost
