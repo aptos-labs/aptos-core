@@ -190,23 +190,14 @@ impl EventDb {
         start: Version,
         end: Version,
         db_batch: &SchemaBatch,
-        indexer_batch: &SchemaBatch,
-        sharding_enabled: bool,
-        event_indexer_enabled: bool,
+        indices_batch: Option<&SchemaBatch>,
     ) -> anyhow::Result<()> {
         let mut current_version = start;
 
-        let batch = if !sharding_enabled {
-            Some(db_batch)
-        } else if event_indexer_enabled {
-            Some(indexer_batch)
-        } else {
-            None
-        };
         for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
             for (idx, event) in (events?).into_iter().enumerate() {
                 if let ContractEvent::V1(v1) = event {
-                    if let Some(batch) = batch {
+                    if let Some(batch) = indices_batch {
                         batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
                         batch.delete::<EventByVersionSchema>(&(
                             *v1.key(),

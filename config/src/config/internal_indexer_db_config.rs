@@ -78,7 +78,7 @@ impl ConfigSanitizer for InternalIndexerDBConfig {
         {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "Don't turn internal indexer db if DB sharding is off".into(),
+                "Don't turn on internal indexer db if DB sharding is off".into(),
             ));
         }
 

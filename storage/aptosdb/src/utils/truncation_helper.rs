@@ -412,11 +412,11 @@ fn delete_event_data(
                 start_version,
                 latest_version + 1,
                 batch,
-                &SchemaBatch::new(),
-                ledger_db.enable_storage_sharding(),
-                false,
+                // Assuming same data will be overwritten into indices, we don't bother to deal
+                // with the existence or placement of indices
+                // TODO: prune data from internal indices
+                None,
             )?;
-            // we don't need to delete from internal indexer when syncing main db.
         }
     }
     Ok(())

@@ -23,6 +23,18 @@ pub struct EventStorePruner {
     internal_indexer_db: Option<InternalIndexerDB>,
 }
 
+impl EventStorePruner {
+    fn expect_indexer_db(&self) -> &InternalIndexerDB {
+        self.internal_indexer_db
+            .as_ref()
+            .expect("internal indexer not enabled")
+    }
+
+    fn indexer_db(&self) -> Option<&InternalIndexerDB> {
+        self.internal_indexer_db.as_ref()
+    }
+}
+
 impl DBSubPruner for EventStorePruner {
     fn name(&self) -> &str {
         "EventStorePruner"
@@ -30,31 +42,35 @@ impl DBSubPruner for EventStorePruner {
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
-        let indexer_deletes = SchemaBatch::new();
-        let event_indexer_enabled = self.internal_indexer_db.is_some()
-            && self.internal_indexer_db.as_ref().unwrap().event_enabled();
+        let mut indexer_batch = None;
+
+        let indices_batch = if let Some(indexer_db) = self.indexer_db() {
+            if indexer_db.event_enabled() {
+                indexer_batch = Some(SchemaBatch::new());
+            }
+            indexer_batch.as_ref()
+        } else {
+            Some(&batch)
+        };
         self.ledger_db.event_db().prune_events(
             current_progress,
             target_version,
             &batch,
-            &indexer_deletes,
-            self.ledger_db.enable_storage_sharding(),
-            event_indexer_enabled,
+            indices_batch,
         )?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::EventPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
-        if let Some(indexer_db) = &self.internal_indexer_db {
-            if indexer_db.event_enabled() {
-                indexer_deletes.put::<InternalIndexerMetadataSchema>(
-                    &IndexerMetadataKey::EventPrunerProgress,
-                    &IndexerMetadataValue::Version(target_version),
-                )?;
-                indexer_db
-                    .get_inner_db_ref()
-                    .write_schemas(indexer_deletes)?;
-            }
+
+        if let Some(indexer_batch) = indexer_batch {
+            indexer_batch.put::<InternalIndexerMetadataSchema>(
+                &IndexerMetadataKey::EventPrunerProgress,
+                &IndexerMetadataValue::Version(target_version),
+            )?;
+            self.expect_indexer_db()
+                .get_inner_db_ref()
+                .write_schemas(indexer_batch)?;
         }
         self.ledger_db.event_db().write_schemas(batch)
     }
