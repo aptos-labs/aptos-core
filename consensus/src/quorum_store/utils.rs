@@ -414,7 +414,9 @@ impl ProofQueue {
                                     .iter()
                                     .filter(|txn_summary| {
                                         !filtered_txns.contains(txn_summary)
-                                            && txn_summary.expiration_timestamp_secs
+                                                // latest_block_timestamp is microseonds since UNIX epoch
+                                                // expiration_timestamp_secs is seconds since UNIX epoch
+                                            && (txn_summary.expiration_timestamp_secs * 1_000_000)
                                                 > self.latest_block_timestamp
                                     })
                                     .count() as u64
@@ -441,7 +443,7 @@ impl ProofQueue {
                                     .iter()
                                     .filter(|summary| {
                                         filtered_txns.insert(**summary)
-                                            && summary.expiration_timestamp_secs
+                                            && (summary.expiration_timestamp_secs * 1_000_000)
                                                 > self.latest_block_timestamp
                                     })
                                     .count() as u64
