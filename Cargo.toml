@@ -122,7 +122,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/transaction-filter",
-    "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
