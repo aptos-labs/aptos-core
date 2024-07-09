@@ -34,7 +34,7 @@ comparison between v1 and v2 failed:
 +   = In either of these cases, please ensure to check the code does what you expect it to, because of changed semantics.
 + 
 + 
-+ Exiting: checking errors
++ Exiting with checking errors
 + 
 + 
 = task 1 'run'. lines 10-10:

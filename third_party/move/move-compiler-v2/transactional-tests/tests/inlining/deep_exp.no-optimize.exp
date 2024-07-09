@@ -10,7 +10,7 @@ comparison between v1 and v2 failed:
 +    │                ^^^^
 + 
 + 
-+ Exiting: assembling errors
++ Exiting with assembling errors
 + 
 + 
 = task 1 'run'. lines 30-30:

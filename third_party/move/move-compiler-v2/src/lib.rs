@@ -612,7 +612,7 @@ where
     let options = env.get_extension::<Options>().unwrap_or_default();
     env.report_diag(error_writer, options.report_severity());
     if env.has_errors() {
-        bail!("Exiting: {}", msg);
+        bail!("Exiting with {}", msg);
     } else {
         Ok(())
     }
@@ -630,7 +630,7 @@ where
     let options = env.get_extension::<Options>().unwrap_or_default();
     env.report_diag(error_writer, options.report_severity());
     if env.has_warnings() {
-        bail!("Exiting: {}", msg);
+        bail!("Exiting with {}", msg);
     } else {
         Ok(())
     }
