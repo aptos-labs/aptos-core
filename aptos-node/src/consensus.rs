@@ -25,6 +25,8 @@ use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::channel::mpsc::Sender;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
+use aptos_mpc::start_mpc_runtime;
+use aptos_mpc::types::MPCMessage;
 
 /// Creates and returns the consensus observer runtime (if either the
 /// observer or publisher is enabled).
@@ -168,6 +170,41 @@ pub fn create_dkg_runtime(
     };
 
     (vtxn_pool, dkg_runtime)
+}
+
+/// Creates and starts the MPC runtime (if enabled)
+pub fn create_mpc_runtime(
+    node_config: &mut NodeConfig,
+    mpc_subscriptions: Option<(
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+        EventNotificationListener,
+    )>,
+    mpc_network_interfaces: Option<ApplicationNetworkInterfaces<MPCMessage>>,
+    vtxn_pool: &VTxnPoolState,
+) -> Option<Runtime> {
+    match mpc_network_interfaces {
+        Some(interfaces) => {
+            let ApplicationNetworkInterfaces {
+                network_client,
+                network_service_events,
+            } = interfaces;
+            let (reconfig_events, mpc_events) = mpc_subscriptions
+                .expect("MPC needs to listen to NewEpochEvents events and various MPC events");
+            let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
+            let rb_config = node_config.consensus.rand_rb_config.clone();
+            let mpc_runtime = start_mpc_runtime(
+                my_addr,
+                network_client,
+                network_service_events,
+                reconfig_events,
+                mpc_events,
+                vtxn_pool.clone(),
+                rb_config,
+            );
+            Some(mpc_runtime)
+        },
+        _ => None,
+    }
 }
 
 /// Creates and starts the JWK consensus runtime (if enabled)

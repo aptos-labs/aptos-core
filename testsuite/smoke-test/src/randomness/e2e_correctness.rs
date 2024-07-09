@@ -3,7 +3,7 @@
 
 use crate::{
     randomness::{
-        decrypt_key_map, get_current_version, get_on_chain_resource, verify_dkg_transcript,
+        decrypt_key_map, get_current_version, verify_dkg_transcript,
         verify_randomness,
     },
     smoke_test_environment::SwarmBuilder,
@@ -12,6 +12,7 @@ use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
 use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
+use crate::utils::get_on_chain_resource;
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
 #[tokio::test]

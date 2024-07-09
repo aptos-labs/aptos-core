@@ -11,6 +11,7 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
+    use aptos_framework::next_validator_set;
     use aptos_framework::reconfiguration_state;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
@@ -170,6 +171,7 @@ module aptos_framework::reconfiguration {
             },
         );
 
+        next_validator_set::clear();
         reconfiguration_state::on_reconfig_finish();
     }
 

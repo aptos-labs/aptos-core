@@ -3,7 +3,7 @@
 
 use crate::{
     randomness::{
-        decrypt_key_map, get_on_chain_resource, script_to_update_consensus_config,
+        decrypt_key_map, script_to_update_consensus_config,
         verify_dkg_transcript,
     },
     smoke_test_environment::SwarmBuilder,
@@ -15,6 +15,7 @@ use aptos_types::{
     dkg::DKGState, on_chain_config::OnChainRandomnessConfig, randomness::PerBlockRandomness,
 };
 use std::{sync::Arc, time::Duration};
+use crate::utils::get_on_chain_resource;
 
 /// Disable on-chain randomness by only disabling validator transactions.
 #[tokio::test]

@@ -25,9 +25,16 @@ impl AptosVM {
             ValidatorTransaction::ObservedJWKUpdate(jwk_update) => {
                 self.process_jwk_update(resolver, log_context, session_id, jwk_update)
             },
+            ValidatorTransaction::MPCReconfigWorkDone(reconfig_work_result) => {
+                self.process_mpc_reconfig_work_done(resolver, log_context, session_id, reconfig_work_result)
+            }
+            ValidatorTransaction::MPCUserRequestDone(task_result) => {
+                self.process_mpc_user_request_done(resolver, log_context, session_id, task_result)
+            }
         }
     }
 }
 
 mod dkg;
 mod jwk;
+mod mpc;

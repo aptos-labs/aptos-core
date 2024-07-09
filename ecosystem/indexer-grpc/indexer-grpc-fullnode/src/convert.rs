@@ -882,6 +882,12 @@ fn convert_validator_transaction(
                     )
                 )
             },
+            ApiValidatorTransactionEnum::MPCReconfigWorkDone(txn) => {
+                todo!()
+            },
+            ApiValidatorTransactionEnum::MPCUserRequestDone(txn) => {
+                todo!()
+            },
             ApiValidatorTransactionEnum::ObservedJwkUpdate(observed_jwk_update) => {
                 Some(
                     validator_transaction::ValidatorTransactionType::ObservedJwkUpdate(

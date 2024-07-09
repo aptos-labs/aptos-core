@@ -2791,6 +2791,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-mpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-bounded-executor",
+ "aptos-channels",
+ "aptos-config",
+ "aptos-consensus-types",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-enum-conversion-derive",
+ "aptos-event-notifications",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-network",
+ "aptos-reliable-broadcast",
+ "aptos-runtimes",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-validator-transaction-pool",
+ "async-trait",
+ "bcs 0.1.4",
+ "blstrs",
+ "bytes",
+ "fail",
+ "futures",
+ "futures-channel",
+ "futures-util",
+ "move-core-types",
+ "once_cell",
+ "rand 0.7.3",
+ "serde",
+ "tokio",
+ "tokio-retry",
+]
+
+[[package]]
 name = "aptos-mvhashmap"
 version = "0.1.0"
 dependencies = [
@@ -3044,6 +3082,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-mempool-notifications",
+ "aptos-mpc",
  "aptos-network",
  "aptos-network-benchmark",
  "aptos-network-builder",
@@ -15333,9 +15372,12 @@ dependencies = [
  "aptos-vm",
  "base64 0.13.1",
  "bcs 0.1.4",
+ "blstrs",
  "diesel",
  "digest 0.9.0",
+ "ff",
  "futures",
+ "group",
  "hex",
  "hyper 0.14.28",
  "move-core-types",

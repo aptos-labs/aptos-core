@@ -92,6 +92,7 @@ pub enum FeatureFlag {
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
     REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+    RECONFIG_REFACTORING = 77,
 }
 
 impl FeatureFlag {
@@ -167,6 +168,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_ENUM_TYPES,
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
+            FeatureFlag::RECONFIG_REFACTORING,
         ]
     }
 }

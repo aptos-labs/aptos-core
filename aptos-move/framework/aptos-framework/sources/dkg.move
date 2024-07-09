@@ -1,10 +1,12 @@
 /// DKG on-chain states and helper functions.
 module aptos_framework::dkg {
-    use std::error;
     use std::option;
     use std::option::Option;
     use aptos_framework::event::emit;
+    use aptos_framework::randomness_config;
     use aptos_framework::randomness_config::RandomnessConfig;
+    use aptos_framework::reconfiguration;
+    use aptos_framework::stake;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::validator_consensus_info::ValidatorConsensusInfo;
@@ -58,42 +60,64 @@ module aptos_framework::dkg {
 
     /// Mark on-chain DKG state as in-progress. Notify validators to start DKG.
     /// Abort if a DKG is already in progress.
-    public(friend) fun start(
-        dealer_epoch: u64,
-        randomness_config: RandomnessConfig,
-        dealer_validator_set: vector<ValidatorConsensusInfo>,
-        target_validator_set: vector<ValidatorConsensusInfo>,
-    ) acquires DKGState {
-        let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        let new_session_metadata = DKGSessionMetadata {
-            dealer_epoch,
-            randomness_config,
-            dealer_validator_set,
-            target_validator_set,
-        };
-        let start_time_us = timestamp::now_microseconds();
-        dkg_state.in_progress = std::option::some(DKGSessionState {
-            metadata: new_session_metadata,
-            start_time_us,
-            transcript: vector[],
-        });
+    public(friend) fun on_async_reconfig_start() acquires DKGState {
+        if (randomness_config::enabled()) {
+            let dealer_epoch = reconfiguration::current_epoch();
+            let randomness_config = randomness_config::current();
+            let dealer_validator_set = stake::cur_validator_consensus_infos();
+            let target_validator_set = stake::next_validator_consensus_infos();
+            let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
+            let new_session_metadata = DKGSessionMetadata {
+                dealer_epoch,
+                randomness_config,
+                dealer_validator_set,
+                target_validator_set,
+            };
+            let start_time_us = timestamp::now_microseconds();
+            dkg_state.in_progress = std::option::some(DKGSessionState {
+                metadata: new_session_metadata,
+                start_time_us,
+                transcript: vector[],
+            });
 
-        emit(DKGStartEvent {
-            start_time_us,
-            session_metadata: new_session_metadata,
-        });
+            emit(DKGStartEvent {
+                start_time_us,
+                session_metadata: new_session_metadata,
+            });
+        };
     }
 
-    /// Put a transcript into the currently incomplete DKG session, then mark it completed.
-    ///
-    /// Abort if DKG is not in progress.
+    public(friend) fun ready_for_next_epoch(): bool acquires DKGState {
+        if (!randomness_config::enabled()) {
+            return true
+        };
+
+        if (!exists<DKGState>(@aptos_framework)) {
+            return false
+        };
+
+        let maybe_session = &borrow_global<DKGState>(@aptos_framework).last_completed;
+        if (option::is_none(maybe_session)) {
+            return false
+        };
+
+        let session = option::borrow(maybe_session);
+        if (session.metadata.dealer_epoch != reconfiguration::current_epoch()) {
+            return false
+        };
+
+        true
+    }
+
+    /// When a DKG is in progress, put a transcript into the currently incomplete DKG session, then mark it completed.
     public(friend) fun finish(transcript: vector<u8>) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        assert!(option::is_some(&dkg_state.in_progress), error::invalid_state(EDKG_NOT_IN_PROGRESS));
-        let session = option::extract(&mut dkg_state.in_progress);
-        session.transcript = transcript;
-        dkg_state.last_completed = option::some(session);
-        dkg_state.in_progress = option::none();
+        if (option::is_some(&dkg_state.in_progress)) {
+            let session = option::extract(&mut dkg_state.in_progress);
+            session.transcript = transcript;
+            dkg_state.last_completed = option::some(session);
+            dkg_state.in_progress = option::none();
+        }
     }
 
     /// Delete the currently incomplete session, if it exists.

@@ -582,6 +582,21 @@ module std::features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    /// Some async reconfig refactorings.
+    /// - Decouple async reconfiguration from randomness.
+    ///   - Randomness and any future feature (potentially MPC) depend on this feature (and very likely also `ValidatorTransactions`).
+    /// - Epoch switches (and related events) are guaranteed to occur in BlockMetadataExt transactions.
+    /// - When no async reconfig-dependent features are enabled, async reconfig becomes instant.
+    ///
+    /// Lifetime: transient
+    const RECONFIG_REFACTORING: u64 = 72;
+
+    public fun get_reconfig_refactoring_feature(): u64 { RECONFIG_REFACTORING }
+
+    public fun reconfig_refactoring_enabled(): bool acquires Features {
+        is_enabled(RECONFIG_REFACTORING)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

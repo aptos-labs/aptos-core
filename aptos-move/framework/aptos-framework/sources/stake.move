@@ -1459,7 +1459,12 @@ module aptos_framework::stake {
             total_joining_power: 0,
         };
 
-        validator_consensus_infos_from_validator_set(&new_validator_set)
+        let ret = validator_consensus_infos_from_validator_set(&new_validator_set);
+        ret
+    }
+
+    public(friend) fun finalize_next_validator_set() acquires ValidatorSet, ValidatorPerformance, StakePool, ValidatorFees, ValidatorConfig {
+        next_validator_set::save(next_validator_consensus_infos());
     }
 
     fun validator_consensus_infos_from_validator_set(validator_set: &ValidatorSet): vector<ValidatorConsensusInfo> {
@@ -1775,6 +1780,7 @@ module aptos_framework::stake {
     #[test_only]
     use aptos_framework::aptos_coin;
     use aptos_std::bls12381::proof_of_possession_from_bytes;
+    use aptos_framework::next_validator_set;
     use aptos_framework::reconfiguration_state;
     use aptos_framework::validator_consensus_info;
     use aptos_framework::validator_consensus_info::ValidatorConsensusInfo;

@@ -52,6 +52,7 @@ use futures::{
 use futures_channel::mpsc::unbounded;
 use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 #[async_trait::async_trait]
 pub trait TExecutionClient: Send + Sync {
@@ -64,6 +65,7 @@ pub trait TExecutionClient: Send + Sync {
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
+        features: &Features,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
@@ -298,6 +300,7 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
+        features: &Features,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
@@ -330,6 +333,7 @@ impl TExecutionClient for ExecutionProxyClient {
             block_executor_onchain_config,
             transaction_deduper,
             randomness_enabled,
+            features.is_enabled(FeatureFlag::RECONFIG_REFACTORING),
         );
 
         maybe_rand_msg_tx
@@ -489,6 +493,7 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
+        _features: &Features,
         _rand_config: Option<RandConfig>,
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
