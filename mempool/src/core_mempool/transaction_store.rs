@@ -569,10 +569,11 @@ impl TransactionStore {
         count: usize,
         before: Option<Instant>,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
+        counters::MEMPOOL_READ_TIMELINE_FREQUENCY.inc();
+        counters::MEMPOOL_READ_TIMELINE_MAX_TXNS.observe(count as f64);
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
         let mut last_timeline_id = timeline_id.id_per_bucket.clone();
-
         // Add as many transactions to the batch as possible
         for (i, bucket) in self
             .timeline_index

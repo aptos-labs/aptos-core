@@ -196,6 +196,23 @@ pub fn core_mempool_txn_commit_latency(
         .observe(latency.as_secs_f64());
 }
 
+pub static MEMPOOL_READ_TIMELINE_FREQUENCY: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_read_timeline",
+        "Number of times core mempool read_timeline is invoked"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_READ_TIMELINE_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_max_txns",
+        "Number of max txns being pulled in read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
 static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
