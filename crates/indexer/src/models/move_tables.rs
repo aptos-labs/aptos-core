@@ -7,7 +7,6 @@ use crate::{
     util::{hash_str, standardize_address},
 };
 use aptos_api_types::{DeleteTableItem, WriteTableItem};
-use aptos_logger::debug;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -57,10 +56,6 @@ impl TableItem {
         transaction_version: i64,
         transaction_block_height: i64,
     ) -> (Self, CurrentTableItem) {
-        debug!(
-            "Decoding WriteTableItem: {:?}",
-            write_table_item
-        );
         (
             Self {
                 transaction_version,
