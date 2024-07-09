@@ -142,7 +142,7 @@ impl Server for AssetUploaderContext {
         // Spawn a task for each URL
         let mut tasks = Vec::with_capacity(urls_split.len());
         let self_clone = self.clone();
-        for url in urls_split {
+        for url in urls_split.clone() {
             let self_clone = self_clone.clone();
             tasks.push(tokio::spawn(async move {
                 match self_clone.upload_asset(&url).await {
@@ -174,17 +174,21 @@ impl Server for AssetUploaderContext {
         // Wait for all tasks to finish
         match try_join_all(tasks).await {
             Ok(uris) => {
-                info!("[Asset Uploader] Successfully uploaded all assets");
                 let mut successes = Vec::new();
                 let mut failures = Vec::new();
 
-                for uri in uris {
+                for (i, uri) in uris.iter().enumerate() {
                     match uri {
-                        Ok(uri) => successes.push(uri),
-                        Err(e) => failures.push(e.to_string()),
+                        Ok(uri) => successes.push(uri.clone()),
+                        Err(e) => {
+                            let asset_uri = urls_split.get(i).expect("Num tasks != num URLs");
+                            warn!(error = ?e, asset_uri, "[Asset Uploader] Failed to upload asset");
+                            failures.push(asset_uri.clone())
+                        },
                     }
                 }
 
+                info!(successes = ?successes, failures = ?failures, "[Asset Uploader] Uploaded assets");
                 Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", "application/json")
