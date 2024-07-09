@@ -326,7 +326,10 @@ impl ProofQueue {
         }
         self.inc_remaining(&author, num_txns);
 
-        self.gc_expired_batch_summaries_without_proofs();
+        sample!(
+            SampleRate::Duration(Duration::from_millis(500)),
+            self.gc_expired_batch_summaries_without_proofs()
+        );
     }
 
     pub(crate) fn add_batch_summaries(
@@ -373,8 +376,10 @@ impl ProofQueue {
                 );
             }
         }
-
-        self.gc_expired_batch_summaries_without_proofs();
+        sample!(
+            SampleRate::Duration(Duration::from_millis(500)),
+            self.gc_expired_batch_summaries_without_proofs()
+        );
         counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION.observe_duration(start.elapsed());
     }
 
