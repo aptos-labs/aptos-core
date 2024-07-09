@@ -414,7 +414,7 @@ impl TransactionStore {
             let mut min_seq = sequence_num;
             let input_seq = sequence_num;
             for (_, txn) in
-                txns.range_mut((Bound::Excluded(input_seq), Bound::Included(input_seq + 50)))
+                txns.range_mut((Bound::Included(input_seq), Bound::Included(input_seq + 50)))
             {
                 if txn.timeline_state == TimelineState::NotReady {
                     self.timeline_index.insert(txn);
