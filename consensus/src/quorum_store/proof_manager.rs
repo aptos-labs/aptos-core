@@ -304,7 +304,7 @@ impl ProofManager {
 
     pub async fn start(
         mut self,
-        back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
+        _back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
         mut proposal_rx: Receiver<GetPayloadCommand>,
         mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
     ) {
@@ -323,9 +323,10 @@ impl ProofManager {
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
                             back_pressure = updated_back_pressure;
-                            if back_pressure_tx.send(back_pressure).await.is_err() {
-                                debug!("Failed to send back_pressure for proposal");
-                            }
+                            // commented for testing
+                            // if back_pressure_tx.send(back_pressure).await.is_err() {
+                            //     debug!("Failed to send back_pressure for proposal");
+                            // }
                         }
                     }),
                     Some(msg) = proof_rx.recv() => {
@@ -353,9 +354,10 @@ impl ProofManager {
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
                             back_pressure = updated_back_pressure;
-                            if back_pressure_tx.send(back_pressure).await.is_err() {
-                                debug!("Failed to send back_pressure for commit notification");
-                            }
+                            // commented for testing
+                            // if back_pressure_tx.send(back_pressure).await.is_err() {
+                            //     debug!("Failed to send back_pressure for commit notification");
+                            // }
                         }
                     })
                 }

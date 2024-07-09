@@ -663,12 +663,16 @@ impl ProofQueue {
         let remaining_txns_without_duplicates = self.remaining_txns_without_duplicates();
         counters::NUM_UNIQUE_TOTAL_TXNS_LEFT_ON_UPDATE
             .observe(remaining_txns_without_duplicates as f64);
+
         // Number of txns with more than one batches
-        counters::TXNS_WITH_DUPLICATE_BATCHES.observe(
-            self.txn_summary_num_occurrences
-                .iter()
-                .filter(|(_, count)| **count > 1)
-                .count() as f64,
+        sample!(
+            SampleRate::Duration(Duration::from_secs(3)),
+            counters::TXNS_WITH_DUPLICATE_BATCHES.observe(
+                self.txn_summary_num_occurrences
+                    .iter()
+                    .filter(|(_, count)| **count > 1)
+                    .count() as f64,
+            );
         );
 
         // Number of txns in unexpired and uncommitted proofs with summaries in batch_summaries
