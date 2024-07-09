@@ -89,7 +89,7 @@ local_ip_address = {
 metrics = "PUSH_METRICS_NAMESPACE=jan-benchmark PUSH_METRICS_ENDPOINT=https://gw-c7-2b.cloud.victoriametrics.com/api/v1/import/prometheus PUSH_METRICS_API_TOKEN=06147e32-17de-4d29-989e-6a640ab50f13"
 coordinator = "10.128.0.58" # run-benchmark-1
 
-num_shards = 4
+num_shards = 16
 rem_exe_add = "--remote-executor-addresses "
 for i in range(num_shards):
     rem_exe_add += local_ip_address[f"sharding-executor-{i+1}"] + ":" + str(52200 + i + 2) + " "
@@ -116,7 +116,7 @@ git_update_command = [
 ]
 
 git_update_command = [
-    f"cd aptos-core/ git pull && git checkout multi_machine_sharding_notify_one && git pull",
+    f"cd aptos-core/ && git pull && git checkout multi_machine_sharding_notify_one && git pull",
 ]
 
 def get_external_ip(instance):
