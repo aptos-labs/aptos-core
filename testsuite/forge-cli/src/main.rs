@@ -511,6 +511,11 @@ fn get_test_suite(
         "chaos" => return Ok(chaos_test_suite(duration)),
         _ => {}, // No multi-test suite matches!
     };
+    if let Some(test_suite) = get_land_blocking_test(test_name, duration, test_cmd) {
+        return Ok(test_suite);
+    } else {
+        panic!("skipping everything else")
+    }
 
     // Otherwise, check the test name against the grouped test suites
     if let Some(test_suite) = get_land_blocking_test(test_name, duration, test_cmd) {
