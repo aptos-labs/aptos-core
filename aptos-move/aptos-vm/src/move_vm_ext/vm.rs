@@ -147,7 +147,7 @@ impl MoveVmExt {
         vm_config.ty_builder = ty_builder;
         vm_config.disallow_dispatch_for_native = env
             .features()
-            .is_enabled(FeatureFlag::DISALLOW_NATIVE_DISPATCH);
+            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
 
         Self {
             inner: WarmVmCache::get_warm_vm(
