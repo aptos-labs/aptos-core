@@ -16,7 +16,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     metadata::Metadata,
 };
-use move_vm_types::resolver::MoveResolver;
+use move_vm_types::resolver::{ModuleResolver, ResourceResolver};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -68,14 +68,14 @@ impl MoveVM {
     ///     cases where this may not be necessary, with the most notable one being the common module
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session<'r>(&self, remote: &'r impl MoveResolver) -> Session<'r, '_> {
-        self.new_session_with_extensions(remote, NativeContextExtensions::default())
+    pub fn new_session<'r>(&self, resource_resolver: &'r impl ResourceResolver) -> Session<'r, '_> {
+        self.new_session_with_extensions(resource_resolver, NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
         &self,
-        remote: &'r impl MoveResolver,
+        resource_resolver: &'r impl ResourceResolver,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
@@ -86,7 +86,7 @@ impl MoveVM {
                     .vm_config()
                     .deserializer_config
                     .clone(),
-                remote,
+                resource_resolver,
             ),
             module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
             native_extensions,
@@ -96,7 +96,7 @@ impl MoveVM {
     /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
     pub fn new_session_with_extensions_and_modules<'r>(
         &self,
-        remote: &'r impl MoveResolver,
+        resource_resolver: &'r impl ResourceResolver,
         module_storage: Arc<dyn ModuleStorage>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
@@ -108,7 +108,7 @@ impl MoveVM {
                     .vm_config()
                     .deserializer_config
                     .clone(),
-                remote,
+                resource_resolver,
             ),
             module_store: ModuleStorageAdapter::new(module_storage),
             native_extensions,
@@ -119,7 +119,9 @@ impl MoveVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        remote: &impl MoveResolver,
+        // TODO(George): this was a hack to add cache, we should remove it
+        resource_resolver: &impl ResourceResolver,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.runtime
             .loader()
@@ -131,9 +133,10 @@ impl MoveVM {
                         .vm_config()
                         .deserializer_config
                         .clone(),
-                    remote,
+                    resource_resolver,
                 ),
                 &ModuleStorageAdapter::new(self.runtime.module_storage()),
+                module_resolver,
             )
             .map(|arc_module| arc_module.arc_module())
     }

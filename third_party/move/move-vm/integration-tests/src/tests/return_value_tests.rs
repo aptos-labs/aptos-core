@@ -70,6 +70,7 @@ fn run(
         ty_args,
         args,
         &mut UnmeteredGasMeter,
+        &storage,
         &mut TraversalContext::new(&traversal_storage),
     )?;
 

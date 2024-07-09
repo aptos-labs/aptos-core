@@ -45,16 +45,26 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
+    vm::module_write_op::ModuleWrite,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{
-    ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
+    AptosModuleStorage, ResourceGroupSize, StateStorageView, TResourceGroupView, TResourceView,
 };
 use bytes::Bytes;
 use claims::assert_ok;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::{PartialVMError, PartialVMResult},
+};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    metadata::Metadata,
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
+};
 use move_vm_types::{
     delayed_values::delayed_field_id::ExtractUniqueIndex,
     value_serde::{
@@ -156,7 +166,7 @@ trait ResourceGroupState<T: Transaction> {
 }
 
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
-    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier, T::Module>,
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
@@ -439,7 +449,7 @@ fn wait_for_dependency(
 
 impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier, T::Module>,
         shared_scheduler: &'a Scheduler,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
@@ -459,12 +469,11 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
-    // TODO: Actually fill in the logic to record fetched executables, etc.
     fn fetch_module(
         &self,
         key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
+    ) -> anyhow::Result<MVModulesOutput<T::Module, X>, MVModulesError> {
         // Record for the R/W path intersection fallback for modules.
         self.captured_reads
             .borrow_mut()
@@ -769,7 +778,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
 }
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier, T::Module>,
     pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
@@ -778,7 +787,7 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
 
 impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
     pub fn new(
-        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier, T::Module>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
     ) -> Self {
@@ -1131,7 +1140,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_reads_needing_exchange_sequential(
         &self,
         read_set: &HashSet<T::Key>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier, T::Module>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
@@ -1228,7 +1237,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_group_reads_needing_exchange_sequential(
         &self,
         group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier, T::Module>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
@@ -1522,46 +1531,144 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
     for LatestView<'a, T, S, X>
 {
-    type Key = T::Key;
+    fn check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        get_module(self, self.txn_idx, address, module_name).map(|s| s.is_some())
+    }
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        debug_assert!(
-            state_key.is_module_path(),
-            "Reading a resource {:?} using ModuleView",
-            state_key,
-        );
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        let module = get_existing_module(self, self.txn_idx, address, module_name)?;
+        Ok(module.serialized_module_bytes().clone())
+    }
 
-        match &self.latest_view {
-            ViewState::Sync(state) => {
-                use MVModulesError::*;
-                use MVModulesOutput::*;
+    fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        let module = get_existing_module(self, self.txn_idx, address, module_name)?;
+        Ok(module.module_size_in_bytes())
+    }
 
-                match state.fetch_module(state_key, self.txn_idx) {
-                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                    Ok(Module((v, _))) => Ok(v.as_state_value()),
-                    Err(Dependency(_)) => {
-                        // Return anything (e.g. module does not exist) to avoid waiting,
-                        // because parallel execution will fall back to sequential anyway.
-                        Ok(None)
-                    },
-                    Err(NotFound) => self.get_raw_base_value(state_key),
-                }
-            },
-            ViewState::Unsync(state) => {
-                state
-                    .read_set
-                    .borrow_mut()
-                    .module_reads
-                    .insert(state_key.clone());
-                state.unsync_map.fetch_module(state_key).map_or_else(
-                    || self.get_raw_base_value(state_key),
-                    |v| Ok(v.as_state_value()),
-                )
-            },
-        }
+    fn fetch_module_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        let module = get_existing_module(self, self.txn_idx, address, module_name)?;
+        Ok(module.module_state_value_metadata())
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        let module = get_existing_module(self, self.txn_idx, address, module_name)?;
+        Ok(module.module_metadata())
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        let module = get_existing_module(self, self.txn_idx, address, module_name)?;
+        Ok(module.immediate_dependencies())
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        let module = get_existing_module(self, self.txn_idx, address, module_name)?;
+        Ok(module.immediate_friends())
+    }
+}
+
+fn get_existing_module<T: Transaction, S: TStateView<Key = T::Key>, X: Executable>(
+    latest_view: &LatestView<'_, T, S, X>,
+    txn_idx: TxnIndex,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+) -> PartialVMResult<Arc<T::Module>> {
+    get_module(latest_view, txn_idx, address, module_name)?.ok_or_else(|| {
+        PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!(
+            "Linker Error: Module {}::{} doesn't exist",
+            address, module_name
+        ))
+    })
+}
+
+fn get_module<T: Transaction, S: TStateView<Key = T::Key>, X: Executable>(
+    latest_view: &LatestView<'_, T, S, X>,
+    txn_idx: TxnIndex,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+) -> PartialVMResult<Option<Arc<T::Module>>> {
+    let state_key = T::Key::from_address_and_module_name(address, module_name);
+    match &latest_view.latest_view {
+        ViewState::Sync(state) => {
+            use MVModulesError::*;
+            use MVModulesOutput::*;
+
+            match state.fetch_module(&state_key, txn_idx) {
+                Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
+                Ok(Module((v, _))) => Ok(Some(v)),
+                Err(Dependency(_)) => {
+                    // Return anything (e.g. module does not exist) to avoid waiting,
+                    // because parallel execution will fall back to sequential anyway.
+                    Ok(None)
+                },
+                Err(NotFound) => {
+                    Ok(match latest_view.get_raw_base_value(&state_key)? {
+                        Some(state_value) => {
+                            // FIXME(George): Pass config from the environment.
+                            let module = T::Module::from_state_value(
+                                state_value,
+                                &DeserializerConfig::default(),
+                            )?;
+                            Some(Arc::new(module))
+                        },
+                        None => None,
+                    })
+                },
+            }
+        },
+        ViewState::Unsync(state) => {
+            state
+                .read_set
+                .borrow_mut()
+                .module_reads
+                .insert(state_key.clone());
+            match state.unsync_map.fetch_module(&state_key) {
+                Some(m) => Ok(Some(m)),
+                None => {
+                    Ok(match latest_view.get_raw_base_value(&state_key)? {
+                        Some(state_value) => {
+                            // FIXME(George): Pass config from the environment.
+                            let module = T::Module::from_state_value(
+                                state_value,
+                                &DeserializerConfig::default(),
+                            )?;
+                            Some(Arc::new(module))
+                        },
+                        None => None,
+                    })
+                },
+            }
+        },
     }
 }
 
@@ -1845,6 +1952,7 @@ mod test {
         type Event = MockEvent;
         type Identifier = DelayedFieldID;
         type Key = KeyType<u32>;
+        type Module = ValueType;
         type Tag = u32;
         type Value = ValueType;
 
@@ -2702,7 +2810,8 @@ mod test {
     }
 
     struct Holder {
-        unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
+        unsync_map:
+            UnsyncMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID, ValueType>,
         counter: RefCell<u32>,
         base_view: MockStateView,
     }
@@ -2738,7 +2847,8 @@ mod test {
         holder: Holder,
         counter: AtomicU32,
         base_view: MockStateView,
-        versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
+        versioned_map:
+            MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID, ValueType>,
         scheduler: Scheduler,
     }
 

@@ -85,6 +85,7 @@ fn merge_borrow_states_infinite_loop() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap_err();

@@ -11,7 +11,9 @@ use crate::{
     native_extensions::NativeContextExtensions,
 };
 use bytes::Bytes;
-use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
+use move_binary_format::{
+    compatibility::Compatibility, errors::*, file_format::LocalIndex, CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -24,6 +26,7 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{StructNameIndex, StructType, Type, TypeBuilder},
+    resolver::ModuleResolver,
     values::{GlobalValue, Value},
 };
 use std::{borrow::Borrow, sync::Arc};
@@ -58,6 +61,7 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
@@ -76,6 +80,7 @@ impl<'r, 'l> Session<'r, 'l> {
             args,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -91,6 +96,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
+        module_resolver: &impl ModuleResolver,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
         let func = self.move_vm.runtime.loader().load_function(
@@ -99,6 +105,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &ty_args,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
         )?;
 
         self.move_vm.runtime.execute_function_instantiation(
@@ -106,6 +113,7 @@ impl<'r, 'l> Session<'r, 'l> {
             args,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -116,6 +124,7 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
@@ -124,6 +133,7 @@ impl<'r, 'l> Session<'r, 'l> {
             args,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -152,6 +162,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
+        module_resolver: &impl ModuleResolver,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
         self.move_vm.runtime.execute_script(
@@ -160,6 +171,7 @@ impl<'r, 'l> Session<'r, 'l> {
             args,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
@@ -183,9 +195,10 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         module: Vec<u8>,
         sender: AccountAddress,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<()> {
-        self.publish_module_bundle(vec![module], sender, gas_meter)
+        self.publish_module_bundle(vec![module], sender, module_resolver, gas_meter)
     }
 
     /// Publish a series of modules.
@@ -207,6 +220,7 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         modules: Vec<Vec<u8>>,
         sender: AccountAddress,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<()> {
         self.move_vm.runtime.publish_module_bundle(
@@ -214,7 +228,24 @@ impl<'r, 'l> Session<'r, 'l> {
             sender,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
             gas_meter,
+            Compatibility::full_check(),
+        )
+    }
+
+    pub fn verify_module_bundle_for_publish(
+        &mut self,
+        modules: &[CompiledModule],
+        sender: &AccountAddress,
+        module_resolver: &impl ModuleResolver,
+    ) -> VMResult<()> {
+        self.move_vm.runtime.verify_module_bundle_for_publish(
+            modules,
+            sender,
+            &mut self.data_cache,
+            &self.module_store,
+            module_resolver,
             Compatibility::full_check(),
         )
     }
@@ -225,6 +256,7 @@ impl<'r, 'l> Session<'r, 'l> {
         modules: Vec<Vec<u8>>,
         sender: AccountAddress,
         gas_meter: &mut impl GasMeter,
+        module_resolver: &impl ModuleResolver,
         compat_config: Compatibility,
     ) -> VMResult<()> {
         self.move_vm.runtime.publish_module_bundle(
@@ -232,7 +264,25 @@ impl<'r, 'l> Session<'r, 'l> {
             sender,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
             gas_meter,
+            compat_config,
+        )
+    }
+
+    pub fn verify_module_bundle_for_publish_with_compat_config(
+        &mut self,
+        modules: &[CompiledModule],
+        sender: &AccountAddress,
+        module_resolver: &impl ModuleResolver,
+        compat_config: Compatibility,
+    ) -> VMResult<()> {
+        self.move_vm.runtime.verify_module_bundle_for_publish(
+            modules,
+            sender,
+            &mut self.data_cache,
+            &self.module_store,
+            module_resolver,
             compat_config,
         )
     }
@@ -242,12 +292,14 @@ impl<'r, 'l> Session<'r, 'l> {
         modules: Vec<Vec<u8>>,
         sender: AccountAddress,
         gas_meter: &mut impl GasMeter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<()> {
         self.move_vm.runtime.publish_module_bundle(
             modules,
             sender,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
             gas_meter,
             Compatibility::no_check(),
         )
@@ -317,15 +369,14 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
-    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Bytes> {
+    pub fn load_module(
+        &self,
+        module_resolver: &impl ModuleResolver,
+        module_id: &ModuleId,
+    ) -> VMResult<Bytes> {
         self.data_cache
-            .load_module(module_id)
+            .load_module(module_resolver, module_id)
             .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    /// Check if this module exists.
-    pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
-        self.data_cache.exists_module(module_id)
     }
 
     /// Load a script and all of its types into cache
@@ -333,12 +384,14 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         script: impl Borrow<[u8]>,
         ty_args: &[TypeTag],
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<LoadedFunction> {
         self.move_vm.runtime.loader().load_script(
             script.borrow(),
             ty_args,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
         )
     }
 
@@ -348,6 +401,7 @@ impl<'r, 'l> Session<'r, 'l> {
         module_id: &ModuleId,
         function_name: &IdentStr,
         expected_return_type: &Type,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<LoadedFunction> {
         self.move_vm
             .runtime
@@ -358,6 +412,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 expected_return_type,
                 &mut self.data_cache,
                 &self.module_store,
+                module_resolver,
             )
     }
 
@@ -367,6 +422,7 @@ impl<'r, 'l> Session<'r, 'l> {
         module_id: &ModuleId,
         function_name: &IdentStr,
         ty_args: &[TypeTag],
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<LoadedFunction> {
         self.move_vm.runtime.loader().load_function(
             module_id,
@@ -374,32 +430,50 @@ impl<'r, 'l> Session<'r, 'l> {
             ty_args,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
         )
     }
 
-    pub fn load_type(&mut self, type_tag: &TypeTag) -> VMResult<Type> {
-        self.move_vm
-            .runtime
-            .loader()
-            .load_type(type_tag, &mut self.data_cache, &self.module_store)
+    pub fn load_type(
+        &mut self,
+        type_tag: &TypeTag,
+        module_resolver: &impl ModuleResolver,
+    ) -> VMResult<Type> {
+        self.move_vm.runtime.loader().load_type(
+            type_tag,
+            &mut self.data_cache,
+            &self.module_store,
+            module_resolver,
+        )
     }
 
-    pub fn get_type_layout(&mut self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
+    pub fn get_type_layout(
+        &mut self,
+        type_tag: &TypeTag,
+        module_resolver: &impl ModuleResolver,
+    ) -> VMResult<MoveTypeLayout> {
         self.move_vm.runtime.loader().get_type_layout(
             type_tag,
             &mut self.data_cache,
             &self.module_store,
+            module_resolver,
         )
     }
 
     pub fn get_fully_annotated_type_layout(
         &mut self,
         type_tag: &TypeTag,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<MoveTypeLayout> {
         self.move_vm
             .runtime
             .loader()
-            .get_fully_annotated_type_layout(type_tag, &mut self.data_cache, &self.module_store)
+            .get_fully_annotated_type_layout(
+                type_tag,
+                &mut self.data_cache,
+                &self.module_store,
+                module_resolver,
+            )
     }
 
     pub fn get_type_tag(&self, ty: &Type) -> VMResult<TypeTag> {
@@ -441,6 +515,7 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn check_dependencies_and_charge_gas<'a, I>(
         &mut self,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext<'a>,
         ids: I,
@@ -454,6 +529,7 @@ impl<'r, 'l> Session<'r, 'l> {
             .loader()
             .check_dependencies_and_charge_gas(
                 &self.module_store,
+                module_resolver,
                 &mut self.data_cache,
                 gas_meter,
                 &mut traversal_context.visited,
@@ -464,6 +540,7 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn check_script_dependencies_and_check_gas(
         &mut self,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         script: impl Borrow<[u8]>,
@@ -473,6 +550,7 @@ impl<'r, 'l> Session<'r, 'l> {
             .loader()
             .check_script_dependencies_and_check_gas(
                 &self.module_store,
+                module_resolver,
                 &mut self.data_cache,
                 gas_meter,
                 traversal_context,

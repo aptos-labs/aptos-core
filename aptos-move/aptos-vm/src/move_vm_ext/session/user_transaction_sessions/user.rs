@@ -12,7 +12,10 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     AptosVM,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
+};
 use derive_more::{Deref, DerefMut};
 use move_core_types::vm_status::VMStatus;
 
@@ -51,11 +54,11 @@ impl<'r, 'l> UserSession<'r, 'l> {
 
     pub fn finish(
         self,
+        module_write_set: ModuleWriteSet,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let Self { session } = self;
-        let (change_set, module_write_set) =
-            session.finish_with_squashed_change_set(change_set_configs, false)?;
+        let change_set = session.finish_with_squashed_change_set(change_set_configs, false)?;
         UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
     }
 }

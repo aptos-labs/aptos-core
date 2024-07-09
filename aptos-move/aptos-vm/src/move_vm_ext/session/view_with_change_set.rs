@@ -25,13 +25,19 @@ use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
     change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
+        AptosModuleStorage, ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
         TResourceGroupView, TResourceView,
     },
 };
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    language_storage::StructTag,
+    metadata::Metadata,
+    value::MoveTypeLayout,
+};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -311,11 +317,71 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
-    type Key = StateKey;
+// We should not need this implementation, if we would be able to split ExecutorView into
+// a a pair of views, one for code, and one for data.
+// TODO(George): Split the views?
+impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
+    fn check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        self.base_executor_view
+            .check_module_exists(address, module_name)
+    }
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.base_executor_view.get_module_state_value(state_key)
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        self.base_executor_view
+            .fetch_module_bytes(address, module_name)
+    }
+
+    fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        self.base_executor_view
+            .fetch_module_size_in_bytes(address, module_name)
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        self.base_executor_view
+            .fetch_module_state_value_metadata(address, module_name)
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        self.base_executor_view
+            .fetch_module_metadata(address, module_name)
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        self.base_executor_view
+            .fetch_module_immediate_dependencies(address, module_name)
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        self.base_executor_view
+            .fetch_module_immediate_friends(address, module_name)
     }
 }
 
@@ -359,8 +425,13 @@ mod test {
         bcs::from_bytes(&view.get_resource_bytes(&key(s), None).unwrap().unwrap()).unwrap()
     }
 
-    fn read_module(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        bcs::from_bytes(&view.get_module_bytes(&key(s)).unwrap().unwrap()).unwrap()
+    fn read_module(view: &ExecutorViewWithChangeSet, s: &str) -> u128 {
+        bcs::from_bytes(
+            &view
+                .fetch_module_bytes(&AccountAddress::ONE, IdentStr::new(s).unwrap())
+                .unwrap(),
+        )
+        .unwrap()
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {

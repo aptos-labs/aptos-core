@@ -25,7 +25,7 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
 use move_vm_types::{
-    resolver::MoveResolver,
+    resolver::{ModuleResolver, ResourceResolver},
     values::{Reference, Value},
 };
 use std::{
@@ -84,12 +84,12 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r impl MoveResolver,
+        resource_resolver: &'r impl ResourceResolver,
     ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
             virtual_time,
-            move_resolver,
+            resource_resolver,
             NativeContextExtensions::default(),
         )
     }
@@ -99,7 +99,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r impl MoveResolver,
+        resource_resolver: &'r impl ResourceResolver,
         ext: NativeContextExtensions<'r>,
     ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);
@@ -107,7 +107,7 @@ impl AsyncVM {
             vm: self,
             vm_session: self
                 .move_vm
-                .new_session_with_extensions(move_resolver, extensions),
+                .new_session_with_extensions(resource_resolver, extensions),
         }
     }
 
@@ -173,6 +173,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         module_id: &ModuleId,
         actor_addr: AccountAddress,
         gas_status: &mut GasStatus,
+        module_resolver: &impl ModuleResolver,
     ) -> AsyncResult<'r> {
         let actor = self
             .vm
@@ -182,7 +183,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         let state_type_tag = TypeTag::Struct(Box::new(actor.state_tag.clone()));
         let state_type = self
             .vm_session
-            .load_type(&state_type_tag)
+            .load_type(&state_type_tag, module_resolver)
             .map_err(vm_error_to_async)?;
 
         // Check whether the actor state already exists.
@@ -210,6 +211,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 gas_status,
+                module_resolver,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
@@ -261,6 +263,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         message_hash: u64,
         mut args: Vec<Vec<u8>>,
         gas_status: &mut GasStatus,
+        module_resolver: &impl ModuleResolver,
     ) -> AsyncResult<'r> {
         // Resolve actor and function which handles the message.
         let (module_id, handler_id) =
@@ -278,7 +281,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         let state_type_tag = TypeTag::Struct(Box::new(actor.state_tag.clone()));
         let state_type = self
             .vm_session
-            .load_type(&state_type_tag)
+            .load_type(&state_type_tag, module_resolver)
             .map_err(vm_error_to_async)?;
 
         let actor_state_global = self
@@ -293,7 +296,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
             .map_err(partial_vm_error_to_async)?;
         args.insert(
             0,
-            self.to_bcs(actor_state, &state_type_tag)
+            self.to_bcs(actor_state, &state_type_tag, module_resolver)
                 .map_err(partial_vm_error_to_async)?,
         );
 
@@ -308,6 +311,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 vec![],
                 args,
                 gas_status,
+                module_resolver,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
@@ -354,10 +358,15 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn to_bcs(&mut self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
+    fn to_bcs(
+        &mut self,
+        value: Value,
+        tag: &TypeTag,
+        module_resolver: &impl ModuleResolver,
+    ) -> PartialVMResult<Vec<u8>> {
         let type_layout = self
             .vm_session
-            .get_type_layout(tag)
+            .get_type_layout(tag, module_resolver)
             .map_err(|e| e.to_partial())?;
         value
             .simple_serialize(&type_layout)

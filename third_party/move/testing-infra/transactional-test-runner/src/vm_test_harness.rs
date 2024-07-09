@@ -155,7 +155,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         };
 
         adapter
-            .perform_session_action(None, |session, gas_status| {
+            .perform_session_action(None, |session, module_storage, gas_status| {
                 for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
                     .into_iter()
                     .map(|tmod| &tmod.named_module.module)
@@ -170,7 +170,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     let id = module.self_id();
                     let sender = *id.address();
                     session
-                        .publish_module(module_bytes, sender, gas_status)
+                        .publish_module(module_bytes, sender, module_storage, gas_status)
                         .unwrap();
                 }
                 Ok(())
@@ -208,20 +208,22 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let id = module.self_id();
         let sender = *id.address();
         let verbose = extra_args.verbose;
-        let result = self.perform_session_action(gas_budget, |session, gas_status| {
-            let compat = Compatibility::new(
-                !extra_args.skip_check_struct_and_pub_function_linking,
-                !extra_args.skip_check_struct_layout,
-                !extra_args.skip_check_friend_linking,
-            );
+        let result =
+            self.perform_session_action(gas_budget, |session, module_storage, gas_status| {
+                let compat = Compatibility::new(
+                    !extra_args.skip_check_struct_and_pub_function_linking,
+                    !extra_args.skip_check_struct_layout,
+                    !extra_args.skip_check_friend_linking,
+                );
 
-            session.publish_module_bundle_with_compat_config(
-                vec![module_bytes],
-                sender,
-                gas_status,
-                compat,
-            )
-        });
+                session.publish_module_bundle_with_compat_config(
+                    vec![module_bytes],
+                    sender,
+                    gas_status,
+                    module_storage,
+                    compat,
+                )
+            });
         match result {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
@@ -264,12 +266,13 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
-        self.perform_session_action(gas_budget, |session, gas_status| {
+        self.perform_session_action(gas_budget, |session, module_storage, gas_status| {
             session.execute_script(
                 script_bytes,
                 type_args,
                 args,
                 gas_status,
+                module_storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
         })
@@ -314,13 +317,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let traversal_storage = TraversalStorage::new();
 
         let serialized_return_values = self
-            .perform_session_action(gas_budget, |session, gas_status| {
+            .perform_session_action(gas_budget, |session, module_storage, gas_status| {
                 session.execute_function_bypass_visibility(
                     module,
                     function,
                     type_args,
                     args,
                     gas_status,
+                    module_storage,
                     &mut TraversalContext::new(&traversal_storage),
                 )
             })
@@ -373,7 +377,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
     fn perform_session_action<Ret>(
         &mut self,
         gas_budget: Option<u64>,
-        f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
+        f: impl FnOnce(&mut Session, &InMemoryStorage, &mut GasStatus) -> VMResult<Ret>,
     ) -> VMResult<Ret> {
         let vm_config = VMConfig {
             verifier_config: VerifierConfig::production(),
@@ -399,7 +403,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         };
 
         // perform op
-        let res = f(&mut session, &mut gas_status)?;
+        let res = f(&mut session, &self.storage, &mut gas_status)?;
 
         // save changeset
         let changeset = session.finish()?;

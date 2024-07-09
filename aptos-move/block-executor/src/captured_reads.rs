@@ -963,6 +963,7 @@ mod test {
         type Event = MockEvent;
         type Identifier = DelayedFieldID;
         type Key = KeyType<u32>;
+        type Module = ValueType;
         type Tag = u32;
         type Value = ValueType;
 

@@ -28,7 +28,7 @@ use move_core_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::TraversalContext};
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
 use once_cell::sync::Lazy;
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
@@ -71,6 +71,7 @@ impl TransactionValidation {
 
 pub(crate) fn run_script_prologue(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
@@ -141,6 +142,7 @@ pub(crate) fn run_script_prologue(
             vec![],
             serialize_values(&args),
             &mut gas_meter,
+            module_resolver,
             traversal_context,
         )
         .map(|_return_vals| ())
@@ -155,6 +157,7 @@ pub(crate) fn run_script_prologue(
 /// match that hash.
 pub(crate) fn run_multisig_prologue(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     txn_data: &TransactionMetadata,
     payload: &Multisig,
     features: &Features,
@@ -184,6 +187,7 @@ pub(crate) fn run_multisig_prologue(
                 MoveValue::vector_u8(provided_payload),
             ]),
             &mut UnmeteredGasMeter,
+            module_resolver,
             traversal_context,
         )
         .map(|_return_vals| ())
@@ -193,6 +197,7 @@ pub(crate) fn run_multisig_prologue(
 
 fn run_epilogue(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
@@ -225,6 +230,7 @@ fn run_epilogue(
             vec![],
             serialize_values(&args),
             &mut UnmeteredGasMeter,
+            module_resolver,
             traversal_context,
         )
     } else {
@@ -245,6 +251,7 @@ fn run_epilogue(
             vec![],
             serialize_values(&args),
             &mut UnmeteredGasMeter,
+            module_resolver,
             traversal_context,
         )
     }
@@ -253,7 +260,7 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, fee_statement, traversal_context)?;
+        emit_fee_statement(session, module_resolver, fee_statement, traversal_context)?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -263,6 +270,7 @@ fn run_epilogue(
 
 fn emit_fee_statement(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
@@ -273,6 +281,7 @@ fn emit_fee_statement(
             vec![],
             vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
             &mut UnmeteredGasMeter,
+            module_resolver,
             traversal_context,
         )
         .map(|_return_vals| ())
@@ -282,6 +291,7 @@ fn emit_fee_statement(
 /// in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_success_epilogue(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     features: &Features,
@@ -298,6 +308,7 @@ pub(crate) fn run_success_epilogue(
 
     run_epilogue(
         session,
+        module_resolver,
         gas_remaining,
         fee_statement,
         txn_data,
@@ -311,6 +322,7 @@ pub(crate) fn run_success_epilogue(
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     features: &Features,
@@ -320,6 +332,7 @@ pub(crate) fn run_failure_epilogue(
 ) -> Result<(), VMStatus> {
     run_epilogue(
         session,
+        module_resolver,
         gas_remaining,
         fee_statement,
         txn_data,

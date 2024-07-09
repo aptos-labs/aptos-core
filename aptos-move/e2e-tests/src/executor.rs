@@ -57,6 +57,7 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     environment::Environment,
+    module_write_set::ModuleWriteSet,
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use bytes::Bytes;
@@ -884,7 +885,12 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
+            let _ = session.load_function(
+                module,
+                &Self::name(function_name),
+                &type_params.clone(),
+                &resolver,
+            );
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -927,6 +933,7 @@ impl FakeExecutor {
                     ty,
                     arg,
                     regular.as_mut().unwrap(),
+                    &resolver,
                     &mut TraversalContext::new(&storage),
                 ),
                 GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
@@ -935,6 +942,7 @@ impl FakeExecutor {
                     ty,
                     arg,
                     unmetered.as_mut().unwrap(),
+                    &resolver,
                     &mut TraversalContext::new(&storage),
                 ),
             };
@@ -1008,6 +1016,7 @@ impl FakeExecutor {
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
+                &resolver,
                 &mut TraversalContext::new(&storage),
             );
             if let Err(err) = result {
@@ -1015,13 +1024,13 @@ impl FakeExecutor {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
-            let (change_set, module_write_set) = session
+            let change_set = session
                 .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                     LATEST_GAS_FEATURE_VERSION,
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_combine_into_storage_change_set(module_write_set)
+                .try_combine_into_storage_change_set(ModuleWriteSet::empty())
                 .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
@@ -1061,6 +1070,7 @@ impl FakeExecutor {
                     args,
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
+                    &resolver,
                     &mut TraversalContext::new(&storage),
                 )
                 .unwrap_or_else(|e| {
@@ -1071,13 +1081,13 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let (change_set, module_write_set) = session
+            let change_set = session
                 .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                     LATEST_GAS_FEATURE_VERSION,
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_combine_into_storage_change_set(module_write_set)
+                .try_combine_into_storage_change_set(ModuleWriteSet::empty())
                 .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
@@ -1119,17 +1129,18 @@ impl FakeExecutor {
                 args,
                 // TODO(Gas): we probably want to switch to metered execution in the future
                 &mut UnmeteredGasMeter,
+                &resolver,
                 &mut TraversalContext::new(&storage),
             )
             .map_err(|e| e.into_vm_status())?;
 
-        let (change_set, module_write_set) = session
+        let change_set = session
             .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                 LATEST_GAS_FEATURE_VERSION,
             ))
             .expect("Failed to generate txn effects");
         let (write_set, events) = change_set
-            .try_combine_into_storage_change_set(module_write_set)
+            .try_combine_into_storage_change_set(ModuleWriteSet::empty())
             .expect("Failed to convert to storage ChangeSet")
             .into_inner();
         Ok((write_set, events))

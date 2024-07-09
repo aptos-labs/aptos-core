@@ -16,9 +16,12 @@ use move_binary_format::{
     file_format::{AbilitySet, Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::{
-    runtime_access_specifier::AccessSpecifier,
-    runtime_types::{StructIdentifier, Type},
+use move_vm_types::{
+    loaded_data::{
+        runtime_access_specifier::AccessSpecifier,
+        runtime_types::{StructIdentifier, Type},
+    },
+    resolver::ModuleResolver,
 };
 use std::{fmt::Debug, sync::Arc};
 
@@ -188,18 +191,20 @@ impl Function {
     pub(crate) fn get_resolver<'a>(
         &self,
         loader: &'a Loader,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &'a ModuleStorageAdapter,
+        module_resolver: &'a dyn ModuleResolver,
     ) -> Resolver<'a> {
         match &self.scope {
             Scope::Module(module_id) => {
                 let module = module_store
                     .module_at(module_id)
                     .expect("ModuleId on Function must exist");
-                Resolver::for_module(loader, module_store, module)
+                Resolver::for_module(loader, module_store, module_resolver, module)
             },
             Scope::Script(script_hash) => {
                 let script = loader.get_script(script_hash);
-                Resolver::for_script(loader, module_store, script)
+                Resolver::for_script(loader, module_store, module_resolver, script)
             },
         }
     }

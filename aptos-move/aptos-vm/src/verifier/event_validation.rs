@@ -16,6 +16,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress, language_storage::ModuleId, vm_status::StatusCode,
 };
+use move_vm_types::resolver::ModuleResolver;
 use std::collections::HashSet;
 
 const EVENT_MODULE_NAME: &str = "event";
@@ -36,6 +37,7 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// * Verify all changes are compatible upgrades (existing event attributes cannot be removed)
 pub(crate) fn validate_module_events(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     modules: &[CompiledModule],
 ) -> VMResult<()> {
     for module in modules {
@@ -50,7 +52,7 @@ pub(crate) fn validate_module_events(
         validate_emit_calls(&new_event_structs, module)?;
 
         let original_event_structs =
-            extract_event_metadata_from_module(session, &module.self_id())?;
+            extract_event_metadata_from_module(session, module_resolver, &module.self_id())?;
 
         for member in original_event_structs {
             // Fail if we see a removal of an event attribute.
@@ -119,15 +121,18 @@ pub(crate) fn validate_emit_calls(
 /// Given a module id extract all event metadata
 pub(crate) fn extract_event_metadata_from_module(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     module_id: &ModuleId,
 ) -> VMResult<HashSet<String>> {
-    let metadata = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-        .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
-    });
+    let metadata = session
+        .load_module(module_resolver, module_id)
+        .map(|module| {
+            CompiledModule::deserialize_with_config(
+                &module,
+                &session.get_vm_config().deserializer_config,
+            )
+            .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
+        });
 
     if let Ok(Ok(Some(metadata))) = metadata {
         extract_event_metadata(&metadata)

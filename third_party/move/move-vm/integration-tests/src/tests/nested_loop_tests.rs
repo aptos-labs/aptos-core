@@ -53,7 +53,7 @@ fn test_publish_module_with_nested_loops() {
         );
 
         let mut sess = vm.new_session(&storage);
-        sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
+        sess.publish_module(m_blob.clone(), TEST_ADDR, &storage, &mut UnmeteredGasMeter)
             .unwrap();
     }
 
@@ -75,7 +75,7 @@ fn test_publish_module_with_nested_loops() {
         );
 
         let mut sess = vm.new_session(&storage);
-        sess.publish_module(m_blob, TEST_ADDR, &mut UnmeteredGasMeter)
+        sess.publish_module(m_blob, TEST_ADDR, &storage, &mut UnmeteredGasMeter)
             .unwrap_err();
     }
 }
@@ -130,6 +130,7 @@ fn test_run_script_with_nested_loops() {
             vec![],
             args,
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -159,6 +160,7 @@ fn test_run_script_with_nested_loops() {
             vec![],
             args,
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap_err();

@@ -10,6 +10,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_types::{
     delayed_fields::PanicError,
     executable::{Executable, ModulePath},
+    vm::module_write_op::ModuleWrite,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
@@ -36,12 +37,13 @@ pub struct UnsyncMap<
     V: TransactionWrite,
     X: Executable,
     I: Copy,
+    M: ModuleWrite,
 > {
     // Only use Arc to provide unified interfaces with the MVHashMap / concurrent setting. This
     // simplifies the trait-based integration for executable caching. TODO: better representation.
     resource_map: RefCell<HashMap<K, ValueWithLayout<V>>>,
     // Optional hash can store the hash of the module to avoid re-computations.
-    module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
+    module_map: RefCell<HashMap<K, (Arc<M>, Option<HashValue>)>>,
     group_cache: RefCell<HashMap<K, RefCell<HashMap<T, ValueWithLayout<V>>>>>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 
@@ -60,7 +62,8 @@ impl<
         V: TransactionWrite,
         X: Executable,
         I: Hash + Clone + Copy + Eq,
-    > Default for UnsyncMap<K, T, V, X, I>
+        M: ModuleWrite,
+    > Default for UnsyncMap<K, T, V, X, I, M>
 {
     fn default() -> Self {
         Self {
@@ -81,7 +84,8 @@ impl<
         V: TransactionWrite,
         X: Executable,
         I: Hash + Clone + Copy + Eq,
-    > UnsyncMap<K, T, V, X, I>
+        M: ModuleWrite,
+    > UnsyncMap<K, T, V, X, I, M>
 {
     pub fn new() -> Self {
         Self::default()
@@ -233,7 +237,7 @@ impl<
         })
     }
 
-    pub fn fetch_module(&self, key: &K) -> Option<Arc<V>> {
+    pub fn fetch_module(&self, key: &K) -> Option<Arc<M>> {
         self.module_map
             .borrow()
             .get(key)
@@ -250,7 +254,7 @@ impl<
             .insert(key, ValueWithLayout::Exchanged(value, layout));
     }
 
-    pub fn write_module(&self, key: K, value: V) {
+    pub fn write_module(&self, key: K, value: M) {
         self.module_map
             .borrow_mut()
             .insert(key, (Arc::new(value), None));
@@ -287,7 +291,7 @@ mod test {
     use claims::{assert_err, assert_err_eq, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
 
     fn finalize_group_as_hashmap(
-        map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>,
+        map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue>,
         key: &KeyType<Vec<u8>>,
     ) -> HashMap<usize, ValueWithLayout<TestValue>> {
         map.finalize_group(key).collect()
@@ -297,7 +301,9 @@ mod test {
     #[test]
     fn group_commit_idx() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map =
+            UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue>::new(
+            );
 
         map.set_group_base_values(
             ap.clone(),
@@ -385,7 +391,9 @@ mod test {
     #[test]
     fn set_base_twice() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map =
+            UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue>::new(
+            );
 
         map.set_group_base_values(
             ap.clone(),
@@ -401,7 +409,9 @@ mod test {
     #[test]
     fn group_op_without_base() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map =
+            UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue>::new(
+            );
 
         assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(10, true), None));
     }
@@ -410,7 +420,9 @@ mod test {
     #[test]
     fn group_no_path_exists() {
         let ap = KeyType(b"/foo/b".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map =
+            UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue>::new(
+            );
 
         let _ = map.finalize_group(&ap).collect::<Vec<_>>();
     }
@@ -418,7 +430,9 @@ mod test {
     #[test]
     fn group_size() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map =
+            UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue>::new(
+            );
 
         assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Uninitialized);
 
@@ -477,7 +491,9 @@ mod test {
     #[test]
     fn group_value() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map =
+            UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue>::new(
+            );
 
         // Uninitialized before group is set, TagNotFound afterwards
         assert_err_eq!(
@@ -494,7 +510,7 @@ mod test {
         for i in 1..5 {
             assert_ok_eq!(
                 map.fetch_group_tagged_data(&ap, &i),
-                ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(i)),)
+                ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(i)))
             );
         }
         assert_err_eq!(
@@ -516,11 +532,11 @@ mod test {
         );
         assert_ok_eq!(
             map.fetch_group_tagged_data(&ap, &3),
-            ValueWithLayout::Exchanged(Arc::new(TestValue::modification_with_len(8)), None,)
+            ValueWithLayout::Exchanged(Arc::new(TestValue::modification_with_len(8)), None)
         );
         assert_ok_eq!(
             map.fetch_group_tagged_data(&ap, &6),
-            ValueWithLayout::Exchanged(Arc::new(TestValue::creation_with_len(9)), None,)
+            ValueWithLayout::Exchanged(Arc::new(TestValue::creation_with_len(9)), None)
         );
 
         // others unaffected.
@@ -530,11 +546,11 @@ mod test {
         );
         assert_ok_eq!(
             map.fetch_group_tagged_data(&ap, &2),
-            ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(2)),)
+            ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(2)))
         );
         assert_ok_eq!(
             map.fetch_group_tagged_data(&ap, &4),
-            ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(4)),)
+            ValueWithLayout::RawFromStorage(Arc::new(TestValue::creation_with_len(4)))
         );
     }
 }

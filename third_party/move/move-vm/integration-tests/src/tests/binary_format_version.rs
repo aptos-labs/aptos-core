@@ -33,6 +33,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         sess.publish_module(
             b_new.clone(),
             *m.self_id().address(),
+            &storage,
             &mut UnmeteredGasMeter,
         )
         .unwrap();
@@ -40,6 +41,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         sess.publish_module(
             b_old.clone(),
             *m.self_id().address(),
+            &storage,
             &mut UnmeteredGasMeter,
         )
         .unwrap();
@@ -67,6 +69,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             sess.publish_module(
                 b_new.clone(),
                 *m.self_id().address(),
+                &storage,
                 &mut UnmeteredGasMeter,
             )
             .unwrap_err()
@@ -77,6 +80,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         sess.publish_module(
             b_old.clone(),
             *m.self_id().address(),
+            &storage,
             &mut UnmeteredGasMeter,
         )
         .unwrap();
@@ -109,6 +113,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             vec![],
             args.clone(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -118,6 +123,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             vec![],
             args,
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -148,6 +154,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
                 vec![],
                 args.clone(),
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage)
             )
             .unwrap_err()
@@ -160,6 +167,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             vec![],
             args,
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();

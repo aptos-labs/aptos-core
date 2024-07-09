@@ -24,7 +24,6 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use derive_more::{Deref, DerefMut};
-use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
 
 #[derive(Deref, DerefMut)]
@@ -112,20 +111,9 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
             module_write_set,
         } = self;
 
-        let (change_set, empty_module_write_set) =
-            session.finish_with_squashed_change_set(change_set_configs, true)?;
+        let change_set = session.finish_with_squashed_change_set(change_set_configs, true)?;
         let epilogue_session_change_set =
             UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)?;
-
-        // Epilogue can never publish modules! When we move publishing outside MoveVM, we do not need to have
-        // this check here, as modules will only be visible in user session.
-        empty_module_write_set
-            .is_empty_or_invariant_violation()
-            .map_err(|e| {
-                e.with_message("Non-empty module write set in epilogue session".to_string())
-                    .finish(Location::Undefined)
-                    .into_vm_status()
-            })?;
 
         let (change_set, module_write_set) = epilogue_session_change_set.unpack();
         Ok(VMOutput::new(

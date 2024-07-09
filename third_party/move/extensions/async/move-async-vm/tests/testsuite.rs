@@ -91,7 +91,7 @@ impl Harness {
         let mut session = self.vm.new_session(test_account(), 0, &proxy);
         let mut done = BTreeSet::new();
         for id in self.module_cache.keys() {
-            self.publish_module(&mut session, id, &mut gas, &mut done)?;
+            self.publish_module(&mut session, id, &proxy, &mut gas, &mut done)?;
         }
         // Initialize actors
         let mut mailbox: VecDeque<Message> = Default::default();
@@ -104,7 +104,7 @@ impl Harness {
             {
                 let proxy = HarnessProxy { harness: self };
                 let session = self.vm.new_session(addr, 0, &proxy);
-                let result = session.new_actor(&actor, addr, &mut gas);
+                let result = session.new_actor(&actor, addr, &mut gas, &proxy);
                 self.handle_result(&mut mailbox, result);
             };
 
@@ -136,7 +136,7 @@ impl Harness {
             let proxy = HarnessProxy { harness: self };
             let session = self.vm.new_session(actor, tick, &proxy);
             tick += 1000_1000; // micros
-            let result = session.handle_message(actor, message_hash, args, &mut gas);
+            let result = session.handle_message(actor, message_hash, args, &mut gas, &proxy);
             self.handle_result(&mut mailbox, result);
         }
         Ok(())
@@ -146,6 +146,7 @@ impl Harness {
         &self,
         session: &mut AsyncSession,
         id: &IdentStr,
+        module_resolver: &impl ModuleResolver,
         gas: &mut GasStatus,
         done: &mut BTreeSet<Identifier>,
     ) -> anyhow::Result<()> {
@@ -154,13 +155,16 @@ impl Harness {
             if let CompiledUnit::Module(m) = cu {
                 for dep in &m.module.module_handles {
                     let dep_id = m.module.identifier_at(dep.name);
-                    self.publish_module(session, dep_id, gas, done)?
+                    self.publish_module(session, dep_id, module_resolver, gas, done)?
                 }
             }
             self.log(format!("publishing {}", id));
-            session
-                .get_move_session()
-                .publish_module(cu.serialize(None), test_account(), gas)?
+            session.get_move_session().publish_module(
+                cu.serialize(None),
+                test_account(),
+                module_resolver,
+                gas,
+            )?
         }
         Ok(())
     }
@@ -382,17 +386,65 @@ struct HarnessProxy<'a> {
 }
 
 impl<'a> ModuleResolver for HarnessProxy<'a> {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        todo!()
     }
 
-    fn get_module(&self, id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        Ok(self
-            .harness
-            .module_cache
-            .get(id.name())
-            .map(|c| c.serialize(None).into()))
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        todo!()
     }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        todo!()
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        todo!()
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        todo!()
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        todo!()
+    }
+
+    // fn fetch_module_bytes(
+    //     &self,
+    //     _address: &AccountAddress,
+    //     module_name: &IdentStr,
+    // ) -> PartialVMResult<Option<Bytes>> {
+    //     Ok(self
+    //         .harness
+    //         .module_cache
+    //         .get(module_name)
+    //         .map(|c| c.serialize(None).into()))
+    // }
 }
 
 impl<'a> ResourceResolver for HarnessProxy<'a> {

@@ -143,6 +143,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
+                resolver,
                 &mut TraversalContext::new(&module_storage),
             )
             .map_err(|e| {

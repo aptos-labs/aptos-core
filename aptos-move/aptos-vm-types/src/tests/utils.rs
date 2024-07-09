@@ -17,6 +17,7 @@ use aptos_types::{
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
+    vm::module_write_op::ModuleWriteOp,
     write_set::WriteOp,
 };
 use move_binary_format::errors::PartialVMResult;
@@ -49,6 +50,7 @@ macro_rules! as_bytes {
 
 use crate::module_write_set::ModuleWriteSet;
 pub(crate) use as_bytes;
+use move_binary_format::deserializer::DeserializerConfig;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -238,7 +240,17 @@ pub(crate) fn build_vm_output(
             .with_aggregator_v1_write_set(aggregator_v1_write_set)
             .with_aggregator_v1_delta_set(aggregator_v1_delta_set)
             .build(),
-        ModuleWriteSet::new(false, module_write_set.into_iter().collect()),
+        ModuleWriteSet::new(
+            module_write_set
+                .into_iter()
+                .map(|(k, w)| {
+                    (
+                        k,
+                        ModuleWriteOp::from_write_op(w, &DeserializerConfig::default()).unwrap(),
+                    )
+                })
+                .collect(),
+        ),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
         TransactionAuxiliaryData::default(),

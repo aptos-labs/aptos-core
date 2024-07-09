@@ -152,19 +152,20 @@ fn main() -> Result<()> {
     ));
 
     let vm = MoveVM::new(natives);
-    let mut storage = InMemoryStorage::new();
 
+    let resource_storage = InMemoryStorage::new();
+    let mut extensions = NativeContextExtensions::default();
+    extensions.add(NativeTableContext::new([0; 32], &resource_storage));
+    let mut sess = vm.new_session_with_extensions(&resource_storage, extensions);
+
+    let mut module_storage = InMemoryStorage::new();
     let test_modules = compile_test_modules();
     for module in &test_modules {
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(module.self_id(), blob);
+        module_storage.publish_or_overwrite_module(module.self_id(), blob);
     }
 
-    let mut extensions = NativeContextExtensions::default();
-    extensions.add(NativeTableContext::new([0; 32], &storage));
-
-    let mut sess = vm.new_session_with_extensions(&storage, extensions);
     let traversal_storage = TraversalStorage::new();
 
     let src = fs::read_to_string(&args[1])?;
@@ -175,25 +176,26 @@ fn main() -> Result<()> {
             vec![],
             args,
             &mut UnmeteredGasMeter,
+            &module_storage,
             &mut TraversalContext::new(&traversal_storage),
         )?;
     } else {
         let module = Compiler::new(test_modules.iter().collect()).into_compiled_module(&src)?;
+        let module_id = module.self_id();
         let mut module_blob = vec![];
         module.serialize(&mut module_blob)?;
 
-        sess.publish_module(
-            module_blob,
-            *module.self_id().address(),
-            &mut UnmeteredGasMeter,
-        )?;
+        sess.verify_module_bundle_for_publish(&[module], module_id.address(), &module_storage)?;
+        module_storage.publish_or_overwrite_module(module_id.clone(), module_blob);
+
         let args: Vec<Vec<u8>> = vec![];
         let res = sess.execute_function_bypass_visibility(
-            &module.self_id(),
+            &module_id,
             ident_str!("run"),
             vec![],
             args,
             &mut UnmeteredGasMeter,
+            &module_storage,
             &mut TraversalContext::new(&traversal_storage),
         )?;
         println!("{:?}", res);

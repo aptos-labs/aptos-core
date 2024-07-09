@@ -170,6 +170,7 @@ fn runtime_reentrancy_check() {
             vec![],
             args.clone(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage)
         )
         .unwrap_err()
@@ -188,6 +189,7 @@ fn runtime_reentrancy_check() {
         vec![],
         args.clone(),
         &mut UnmeteredGasMeter,
+        &storage,
         &mut TraversalContext::new(&traversal_storage),
     )
     .unwrap();
@@ -202,6 +204,7 @@ fn runtime_reentrancy_check() {
             vec![],
             args,
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage)
         )
         .unwrap_err()

@@ -9,6 +9,7 @@ use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::LoadedFunction;
+use move_vm_types::resolver::ModuleResolver;
 
 /// Based on the function attributes in the module metadata, determine whether a
 /// function is a view function.
@@ -30,6 +31,7 @@ pub fn determine_is_view(
 /// function, and validates the arguments.
 pub(crate) fn validate_view_function(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     args: Vec<Vec<u8>>,
     fun_name: &IdentStr,
     func: &LoadedFunction,
@@ -56,6 +58,7 @@ pub(crate) fn validate_view_function(
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,
+        module_resolver,
         func.param_tys(),
         args,
         func.ty_args(),

@@ -42,7 +42,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{GenesisMoveVM, SessionExt},
 };
-use claims::assert_ok;
+use aptos_vm_types::module_write_set::ModuleWriteSet;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -50,7 +50,7 @@ use move_core_types::{
     value::{serialize_values, MoveTypeLayout, MoveValue},
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -138,6 +138,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let gas_schedule = default_gas_schedule();
     initialize(
         &mut session,
+        &resolver,
         chain_id,
         genesis_config,
         &consensus_config,
@@ -146,27 +147,24 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     );
     initialize_features(
         &mut session,
+        &resolver,
         genesis_config
             .initial_features_override
             .clone()
             .map(Features::into_flag_vec),
     );
-    initialize_aptos_coin(&mut session);
-    initialize_on_chain_governance(&mut session, genesis_config);
-    create_accounts(&mut session, accounts);
-    create_employee_validators(&mut session, employees, genesis_config);
-    create_and_initialize_validators_with_commission(&mut session, validators);
-    set_genesis_end(&mut session);
+    initialize_aptos_coin(&mut session, &resolver);
+    initialize_on_chain_governance(&mut session, &resolver, genesis_config);
+    create_accounts(&mut session, &resolver, accounts);
+    create_employee_validators(&mut session, &resolver, employees, genesis_config);
+    create_and_initialize_validators_with_commission(&mut session, &resolver, validators);
+    set_genesis_end(&mut session, &resolver);
 
     // Reconfiguration should happen after all on-chain invocations.
-    emit_new_block_and_epoch_event(&mut session);
+    emit_new_block_and_epoch_event(&mut session, &resolver);
 
     let configs = vm.genesis_change_set_configs();
-    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
-    assert_ok!(
-        module_write_set.is_empty_or_invariant_violation(),
-        "Modules cannot be published in this session"
-    );
+    let mut change_set = session.finish(&configs).unwrap();
 
     // Publish the framework, using a different session id, in case both scripts create tables.
     let state_view = GenesisStateView::new();
@@ -175,8 +173,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut new_id = [0u8; 32];
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
-    publish_framework(&mut session, framework);
-    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
+    publish_framework(&mut session, &resolver, framework);
+    let additional_change_set = session.finish(&configs).unwrap();
     change_set
         .squash_additional_change_set(additional_change_set)
         .unwrap();
@@ -193,8 +191,11 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
+    // FIXME(George): This is to make code compile, we need to create a module write set here.
+    let dummy_module_write_set = ModuleWriteSet::empty();
+
     let change_set = change_set
-        .try_combine_into_storage_change_set(module_write_set)
+        .try_combine_into_storage_change_set(dummy_module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
@@ -246,6 +247,7 @@ pub fn encode_genesis_change_set(
     // On-chain genesis process.
     initialize(
         &mut session,
+        &resolver,
         chain_id,
         genesis_config,
         consensus_config,
@@ -254,50 +256,47 @@ pub fn encode_genesis_change_set(
     );
     initialize_features(
         &mut session,
+        &resolver,
         genesis_config
             .initial_features_override
             .clone()
             .map(Features::into_flag_vec),
     );
     if genesis_config.is_test {
-        initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
+        initialize_core_resources_and_aptos_coin(&mut session, &resolver, core_resources_key);
     } else {
-        initialize_aptos_coin(&mut session);
+        initialize_aptos_coin(&mut session, &resolver);
     }
-    initialize_config_buffer(&mut session);
-    initialize_dkg(&mut session);
-    initialize_reconfiguration_state(&mut session);
+    initialize_config_buffer(&mut session, &resolver);
+    initialize_dkg(&mut session, &resolver);
+    initialize_reconfiguration_state(&mut session, &resolver);
     let randomness_config = genesis_config
         .randomness_config_override
         .clone()
         .unwrap_or_else(OnChainRandomnessConfig::default_for_genesis);
-    initialize_randomness_api_v0_config(&mut session);
-    initialize_randomness_config_seqnum(&mut session);
-    initialize_randomness_config(&mut session, randomness_config);
-    initialize_randomness_resources(&mut session);
-    initialize_on_chain_governance(&mut session, genesis_config);
-    create_and_initialize_validators(&mut session, validators);
+    initialize_randomness_api_v0_config(&mut session, &resolver);
+    initialize_randomness_config_seqnum(&mut session, &resolver);
+    initialize_randomness_config(&mut session, &resolver, randomness_config);
+    initialize_randomness_resources(&mut session, &resolver);
+    initialize_on_chain_governance(&mut session, &resolver, genesis_config);
+    create_and_initialize_validators(&mut session, &resolver, validators);
     if genesis_config.is_test {
-        allow_core_resources_to_set_version(&mut session);
+        allow_core_resources_to_set_version(&mut session, &resolver);
     }
     let jwk_consensus_config = genesis_config
         .jwk_consensus_config_override
         .clone()
         .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
-    initialize_jwk_consensus_config(&mut session, &jwk_consensus_config);
-    initialize_jwks_resources(&mut session);
-    initialize_keyless_accounts(&mut session, chain_id);
-    set_genesis_end(&mut session);
+    initialize_jwk_consensus_config(&mut session, &resolver, &jwk_consensus_config);
+    initialize_jwks_resources(&mut session, &resolver);
+    initialize_keyless_accounts(&mut session, &resolver, chain_id);
+    set_genesis_end(&mut session, &resolver);
 
     // Reconfiguration should happen after all on-chain invocations.
-    emit_new_block_and_epoch_event(&mut session);
+    emit_new_block_and_epoch_event(&mut session, &resolver);
 
     let configs = vm.genesis_change_set_configs();
-    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
-    assert_ok!(
-        module_write_set.is_empty_or_invariant_violation(),
-        "Modules cannot be published in this session"
-    );
+    let mut change_set = session.finish(&configs).unwrap();
 
     let state_view = GenesisStateView::new();
     let resolver = state_view.as_move_resolver();
@@ -306,8 +305,8 @@ pub fn encode_genesis_change_set(
     let mut new_id = [0u8; 32];
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
-    publish_framework(&mut session, framework);
-    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
+    publish_framework(&mut session, &resolver, framework);
+    let additional_change_set = session.finish(&configs).unwrap();
     change_set
         .squash_additional_change_set(additional_change_set)
         .unwrap();
@@ -325,8 +324,11 @@ pub fn encode_genesis_change_set(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
+    // FIXME(George): This is to make code compile, we need to create a module write set here.
+    let dummy_module_write_set = ModuleWriteSet::empty();
+
     change_set
-        .try_combine_into_storage_change_set(module_write_set)
+        .try_combine_into_storage_change_set(dummy_module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
 }
 
@@ -368,6 +370,7 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 
 fn exec_function(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -381,6 +384,7 @@ fn exec_function(
             ty_args,
             args,
             &mut UnmeteredGasMeter,
+            module_resolver,
             &mut TraversalContext::new(&storage),
         )
         .unwrap_or_else(|e| {
@@ -396,6 +400,7 @@ fn exec_function(
 
 fn initialize(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
     consensus_config: &OnChainConsensusConfig,
@@ -425,6 +430,7 @@ fn initialize(
     let epoch_interval_usecs = genesis_config.epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
     exec_function(
         session,
+        module_resolver,
         GENESIS_MODULE_NAME,
         "initialize",
         vec![],
@@ -446,7 +452,11 @@ fn initialize(
     );
 }
 
-fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<FeatureFlag>>) {
+fn initialize_features(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+    features_override: Option<Vec<FeatureFlag>>,
+) {
     let features: Vec<u64> = features_override
         .unwrap_or_else(FeatureFlag::default_features)
         .into_iter()
@@ -459,6 +469,7 @@ fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<F
 
     exec_function(
         session,
+        module_resolver,
         "features",
         "change_feature_flags_internal",
         vec![],
@@ -466,9 +477,10 @@ fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<F
     );
 }
 
-fn initialize_aptos_coin(session: &mut SessionExt) {
+fn initialize_aptos_coin(session: &mut SessionExt, module_resolver: &impl ModuleResolver) {
     exec_function(
         session,
+        module_resolver,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
         vec![],
@@ -476,9 +488,10 @@ fn initialize_aptos_coin(session: &mut SessionExt) {
     );
 }
 
-fn initialize_config_buffer(session: &mut SessionExt) {
+fn initialize_config_buffer(session: &mut SessionExt, module_resolver: &impl ModuleResolver) {
     exec_function(
         session,
+        module_resolver,
         CONFIG_BUFFER_MODULE_NAME,
         "initialize",
         vec![],
@@ -486,9 +499,10 @@ fn initialize_config_buffer(session: &mut SessionExt) {
     );
 }
 
-fn initialize_dkg(session: &mut SessionExt) {
+fn initialize_dkg(session: &mut SessionExt, module_resolver: &impl ModuleResolver) {
     exec_function(
         session,
+        module_resolver,
         DKG_MODULE_NAME,
         "initialize",
         vec![],
@@ -496,9 +510,13 @@ fn initialize_dkg(session: &mut SessionExt) {
     );
 }
 
-fn initialize_randomness_config_seqnum(session: &mut SessionExt) {
+fn initialize_randomness_config_seqnum(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+) {
     exec_function(
         session,
+        module_resolver,
         RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME,
         "initialize",
         vec![],
@@ -506,9 +524,13 @@ fn initialize_randomness_config_seqnum(session: &mut SessionExt) {
     );
 }
 
-fn initialize_randomness_api_v0_config(session: &mut SessionExt) {
+fn initialize_randomness_api_v0_config(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+) {
     exec_function(
         session,
+        module_resolver,
         RANDOMNESS_API_V0_CONFIG_MODULE_NAME,
         "initialize",
         vec![],
@@ -522,10 +544,12 @@ fn initialize_randomness_api_v0_config(session: &mut SessionExt) {
 
 fn initialize_randomness_config(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     randomness_config: OnChainRandomnessConfig,
 ) {
     exec_function(
         session,
+        module_resolver,
         RANDOMNESS_CONFIG_MODULE_NAME,
         "initialize",
         vec![],
@@ -536,9 +560,13 @@ fn initialize_randomness_config(
     );
 }
 
-fn initialize_randomness_resources(session: &mut SessionExt) {
+fn initialize_randomness_resources(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+) {
     exec_function(
         session,
+        module_resolver,
         RANDOMNESS_MODULE_NAME,
         "initialize",
         vec![],
@@ -546,9 +574,13 @@ fn initialize_randomness_resources(session: &mut SessionExt) {
     );
 }
 
-fn initialize_reconfiguration_state(session: &mut SessionExt) {
+fn initialize_reconfiguration_state(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+) {
     exec_function(
         session,
+        module_resolver,
         RECONFIGURATION_STATE_MODULE_NAME,
         "initialize",
         vec![],
@@ -558,10 +590,12 @@ fn initialize_reconfiguration_state(session: &mut SessionExt) {
 
 fn initialize_jwk_consensus_config(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     jwk_consensus_config: &OnChainJWKConsensusConfig,
 ) {
     exec_function(
         session,
+        module_resolver,
         JWK_CONSENSUS_CONFIG_MODULE_NAME,
         "initialize",
         vec![],
@@ -572,9 +606,10 @@ fn initialize_jwk_consensus_config(
     );
 }
 
-fn initialize_jwks_resources(session: &mut SessionExt) {
+fn initialize_jwks_resources(session: &mut SessionExt, module_resolver: &impl ModuleResolver) {
     exec_function(
         session,
+        module_resolver,
         JWKS_MODULE_NAME,
         "initialize",
         vec![],
@@ -582,9 +617,10 @@ fn initialize_jwks_resources(session: &mut SessionExt) {
     );
 }
 
-fn set_genesis_end(session: &mut SessionExt) {
+fn set_genesis_end(session: &mut SessionExt, module_resolver: &impl ModuleResolver) {
     exec_function(
         session,
+        module_resolver,
         GENESIS_MODULE_NAME,
         "set_genesis_end",
         vec![],
@@ -594,11 +630,13 @@ fn set_genesis_end(session: &mut SessionExt) {
 
 fn initialize_core_resources_and_aptos_coin(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     core_resources_key: &Ed25519PublicKey,
 ) {
     let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
     exec_function(
         session,
+        module_resolver,
         GENESIS_MODULE_NAME,
         "initialize_core_resources_and_aptos_coin",
         vec![],
@@ -610,9 +648,14 @@ fn initialize_core_resources_and_aptos_coin(
 }
 
 /// Create and initialize Association and Core Code accounts.
-fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &GenesisConfiguration) {
+fn initialize_on_chain_governance(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+    genesis_config: &GenesisConfiguration,
+) {
     exec_function(
         session,
+        module_resolver,
         GOVERNANCE_MODULE_NAME,
         "initialize",
         vec![],
@@ -625,10 +668,15 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
     );
 }
 
-fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
+fn initialize_keyless_accounts(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+    chain_id: ChainId,
+) {
     let config = keyless::Configuration::new_for_devnet();
     exec_function(
         session,
+        module_resolver,
         KEYLESS_ACCOUNT_MODULE_NAME,
         "update_configuration",
         vec![],
@@ -641,6 +689,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
         let vk = Groth16VerificationKey::from(&*DEVNET_VERIFICATION_KEY);
         exec_function(
             session,
+            module_resolver,
             KEYLESS_ACCOUNT_MODULE_NAME,
             "update_groth16_verification_key",
             vec![],
@@ -657,6 +706,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
         .into();
         exec_function(
             session,
+            module_resolver,
             JWKS_MODULE_NAME,
             "set_patches",
             vec![],
@@ -668,12 +718,17 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
     }
 }
 
-fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
+fn create_accounts(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+    accounts: &[AccountBalance],
+) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
     exec_function(
         session,
+        module_resolver,
         GENESIS_MODULE_NAME,
         "create_accounts",
         vec![],
@@ -683,6 +738,7 @@ fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
 
 fn create_employee_validators(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     employees: &[EmployeePool],
     genesis_config: &GenesisConfiguration,
 ) {
@@ -695,6 +751,7 @@ fn create_employee_validators(
 
     exec_function(
         session,
+        module_resolver,
         GENESIS_MODULE_NAME,
         "create_employee_validators",
         vec![],
@@ -705,12 +762,17 @@ fn create_employee_validators(
 /// Creates and initializes each validator owner and validator operator. This method creates all
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
-fn create_and_initialize_validators(session: &mut SessionExt, validators: &[Validator]) {
+fn create_and_initialize_validators(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+    validators: &[Validator],
+) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(validators_bytes);
     exec_function(
         session,
+        module_resolver,
         GENESIS_MODULE_NAME,
         "create_initialize_validators",
         vec![],
@@ -720,6 +782,7 @@ fn create_and_initialize_validators(session: &mut SessionExt, validators: &[Vali
 
 fn create_and_initialize_validators_with_commission(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     validators: &[ValidatorWithCommissionRate],
 ) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
@@ -730,6 +793,7 @@ fn create_and_initialize_validators_with_commission(
     serialized_values.push(validators_bytes);
     exec_function(
         session,
+        module_resolver,
         GENESIS_MODULE_NAME,
         "create_initialize_validators_with_commission",
         vec![],
@@ -737,9 +801,13 @@ fn create_and_initialize_validators_with_commission(
     );
 }
 
-fn allow_core_resources_to_set_version(session: &mut SessionExt) {
+fn allow_core_resources_to_set_version(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+) {
     exec_function(
         session,
+        module_resolver,
         VERSION_MODULE_NAME,
         "initialize_for_test",
         vec![],
@@ -748,14 +816,22 @@ fn allow_core_resources_to_set_version(session: &mut SessionExt) {
 }
 
 /// Publish the framework release bundle.
-fn publish_framework(session: &mut SessionExt, framework: &ReleaseBundle) {
+fn publish_framework(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+    framework: &ReleaseBundle,
+) {
     for pack in &framework.packages {
-        publish_package(session, pack)
+        publish_package(session, module_resolver, pack)
     }
 }
 
 /// Publish the given package.
-fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
+fn publish_package(
+    session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
+    pack: &ReleasePackage,
+) {
     let modules = pack.sorted_code_and_modules();
     let addr = *modules.first().unwrap().1.self_id().address();
     let code = modules
@@ -763,7 +839,7 @@ fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
         .map(|(c, _)| c.to_vec())
         .collect::<Vec<_>>();
     session
-        .publish_module_bundle(code, addr, &mut UnmeteredGasMeter)
+        .publish_module_bundle(code, addr, module_resolver, &mut UnmeteredGasMeter)
         .unwrap_or_else(|e| {
             panic!(
                 "Failure publishing package `{}`: {:?}",
@@ -773,19 +849,27 @@ fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
         });
 
     // Call the initialize function with the metadata.
-    exec_function(session, CODE_MODULE_NAME, "initialize", vec![], vec![
-        MoveValue::Signer(CORE_CODE_ADDRESS)
-            .simple_serialize()
-            .unwrap(),
-        MoveValue::Signer(addr).simple_serialize().unwrap(),
-        bcs::to_bytes(pack.package_metadata()).unwrap(),
-    ]);
+    exec_function(
+        session,
+        module_resolver,
+        CODE_MODULE_NAME,
+        "initialize",
+        vec![],
+        vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS)
+                .simple_serialize()
+                .unwrap(),
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            bcs::to_bytes(pack.package_metadata()).unwrap(),
+        ],
+    );
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
-fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
+fn emit_new_block_and_epoch_event(session: &mut SessionExt, module_resolver: &impl ModuleResolver) {
     exec_function(
         session,
+        module_resolver,
         "block",
         "emit_genesis_block_event",
         vec![],
@@ -795,6 +879,7 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
     );
     exec_function(
         session,
+        module_resolver,
         "reconfiguration",
         "emit_genesis_reconfiguration_event",
         vec![],
@@ -1071,7 +1156,11 @@ pub fn test_genesis_module_publishing() {
     let resolver = state_view.as_move_resolver();
 
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
-    publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
+    publish_framework(
+        &mut session,
+        &resolver,
+        aptos_cached_packages::head_release_bundle(),
+    );
 }
 
 #[test]

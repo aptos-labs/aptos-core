@@ -6,7 +6,8 @@ use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     account_address::AccountAddress,
-    language_storage::{ModuleId, StructTag},
+    identifier::{IdentStr, Identifier},
+    language_storage::StructTag,
     metadata::Metadata,
     value::MoveTypeLayout,
 };
@@ -23,9 +24,41 @@ use move_core_types::{
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ModuleResolver {
-    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata>;
+    fn check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<bool>;
 
-    fn get_module(&self, id: &ModuleId) -> PartialVMResult<Option<Bytes>>;
+    fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<usize>;
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>>;
+
+    fn fetch_module_immediate_friends(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>>;
+
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>>;
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>>;
 }
 
 pub fn resource_size(resource: &Option<Bytes>) -> usize {
@@ -50,8 +83,3 @@ pub trait ResourceResolver {
         layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)>;
 }
-
-/// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver: ModuleResolver + ResourceResolver {}
-
-impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}
