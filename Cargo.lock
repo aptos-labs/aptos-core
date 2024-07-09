@@ -820,7 +820,6 @@ dependencies = [
  "get_if_addrs",
  "maplit",
  "num_cpus",
- "number_range",
  "poem-openapi",
  "rand 0.7.3",
  "serde",
@@ -11702,17 +11701,6 @@ name = "number_prefix"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
-
-[[package]]
-name = "number_range"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60080faccd4ca50ad0b801b2be686136376b13f691f6eac84817e40973b2e1bb"
-dependencies = [
- "anyhow",
- "itertools 0.10.5",
- "num 0.4.1",
-]
 
 [[package]]
 name = "object"
