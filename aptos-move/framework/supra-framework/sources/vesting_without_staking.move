@@ -87,7 +87,8 @@ module supra_framework::vesting_without_staking {
 
     struct VestingRecord has copy, store, drop {
         init_amount: u64,
-        left_amount: u64
+        left_amount: u64,
+		last_vested_period: u64,
     }
 
     struct VestingContract has key {
@@ -138,7 +139,8 @@ module supra_framework::vesting_without_staking {
     }
 
     struct VestEvent has drop, store {
-        admin: address,
+		admin: address,
+        shareholder_address: address,
         vesting_contract_address: address,
         period_vested: u64,
     }
@@ -311,6 +313,7 @@ module supra_framework::vesting_without_staking {
             simple_map::add(&mut shareholders, shareholder, VestingRecord {
                 init_amount: init,
                 left_amount: init,
+				last_vested_period: vesting_schedule.last_vested_period,
             });
             grant_amount = grant_amount + init;
         };
@@ -371,18 +374,39 @@ module supra_framework::vesting_without_staking {
             return
         };
 
+		let shareholders=simple_map::keys(&vesting_contract.shareholders);
+		while(vector::length(&shareholders)>0)
+		{
+			let shareholder = vector::pop_back(&mut shareholders);
+			vest_individual(contract_address,shareholder);
+
+		};
+        
+           }
+
+	public entry fun vest_individual(contract_address: address, shareholder_address: address) acquires VestingContract {
+		assert_active_vesting_contract(contract_address);
+		//extract beneficiary address
+		let vesting_signer = account::create_signer_with_capability(&borrow_global<VestingContract>(contract_address).signer_cap);
+		let beneficiary = beneficiary(contract_address,shareholder_address);
+        let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
+        // Short-circuit if vesting hasn't started yet.
+        if (vesting_contract.vesting_schedule.start_timestamp_secs > timestamp::now_seconds()) {
+            return
+        };
+		
+		let vesting_record = simple_map::borrow_mut(&mut vesting_contract.shareholders,&shareholder_address);
+
         // Check if the next vested period has already passed. If not, short-circuit since there's nothing to vest.
-        let vesting_schedule = &mut vesting_contract.vesting_schedule;
-        let last_vested_period = vesting_schedule.last_vested_period;
+        let vesting_schedule = vesting_contract.vesting_schedule;
+        let schedule = &vesting_schedule.schedule;
+        let last_vested_period = vesting_record.last_vested_period;
         let next_period_to_vest = last_vested_period + 1;
         let last_completed_period =
             (timestamp::now_seconds() - vesting_schedule.start_timestamp_secs) / vesting_schedule.period_duration;
-        if (last_completed_period < next_period_to_vest) {
-            return
-        };
+		while(last_completed_period>=next_period_to_vest) {
 
         // Index is 0-based while period is 1-based so we need to subtract 1.
-        let schedule = &vesting_schedule.schedule;
         let schedule_index = next_period_to_vest - 1;
         let vesting_fraction = if (schedule_index < vector::length(schedule)) {
             *vector::borrow(schedule, schedule_index)
@@ -391,20 +415,31 @@ module supra_framework::vesting_without_staking {
             *vector::borrow(schedule, vector::length(schedule) - 1)
         };
 
-        vesting_schedule.last_vested_period = next_period_to_vest;
+		//amount to be transfer is minimum of what is left and vesting fraction due of init_amount
+		let amount = min(vesting_record.left_amount,fixed_point32::multiply_u64(vesting_record.init_amount,vesting_fraction));
+		//update left_amount for the shareholder
+		vesting_record.left_amount=vesting_record.left_amount-amount;
+		coin::transfer<SupraCoin>(&vesting_signer,beneficiary,amount);
 
-        emit_event(
+    emit_event(
             &mut vesting_contract.vest_events,
             VestEvent {
                 admin: vesting_contract.admin,
+				shareholder_address: shareholder_address,
                 vesting_contract_address: contract_address,
                 period_vested: next_period_to_vest,
             },
         );
-        // Every shareholder should receive the money in proportion to their shares.
-        distribute(vesting_fraction, contract_address);
-    }
 
+		//update last_vested_period for the shareholder
+        vesting_record.last_vested_period = next_period_to_vest;
+		next_period_to_vest = next_period_to_vest+1;
+		
+		};
+
+
+	}
+	
     /// Distribute any withdrawable grant.
     /// This is no entry function anymore as it's called from within the vest.
     fun distribute(vesting_fraction: FixedPoint32, contract_address: address) acquires VestingContract {
