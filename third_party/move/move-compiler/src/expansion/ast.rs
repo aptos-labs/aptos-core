@@ -488,7 +488,7 @@ pub enum Exp_ {
 
     Borrow(bool, Box<Exp>),
     ExpDotted(Box<ExpDotted>),
-    Index(Box<Exp>, Box<Exp>), // spec only (no mutation needed right now)
+    Index(Box<Exp>, Box<Exp>), // spec only unless language >= v2
 
     Cast(Box<Exp>, Type),
     Annotate(Box<Exp>, Type),
@@ -1655,7 +1655,9 @@ impl AstDebug for Exp_ {
                 rhs.ast_debug(w);
             },
             E::Mutate(lhs, rhs) => {
-                w.write("*");
+                if !matches!(lhs.value, E::Index(_, _)) {
+                    w.write("*");
+                }
                 lhs.ast_debug(w);
                 w.write(" = ");
                 rhs.ast_debug(w);
