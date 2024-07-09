@@ -107,6 +107,7 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
                 handle_mempool_reconfig_event(&mut smp, &bounded_executor, reconfig_notification.on_chain_configs).await;
             },
             (peer, backoff) = scheduled_broadcasts.select_next_some() => {
+                counters::MEMPOOL_EXECUTE_BROADCAST_SCHEDULED.inc();
                 tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
             },
             (network_id, event) = events.select_next_some() => {
@@ -351,6 +352,7 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
         }
         for peer in &newly_added_upstream {
             debug!(LogSchema::new(LogEntry::NewPeer).peer(peer));
+            counters::MEMPOOL_EXECUTE_BROADCAST_PEER_UPDATE.inc();
             tasks::execute_broadcast(*peer, false, smp, scheduled_broadcasts, executor.clone())
                 .await;
         }

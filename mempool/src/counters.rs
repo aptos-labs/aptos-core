@@ -213,6 +213,22 @@ pub static MEMPOOL_READ_TIMELINE_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static MEMPOOL_EXECUTE_BROADCAST_SCHEDULED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_execute_broadcast_scheduled",
+        "Numebr of times execute broadcast is called"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_EXECUTE_BROADCAST_PEER_UPDATE: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_execute_broadcast_peer_updated",
+        "Numebr of times execute broadcast is called"
+    )
+    .unwrap()
+});
+
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
 static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
