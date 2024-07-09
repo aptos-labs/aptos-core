@@ -9,8 +9,7 @@
 //!
 //! [handshake]: crate::noise::handshake
 
-use crate::noise::crypto;
-use aptos_crypto::x25519;
+use aptos_crypto::{noise, x25519};
 use aptos_logger::prelude::*;
 use futures::{
     io::{AsyncRead, AsyncWrite},
@@ -37,7 +36,7 @@ pub struct NoiseStream<TSocket> {
     /// the socket we write to and read from
     socket: TSocket,
     /// the noise session used to encrypt and decrypt messages
-    session: crypto::NoiseSession,
+    session: noise::NoiseSession,
     /// handy buffers to write/read
     buffers: Box<NoiseBuffers>,
     /// an enum used for progressively reading a noise payload
@@ -48,7 +47,7 @@ pub struct NoiseStream<TSocket> {
 
 impl<TSocket> NoiseStream<TSocket> {
     /// Create a NoiseStream from a socket and a noise post-handshake session
-    pub fn new(socket: TSocket, session: crypto::NoiseSession) -> Self {
+    pub fn new(socket: TSocket, session: noise::NoiseSession) -> Self {
         Self {
             socket,
             session,
@@ -83,7 +82,7 @@ enum ReadState {
     /// End of file reached, result indicated if EOF was expected or not
     Eof(Result<(), ()>),
     /// Decryption Error
-    DecryptionError(crypto::NoiseError),
+    DecryptionError(noise::NoiseError),
 }
 
 impl<TSocket> NoiseStream<TSocket>
@@ -220,7 +219,7 @@ enum WriteState {
     /// End of file reached
     Eof,
     /// Encryption Error
-    EncryptionError(crypto::NoiseError),
+    EncryptionError(noise::NoiseError),
 }
 
 impl<TSocket> NoiseStream<TSocket>
@@ -270,11 +269,10 @@ where
                         {
                             Ok(authentication_tag) => {
                                 // append the authentication tag
-                                self.buffers.write_buffer
-                                    [*offset..*offset + crypto::AES_GCM_TAGLEN]
+                                self.buffers.write_buffer[*offset..*offset + noise::AES_GCM_TAGLEN]
                                     .copy_from_slice(&authentication_tag);
                                 // calculate frame length
-                                let frame_len = crypto::encrypted_len(*offset);
+                                let frame_len = noise::encrypted_len(*offset);
                                 let frame_len = frame_len
                                     .try_into()
                                     .expect("offset should be able to fit in u16");
@@ -404,22 +402,22 @@ where
 //
 
 // encrypted messages include a tag along with the payload.
-const MAX_WRITE_BUFFER_LENGTH: usize = crypto::decrypted_len(crypto::MAX_SIZE_NOISE_MSG);
+const MAX_WRITE_BUFFER_LENGTH: usize = noise::decrypted_len(noise::MAX_SIZE_NOISE_MSG);
 
 /// Collection of buffers used for buffering data during the various read/write states of a
 /// [`NoiseStream`]
 struct NoiseBuffers {
     /// A read buffer, used for both a received ciphertext and then for its decrypted content.
-    read_buffer: [u8; crypto::MAX_SIZE_NOISE_MSG],
+    read_buffer: [u8; noise::MAX_SIZE_NOISE_MSG],
     /// A write buffer, used for both a plaintext to send, and then its encrypted version.
-    write_buffer: [u8; crypto::MAX_SIZE_NOISE_MSG],
+    write_buffer: [u8; noise::MAX_SIZE_NOISE_MSG],
 }
 
 impl NoiseBuffers {
     fn new() -> Self {
         Self {
-            read_buffer: [0; crypto::MAX_SIZE_NOISE_MSG],
-            write_buffer: [0; crypto::MAX_SIZE_NOISE_MSG],
+            read_buffer: [0; noise::MAX_SIZE_NOISE_MSG],
+            write_buffer: [0; noise::MAX_SIZE_NOISE_MSG],
         }
     }
 }
@@ -525,7 +523,6 @@ where
 mod test {
     use super::*;
     use crate::{
-        noise::crypto::{NoiseSession, MAX_SIZE_NOISE_MSG},
         noise::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader},
         testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
     };
@@ -628,7 +625,7 @@ mod test {
         fake_socket.set_trailing();
 
         // setup a NoiseStream with a dummy state
-        let noise_session = NoiseSession::new_for_testing();
+        let noise_session = noise::NoiseSession::new_for_testing();
         let mut peer = NoiseStream::new(fake_socket, noise_session);
 
         // make sure we error and we don't continuously read
@@ -671,11 +668,11 @@ mod test {
         let ((client, _client_public), (server, server_public)) = build_peers();
         let (mut client, mut server) = perform_handshake(client, server_public, server);
 
-        let buf_send = [1; MAX_SIZE_NOISE_MSG];
+        let buf_send = [1; noise::MAX_SIZE_NOISE_MSG];
         block_on(client.write_all(&buf_send)).unwrap();
         block_on(client.flush()).unwrap();
 
-        let mut buf_receive = [0; MAX_SIZE_NOISE_MSG];
+        let mut buf_receive = [0; noise::MAX_SIZE_NOISE_MSG];
         block_on(server.read_exact(&mut buf_receive)).unwrap();
         assert_eq!(&buf_receive[..], &buf_send[..]);
     }

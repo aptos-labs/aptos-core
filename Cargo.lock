@@ -831,6 +831,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -888,6 +889,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "ring 0.16.20",
  "serde",
  "serde-name",
  "serde_bytes",
@@ -2675,11 +2677,9 @@ dependencies = [
  "rand 0.7.3",
  "rand 0.8.5",
  "rand_core 0.5.1",
- "ring 0.16.20",
  "serde",
  "serde_bytes",
  "serde_json",
- "sha2 0.9.9",
  "thiserror",
  "tokio",
  "tokio-retry",

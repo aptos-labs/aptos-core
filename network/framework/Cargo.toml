@@ -50,8 +50,6 @@ rand = { workspace = true, features = ["small_rng"] }
 # https://github.com/aptos-labs/aptos-core/blob/main/state-sync/aptos-data-client/Cargo.toml#L41.
 # See also https://github.com/aptos-labs/aptos-core/issues/13031
 rand_latest = { package = "rand", version = "0.8.5" }
-ring = { workspace = true }
-sha2 = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
