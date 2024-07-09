@@ -120,7 +120,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
-    "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",

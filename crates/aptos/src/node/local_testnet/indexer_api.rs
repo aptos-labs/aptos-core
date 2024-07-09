@@ -8,7 +8,7 @@ use super::{
     },
     health_checker::HealthChecker,
     traits::{PostHealthyStep, ServiceManager, ShutdownStep},
-    RunLocalTestnet,
+    RunLocalnet,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -34,17 +34,17 @@ const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.36.1";
 /// any references to tables that aren't created by the Rust processor migrations.
 ///
 /// To arrive at the final edited file I normally start with the new metadata file,
-/// try to start the local testnet, and check .aptos/testnet/main/tracing.log to
+/// try to start the localnet, and check .aptos/testnet/main/tracing.log to
 /// see what error Hasura returned. Remove the culprit from the metadata, which is
 /// generally a few tables and relations to those tables, and try again. Repeat until
 /// it accepts the metadata.
 ///
-/// This works fine today since all the key processors you'd need in a local testnet
+/// This works fine today since all the key processors you'd need in a localnet
 /// are in the set of processors written in Rust. If this changes, we can explore
 /// alternatives, e.g. running processors in other languages using containers.
 const HASURA_METADATA: &str = include_str!("hasura_metadata.json");
 
-/// Args related to running an indexer API for the local testnet.
+/// Args related to running an indexer API for the localnet.
 #[derive(Debug, Parser)]
 pub struct IndexerApiArgs {
     /// If set, we will run a postgres DB using Docker (unless
@@ -70,7 +70,7 @@ pub struct IndexerApiManager {
 
 impl IndexerApiManager {
     pub fn new(
-        args: &RunLocalTestnet,
+        args: &RunLocalnet,
         prerequisite_health_checkers: HashSet<HealthChecker>,
         test_dir: PathBuf,
         postgres_connection_string: String,

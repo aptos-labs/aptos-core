@@ -19,11 +19,10 @@
 //! Usage example:
 //!
 //! ```
-//! use aptos_network::noise;
-//! use aptos_crypto::{x25519, traits::*};
+//! use aptos_crypto::{noise, x25519, traits::*};
 //! use rand::prelude::*;
 //!
-//! # fn main() -> Result<(), noise::NoiseError> {
+//! # fn main() -> Result<(), aptos_crypto::noise::NoiseError> {
 //! let mut rng = rand::thread_rng();
 //! let initiator_static = x25519::PrivateKey::generate(&mut rng);
 //! let responder_static = x25519::PrivateKey::generate(&mut rng);
@@ -64,9 +63,7 @@
 //!
 #![allow(clippy::arithmetic_side_effects)]
 
-use aptos_crypto::{
-    hash::HashValue, hkdf::Hkdf, traits::Uniform as _, x25519, ValidCryptoMaterial,
-};
+use crate::{hash::HashValue, hkdf::Hkdf, traits::Uniform as _, x25519, ValidCryptoMaterial};
 use ring::aead::{self, Aad, LessSafeKey, UnboundKey};
 use sha2::Digest;
 use std::{
@@ -558,7 +555,6 @@ impl NoiseConfig {
 
     /// This function is a one-call that replaces calling the two functions parse_client_init_message
     /// and respond_to_client consecutively
-    #[allow(dead_code)]
     pub fn respond_to_client_and_finalize(
         &self,
         rng: &mut (impl rand::RngCore + rand::CryptoRng),

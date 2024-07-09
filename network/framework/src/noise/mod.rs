@@ -102,7 +102,6 @@
 //! [ik]: https://noiseexplorer.com/patterns/IK
 //! [crypto]: ../aptos_crypto/noise/index.html
 
-mod crypto;
 pub mod error;
 pub mod handshake;
 pub mod stream;

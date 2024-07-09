@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{
-        account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
-        TransactionOptions, TransactionSummary,
+    common::{
+        init::Network,
+        types::{
+            account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
+            TransactionOptions, TransactionSummary,
+        },
     },
     config::GlobalConfig,
     CliResult,
@@ -14,7 +17,6 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, FaucetClient, State};
-#[cfg(feature = "aptos")]
 use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{
     account_address::create_multisig_account_address,
@@ -86,7 +88,6 @@ pub async fn to_common_result<T: Serialize>(
 ) -> CliResult {
     let latency = start_time.elapsed();
 
-    #[cfg(feature = "aptos")]
     if !telemetry_is_disabled() {
         let error = if let Err(ref error) = result {
             // Only print the error type
@@ -131,7 +132,6 @@ async fn send_telemetry_event(command: &str, latency: Duration, error: Option<&s
     // Collect the build information
     let build_information = cli_build_information();
 
-    #[cfg(feature = "aptos")]
     // Send the event
     aptos_telemetry::cli_metrics::send_cli_telemetry_event(
         build_information,
@@ -431,6 +431,22 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
     Ok(input_buf)
 }
 
+/// Lists the content of a directory
+pub fn read_dir_files(
+    path: &Path,
+    predicate: impl Fn(&Path) -> bool,
+) -> CliTypedResult<Vec<PathBuf>> {
+    let to_cli_err = |err| CliError::IO(path.display().to_string(), err);
+    let mut result = vec![];
+    for entry in std::fs::read_dir(path).map_err(to_cli_err)? {
+        let path = entry.map_err(to_cli_err)?.path();
+        if predicate(path.as_path()) {
+            result.push(path)
+        }
+    }
+    Ok(result)
+}
+
 /// Fund account (and possibly create it) from a faucet. This function waits for the
 /// transaction on behalf of the caller.
 pub async fn fund_account(
@@ -475,7 +491,6 @@ pub async fn wait_for_transactions(
 
 pub fn start_logger(level: Level) {
     let mut logger = aptos_logger::Logger::new();
-    #[cfg(feature = "aptos")]
     logger.channel_size(1000).is_async(false).level(level);
     logger.build();
 }
@@ -485,9 +500,19 @@ pub async fn profile_or_submit(
     payload: TransactionPayload,
     txn_options_ref: &TransactionOptions,
 ) -> CliTypedResult<TransactionSummary> {
+    if txn_options_ref.profile_gas && txn_options_ref.benchmark {
+        return Err(CliError::UnexpectedError(
+            "Cannot perform benchmarking and gas profiling at the same time.".to_string(),
+        ));
+    }
+
     // Profile gas if needed.
     if txn_options_ref.profile_gas {
         txn_options_ref.profile_gas(payload).await
+    } else if txn_options_ref.benchmark {
+        txn_options_ref.benchmark_locally(payload).await
+    } else if txn_options_ref.local {
+        txn_options_ref.simulate_locally(payload).await
     } else {
         // Otherwise submit the transaction.
         txn_options_ref
@@ -539,5 +564,33 @@ pub fn view_json_option_str(option_ref: &serde_json::Value) -> CliTypedResult<Op
             "JSON field does not have an inner `vec` field: {}",
             option_ref
         )))
+    }
+}
+
+pub fn explorer_account_link(hash: AccountAddress, network: Option<Network>) -> String {
+    // For now, default to what the browser is already on, though the link could be wrong
+    if let Some(network) = network {
+        format!(
+            "https://explorer.aptoslabs.com/account/{}?network={}",
+            hash, network
+        )
+    } else {
+        format!("https://explorer.aptoslabs.com/account/{}", hash)
+    }
+}
+
+pub fn explorer_transaction_link(
+    hash: aptos_crypto::HashValue,
+    network: Option<Network>,
+) -> String {
+    // For now, default to what the browser is already on, though the link could be wrong
+    if let Some(network) = network {
+        format!(
+            "https://explorer.aptoslabs.com/txn/{}?network={}",
+            hash.to_hex_literal(),
+            network
+        )
+    } else {
+        format!("https://explorer.aptoslabs.com/txn/{}", hash)
     }
 }
