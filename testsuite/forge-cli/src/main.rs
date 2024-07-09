@@ -363,7 +363,7 @@ fn main() -> Result<()> {
                             k8s.port_forward || forge_runner_mode == ForgeRunnerMode::Local,
                             k8s.reuse,
                             k8s.keep,
-                            k8s.enable_haproxy,
+                            true, //k8s.enable_haproxy,
                         )
                         .unwrap(),
                         &args.options,
@@ -401,7 +401,7 @@ fn main() -> Result<()> {
                     resize.testnet_image_tag,
                     resize.move_modules_dir,
                     !resize.connect_directly,
-                    resize.enable_haproxy,
+                    true, //resize.enable_haproxy,
                     None,
                     None,
                 ))?;
@@ -1937,16 +1937,12 @@ fn validators_join_and_leave() -> ForgeConfig {
 
 fn realistic_env_max_load_test(
     duration: Duration,
-    test_cmd: &TestCommand,
+    _test_cmd: &TestCommand,
     num_validators: usize,
     num_fullnodes: usize,
 ) -> ForgeConfig {
-    // Check if HAProxy is enabled
-    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
-        k8s.enable_haproxy
-    } else {
-        false
-    };
+    // Enable HAProxy
+    let ha_proxy = true;
 
     // Determine if this is a long running test
     let duration_secs = duration.as_secs();
@@ -1999,7 +1995,7 @@ fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
+    let mempool_backlog = 40000;
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
@@ -2009,7 +2005,7 @@ fn realistic_env_max_load_test(
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
-                    4600
+                    6500
                 } else if long_running {
                     // This is for forge stable
                     7000
