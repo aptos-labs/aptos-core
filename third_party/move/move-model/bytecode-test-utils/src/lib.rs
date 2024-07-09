@@ -41,8 +41,9 @@ pub fn test_runner(
         }],
         vec![],
         ModelBuilderOptions::default(),
-        false,
+        false, // skip_attribute_checks
         KnownAttribute::get_all_attribute_names(),
+        false, // warnings_are_errors
     )?;
     let compiler_options =
         move_compiler_v2::Options::default().set_experiment(Experiment::SPEC_REWRITE, true);

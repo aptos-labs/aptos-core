@@ -335,20 +335,26 @@ pub fn debug_compiler_env_var() -> bool {
 }
 
 pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
-    static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_ENV_VAR));
+    static WARN_OF_DEPRECATION: Lazy<bool> = Lazy::new(|| {
+        read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_ENV_VAR)
+            || read_bool_env_var(cli::MVC_WARN_OF_DEPRECATION_USE_ENV_VAR)
+    });
     *WARN_OF_DEPRECATION
 }
 
-pub fn warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
-    static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_ENV_VAR));
+pub fn move_compiler_warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
+    static WARN_OF_DEPRECATION: Lazy<bool> = Lazy::new(|| {
+        read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_ENV_VAR)
+            || read_bool_env_var(cli::MVC_WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_ENV_VAR)
+    });
     *WARN_OF_DEPRECATION
 }
 
 pub fn move_compiler_warnings_are_errors_env_var() -> bool {
-    static WARNINGS_ARE_ERRORS: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARNINGS_ARE_ERRORS_ENV_VAR));
+    static WARNINGS_ARE_ERRORS: Lazy<bool> = Lazy::new(|| {
+        read_bool_env_var(cli::MOVE_COMPILER_WARNINGS_ARE_ERRORS_ENV_VAR)
+            || read_bool_env_var(cli::MVC_WARNINGS_ARE_ERRORS_ENV_VAR)
+    });
     *WARNINGS_ARE_ERRORS
 }
 
@@ -405,15 +411,15 @@ pub struct Flags {
     debug: bool,
 
     /// Show warnings about use of deprecated functions, modules, constants, etc.
-    /// Note that current value of this constant is "Wdeprecation"
+    /// Note that current value of this constant is "warn-deprecation"
     #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
            default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
     warn_of_deprecation_use: bool,
 
     /// Show warnings about use of deprecated usage in the Aptos libraries,
     /// which we should generally not bother users with.
-    /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
+    /// Note that current value of this constant is "warn-deprecation-aptos"
+    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=bool_to_str(move_compiler_warn_of_deprecation_use_in_aptos_libs_env_var()))]
     warn_of_deprecation_use_in_aptos_libs: bool,
 
     /// Show warnings about unused functions, fields, constants, etc.
@@ -456,7 +462,8 @@ impl Flags {
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
-            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
+            warn_of_deprecation_use_in_aptos_libs:
+                move_compiler_warn_of_deprecation_use_in_aptos_libs_env_var(),
             warn_unused: false,
             warnings_are_errors: move_compiler_warnings_are_errors_env_var(),
             lang_v2: false,

@@ -273,12 +273,13 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
             SyntaxChoice::Source => {
+                let warnings_are_errors = run_config.get_warnings_are_errors();
                 let (unit, opt_model, warnings_opt) = match run_config {
                     // Run the V2 compiler if requested
                     TestRunConfig::CompilerV2 {
                         language_version,
                         v2_experiments,
-                        warnings_are_errors,
+                        ..
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -290,14 +291,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         v2_experiments,
                     )?,
                     // In all other cases, run V1
-                    TestRunConfig::ComparisonV1V2 {
-                        warnings_are_errors,
-                        ..
-                    }
-                    | TestRunConfig::CompilerV1 {
-                        warnings_are_errors,
-                        ..
-                    } => compile_source_unit(
+                    _ => compile_source_unit(
                         state.pre_compiled_deps_v1,
                         state.named_address_mapping.clone(),
                         &state.source_files().cloned().collect::<Vec<_>>(),

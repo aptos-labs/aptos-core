@@ -91,8 +91,8 @@ pub fn report_diagnostics_exit_on_error(
     );
 }
 
-// Report any warning diagnostics, and if the worst has `Warning` severity, and
-// `warnings_are_errors` is set, then exit and
+// Report any pending warning diagnostics, exiting if there are any errors; if there are warnings
+// but no errors and `warnings_are_errors` is set, then output a message about that and exit.
 pub fn report_warnings(files: &FilesSourceText, warnings: Diagnostics, warnings_are_errors: bool) {
     if warnings.is_empty() {
         return;

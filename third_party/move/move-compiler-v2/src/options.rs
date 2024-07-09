@@ -11,7 +11,7 @@ use move_compiler::{
     command_line as cli,
     shared::{
         move_compiler_warn_of_deprecation_use_env_var,
-        warn_of_deprecation_use_in_aptos_libs_env_var,
+        move_compiler_warn_of_deprecation_use_in_aptos_libs_env_var,
     },
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
@@ -101,8 +101,8 @@ pub struct Options {
     /// Show warnings about use of deprecated usage in the Aptos libraries,
     /// which we should generally not bother users with.
     /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(hide(true), long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
-           default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
+    #[clap(hide(true), long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
+           default_value=bool_to_str(move_compiler_warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
     /// Show warnings about unused functions, fields, constants, etc.
