@@ -13,14 +13,14 @@ pub(crate) fn validate_module_natives(modules: &[CompiledModule]) -> VMResult<()
     for module in modules {
         let module_address = module.self_addr();
         for def in module.function_defs() {
-            if def.is_native() {
-                if !module_address.is_special() {
-                    return Err(
-                        PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
-                            .with_message("Cannot publish native function".to_string())
-                            .finish(Location::Module(module.self_id())),
-                    );
-                }
+            if def.is_native() && !module_address.is_special() {
+                return Err(
+                    PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
+                        .with_message(
+                            "Cannot publish native function to non-special address".to_string(),
+                        )
+                        .finish(Location::Module(module.self_id())),
+                );
             }
         }
     }

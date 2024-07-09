@@ -768,7 +768,7 @@ impl AptosVM {
             return Err(
                 PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
                     .with_message(
-                        "Execute user defined native entry function is not allowed".to_string(),
+                        "Executing user defined native entry function is not allowed".to_string(),
                     )
                     .finish(Location::Module(entry_fn.module().clone()))
                     .into_vm_status(),

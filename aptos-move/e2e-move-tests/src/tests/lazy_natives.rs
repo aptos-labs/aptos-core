@@ -3,14 +3,15 @@
 
 use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_package_builder::PackageBuilder;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::vm_status::StatusCode;
 
 #[test]
 fn lazy_natives() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-
+    // Set flag to publish the package.
+    h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
     let mut builder = PackageBuilder::new("LazyNatives");
     builder.add_source(
         "test",
@@ -28,6 +29,7 @@ module 0xcafe::test {
     // Should be able to publish with unbound native.
     assert_success!(h.publish_package(&acc, dir.path()));
 
+    h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
     // Should be able to call nothing entry
     assert_success!(h.run_entry_function(
         &acc,
