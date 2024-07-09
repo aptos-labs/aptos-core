@@ -609,6 +609,7 @@ impl TransactionStore {
                 }
             }
         }
+        counters::MEMPOOL_READ_TIMELINE_OUTPUT_SIZE.observe(batch.len() as f64);
 
         (batch, last_timeline_id.into())
     }

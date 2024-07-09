@@ -213,6 +213,15 @@ pub static MEMPOOL_READ_TIMELINE_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static MEMPOOL_READ_TIMELINE_OUTPUT_SIZE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_output_size",
+        "Number of transactions returned by read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 pub static MEMPOOL_EXECUTE_BROADCAST_SCHEDULED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_mempool_execute_broadcast_scheduled",
