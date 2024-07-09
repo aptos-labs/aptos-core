@@ -1793,7 +1793,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 {
                     continue;
                 }
-                if other_label == label {
+                if other_label == label
+                    || self.state.transitive_children(label).contains(other_label)
+                {
                     // Compute all visible usages at leaves to show the conflict.
                     // It is not enough to just show the usage of `temp`, because the
                     // actual usage might be something derived from it, and `temp`
