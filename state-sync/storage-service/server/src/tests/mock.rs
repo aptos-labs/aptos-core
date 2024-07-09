@@ -14,10 +14,8 @@ use aptos_config::{
 use aptos_crypto::HashValue;
 use aptos_network::{
     application::{interface::NetworkServiceEvents, storage::PeersAndMetadata},
-    peer_manager::PeerManagerNotification,
     protocols::{
         network::{NetworkEvents, NewNetworkEvents},
-        rpc::InboundRpcRequest,
         wire::handshake::v1::ProtocolId,
     },
 };
@@ -51,6 +49,9 @@ use mockall::mock;
 use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::timeout;
+use aptos_config::network_id::PeerNetworkId;
+use aptos_network::protocols::network::ReceivedMessage;
+use aptos_network::protocols::wire::messaging::v1::{NetworkMessage, RpcRequest};
 
 // Useful test constants
 const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
@@ -59,7 +60,7 @@ const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
 /// mock client requests to a [`StorageServiceServer`].
 pub struct MockClient {
     peer_manager_notifiers:
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 }
 
 impl MockClient {
@@ -161,12 +162,17 @@ impl MockClient {
             .to_bytes(&StorageServiceMessage::Request(request))
             .unwrap();
         let (res_tx, res_rx) = oneshot::channel();
-        let inbound_rpc = InboundRpcRequest {
-            protocol_id,
-            data: data.into(),
-            res_tx,
+        let notification = ReceivedMessage {
+            message: NetworkMessage::RpcRequest(RpcRequest{
+                protocol_id,
+                request_id: 0, // TODO: rand? inc?
+                priority: 0,
+                raw_request: data,
+            }),
+            sender: PeerNetworkId::new(network_id, peer_id),
+            rx_at: 0,
+            rpc_replier: Some(Arc::new(res_tx)),
         };
-        let notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Push the request up to the storage service
         self.peer_manager_notifiers

@@ -8,7 +8,7 @@ use crate::{
     test_utils::{self, consensus_runtime, placeholder_ledger_info, timed_block_on},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
@@ -27,7 +27,7 @@ use aptos_network::{
     },
     protocols::{
         network::{NewNetworkEvents, SerializedRequest},
-        rpc::InboundRpcRequest,
+        // rpc::InboundRpcRequest,
         wire::handshake::v1::ProtocolIdSet,
     },
     ProtocolId,
@@ -41,6 +41,8 @@ use std::{
     time::Duration,
 };
 use tokio::runtime::Handle;
+use aptos_network::protocols::network::ReceivedMessage;
+use aptos_network::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 
 /// `TwinId` is used by the NetworkPlayground to uniquely identify
 /// nodes, even if they have the same `AccountAddress` (e.g. for Twins)
@@ -67,7 +69,7 @@ pub struct NetworkPlayground {
     ///
     node_consensus_txs: Arc<
         Mutex<
-            HashMap<TwinId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+            HashMap<TwinId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
         >,
     >,
     /// Nodes' outbound handlers forward their outbound non-rpc messages to this
@@ -130,7 +132,7 @@ impl NetworkPlayground {
             Mutex<
                 HashMap<
                     TwinId,
-                    aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+                    aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
                 >,
             >,
         >,
@@ -163,16 +165,27 @@ impl NetworkPlayground {
                     let node_consensus_tx =
                         node_consensus_txs.lock().get(dst_twin_id).unwrap().clone();
 
-                    let inbound_req = InboundRpcRequest {
-                        protocol_id: outbound_req.protocol_id,
-                        data: outbound_req.data,
-                        res_tx: outbound_req.res_tx,
-                    };
+                    // let inbound_req = InboundRpcRequest {
+                    //     protocol_id: outbound_req.protocol_id,
+                    //     data: outbound_req.data,
+                    //     res_tx: outbound_req.res_tx,
+                    // };
 
                     node_consensus_tx
                         .push(
                             (src_twin_id.author, ProtocolId::ConsensusRpcBcs),
-                            PeerManagerNotification::RecvRpc(src_twin_id.author, inbound_req),
+                            // PeerManagerNotification::RecvRpc(src_twin_id.author, inbound_req),
+                            ReceivedMessage{
+                                message: NetworkMessage::RpcRequest(RpcRequest{
+                                    protocol_id: outbound_req.protocol_id,
+                                    request_id: 123, // TODO: seq?
+                                    priority: 0,
+                                    raw_request: outbound_req.data.into(),
+                                }),
+                                sender: PeerNetworkId::new(NetworkId::Validator, src_twin_id.author),
+                                rx_at: 0,
+                                rpc_replier: Some(Arc::new(outbound_req.res_tx)),
+                            },
                         )
                         .unwrap();
                 },
@@ -189,7 +202,7 @@ impl NetworkPlayground {
     pub fn add_node(
         &mut self,
         twin_id: TwinId,
-        consensus_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        consensus_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         conn_mgr_reqs_rx: aptos_channels::Receiver<aptos_network::ConnectivityRequest>,
     ) {
@@ -227,10 +240,20 @@ impl NetworkPlayground {
             .clone();
 
         // copy message data
-        let msg_copy = match &msg_notif {
+        let (source_address, msg, rmsg) = match &msg_notif {
             PeerManagerNotification::RecvMessage(src, msg) => {
+                let rmsg = ReceivedMessage{
+                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                        protocol_id: msg.protocol_id,
+                        priority: 0,
+                        raw_msg: msg.mdata.clone().into(),
+                    }),
+                    sender: PeerNetworkId::new(NetworkId::Validator, *src),
+                    rx_at: 0,
+                    rpc_replier: None,
+                };
                 let msg: ConsensusMsg = msg.to_message().unwrap();
-                (*src, msg)
+                (*src, msg, rmsg)
             },
             msg_notif => panic!(
                 "[network playground] Unexpected PeerManagerNotification: {:?}",
@@ -239,9 +262,9 @@ impl NetworkPlayground {
         };
         let _ = node_consensus_tx.push(
             (src_twin_id.author, ProtocolId::ConsensusDirectSendBcs),
-            msg_notif,
+            rmsg,
         );
-        msg_copy
+        (source_address, msg)
     }
 
     /// Wait for exactly `num_messages` to be enqueued and delivered. Return a
@@ -268,6 +291,9 @@ impl NetworkPlayground {
                 PeerManagerRequest::SendDirectSend(dst_inner, msg_inner) => {
                     (*dst_inner, msg_inner.clone())
                 },
+                // NetworkMessage::DirectSendMsg(dmsg) => {
+                //
+                // },
                 msg_inner => panic!(
                     "[network playground] Unexpected PeerManagerRequest: {:?}",
                     msg_inner
@@ -282,6 +308,12 @@ impl NetworkPlayground {
                 if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {
                     let msg_notif =
                         PeerManagerNotification::RecvMessage(src_twin_id.author, msg.clone());
+                    // let msg_notif = ReceivedMessage{
+                    //     message: NetworkMessage::,
+                    //     sender: (),
+                    //     rx_at: 0,
+                    //     rpc_replier: None,
+                    // };
                     let msg_copy = self
                         .deliver_message(src_twin_id, *dst_twin_id, msg_notif)
                         .await;
@@ -496,7 +528,7 @@ mod tests {
             storage::PeersAndMetadata,
         },
         protocols::{
-            direct_send::Message,
+            // direct_send::Message,
             network,
             network::{NetworkEvents, NewNetworkSender},
         },
@@ -814,10 +846,20 @@ mod tests {
 
         let peer_id = PeerId::random();
         let protocol_id = ProtocolId::ConsensusDirectSendBcs;
-        let bad_msg = PeerManagerNotification::RecvMessage(peer_id, Message {
-            protocol_id,
-            mdata: Bytes::from_static(b"\xde\xad\xbe\xef"),
-        });
+        // let bad_msg = PeerManagerNotification::RecvMessage(peer_id, Message {
+        //     protocol_id,
+        //     mdata: Bytes::from_static(b"\xde\xad\xbe\xef"),
+        // });
+        let bad_msg = ReceivedMessage {
+            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                protocol_id,
+                priority: 0,
+                raw_msg: Bytes::from_static(b"\xde\xad\xbe\xef").into(),
+            }),
+            sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
+            rx_at: 0,
+            rpc_replier: None,
+        };
 
         peer_mgr_notifs_tx
             .push((peer_id, protocol_id), bad_msg)
@@ -829,13 +871,24 @@ mod tests {
 
         let protocol_id = ProtocolId::ConsensusRpcJson;
         let (res_tx, _res_rx) = oneshot::channel();
-        let liveness_check_msg = PeerManagerNotification::RecvRpc(peer_id, InboundRpcRequest {
-            protocol_id,
-            data: Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()),
-            res_tx,
-        });
+        // let liveness_check_msg = PeerManagerNotification::RecvRpc(peer_id, InboundRpcRequest {
+        //     protocol_id,
+        //     data: Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()),
+        //     res_tx,
+        // });
+        let liveness_check_msg = ReceivedMessage{
+            message: NetworkMessage::RpcRequest(RpcRequest{
+                protocol_id,
+                request_id: 0, // TODO: seq?
+                priority: 0,
+                raw_request: Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()).into(),
+            }),
+            sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
+            rx_at: 0,
+            rpc_replier: Some(Arc::new(res_tx)),
+        };
 
-        peer_mgr_notifs_tx
+            peer_mgr_notifs_tx
             .push((peer_id, protocol_id), liveness_check_msg)
             .unwrap();
 

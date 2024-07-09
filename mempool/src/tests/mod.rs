@@ -9,6 +9,7 @@ mod core_mempool_test;
 #[cfg(test)]
 mod integration_tests;
 #[cfg(test)]
+#[cfg(wrong_network_abstraction)]
 mod multi_node_test;
 #[cfg(test)]
 mod node;

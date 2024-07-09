@@ -23,13 +23,11 @@ use aptos_network::{
         storage::PeersAndMetadata,
     },
     peer_manager::{
-        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
+        ConnectionRequestSender, PeerManagerRequest,
         PeerManagerRequestSender,
     },
     protocols::{
-        direct_send::Message,
         network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
-        rpc::InboundRpcRequest,
         wire::handshake::v1::ProtocolId::MempoolDirectSend,
     },
     testutils::{
@@ -54,6 +52,8 @@ use maplit::btreemap;
 use std::{collections::HashMap, hash::Hash, sync::Arc};
 use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
+use aptos_network::protocols::network::ReceivedMessage;
+use aptos_network::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 
 /// An individual mempool node that runs in it's own runtime.
 ///
@@ -259,23 +259,44 @@ impl MempoolNode {
             request_id: batch_id.clone(),
             transactions: sign_transactions(txns),
         };
-        let data = protocol_id.to_bytes(&msg).unwrap().into();
+        let data = protocol_id.to_bytes(&msg).unwrap();
         let (notif, maybe_receiver) = match protocol_id {
             ProtocolId::MempoolDirectSend => (
-                PeerManagerNotification::RecvMessage(remote_peer_id, Message {
-                    protocol_id,
-                    mdata: data,
-                }),
+                // PeerManagerNotification::RecvMessage(remote_peer_id, Message {
+                //     protocol_id,
+                //     mdata: data,
+                // }),
+                ReceivedMessage{
+                    message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                        protocol_id,
+                        priority: 0,
+                        raw_msg: data,
+                    }),
+                    sender: PeerNetworkId::new(network_id, remote_peer_id),
+                    rx_at: 0,
+                    rpc_replier: None,
+                },
                 None,
             ),
             ProtocolId::MempoolRpc => {
                 let (res_tx, res_rx) = oneshot::channel();
-                let notif = PeerManagerNotification::RecvRpc(remote_peer_id, InboundRpcRequest {
-                    protocol_id,
-                    data,
-                    res_tx,
-                });
-                (notif, Some(res_rx))
+                // let notif = PeerManagerNotification::RecvRpc(remote_peer_id, InboundRpcRequest {
+                //     protocol_id,
+                //     data,
+                //     res_tx,
+                // });
+                let rmsg = ReceivedMessage {
+                    message: NetworkMessage::RpcRequest(RpcRequest{
+                        protocol_id,
+                        request_id: 0, // TODO: a number?
+                        priority: 0,
+                        raw_request: data,
+                    }),
+                    sender: PeerNetworkId::new(network_id, remote_peer_id),
+                    rx_at: 0,
+                    rpc_replier: Some(Arc::new(res_tx)),
+                };
+                (rmsg, Some(res_rx))
             },
 
             protocol_id => panic!("Invalid protocol id found: {:?}", protocol_id),
@@ -403,10 +424,20 @@ impl MempoolNode {
         if let Some(rpc_sender) = maybe_rpc_sender {
             rpc_sender.send(Ok(bytes.into())).unwrap();
         } else {
-            let notif = PeerManagerNotification::RecvMessage(peer_id, Message {
-                protocol_id,
-                mdata: bytes.into(),
-            });
+            // let notif = PeerManagerNotification::RecvMessage(peer_id, Message {
+            //     protocol_id,
+            //     mdata: bytes.into(),
+            // });
+            let notif = ReceivedMessage{
+                message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                    protocol_id,
+                    priority: 0,
+                    raw_msg: bytes,
+                }),
+                sender: PeerNetworkId::new(network_id, peer_id),
+                rx_at: 0,
+                rpc_replier: None,
+            };
             inbound_handle
                 .inbound_message_sender
                 .push((peer_id, protocol_id), notif)

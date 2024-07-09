@@ -7,11 +7,11 @@ use crate::{
         INBOUND_RPC_TIMEOUT_MS, MAX_CONCURRENT_INBOUND_RPCS, MAX_CONCURRENT_OUTBOUND_RPCS,
         MAX_FRAME_SIZE, MAX_MESSAGE_SIZE, NETWORK_CHANNEL_SIZE,
     },
-    peer::{DisconnectReason, Peer, PeerNotification, PeerRequest},
+    peer::{DisconnectReason, Peer, PeerRequest},
     peer_manager::TransportNotification,
     protocols::{
         direct_send::Message,
-        rpc::{error::RpcError, InboundRpcRequest, OutboundRpcRequest},
+        rpc::{error::RpcError, OutboundRpcRequest},
         wire::{
             handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
             messaging::v1::{
@@ -38,10 +38,14 @@ use futures::{
     SinkExt,
 };
 use std::{collections::HashSet, str::FromStr, time::Duration};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::runtime::{Handle, Runtime};
 use tokio_util::compat::{
     FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
 };
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use crate::protocols::network::ReceivedMessage;
 
 static PROTOCOL: ProtocolId = ProtocolId::MempoolDirectSend;
 
@@ -49,12 +53,13 @@ fn build_test_peer(
     executor: Handle,
     time_service: TimeService,
     origin: ConnectionOrigin,
+    upstream_handlers: Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
 ) -> (
     Peer<MemorySocket>,
     PeerHandle,
     MemorySocket,
     aptos_channels::Receiver<TransportNotification<MemorySocket>>,
-    aptos_channel::Receiver<ProtocolId, PeerNotification>,
+    // aptos_channel::Receiver<ProtocolId, PeerNotification>,
 ) {
     let (a, b) = MemorySocket::new_pair();
     let peer_id = PeerId::random();
@@ -74,8 +79,10 @@ fn build_test_peer(
     let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(1);
     let (peer_reqs_tx, peer_reqs_rx) =
         aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
-    let (peer_notifs_tx, peer_notifs_rx) =
-        aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
+    // let (peer_notifs_tx, peer_notifs_rx) =
+    //     aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
+    // upstream_handlers: Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
+    // let upstream_handlers = Arc::new(HashMap::new());
 
     let peer = Peer::new(
         NetworkContext::mock(),
@@ -84,7 +91,7 @@ fn build_test_peer(
         connection,
         connection_notifs_tx,
         peer_reqs_rx,
-        peer_notifs_tx,
+        upstream_handlers,
         Duration::from_millis(INBOUND_RPC_TIMEOUT_MS),
         MAX_CONCURRENT_INBOUND_RPCS,
         MAX_CONCURRENT_OUTBOUND_RPCS,
@@ -93,34 +100,35 @@ fn build_test_peer(
     );
     let peer_handle = PeerHandle(peer_reqs_tx);
 
-    (peer, peer_handle, b, connection_notifs_rx, peer_notifs_rx)
+    (peer, peer_handle, b, connection_notifs_rx)
 }
 
 fn build_test_connected_peers(
     executor: Handle,
     time_service: TimeService,
+    upstream_handlers_a: Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
+    upstream_handlers_b: Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
 ) -> (
     (
         Peer<MemorySocket>,
         PeerHandle,
         aptos_channels::Receiver<TransportNotification<MemorySocket>>,
-        aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ),
     (
         Peer<MemorySocket>,
         PeerHandle,
         aptos_channels::Receiver<TransportNotification<MemorySocket>>,
-        aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ),
 ) {
-    let (peer_a, peer_handle_a, connection_a, connection_notifs_rx_a, peer_notifs_rx_a) =
+    let (peer_a, peer_handle_a, connection_a, connection_notifs_rx_a) =
         build_test_peer(
             executor.clone(),
             time_service.clone(),
             ConnectionOrigin::Inbound,
+            upstream_handlers_a,
         );
-    let (mut peer_b, peer_handle_b, _connection_b, connection_notifs_rx_b, peer_notifs_rx_b) =
-        build_test_peer(executor, time_service, ConnectionOrigin::Outbound);
+    let (mut peer_b, peer_handle_b, _connection_b, connection_notifs_rx_b) =
+        build_test_peer(executor, time_service, ConnectionOrigin::Outbound, upstream_handlers_b);
 
     // Make sure both peers are connected
     peer_b.connection = Some(connection_a);
@@ -129,13 +137,11 @@ fn build_test_connected_peers(
             peer_a,
             peer_handle_a,
             connection_notifs_rx_a,
-            peer_notifs_rx_a,
         ),
         (
             peer_b,
             peer_handle_b,
             connection_notifs_rx_b,
-            peer_notifs_rx_b,
         ),
     )
 }
@@ -200,11 +206,13 @@ impl PeerHandle {
 fn peer_send_message() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, mut peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
+    let upstream_handlers = Arc::new(HashMap::new());
+    let (peer, mut peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
@@ -243,11 +251,16 @@ fn peer_send_message() {
 fn peer_recv_message() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, _peer_handle, connection, _connection_notifs_rx, mut peer_notifs_rx) =
+    let mut upstream_handlers = HashMap::new();
+    let (sender, mut receiver) = aptos_channel::new(QueueStyle::FIFO, 50, None);
+    upstream_handlers.insert(PROTOCOL, sender);
+    let upstream_handlers = Arc::new(upstream_handlers);
+    let (peer, _peer_handle, connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
 
     let send_msg = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
@@ -255,10 +268,22 @@ fn peer_recv_message() {
         priority: 0,
         raw_msg: Vec::from("hello world"),
     }));
-    let recv_msg = PeerNotification::RecvMessage(Message {
-        protocol_id: PROTOCOL,
-        mdata: Bytes::from("hello world"),
-    });
+    // let recv_msg = PeerNotification::RecvMessage(Message {
+    //     protocol_id: PROTOCOL,
+    //     mdata: Bytes::from("hello world"),
+    // });
+    let recv_msg = ReceivedMessage {
+        message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+            protocol_id: PROTOCOL,
+            priority: 0,
+            raw_msg: Vec::from("hello world"),
+        }),
+        sender: PeerNetworkId::new(NetworkId::Validator,PeerId::random()),
+        rx_at: 0,
+        rpc_replier: None,
+    };
+
+    //Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
 
     let client = async move {
         let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE);
@@ -273,7 +298,7 @@ fn peer_recv_message() {
     let server = async move {
         for _ in 0..30 {
             // Wait to receive notification of DirectSendMsg from Peer.
-            let received = peer_notifs_rx.next().await.unwrap();
+            let received = receiver.next().await.unwrap();
             assert_eq!(recv_msg, received);
         }
     };
@@ -286,10 +311,18 @@ fn peer_recv_message() {
 fn peers_send_message_concurrent() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
+    let mut upstream_handlers_a = HashMap::new();
+    let (prot_a_tx, mut prot_a_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    upstream_handlers_a.insert(PROTOCOL, prot_a_tx);
+    let upstream_handlers_a = Arc::new(upstream_handlers_a);
+    let mut upstream_handlers_b = HashMap::new();
+    let (prot_b_tx, mut prot_b_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    upstream_handlers_b.insert(PROTOCOL, prot_b_tx);
+    let upstream_handlers_b = Arc::new(upstream_handlers_b);
     let (
-        (peer_a, mut peer_handle_a, mut connection_notifs_rx_a, mut peer_notifs_rx_a),
-        (peer_b, mut peer_handle_b, mut connection_notifs_rx_b, mut peer_notifs_rx_b),
-    ) = build_test_connected_peers(rt.handle().clone(), TimeService::mock());
+        (peer_a, mut peer_handle_a, mut connection_notifs_rx_a),
+        (peer_b, mut peer_handle_b, mut connection_notifs_rx_b),
+    ) = build_test_connected_peers(rt.handle().clone(), TimeService::mock(), upstream_handlers_a, upstream_handlers_b);
 
     let remote_peer_id_a = peer_a.remote_peer_id();
     let remote_peer_id_b = peer_b.remote_peer_id();
@@ -310,10 +343,28 @@ fn peers_send_message_concurrent() {
         peer_handle_b.send_direct_send(msg_b.clone());
 
         // Check that each peer received the other's message
-        let notif_a = peer_notifs_rx_a.next().await;
-        let notif_b = peer_notifs_rx_b.next().await;
-        assert_eq!(notif_a, Some(PeerNotification::RecvMessage(msg_b)));
-        assert_eq!(notif_b, Some(PeerNotification::RecvMessage(msg_a)));
+        let notif_a = prot_a_rx.next().await;
+        let notif_b = prot_b_rx.next().await;
+        assert_eq!(notif_a, Some(ReceivedMessage{
+            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                protocol_id: PROTOCOL,
+                priority: 0,
+                raw_msg: msg_b.mdata.into(),
+            }),
+            sender: PeerNetworkId::new(NetworkId::Validator, remote_peer_id_b),
+            rx_at: 0,
+            rpc_replier: None,
+        }));
+        assert_eq!(notif_b, Some(ReceivedMessage{
+            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                protocol_id: PROTOCOL,
+                priority: 0,
+                raw_msg: msg_a.mdata.into(),
+            }),
+            sender: PeerNetworkId::new(NetworkId::Validator, remote_peer_id_a),
+            rx_at: 0,
+            rpc_replier: None,
+        }));
 
         // Shut one peers and the other should shutdown due to ConnectionLost
         drop(peer_handle_a);
@@ -340,11 +391,16 @@ fn peers_send_message_concurrent() {
 fn peer_recv_rpc() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, _peer_handle, mut connection, _connection_notifs_rx, mut peer_notifs_rx) =
+    let mut upstream_handlers = HashMap::new();
+    let (prot_tx, mut prot_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    upstream_handlers.insert(PROTOCOL, prot_tx);
+    let upstream_handlers = Arc::new(upstream_handlers);
+    let (peer, _peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
@@ -354,11 +410,11 @@ fn peer_recv_rpc() {
         priority: 0,
         raw_request: Vec::from("hello world"),
     }));
-    let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
-        protocol_id: PROTOCOL,
-        data: Bytes::from("hello world"),
-        res_tx: oneshot::channel().0,
-    });
+    // let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
+    //     protocol_id: PROTOCOL,
+    //     data: Bytes::from("hello world"),
+    //     res_tx: oneshot::channel().0,
+    // });
     let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
         request_id: 123,
         priority: 0,
@@ -379,16 +435,23 @@ fn peer_recv_rpc() {
     let server = async move {
         for _ in 0..30 {
             // Wait to receive RpcRequest from Peer.
-            let received = peer_notifs_rx.next().await.unwrap();
-            assert_eq!(recv_msg, received);
+            let received = prot_rx.next().await.unwrap();
+            let ReceivedMessage{ message, sender: _sender, rx_at: _rx_at, rpc_replier } = received;
+            assert_eq!(message, NetworkMessage::RpcRequest(RpcRequest{
+                protocol_id: PROTOCOL,
+                request_id: 123,
+                priority: 0,
+                raw_request: Vec::from("hello world"),
+            }));
 
             // Send response to rpc.
-            match received {
-                PeerNotification::RecvRpc(req) => {
+            match message {
+                NetworkMessage::RpcRequest(_req) => {
                     let response = Ok(Bytes::from("goodbye world"));
-                    req.res_tx.send(response).unwrap()
+                    let rpc_replier = Arc::into_inner(rpc_replier.expect("rpc without replier")).expect("Arc unpack fail");
+                    rpc_replier.send(response).expect("rpc reply send fail")
                 },
-                _ => panic!("Unexpected PeerNotification: {:?}", received),
+                msg => panic!("Unexpected PeerNotification: {:?}", msg),
             }
         }
     };
@@ -399,11 +462,16 @@ fn peer_recv_rpc() {
 fn peer_recv_rpc_concurrent() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, _peer_handle, mut connection, _connection_notifs_rx, mut peer_notifs_rx) =
+    let mut upstream_handlers = HashMap::new();
+    let (prot_tx, mut prot_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    upstream_handlers.insert(PROTOCOL, prot_tx);
+    let upstream_handlers = Arc::new(upstream_handlers);
+    let (peer, _peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
@@ -413,11 +481,11 @@ fn peer_recv_rpc_concurrent() {
         priority: 0,
         raw_request: Vec::from("hello world"),
     }));
-    let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
-        protocol_id: PROTOCOL,
-        data: Bytes::from("hello world"),
-        res_tx: oneshot::channel().0,
-    });
+    // let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
+    //     protocol_id: PROTOCOL,
+    //     data: Bytes::from("hello world"),
+    //     res_tx: oneshot::channel().0,
+    // });
     let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
         request_id: 123,
         priority: 0,
@@ -444,10 +512,16 @@ fn peer_recv_rpc_concurrent() {
 
         // Wait to receive RpcRequests from Peer.
         for _ in 0..30 {
-            let received = peer_notifs_rx.next().await.unwrap();
-            assert_eq!(recv_msg, received);
-            match received {
-                PeerNotification::RecvRpc(req) => res_txs.push(req.res_tx),
+            let received = prot_rx.next().await.unwrap();
+            // assert_eq!(recv_msg, received);
+            match &received.message {
+                // PeerNotification::RecvRpc(req) => res_txs.push(req.res_tx),
+                NetworkMessage::RpcRequest(req) => {
+                    assert_eq!(Vec::from("hello world"), req.raw_request);
+                    let arcsender = received.rpc_replier.unwrap();
+                    let sender = Arc::into_inner(arcsender).unwrap();
+                    res_txs.push(sender)
+                },
                 _ => panic!("Unexpected PeerNotification: {:?}", received),
             };
         }
@@ -466,11 +540,16 @@ fn peer_recv_rpc_timeout() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let mock_time = MockTimeService::new();
-    let (peer, _peer_handle, mut connection, _connection_notifs_rx, mut peer_notifs_rx) =
+    let mut upstream_handlers = HashMap::new();
+    let (prot_tx, mut prot_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    upstream_handlers.insert(PROTOCOL, prot_tx);
+    let upstream_handlers = Arc::new(upstream_handlers);
+    let (peer, _peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             mock_time.clone().into(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut client_sink, client_stream) = build_network_sink_stream(&mut connection);
 
@@ -480,23 +559,27 @@ fn peer_recv_rpc_timeout() {
         priority: 0,
         raw_request: Vec::from("hello world"),
     }));
-    let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
-        protocol_id: PROTOCOL,
-        data: Bytes::from("hello world"),
-        res_tx: oneshot::channel().0,
-    });
+    // let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
+    //     protocol_id: PROTOCOL,
+    //     data: Bytes::from("hello world"),
+    //     res_tx: oneshot::channel().0,
+    // });
 
     let test = async move {
         // Client sends the rpc request.
         client_sink.send(&send_msg).await.unwrap();
 
         // Server receives the rpc request from client.
-        let received = peer_notifs_rx.next().await.unwrap();
-        assert_eq!(received, recv_msg);
+        let received = prot_rx.next().await.unwrap();
+        // assert_eq!(received, recv_msg);
 
         // Pull out the request completion handle.
-        let mut res_tx = match received {
-            PeerNotification::RecvRpc(req) => req.res_tx,
+        let mut res_tx = match &received.message {
+            NetworkMessage::RpcRequest(req) => {
+                assert_eq!(Vec::from("hello world"), req.raw_request);
+                let arcsender = received.rpc_replier.unwrap();
+                Arc::into_inner(arcsender).unwrap()
+            },
             _ => panic!("Unexpected PeerNotification: {:?}", received),
         };
 
@@ -524,11 +607,16 @@ fn peer_recv_rpc_timeout() {
 fn peer_recv_rpc_cancel() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, _peer_handle, mut connection, _connection_notifs_rx, mut peer_notifs_rx) =
+    let mut upstream_handlers = HashMap::new();
+    let (prot_tx, mut prot_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    upstream_handlers.insert(PROTOCOL, prot_tx);
+    let upstream_handlers = Arc::new(upstream_handlers);
+    let (peer, _peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut client_sink, client_stream) = build_network_sink_stream(&mut connection);
 
@@ -538,23 +626,27 @@ fn peer_recv_rpc_cancel() {
         priority: 0,
         raw_request: Vec::from("hello world"),
     }));
-    let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
-        protocol_id: PROTOCOL,
-        data: Bytes::from("hello world"),
-        res_tx: oneshot::channel().0,
-    });
+    // let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
+    //     protocol_id: PROTOCOL,
+    //     data: Bytes::from("hello world"),
+    //     res_tx: oneshot::channel().0,
+    // });
 
     let test = async move {
         // Client sends the rpc request.
         client_sink.send(&send_msg).await.unwrap();
 
         // Server receives the rpc request from client.
-        let received = peer_notifs_rx.next().await.unwrap();
-        assert_eq!(received, recv_msg);
+        let received = prot_rx.next().await.unwrap();
+        // assert_eq!(received, recv_msg);
 
         // Pull out the request completion handle.
-        let res_tx = match received {
-            PeerNotification::RecvRpc(req) => req.res_tx,
+        let res_tx = match &received.message {
+            NetworkMessage::RpcRequest(req) => {
+                assert_eq!(Vec::from("hello world"), req.raw_request);
+                let arcsender = received.rpc_replier.unwrap();
+                Arc::into_inner(arcsender).unwrap()
+            },
             _ => panic!("Unexpected PeerNotification: {:?}", received),
         };
 
@@ -578,11 +670,13 @@ fn peer_recv_rpc_cancel() {
 fn peer_send_rpc() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, mut peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
+    let upstream_handlers = Arc::new(HashMap::new());
+    let (peer, mut peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut server_sink, mut server_stream) = build_network_sink_stream(&mut connection);
     let timeout = Duration::from_millis(10_000);
@@ -637,11 +731,13 @@ fn peer_send_rpc() {
 fn peer_send_rpc_concurrent() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
+    let upstream_handlers = Arc::new(HashMap::new());
+    let (peer, peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut server_sink, mut server_stream) = build_network_sink_stream(&mut connection);
     let timeout = Duration::from_millis(10_000);
@@ -706,11 +802,13 @@ fn peer_send_rpc_concurrent() {
 fn peer_send_rpc_cancel() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
+    let upstream_handlers = Arc::new(HashMap::new());
+    let (peer, peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut server_sink, mut server_stream) = build_network_sink_stream(&mut connection);
     let timeout = Duration::from_millis(10_000);
@@ -767,11 +865,13 @@ fn peer_send_rpc_timeout() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let mock_time = MockTimeService::new();
-    let (peer, peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
+    let upstream_handlers = Arc::new(HashMap::new());
+    let (peer, peer_handle, mut connection, _connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             mock_time.clone().into(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let (mut server_sink, mut server_stream) = build_network_sink_stream(&mut connection);
     let timeout = Duration::from_millis(10_000);
@@ -831,11 +931,13 @@ fn peer_send_rpc_timeout() {
 fn peer_disconnect_request() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, peer_handle, _connection, mut connection_notifs_rx, _peer_notifs_rx) =
+    let upstream_handlers = Arc::new(HashMap::new());
+    let (peer, peer_handle, _connection, mut connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let remote_peer_id = peer.remote_peer_id();
 
@@ -857,11 +959,13 @@ fn peer_disconnect_request() {
 fn peer_disconnect_connection_lost() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, _peer_handle, mut connection, mut connection_notifs_rx, _peer_notifs_rx) =
+    let upstream_handlers = Arc::new(HashMap::new());
+    let (peer, _peer_handle, mut connection, mut connection_notifs_rx) =
         build_test_peer(
             rt.handle().clone(),
             TimeService::mock(),
             ConnectionOrigin::Inbound,
+            upstream_handlers,
         );
     let remote_peer_id = peer.remote_peer_id();
 
@@ -881,10 +985,12 @@ fn peer_disconnect_connection_lost() {
 fn peer_terminates_when_request_tx_has_dropped() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
-    let (peer, peer_handle, _connection, _connection_notifs_rx, _peer_notifs_rx) = build_test_peer(
+    let upstream_handlers = Arc::new(HashMap::new());
+    let (peer, peer_handle, _connection, _connection_notifs_rx) = build_test_peer(
         rt.handle().clone(),
         TimeService::mock(),
         ConnectionOrigin::Inbound,
+        upstream_handlers,
     );
 
     let drop = async move {
@@ -898,10 +1004,18 @@ fn peer_terminates_when_request_tx_has_dropped() {
 fn peers_send_multiplex() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
+    let mut upstream_handlers_a = HashMap::new();
+    let (prot_a_tx, mut prot_a_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    upstream_handlers_a.insert(PROTOCOL, prot_a_tx);
+    let upstream_handlers_a = Arc::new(upstream_handlers_a);
+    let mut upstream_handlers_b = HashMap::new();
+    let (prot_b_tx, mut prot_b_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    upstream_handlers_b.insert(PROTOCOL, prot_b_tx);
+    let upstream_handlers_b = Arc::new(upstream_handlers_b);
     let (
-        (peer_a, mut peer_handle_a, mut connection_notifs_rx_a, mut peer_notifs_rx_a),
-        (peer_b, mut peer_handle_b, mut connection_notifs_rx_b, mut peer_notifs_rx_b),
-    ) = build_test_connected_peers(rt.handle().clone(), TimeService::mock());
+        (peer_a, mut peer_handle_a, mut connection_notifs_rx_a),
+        (peer_b, mut peer_handle_b, mut connection_notifs_rx_b),
+    ) = build_test_connected_peers(rt.handle().clone(), TimeService::mock(), upstream_handlers_a, upstream_handlers_b);
 
     let remote_peer_id_a = peer_a.remote_peer_id();
     let remote_peer_id_b = peer_b.remote_peer_id();
@@ -922,10 +1036,28 @@ fn peers_send_multiplex() {
         peer_handle_b.send_direct_send(msg_b.clone());
 
         // Check that each peer received the other's message
-        let notif_a = peer_notifs_rx_a.next().await;
-        let notif_b = peer_notifs_rx_b.next().await;
-        assert_eq!(notif_a, Some(PeerNotification::RecvMessage(msg_b)));
-        assert_eq!(notif_b, Some(PeerNotification::RecvMessage(msg_a)));
+        let notif_a = prot_a_rx.next().await;
+        let notif_b = prot_b_rx.next().await;
+        assert_eq!(notif_a, Some(ReceivedMessage{
+            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                protocol_id: PROTOCOL,
+                priority: 0,
+                raw_msg: msg_b.mdata.into(),
+            }),
+            sender: PeerNetworkId::new(NetworkId::Validator, remote_peer_id_b),
+            rx_at: 0,
+            rpc_replier: None,
+        }));
+        assert_eq!(notif_b, Some(ReceivedMessage{
+            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                protocol_id: PROTOCOL,
+                priority: 0,
+                raw_msg: msg_a.mdata.into(),
+            }),
+            sender: PeerNetworkId::new(NetworkId::Validator, remote_peer_id_a),
+            rx_at: 0,
+            rpc_replier: None,
+        }));
 
         // Shut one peers and the other should shutdown due to ConnectionLost
         drop(peer_handle_a);

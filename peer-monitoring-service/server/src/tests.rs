@@ -20,10 +20,10 @@ use aptos_network::{
     application::{
         interface::NetworkServiceEvents, metadata::ConnectionState, storage::PeersAndMetadata,
     },
-    peer_manager::PeerManagerNotification,
+    // peer_manager::PeerManagerNotification,
     protocols::{
         network::{NetworkEvents, NewNetworkEvents},
-        rpc::InboundRpcRequest,
+        // rpc::InboundRpcRequest,
         wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
     },
     transport::{ConnectionId, ConnectionMetadata},
@@ -69,6 +69,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_network::protocols::network::ReceivedMessage;
+use aptos_network::protocols::wire::messaging::v1::{NetworkMessage, RpcRequest};
 
 // Useful test constants
 const LOCAL_HOST_NET_ADDR: &str = "/ip4/127.0.0.1/tcp/8081";
@@ -468,7 +470,7 @@ async fn verify_node_information(
 /// mock client requests to a peer monitoring service server.
 struct MockClient {
     peer_manager_notifiers:
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 }
 
 impl MockClient {
@@ -554,12 +556,23 @@ impl MockClient {
             .to_bytes(&PeerMonitoringServiceMessage::Request(request))
             .unwrap();
         let (request_sender, request_receiver) = oneshot::channel();
-        let inbound_rpc = InboundRpcRequest {
-            protocol_id,
-            data: request_data.into(),
-            res_tx: request_sender,
+        // let inbound_rpc = InboundRpcRequest {
+        //     protocol_id,
+        //     data: request_data.into(),
+        //     res_tx: request_sender,
+        // };
+        // let request_notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
+        let request_notification = ReceivedMessage {
+            message: NetworkMessage::RpcRequest(RpcRequest{
+                protocol_id,
+                request_id: 42, // TODO? count? rand?
+                priority: 0,
+                raw_request: request_data.clone(),
+            }),
+            sender: PeerNetworkId::new(network_id, peer_id),
+            rx_at: 0,
+            rpc_replier: Some(Arc::new(request_sender)),
         };
-        let request_notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Send the request to the peer monitoring service
         self.peer_manager_notifiers

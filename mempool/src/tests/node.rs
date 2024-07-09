@@ -2,60 +2,47 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    core_mempool::{CoreMempool, TimelineState},
-    network::MempoolSyncMsg,
-    shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
-    tests::common::TestTransaction,
-};
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+// use crate::{
+//     core_mempool::CoreMempool,
+//     network::MempoolSyncMsg,
+//     shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
+// };
+// use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{Identity, NodeConfig, PeerRole, RoleType},
+    config::{PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_crypto::{x25519::PrivateKey, Uniform};
-use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
-use aptos_infallible::{Mutex, MutexGuard, RwLock};
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
-    application::{
-        interface::{NetworkClient, NetworkServiceEvents},
-        storage::PeersAndMetadata,
-    },
-    peer_manager::{
-        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
-        PeerManagerRequestSender,
-    },
-    protocols::{
-        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
-        wire::handshake::v1::ProtocolId::MempoolDirectSend,
-    },
-    transport::ConnectionMetadata,
-    ProtocolId,
-};
-use aptos_storage_interface::mock::MockDbReaderWriter;
+// use aptos_crypto::{x25519::PrivateKey, Uniform};
+// use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
+// use aptos_infallible::{Mutex, RwLock};
+// use aptos_network::{
+//     application::{
+//         interface::{NetworkClient, NetworkServiceEvents},
+//         storage::PeersAndMetadata,
+//     },
+// };
+// use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::{
-    on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
+    // on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
     PeerId,
 };
-use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+// use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use enum_dispatch::enum_dispatch;
-use futures::{
-    channel::mpsc::{self, unbounded, UnboundedReceiver},
-    FutureExt, StreamExt,
-};
-use rand::rngs::StdRng;
+// use futures::{
+//     channel::mpsc::{self, unbounded, UnboundedReceiver},
+// };
+// use rand::rngs::StdRng;
 use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
+    collections::HashSet,
+    // sync::Arc,
 };
-use tokio::runtime::Runtime;
+// use tokio::runtime::Runtime;
 
-type MempoolNetworkHandle = (
-    NetworkId,
-    NetworkSender<MempoolSyncMsg>,
-    NetworkEvents<MempoolSyncMsg>,
-);
+// type MempoolNetworkHandle = (
+//     NetworkId,
+//     NetworkSender<MempoolSyncMsg>,
+//     NetworkEvents<MempoolSyncMsg>,
+// );
 
 /// This is a simple node identifier for testing
 /// This keeps track of the `NodeType` and a simple index
@@ -65,6 +52,7 @@ pub struct NodeId {
     num: u32,
 }
 
+#[cfg(unused)]
 impl NodeId {
     pub(crate) fn new(node_type: NodeType, num: u32) -> Self {
         NodeId { node_type, num }
@@ -75,9 +63,9 @@ impl NodeId {
 /// Validators, ValidatorFullNodes, and FullNodes
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub enum NodeType {
-    Validator,
-    ValidatorFullNode,
-    FullNode,
+    // Validator,
+    // ValidatorFullNode,
+    // FullNode,
 }
 
 /// A union type for all types of simulated nodes
@@ -138,6 +126,7 @@ pub struct ValidatorNodeInfo {
     vfn_peer_id: PeerId,
 }
 
+#[cfg(unused)]
 impl ValidatorNodeInfo {
     fn new(peer_id: PeerId, vfn_peer_id: PeerId) -> Self {
         ValidatorNodeInfo {
@@ -175,6 +164,7 @@ pub struct ValidatorFullNodeInfo {
     vfn_peer_id: PeerId,
 }
 
+#[cfg(wrong_network_abstraction)]
 impl ValidatorFullNodeInfo {
     fn new(peer_id: PeerId, vfn_peer_id: PeerId) -> Self {
         ValidatorFullNodeInfo {
@@ -212,6 +202,7 @@ pub struct FullNodeInfo {
     peer_role: PeerRole,
 }
 
+#[cfg(wrong_network_abstraction)]
 impl FullNodeInfo {
     fn new(peer_id: PeerId, peer_role: PeerRole) -> Self {
         FullNodeInfo { peer_id, peer_role }
@@ -241,6 +232,7 @@ impl NodeInfoTrait for FullNodeInfo {
 }
 
 /// Provides a `NodeInfo` and `NodeConfig` for a validator
+#[cfg(unused)]
 pub fn validator_config(rng: &mut StdRng) -> (ValidatorNodeInfo, NodeConfig) {
     let config = NodeConfig::generate_random_config_with_template(
         &NodeConfig::get_default_validator_config(),
@@ -259,6 +251,7 @@ pub fn validator_config(rng: &mut StdRng) -> (ValidatorNodeInfo, NodeConfig) {
 }
 
 /// Provides a `NodeInfo` and `NodeConfig` for a ValidatorFullNode
+#[cfg(wrong_network_abstraction)]
 pub fn vfn_config(rng: &mut StdRng, peer_id: PeerId) -> (ValidatorFullNodeInfo, NodeConfig) {
     let mut vfn_config = NodeConfig::generate_random_config_with_template(
         &NodeConfig::get_default_vfn_config(),
@@ -292,6 +285,7 @@ pub fn vfn_config(rng: &mut StdRng, peer_id: PeerId) -> (ValidatorFullNodeInfo, 
 }
 
 /// Provides a `NodeInfo` and `NodeConfig` for a public full node
+#[cfg(wrong_network_abstraction)]
 pub fn public_full_node_config(
     rng: &mut StdRng,
     peer_role: PeerRole,
@@ -311,6 +305,7 @@ pub fn public_full_node_config(
 }
 
 /// A struct representing a node, it's network interfaces, mempool, and a mempool event subscriber
+#[cfg(wrong_network_abstraction)]
 pub struct Node {
     /// The identifying Node
     node_info: NodeInfo,
@@ -327,6 +322,7 @@ pub struct Node {
 }
 
 /// Reimplement `NodeInfoTrait` for simplicity
+#[cfg(wrong_network_abstraction)]
 impl NodeInfoTrait for Node {
     fn supported_networks(&self) -> Vec<NetworkId> {
         self.node_info.supported_networks()
@@ -345,6 +341,7 @@ impl NodeInfoTrait for Node {
     }
 }
 
+#[cfg(wrong_network_abstraction)]
 impl Node {
     /// Sets up a single node by starting up mempool and any network handles
     pub fn new(node: NodeInfo, config: NodeConfig) -> Node {
@@ -463,14 +460,16 @@ impl Node {
 
 /// A simplistic view of the entire network stack for a given `NetworkId`
 /// Allows us to mock out the network without dealing with the details
+#[cfg(wrong_network_abstraction)]
 pub struct NodeNetworkInterface {
     /// Peer request receiver for messages
     pub(crate) network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Peer notification sender for sending outgoing messages to other peers
     pub(crate) network_notifs_tx:
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
 }
 
+#[cfg(wrong_network_abstraction)]
 impl NodeNetworkInterface {
     fn get_next_network_req(&mut self, runtime: Arc<Runtime>) -> PeerManagerRequest {
         runtime.block_on(self.network_reqs_rx.next()).unwrap()
@@ -491,6 +490,7 @@ impl NodeNetworkInterface {
 // Below here are static functions to help build a new `Node`
 
 /// Sets up the network handles for a `Node`
+#[cfg(wrong_network_abstraction)]
 fn setup_node_network_interfaces(
     node: &NodeInfo,
 ) -> (
@@ -534,6 +534,7 @@ fn setup_node_network_interfaces(
 }
 
 /// Builds a single network interface with associated queues, and attaches it to the top level network
+#[cfg(wrong_network_abstraction)]
 fn setup_node_network_interface(
     peer_network_id: PeerNetworkId,
 ) -> (NodeNetworkInterface, MempoolNetworkHandle) {
@@ -560,6 +561,7 @@ fn setup_node_network_interface(
 }
 
 /// Starts up the mempool resources for a single node
+#[cfg(wrong_network_abstraction)]
 fn start_node_mempool(
     config: NodeConfig,
     network_client: NetworkClient<MempoolSyncMsg>,
