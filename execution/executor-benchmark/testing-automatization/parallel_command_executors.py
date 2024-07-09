@@ -86,12 +86,10 @@ local_ip_address = {
 
 # Global list of commands to be executed on each VM
 
-rem_exe_add = "--remote-executor-addresses 10.138.0.4:52202 10.138.0.5:52203 10.138.0.6:52204 10.138.0.7:52205 10.138.0.8:52206 10.138.0.9:52207 10.138.0.10:52208 10.138.0.11:52209 10.138.0.19:52210 10.138.0.20:52211 10.138.0.21:52212 10.138.0.22:52213 10.138.0.23:52214 10.138.0.27:52215 10.138.0.36:52216 10.138.0.37:52217"
-
 metrics = "PUSH_METRICS_NAMESPACE=jan-benchmark PUSH_METRICS_ENDPOINT=https://gw-c7-2b.cloud.victoriametrics.com/api/v1/import/prometheus PUSH_METRICS_API_TOKEN=06147e32-17de-4d29-989e-6a640ab50f13"
 coordinator = "10.128.0.58" # run-benchmark-1
 
-num_shards = 32
+num_shards = 4
 rem_exe_add = "--remote-executor-addresses "
 for i in range(num_shards):
     rem_exe_add += local_ip_address[f"sharding-executor-{i+1}"] + ":" + str(52200 + i + 2) + " "
