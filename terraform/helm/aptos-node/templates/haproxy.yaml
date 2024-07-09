@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
 data:
-  haproxy.cfg: |-
+  haproxy.cfg: |
 {{ (tpl ($.Files.Get "files/haproxy.cfg") $) | indent 4 }}
   blocked.ips: ""
 
