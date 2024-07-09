@@ -4,7 +4,7 @@
 pub mod analyze;
 pub mod local_testnet;
 
-use self::local_testnet::RunLocalTestnet;
+use self::local_testnet::RunLocalnet;
 use crate::{
     common::{
         types::{
@@ -76,7 +76,8 @@ pub enum NodeTool {
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
-    RunLocalTestnet(RunLocalTestnet),
+    #[clap(aliases = &["run-local-testnet"])]
+    RunLocalnet(RunLocalnet),
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
 }
@@ -100,7 +101,7 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
-            RunLocalTestnet(tool) => tool
+            RunLocalnet(tool) => tool
                 .execute_serialized_without_logger()
                 .await
                 .map(|_| "".to_string()),
@@ -1192,6 +1193,8 @@ pub enum AnalyzeMode {
     /// For each epoch summarize how many validators were in
     /// each of the reliability buckets.
     NetworkHealthOverTime,
+    /// Max TPS
+    MaxTps,
 }
 
 #[async_trait]
@@ -1210,6 +1213,8 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
 
         let print_detailed = self.analyze_mode == AnalyzeMode::DetailedEpochTable
             || self.analyze_mode == AnalyzeMode::All;
+        let print_max_tps =
+            self.analyze_mode == AnalyzeMode::MaxTps || self.analyze_mode == AnalyzeMode::All;
         for epoch_info in epochs {
             let mut epoch_stats =
                 AnalyzeValidators::analyze(&epoch_info.blocks, &epoch_info.validators);
@@ -1242,6 +1247,21 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
                     true,
                 );
             }
+            if print_max_tps {
+                for (num_blocks_for_max_tps, max_tps) in &epoch_stats.max_tps_per_block_interval {
+                    println!(
+                        "In {}epoch {}: during consecutive {:?}, found peak of {} TPS, ending on version: {}, {} txns over {}s and {} blocks",
+                        if epoch_info.partial { "partial " } else { "" },
+                        epoch_info.epoch,
+                        num_blocks_for_max_tps,
+                        max_tps.tps,
+                        max_tps.end_version,
+                        max_tps.txns,
+                        max_tps.duration,
+                        max_tps.blocks,
+                    );
+                }
+            }
             if !epoch_info.partial {
                 stats.insert(epoch_info.epoch, epoch_stats);
             }
@@ -1259,6 +1279,19 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
                 stats.keys().max().unwrap()
             );
             AnalyzeValidators::print_detailed_epoch_table(&total_stats, None, true);
+        }
+        if print_max_tps {
+            for (num_blocks_for_max_tps, max_tps) in &total_stats.max_tps_per_block_interval {
+                println!(
+                    "Across all epochs: during consecutive {:?}, found peak of {} TPS, ending on version: {}, {} txns over {}s and {} blocks",
+                    num_blocks_for_max_tps,
+                    max_tps.tps,
+                    max_tps.end_version,
+                    max_tps.txns,
+                    max_tps.duration,
+                    max_tps.blocks,
+                );
+            }
         }
         let all_validators: Vec<_> = total_stats.validator_stats.keys().cloned().collect();
         if self.analyze_mode == AnalyzeMode::ValidatorHealthOverTime

@@ -44,6 +44,7 @@ async fn maybe_download_package(info: &CustomDepInfo) -> anyhow::Result<()> {
         let registry = CachedPackageRegistry::create(
             Url::parse(info.node_url.as_str())?,
             load_account_arg(info.package_address.as_str())?,
+            false,
         )
         .await?;
         let package = registry.get_package(info.package_name).await?;
