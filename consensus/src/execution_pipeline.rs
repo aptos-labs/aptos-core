@@ -161,53 +161,96 @@ impl ExecutionPipeline {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
 
-            // TODO: basically copy-paste from mempool process_incoming_transactions
-            let start_storage_read = Instant::now();
+            // // TODO: basically copy-paste from mempool process_incoming_transactions
+            // let start_storage_read = Instant::now();
+            // let state_view = db
+            //     .latest_state_checkpoint_view()
+            //     .expect("Failed to get latest state checkpoint view.");
+            // let mut num_filtered: u64 = 0;
+            // let txns_to_execute = SIG_VERIFY_POOL.install(|| {
+            //     txns_to_execute
+            //         .into_par_iter()
+            //         .map(|t| match t.try_as_signed_user_txn() {
+            //             Some(signed_txn) => {
+            //                 match Self::get_account_sequence_number(
+            //                     &state_view,
+            //                     signed_txn.sender(),
+            //                 ) {
+            //                     Ok(sequence_number) => {
+            //                         if signed_txn.sequence_number() >= sequence_number {
+            //                             Some(t)
+            //                         } else {
+            //                             // Sequence number too old
+            //                             num_filtered += 1;
+            //                             None
+            //                         }
+            //                     },
+            //                     Err(e) => {
+            //                         info!("Failed to get sequence number: {:?}", e);
+            //                         num_filtered += 1;
+            //                         None
+            //                     },
+            //                 }
+            //             },
+            //             None => Some(t),
+            //         })
+            //         .collect::<Vec<_>>()
+            // });
+            // // Track latency for storage read fetching sequence number
+            // let storage_read_latency = start_storage_read.elapsed();
+            // // TODO: convert into proper stats
+            // info!(
+            //     "txns filtered by sequence number: {}/{}, in {} ms",
+            //     num_filtered,
+            //     txns_to_execute.len(),
+            //     storage_read_latency.as_millis()
+            // );
+
             let txns_to_execute_len = txns_to_execute.len();
+            let start_storage_read = Instant::now();
             let state_view = db
                 .latest_state_checkpoint_view()
                 .expect("Failed to get latest state checkpoint view.");
-            let txns_to_execute = SIG_VERIFY_POOL.install(|| {
-                txns_to_execute
-                    .into_par_iter()
-                    .filter(|t| match t.try_as_signed_user_txn() {
-                        Some(signed_txn) => {
-                            match Self::get_account_sequence_number(
-                                &state_view,
-                                signed_txn.sender(),
-                            ) {
-                                Ok(sequence_number) => {
-                                    signed_txn.sequence_number() >= sequence_number
-                                },
-                                Err(e) => {
-                                    error!("Failed to get sequence number: {:?}", e);
-                                    false
-                                },
-                            }
-                        },
-                        None => true,
-                    })
-                    .collect::<Vec<_>>()
-            });
-            // Track latency for storage read fetching sequence number
-            let storage_read_latency = start_storage_read.elapsed();
-            // TODO: convert into proper stats
-            info!(
-                "txns filtered by sequence number: {}/{}, in {} ms",
-                txns_to_execute.len(),
-                txns_to_execute_len,
-                storage_read_latency.as_millis()
-            );
-
+            // TODO: this is a hack, just say an old transaction is invalid
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
                 SIG_VERIFY_POOL.install(|| {
                     let num_txns = txns_to_execute.len();
                     txns_to_execute
                         .into_par_iter()
                         .with_min_len(optimal_min_len(num_txns, 32))
-                        .map(|t| t.into())
+                        .map(|t| match t.try_as_signed_user_txn() {
+                            Some(signed_txn) => match Self::get_account_sequence_number(
+                                &state_view,
+                                signed_txn.sender(),
+                            ) {
+                                Ok(sequence_number) => {
+                                    if signed_txn.sequence_number() >= sequence_number {
+                                        t.into()
+                                    } else {
+                                        SignatureVerifiedTransaction::Invalid(t)
+                                    }
+                                },
+                                Err(e) => {
+                                    info!("Failed to get sequence number: {:?}", e);
+                                    SignatureVerifiedTransaction::Invalid(t)
+                                },
+                            },
+                            None => t.into(),
+                        })
                         .collect::<Vec<_>>()
                 });
+            let storage_read_latency = start_storage_read.elapsed();
+
+            let num_old = sig_verified_txns
+                .iter()
+                .filter(|t| matches!(t, SignatureVerifiedTransaction::Invalid(_)))
+                .count();
+            info!(
+                "txns filtered by sequence number: {}/{}, in {} ms",
+                num_old,
+                txns_to_execute_len,
+                storage_read_latency.as_millis()
+            );
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
