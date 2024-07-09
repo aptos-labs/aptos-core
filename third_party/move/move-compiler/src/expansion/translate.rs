@@ -645,7 +645,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
     check_valid_module_member_name(context, ModuleMemberKind::Function, pfunction.name.0);
     let (function_name, function) = function_(context, pfunction);
     match &function.visibility {
-        E::Visibility::Public(loc) | E::Visibility::Friend(loc) => {
+        E::Visibility::Public(loc) | E::Visibility::Package(loc) | E::Visibility::Friend(loc) => {
             let msg = format!(
                 "Invalid '{}' visibility modifier. \
                 Script functions are not callable from other Move functions.",
@@ -1890,6 +1890,7 @@ fn visibility(pvisibility: P::Visibility) -> E::Visibility {
     match pvisibility {
         P::Visibility::Public(loc) => E::Visibility::Public(loc),
         P::Visibility::Script(loc) => E::Visibility::Public(loc),
+        P::Visibility::Package(loc) => E::Visibility::Package(loc),
         P::Visibility::Friend(loc) => E::Visibility::Friend(loc),
         P::Visibility::Internal => E::Visibility::Internal,
     }
@@ -2509,7 +2510,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::Move(v) => EE::Move(v),
         PE::Copy(v) => EE::Copy(v),
-        PE::Name(_pn, Some(_ty)) if !context.in_spec_context => {
+        PE::Name(_pn, Some(_ty)) if !context.in_spec_context && !context.env.flags().lang_v2() => {
             context.env.add_diag(diag!(
                 Syntax::SpecContextRestricted,
                 (
@@ -2698,13 +2699,21 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::Cast(e, ty) => EE::Cast(exp(context, *e), type_(context, ty)),
         PE::Index(e, i) => {
-            if context.in_spec_context {
+            if context.env.flags().lang_v2() || context.in_spec_context {
                 EE::Index(exp(context, *e), exp(context, *i))
             } else {
-                let msg = "`_[_]` index operator only allowed in specifications";
-                context
-                    .env
-                    .add_diag(diag!(Syntax::SpecContextRestricted, (loc, msg)));
+                // If it is a name, call `name_access_chain` to avoid
+                // the unused alias warning
+                if let PE::Name(pn, _) = e.value {
+                    let _ = name_access_chain(context, Access::Term, pn, None);
+                }
+                context.env.add_diag(diag!(
+                    Syntax::UnsupportedLanguageItem,
+                    (
+                        loc,
+                        "`_[_]` index operator in non-specification code only allowed in Move 2 and beyond"
+                    )
+                ));
                 EE::UnresolvedError
             }
         },
@@ -2939,6 +2948,10 @@ fn lvalues(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<LValue> {
             let al_opt: Option<E::LValueList_> =
                 pes.into_iter().map(|pe| assign(context, pe)).collect();
             L::Assigns(sp(loc, al_opt?))
+        },
+        PE::Index(_, _) if context.env.flags().lang_v2() => {
+            let er = exp(context, sp(loc, e_));
+            L::Mutate(er)
         },
         PE::Dereference(pr) => {
             let er = exp(context, *pr);

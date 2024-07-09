@@ -55,6 +55,7 @@ async fn get_proposal(
     let filter_set = HashSet::from_iter(filter.iter().cloned());
     let req = GetPayloadCommand::GetPayloadRequest(
         max_txns,
+        max_txns,
         1000000,
         max_txns / 2,
         100000,

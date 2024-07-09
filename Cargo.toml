@@ -41,7 +41,6 @@ members = [
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
     "aptos-move/vm-genesis",
-    "aptos-move/writeset-transaction-generator",
     "aptos-node",
     "aptos-utils",
     "config",
@@ -249,6 +248,7 @@ members = [
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
+    "tools/compute-module-expansion-size",
     "types",
     "vm-validator",
 ]
@@ -454,7 +454,6 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
-aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
@@ -644,7 +643,6 @@ num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
 num-traits = "0.2.15"
-number_range = "0.3.2"
 once_cell = "1.10.0"
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"

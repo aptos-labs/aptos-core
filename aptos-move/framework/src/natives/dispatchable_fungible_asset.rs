@@ -11,7 +11,7 @@ use smallvec::SmallVec;
 use std::collections::VecDeque;
 
 /***************************************************************************************************
- * native fun dispatchable_withdraw / dispatchable_deposit / dispatchable_derived_balance
+ * native fun dispatchable_withdraw / dispatchable_deposit / dispatchable_derived_balance / dispatchable_derived_supply
  *
  *   Directs control flow based on the last argument. We use the same native function implementation
  *   for all dispatching native.
@@ -54,6 +54,7 @@ pub fn make_all(
         ("dispatchable_withdraw", native_dispatch as RawSafeNative),
         ("dispatchable_deposit", native_dispatch),
         ("dispatchable_derived_balance", native_dispatch),
+        ("dispatchable_derived_supply", native_dispatch),
     ];
 
     builder.make_named_natives(natives)

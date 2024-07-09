@@ -34,7 +34,7 @@ async fn test_full_node_basic_flow() {
         )
         .await
         .unwrap();
-    for fullnode in swarm.full_nodes_mut() {
+    for fullnode in swarm.full_nodes() {
         fullnode
             .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
             .await
@@ -126,7 +126,7 @@ async fn test_vfn_failover() {
         .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
 
-    for fullnode in swarm.full_nodes_mut() {
+    for fullnode in swarm.full_nodes() {
         fullnode
             .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
             .await

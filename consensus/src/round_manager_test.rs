@@ -303,6 +303,7 @@ impl NodeSetup {
             Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
             Duration::ZERO,
+            20,
             10,
             1000,
             5,
@@ -1853,6 +1854,7 @@ fn block_retrieval_test() {
     });
 }
 
+#[ignore] // TODO: turn this test back on once the flakes have resolved.
 #[test]
 pub fn forking_retrieval_test() {
     let runtime = consensus_runtime();

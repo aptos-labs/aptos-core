@@ -1,16 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
-};
+use crate::{create_emitter_and_request, LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
-    EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TestReport,
+    EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport,
 };
 use aptos_logger::info;
+use async_trait::async_trait;
 use rand::{rngs::OsRng, Rng, SeedableRng};
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 pub struct TwoTrafficsTest {
     pub inner_traffic: EmitJobRequest,
@@ -23,10 +25,11 @@ impl Test for TwoTrafficsTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn test(
+    async fn test(
         &self,
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
@@ -34,26 +37,28 @@ impl NetworkLoadTest for TwoTrafficsTest {
             "Running TwoTrafficsTest test for duration {}s",
             duration.as_secs_f32()
         );
-        let nodes_to_send_load_to =
-            LoadDestination::FullnodesOtherwiseValidators.get_destination_nodes(swarm);
+        let nodes_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
+            .get_destination_nodes(swarm.clone())
+            .await;
         let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
 
         let (emitter, emit_job_request) = create_emitter_and_request(
-            swarm,
+            swarm.clone(),
             self.inner_traffic.clone(),
             &nodes_to_send_load_to,
             rng,
-        )?;
-
-        let rt = traffic_emitter_runtime()?;
+        )
+        .await?;
 
         let test_start = Instant::now();
 
-        let stats = rt.block_on(emitter.emit_txn_for(
-            swarm.chain_info().root_account,
-            emit_job_request,
-            duration,
-        ))?;
+        let stats = emitter
+            .emit_txn_for(
+                swarm.read().await.chain_info().root_account,
+                emit_job_request,
+                duration,
+            )
+            .await?;
 
         let actual_test_duration = test_start.elapsed();
         info!(
@@ -77,8 +82,9 @@ impl NetworkLoadTest for TwoTrafficsTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for TwoTrafficsTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

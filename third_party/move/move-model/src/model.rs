@@ -45,6 +45,8 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{info, warn};
 pub use move_binary_format::file_format::{AbilitySet, Visibility};
+#[allow(deprecated)]
+use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
@@ -53,7 +55,6 @@ use move_binary_format::{
         FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
         StructDefinitionIndex,
     },
-    normalized::Type as MType,
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
 };
@@ -1641,6 +1642,7 @@ impl GlobalEnv {
             field_data,
             variants: None,
             spec: RefCell::new(Spec::default()),
+            is_native: false,
         }
     }
 
@@ -1768,6 +1770,7 @@ impl GlobalEnv {
         name: Symbol,
         loc: Loc,
         visibility: Visibility,
+        has_package_visibility: bool,
         type_params: Vec<TypeParameter>,
         params: Vec<Parameter>,
         result_type: Type,
@@ -1781,6 +1784,7 @@ impl GlobalEnv {
             def_idx: None,
             handle_idx: None,
             visibility,
+            has_package_visibility,
             is_native: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
@@ -1910,6 +1914,10 @@ impl GlobalEnv {
         }
     }
 
+    pub(crate) fn get_module_data_mut(&mut self, id: ModuleId) -> &mut ModuleData {
+        &mut self.module_data[id.0 as usize]
+    }
+
     /// Gets a struct by qualified id.
     pub fn get_struct_qid(&self, qid: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(qid.module_id).into_struct(qid.id)
@@ -1997,6 +2005,7 @@ impl GlobalEnv {
     }
 
     /// Attempt to compute a struct type for (`mid`, `sid`, `ts`).
+    #[allow(deprecated)]
     pub fn get_struct_type(&self, mid: ModuleId, sid: StructId, ts: &[Type]) -> Option<MType> {
         let menv = self.get_module(mid);
         Some(MType::Struct {
@@ -2657,7 +2666,7 @@ impl<'env> ModuleEnv<'env> {
         self.data.name.is_script()
     }
 
-    /// Returns true of this module is target of compilation. A non-target module is
+    /// Returns true if this module is target of compilation. A non-target module is
     /// a dependency only but not explicitly requested to process.
     pub fn is_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
@@ -2736,6 +2745,43 @@ impl<'env> ModuleEnv<'env> {
     /// Returns the set of modules this one declares as friends.
     pub fn get_friend_modules(&self) -> BTreeSet<ModuleId> {
         self.data.friend_modules.clone()
+    }
+
+    /// Returns the set of modules in the current package,
+    /// whose public(package) functions are called in the current module.
+    /// Requires: `self` is a primary target.
+    pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
+        debug_assert!(self.is_primary_target());
+        let mut deps = BTreeSet::new();
+        if self.is_script_module() {
+            return deps;
+        }
+        for fun_env in self.get_functions() {
+            let called_funs = fun_env.get_called_functions().expect("called functions");
+            for fun in called_funs {
+                let mod_id = fun.module_id;
+                if self.get_id() == mod_id {
+                    // no need to friend self
+                    continue;
+                }
+                let mod_env = self.env.get_module(mod_id);
+                let fun_env = mod_env.get_function(fun.id);
+                if fun_env.has_package_visibility() && self.can_call_package_fun_in(&mod_env) {
+                    deps.insert(mod_id);
+                }
+            }
+        }
+        deps
+    }
+
+    /// Returns true if functions in the current module can call a public(package) function in the given module.
+    /// Requires: `self` is a primary target.
+    fn can_call_package_fun_in(&self, other: &Self) -> bool {
+        debug_assert!(self.is_primary_target());
+        !self.is_script_module()
+            && !other.is_script_module()
+            && other.is_primary_target()
+            && self.self_address() == other.self_address()
     }
 
     /// Returns true if the given module is a transitive dependency of this one. The
@@ -3256,6 +3302,9 @@ pub struct StructData {
 
     /// Associated specification.
     pub(crate) spec: RefCell<Spec>,
+
+    /// Whether this struct is native
+    pub is_native: bool,
 }
 
 #[derive(Debug)]
@@ -3472,6 +3521,11 @@ impl<'env> StructEnv<'env> {
                 struct_env: self.clone(),
                 data,
             })
+    }
+
+    /// Return true if it is a native struct
+    pub fn is_native(&self) -> bool {
+        self.data.is_native
     }
 
     /// Return the number of fields in the struct. Notice of the struct has variants, this
@@ -3813,6 +3867,10 @@ pub struct FunctionData {
 
     /// Visibility of this function (private, friend, or public)
     pub(crate) visibility: Visibility,
+
+    /// Whether this function has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
+    pub(crate) has_package_visibility: bool,
 
     /// Whether this is a native function
     pub(crate) is_native: bool,
@@ -4179,6 +4237,11 @@ impl<'env> FunctionEnv<'env> {
     /// Return true if this function is a friend function
     pub fn is_friend(&self) -> bool {
         self.visibility() == Visibility::Friend
+    }
+
+    /// Return true iff this function is has package visibility
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 
     /// Returns true if invariants are declared disabled in body of function

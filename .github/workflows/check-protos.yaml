@@ -51,9 +51,7 @@ jobs:
           version: "25.x"
 
       # Set up pnpm.
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8.6.2
+      - uses: pnpm/action-setup@v4
 
       # Set up Poetry.
       - name: Install Python deps for generating code from protos

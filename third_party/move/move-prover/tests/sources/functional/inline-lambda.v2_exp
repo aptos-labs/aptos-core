@@ -1,4 +1,16 @@
 Move prover returns: exiting with verification errors
+warning: Unused assignment to `r1`. Consider removing or prefixing with an underscore: `_r1`
+   ┌─ tests/sources/functional/inline-lambda.move:11:31
+   │
+11 │         let r1 = apply(0, |v| v >= 0);
+   │                               ^^^^^^
+
+warning: Unused assignment to `r2`. Consider removing or prefixing with an underscore: `_r2`
+   ┌─ tests/sources/functional/inline-lambda.move:16:31
+   │
+16 │         let r2 = apply(0, |v| v != a1 + a2);
+   │                               ^^^^^^^^^^^^
+
 error: unknown assertion failed
   ┌─ tests/sources/functional/inline-lambda.move:5:13
   │

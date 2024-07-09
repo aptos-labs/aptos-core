@@ -1370,7 +1370,10 @@ impl TransactionsApi {
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
-        let exe_status = ExecutionStatus::convert_vm_status_for_simulation(vm_status.clone());
+        let exe_status = ExecutionStatus::conmbine_vm_status_for_simulation(
+            output.auxiliary_data(),
+            output.status().clone(),
+        );
 
         let stats_key = match txn.payload() {
             TransactionPayload::Script(_) => {

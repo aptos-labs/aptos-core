@@ -60,6 +60,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
@@ -67,6 +68,7 @@ use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
     num::NonZeroUsize,
+    ops::DerefMut,
     path::{Path, PathBuf},
     process,
     sync::{
@@ -827,7 +829,11 @@ fn optimize_for_maximum_throughput(
 ) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_unique_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_txns = config
+        .consensus
+        .max_sending_block_txns
+        .max(max_txns_per_block as u64);
     config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
@@ -1946,6 +1952,16 @@ fn realistic_env_max_load_test(
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
 
+    // resource override for long_running tests
+    let resource_override = if long_running {
+        NodeResourceOverride {
+            storage_gib: Some(1000), // long running tests need more storage
+            ..NodeResourceOverride::default()
+        }
+    } else {
+        NodeResourceOverride::default() // no overrides
+    };
+
     let mut success_criteria = SuccessCriteria::new(95)
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 10% of the time.
@@ -2022,6 +2038,8 @@ fn realistic_env_max_load_test(
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)
+        .with_validator_resource_override(resource_override)
+        .with_fullnode_resource_override(resource_override)
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
@@ -2112,10 +2130,12 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_validator_resource_override(NodeResourceOverride {
                 cpu_cores: Some(58),
                 memory_gib: Some(200),
+                storage_gib: Some(500), // assuming we're using these large marchines for long-running or expensive tests which need more disk
             })
             .with_fullnode_resource_override(NodeResourceOverride {
                 cpu_cores: Some(58),
                 memory_gib: Some(200),
+                storage_gib: Some(500),
             })
             .with_success_criteria(
                 SuccessCriteria::new(25000)
@@ -2660,18 +2680,19 @@ impl Test for RestartValidator {
     }
 }
 
+#[async_trait]
 impl NetworkTest for RestartValidator {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        let runtime = Runtime::new()?;
-        runtime.block_on(async {
-            let node = ctx.swarm().validators_mut().next().unwrap();
-            node.health_check().await.expect("node health check failed");
-            node.stop().await.unwrap();
-            println!("Restarting node {}", node.peer_id());
-            node.start().await.unwrap();
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            node.health_check().await.expect("node health check failed");
-        });
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let swarm = ctx.swarm.read().await;
+        let node = swarm.validators().next().unwrap();
+        node.health_check().await.expect("node health check failed");
+        node.stop().await.unwrap();
+        println!("Restarting node {}", node.peer_id());
+        node.start().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        node.health_check().await.expect("node health check failed");
         Ok(())
     }
 }
@@ -2685,17 +2706,23 @@ impl Test for EmitTransaction {
     }
 }
 
+#[async_trait]
 impl NetworkTest for EmitTransaction {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
         let duration = Duration::from_secs(10);
         let all_validators = ctx
-            .swarm()
+            .swarm
+            .read()
+            .await
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration).unwrap();
+        let stats = generate_traffic(ctx, &all_validators, duration)
+            .await
+            .unwrap();
         ctx.report.report_txn_stats(self.name().to_string(), &stats);
-
         Ok(())
     }
 }
@@ -2717,10 +2744,11 @@ impl Test for Delay {
     }
 }
 
+#[async_trait]
 impl NetworkTest for Delay {
-    fn run(&self, _ctx: &mut NetworkContext<'_>) -> Result<()> {
+    async fn run<'a>(&self, _ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         info!("forge sleep {}", self.seconds);
-        std::thread::sleep(Duration::from_secs(self.seconds));
+        tokio::time::sleep(Duration::from_secs(self.seconds)).await;
         Ok(())
     }
 }
@@ -2734,10 +2762,12 @@ impl Test for GatherMetrics {
     }
 }
 
+#[async_trait]
 impl NetworkTest for GatherMetrics {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        let runtime = ctx.runtime.handle();
-        runtime.block_on(gather_metrics_one(ctx));
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        gather_metrics_one(ctx).await;
         Ok(())
     }
 }
@@ -2749,14 +2779,17 @@ async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
     let now = chrono::prelude::Utc::now()
         .format("%Y%m%d_%H%M%S")
         .to_string();
-    for val in ctx.swarm.validators() {
-        let mut url = val.inspection_service_endpoint();
-        let valname = val.peer_id().to_string();
-        url.set_path("metrics");
-        let fname = format!("{}.{}.metrics", now, valname);
-        let outpath: PathBuf = outdir.join(fname);
-        let th = handle.spawn(gather_metrics_to_file(url, outpath));
-        gets.push(th);
+    {
+        let swarm = ctx.swarm.read().await;
+        for val in swarm.validators() {
+            let mut url = val.inspection_service_endpoint();
+            let valname = val.peer_id().to_string();
+            url.set_path("metrics");
+            let fname = format!("{}.{}.metrics", now, valname);
+            let outpath: PathBuf = outdir.join(fname);
+            let th = handle.spawn(gather_metrics_to_file(url, outpath));
+            gets.push(th);
+        }
     }
     // join all the join handles
     while !gets.is_empty() {

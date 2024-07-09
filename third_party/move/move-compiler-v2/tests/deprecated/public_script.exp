@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: DEPRECATED. will be removed
+  ┌─ tests/deprecated/public_script.move:2:5
+  │
+2 │     public(script) fun main() {
+  │     ^^^^^^^^^^^^^^ 'public(script)' is deprecated in favor of the 'entry' modifier. Replace with 'public entry'
+
+error: address with no value
+  ┌─ tests/deprecated/public_script.move:4:30
+  │
+4 │         let _addr:address = @Test;
+  │                              ^^^^ address 'Test' is not assigned a value. Try assigning it a value when calling the compiler

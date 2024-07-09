@@ -13,7 +13,7 @@ use aptos_sdk::{
 };
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use std::sync::Arc;
+use std::{borrow::Borrow, sync::Arc};
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
@@ -220,7 +220,7 @@ impl CustomModulesDelegationGeneratorCreator {
             let publisher = LocalAccount::generate(&mut rng);
             let publisher_address = publisher.address();
             requests_create.push(create_account_transaction(
-                root_account.get_root_account(),
+                root_account.get_root_account().borrow(),
                 publisher_address,
                 &init_txn_factory,
                 publisher_balance,

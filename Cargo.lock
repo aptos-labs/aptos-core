@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.4.1"
+version = "3.5.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -458,6 +458,7 @@ dependencies = [
  "aptos-executor-types",
  "aptos-framework",
  "aptos-genesis",
+ "aptos-indexer-grpc-table-info",
  "aptos-mempool",
  "aptos-mempool-notifications",
  "aptos-sdk",
@@ -819,7 +820,6 @@ dependencies = [
  "get_if_addrs",
  "maplit",
  "num_cpus",
- "number_range",
  "poem-openapi",
  "rand 0.7.3",
  "serde",
@@ -1678,6 +1678,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-retrier",
+ "aptos-runtimes",
  "aptos-sdk",
  "aptos-short-hex-str",
  "aptos-state-sync-driver",
@@ -2493,6 +2494,7 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
+ "claims",
  "goldenfile",
  "move-binary-format",
  "move-command-line-common",
@@ -2650,6 +2652,7 @@ name = "aptos-move-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-executor",
  "aptos-consensus",
  "aptos-crypto",
  "aptos-gas-profiling",
@@ -2662,6 +2665,7 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "clap 4.4.14",
+ "itertools 0.12.1",
  "regex",
  "reqwest",
  "tokio",
@@ -3945,6 +3949,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "assert_approx_eq",
+ "async-trait",
  "bcs 0.1.4",
  "csv",
  "futures",
@@ -3953,6 +3958,7 @@ dependencies = [
  "rand 0.7.3",
  "reqwest",
  "tokio",
+ "tokio-scoped",
 ]
 
 [[package]]
@@ -3988,9 +3994,7 @@ dependencies = [
  "criterion",
  "criterion-cpu-time",
  "num_cpus",
- "once_cell",
  "proptest",
- "rayon",
 ]
 
 [[package]]
@@ -4419,19 +4423,6 @@ dependencies = [
  "serde",
  "serde_json",
  "warp",
-]
-
-[[package]]
-name = "aptos-writeset-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "aptos-vm",
- "move-core-types",
- "move-vm-runtime",
- "move-vm-types",
 ]
 
 [[package]]
@@ -6123,6 +6114,19 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-util 0.7.10",
+]
+
+[[package]]
+name = "compute-module-expansion-size"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.4.14",
+ "futures",
+ "move-binary-format",
+ "move-core-types",
+ "rayon",
+ "tokio",
 ]
 
 [[package]]
@@ -11699,17 +11703,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
-name = "number_range"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60080faccd4ca50ad0b801b2be686136376b13f691f6eac84817e40973b2e1bb"
-dependencies = [
- "anyhow",
- "itertools 0.10.5",
- "num 0.4.1",
-]
-
-[[package]]
 name = "object"
 version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15694,6 +15687,16 @@ dependencies = [
  "rustls 0.23.7",
  "rustls-pki-types",
  "tokio",
+]
+
+[[package]]
+name = "tokio-scoped"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4beb8ba13bc53ac53ce1d52b42f02e5d8060f0f42138862869beb769722b256"
+dependencies = [
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

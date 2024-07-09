@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::NodeConfig;
-use aptos_db_indexer::{db_indexer::DBIndexer, db_ops::open_internal_indexer_db};
+use aptos_db_indexer::{
+    db_indexer::DBIndexer, db_ops::open_internal_indexer_db, indexer_reader::IndexerReaders,
+};
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_schemadb::DB;
 use aptos_storage_interface::DbReader;
+use aptos_types::indexer::indexer_db_reader::IndexerReader;
 use std::sync::Arc;
+use tokio::runtime::Handle;
 
 const SERVICE_TYPE: &str = "internal_indexer_db_service";
 const INTERNAL_INDEXER_DB: &str = "internal_indexer_db";
@@ -82,5 +86,44 @@ impl InternalIndexerDBService {
             );
             start_version = next_version;
         }
+    }
+}
+
+pub struct MockInternalIndexerDBService {
+    pub indexer_readers: Option<IndexerReaders>,
+    pub _handle: Option<Handle>,
+}
+
+impl MockInternalIndexerDBService {
+    pub fn new_for_test(db_reader: Arc<dyn DbReader>, node_config: &NodeConfig) -> Self {
+        if !node_config
+            .indexer_db_config
+            .is_internal_indexer_db_enabled()
+        {
+            return Self {
+                indexer_readers: None,
+                _handle: None,
+            };
+        }
+
+        let db = InternalIndexerDBService::get_indexer_db(node_config).unwrap();
+        let handle = Handle::current();
+        let mut internal_indexer_db_service =
+            InternalIndexerDBService::new(db_reader, node_config, db);
+        let db_indexer = internal_indexer_db_service.get_db_indexer();
+        handle.spawn(async move {
+            internal_indexer_db_service.run().await;
+        });
+        Self {
+            indexer_readers: IndexerReaders::new(None, Some(db_indexer)),
+            _handle: Some(handle),
+        }
+    }
+
+    pub fn get_indexer_reader(&self) -> Option<Arc<dyn IndexerReader>> {
+        if let Some(indexer_reader) = &self.indexer_readers {
+            return Some(Arc::new(indexer_reader.to_owned()));
+        }
+        None
     }
 }
