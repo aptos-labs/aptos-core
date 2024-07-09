@@ -117,6 +117,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                                        outbound_rpc_runtime_clone)
             });
         }
+        let mut received_msg = vec![0; 100];
         while let Ok(message) = self.kv_rx.recv() {
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let mut delta = 0.0;
@@ -129,8 +130,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let _timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_requests_handler_timer"])
                 .start_timer();
-
-            let priority = message.seq_num.unwrap();
+            received_msg[message.shard_id] += 1;
+            let priority = message.seq_num.unwrap() * received_msg[message.shard_id];
             {
                 let (lock, cvar) = &*self.recv_condition;
                 let _lg = lock.lock().unwrap();
