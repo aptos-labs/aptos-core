@@ -57,8 +57,12 @@ impl ModuleWriteSet {
         })
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.write_ops.is_empty()
+    }
+
     pub fn is_empty_or_invariant_violation(&self) -> PartialVMResult<()> {
-        if !self.write_ops.is_empty() {
+        if !self.is_empty() {
             return Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             ));
