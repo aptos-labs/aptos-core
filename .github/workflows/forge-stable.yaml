@@ -166,7 +166,7 @@ jobs:
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-realistic-env-workload-sweep-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 1600 # Run for 26 minutes (4 tests, each for 400 seconds)
+      FORGE_RUNNER_DURATION_SECS: 2000 # Run for 33 minutes (5 tests, each for 400 seconds)
       FORGE_TEST_SUITE: realistic_env_workload_sweep
       POST_TO_SLACK: true
 

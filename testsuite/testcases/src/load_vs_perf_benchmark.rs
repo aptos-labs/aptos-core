@@ -237,7 +237,7 @@ impl TransactionWorkload {
     }
 }
 
-pub struct ContinuousTraffic {
+pub struct BackgroundTraffic {
     pub traffic: EmitJobRequest,
     pub criteria: Vec<SuccessCriteria>,
 }
@@ -247,12 +247,15 @@ pub struct LoadVsPerfBenchmark {
     pub workloads: Workloads,
     pub criteria: Vec<SuccessCriteria>,
 
-    pub continuous_traffic: Option<ContinuousTraffic>,
+    pub background_traffic: Option<BackgroundTraffic>,
 }
 
 impl Test for LoadVsPerfBenchmark {
     fn name(&self) -> &'static str {
-        "continuous progress test"
+        match self.workloads {
+            Workloads::TPS(_) => "load vs perf test",
+            Workloads::TRANSACTIONS(_) => "workload vs perf test",
+        }
     }
 }
 
@@ -306,14 +309,14 @@ impl NetworkTest for LoadVsPerfBenchmark {
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
 
-        let mut continous_job = if let Some(continuous_traffic) = &self.continuous_traffic {
+        let mut background_job = if let Some(background_traffic) = &self.background_traffic {
             let nodes_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
                 .get_destination_nodes(ctx.swarm.clone())
                 .await;
             let rng = SeedableRng::from_rng(ctx.core().rng())?;
             let (mut emitter, emit_job_request) = create_emitter_and_request(
                 ctx.swarm.clone(),
-                continuous_traffic.traffic.clone(),
+                background_traffic.traffic.clone(),
                 &nodes_to_send_load_to,
                 rng,
             )
@@ -351,7 +354,7 @@ impl NetworkTest for LoadVsPerfBenchmark {
                     phase_duration
                         .checked_mul(self.workloads.num_phases(index) as u32)
                         .unwrap(),
-                    continous_job.as_mut(),
+                    background_job.as_mut(),
                 )
                 .await
                 .inspect_err(|e| {
@@ -369,11 +372,11 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 info!("{}", line);
             }
 
-            if let Some(job) = &continous_job {
+            if let Some(job) = &background_job {
                 let stats_by_phase = job.peek_and_accumulate();
-                for line in to_table_continuous(
+                for line in to_table_background(
                     "background traffic".to_string(),
-                    &extract_continuous_stats(stats_by_phase),
+                    &extract_background_stats(stats_by_phase),
                 ) {
                     info!("{}", line);
                 }
@@ -389,13 +392,13 @@ impl NetworkTest for LoadVsPerfBenchmark {
             ctx.report.report_text(line);
         }
 
-        let continuous_results = match continous_job {
+        let background_results = match background_job {
             Some(job) => {
                 let stats_by_phase = job.stop_job().await;
 
-                let result = extract_continuous_stats(stats_by_phase);
+                let result = extract_background_stats(stats_by_phase);
 
-                for line in to_table_continuous("continuous traffic".to_string(), &result) {
+                for line in to_table_background("background traffic".to_string(), &result) {
                     ctx.report.report_text(line);
                 }
                 Some(result)
@@ -418,11 +421,11 @@ impl NetworkTest for LoadVsPerfBenchmark {
             }
         }
 
-        if let Some(results) = continuous_results {
+        if let Some(results) = background_results {
             for (index, (name, stats)) in results.into_iter().enumerate() {
                 let rate = stats.rate();
                 if let Some(criteria) = self
-                    .continuous_traffic
+                    .background_traffic
                     .as_ref()
                     .unwrap()
                     .criteria
@@ -443,12 +446,12 @@ impl NetworkTest for LoadVsPerfBenchmark {
     }
 }
 
-fn extract_continuous_stats(stats_by_phase: Vec<TxnStats>) -> Vec<(String, TxnStats)> {
+fn extract_background_stats(stats_by_phase: Vec<TxnStats>) -> Vec<(String, TxnStats)> {
     let mut result = vec![];
     for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
         if phase % 2 != 0 {
             result.push((
-                format!("continuous with traffic {}", phase / 2),
+                format!("background with traffic {}", phase / 2),
                 phase_stats,
             ));
         }
@@ -504,7 +507,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
     table
 }
 
-fn to_table_continuous(type_name: String, results: &[(String, TxnStats)]) -> Vec<String> {
+fn to_table_background(type_name: String, results: &[(String, TxnStats)]) -> Vec<String> {
     let mut table = Vec::new();
     table.push(format!(
         "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",

@@ -36,7 +36,7 @@ use aptos_testcases::{
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
     load_vs_perf_benchmark::{
-        ContinuousTraffic, LoadVsPerfBenchmark, TransactionWorkload, Workloads,
+        BackgroundTraffic, LoadVsPerfBenchmark, TransactionWorkload, Workloads,
     },
     modifiers::{CpuChaosTest, ExecutionDelayConfig, ExecutionDelayTest},
     multi_region_network_test::{
@@ -1076,7 +1076,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
             },
         )
         .collect(),
-        continuous_traffic: None,
+        background_traffic: None,
     })
 }
 
@@ -1086,11 +1086,11 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         workloads: Workloads::TRANSACTIONS(vec![
             TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
             TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
-            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 20000)
+            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 10000)
                 .with_transactions_per_account(1),
-            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 30000)
+            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
                 .with_unique_senders(),
-            TransactionWorkload::new(TransactionTypeArg::PublishPackage, 1000)
+            TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
                 .with_transactions_per_account(1),
         ]),
         // Investigate/improve to make latency more predictable on different workloads
@@ -1099,7 +1099,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
             (7000, 100, 0.3, 0.5, 0.5, 0.5),
             (2000, 300, 0.3, 1.0, 0.6, 1.0),
             (3200, 500, 0.3, 1.5, 0.7, 0.7),
-            (150, 30, 0.5, 1.0, 1.5, 1.0),
+            (30, 5, 0.5, 2.0, 1.5, 1.0),
         ]
         .into_iter()
         .map(
@@ -1129,7 +1129,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
             },
         )
         .collect(),
-        continuous_traffic: None,
+        background_traffic: None,
     })
 }
 
@@ -1148,7 +1148,7 @@ fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
                 .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
-        continuous_traffic: Some(ContinuousTraffic {
+        background_traffic: Some(BackgroundTraffic {
             traffic: EmitJobRequest::default()
                 .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
                 .mode(EmitJobMode::ConstTps { tps: 40 }),
@@ -1187,7 +1187,7 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
             TransactionWorkload::new_const_tps(TransactionTypeArg::ModifyGlobalFlagAggV2, 3 * 3500),
         ]),
         criteria: Vec::new(),
-        continuous_traffic: Some(ContinuousTraffic {
+        background_traffic: Some(BackgroundTraffic {
             traffic: EmitJobRequest::default()
                 .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
                 .mode(EmitJobMode::ConstTps { tps: 10 })
@@ -1234,7 +1234,7 @@ fn load_vs_perf_benchmark() -> ForgeConfig {
                 200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
             ]),
             criteria: Vec::new(),
-            continuous_traffic: None,
+            background_traffic: None,
         })
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -1276,7 +1276,7 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
                     .with_unique_senders(),
             ]),
             criteria: Vec::new(),
-            continuous_traffic: None,
+            background_traffic: None,
         })
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
