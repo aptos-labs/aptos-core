@@ -54,7 +54,7 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
-        OnChainConfig, TimedFeatures,
+        OnChainConfig, TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -1411,6 +1411,20 @@ impl AptosVM {
                     )?;
 
                     // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+                }
+
+                if self
+                    .timed_features()
+                    .is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
+                {
+                    for (module, blob) in modules.iter().zip(bundle.iter()) {
+                        // TODO(Gas): Make budget configurable.
+                        let budget = 2048 + blob.code().len() as u64 * 20;
+                        move_binary_format::check_complexity::check_module_complexity(
+                            module, budget,
+                        )
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                    }
                 }
 
                 // Validate the module bundle
