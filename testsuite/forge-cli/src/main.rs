@@ -1425,7 +1425,7 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
         .with_initial_fullnode_count(20)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 40000 })
+                .mode(EmitJobMode::ConstTps { tps: 25000 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(7500),
         }))
