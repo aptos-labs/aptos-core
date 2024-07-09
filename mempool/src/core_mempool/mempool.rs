@@ -364,6 +364,15 @@ impl Mempool {
                 skipped.insert((txn.address, tx_seq));
             }
         }
+        counters::MEMPOOL_GET_BATCH_SKIPPED_TXNS.observe(skipped.len() as f64);
+        counters::MEMPOOL_GET_BATCH_MAX_TXNS.observe(max_txns as f64);
+        counters::MEMPOOL_GET_BATCH_MAX_BYTES.observe(max_bytes as f64);
+        if (result.len() as u64) < max_txns && skipped.is_empty() {
+            counters::MEMPOOL_GET_BATCH_SPACE_REMAINING.observe(1.0);
+        } else {
+            counters::MEMPOOL_GET_BATCH_SPACE_REMAINING.observe(0.0);
+        }
+
         let result_size = result.len();
         let result_end_time = start_time.elapsed();
         let result_time = result_end_time.saturating_sub(gas_end_time);
