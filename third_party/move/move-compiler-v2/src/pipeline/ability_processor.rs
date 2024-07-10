@@ -330,10 +330,10 @@ impl<'a> Transformer<'a> {
                         );
                     },
                     WriteRef => {
-                        let ty = self.builder.get_local_type(srcs[0]);
+                        let ty = self.builder.get_local_type(srcs[1]);
                         self.check_drop_for_type(
                             *id,
-                            srcs[0],
+                            srcs[1],
                             ty.get_target_type().expect("reference type"),
                             || ("reference content dropped here".to_string(), vec![]),
                         );

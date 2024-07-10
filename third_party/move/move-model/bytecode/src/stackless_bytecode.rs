@@ -179,7 +179,7 @@ pub enum Operation {
     Release,
 
     ReadRef,
-    WriteRef,
+    WriteRef, // (value, reference)
     FreezeRef(/*explicit*/ bool),
     Vector,
 
@@ -862,7 +862,7 @@ impl Bytecode {
             },
             Call(_, _, Operation::WriteRef, srcs, aa) => {
                 // write-ref only distorts the value of the reference, but not the pointer itself
-                (add_abort(vec![], aa), vec![(srcs[0], false)])
+                (add_abort(vec![], aa), vec![(srcs[1], false)])
             },
             Call(_, dests, Function(..), srcs, aa) => {
                 let mut val_targets = vec![];

@@ -31,7 +31,7 @@ module 0x42::assign {
 fun assign::assign_field($t0: &mut assign::S, $t1: u64) {
      var $t2: &mut u64
   0: $t2 := borrow_field<assign::S>.f($t0)
-  1: write_ref($t2, $t1)
+  1: write_ref($t1, $t2)
   2: return ()
 }
 
@@ -40,7 +40,7 @@ fun assign::assign_field($t0: &mut assign::S, $t1: u64) {
 fun assign::assign_int($t0: &mut u64) {
      var $t1: u64
   0: $t1 := 42
-  1: write_ref($t0, $t1)
+  1: write_ref($t1, $t0)
   2: return ()
 }
 
@@ -66,7 +66,7 @@ fun assign::assign_struct($t0: &mut assign::S) {
   1: $t4 := 42
   2: $t3 := pack assign::T($t4)
   3: $t1 := pack assign::S($t2, $t3)
-  4: write_ref($t0, $t1)
+  4: write_ref($t1, $t0)
   5: return ()
 }
 

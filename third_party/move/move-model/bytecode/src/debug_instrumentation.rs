@@ -69,7 +69,7 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                     builder.emit(bc);
                 },
                 Call(_, _, Operation::WriteRef, srcs, _)
-                    if srcs[0] < fun_env.get_local_count().unwrap_or_default() =>
+                    if srcs[1] < fun_env.get_local_count().unwrap_or_default() =>
                 {
                     builder.set_loc_from_attr(bc.get_attr_id());
                     builder.emit(bc.clone());
@@ -77,8 +77,8 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                         Call(
                             id,
                             vec![],
-                            Operation::TraceLocal(srcs[0]),
-                            vec![srcs[0]],
+                            Operation::TraceLocal(srcs[1]),
+                            vec![srcs[1]],
                             None,
                         )
                     });

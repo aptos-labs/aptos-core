@@ -1202,8 +1202,8 @@ impl<'env> FunctionTranslator<'env> {
                         );
                     },
                     WriteRef => {
-                        let reference = srcs[0];
-                        let value = srcs[1];
+                        let value = srcs[0];
+                        let reference = srcs[1];
                         emitln!(
                             writer,
                             "{} := $UpdateMutation({}, {});",

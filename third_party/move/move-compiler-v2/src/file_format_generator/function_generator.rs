@@ -496,9 +496,7 @@ impl<'a> FunctionGenerator<'a> {
             },
             Operation::ReadRef => self.gen_builtin(ctx, dest, FF::Bytecode::ReadRef, source),
             Operation::WriteRef => {
-                // TODO: WriteRef in FF bytecode and in stackless bytecode use different operand
-                // order, perhaps we should fix this.
-                self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
+                self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[0], source[1]])
             },
             Operation::Release => {
                 // Move bytecode does not process release, values are released indirectly

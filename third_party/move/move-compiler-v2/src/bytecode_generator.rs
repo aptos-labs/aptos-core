@@ -386,8 +386,8 @@ impl<'env> Generator<'env> {
                 // Notice that we cannot be in reference mode here for reasons
                 // of typing: the result of the Mutate operator is `()` and cannot
                 // appear where references are processed.
-                let rhs_temp = self.gen_arg(rhs, false);
                 let lhs_temp = self.gen_auto_ref_arg(lhs, ReferenceKind::Mutable);
+                let rhs_temp = self.gen_arg(rhs, false);
                 let lhs_type = self.get_node_type(lhs.node_id());
 
                 // For the case: `fun f(p: &mut S) { *(p :&S) =... },
@@ -407,7 +407,7 @@ impl<'env> Generator<'env> {
                     );
                 }
                 self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
-                    lhs_temp, rhs_temp,
+                    rhs_temp, lhs_temp
                 ])
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),

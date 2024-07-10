@@ -35,7 +35,7 @@ fun reference_conversion::use_it(): u64 {
   0: $t1 := 42
   1: $t2 := borrow_local($t1)
   2: $t3 := 43
-  3: write_ref($t2, $t3)
+  3: write_ref($t3, $t2)
   4: $t4 := freeze_ref(implicit)($t2)
   5: $t0 := reference_conversion::deref($t4)
   6: return $t0

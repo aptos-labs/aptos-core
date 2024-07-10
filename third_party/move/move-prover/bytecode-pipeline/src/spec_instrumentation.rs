@@ -784,7 +784,7 @@ impl<'a> Instrumenter<'a> {
                     id,
                     vec![],
                     Operation::WriteRef,
-                    vec![mem_ref, rhs_temp],
+                    vec![rhs_temp, mem_ref],
                     None,
                 )
             });
