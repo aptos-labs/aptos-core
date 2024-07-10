@@ -306,7 +306,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "server-framework",
  "shadow-rs",
- "supra",
+ "supra-aptos",
  "tempfile",
  "termcolor",
  "thiserror",
@@ -15228,7 +15228,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
-name = "supra"
+name = "supra-aptos"
 version = "0.1.0"
 dependencies = [
  "anyhow",

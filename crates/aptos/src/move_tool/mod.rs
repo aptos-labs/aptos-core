@@ -67,7 +67,7 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
-use supra::{SupraCommand, SupraCommandArguments};
+use supra_aptos::{SupraCommand, SupraCommandArguments};
 
 /// Tool for Move related operations
 ///
