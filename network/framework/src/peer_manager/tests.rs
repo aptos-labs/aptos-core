@@ -89,7 +89,6 @@ fn build_test_peer_manager(
     >,
     aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
     aptos_channel::Sender<PeerId, ConnectionRequest>,
-    // aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
     conn_notifs_channel::Receiver,
 ) {
     let (peer_manager_request_tx, peer_manager_request_rx) =

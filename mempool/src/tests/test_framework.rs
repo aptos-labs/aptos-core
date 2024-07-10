@@ -415,10 +415,6 @@ impl MempoolNode {
         if let Some(rpc_sender) = maybe_rpc_sender {
             rpc_sender.send(Ok(bytes.into())).unwrap();
         } else {
-            // let notif = PeerManagerNotification::RecvMessage(peer_id, Message {
-            //     protocol_id,
-            //     mdata: bytes.into(),
-            // });
             let notif = ReceivedMessage {
                 message: NetworkMessage::DirectSendMsg(DirectSendMsg {
                     protocol_id,

@@ -307,13 +307,12 @@ pub trait TestNode: ApplicationNode + Sync {
     async fn send_next_network_msg(&mut self, network_id: NetworkId) {
         let request = self.get_next_network_msg(network_id).await;
 
-        // let (remote_peer_id, protocol_id, data, maybe_rpc_info) = match request {
         let (remote_peer_id, protocol_id, rmsg) = match request {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
                 let rmsg = ReceivedMessage {
                     message: NetworkMessage::RpcRequest(RpcRequest {
                         protocol_id: msg.protocol_id,
-                        request_id: 0, // TODO: rand? seq?
+                        request_id: 0,
                         priority: 0,
                         raw_request: msg.data.into(),
                     }),
@@ -321,13 +320,7 @@ pub trait TestNode: ApplicationNode + Sync {
                     rx_at: 0,
                     rpc_replier: Some(Arc::new(msg.res_tx)),
                 };
-                (
-                    peer_id,
-                    msg.protocol_id,
-                    // msg.data,
-                    // Some((msg.timeout, msg.res_tx)),
-                    rmsg,
-                )
+                (peer_id, msg.protocol_id, rmsg)
             },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 let rmsg = ReceivedMessage {
@@ -341,7 +334,6 @@ pub trait TestNode: ApplicationNode + Sync {
                     rpc_replier: None,
                 };
                 (peer_id, msg.protocol_id, rmsg)
-                // (peer_id, msg.protocol_id, msg.mdata, None)
             },
         };
 
@@ -350,19 +342,6 @@ pub trait TestNode: ApplicationNode + Sync {
         let receiver_handle = self.get_inbound_handle_for_peer(receiver_peer_network_id);
         let sender_peer_id = sender_peer_network_id.peer_id();
 
-        // TODO: Add timeout functionality
-        // let peer_manager_notif = if let Some((_timeout, res_tx)) = maybe_rpc_info {
-        //     PeerManagerNotification::RecvRpc(sender_peer_id, InboundRpcRequest {
-        //         protocol_id,
-        //         data,
-        //         res_tx,
-        //     })
-        // } else {
-        //     PeerManagerNotification::RecvMessage(sender_peer_id, Message {
-        //         protocol_id,
-        //         mdata: data,
-        //     })
-        // };
         receiver_handle
             .inbound_message_sender
             .push((sender_peer_id, protocol_id), rmsg)

@@ -148,7 +148,6 @@ impl TestHarness {
         self.peer_mgr_notifs_tx
             .push_with_feedback(
                 key,
-                // PeerManagerNotification::RecvRpc(peer_id, inbound_rpc_req),
                 ReceivedMessage {
                     message: NetworkMessage::RpcRequest(RpcRequest {
                         protocol_id,
