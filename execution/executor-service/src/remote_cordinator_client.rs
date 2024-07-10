@@ -245,7 +245,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
 
                 self.state_view_client.init_for_block();
                 let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
-                self.state_view_client.pre_fetch_state_values(state_keys, false, txns.num_txns);
+                self.state_view_client.pre_fetch_state_values(state_keys, false, txns.cmds.len());
                 let num_txns = txns.num_txns;
                 let num_txns_in_the_batch = txns.cmds.len();
                 let shard_txns_start_index = txns.shard_txns_start_index;
