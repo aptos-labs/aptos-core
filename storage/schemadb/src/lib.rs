@@ -164,7 +164,7 @@ impl DB {
         let all_cfds = cfds.into_iter().chain(unrecognized_cfds);
 
         let inner =
-            rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds).into_db_res()?;
+            InnerDB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds).into_db_res()?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -179,7 +179,7 @@ impl DB {
     ) -> DbResult<DB> {
         let error_if_log_file_exists = false;
         let inner =
-            rocksdb::DB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)
+            InnerDB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)
                 .into_db_res()?;
 
         Ok(Self::log_construct(name, inner))
