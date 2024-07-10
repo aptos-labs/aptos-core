@@ -157,7 +157,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let _timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_requests_handler_timer"])
                 .start_timer();
-            let priority = -(message.seq_num.unwrap() as i64);
+            let priority = message.seq_num.unwrap() as i64;
             if priority == 200 {
                 info!("Received first message from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
             }
@@ -167,7 +167,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             {
                 let (lock, cvar) = &*self.recv_condition;
                 let _lg = lock.lock().unwrap();
-                self.kv_unprocessed_pq.lock().unwrap().push(State{msg: message, priority});
+                self.kv_unprocessed_pq.lock().unwrap().push(State{msg: message, priority: -priority});
                 //self.recv_condition.1.notify_all();
                 self.recv_condition.1.notify_one();
                 REMOTE_EXECUTOR_TIMER

@@ -140,19 +140,18 @@ impl RemoteStateViewClient {
         kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
         shard_id: ShardId,
         state_keys: Vec<StateKey>,
-        first_txn_indx: usize,
+        last_txn_indx: usize,
     ) {
         state_keys.clone().into_iter().for_each(|state_key| {
             state_view_clone.read().unwrap().insert_state_key(state_key);
         });
-        let mut seq_num = first_txn_indx as u64;
+        let seq_num = last_txn_indx as u64;
 
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
-                seq_num += state_keys.len() as u64;
                 let priority = {if state_keys.len() == 1 {0} else {seq_num}};
                 info!("Sending a state value request with priority {}", priority);
                 thread_pool.spawn_fifo(move || {
