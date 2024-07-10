@@ -586,6 +586,94 @@ pub struct BlockMetadataTransaction {
     pub timestamp: U64,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "validator_transaction_type", rename_all = "snake_case")]
+#[oai(
+    one_of,
+    discriminator_name = "validator_transaction_type",
+    rename_all = "snake_case"
+)]
+pub enum ValidatorTransaction {
+    ObservedJwkUpdate(JWKUpdateTransaction),
+    DkgResult(DKGResultTransaction),
+}
+
+impl ValidatorTransaction {
+    pub fn type_str(&self) -> &'static str {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(_) => {
+                "validator_transaction__observed_jwk_update"
+            },
+            ValidatorTransaction::DkgResult(_) => "validator_transaction__dkg_result",
+        }
+    }
+
+    pub fn transaction_info(&self) -> &TransactionInfo {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(t) => &t.info,
+            ValidatorTransaction::DkgResult(t) => &t.info,
+        }
+    }
+
+    pub fn transaction_info_mut(&mut self) -> &mut TransactionInfo {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(t) => &mut t.info,
+            ValidatorTransaction::DkgResult(t) => &mut t.info,
+        }
+    }
+
+    pub fn timestamp(&self) -> U64 {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(t) => t.timestamp,
+            ValidatorTransaction::DkgResult(t) => t.timestamp,
+        }
+    }
+
+    pub fn events(&self) -> &[Event] {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(t) => &t.events,
+            ValidatorTransaction::DkgResult(t) => &t.events,
+        }
+    }
+}
+
+impl
+    From<(
+        aptos_types::validator_txn::ValidatorTransaction,
+        TransactionInfo,
+        Vec<Event>,
+        u64,
+    )> for ValidatorTransaction
+{
+    fn from(
+        (txn, info, events, timestamp): (
+            aptos_types::validator_txn::ValidatorTransaction,
+            TransactionInfo,
+            Vec<Event>,
+            u64,
+        ),
+    ) -> Self {
+        match txn {
+            aptos_types::validator_txn::ValidatorTransaction::DKGResult(dkg_transcript) => {
+                Self::DkgResult(DKGResultTransaction {
+                    info,
+                    events,
+                    timestamp: U64::from(timestamp),
+                    dkg_transcript: dkg_transcript.into(),
+                })
+            },
+            aptos_types::validator_txn::ValidatorTransaction::ObservedJWKUpdate(
+                quorum_certified_update,
+            ) => Self::ObservedJwkUpdate(JWKUpdateTransaction {
+                info,
+                events,
+                timestamp: U64::from(timestamp),
+                quorum_certified_update: quorum_certified_update.into(),
+            }),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ValidatorTransaction {
     #[serde(flatten)]
@@ -593,6 +681,101 @@ pub struct ValidatorTransaction {
     pub info: TransactionInfo,
     pub events: Vec<Event>,
     pub timestamp: U64,
+    pub quorum_certified_update: ExportedQuorumCertifiedUpdate,
+}
+
+/// A more API-friendly representation of the on-chain `aptos_types::jwks::QuorumCertifiedUpdate`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedQuorumCertifiedUpdate {
+    pub update: ExportedProviderJWKs,
+    pub multi_sig: ExportedAggregateSignature,
+}
+
+impl From<QuorumCertifiedUpdate> for ExportedQuorumCertifiedUpdate {
+    fn from(value: QuorumCertifiedUpdate) -> Self {
+        let QuorumCertifiedUpdate { update, multi_sig } = value;
+        Self {
+            update: update.into(),
+            multi_sig: multi_sig.into(),
+        }
+    }
+}
+
+/// A more API-friendly representation of the on-chain `aptos_types::aggregate_signature::AggregateSignature`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedAggregateSignature {
+    pub signer_indices: Vec<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sig: Option<HexEncodedBytes>,
+}
+
+impl From<AggregateSignature> for ExportedAggregateSignature {
+    fn from(value: AggregateSignature) -> Self {
+        Self {
+            signer_indices: value.get_signers_bitvec().iter_ones().collect(),
+            sig: value
+                .sig()
+                .as_ref()
+                .map(|s| HexEncodedBytes::from(s.to_bytes().to_vec())),
+        }
+    }
+}
+
+/// A more API-friendly representation of the on-chain `aptos_types::jwks::ProviderJWKs`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedProviderJWKs {
+    pub issuer: String,
+    pub version: u64,
+    pub jwks: Vec<JWK>,
+}
+
+impl From<ProviderJWKs> for ExportedProviderJWKs {
+    fn from(value: ProviderJWKs) -> Self {
+        let ProviderJWKs {
+            issuer,
+            version,
+            jwks,
+        } = value;
+        Self {
+            issuer: String::from_utf8(issuer).unwrap_or("non_utf8_issuer".to_string()),
+            version,
+            jwks: jwks.iter().map(|on_chain_jwk|{
+                JWK::try_from(on_chain_jwk).expect("conversion from on-chain representation to human-friendly representation should work")
+            }).collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct DKGResultTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub events: Vec<Event>,
+    pub timestamp: U64,
+    pub dkg_transcript: ExportedDKGTranscript,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedDKGTranscript {
+    pub epoch: U64,
+    pub author: Address,
+    pub payload: HexEncodedBytes,
+}
+
+impl From<DKGTranscript> for ExportedDKGTranscript {
+    fn from(value: DKGTranscript) -> Self {
+        let DKGTranscript {
+            metadata,
+            transcript_bytes,
+        } = value;
+        let DKGTranscriptMetadata { epoch, author } = metadata;
+        Self {
+            epoch: epoch.into(),
+            author: author.into(),
+            payload: HexEncodedBytes::from(transcript_bytes),
+        }
+    }
 }
 
 /// An event from a transaction

@@ -266,7 +266,7 @@ dependencies = [
  "aptos-move-debugger",
  "aptos-network-checker",
  "aptos-node",
- "aptos-protos 1.3.0",
+ "aptos-protos 1.3.1",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -1963,7 +1963,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.3.0",
+ "aptos-protos 1.3.1",
  "async-trait",
  "clap 4.4.14",
  "futures",
@@ -1990,7 +1990,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.3.0",
+ "aptos-protos 1.3.1",
  "aptos-transaction-filter",
  "async-trait",
  "clap 4.4.14",
@@ -2054,7 +2054,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
  "aptos-proptest-helpers",
- "aptos-protos 1.3.0",
+ "aptos-protos 1.3.1",
  "aptos-runtimes",
  "aptos-sdk",
  "aptos-secure-storage",
@@ -2091,7 +2091,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-utils",
- "aptos-protos 1.3.0",
+ "aptos-protos 1.3.1",
  "futures",
  "jemallocator",
  "lazy_static",
@@ -2183,7 +2183,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-protos 1.3.0",
+ "aptos-protos 1.3.1",
  "async-trait",
  "backoff",
  "base64 0.13.1",
@@ -3210,6 +3210,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.0"
+source = "git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1#4b9a2593facaee92b28df2e99b2773a7e4f930f5"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3220,8 +3221,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.3.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1#4b9a2593facaee92b28df2e99b2773a7e4f930f5"
+version = "1.3.1"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3545,7 +3545,7 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-protos 1.3.0",
+ "aptos-protos 1.3.1",
  "bcs 0.1.4",
  "crossbeam-channel",
  "once_cell",
@@ -4013,7 +4013,7 @@ name = "aptos-transaction-filter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-protos 1.3.0",
+ "aptos-protos 1.3.1",
  "derive_builder",
  "lz4",
  "prost 0.12.3",
@@ -12843,7 +12843,7 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d)",
- "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1)",
+ "aptos-protos 1.3.0",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
