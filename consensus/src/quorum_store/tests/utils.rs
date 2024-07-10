@@ -110,13 +110,14 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     let my_peer_id = PeerId::random();
     let mut proof_queue = ProofQueue::new(my_peer_id);
     let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
+    let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
     let txns = vec![
-        TransactionSummary::new(PeerId::ONE, 0, HashValue::zero()),
-        TransactionSummary::new(PeerId::ONE, 1, HashValue::zero()),
-        TransactionSummary::new(PeerId::ONE, 2, HashValue::zero()),
-        TransactionSummary::new(PeerId::ONE, 3, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 0, now_in_secs + 1, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 1, now_in_secs + 1, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 2, now_in_secs + 1, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 3, now_in_secs + 1, HashValue::zero()),
     ];
 
     let author_0_batches = vec![
@@ -312,22 +313,22 @@ fn test_proof_pull_proofs_with_duplicates() {
     let my_peer_id = PeerId::random();
     let mut proof_queue = ProofQueue::new(my_peer_id);
     let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
-
+    let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let txns = vec![
-        TxnSummaryWithExpiration::new(PeerId::ONE, 0, 10, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 1, 10, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 2, 10, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 3, 10, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 0, now_in_secs + 1, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 1, now_in_secs + 1, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 2, now_in_secs + 1, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 3, now_in_secs + 1, HashValue::zero()),
     ];
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
 
     let author_0_batches = vec![
-        proof_of_store(author_0, BatchId::new_for_test(0), 100, now + 5000),
-        proof_of_store(author_0, BatchId::new_for_test(1), 200, now + 5000),
-        proof_of_store(author_0, BatchId::new_for_test(2), 50, now + 5000),
-        proof_of_store(author_0, BatchId::new_for_test(3), 300, now + 5000),
+        proof_of_store(author_0, BatchId::new_for_test(0), 100, now + 1_000_000),
+        proof_of_store(author_0, BatchId::new_for_test(1), 200, now + 2_000_000),
+        proof_of_store(author_0, BatchId::new_for_test(2), 50, now + 3_000_000),
+        proof_of_store(author_0, BatchId::new_for_test(3), 300, now + 2_000_000),
     ];
     let info_0 = author_0_batches[0].info().clone();
     proof_queue.add_batch_summaries(vec![(author_0_batches[0].info().clone(), vec![txns[0]])]);
@@ -335,6 +336,7 @@ fn test_proof_pull_proofs_with_duplicates() {
     proof_queue.add_batch_summaries(vec![(author_0_batches[2].info().clone(), vec![txns[2]])]);
     proof_queue.add_batch_summaries(vec![(author_0_batches[3].info().clone(), vec![txns[0]])]);
 
+    proof_queue.push(batch);
     for batch in author_0_batches {
         proof_queue.push(batch);
     }
