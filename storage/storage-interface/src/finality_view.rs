@@ -1,4 +1,4 @@
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -12,13 +12,13 @@ use crate::{AptosDbError, DbReader, Result};
 
 /// A wrapper over [`DbReader`], representing ledger at the end of a block
 /// as the latest ledger and its version as the latest transaction version.
-pub struct FinalityView<Db> {
-    reader: Db,
+pub struct FinalityView {
+    reader: Arc<dyn DbReader>,
     finalized_ledger_info: RwLock<Option<LedgerInfoWithSignatures>>,
 }
 
-impl<Db> FinalityView<Db> {
-    pub fn new(reader: Db) -> Self {
+impl FinalityView {
+    pub fn new(reader: Arc<dyn DbReader>) -> Self {
         Self {
             reader,
             finalized_ledger_info: RwLock::new(None),
@@ -26,7 +26,7 @@ impl<Db> FinalityView<Db> {
     }
 }
 
-impl<Db: DbReader> FinalityView<Db> {
+impl FinalityView {
     /// Updates the information on the latest finalized block at the specified height.
     pub fn set_finalized_block_height(&self, height: u64) -> Result<()> {
         let (_start_ver, end_ver, block_event) = self.reader.get_block_info_by_height(height)?;
@@ -54,9 +54,9 @@ impl<Db: DbReader> FinalityView<Db> {
     }
 }
 
-impl<Db: DbReader> DbReader for FinalityView<Db> {
+impl DbReader for FinalityView {
     fn get_read_delegatee(&self) -> &dyn DbReader {
-        &self.reader
+        &*self.reader
     }
 
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
@@ -98,7 +98,7 @@ mod tests {
         // If the mock is changed to be stateful, this should be ref-counted
         // and shared with the view.
         let mock = MockDbReaderWriter;
-        let view = FinalityView::new(MockDbReaderWriter);
+        let view = FinalityView::new(Arc::new(MockDbReaderWriter));
 
         let ledger_info = view.get_latest_ledger_info_option()?;
         assert_eq!(ledger_info, None);
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_get_synced_version() -> anyhow::Result<()> {
-        let view = FinalityView::new(MockDbReaderWriter);
+        let view = FinalityView::new(Arc::new(MockDbReaderWriter));
         let res = view.get_synced_version();
         assert!(res.is_err());
         let blockheight = 1;
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_get_latest_state_checkpoint_version() -> Result<()> {
-        let view = FinalityView::new(MockDbReaderWriter);
+        let view = FinalityView::new(Arc::new(MockDbReaderWriter));
         let version = view.get_latest_state_checkpoint_version()?;
         assert_eq!(version, None);
         view.set_finalized_block_height(1)?;
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_latest_state_checkpoint_view() -> anyhow::Result<()> {
-        let view = Arc::new(FinalityView::new(MockDbReaderWriter));
+        let view = Arc::new(FinalityView::new(Arc::new(MockDbReaderWriter)));
         let reader: Arc<dyn DbReader> = view.clone();
         view.set_finalized_block_height(1)?;
         let latest_state_view = reader.latest_state_checkpoint_view()?;
