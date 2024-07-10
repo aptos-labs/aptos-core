@@ -145,18 +145,18 @@ impl RemoteStateViewClient {
         state_keys.clone().into_iter().for_each(|state_key| {
             state_view_clone.read().unwrap().insert_state_key(state_key);
         });
-        let mut seq_num = last_txn_indx as i64 - state_keys.len() as i64;
+        let mut seq_num = last_txn_indx as u64 - state_keys.len() as u64;
 
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
-                seq_num += state_keys.len() as i64;
+                seq_num += state_keys.len() as u64;
                 thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();
                     let rand_send_thread_idx = rng.gen_range(0, sender.len());
-                    Self::send_state_value_request(shard_id, sender, state_keys, rand_send_thread_idx, seq_num as u64);
+                    Self::send_state_value_request(shard_id, sender, state_keys, rand_send_thread_idx, seq_num);
                 });
             });
     }
