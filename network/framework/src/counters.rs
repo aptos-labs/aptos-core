@@ -638,3 +638,17 @@ pub static OP_MEASURE: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static INBOUND_QUEUE_DELAY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_inbound_queue_time",
+        "Time a message sits in queue between peer socket and app code",
+        &["protocol_id"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+        .unwrap()
+});
+
+pub fn inbound_queue_delay_observe(protocol_id: ProtocolId, micros: u64) {
+    INBOUND_QUEUE_DELAY.with_label_values(&[protocol_id.as_str()]).observe((micros as f64) / 1000000.0)
+}
