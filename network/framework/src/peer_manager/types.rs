@@ -26,6 +26,7 @@ pub enum PeerManagerRequest {
 }
 
 /// Notifications sent by PeerManager to upstream actors.
+/// TODO: PeerManagerNotification now only exists in test code and should be deleted; probably use `ReceivedMessage`
 #[derive(Debug)]
 pub enum PeerManagerNotification {
     /// A new RPC request has been received from a remote peer.
