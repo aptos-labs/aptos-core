@@ -634,7 +634,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
-        invalidate_module_cache_on_success: bool,
+        has_modules_published_to_special_address: bool,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         if self.gas_feature_version >= 12 {
             // Check if the gas meter's internal counters are consistent.
@@ -677,7 +677,9 @@ impl AptosVM {
         // We mark module cache invalid if transaction is successfully executed and has
         // published modules. The reason is that epilogue loads the old version of code,
         // and so we need to make sure the next transaction sees the new code.
-        if invalidate_module_cache_on_success {
+        // Note that we only do so for modules at special addresses - i.e., those that
+        // could have actually been loaded in the epilogue.
+        if has_modules_published_to_special_address {
             self.move_vm.mark_loader_cache_as_invalid();
         }
 
@@ -859,7 +861,8 @@ impl AptosVM {
             new_published_modules_loaded,
             change_set_configs,
         )?;
-        let has_published_modules = user_session_change_set.has_published_modules();
+        let has_modules_published_to_special_address =
+            user_session_change_set.has_modules_published_to_special_address();
 
         let epilogue_session = self.charge_change_set_and_respawn_session(
             user_session_change_set,
@@ -875,7 +878,7 @@ impl AptosVM {
             log_context,
             change_set_configs,
             traversal_context,
-            has_published_modules,
+            has_modules_published_to_special_address,
         )
     }
 
@@ -956,8 +959,8 @@ impl AptosVM {
                                 txn_data,
                                 change_set_configs,
                             )?;
-                            let has_published_modules =
-                                user_session_change_set.has_published_modules();
+                            let has_modules_published_to_special_address =
+                                user_session_change_set.has_modules_published_to_special_address();
 
                             // TODO: Deduplicate this against execute_multisig_transaction
                             // A bit tricky since we need to skip success/failure cleanups,
@@ -977,7 +980,7 @@ impl AptosVM {
                                 log_context,
                                 change_set_configs,
                                 traversal_context,
-                                has_published_modules,
+                                has_modules_published_to_special_address,
                             )
                         })
                     },
@@ -1106,7 +1109,7 @@ impl AptosVM {
             MoveValue::vector_u8(payload_bytes),
         ]);
 
-        let (epilogue_session, has_published_modules) = match execution_result {
+        let (epilogue_session, has_modules_published_to_special_address) = match execution_result {
             Err(execution_error) => {
                 // Invalidate the loader cache in case there was a new module loaded from a module
                 // publish request that failed.
@@ -1127,7 +1130,8 @@ impl AptosVM {
                 (epilogue_session, false)
             },
             Ok(user_session_change_set) => {
-                let has_published_modules = user_session_change_set.has_published_modules();
+                let has_modules_published_to_special_address =
+                    user_session_change_set.has_modules_published_to_special_address();
 
                 // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
                 // cleanup write set changes, which is consistent with outer-level success cleanup
@@ -1150,7 +1154,7 @@ impl AptosVM {
                         )
                         .map_err(|e| e.into_vm_status())
                 })?;
-                (epilogue_session, has_published_modules)
+                (epilogue_session, has_modules_published_to_special_address)
             },
         };
 
@@ -1162,7 +1166,7 @@ impl AptosVM {
             log_context,
             change_set_configs,
             traversal_context,
-            has_published_modules,
+            has_modules_published_to_special_address,
         )
     }
 

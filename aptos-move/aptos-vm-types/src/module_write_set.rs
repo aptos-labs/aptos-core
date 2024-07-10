@@ -13,18 +13,29 @@ use std::collections::BTreeMap;
 #[must_use]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ModuleWriteSet {
+    // True if there are write ops which write to 0x1, etc. A special flag
+    // is used for performance reasons, as otherwise we would need traverse
+    // the write ops and deserializes access paths.
+    has_writes_to_special_address: bool,
     write_ops: BTreeMap<StateKey, WriteOp>,
 }
 
 impl ModuleWriteSet {
     pub fn empty() -> Self {
         Self {
+            has_writes_to_special_address: false,
             write_ops: BTreeMap::new(),
         }
     }
 
-    pub fn new(write_ops: BTreeMap<StateKey, WriteOp>) -> Self {
-        Self { write_ops }
+    pub fn new(
+        has_writes_to_special_address: bool,
+        write_ops: BTreeMap<StateKey, WriteOp>,
+    ) -> Self {
+        Self {
+            has_writes_to_special_address,
+            write_ops,
+        }
     }
 
     pub fn into_write_ops(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
@@ -57,12 +68,12 @@ impl ModuleWriteSet {
         })
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.write_ops.is_empty()
+    pub fn has_writes_to_special_address(&self) -> bool {
+        self.has_writes_to_special_address
     }
 
     pub fn is_empty_or_invariant_violation(&self) -> PartialVMResult<()> {
-        if !self.is_empty() {
+        if !self.write_ops().is_empty() {
             return Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             ));

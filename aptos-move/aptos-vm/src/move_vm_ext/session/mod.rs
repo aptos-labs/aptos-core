@@ -250,12 +250,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If group or data doesn't exist, Unreachable
     ///   * Otherwise modify
     /// * Delete -- remove element from container
-    ///   * If group or data does't exist, Unreachable
+    ///   * If group or data doesn't exist, Unreachable
     ///   * If elements remain, Modify
     ///   * Otherwise delete
     ///
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
-    /// merging them into the a single op corresponding to the whole resource group (V0).
+    /// merging them into a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         resolver: &dyn AptosMoveResolver,
@@ -362,7 +362,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ) -> PartialVMResult<(VMChangeSet, ModuleWriteSet)> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
+
+        let mut has_modules_published_to_special_address = false;
         let mut module_write_ops = BTreeMap::new();
+
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
 
@@ -380,6 +383,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
 
             for (name, blob_op) in modules {
+                if addr.is_special() {
+                    has_modules_published_to_special_address = true;
+                }
                 let state_key = StateKey::module(&addr, &name);
                 let op = woc.convert_module(&state_key, blob_op, false)?;
                 module_write_ops.insert(state_key, op);
@@ -449,7 +455,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             group_reads_needing_change,
             events,
         )?;
-        let module_write_set = ModuleWriteSet::new(module_write_ops);
+        let module_write_set =
+            ModuleWriteSet::new(has_modules_published_to_special_address, module_write_ops);
 
         Ok((change_set, module_write_set))
     }

@@ -820,7 +820,10 @@ pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimizatio
         BTreeMap::new(),
         BTreeMap::new(),
     );
-    let module_write_set = ModuleWriteSet::new(module_write_ops);
+
+    // The flag if modules have been published to a special address is irrelevant because
+    // write set transaction does not run an epilogue. Therefore, it is simply set to true.
+    let module_write_set = ModuleWriteSet::new(true, module_write_ops);
     (change_set, module_write_set)
 }
 
