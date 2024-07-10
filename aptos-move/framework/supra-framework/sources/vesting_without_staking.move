@@ -387,95 +387,60 @@ module supra_framework::vesting_without_staking {
 		//extract beneficiary address
 		let vesting_signer = account::create_signer_with_capability(&borrow_global<VestingContract>(contract_address).signer_cap);
 		let beneficiary = beneficiary(contract_address,shareholder_address);
-        let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
-        // Short-circuit if vesting hasn't started yet.
-        if (vesting_contract.vesting_schedule.start_timestamp_secs > timestamp::now_seconds()) {
-            return
-        };
-		
-		let vesting_record = simple_map::borrow_mut(&mut vesting_contract.shareholders,&shareholder_address);
-
-        // Check if the next vested period has already passed. If not, short-circuit since there's nothing to vest.
-        let vesting_schedule = vesting_contract.vesting_schedule;
-        let schedule = &vesting_schedule.schedule;
-        let last_vested_period = vesting_record.last_vested_period;
-        let next_period_to_vest = last_vested_period + 1;
-        let last_completed_period =
-            (timestamp::now_seconds() - vesting_schedule.start_timestamp_secs) / vesting_schedule.period_duration;
-		while(last_completed_period>=next_period_to_vest) {
-            // Index is 0-based while period is 1-based so we need to subtract 1.
-            let schedule_index = next_period_to_vest - 1;
-            let vesting_fraction = if (schedule_index < vector::length(schedule)) {
-                *vector::borrow(schedule, schedule_index)
-            } else {
-                // Last vesting schedule fraction will repeat until the grant runs out.
-                *vector::borrow(schedule, vector::length(schedule) - 1)
+        {
+            let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
+            // Short-circuit if vesting hasn't started yet.
+            if (vesting_contract.vesting_schedule.start_timestamp_secs > timestamp::now_seconds()) {
+                return
             };
 
-            //amount to be transfer is minimum of what is left and vesting fraction due of init_amount
-            let amount = min(vesting_record.left_amount,fixed_point32::multiply_u64(vesting_record.init_amount,vesting_fraction));
-            //update left_amount for the shareholder
-            vesting_record.left_amount = vesting_record.left_amount-amount;
-            coin::transfer<SupraCoin>(&vesting_signer,beneficiary,amount);
+            let vesting_record = simple_map::borrow_mut(&mut vesting_contract.shareholders,&shareholder_address);
 
-            emit_event(
-                &mut vesting_contract.vest_events,
-                VestEvent {
-                    admin: vesting_contract.admin,
-                    shareholder_address: shareholder_address,
-                    vesting_contract_address: contract_address,
-                    period_vested: next_period_to_vest,
-                },
-            );
+            // Check if the next vested period has already passed. If not, short-circuit since there's nothing to vest.
+            let vesting_schedule = vesting_contract.vesting_schedule;
+            let schedule = &vesting_schedule.schedule;
+            let last_vested_period = vesting_record.last_vested_period;
+            let next_period_to_vest = last_vested_period + 1;
+            let last_completed_period =
+                (timestamp::now_seconds() - vesting_schedule.start_timestamp_secs) / vesting_schedule.period_duration;
+            while(last_completed_period>=next_period_to_vest) {
+                // Index is 0-based while period is 1-based so we need to subtract 1.
+                let schedule_index = next_period_to_vest - 1;
+                let vesting_fraction = if (schedule_index < vector::length(schedule)) {
+                    *vector::borrow(schedule, schedule_index)
+                } else {
+                    // Last vesting schedule fraction will repeat until the grant runs out.
+                    *vector::borrow(schedule, vector::length(schedule) - 1)
+                };
 
-            //update last_vested_period for the shareholder
-            vesting_record.last_vested_period = next_period_to_vest;
-            next_period_to_vest = next_period_to_vest+1;
-		};
+                //amount to be transfer is minimum of what is left and vesting fraction due of init_amount
+                let amount = min(
+                    vesting_record.left_amount,
+                    fixed_point32::multiply_u64(vesting_record.init_amount, vesting_fraction)
+                );
+                //update left_amount for the shareholder
+                vesting_record.left_amount = vesting_record.left_amount - amount;
+                coin::transfer<SupraCoin>(&vesting_signer, beneficiary, amount);
+                emit_event(
+                    &mut vesting_contract.vest_events,
+                    VestEvent {
+                        admin: vesting_contract.admin,
+                        shareholder_address: shareholder_address,
+                        vesting_contract_address: contract_address,
+                        period_vested: next_period_to_vest,
+                    },
+                );
+                //update last_vested_period for the shareholder
+                vesting_record.last_vested_period = next_period_to_vest;
+                next_period_to_vest = next_period_to_vest + 1;
+        };
+            let total_balance = coin::balance<SupraCoin>(contract_address);
+            if (total_balance == 0) {
+                set_terminate_vesting_contract(contract_address);
+            };
+
+        };
 	}
-	
-    /// Distribute any withdrawable grant.
-    /// This is no entry function anymore as it's called from within the vest.
-    fun distribute(vesting_fraction: FixedPoint32, contract_address: address) acquires VestingContract {
-        assert_active_vesting_contract(contract_address);
-
-        let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
-        let vesting_signer = get_vesting_account_signer_internal(vesting_contract);
-        let total_amount_left = 0;
-        // Distribute coins to shareholders.
-        let (shareholders_address, vesting_records) = simple_map::to_vec_pair(vesting_contract.shareholders);
-        assert!(vector::length(&shareholders_address) == vector::length(&vesting_records), error::invalid_state(ESHARES_LENGTH_MISMATCH));
-        while (
-            {
-            spec {
-                // ensures that the length of shareholders_address and vesting_records are the same
-                invariant len(shareholders_address) == len(vesting_records);
-            };
-            vector::length(&shareholders_address) > 0
-            }
-        )
-         {
-            let amount_to_add = distribute_to_shareholder(&vesting_signer, vesting_contract, &mut shareholders_address, &mut vesting_records, vesting_fraction);
-            total_amount_left = total_amount_left + amount_to_add;
-        };
-
-        let total_balance = coin::balance<SupraCoin>(contract_address);
-        assert!(total_amount_left == total_balance, EBALANCE_MISMATCH);
-        if (total_balance == 0) {
-            set_terminate_vesting_contract(contract_address);
-        }
-    }
-
-    fun distribute_to_shareholder(vesting_signer: &signer, vesting_contract: &mut VestingContract, shareholders_address: &mut vector<address>, vesting_records: &mut vector<VestingRecord>, vesting_fraction: FixedPoint32) : u64 {
-        let shareholder = vector::pop_back(shareholders_address);
-        let shareholder_record = vector::pop_back(vesting_records);
-        let amount = min(shareholder_record.left_amount, fixed_point32::multiply_u64(shareholder_record.init_amount, vesting_fraction));
-        let recipient_address = get_beneficiary(vesting_contract, shareholder);
-        coin::transfer<SupraCoin>(vesting_signer, recipient_address, amount);
-        let shareholder_amount = simple_map::borrow_mut(&mut vesting_contract.shareholders, &shareholder);
-        shareholder_amount.left_amount = shareholder_amount.left_amount - amount;
-        shareholder_amount.left_amount
-    }
 
     /// Remove the lockup period for the vesting contract. This can only be called by the admin of the vesting contract.
     /// Example usage: If admin find shareholder suspicious, admin can remove it.
@@ -793,7 +758,7 @@ module supra_framework::vesting_without_staking {
     }
 
     #[test(supra_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
-    // #[expected_failure(abort_code = 0x30008, location = Self)]
+    #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_termination_after_successful_vesting(
         supra_framework: &signer,
         admin: &signer,
@@ -835,8 +800,7 @@ module supra_framework::vesting_without_staking {
 
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == shareholder_1_share, 0);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == shareholder_2_share, 0);
-        // TODO discuss the desired behavior
-        // vest(contract_address);
+        vest(contract_address);
     }
 
     #[test(supra_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
@@ -912,17 +876,21 @@ module supra_framework::vesting_without_staking {
         vest_individual(contract_address,shareholder_1_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 2, 10);
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
         vest_individual(contract_address,shareholder_2_address);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 2, 10);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*3);
         vest_individual(contract_address,shareholder_1_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 1, 10);
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
         vest_individual(contract_address,shareholder_2_address);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 1, 10);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
     }
 
     #[test(supra_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
