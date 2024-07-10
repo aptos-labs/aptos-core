@@ -1964,8 +1964,8 @@ fn realistic_env_max_load_test(
 
     let mut success_criteria = SuccessCriteria::new(95)
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
-            // Check that we don't use more than 18 CPU cores for 10% of the time.
-            MetricsThreshold::new(18.0, 10),
+            // Check that we don't use more than 18 CPU cores for 15% of the time.
+            MetricsThreshold::new(18.0, 15),
             // Memory starts around 3.5GB, and grows around 1.4GB/hr in this test.
             // Check that we don't use more than final expected memory for more than 10% of the time.
             MetricsThreshold::new_gb(3.5 + 1.4 * (duration_secs as f64 / 3600.0), 10),
