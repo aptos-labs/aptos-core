@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::{common::types::GasOptions, move_tool::MemberId, test::CliTestFramework};
+use movement::{common::types::GasOptions, move_tool::MemberId, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;

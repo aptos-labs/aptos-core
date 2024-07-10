@@ -5,7 +5,7 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{create_and_fund_account, MAX_CATCH_UP_WAIT_SECS},
 };
-use aptos::{
+use movement::{
     account::create::DEFAULT_FUNDED_COINS,
     common::types::TransactionSummary,
     node::analyze::{
