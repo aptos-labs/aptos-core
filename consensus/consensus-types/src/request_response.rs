@@ -4,7 +4,7 @@
 use crate::common::{Payload, PayloadFilter};
 use anyhow::Result;
 use futures::channel::oneshot;
-use std::{fmt, fmt::Formatter};
+use std::{fmt, fmt::Formatter, time::Duration};
 
 pub enum GetPayloadCommand {
     /// Request to pull block to submit to consensus.
@@ -25,6 +25,8 @@ pub enum GetPayloadCommand {
         PayloadFilter,
         // callback to respond to
         oneshot::Sender<Result<GetPayloadResponse>>,
+        // block timestamp
+        Duration,
     ),
 }
 
@@ -40,11 +42,12 @@ impl fmt::Display for GetPayloadCommand {
                 return_non_full,
                 excluded,
                 _,
+                block_timestamp,
             ) => {
                 write!(
                     f,
-                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {}, max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}]",
-                    max_txns, max_txns_after_filtering, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded
+                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {}, max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}, block_timestamp: {:?}]",
+                    max_txns, max_txns_after_filtering, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded, block_timestamp
                 )
             },
         }

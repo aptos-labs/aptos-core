@@ -62,6 +62,7 @@ async fn get_proposal(
         true,
         PayloadFilter::InQuorumStore(filter_set),
         callback_tx,
+        aptos_infallible::duration_since_epoch(),
     );
     proof_manager.handle_proposal_request(req);
     let GetPayloadResponse::GetPayloadResponse(payload) = callback_rx.await.unwrap().unwrap();

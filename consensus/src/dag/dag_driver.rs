@@ -268,6 +268,7 @@ impl DagDriver {
                 false,
                 0,
                 0.0,
+                self.time_service.now_unix_time(),
             )
             .await
         {

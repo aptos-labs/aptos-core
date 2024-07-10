@@ -3,7 +3,7 @@
 
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary},
+    common::{TransactionInProgress, TransactionSummary, TxnSummaryWithExpiration},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_logger::prelude::*;
@@ -200,14 +200,14 @@ pub struct ProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // ProofOfStore and insertion_time. None if committed
     batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
-    // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, sequence number, hash)
+    // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, sequence number, hash, expiration)
     // has been included. We only count those batches that are in both batch_to_proof and author_to_batches.
-    txn_summary_num_occurrences: HashMap<TransactionSummary, u64>,
+    txn_summary_num_occurrences: HashMap<TxnSummaryWithExpiration, u64>,
     // List of transaction summaries for each batch, along with expiration time and a boolean stating whether a proof for the
     // batch has been received. If the boolean is true, then all the transaction summaries in the batch have
     // been added to txn_summary_num_occurrences. The boolean has been added to avoid double counting when a
     // batch summary is received multiple times.
-    batch_summaries: HashMap<BatchKey, (Vec<TransactionSummary>, u64, bool)>,
+    batch_summaries: HashMap<BatchKey, (Vec<TxnSummaryWithExpiration>, u64, bool)>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -252,6 +252,10 @@ impl ProofQueue {
             self.remaining_local_txns -= num_txns;
             self.remaining_local_proofs -= 1;
         }
+    }
+
+    pub(crate) fn batch_summaries_len(&self) -> usize {
+        self.batch_summaries.len()
     }
 
     fn remaining_txns_without_duplicates(&self) -> u64 {
@@ -336,7 +340,7 @@ impl ProofQueue {
 
     pub(crate) fn add_batch_summaries(
         &mut self,
-        batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
+        batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
         let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {
@@ -457,6 +461,7 @@ impl ProofQueue {
         max_txns_after_filtering: u64,
         max_bytes: u64,
         return_non_full: bool,
+        block_timestamp: Duration,
     ) -> (Vec<ProofOfStore>, u64, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
@@ -496,7 +501,11 @@ impl ProofQueue {
                             cur_unique_txns
                                 + txn_summaries
                                     .iter()
-                                    .filter(|txn_summary| !filtered_txns.contains(txn_summary))
+                                    .filter(|txn_summary| {
+                                        !filtered_txns.contains(txn_summary)
+                                            && block_timestamp.as_secs()
+                                                < txn_summary.expiration_timestamp_secs
+                                    })
                                     .count() as u64
                         } else {
                             cur_unique_txns + batch.num_txns()
@@ -518,7 +527,11 @@ impl ProofQueue {
                             |(summaries, _, _)| {
                                 summaries
                                     .iter()
-                                    .filter(|summary| filtered_txns.insert(**summary))
+                                    .filter(|summary| {
+                                        filtered_txns.insert(**summary)
+                                            && block_timestamp.as_secs()
+                                                < summary.expiration_timestamp_secs
+                                    })
                                     .count() as u64
                             },
                         );
