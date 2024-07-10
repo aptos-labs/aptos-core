@@ -386,15 +386,12 @@ impl Worker {
     }
 
     fn upsert(&mut self) {
-        upsert_uris(
-            &mut self.conn,
-            &self.model,
-            self.last_transaction_version as i64,
-        )
-        .unwrap_or_else(|e| {
-            self.log_error("Commit to Postgres failed", &e);
-            panic!();
-        });
+        upsert_uris(&mut self.conn, &self.model, self.last_transaction_version).unwrap_or_else(
+            |e| {
+                self.log_error("Commit to Postgres failed", &e);
+                panic!();
+            },
+        );
     }
 
     fn is_blacklisted_uri(&mut self, uri: &str) -> bool {
