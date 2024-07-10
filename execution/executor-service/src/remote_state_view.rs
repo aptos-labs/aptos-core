@@ -140,29 +140,28 @@ impl RemoteStateViewClient {
         kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
         shard_id: ShardId,
         state_keys: Vec<StateKey>,
+        last_txn_indx: usize,
     ) {
         state_keys.clone().into_iter().for_each(|state_key| {
             state_view_clone.read().unwrap().insert_state_key(state_key);
         });
-        let mut seq_num = 0;
+        let mut seq_num = last_txn_indx as i64 - state_keys.len() as i64;
 
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
-                if state_keys.len() > 1 {
-                    seq_num += 1;
-                }
+                seq_num += state_keys.len() as i64;
                 thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();
                     let rand_send_thread_idx = rng.gen_range(0, sender.len());
-                    Self::send_state_value_request(shard_id, sender, state_keys, rand_send_thread_idx, seq_num);
+                    Self::send_state_value_request(shard_id, sender, state_keys, rand_send_thread_idx, seq_num as u64);
                 });
             });
     }
 
-    pub fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_insert_keys: bool) {
+    pub fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_insert_keys: bool, last_txn_indx: usize) {
         let state_view_clone = self.state_view.clone();
         let thread_pool_clone = self.thread_pool.clone();
         let kv_tx_clone = self.kv_tx.clone();
@@ -175,6 +174,7 @@ impl RemoteStateViewClient {
                 kv_tx_clone,
                 shard_id,
                 state_keys,
+                last_txn_indx,
             );
         };
         if sync_insert_keys {
@@ -229,7 +229,7 @@ impl TStateView for RemoteStateViewClient {
         REMOTE_EXECUTOR_REMOTE_KV_COUNT
             .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_kv"])
             .inc();
-        self.pre_fetch_state_values(vec![state_key.clone()], true);
+        self.pre_fetch_state_values(vec![state_key.clone()], true, 0);
         state_view_reader.get_state_value(state_key)
     }
 
