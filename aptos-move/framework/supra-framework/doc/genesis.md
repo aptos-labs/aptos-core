@@ -39,6 +39,12 @@
     -  [Function `create_initialize_validators_with_commission`](#@Specification_1_create_initialize_validators_with_commission)
     -  [Function `create_initialize_validators`](#@Specification_1_create_initialize_validators)
     -  [Function `create_initialize_validator`](#@Specification_1_create_initialize_validator)
+    -  [Function `create_delegation_pools`](#@Specification_1_create_delegation_pools)
+    -  [Function `create_delegation_pool`](#@Specification_1_create_delegation_pool)
+    -  [Function `create_pbo_delegation_pools`](#@Specification_1_create_pbo_delegation_pools)
+    -  [Function `create_pbo_delegation_pool`](#@Specification_1_create_pbo_delegation_pool)
+    -  [Function `assert_validator_addresses_check`](#@Specification_1_assert_validator_addresses_check)
+    -  [Function `create_vesting_without_staking_pools`](#@Specification_1_create_vesting_without_staking_pools)
     -  [Function `set_genesis_end`](#@Specification_1_set_genesis_end)
     -  [Function `initialize_for_verification`](#@Specification_1_initialize_for_verification)
 
@@ -1639,25 +1645,98 @@ The last step of genesis.
 
 
 
-<a id="@Specification_1_set_genesis_end"></a>
+<a id="@Specification_1_create_delegation_pools"></a>
 
-### Function `set_genesis_end`
+### Function `create_delegation_pools`
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_delegation_pools">create_delegation_pools</a>(delegator_configs: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_DelegatorConfiguration">genesis::DelegatorConfiguration</a>&gt;)
 </code></pre>
 
 
 
 
-<pre><code><b>pragma</b> delegate_invariants_to_caller;
-// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-<b>requires</b> len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@supra_framework).active_validators) &gt;= 1;
-// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
-<b>let</b> addr = std::signer::address_of(supra_framework);
-<b>aborts_if</b> addr != @supra_framework;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@supra_framework);
-<b>ensures</b> <b>global</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@supra_framework) == <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a> {};
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_create_delegation_pool"></a>
+
+### Function `create_delegation_pool`
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_delegation_pool">create_delegation_pool</a>(delegator_config: &<a href="genesis.md#0x1_genesis_DelegatorConfiguration">genesis::DelegatorConfiguration</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_create_pbo_delegation_pools"></a>
+
+### Function `create_pbo_delegation_pools`
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_pbo_delegation_pools">create_pbo_delegation_pools</a>(pbo_delegator_configs: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_PboDelegatorConfiguration">genesis::PboDelegatorConfiguration</a>&gt;, delegation_percentage: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_create_pbo_delegation_pool"></a>
+
+### Function `create_pbo_delegation_pool`
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_pbo_delegation_pool">create_pbo_delegation_pool</a>(pbo_delegator_config: &<a href="genesis.md#0x1_genesis_PboDelegatorConfiguration">genesis::PboDelegatorConfiguration</a>, delegation_percentage: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_assert_validator_addresses_check"></a>
+
+### Function `assert_validator_addresses_check`
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_assert_validator_addresses_check">assert_validator_addresses_check</a>(validator: &<a href="genesis.md#0x1_genesis_ValidatorConfiguration">genesis::ValidatorConfiguration</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_create_vesting_without_staking_pools"></a>
+
+### Function `create_vesting_without_staking_pools`
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_vesting_without_staking_pools">create_vesting_without_staking_pools</a>(vesting_pool_map: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_VestingPoolsMap">genesis::VestingPoolsMap</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
@@ -1689,6 +1768,29 @@ The last step of genesis.
     <b>let</b> staking_rewards_config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@supra_framework);
     <b>requires</b> staking_rewards_config.last_rewards_rate_period_start_in_secs &lt;= <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
 }
+</code></pre>
+
+
+
+<a id="@Specification_1_set_genesis_end"></a>
+
+### Function `set_genesis_end`
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<b>requires</b> len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@supra_framework).active_validators) &gt;= 1;
+// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
+<b>let</b> addr = std::signer::address_of(supra_framework);
+<b>aborts_if</b> addr != @supra_framework;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@supra_framework);
+<b>ensures</b> <b>global</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@supra_framework) == <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a> {};
 </code></pre>
 
 

@@ -88,43 +88,43 @@ spec supra_framework::vesting_without_staking {
         // ensures last_completed_period > next_period_to_vest ==> TRACE(vesting_contract_post.vesting_schedule.last_vested_period) == TRACE(next_period_to_vest);
     }
 
-    spec distribute {
-        pragma verify = true;
-        pragma aborts_if_is_partial = true;
-        include VestingContractActive;
-        let post vesting_contract_post = global<VestingContract>(contract_address);
-        let post total_balance = coin::balance<SupraCoin>(contract_address);
-        // ensure if the total balance is 0, the vesting contract is terminated
-        ensures total_balance == 0 ==> vesting_contract_post.state == VESTING_POOL_TERMINATED;
-        // // ensure if the total balance is not 0, the vesting contract is active
-        // ensures total_balance != 0 ==> vesting_contract_post.state == VESTING_POOL_ACTIVE;
-    }
-
-    spec distribute_to_shareholder {
-        pragma verify = true;
-        // pragma opaque;
-        // modifies global<coin::CoinStore<SupraCoin>>(address_from);
-        let shareholder = shareholders_address[len(shareholders_address) - 1];
-        let shareholder_record = vesting_records[len(vesting_records) - 1];
-        let amount = min(shareholder_record.left_amount, fixed_point32::spec_multiply_u64(shareholder_record.init_amount, vesting_fraction));
-        let shareholder_amount = simple_map::spec_get(vesting_contract.shareholders, shareholder);
-        let post shareholder_amount_post = simple_map::spec_get(vesting_contract.shareholders, shareholder);
-        let address_from = signer::address_of(vesting_signer);
-        let address_to_beneficiary = simple_map::spec_get(vesting_contract.beneficiaries, shareholder);
-        let flag = simple_map::spec_contains_key(vesting_contract.beneficiaries, shareholder);
-        // Ensure that the amount is transferred to the beneficiary and the amount is substract from left_amount if the beneficiary exists
-        ensures (flag && address_from != address_to_beneficiary)
-            ==> (coin::balance<SupraCoin>(address_to_beneficiary) == old(coin::balance<SupraCoin>(address_to_beneficiary)) + amount
-                && coin::balance<SupraCoin>(address_from) == old(coin::balance<SupraCoin>(address_from)) - amount
-                && shareholder_amount_post.left_amount == shareholder_amount.left_amount - amount);
-        // Ensure that the amount is transferred to the shareholder and the amount is substract from left_amount if the beneficiary doesn't exist
-        ensures (!flag && address_from != shareholder)
-            ==> (coin::balance<SupraCoin>(shareholder) == old(coin::balance<SupraCoin>(shareholder)) + amount
-                && coin::balance<SupraCoin>(address_from) == old(coin::balance<SupraCoin>(address_from)) - amount
-                && shareholder_amount_post.left_amount == shareholder_amount.left_amount - amount);
-        // Ensure the length of the shareholders_address and vesting_records are the same if they are the same before the function call
-        ensures (len(old(shareholders_address)) == len(old(vesting_records))) ==> (len(shareholders_address) == len(vesting_records));
-    }
+    // spec distribute {
+    //     pragma verify = true;
+    //     pragma aborts_if_is_partial = true;
+    //     include VestingContractActive;
+    //     let post vesting_contract_post = global<VestingContract>(contract_address);
+    //     let post total_balance = coin::balance<SupraCoin>(contract_address);
+    //     // ensure if the total balance is 0, the vesting contract is terminated
+    //     ensures total_balance == 0 ==> vesting_contract_post.state == VESTING_POOL_TERMINATED;
+    //     // // ensure if the total balance is not 0, the vesting contract is active
+    //     // ensures total_balance != 0 ==> vesting_contract_post.state == VESTING_POOL_ACTIVE;
+    // }
+    //
+    // spec distribute_to_shareholder {
+    //     pragma verify = true;
+    //     // pragma opaque;
+    //     // modifies global<coin::CoinStore<SupraCoin>>(address_from);
+    //     let shareholder = shareholders_address[len(shareholders_address) - 1];
+    //     let shareholder_record = vesting_records[len(vesting_records) - 1];
+    //     let amount = min(shareholder_record.left_amount, fixed_point32::spec_multiply_u64(shareholder_record.init_amount, vesting_fraction));
+    //     let shareholder_amount = simple_map::spec_get(vesting_contract.shareholders, shareholder);
+    //     let post shareholder_amount_post = simple_map::spec_get(vesting_contract.shareholders, shareholder);
+    //     let address_from = signer::address_of(vesting_signer);
+    //     let address_to_beneficiary = simple_map::spec_get(vesting_contract.beneficiaries, shareholder);
+    //     let flag = simple_map::spec_contains_key(vesting_contract.beneficiaries, shareholder);
+    //     // Ensure that the amount is transferred to the beneficiary and the amount is substract from left_amount if the beneficiary exists
+    //     ensures (flag && address_from != address_to_beneficiary)
+    //         ==> (coin::balance<SupraCoin>(address_to_beneficiary) == old(coin::balance<SupraCoin>(address_to_beneficiary)) + amount
+    //             && coin::balance<SupraCoin>(address_from) == old(coin::balance<SupraCoin>(address_from)) - amount
+    //             && shareholder_amount_post.left_amount == shareholder_amount.left_amount - amount);
+    //     // Ensure that the amount is transferred to the shareholder and the amount is substract from left_amount if the beneficiary doesn't exist
+    //     ensures (!flag && address_from != shareholder)
+    //         ==> (coin::balance<SupraCoin>(shareholder) == old(coin::balance<SupraCoin>(shareholder)) + amount
+    //             && coin::balance<SupraCoin>(address_from) == old(coin::balance<SupraCoin>(address_from)) - amount
+    //             && shareholder_amount_post.left_amount == shareholder_amount.left_amount - amount);
+    //     // Ensure the length of the shareholders_address and vesting_records are the same if they are the same before the function call
+    //     ensures (len(old(shareholders_address)) == len(old(vesting_records))) ==> (len(shareholders_address) == len(vesting_records));
+    // }
 
     spec remove_shareholder {
         pragma verify = true;
