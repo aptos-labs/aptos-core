@@ -210,7 +210,7 @@ impl RemoteStateViewClient {
         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
             .with_label_values(&["0_kv_req_grpc_shard_send_1_lock_acquired"]).observe(delta);
         sender_lk.send(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
-                       &MessageType::new(REMOTE_KV_REQUEST_MSG_TYPE.to_string()));
+                       &MessageType::new(format!("remote_kv_request_{}", shard_id)));
     }
 }
 
