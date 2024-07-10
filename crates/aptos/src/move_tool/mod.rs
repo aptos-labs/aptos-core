@@ -167,7 +167,7 @@ impl FrameworkPackageArgs {
         const SUPRA_FRAMEWORK: &str = "SupraFramework";
         const SUPRA_FRAMEWORK_GIT_PATH: &str = "https://github.com/Entropy-Foundation/aptos-core.git";
         const SUBDIR_PATH: &str = "aptos-move/framework/supra-framework";
-        const DEFAULT_BRANCH: &str = "devnet";
+        const DEFAULT_BRANCH: &str = "integrate_consensus_key";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), prompt_options)?;
