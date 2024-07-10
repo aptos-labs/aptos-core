@@ -212,6 +212,7 @@ impl ProofManager {
                 return_non_full,
                 filter,
                 callback,
+                block_timestamp,
             ) => {
                 let excluded_batches: HashSet<_> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -228,6 +229,7 @@ impl ProofManager {
                         max_unique_txns,
                         max_bytes,
                         return_non_full,
+                        block_timestamp,
                     );
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);

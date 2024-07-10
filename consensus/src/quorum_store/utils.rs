@@ -21,7 +21,6 @@ use std::{
 };
 use tokio::time::timeout;
 
-const MICRO_SEC_PER_SEC: u64 = 1_000_000;
 pub(crate) struct Timeouts<T> {
     timeouts: VecDeque<(i64, T)>,
 }
@@ -460,6 +459,7 @@ impl ProofQueue {
         max_unique_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
+        block_timestamp: Duration,
     ) -> (Vec<ProofOfStore>, u64, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
@@ -501,10 +501,7 @@ impl ProofQueue {
                                     .iter()
                                     .filter(|txn_summary| {
                                         !filtered_txns.contains(txn_summary)
-                                                // latest_block_timestamp is microseonds since UNIX epoch
-                                                // expiration_timestamp_secs is seconds since UNIX epoch
-                                                // giving a second buffer for expiration as the expiration time is rounded off to seconds 
-                                            && ((txn_summary.expiration_timestamp_secs + 1) * MICRO_SEC_PER_SEC)
+                                            && block_timestamp.as_secs()
                                                 > self.latest_block_timestamp
                                     })
                                     .count() as u64
@@ -530,7 +527,7 @@ impl ProofQueue {
                                     .iter()
                                     .filter(|summary| {
                                         filtered_txns.insert(**summary)
-                                            && ((summary.expiration_timestamp_secs + 1)* MICRO_SEC_PER_SEC)
+                                            && block_timestamp.as_secs()
                                                 > self.latest_block_timestamp
                                     })
                                     .count() as u64
