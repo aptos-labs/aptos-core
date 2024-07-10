@@ -244,12 +244,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
                 let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
                 Self::handle_message(message.msg, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
-
-                prev_time = SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64;
             }
+            prev_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
         }
     }
 
