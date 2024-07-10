@@ -166,7 +166,7 @@ pub struct ProposalGenerator {
     // Max number of transactions to be added to a proposed block.
     max_block_txns: u64,
     // Max number of unique transactions to be added to a proposed block.
-    max_block_unique_txns: u64,
+    max_block_txns_after_filtering: u64,
     // Max number of bytes to be added to a proposed block.
     max_block_bytes: u64,
     // Max number of inline transactions to be added to a proposed block.
@@ -196,7 +196,7 @@ impl ProposalGenerator {
         time_service: Arc<dyn TimeService>,
         quorum_store_poll_time: Duration,
         max_block_txns: u64,
-        max_block_unique_txns: u64,
+        max_block_txns_after_filtering: u64,
         max_block_bytes: u64,
         max_inline_txns: u64,
         max_inline_bytes: u64,
@@ -214,7 +214,7 @@ impl ProposalGenerator {
             time_service,
             quorum_store_poll_time,
             max_block_txns,
-            max_block_unique_txns,
+            max_block_txns_after_filtering,
             max_block_bytes,
             max_inline_txns,
             max_inline_bytes,
@@ -427,7 +427,7 @@ impl ProposalGenerator {
         timestamp: Duration,
         round: Round,
     ) -> (u64, u64, Option<u64>, Duration) {
-        let mut values_max_block_txns = vec![self.max_block_unique_txns];
+        let mut values_max_block_txns = vec![self.max_block_txns_after_filtering];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
         let mut values_max_txns_from_block_to_execute = vec![];

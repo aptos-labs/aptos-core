@@ -370,7 +370,7 @@ impl ProofQueue {
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: u64,
-        max_unique_txns: u64,
+        max_txns_after_filtering: u64,
         max_bytes: u64,
         return_non_full: bool,
     ) -> (Vec<ProofOfStore>, u64, bool) {
@@ -418,7 +418,7 @@ impl ProofQueue {
                             cur_unique_txns + batch.num_txns()
                         };
                         if cur_bytes + batch.num_bytes() > max_bytes
-                            || unique_txns > max_unique_txns
+                            || unique_txns > max_txns_after_filtering
                             || cur_all_txns + batch.num_txns() > max_txns
                         {
                             // Exceeded the limit for requested bytes or number of transactions.
@@ -443,7 +443,7 @@ impl ProofQueue {
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
                         if cur_bytes == max_bytes
                             || cur_all_txns == max_txns
-                            || cur_unique_txns == max_unique_txns
+                            || cur_unique_txns == max_txns_after_filtering
                         {
                             full = true;
                             return false;
@@ -461,7 +461,7 @@ impl ProofQueue {
             block_total_txns = cur_all_txns,
             block_unique_txns = cur_unique_txns,
             max_txns = max_txns,
-            max_unique_txns = max_unique_txns,
+            max_txns_after_filtering = max_txns_after_filtering,
             max_bytes = max_bytes,
             batch_count = ret.len(),
             full = full,

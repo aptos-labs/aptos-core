@@ -205,7 +205,7 @@ impl ProofManager {
         match msg {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
-                max_unique_txns,
+                max_txns_after_filtering,
                 max_bytes,
                 max_inline_txns,
                 max_inline_bytes,
@@ -225,7 +225,7 @@ impl ProofManager {
                     self.proofs_for_consensus.pull_proofs(
                         &excluded_batches,
                         max_txns,
-                        max_unique_txns,
+                        max_txns_after_filtering,
                         max_bytes,
                         return_non_full,
                     );
@@ -243,7 +243,7 @@ impl ProofManager {
                         min(
                             min(
                                 max_txns.saturating_sub(cur_all_txns),
-                                max_unique_txns.saturating_sub(cur_unique_txns),
+                                max_txns_after_filtering.saturating_sub(cur_unique_txns),
                             ),
                             max_inline_txns,
                         ),
