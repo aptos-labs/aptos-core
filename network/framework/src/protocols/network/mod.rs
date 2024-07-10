@@ -32,13 +32,10 @@ impl<T: DeserializeOwned + Serialize> Message for T {}
 
 /// Events received by network clients in a validator
 ///
-/// An enumeration of the various types of messages that the network will be sending
-/// to its clients. This differs from [`PeerNotification`] since the contents are deserialized
-/// into the type `TMessage` over which `Event` is generic. Note that we assume here that for every
-/// consumer of this API there's a singleton message type, `TMessage`,  which encapsulates all the
-/// messages and RPCs that are received by that consumer.
-///
-/// [`PeerNotification`]: crate::peer::PeerNotification
+/// We assume here that for every consumer of this API there's a singleton message type, `TMessage`,
+/// which encapsulates all the messages and RPCs that are received by that consumer.
+/// This struct is received by application code after a message of bytes has been deserialized
+/// into the application code's TMessage struct type.
 #[derive(Debug)]
 pub enum Event<TMessage> {
     /// New inbound direct-send message from peer.
@@ -195,9 +192,6 @@ impl PartialEq for ReceivedMessage {
 /// network application that deserializes inbound network direct-send and rpc
 /// messages into `TMessage`. Inbound messages that fail to deserialize are logged
 /// and dropped.
-///
-/// `NetworkEvents` is really just a thin wrapper around a
-/// `channel::Receiver<PeerNotification>` that deserializes inbound messages.
 #[pin_project]
 pub struct NetworkEvents<TMessage> {
     #[pin]

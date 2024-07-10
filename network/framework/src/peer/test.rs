@@ -64,7 +64,6 @@ fn build_test_peer(
     PeerHandle,
     MemorySocket,
     aptos_channels::Receiver<TransportNotification<MemorySocket>>,
-    // aptos_channel::Receiver<ProtocolId, PeerNotification>,
 ) {
     let (a, b) = MemorySocket::new_pair();
     let peer_id = PeerId::random();
@@ -408,11 +407,6 @@ fn peer_recv_rpc() {
         priority: 0,
         raw_request: Vec::from("hello world"),
     }));
-    // let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
-    //     protocol_id: PROTOCOL,
-    //     data: Bytes::from("hello world"),
-    //     res_tx: oneshot::channel().0,
-    // });
     let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
         request_id: 123,
         priority: 0,
@@ -458,7 +452,7 @@ fn peer_recv_rpc() {
                         .expect("Arc unpack fail");
                     rpc_replier.send(response).expect("rpc reply send fail")
                 },
-                msg => panic!("Unexpected PeerNotification: {:?}", msg),
+                msg => panic!("Unexpected NetworkMessage: {:?}", msg),
             }
         }
     };
@@ -487,11 +481,6 @@ fn peer_recv_rpc_concurrent() {
         priority: 0,
         raw_request: Vec::from("hello world"),
     }));
-    // let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
-    //     protocol_id: PROTOCOL,
-    //     data: Bytes::from("hello world"),
-    //     res_tx: oneshot::channel().0,
-    // });
     let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
         request_id: 123,
         priority: 0,
@@ -519,16 +508,14 @@ fn peer_recv_rpc_concurrent() {
         // Wait to receive RpcRequests from Peer.
         for _ in 0..30 {
             let received = prot_rx.next().await.unwrap();
-            // assert_eq!(recv_msg, received);
             match &received.message {
-                // PeerNotification::RecvRpc(req) => res_txs.push(req.res_tx),
                 NetworkMessage::RpcRequest(req) => {
                     assert_eq!(Vec::from("hello world"), req.raw_request);
                     let arcsender = received.rpc_replier.unwrap();
                     let sender = Arc::into_inner(arcsender).unwrap();
                     res_txs.push(sender)
                 },
-                _ => panic!("Unexpected PeerNotification: {:?}", received),
+                _ => panic!("Unexpected NetworkMessage: {:?}", received),
             };
         }
 
@@ -564,11 +551,6 @@ fn peer_recv_rpc_timeout() {
         priority: 0,
         raw_request: Vec::from("hello world"),
     }));
-    // let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
-    //     protocol_id: PROTOCOL,
-    //     data: Bytes::from("hello world"),
-    //     res_tx: oneshot::channel().0,
-    // });
 
     let test = async move {
         // Client sends the rpc request.
@@ -585,7 +567,7 @@ fn peer_recv_rpc_timeout() {
                 let arcsender = received.rpc_replier.unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
-            _ => panic!("Unexpected PeerNotification: {:?}", received),
+            _ => panic!("Unexpected NetworkMessage: {:?}", received),
         };
 
         // The rpc response channel should still be open since we haven't timed out yet.
@@ -630,11 +612,6 @@ fn peer_recv_rpc_cancel() {
         priority: 0,
         raw_request: Vec::from("hello world"),
     }));
-    // let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
-    //     protocol_id: PROTOCOL,
-    //     data: Bytes::from("hello world"),
-    //     res_tx: oneshot::channel().0,
-    // });
 
     let test = async move {
         // Client sends the rpc request.
@@ -651,7 +628,7 @@ fn peer_recv_rpc_cancel() {
                 let arcsender = received.rpc_replier.unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
-            _ => panic!("Unexpected PeerNotification: {:?}", received),
+            _ => panic!("Unexpected NetworkMessage: {:?}", received),
         };
 
         // The rpc response channel should still be open since we haven't timed out yet.
