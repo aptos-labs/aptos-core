@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::common::types::{CliTypedResult, TransactionOptions};
+// Copyright © Entropy Foundation
+
+use anyhow::Result;
 use aptos_types::transaction::TransactionPayload;
 
 /// Arguments required by supra cli for its operation.
@@ -14,5 +16,5 @@ pub struct SupraCommandArguments {
 pub trait SupraCommand {
 
     /// consume self and returns [SupraCommandArguments]
-    fn supra_command_arguments(self) -> CliTypedResult<SupraCommandArguments>;
+    fn supra_command_arguments(self) -> Result<SupraCommandArguments>;
 }

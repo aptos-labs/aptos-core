@@ -67,7 +67,7 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
-use crate::common::supra::{SupraCommand, SupraCommandArguments};
+use supra::{SupraCommand, SupraCommandArguments};
 
 /// Tool for Move related operations
 ///
@@ -165,7 +165,7 @@ impl FrameworkPackageArgs {
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
         const SUPRA_FRAMEWORK: &str = "SupraFramework";
-        const SUPRA_FRAMEWORK_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
+        const SUPRA_FRAMEWORK_GIT_PATH: &str = "https://github.com/Entropy-Foundation/aptos-core.git";
         const SUBDIR_PATH: &str = "aptos-move/framework/supra-framework";
         const DEFAULT_BRANCH: &str = "devnet";
 
