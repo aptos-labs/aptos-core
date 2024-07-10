@@ -3,7 +3,7 @@
 
 use crate::{aptos_framework_path, components::ProposalMetadata, ExecutionMode, ReleaseConfig};
 use anyhow::Result;
-use aptos::{
+use movement::{
     common::types::CliCommand,
     governance::{ExecuteProposal, SubmitProposal, SubmitVote},
     move_tool::{RunFunction, RunScript},
