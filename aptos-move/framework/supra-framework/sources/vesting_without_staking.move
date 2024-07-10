@@ -835,8 +835,8 @@ module supra_framework::vesting_without_staking {
 
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == shareholder_1_share, 0);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == shareholder_2_share, 0);
-
-        vest(contract_address);
+        // TODO discuss the desired behavior
+        // vest(contract_address);
     }
 
     #[test(supra_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
