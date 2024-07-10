@@ -42,7 +42,7 @@ pub struct AccountBalanceCommand {
     #[clap(long)]
     filter_currency: bool,
     /// Account to list the balance
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     account: AccountAddress,
     /// Whether to show the amount of stake instead of the normal balance
     #[clap(long)]
