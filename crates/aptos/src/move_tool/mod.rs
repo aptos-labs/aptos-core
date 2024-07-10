@@ -806,7 +806,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
 }
 
 impl SupraCommand for PublishPackage {
-    fn supra_command_arguments(self) -> CliTypedResult<SupraCommandArguments> {
+    fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
         let package_publication_data: PackagePublicationData = (&self).try_into()?;
         Ok(SupraCommandArguments {
             payload: package_publication_data.payload,
@@ -1420,7 +1420,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
 }
 
 impl SupraCommand for RunFunction {
-    fn supra_command_arguments(self) -> CliTypedResult<SupraCommandArguments> {
+    fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
         Ok(SupraCommandArguments {
             payload: TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
             profile: self.txn_options.profile_options.profile,
@@ -1482,7 +1482,7 @@ impl CliCommand<TransactionSummary> for RunScript {
 }
 
 impl SupraCommand for RunScript {
-    fn supra_command_arguments(self) -> CliTypedResult<SupraCommandArguments> {
+    fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
         let (bytecode, _script_hash) = self
             .compile_proposal_args
             .compile("RunScript", self.txn_options.prompt_options)?;
