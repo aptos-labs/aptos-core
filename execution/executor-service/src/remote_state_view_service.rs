@@ -163,7 +163,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 .as_millis() as u64;
             REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_recv_thread_waiting_time"])
-                .observe((curr_time - prev_time) as f64);
+                .observe(((curr_time - prev_time) / 1000)  as f64);
             let _timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_requests_handler_timer"])
                 .start_timer();
@@ -214,7 +214,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 .as_millis() as u64;
             REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_proc_thread_waiting_time"])
-                .observe((curr_time - prev_time) as f64);
+                .observe(((curr_time - prev_time) / 1000) as f64);
 
             let state_view = state_view.clone();
             let kv_txs = kv_tx.clone();
