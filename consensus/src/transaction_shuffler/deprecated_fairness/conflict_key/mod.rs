@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction_shuffler::fairness::TxnIdx;
+use crate::transaction_shuffler::deprecated_fairness::TxnIdx;
 use std::{collections::HashMap, hash::Hash};
 
 pub(crate) mod entry_fun;

@@ -1,6 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::config::{
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+};
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -56,5 +60,28 @@ impl Default for InternalIndexerDBConfig {
             enable_statekeys: false,
             batch_size: 10_000,
         }
+    }
+}
+
+impl ConfigSanitizer for InternalIndexerDBConfig {
+    fn sanitize(
+        node_config: &NodeConfig,
+        _node_type: NodeType,
+        _chain_id: Option<ChainId>,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let config = node_config.indexer_db_config;
+
+        // Shouldn't turn on internal indexer for db without sharding
+        if !node_config.storage.rocksdb_configs.enable_storage_sharding
+            && config.is_internal_indexer_db_enabled()
+        {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Don't turn on internal indexer db if DB sharding is off".into(),
+            ));
+        }
+
+        Ok(())
     }
 }

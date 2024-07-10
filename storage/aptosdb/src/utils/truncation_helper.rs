@@ -408,9 +408,15 @@ fn delete_event_data(
                 latest_version = latest_version,
                 "Truncate event data."
             );
-            ledger_db
-                .event_db()
-                .prune_events(start_version, latest_version + 1, batch)?;
+            ledger_db.event_db().prune_events(
+                start_version,
+                latest_version + 1,
+                batch,
+                // Assuming same data will be overwritten into indices, we don't bother to deal
+                // with the existence or placement of indices
+                // TODO: prune data from internal indices
+                None,
+            )?;
         }
     }
     Ok(())

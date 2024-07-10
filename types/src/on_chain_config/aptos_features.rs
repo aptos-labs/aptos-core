@@ -86,7 +86,7 @@ pub enum FeatureFlag {
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
     LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
-    DISALLOW_NATIVE_DISPATCH = 71,
+    DISALLOW_USER_NATIVES = 71,
 }
 
 impl FeatureFlag {
@@ -153,7 +153,7 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
-            FeatureFlag::DISALLOW_NATIVE_DISPATCH,
+            FeatureFlag::DISALLOW_USER_NATIVES,
         ]
     }
 }
