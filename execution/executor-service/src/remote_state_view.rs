@@ -15,7 +15,7 @@ use std::time::SystemTime;
 
 extern crate itertools;
 use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_COUNT, REMOTE_EXECUTOR_TIMER};
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::partitioner::ShardId,
     state_store::{
@@ -153,7 +153,8 @@ impl RemoteStateViewClient {
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
                 seq_num += state_keys.len() as u64;
-                let priority = if state_keys.len() == 1 {0} else {seq_num};
+                let priority = {if state_keys.len() == 1 {0} else {seq_num}};
+                info!("Sending a state value request with priority {}", priority);
                 thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();
                     let rand_send_thread_idx = rng.gen_range(0, sender.len());
