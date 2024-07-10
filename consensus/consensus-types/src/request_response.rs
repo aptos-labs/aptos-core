@@ -35,7 +35,7 @@ impl fmt::Display for GetPayloadCommand {
         match self {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
-                max_unique_txns,
+                max_txns_after_filtering,
                 max_bytes,
                 max_inline_txns,
                 max_inline_bytes,
