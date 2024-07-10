@@ -2134,10 +2134,12 @@ Destroy a burn capability.
 <a id="0x1_coin_aggregate_supply"></a>
 <b>global</b> <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt;: num;
 <b>apply</b> <a href="coin.md#0x1_coin_TotalSupplyTracked">TotalSupplyTracked</a>&lt;CoinType&gt; <b>to</b> *&lt;CoinType&gt; <b>except</b>
-    initialize, initialize_internal, initialize_with_parallelizable_supply;
+    initialize, initialize_internal, initialize_internal_with_limit, initialize_with_parallelizable_supply,
+initialize_with_parallelizable_supply_with_limit;
 // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a> and <a id="high-level-req-9" href="#high-level-req">high-level requirement 9</a>:
 <b>apply</b> <a href="coin.md#0x1_coin_TotalSupplyNoChange">TotalSupplyNoChange</a>&lt;CoinType&gt; <b>to</b> *&lt;CoinType&gt; <b>except</b> mint,
-    burn, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;
+    burn, burn_from, initialize, initialize_internal, initialize_internal_with_limit,
+initialize_with_parallelizable_supply, initialize_with_parallelizable_supply_with_limit;
 </code></pre>
 
 

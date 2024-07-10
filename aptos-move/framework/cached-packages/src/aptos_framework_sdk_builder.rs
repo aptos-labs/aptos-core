@@ -1133,6 +1133,11 @@ pub enum EntryFunctionCall {
     VestingWithoutStakingVest {
         contract_address: AccountAddress,
     },
+
+    VestingWithoutStakingVestIndividual {
+        contract_address: AccountAddress,
+        shareholder_address: AccountAddress,
+    },
 }
 
 impl EntryFunctionCall {
@@ -1883,6 +1888,10 @@ impl EntryFunctionCall {
             VestingWithoutStakingVest { contract_address } => {
                 vesting_without_staking_vest(contract_address)
             },
+            VestingWithoutStakingVestIndividual {
+                contract_address,
+                shareholder_address,
+            } => vesting_without_staking_vest_individual(contract_address, shareholder_address),
         }
     }
 
@@ -5209,6 +5218,27 @@ pub fn vesting_without_staking_vest(contract_address: AccountAddress) -> Transac
         vec![bcs::to_bytes(&contract_address).unwrap()],
     ))
 }
+
+pub fn vesting_without_staking_vest_individual(
+    contract_address: AccountAddress,
+    shareholder_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting_without_staking").to_owned(),
+        ),
+        ident_str!("vest_individual").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&shareholder_address).unwrap(),
+        ],
+    ))
+}
 mod decoder {
     use super::*;
     pub fn account_offer_rotation_capability(
@@ -7139,6 +7169,19 @@ mod decoder {
             None
         }
     }
+
+    pub fn vesting_without_staking_vest_individual(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingWithoutStakingVestIndividual {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                shareholder_address: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
 }
 
 type EntryFunctionDecoderMap = std::collections::HashMap<
@@ -7750,6 +7793,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_without_staking_vest".to_string(),
             Box::new(decoder::vesting_without_staking_vest),
+        );
+        map.insert(
+            "vesting_without_staking_vest_individual".to_string(),
+            Box::new(decoder::vesting_without_staking_vest_individual),
         );
         map
     });
