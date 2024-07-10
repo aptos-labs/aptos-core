@@ -85,8 +85,8 @@ impl Default for MempoolConfig {
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
-            eager_expire_threshold_ms: Some(10_000),
-            eager_expire_time_ms: 3_000,
+            eager_expire_threshold_ms: Some(15_000),
+            eager_expire_time_ms: 6_000,
         }
     }
 }
