@@ -25,7 +25,7 @@ use crate::{
     protocols::{
         direct_send::Message,
         network::ReceivedMessage,
-        rpc::{error::RpcError, InboundRpcRequest, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
+        rpc::{error::RpcError, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
             DirectSendMsg, ErrorCode, MultiplexMessage, MultiplexMessageSink,
@@ -69,15 +69,6 @@ pub enum PeerRequest {
     SendRpc(OutboundRpcRequest),
     /// Fire-and-forget style message send to peer.
     SendDirectSend(Message),
-}
-
-/// Notifications that [`Peer`] sends to the [`PeerManager`](crate::peer_manager::PeerManager).
-#[derive(Debug, PartialEq)]
-pub enum PeerNotification {
-    /// A new RPC request has been received from peer.
-    RecvRpc(InboundRpcRequest),
-    /// A new message has been received from peer.
-    RecvMessage(Message),
 }
 
 /// The reason for closing a connection.
