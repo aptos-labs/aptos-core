@@ -34,7 +34,7 @@ impl UserSessionChangeSet {
     }
 
     pub(crate) fn has_published_modules(&self) -> bool {
-        self.module_write_set.is_empty()
+        !self.module_write_set.is_empty()
     }
 
     pub(crate) fn unpack(self) -> (VMChangeSet, ModuleWriteSet) {
