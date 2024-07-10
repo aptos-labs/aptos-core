@@ -1548,6 +1548,26 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         let child = self.state.replace_ref(dest, self.code_offset, 1);
         let loc = self.cur_loc();
         let is_mut = self.ty(dest).is_mutable_reference();
+        if is_mut {
+            let children = self.state.transitive_children(&label);
+            for (temp, other_label) in &self.state.temp_to_label_map {
+                let temp_ty = self.ty(*temp);
+                let temp_mutable = temp_ty.is_mutable_reference();
+                if temp_mutable && children.contains(other_label) {
+                    self.error_with_hints(
+                        self.cur_loc(),
+                        format!(
+                            "cannot borrow `{}` which is currently mutably borrowed",
+                            self.global_env().display(&struct_),
+                        ),
+                        "mutable borrow attempted here",
+                        self.borrow_info(&label, |_| true)
+                            .into_iter()
+                            .chain(self.usage_info(&label, |_| true)),
+                    )
+                }
+            }
+        }
         self.state.add_edge(
             label,
             BorrowEdge::new(
@@ -1973,9 +1993,6 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                     .cloned()
                     .collect_vec();
                 step.check_borrow_safety(&exclusive_refs)
-            },
-            Assign(_, _, src, _) if step.ty(*src).is_mutable_reference() => {
-                step.check_borrow_safety(&[*src])
             },
             _ => {},
         }

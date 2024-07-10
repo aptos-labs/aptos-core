@@ -1,5 +1,15 @@
 
 Diagnostics:
+error: cannot borrow `M::R` which is currently mutably borrowed
+  ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:6:18
+  │
+5 │         let r1 = borrow_global_mut<R>(addr);
+  │                  -------------------------- previous mutable global borrow
+6 │         let r2 = borrow_global_mut<R>(addr);
+  │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+7 │         r1.f = r2.f
+  │         ---- conflicting reference `r1` used here
+
 error: cannot mutably borrow since mutable references exist
   ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:6:18
   │
@@ -27,6 +37,29 @@ error: cannot mutably borrow since mutable references exist
    │         │    │
    │         │    requirement enforced here
    │         conflicting reference `f` used here
+
+error: cannot borrow `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:12:18
+   │
+11 │         let f = &mut borrow_global_mut<R>(addr).f;
+   │                 ---------------------------------
+   │                 │    │
+   │                 │    previous mutable global borrow
+   │                 used by mutable field borrow
+12 │         let r2 = borrow_global_mut<R>(addr);
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+13 │         *f = r2.f
+   │         --------- conflicting reference `f` used here
+
+error: cannot borrow `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:18:22
+   │
+17 │         let r1 = borrow_global_mut<R>(addr);
+   │                  -------------------------- previous mutable global borrow
+18 │         let f = &mut borrow_global_mut<R>(addr).f;
+   │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+19 │         r1.f = *f
+   │         ---- conflicting reference `r1` used here
 
 error: cannot mutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:18:22
@@ -65,6 +98,16 @@ error: cannot mutably borrow since immutable references exist
 31 │         r2.f = *f
    │                -- requirement enforced here
 
+error: cannot borrow `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:36:18
+   │
+35 │         let r1 = borrow_global_mut<R>(addr);
+   │                  -------------------------- previous mutable global borrow
+36 │         let f = &borrow_global_mut<R>(addr).f;
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+37 │         r1.f = *f
+   │         ---- conflicting reference `r1` used here
+
 error: cannot mutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:36:18
    │
@@ -76,6 +119,16 @@ error: cannot mutably borrow since mutable references exist
    │         ----   -- requirement enforced here
    │         │
    │         conflicting reference `r1` used here
+
+error: cannot borrow `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:43:18
+   │
+42 │         let r1; if (cond) r1 = borrow_global_mut<R>(addr) else r1 = &mut r;
+   │                                -------------------------- previous mutable global borrow
+43 │         let f = &borrow_global_mut<R>(addr).f;
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+44 │         r1.f = *f;
+   │         ---- conflicting reference `r1` used here
 
 error: cannot mutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:43:18
