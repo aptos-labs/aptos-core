@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::NFTMetadataCrawlerConfig,
+    config::AssetUploaderConfig,
     models::nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
     utils::{
         constants::{MAX_ASSET_UPLOAD_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
@@ -22,14 +22,16 @@ use futures::{future::try_join_all, FutureExt};
 use reqwest::{multipart::Form, Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
+use url::Url;
 
 #[derive(Clone)]
 pub struct AssetUploaderContext {
-    pub nft_metadata_crawler_config: Arc<NFTMetadataCrawlerConfig>,
+    pub asset_uploader_config: Arc<AssetUploaderConfig>,
     pub pool: Pool<ConnectionManager<PgConnection>>,
 }
 
+// Structs below are for accessing relevant data in a typed way for Cloudflare API calls
 #[derive(Debug, Deserialize)]
 struct CloudflareImageUploadResponseResult {
     id: String,
@@ -42,30 +44,19 @@ struct CloudflareImageUploadResponse {
 
 impl AssetUploaderContext {
     pub async fn new(
-        nft_metadata_crawler_config: Arc<NFTMetadataCrawlerConfig>,
+        asset_uploader_config: AssetUploaderConfig,
         pool: Pool<ConnectionManager<PgConnection>>,
     ) -> Self {
-        if nft_metadata_crawler_config.asset_uploader_config.is_none() {
-            error!(config = ?nft_metadata_crawler_config, "[Asset Uploader] asset_uploader_config not found");
-            panic!();
-        }
-
         Self {
-            nft_metadata_crawler_config,
+            asset_uploader_config: Arc::new(asset_uploader_config),
             pool,
         }
     }
 
-    async fn upload_asset(&self, url: &str) -> anyhow::Result<String> {
-        let asset_uploader_config = self
-            .nft_metadata_crawler_config
-            .as_ref()
-            .asset_uploader_config
-            .as_ref()
-            .unwrap();
-
-        let url = url.to_string();
-        let hashed_url = sha256::digest(url.clone());
+    /// Uploads an asset to Cloudflare and returns the CDN URL used to access it
+    /// The CDN URL uses the default variant specified in the config
+    async fn upload_asset(&self, url: Url) -> anyhow::Result<String> {
+        let hashed_url = sha256::digest(url.to_string());
         let op = || {
             async {
                 let client = Client::builder()
@@ -74,22 +65,22 @@ impl AssetUploaderContext {
                     .context("Failed to build reqwest client")?;
 
                 let form = Form::new()
-                    .text("id", format!("tmp/{}", hashed_url)) // Replace with actual metadata
-                    .text("url", url.clone());
+                    .text("id", hashed_url.clone()) // Replace with actual metadata
+                    .text("url", url.to_string());
 
                 info!(
-                    asset_uri = url,
+                    asset_uri = ?url,
                     "[Asset Uploader] Uploading asset to Cloudflare"
                 );
 
                 let res = client
                     .post(format!(
                         "https://api.cloudflare.com/client/v4/accounts/{}/images/v1",
-                        asset_uploader_config.cloudflare_account_id
+                        self.asset_uploader_config.cloudflare_account_id
                     ))
                     .header(
                         "Authorization",
-                        format!("Bearer {}", asset_uploader_config.cloudflare_auth_key),
+                        format!("Bearer {}", self.asset_uploader_config.cloudflare_auth_key),
                     )
                     .multipart(form)
                     .send()
@@ -104,10 +95,10 @@ impl AssetUploaderContext {
 
                 Ok(format!(
                     "{}/{}/{}/{}",
-                    asset_uploader_config.cloudflare_image_delivery_prefix,
-                    asset_uploader_config.cloudflare_account_hash,
+                    self.asset_uploader_config.cloudflare_image_delivery_prefix,
+                    self.asset_uploader_config.cloudflare_account_hash,
                     res.result.id,
-                    asset_uploader_config.cloudflare_default_variant,
+                    self.asset_uploader_config.cloudflare_default_variant,
                 ))
             }
             .boxed()
@@ -125,6 +116,11 @@ impl AssetUploaderContext {
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct AssetUploaderRequest {
+    urls: Vec<Url>,
+}
+
 #[derive(Debug, Serialize)]
 struct AssetUploaderResponse {
     successes: Vec<String>,
@@ -134,37 +130,33 @@ struct AssetUploaderResponse {
 #[async_trait::async_trait]
 impl Server for AssetUploaderContext {
     /// Handles calling parser for the root endpoint
-    async fn handle_request(self: Arc<Self>, msg: Bytes) -> Response<String> {
-        // Can take a comma-separated list of URLs
-        let urls = String::from_utf8_lossy(&msg).to_string();
-        let urls_split: Vec<String> = urls.split(',').map(|s| s.to_string()).collect();
+    async fn handle_request(self: Arc<Self>, msg: Bytes) -> anyhow::Result<Response<String>> {
+        let urls: AssetUploaderRequest =
+            serde_json::from_slice(&msg).context("Failed to parse request")?;
 
         // Spawn a task for each URL
-        let mut tasks = Vec::with_capacity(urls_split.len());
+        let mut tasks = Vec::with_capacity(urls.urls.len());
         let self_clone = self.clone();
-        for url in urls_split.clone() {
+        for url in urls.urls.clone() {
             let self_clone = self_clone.clone();
             tasks.push(tokio::spawn(async move {
-                match self_clone.upload_asset(&url).await {
+                match self_clone.upload_asset(url.clone()).await {
                     Ok(cdn_url) => {
                         info!(
-                            asset_uri = url,
+                            asset_uri = ?url,
                             cdn_uri = cdn_url,
                             "[Asset Uploader] Writing to Postgres"
                         );
-                        let mut model = NFTMetadataCrawlerURIs::new(&url);
+                        let mut model = NFTMetadataCrawlerURIs::new(&url.to_string());
                         model.set_cdn_image_uri(Some(cdn_url.clone()));
 
-                        let mut conn = self_clone.pool.get().unwrap();
-                        upsert_uris(&mut conn, &model, -1).unwrap_or_else(|e| {
-                            error!(error = ?e, asset_uri = url, "[Asset Uploader] Commit to Postgres failed");
-                            panic!();
-                        });
+                        let mut conn = self_clone.pool.get().context("Failed to get connection")?;
+                        upsert_uris(&mut conn, &model, -1).context("Failed to upsert URIs")?;
 
                         Ok(cdn_url)
                     },
                     Err(e) => {
-                        warn!(error = ?e, asset_uri = url, "[Asset Uploader] Failed to upload asset");
+                        warn!(error = ?e, asset_uri = ?url, "[Asset Uploader] Failed to upload asset");
                         Err(e)
                     },
                 }
@@ -181,17 +173,17 @@ impl Server for AssetUploaderContext {
                     match uri {
                         Ok(uri) => successes.push(uri.clone()),
                         Err(e) => {
-                            let asset_uri = urls_split.get(i).expect("Num tasks != num URLs");
-                            warn!(error = ?e, asset_uri, "[Asset Uploader] Failed to upload asset");
-                            failures.push(asset_uri.clone())
+                            let asset_uri = &urls.urls[i];
+                            warn!(error = ?e, asset_uri = ?asset_uri, "[Asset Uploader] Failed to upload asset");
+                            failures.push(asset_uri.to_string())
                         },
                     }
                 }
 
                 info!(successes = ?successes, failures = ?failures, "[Asset Uploader] Uploaded assets");
-                Response::builder()
+                Ok(Response::builder()
                     .status(StatusCode::OK)
-                    .header("Content-Type", "application/json")
+                    .header("content-type", "application/json")
                     .body(
                         serde_json::to_string(&AssetUploaderResponse {
                             successes,
@@ -199,14 +191,14 @@ impl Server for AssetUploaderContext {
                         })
                         .unwrap(),
                     )
-                    .unwrap()
+                    .unwrap())
             },
             Err(e) => {
-                warn!("[Asset Uploader] Failed to upload all assets");
-                Response::builder()
+                warn!(error = ?e, "[Asset Uploader] Failed to upload all assets");
+                Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .body(e.to_string())
-                    .unwrap()
+                    .unwrap())
             },
         }
     }

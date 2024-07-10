@@ -11,21 +11,28 @@ use crate::{
         },
         database::{establish_connection_pool, run_migrations},
     },
-    Server, ServerType,
+    Server,
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use axum::{routing::post, Router};
+use axum::{response::Response, routing::post, Router};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
-use tracing::info;
+use tracing::{info, warn};
 
+/// Required account data and auth keys for Cloudflare
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AssetUploaderConfig {
+    /// Cloudflare API key
     pub cloudflare_auth_key: String,
+    /// Cloudflare Account ID provided at the images home page used to authenticate requests
     pub cloudflare_account_id: String,
+    /// Cloudflare Account Hash provided at the images home page used for generating the CDN image URLs
     pub cloudflare_account_hash: String,
+    /// Cloudflare Image Delivery URL prefix provided at the images home page used for generating the CDN image URLs
     pub cloudflare_image_delivery_prefix: String,
+    /// In addition to on the fly transformations, Cloudflare images can be returned in preset variants. This is the default variant used with the saved CDN image URLs.
     pub cloudflare_default_variant: String,
 }
 
@@ -49,6 +56,13 @@ pub struct ParserConfig {
     pub uri_blacklist: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ServerConfig {
+    Parser(ParserConfig),
+    AssetUploader(AssetUploaderConfig),
+}
+
 /// Structs to hold config from YAML
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -57,10 +71,7 @@ pub struct NFTMetadataCrawlerConfig {
     #[serde(default = "NFTMetadataCrawlerConfig::default_max_num_parse_retries")]
     pub max_num_parse_retries: i32,
     pub server_port: u16,
-    #[serde(default = "NFTMetadataCrawlerConfig::default_server_type")]
-    pub server_type: ServerType,
-    pub asset_uploader_config: Option<AssetUploaderConfig>,
-    pub parser_config: Option<ParserConfig>,
+    pub server_config: ServerConfig,
 }
 
 impl NFTMetadataCrawlerConfig {
@@ -78,10 +89,6 @@ impl NFTMetadataCrawlerConfig {
 
     pub const fn default_max_num_parse_retries() -> i32 {
         DEFAULT_MAX_NUM_PARSE_RETRIES
-    }
-
-    pub const fn default_server_type() -> ServerType {
-        ServerType::Parser
     }
 }
 
@@ -104,16 +111,27 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
 
         // Create request context
         // Dynamic dispatch over different variations of servers
-        let config = Arc::new(self.clone());
-        let context: Arc<dyn Server> = match self.server_type {
-            ServerType::Parser => Arc::new(ParserContext::new(config, pool).await),
-            ServerType::AssetUploader => Arc::new(AssetUploaderContext::new(config, pool).await),
+        let context: Arc<dyn Server> = match &self.server_config {
+            ServerConfig::Parser(parser_config) => Arc::new(
+                ParserContext::new(parser_config.clone(), pool, self.max_num_parse_retries).await,
+            ),
+            ServerConfig::AssetUploader(asset_uploader_config) => {
+                Arc::new(AssetUploaderContext::new(asset_uploader_config.clone(), pool).await)
+            },
         };
 
         // Create web server
         let router = Router::new().route(
             "/",
-            post(|bytes| async move { context.handle_request(bytes).await }),
+            post(|bytes| async move {
+                context.handle_request(bytes).await.unwrap_or_else(|e| {
+                    warn!(error = ?e, "Error handling request");
+                    Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(e.to_string())
+                        .unwrap()
+                })
+            }),
         );
 
         let addr = SocketAddr::from(([0, 0, 0, 0], self.server_port));

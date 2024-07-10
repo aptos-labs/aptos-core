@@ -5,7 +5,6 @@ use anyhow::Context;
 use axum::response::Response;
 use bytes::Bytes;
 use reqwest::{header, Client};
-use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use utils::constants::MAX_HEAD_REQUEST_RETRY_SECONDS;
 
@@ -17,17 +16,10 @@ pub mod schema;
 pub mod utils;
 pub mod worker;
 
-/// Different variations of servers that utilize the CDN
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ServerType {
-    Parser,
-    AssetUploader,
-}
-
 /// Trait for handling requests to the server
 #[async_trait::async_trait]
 trait Server: Send + Sync {
-    async fn handle_request(self: Arc<Self>, bytes: Bytes) -> Response<String>;
+    async fn handle_request(self: Arc<Self>, bytes: Bytes) -> anyhow::Result<Response<String>>;
 }
 
 /// HEAD request to get MIME type and size of content

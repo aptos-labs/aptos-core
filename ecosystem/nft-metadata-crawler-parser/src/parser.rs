@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{NFTMetadataCrawlerConfig, ParserConfig},
+    config::ParserConfig,
     utils::{
         counters::{
             GOT_CONNECTION_COUNT, PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT,
@@ -27,25 +27,19 @@ use tracing::{error, info, warn};
 /// Struct to hold context required for parsing
 #[derive(Clone)]
 pub struct ParserContext {
-    pub nft_metadata_crawler_config: Arc<NFTMetadataCrawlerConfig>,
+    pub parser_config: Arc<ParserConfig>,
     pub pool: Pool<ConnectionManager<PgConnection>>,
     pub gcs_client: Arc<GCSClient>,
+    pub max_num_retries: i32,
 }
 
 impl ParserContext {
     pub async fn new(
-        nft_metadata_crawler_config: Arc<NFTMetadataCrawlerConfig>,
+        parser_config: ParserConfig,
         pool: Pool<ConnectionManager<PgConnection>>,
+        max_num_retries: i32,
     ) -> Self {
-        if nft_metadata_crawler_config.parser_config.is_none() {
-            error!(config = ?nft_metadata_crawler_config, "[NFT Metadata Crawler] parser_config not found");
-            panic!();
-        }
-
-        if let Some(google_application_credentials) =
-            &get_parser_config(nft_metadata_crawler_config.clone())
-                .unwrap()
-                .google_application_credentials
+        if let Some(google_application_credentials) = &parser_config.google_application_credentials
         {
             info!(
                 "[NFT Metadata Crawler] Google Application Credentials path found, setting env var"
@@ -69,9 +63,10 @@ impl ParserContext {
             });
 
         Self {
-            nft_metadata_crawler_config,
+            parser_config: Arc::new(parser_config),
             pool,
             gcs_client: Arc::new(GCSClient::new(gcs_config)),
+            max_num_retries,
         }
     }
 
@@ -156,8 +151,9 @@ impl ParserContext {
             );
 
         let mut worker = Worker::new(
-            self.nft_metadata_crawler_config.clone(),
+            self.parser_config.clone(),
             conn,
+            self.max_num_retries,
             self.gcs_client.clone(),
             &pubsub_message,
             parts[0],
@@ -191,30 +187,21 @@ impl ParserContext {
 #[async_trait::async_trait]
 impl Server for ParserContext {
     /// Handles calling parser for the root endpoint
-    async fn handle_request(self: Arc<Self>, msg: Bytes) -> Response<String> {
+    async fn handle_request(self: Arc<Self>, msg: Bytes) -> anyhow::Result<Response<String>> {
         self.spawn_parser(msg).await;
 
-        if !get_parser_config(self.nft_metadata_crawler_config.clone())
-            .unwrap()
-            .ack_parsed_uris
-        {
-            return Response::builder()
+        if !self.parser_config.ack_parsed_uris {
+            return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .body("".to_string())
-                .unwrap();
+                .unwrap());
         }
 
         PUBSUB_ACK_SUCCESS_COUNT.inc();
 
-        Response::builder()
+        Ok(Response::builder()
             .status(StatusCode::OK)
             .body("".to_string())
-            .unwrap()
+            .unwrap())
     }
-}
-
-fn get_parser_config(
-    nft_metadata_crawler_config: Arc<NFTMetadataCrawlerConfig>,
-) -> Option<ParserConfig> {
-    nft_metadata_crawler_config.as_ref().parser_config.clone()
 }
