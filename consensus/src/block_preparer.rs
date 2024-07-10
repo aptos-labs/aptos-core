@@ -61,7 +61,7 @@ impl BlockPreparer {
             };
 
             if let Some(max_txns_from_block_to_execute) = max_txns_from_block_to_execute {
-                shuffled_txns.truncate(max_txns_from_block_to_execute);
+                shuffled_txns.truncate(max_txns_from_block_to_execute as usize);
             }
             MAX_TXNS_FROM_BLOCK_TO_EXECUTE.observe(shuffled_txns.len() as f64);
             Ok(shuffled_txns)

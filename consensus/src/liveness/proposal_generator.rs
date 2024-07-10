@@ -9,7 +9,8 @@ use crate::{
     block_storage::BlockReader,
     counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
-        PROPOSER_DELAY_PROPOSAL, PROPOSER_PENDING_BLOCKS_COUNT,
+        PROPOSER_DELAY_PROPOSAL, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
+        PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     payload_client::PayloadClient,
@@ -317,13 +318,18 @@ impl ProposalGenerator {
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
             let (
-                max_block_unique_txns,
+                max_block_txns_after_filtering,
                 max_block_bytes,
                 max_txns_from_block_to_execute,
                 proposal_delay,
             ) = self
                 .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
                 .await;
+
+            PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING.observe(max_block_txns_after_filtering as f64);
+            PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE.observe(
+                max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering) as f64,
+            );
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -359,7 +365,7 @@ impl ProposalGenerator {
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     self.max_block_txns,
-                    max_block_unique_txns,
+                    max_block_txns_after_filtering,
                     max_block_bytes,
                     // TODO: Set max_inline_txns and max_inline_bytes correctly
                     self.max_inline_txns,
@@ -376,7 +382,7 @@ impl ProposalGenerator {
 
             if !payload.is_direct()
                 && max_txns_from_block_to_execute.is_some()
-                && payload.len() > max_txns_from_block_to_execute.unwrap()
+                && payload.len() as u64 > max_txns_from_block_to_execute.unwrap()
             {
                 payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
             }
@@ -420,7 +426,7 @@ impl ProposalGenerator {
         voting_power_ratio: f64,
         timestamp: Duration,
         round: Round,
-    ) -> (u64, u64, Option<usize>, Duration) {
+    ) -> (u64, u64, Option<u64>, Duration) {
         let mut values_max_block_txns = vec![self.max_block_unique_txns];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
