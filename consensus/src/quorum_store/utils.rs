@@ -503,9 +503,8 @@ impl ProofQueue {
                                         !filtered_txns.contains(txn_summary)
                                                 // latest_block_timestamp is microseonds since UNIX epoch
                                                 // expiration_timestamp_secs is seconds since UNIX epoch
-                                                // giving a second buffer for expiration as the expiration time is rounded off to seconds 
-                                            && ((txn_summary.expiration_timestamp_secs + 1) * MICRO_SEC_PER_SEC)
-                                                > self.latest_block_timestamp
+                                                // giving a second buffer for expiration as the expiration time is rounded off to seconds
+                                            && (self.latest_block_timestamp + 1) / MICRO_SEC_PER_SEC < txn_summary.expiration_timestamp_secs
                                     })
                                     .count() as u64
                         } else {
@@ -530,8 +529,7 @@ impl ProofQueue {
                                     .iter()
                                     .filter(|summary| {
                                         filtered_txns.insert(**summary)
-                                            && ((summary.expiration_timestamp_secs + 1)* MICRO_SEC_PER_SEC)
-                                                > self.latest_block_timestamp
+                                            && (self.latest_block_timestamp + 1) / MICRO_SEC_PER_SEC < summary.expiration_timestamp_secs
                                     })
                                     .count() as u64
                             },
