@@ -4,6 +4,8 @@ use crate::{RemoteKVRequest, RemoteKVResponse};
 use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use std::{net::SocketAddr, sync::{Arc, RwLock}, thread};
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use std::ops::DerefMut;
 use std::time::SystemTime;
 
@@ -25,9 +27,28 @@ use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
+#[derive(Eq, PartialEq)]
+pub struct State {
+    msg: Message,
+    priority: i64,
+}
+
+impl Ord for State {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.priority.cmp(&other.priority)
+    }
+}
+
+impl PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.priority.cmp(&other.priority))
+    }
+}
+
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_rx: Receiver<Message>,
-    kv_unprocessed_pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
+    kv_unprocessed_pq: Arc<Mutex<BinaryHeap<State>>>,
+    //kv_unprocessed_pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
     kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
     //thread_pool: Arc<Vec<rayon::ThreadPool>>,
     // thread_pool for processing kv requests
@@ -36,6 +57,7 @@ pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     recv_condition: Arc<(Mutex<bool>, Condvar)>,
     outbound_rpc_runtime: Arc<Runtime>,
     //rt_kv_proc_runtime: Arc<Runtime>,
+
 }
 
 impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
@@ -58,6 +80,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                     .unwrap(),
             );
         }*/
+        // let mut unprocessed_pqs = vec![];
+        // for _ in 0..num_shards {
+        //     let mut pq = BinaryHeap::new();
+        //     unprocessed_pqs.push(pq);
+        // }
         let thread_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
             .thread_name(|i| format!("remote-state-view-service-kv-request-handler-{}", i))
@@ -79,7 +106,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .collect_vec();
         Self {
             kv_rx: result_rx,
-            kv_unprocessed_pq: Arc::new(ConcurrentPriorityQueue::new()),
+            kv_unprocessed_pq: Arc::new(Mutex::new(BinaryHeap::new())),
             kv_tx: Arc::new(command_txs),
             thread_pool: Arc::new(thread_pool),
             state_view: Arc::new(RwLock::new(None)),
@@ -113,11 +140,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 Self::priority_handler(state_view_clone.clone(),
                                        kv_tx_clone.clone(),
                                        kv_unprocessed_pq_clone,
-                                        recv_condition_clone.clone(),
-                                       outbound_rpc_runtime_clone)
+                                       recv_condition_clone.clone(),
+                                       outbound_rpc_runtime_clone,
+                                       i)
             });
         }
         let mut received_msg = vec![0; 100];
+        let base = 1000000000;
         while let Ok(message) = self.kv_rx.recv() {
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let mut delta = 0.0;
@@ -131,17 +160,17 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 .with_label_values(&["0", "kv_requests_handler_timer"])
                 .start_timer();
             received_msg[message.shard_id.unwrap() as usize] += 1;
-            let priority = message.seq_num.unwrap() * received_msg[message.shard_id.unwrap() as usize];
+            let priority = -((message.seq_num.unwrap() as i64 * base + received_msg[message.shard_id.unwrap() as usize] as i64));
             {
                 let (lock, cvar) = &*self.recv_condition;
                 let _lg = lock.lock().unwrap();
-                self.kv_unprocessed_pq.push(message, priority);
+                self.kv_unprocessed_pq.lock().unwrap().push(State{msg: message, priority});
                 //self.recv_condition.1.notify_all();
                 self.recv_condition.1.notify_one();
+                REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&["0", "kv_req_pq_size"])
+                    .observe(self.kv_unprocessed_pq.lock().unwrap().len() as f64);
             }
-            REMOTE_EXECUTOR_TIMER
-                .with_label_values(&["0", "kv_req_pq_size"])
-                .observe(self.kv_unprocessed_pq.len() as f64);
         }
     }
 
@@ -179,9 +208,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
                             kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
-                            pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
+                            pq: Arc<Mutex<BinaryHeap<State>>>,
                             recv_condition: Arc<(Mutex<bool>, Condvar)>,
-                            outbound_rpc_runtime: Arc<Runtime>) {
+                            outbound_rpc_runtime: Arc<Runtime>,
+                            id: usize,) {
         let mut rng = StdRng::from_entropy();
         let mut curr_time;
         let mut prev_time = SystemTime::now()
@@ -192,10 +222,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
             let (lock, cvar) = &*recv_condition;
             let mut lg = lock.lock().unwrap();
-            if pq.is_empty() {
+            if pq.lock().unwrap().is_empty() {
                 lg = cvar.wait(lg).unwrap();
             }
-            let maybe_message = pq.pop();
+            let maybe_message = pq.lock().unwrap().pop();
             drop(lg);
             curr_time = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -210,7 +240,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 let kv_txs = kv_tx.clone();
 
                 let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
-                Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
+                Self::handle_message(message.msg, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
 
                 prev_time = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)

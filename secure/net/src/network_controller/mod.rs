@@ -53,7 +53,7 @@ impl NetworkMessage {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 #[allow(dead_code)]
 pub struct Message {
     pub data: Vec<u8>,
