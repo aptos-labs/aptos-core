@@ -508,8 +508,20 @@ fn test_proof_pull_proofs_with_duplicates() {
     // filtered_txns: txn_0 (included in excluded batches)
     assert_eq!(result.1, 3);
 
-    proof_queue.handle_updated_block_timestamp(now_in_usecs + 1_000_000);
+    proof_queue.handle_updated_block_timestamp(now_in_usecs + 500_000);
     // Nothing changes
+    let result = proof_queue.pull_proofs(
+        &hashset![],
+        8,
+        5,
+        400,
+        true,
+        Duration::from_micros(now_in_usecs + 500_100),
+    );
+    assert_eq!(result.1, 4);
+
+    proof_queue.handle_updated_block_timestamp(now_in_usecs + 1_000_000);
+    // txn_1 expired
     let result = proof_queue.pull_proofs(
         &hashset![],
         8,
@@ -519,10 +531,10 @@ fn test_proof_pull_proofs_with_duplicates() {
         Duration::from_micros(now_in_usecs + 1_000_100),
     );
     assert_eq!(result.0.len(), 8);
-    assert_eq!(result.1, 4);
+    assert_eq!(result.1, 3);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 1_200_000);
-    // author_0_batches[0] is removed. No expired txns.
+    // author_0_batches[0] is removed. txn_1 expired.
     let result = proof_queue.pull_proofs(
         &hashset![],
         8,
@@ -531,21 +543,11 @@ fn test_proof_pull_proofs_with_duplicates() {
         true,
         Duration::from_micros(now_in_usecs + 1_200_100),
     );
-    assert_eq!(result.1, 4);
-
-    let result = proof_queue.pull_proofs(
-        &hashset![],
-        8,
-        5,
-        400,
-        true,
-        Duration::from_micros(now_in_usecs + 1_200_100),
-    );
     assert_eq!(result.0.len(), 7);
-    assert_eq!(result.1, 4);
+    assert_eq!(result.1, 3);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 2_000_000);
-    // author_0_batches[0] is removed. txn_1 is expired.
+    // author_0_batches[0] is removed. txn_0, txn_1 are expired.
     let result = proof_queue.pull_proofs(
         &hashset![],
         8,
@@ -555,10 +557,10 @@ fn test_proof_pull_proofs_with_duplicates() {
         Duration::from_micros(now_in_usecs + 2_000_100),
     );
     assert_eq!(result.0.len(), 7);
-    assert_eq!(result.1, 3);
+    assert_eq!(result.1, 2);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 2_500_000);
-    // author_0_batches[0], author_1_batches[1] is removed. txn_1 is expired.
+    // author_0_batches[0], author_1_batches[1] is removed. txn_0, txn_1 is expired.
     let result = proof_queue.pull_proofs(
         &hashset![],
         8,
@@ -568,7 +570,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         Duration::from_micros(now_in_usecs + 2_500_100),
     );
     assert_eq!(result.0.len(), 6);
-    assert_eq!(result.1, 3);
+    assert_eq!(result.1, 2);
 
     let result = proof_queue.pull_proofs(
         &hashset![info_7],
@@ -578,9 +580,9 @@ fn test_proof_pull_proofs_with_duplicates() {
         true,
         Duration::from_micros(now_in_usecs + 2_500_100),
     );
-    // author_0_batches[0], author_1_batches[1] is removed. author_1_batches[2] is excluded. txn_3 is expired.
+    // author_0_batches[0], author_1_batches[1] is removed. author_1_batches[2] is excluded. txn_0, txn_1 are expired.
     assert_eq!(result.0.len(), 5);
-    assert_eq!(result.1, 2);
+    assert_eq!(result.1, 1);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 3_000_000);
     let result = proof_queue.pull_proofs(
@@ -591,9 +593,9 @@ fn test_proof_pull_proofs_with_duplicates() {
         true,
         Duration::from_micros(now_in_usecs + 3_000_100),
     );
-    // author_0_batches[0], author_0_batches[1], author_1_batches[1] are removed. txn_0, txn_1 are expired.
+    // author_0_batches[0], author_0_batches[1], author_1_batches[1] are removed. txn_0, txn_1, txn_2 are expired.
     assert_eq!(result.0.len(), 5);
-    assert_eq!(result.1, 2);
+    assert_eq!(result.1, 1);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 3_500_000);
     let result = proof_queue.pull_proofs(
@@ -604,9 +606,9 @@ fn test_proof_pull_proofs_with_duplicates() {
         true,
         Duration::from_micros(now_in_usecs + 3_500_100),
     );
-    // author_0_batches[0], author_0_batches[1], author_1_batches[1], author_1_batches[2] are removed. txn_0, txn_1 are expired.
+    // author_0_batches[0], author_0_batches[1], author_1_batches[1], author_1_batches[2] are removed. txn_0, txn_1, txn_0 are expired.
     assert_eq!(result.0.len(), 4);
-    assert_eq!(result.1, 1);
+    assert_eq!(result.1, 0);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 4_000_000);
     let result = proof_queue.pull_proofs(
