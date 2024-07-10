@@ -188,7 +188,6 @@ impl LoadVsPerfBenchmark {
         index: usize,
         duration: Duration,
     ) -> Result<Vec<SingleRunStats>> {
-        let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let emit_job_request = workloads.configure(index, ctx.emit_job.clone());
         let stats_by_phase = self
             .test
@@ -198,7 +197,6 @@ impl LoadVsPerfBenchmark {
                 duration,
                 PER_TEST_WARMUP_DURATION_FRACTION,
                 PER_TEST_COOLDOWN_DURATION_FRACTION,
-                rng,
             )
             .await?;
 
