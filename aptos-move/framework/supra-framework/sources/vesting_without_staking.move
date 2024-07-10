@@ -867,28 +867,37 @@ module supra_framework::vesting_without_staking {
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address));
         vest_individual(contract_address,shareholder_1_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 2, 10);
+		assert!(simple_map::borrow(&borrow_global<VestingContract>(contract_address).shareholders,&shareholder_1_address).left_amount + vested_amount_1 ==shareholder_1_share,0);
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
         vest_individual(contract_address,shareholder_2_address);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 2, 10);
+		assert!(simple_map::borrow(&borrow_global<VestingContract>(contract_address).shareholders,
+			&shareholder_2_address).left_amount + vested_amount_2 ==shareholder_2_share,0);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*2);
         vest_individual(contract_address,shareholder_1_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 2, 10);
+		assert!(simple_map::borrow(&borrow_global<VestingContract>(contract_address).shareholders,&shareholder_1_address).left_amount + vested_amount_1 ==shareholder_1_share,0);
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
         vest_individual(contract_address,shareholder_2_address);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 2, 10);
+		assert!(simple_map::borrow(&borrow_global<VestingContract>(contract_address).shareholders,
+			&shareholder_2_address).left_amount + vested_amount_2 ==shareholder_2_share,0);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*3);
         vest_individual(contract_address,shareholder_1_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 1, 10);
+		assert!(simple_map::borrow(&borrow_global<VestingContract>(contract_address).shareholders,&shareholder_1_address).left_amount + vested_amount_1 ==shareholder_1_share,0);
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
         vest_individual(contract_address,shareholder_2_address);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 1, 10);
+		assert!(simple_map::borrow(&borrow_global<VestingContract>(contract_address).shareholders,
+			&shareholder_2_address).left_amount + vested_amount_2 ==shareholder_2_share,0);
         assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
         assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
     }
