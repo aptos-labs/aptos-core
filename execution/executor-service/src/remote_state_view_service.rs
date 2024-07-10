@@ -133,7 +133,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-        let num_handlers = 40;
+        let num_handlers = 30;
         info!("Num handlers created is {}", num_handlers);
         for i in 0..num_handlers {
             let state_view_clone = self.state_view.clone();
@@ -180,10 +180,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                         kv_unprocessed_pq_clone.push(message, (priority / 200) as u64);
                         //self.recv_condition.1.notify_all();
                         recv_condition_clone.1.notify_one();
-                        REMOTE_EXECUTOR_TIMER
-                            .with_label_values(&["0", "kv_req_pq_size"])
-                            .observe(kv_unprocessed_pq_clone.len() as f64);
                     }
+                    REMOTE_EXECUTOR_TIMER
+                        .with_label_values(&["0", "kv_req_pq_size"])
+                        .observe(kv_unprocessed_pq_clone.len() as f64);
                 }
             });
         }
