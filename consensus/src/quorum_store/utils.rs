@@ -504,7 +504,7 @@ impl ProofQueue {
                                                 // latest_block_timestamp is microseonds since UNIX epoch
                                                 // expiration_timestamp_secs is seconds since UNIX epoch
                                                 // giving a second buffer for expiration as the expiration time is rounded off to seconds
-                                            && (self.latest_block_timestamp + 1) / MICRO_SEC_PER_SEC < txn_summary.expiration_timestamp_secs
+                                            && aptos_infallible::duration_since_epoch().as_secs() < txn_summary.expiration_timestamp_secs
                                     })
                                     .count() as u64
                         } else {
@@ -529,7 +529,7 @@ impl ProofQueue {
                                     .iter()
                                     .filter(|summary| {
                                         filtered_txns.insert(**summary)
-                                            && (self.latest_block_timestamp + 1) / MICRO_SEC_PER_SEC < summary.expiration_timestamp_secs
+                                            && aptos_infallible::duration_since_epoch().as_secs() < summary.expiration_timestamp_secs
                                     })
                                     .count() as u64
                             },
