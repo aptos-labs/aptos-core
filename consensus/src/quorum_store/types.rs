@@ -58,7 +58,7 @@ impl PersistedValue {
         &self.maybe_payload
     }
 
-    pub fn synopsis(&self) -> Vec<TxnSummaryWithExpiration> {
+    pub fn summary(&self) -> Vec<TxnSummaryWithExpiration> {
         if let Some(payload) = &self.maybe_payload {
             return payload
                 .iter()
