@@ -162,7 +162,7 @@ impl RemoteCoordinatorClient {
                     let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
                         .with_label_values(&[&shard_id.to_string(), "init_prefetch"])
                         .start_timer();
-                    cmd_rx_thread_pool_clone.spawn(move || {
+                    cmd_rx_thread_pool_clone.spawn_fifo(move || {
 
 
                         let batch_start_index = txns.batch_start_index;
