@@ -3,7 +3,7 @@
 
 use crate::{generate_onchain_config_blob, NetworkLoadTest};
 use anyhow::Ok;
-use aptos::test::CliTestFramework;
+use movement::test::CliTestFramework;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, SwarmExt, Test};
 use aptos_logger::info;
 use aptos_sdk::bcs;
