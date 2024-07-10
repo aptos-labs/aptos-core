@@ -129,7 +129,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-        let num_handlers = 50;
+        let num_handlers = 30;
         let mut send_kv_channels = vec![];
         info!("Num handlers created is {}", num_handlers);
         for i in 0..num_handlers {
@@ -151,7 +151,22 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         }
         let mut received_msg = vec![0; 100];
         let base = 1000000000;
+        let mut curr_time;
+        let mut prev_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
         while let Ok(message) = self.kv_rx.recv() {
+            curr_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            REMOTE_EXECUTOR_TIMER
+                .with_label_values(&["0", "kv_recv_thread_waiting_time"])
+                .observe(((curr_time - prev_time) / 1000) as f64);
+            let _timer = REMOTE_EXECUTOR_TIMER
+                .with_label_values(&["0", "kv_requests_handler_timer"])
+                .start_timer();
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let mut delta = 0.0;
             if curr_time > message.start_ms_since_epoch.unwrap() {
@@ -160,10 +175,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                 .with_label_values(&["2_kv_req_coord_grpc_recv_spawning_req_handler"]).observe(delta);
 
-            let _timer = REMOTE_EXECUTOR_TIMER
-                .with_label_values(&["0", "kv_requests_handler_timer"])
-                .start_timer();
+
             send_kv_channels[message.shard_id.unwrap() as usize].send(message).unwrap();
+
+            prev_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
             // received_msg[message.shard_id.unwrap() as usize] += 1;
             // let priority = -((message.seq_num.unwrap() as i64 * base + received_msg[message.shard_id.unwrap() as usize] as i64));
             // {
