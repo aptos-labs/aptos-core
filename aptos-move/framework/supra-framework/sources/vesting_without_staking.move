@@ -266,9 +266,9 @@ module supra_framework::vesting_without_staking {
     ): VestingSchedule {
         let schedule_len =  vector::length(&schedule);
         assert!(schedule_len > 0, error::invalid_argument(EEMPTY_VESTING_SCHEDULE));
-//If the first vesting fraction is zero, we can replace it with nonzero by increasing start time
+        // If the first vesting fraction is zero, we can replace it with nonzero by increasing start time
         assert!(fixed_point32::get_raw_value(*vector::borrow(&schedule, 0)) != 0, error::invalid_argument(EEMPTY_VESTING_SCHEDULE));
-// last vesting fraction must be non zero to ensure that no amount remains unvested forever.
+        // last vesting fraction must be non zero to ensure that no amount remains unvested forever.
         assert!(fixed_point32::get_raw_value(*vector::borrow(&schedule, schedule_len - 1)) != 0, error::invalid_argument(EEMPTY_VESTING_SCHEDULE));
 
         assert!(period_duration > 0, error::invalid_argument(EZERO_VESTING_SCHEDULE_PERIOD));
@@ -375,14 +375,12 @@ module supra_framework::vesting_without_staking {
         };
 
 		let shareholders=simple_map::keys(&vesting_contract.shareholders);
-		while(vector::length(&shareholders)>0)
+		while(vector::length(&shareholders) > 0)
 		{
 			let shareholder = vector::pop_back(&mut shareholders);
 			vest_individual(contract_address,shareholder);
-
 		};
-        
-           }
+    }
 
 	public entry fun vest_individual(contract_address: address, shareholder_address: address) acquires VestingContract {
 		assert_active_vesting_contract(contract_address);
@@ -405,39 +403,35 @@ module supra_framework::vesting_without_staking {
         let last_completed_period =
             (timestamp::now_seconds() - vesting_schedule.start_timestamp_secs) / vesting_schedule.period_duration;
 		while(last_completed_period>=next_period_to_vest) {
+            // Index is 0-based while period is 1-based so we need to subtract 1.
+            let schedule_index = next_period_to_vest - 1;
+            let vesting_fraction = if (schedule_index < vector::length(schedule)) {
+                *vector::borrow(schedule, schedule_index)
+            } else {
+                // Last vesting schedule fraction will repeat until the grant runs out.
+                *vector::borrow(schedule, vector::length(schedule) - 1)
+            };
 
-        // Index is 0-based while period is 1-based so we need to subtract 1.
-        let schedule_index = next_period_to_vest - 1;
-        let vesting_fraction = if (schedule_index < vector::length(schedule)) {
-            *vector::borrow(schedule, schedule_index)
-        } else {
-            // Last vesting schedule fraction will repeat until the grant runs out.
-            *vector::borrow(schedule, vector::length(schedule) - 1)
-        };
+            //amount to be transfer is minimum of what is left and vesting fraction due of init_amount
+            let amount = min(vesting_record.left_amount,fixed_point32::multiply_u64(vesting_record.init_amount,vesting_fraction));
+            //update left_amount for the shareholder
+            vesting_record.left_amount = vesting_record.left_amount-amount;
+            coin::transfer<SupraCoin>(&vesting_signer,beneficiary,amount);
 
-		//amount to be transfer is minimum of what is left and vesting fraction due of init_amount
-		let amount = min(vesting_record.left_amount,fixed_point32::multiply_u64(vesting_record.init_amount,vesting_fraction));
-		//update left_amount for the shareholder
-		vesting_record.left_amount=vesting_record.left_amount-amount;
-		coin::transfer<SupraCoin>(&vesting_signer,beneficiary,amount);
+            emit_event(
+                &mut vesting_contract.vest_events,
+                VestEvent {
+                    admin: vesting_contract.admin,
+                    shareholder_address: shareholder_address,
+                    vesting_contract_address: contract_address,
+                    period_vested: next_period_to_vest,
+                },
+            );
 
-    emit_event(
-            &mut vesting_contract.vest_events,
-            VestEvent {
-                admin: vesting_contract.admin,
-				shareholder_address: shareholder_address,
-                vesting_contract_address: contract_address,
-                period_vested: next_period_to_vest,
-            },
-        );
-
-		//update last_vested_period for the shareholder
-        vesting_record.last_vested_period = next_period_to_vest;
-		next_period_to_vest = next_period_to_vest+1;
-		
+            //update last_vested_period for the shareholder
+            vesting_record.last_vested_period = next_period_to_vest;
+            next_period_to_vest = next_period_to_vest+1;
 		};
-
-
 	}
 	
     /// Distribute any withdrawable grant.
