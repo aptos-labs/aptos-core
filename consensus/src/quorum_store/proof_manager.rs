@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, ProofWithData, TransactionSummary},
+    common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
@@ -29,7 +29,7 @@ use std::{
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
-    ReceiveBatches(Vec<(BatchInfo, Vec<TransactionSummary>)>),
+    ReceiveBatches(Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -168,7 +168,7 @@ impl ProofManager {
 
     pub(crate) fn receive_batches(
         &mut self,
-        batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
+        batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
         if self.allow_batches_without_pos_in_proposal {
             let batches = batch_summaries
@@ -212,6 +212,7 @@ impl ProofManager {
                 return_non_full,
                 filter,
                 callback,
+                block_timestamp,
             ) => {
                 let excluded_batches: HashSet<_> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -228,6 +229,7 @@ impl ProofManager {
                         max_txns_after_filtering,
                         max_bytes,
                         return_non_full,
+                        block_timestamp,
                     );
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);

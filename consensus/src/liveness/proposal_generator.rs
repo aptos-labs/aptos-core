@@ -376,6 +376,7 @@ impl ProposalGenerator {
                     pending_ordering,
                     pending_blocks.len(),
                     max_fill_fraction,
+                    timestamp,
                 )
                 .await
                 .context("Fail to retrieve payload")?;

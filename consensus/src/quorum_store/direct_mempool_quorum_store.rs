@@ -146,6 +146,7 @@ impl DirectMempoolQuorumStore {
                 return_non_full,
                 payload_filter,
                 callback,
+                _block_timestamp,
             ) => {
                 self.handle_block_request(
                     max_txns_after_filtering,
