@@ -46,8 +46,8 @@ impl fmt::Display for GetPayloadCommand {
             ) => {
                 write!(
                     f,
-                    "GetPayloadRequest [max_txns: {}, max_unique_txns: {}, max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}, block_timestamp: {:?}]",
-                    max_txns, max_unique_txns, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded, block_timestamp
+                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {}, max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}, block_timestamp: {:?}]",
+                    max_txns, max_txns_after_filtering, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded, block_timestamp
                 )
             },
         }
