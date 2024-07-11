@@ -71,6 +71,7 @@ const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
+#[allow(dead_code)]
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
 const APTOS_COINS_BASE_WITH_DECIMALS: u64 = u64::pow(10, 8);
@@ -384,6 +385,26 @@ fn exec_function(
         });
 }
 
+// Calculates the per-epoch rewards rate, represented as 2 separate ints (numerator and
+// denominator).
+#[cfg(feature = "aptos")]
+fn rewards_rate(genesis_config: &GenesisConfiguration) -> (u64, u64) {
+    const REWARDS_RATE_DENOMINATOR: u64 = 1_000_000_000;
+    // Multiplication before division to minimize rounding errors due to integer division.
+    // To convert the percentage to the fractional value, divide by 100, which can be folded
+    // into the constant denominator scaling factor.
+    let rewards_rate_numerator = genesis_config.rewards_apy_percentage
+        * (REWARDS_RATE_DENOMINATOR / 100)
+        * genesis_config.epoch_duration_secs
+        / NUM_SECONDS_PER_YEAR;
+    (rewards_rate_numerator, REWARDS_RATE_DENOMINATOR)
+}
+
+#[cfg(not(feature = "aptos"))]
+fn rewards_rate(_: &GenesisConfiguration) -> (u64, u64) {
+    (0, 1)
+}
+
 fn initialize(
     session: &mut SessionExt,
     chain_id: ChainId,
@@ -401,14 +422,8 @@ fn initialize(
     let execution_config_bytes =
         bcs::to_bytes(execution_config).expect("Failure serializing genesis consensus config");
 
-    // Calculate the per-epoch rewards rate, represented as 2 separate ints (numerator and
-    // denominator).
-    let rewards_rate_denominator = 1_000_000_000;
-    let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / genesis_config.epoch_duration_secs;
-    // Multiplication before division to minimize rounding errors due to integer division.
-    let rewards_rate_numerator = (genesis_config.rewards_apy_percentage * rewards_rate_denominator
-        / 100)
-        / num_epochs_in_a_year;
+
+    let (rewards_rate_numerator, rewards_rate_denominator) = rewards_rate(genesis_config);
 
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
