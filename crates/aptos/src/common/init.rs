@@ -138,13 +138,13 @@ impl CliCommand<()> for InitTool {
             },
             Network::Testnet => {
                 profile_config.rest_url =
-                    Some("https://fullnode.testnet.aptoslabs.com".to_string());
+                    Some("https://aptos.testnet.suzuka.movementlabs.xyz/v1/".to_string());
                 profile_config.faucet_url =
-                    Some("https://faucet.testnet.aptoslabs.com".to_string());
+                    Some("https://faucet.testnet.suzuka.movementlabs.xyz/".to_string());
             },
             Network::Devnet => {
-                profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
-                profile_config.faucet_url = Some("https://faucet.devnet.aptoslabs.com".to_string());
+                profile_config.rest_url = Some("https://aptos.devnet.inola.movementlabs.xyz/v1".to_string());
+                profile_config.faucet_url = Some("https://faucet.devnet.inola.movementlabs.xyz".to_string());
             },
             Network::Local => {
                 profile_config.rest_url = Some("http://localhost:8080".to_string());
