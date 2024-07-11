@@ -565,7 +565,11 @@ impl TransactionStore {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
         let mut last_timeline_id = timeline_id.id_per_bucket.clone();
-
+        counters::MEMPOOL_READ_TIMELINE_FREQUENCY.inc();
+        counters::MEMPOOL_READ_TIMELINE_MAX_TXNS.observe(count as f64);
+        counters::MEMPOOL_READ_TIMELINE_BEFORE
+            .observe_duration(Instant::now().duration_since(before.unwrap_or(Instant::now())));
+        let mut batch_full = false;
         // Add as many transactions to the batch as possible
         for (i, bucket) in self
             .timeline_index
@@ -576,8 +580,15 @@ impl TransactionStore {
         {
             for (address, sequence_number) in bucket {
                 if let Some(txn) = self.get_mempool_txn(address, *sequence_number) {
+                    println!(
+                        "read_timeline: address: {}, sequence_number: {}, time taken: {:?}",
+                        address,
+                        sequence_number,
+                        SystemTime::now().duration_since(txn.insertion_info.insertion_time)
+                    );
                     let transaction_bytes = txn.txn.raw_txn_bytes_len() as u64;
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
+                        batch_full = true;
                         break; // The batch is full
                     } else {
                         batch.push(txn.txn.clone());
@@ -601,6 +612,7 @@ impl TransactionStore {
                 }
             }
         }
+        info!("read_timeline: requested size: {}, batch size: {}, before: {:?}, timeline_id: {:?}, output timeline_id: {:?}, batch_full: {}", count, batch.len(), Instant::now().duration_since(before.unwrap_or(Instant::now())), timeline_id, last_timeline_id, batch_full);
 
         (batch, last_timeline_id.into())
     }
