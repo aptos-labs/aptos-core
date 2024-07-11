@@ -142,26 +142,30 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let thread_pool_clone = self.thread_pool.clone();
         let num_handlers = 60;
         info!("Num handlers created is {}", num_handlers);
-        for i in 0..num_handlers {
-            let state_view_clone = self.state_view.clone();
-            let kv_tx_clone = self.kv_tx.clone();
-            let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
-            let recv_condition_clone = self.recv_condition.clone();
-            let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
-            thread_pool_clone.spawn(move || {
-                Self::priority_handler(state_view_clone.clone(),
-                                       kv_tx_clone.clone(),
-                                       kv_unprocessed_pq_clone,
-                                       recv_condition_clone.clone(),
-                                       outbound_rpc_runtime_clone,
-                                       i)
-            });
-        }
+        // for i in 0..num_handlers {
+        //     let state_view_clone = self.state_view.clone();
+        //     let kv_tx_clone = self.kv_tx.clone();
+        //     let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
+        //     let recv_condition_clone = self.recv_condition.clone();
+        //     let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
+        //     thread_pool_clone.spawn(move || {
+        //         Self::priority_handler(state_view_clone.clone(),
+        //                                kv_tx_clone.clone(),
+        //                                kv_unprocessed_pq_clone,
+        //                                recv_condition_clone.clone(),
+        //                                outbound_rpc_runtime_clone,
+        //                                i)
+        //     });
+        // }
         for i in 0..self.num_shards {
             let kv_rx_clone = self.kv_rx[i].clone();
             let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
             let recv_condition_clone = self.recv_condition.clone();
+            let state_view_clone = self.state_view.clone();
+            let kv_tx_clone = self.kv_tx.clone();
+            let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
             self.thread_pool_recv.spawn(move || {
+                let mut rng = StdRng::from_entropy();
                 while let Ok(message) = kv_rx_clone.recv() {
                     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
                     let mut delta = 0.0;
@@ -181,17 +185,18 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                     if message.shard_id.unwrap() == 0 && priority >= 6200 {
                         info!("Received last message from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
                     }
-                    {
-                        let (lock, cvar) = &*recv_condition_clone;
-                        let _lg = lock.lock().unwrap();
-                        kv_unprocessed_pq_clone.push(message, (priority / 200) as u64);
-                        //self.recv_condition.1.notify_all();
-                        recv_condition_clone.1.notify_all();
-                        //recv_condition_clone.1.notify_one();
-                    }
-                    REMOTE_EXECUTOR_TIMER
-                        .with_label_values(&["0", "kv_req_pq_size"])
-                        .observe(kv_unprocessed_pq_clone.len() as f64);
+                    Self::handle_message(message, state_view_clone.clone(), kv_tx_clone.clone(), rng.gen_range(0, kv_tx_clone[0].len()), outbound_rpc_runtime_clone.clone());
+                    // {
+                    //     let (lock, cvar) = &*recv_condition_clone;
+                    //     let _lg = lock.lock().unwrap();
+                    //     kv_unprocessed_pq_clone.push(message, (priority / 200) as u64);
+                    //     //self.recv_condition.1.notify_all();
+                    //     //recv_condition_clone.1.notify_all();
+                    //     recv_condition_clone.1.notify_one();
+                    // }
+                    // REMOTE_EXECUTOR_TIMER
+                    //     .with_label_values(&["0", "kv_req_pq_size"])
+                    //     .observe(kv_unprocessed_pq_clone.len() as f64);
                 }
             });
         }
