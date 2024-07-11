@@ -151,7 +151,7 @@ impl TestHarness {
                         raw_request: data,
                     }),
                     sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
-                    rx_at: 0,
+                    receive_timestamp_micros: 0,
                     rpc_replier: Some(Arc::new(res_tx)),
                 },
                 Some(delivered_tx),

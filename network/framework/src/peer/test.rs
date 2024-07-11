@@ -431,7 +431,7 @@ fn peer_recv_rpc() {
             let ReceivedMessage {
                 message,
                 sender: _sender,
-                rx_at: _rx_at,
+                receive_timestamp_micros: _rx_at,
                 rpc_replier,
             } = received;
             assert_eq!(

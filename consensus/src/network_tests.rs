@@ -171,7 +171,7 @@ impl NetworkPlayground {
                                     NetworkId::Validator,
                                     src_twin_id.author,
                                 ),
-                                rx_at: 0,
+                                receive_timestamp_micros: 0,
                                 rpc_replier: Some(Arc::new(outbound_req.res_tx)),
                             },
                         )
@@ -237,7 +237,7 @@ impl NetworkPlayground {
                         raw_msg: msg.mdata.clone().into(),
                     }),
                     sender: PeerNetworkId::new(NetworkId::Validator, *src),
-                    rx_at: 0,
+                    receive_timestamp_micros: 0,
                     rpc_replier: None,
                 };
                 let msg: ConsensusMsg = msg.to_message().unwrap();
@@ -831,7 +831,7 @@ mod tests {
                 raw_msg: Bytes::from_static(b"\xde\xad\xbe\xef").into(),
             }),
             sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
-            rx_at: 0,
+            receive_timestamp_micros: 0,
             rpc_replier: None,
         };
 
@@ -853,7 +853,7 @@ mod tests {
                 raw_request: Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()).into(),
             }),
             sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
-            rx_at: 0,
+            receive_timestamp_micros: 0,
             rpc_replier: Some(Arc::new(res_tx)),
         };
 

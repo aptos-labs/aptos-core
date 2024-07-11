@@ -138,7 +138,7 @@ pub struct ReceivedMessage {
     pub sender: PeerNetworkId,
 
     // unix microseconds
-    pub rx_at: u64,
+    pub receive_timestamp_micros: u64,
 
     pub rpc_replier: Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
 }
@@ -153,7 +153,7 @@ impl ReceivedMessage {
         Self {
             message,
             sender,
-            rx_at,
+            receive_timestamp_micros: rx_at,
             rpc_replier: None,
         }
     }
@@ -183,7 +183,7 @@ impl ReceivedMessage {
 impl PartialEq for ReceivedMessage {
     fn eq(&self, other: &Self) -> bool {
         (self.message == other.message)
-            && (self.rx_at == other.rx_at)
+            && (self.receive_timestamp_micros == other.receive_timestamp_micros)
             && (self.sender == other.sender)
     }
 }
@@ -275,7 +275,7 @@ fn received_message_to_event<TMessage: Message>(
     let ReceivedMessage {
         message,
         sender: _sender,
-        rx_at,
+        receive_timestamp_micros: rx_at,
         rpc_replier,
     } = message;
     let now = std::time::SystemTime::now();

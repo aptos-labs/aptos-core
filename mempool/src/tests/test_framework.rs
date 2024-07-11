@@ -269,7 +269,7 @@ impl MempoolNode {
                         raw_msg: data,
                     }),
                     sender: PeerNetworkId::new(network_id, remote_peer_id),
-                    rx_at: 0,
+                    receive_timestamp_micros: 0,
                     rpc_replier: None,
                 },
                 None,
@@ -284,7 +284,7 @@ impl MempoolNode {
                         raw_request: data,
                     }),
                     sender: PeerNetworkId::new(network_id, remote_peer_id),
-                    rx_at: 0,
+                    receive_timestamp_micros: 0,
                     rpc_replier: Some(Arc::new(res_tx)),
                 };
                 (rmsg, Some(res_rx))
@@ -422,7 +422,7 @@ impl MempoolNode {
                     raw_msg: bytes,
                 }),
                 sender: PeerNetworkId::new(network_id, peer_id),
-                rx_at: 0,
+                receive_timestamp_micros: 0,
                 rpc_replier: None,
             };
             inbound_handle

@@ -170,7 +170,7 @@ impl MockClient {
                 raw_request: data,
             }),
             sender: PeerNetworkId::new(network_id, peer_id),
-            rx_at: 0,
+            receive_timestamp_micros: 0,
             rpc_replier: Some(Arc::new(res_tx)),
         };
 
