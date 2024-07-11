@@ -27,6 +27,7 @@ pub trait UserPayloadClient: Send + Sync {
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
+        block_timestamp: Duration,
     ) -> anyhow::Result<Payload, QuorumStoreError>;
 }
 
@@ -59,6 +60,7 @@ impl UserPayloadClient for DummyClient {
         _pending_ordering: bool,
         _pending_uncommitted_blocks: usize,
         _recent_max_fill_fraction: f32,
+        _block_timestamp: Duration,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let timer = Instant::now();
         let mut nxt_txn_idx = 0;

@@ -59,6 +59,7 @@ impl PriorityIndex {
         OrderedQueueKey {
             gas_ranking_score: txn.ranking_score,
             expiration_time: txn.expiration_time,
+            insertion_time: txn.insertion_info.insertion_time,
             address: txn.get_sender(),
             sequence_number: txn.sequence_info,
             hash: txn.get_committed_hash(),
@@ -78,6 +79,7 @@ impl PriorityIndex {
 pub struct OrderedQueueKey {
     pub gas_ranking_score: u64,
     pub expiration_time: Duration,
+    pub insertion_time: SystemTime,
     pub address: AccountAddress,
     pub sequence_number: SequenceInfo,
     pub hash: HashValue,
@@ -95,7 +97,7 @@ impl Ord for OrderedQueueKey {
             Ordering::Equal => {},
             ordering => return ordering,
         }
-        match self.expiration_time.cmp(&other.expiration_time).reverse() {
+        match self.insertion_time.cmp(&other.insertion_time).reverse() {
             Ordering::Equal => {},
             ordering => return ordering,
         }
