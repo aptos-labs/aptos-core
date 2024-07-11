@@ -16,6 +16,7 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 use std::sync::Mutex;
+use std::time::SystemTime;
 use aptos_logger::info;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
@@ -157,6 +158,13 @@ impl RemoteCoordinatorClient {
                     if num_txns_processed == num_txns_in_the_block {
                         is_block_init_done_clone.store(false, std::sync::atomic::Ordering::Relaxed);
                         break_out = true;
+                    }
+                    let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                    if num_txns_processed == 200 {
+                        info!("Send first batch from a shard with seq_num {} at time {}", num_txns_processed, curr_time);
+                    }
+                    if num_txns_processed >= 6200 {
+                        info!("Send first batch from a shard with seq_num {} at time {}", num_txns_processed, curr_time);
                     }
 
                     let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
