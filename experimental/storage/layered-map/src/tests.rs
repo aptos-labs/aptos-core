@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::MapLayer;
+use crate::layer::MapLayer;
 use bitvec::{order::Msb0, view::BitView};
 use proptest::{
     collection::{btree_map, vec},

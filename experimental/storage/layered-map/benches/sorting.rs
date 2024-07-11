@@ -194,7 +194,6 @@ fn compare_sorting(c: &mut Criterion) {
             BatchSize::SmallInput,
         )
     });
-
 }
 
 criterion_group!(
