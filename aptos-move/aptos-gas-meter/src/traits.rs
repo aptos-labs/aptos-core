@@ -7,7 +7,7 @@ use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet,
+    change_set::ChangeSetInterface,
     resolver::ExecutorView,
     storage::{
         io_pricing::IoPricing,
@@ -140,7 +140,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// unless you are doing something special, such as injecting additional logging logic.
     fn process_storage_fee_for_all(
         &mut self,
-        change_set: &mut VMChangeSet,
+        change_set: &mut impl ChangeSetInterface,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
         executor_view: &dyn ExecutorView,
@@ -173,12 +173,9 @@ pub trait AptosGasMeter: MoveGasMeter {
         }
 
         // Events (no event fee in v2)
-        let event_fee = change_set
-            .events()
-            .iter()
-            .fold(Fee::new(0), |acc, (event, _)| {
-                acc + pricing.legacy_storage_fee_per_event(params, event)
-            });
+        let event_fee = change_set.events_iter().fold(Fee::new(0), |acc, event| {
+            acc + pricing.legacy_storage_fee_per_event(params, event)
+        });
         let event_discount = pricing.legacy_storage_discount_for_events(params, event_fee);
         let event_net_fee = event_fee
             .checked_sub(event_discount)

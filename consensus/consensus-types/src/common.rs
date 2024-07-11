@@ -51,6 +51,36 @@ impl fmt::Display for TransactionSummary {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
+pub struct TxnSummaryWithExpiration {
+    pub sender: AccountAddress,
+    pub sequence_number: u64,
+    pub expiration_timestamp_secs: u64,
+    pub hash: HashValue,
+}
+
+impl TxnSummaryWithExpiration {
+    pub fn new(
+        sender: AccountAddress,
+        sequence_number: u64,
+        expiration_timestamp_secs: u64,
+        hash: HashValue,
+    ) -> Self {
+        Self {
+            sender,
+            sequence_number,
+            expiration_timestamp_secs,
+            hash,
+        }
+    }
+}
+
+impl fmt::Display for TxnSummaryWithExpiration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.sender, self.sequence_number,)
+    }
+}
+
 #[derive(Clone)]
 pub struct TransactionInProgress {
     pub gas_unit_price: u64,
@@ -168,7 +198,7 @@ impl ProofWithData {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ProofWithDataWithTxnLimit {
     pub proof_with_data: ProofWithData,
-    pub max_txns_to_execute: Option<usize>,
+    pub max_txns_to_execute: Option<u64>,
 }
 
 impl PartialEq for ProofWithDataWithTxnLimit {
@@ -181,7 +211,7 @@ impl PartialEq for ProofWithDataWithTxnLimit {
 impl Eq for ProofWithDataWithTxnLimit {}
 
 impl ProofWithDataWithTxnLimit {
-    pub fn new(proof_with_data: ProofWithData, max_txns_to_execute: Option<usize>) -> Self {
+    pub fn new(proof_with_data: ProofWithData, max_txns_to_execute: Option<u64>) -> Self {
         Self {
             proof_with_data,
             max_txns_to_execute,
@@ -197,7 +227,7 @@ impl ProofWithDataWithTxnLimit {
     }
 }
 
-fn sum_max_txns_to_execute(m1: Option<usize>, m2: Option<usize>) -> Option<usize> {
+fn sum_max_txns_to_execute(m1: Option<u64>, m2: Option<u64>) -> Option<u64> {
     match (m1, m2) {
         (None, _) => m2,
         (_, None) => m1,
@@ -214,12 +244,12 @@ pub enum Payload {
     QuorumStoreInlineHybrid(
         Vec<(BatchInfo, Vec<SignedTransaction>)>,
         ProofWithData,
-        Option<usize>,
+        Option<u64>,
     ),
 }
 
 impl Payload {
-    pub fn transform_to_quorum_store_v2(self, max_txns_to_execute: Option<usize>) -> Self {
+    pub fn transform_to_quorum_store_v2(self, max_txns_to_execute: Option<u64>) -> Self {
         match self {
             Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
                 ProofWithDataWithTxnLimit::new(proof_with_status, max_txns_to_execute),

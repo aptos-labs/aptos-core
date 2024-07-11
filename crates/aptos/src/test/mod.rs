@@ -828,6 +828,7 @@ impl CliTestFramework {
                 framework_local_dir: framework_dir,
                 skip_fetch_latest_git_deps: false,
             },
+            template: None,
         }
         .execute()
         .await

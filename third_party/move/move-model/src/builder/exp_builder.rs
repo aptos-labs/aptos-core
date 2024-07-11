@@ -25,10 +25,11 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
+    FunId,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{self, AbilitySet};
+use move_binary_format::file_format::{self, Ability, AbilitySet};
 use move_compiler::{
     expansion::ast as EA,
     hlir::ast as HA,
@@ -171,7 +172,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
-        if self.env().language_version() < version_min {
+        if !self.env().language_version().is_at_least(version_min) {
             self.env().error(
                 loc,
                 &format!(
@@ -381,7 +382,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let mut reported_vars = BTreeSet::new();
             for i in self.node_counter_start..self.env().next_free_node_number() {
                 let node_id = NodeId::new(i);
-
                 if let Some(ty) = self.get_node_type_opt(node_id) {
                     let ty = self.finalize_type(node_id, &ty, &mut reported_vars);
                     self.update_node_type(node_id, ty);
@@ -1636,7 +1636,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     context,
                 )
             },
-            EA::Exp_::ExpDotted(dotted) => self.translate_dotted(dotted, expected_type, context),
+            EA::Exp_::ExpDotted(dotted) => {
+                self.translate_dotted(dotted, expected_type, false, context)
+            },
             EA::Exp_::Index(target, index) => {
                 self.translate_index(&loc, target, index, expected_type, context)
             },
@@ -1735,7 +1737,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let (rhs_ty, rhs) = self.translate_exp_free(rhs);
                 // Do not freeze when translating the lhs of a mutate operation
                 self.insert_freeze = false;
-                let (lhs_ty, lhs) = self.translate_exp_free(lhs);
+                let (lhs_ty, lhs) = if let EA::Exp_::Index(target, index) = &lhs.value {
+                    let result_ty =
+                        Type::Reference(ReferenceKind::Mutable, Box::new(rhs_ty.clone()));
+                    if let Some(call) = self.try_resource_or_vector_index(
+                        &loc, target, index, context, &result_ty, true,
+                    ) {
+                        (result_ty, call)
+                    } else {
+                        self.translate_exp_free(lhs)
+                    }
+                } else {
+                    self.translate_exp_free(lhs)
+                };
                 self.insert_freeze = true;
                 self.check_type(
                     &self.get_node_loc(lhs.node_id()),
@@ -1751,7 +1765,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let (ty, rhs) = self.translate_exp_free(rhs);
                 // Do not freeze when translating the lhs of a mutate operation
                 self.insert_freeze = false;
-                let lhs = self.translate_dotted(lhs, &ty, &ErrorMessageContext::Assignment);
+                let lhs = self.translate_dotted(lhs, &ty, true, &ErrorMessageContext::Assignment);
                 self.insert_freeze = true;
                 let result_ty = self.check_type(&loc, &Type::unit(), expected_type, context);
                 let id = self.new_node_id_with_type_loc(&result_ty, &loc);
@@ -1774,6 +1788,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let target_ty = self.fresh_type_var();
                 let ty = Type::Reference(ref_kind, Box::new(target_ty.clone()));
                 let result_ty = self.check_type(&loc, &ty, expected_type, context);
+                if let EA::Exp_::Index(target, index) = &exp.value {
+                    if let Some(call) = self.try_resource_or_vector_index(
+                        &loc, target, index, context, &result_ty, *mutable,
+                    ) {
+                        return call;
+                    }
+                }
                 let target_exp = self.translate_exp(exp, &target_ty);
                 if self.subs.specialize(&target_ty).is_reference() {
                     self.error(&loc, "cannot borrow from a reference")
@@ -3236,6 +3257,201 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    fn call_to_borrow_global_for_index_op(
+        &mut self,
+        loc: &Loc,
+        resource_ty_exp: &EA::Exp,
+        addr_exp: &EA::Exp,
+        mutable: bool,
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        fn convert_name_to_type(
+            loc: &move_ir_types::location::Loc,
+            exp_: EA::Exp_,
+        ) -> Option<EA::Type> {
+            if let EA::Exp_::Name(m, type_opt) = exp_ {
+                Some(EA::Type::new(
+                    *loc,
+                    EA::Type_::Apply(m, type_opt.unwrap_or(vec![])),
+                ))
+            } else {
+                None
+            }
+        }
+        let type_opt = convert_name_to_type(&resource_ty_exp.loc, resource_ty_exp.clone().value);
+        if let Some(ty) = type_opt {
+            let resource_ty = self.translate_type(&ty);
+            let ref_t = Type::Reference(
+                ReferenceKind::from_is_mut(mutable),
+                Box::new(resource_ty.clone()),
+            );
+            let ty = self.check_type(loc, &ref_t, expected_type, context);
+            if ty.is_error() {
+                return self.new_error_exp();
+            }
+            let addr = self.translate_exp_in_context(
+                addr_exp,
+                &Type::Primitive(PrimitiveType::Address),
+                context,
+            );
+            let node = self.new_node_id_with_type_loc(
+                &Type::Reference(
+                    ReferenceKind::from_is_mut(mutable),
+                    Box::new(resource_ty.clone()),
+                ),
+                loc,
+            );
+            self.set_node_instantiation(node, vec![resource_ty.clone()]);
+            ExpData::Call(
+                node,
+                Operation::BorrowGlobal(ReferenceKind::from_is_mut(mutable)),
+                vec![addr.into()],
+            )
+        } else {
+            self.new_error_exp()
+        }
+    }
+
+    //TODO: make a Lazy const for mid and fid of vector functions
+    fn get_vector_borrow(&self, mutable: bool) -> (Option<ModuleId>, Option<FunId>) {
+        let target_str = if mutable {
+            "vector::borrow_mut"
+        } else {
+            "vector::borrow"
+        };
+        for m in self.env().get_modules() {
+            if m.is_std_vector() {
+                let mid = m.get_id();
+                for f in m.get_functions() {
+                    if f.get_full_name_str() == target_str {
+                        let fid = f.get_id();
+                        return (Some(mid), Some(fid));
+                    }
+                }
+            }
+        }
+        (None, None)
+    }
+
+    fn call_to_vector_borrow_for_index_op(
+        &mut self,
+        loc: &Loc,
+        vec_exp: &EA::Exp,
+        idx_exp: &EA::Exp,
+        mutable: bool,
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let inner_ty = if let Type::Reference(_, in_ty) = &expected_type {
+            in_ty.as_ref().clone()
+        } else {
+            expected_type.clone()
+        };
+        let ref_vec_exp_e = &sp(
+            vec_exp.loc,
+            EA::Exp_::Borrow(mutable, Box::new(vec_exp.clone())),
+        );
+        let vec_exp_e = self.translate_exp_in_context(
+            ref_vec_exp_e,
+            &Type::Reference(
+                ReferenceKind::from_is_mut(mutable),
+                Box::new(Type::Vector(Box::new(inner_ty.clone()))),
+            ),
+            context,
+        );
+        let idx_exp_e =
+            self.translate_exp_in_context(idx_exp, &Type::Primitive(PrimitiveType::U64), context);
+        if self.had_errors {
+            return self.new_error_exp();
+        }
+        if let (Some(mid), Some(fid)) = self.get_vector_borrow(mutable) {
+            let instantiated_inner = self.subs.specialize(&inner_ty);
+            let node_id = self.env().new_node(
+                loc.clone(),
+                Type::Reference(
+                    ReferenceKind::from_is_mut(mutable),
+                    Box::new(instantiated_inner.clone()),
+                ),
+            );
+            self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
+            let call = ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
+                vec_exp_e.into_exp(),
+                idx_exp_e.clone().into_exp(),
+            ]);
+            return call;
+        }
+        ExpData::Invalid(self.env().new_node_id())
+    }
+
+    /// Try to translate a resource or vector Index expression
+    fn try_resource_or_vector_index(
+        &mut self,
+        loc: &Loc,
+        target: &EA::Exp,
+        index: &EA::Exp,
+        context: &ErrorMessageContext,
+        ty: &Type,
+        mutable: bool,
+    ) -> Option<ExpData> {
+        let mut call = None;
+        if let EA::Exp_::Name(m, _) = &target.value {
+            let global_var_sym = match &m.value {
+                EA::ModuleAccess_::ModuleAccess(..) => self.parent.module_access_to_qualified(m),
+                EA::ModuleAccess_::Name(name) => {
+                    let sym = self.symbol_pool().make(name.value.as_str());
+                    self.parent.qualified_by_module(sym)
+                },
+            };
+            if self
+                .parent
+                .parent
+                .struct_table
+                .contains_key(&global_var_sym)
+            {
+                self.check_language_version(loc, "resource indexing", LanguageVersion::V2_0);
+                if self
+                    .parent
+                    .parent
+                    .struct_table
+                    .get(&global_var_sym)
+                    .is_some_and(|entry| entry.abilities.has_ability(Ability::Key))
+                {
+                    call = Some(self.call_to_borrow_global_for_index_op(
+                        loc, target, index, mutable, ty, context,
+                    ));
+                } else {
+                    self.error(loc, "resource indexing can only applied to a resource type (a struct type which has key ability)");
+                    call = Some(self.new_error_exp());
+                }
+            } else if self
+                .parent
+                .parent
+                .spec_schema_table
+                .contains_key(&global_var_sym)
+                && self
+                    .env()
+                    .language_version
+                    .is_at_least(LanguageVersion::V2_0)
+            {
+                self.error(loc, "indexing can only be applied to a vector or a resource type (a struct type which has key ability)");
+                call = Some(self.new_error_exp());
+            }
+        }
+        if !self.is_spec_mode() {
+            self.check_language_version(loc, "vector indexing", LanguageVersion::V2_0);
+            // Translate to vector indexing in impl mode if the target is not a resource or a spec schema
+            // spec mode is handled in `translate_index`
+            if call.is_none() {
+                call =
+                    Some(self.call_to_vector_borrow_for_index_op(
+                        loc, target, index, mutable, ty, context,
+                    ));
+            }
+        }
+        call
+    }
+
     /// Translate an Index expression.
     fn translate_index(
         &mut self,
@@ -3245,6 +3461,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
+        let index_call_opt = self.try_resource_or_vector_index(
+            loc,
+            target,
+            index,
+            context,
+            &Type::Reference(ReferenceKind::Immutable, Box::new(expected_type.clone())),
+            false,
+        );
+        if let Some(call) = index_call_opt {
+            if !self.is_spec_mode() {
+                // if v[i] is on right hand side, need deref to get the value
+                let deref_id = self.new_node_id_with_type_loc(expected_type, loc);
+                return ExpData::Call(deref_id, Operation::Deref, vec![call.into_exp()]);
+            }
+            return call;
+        }
         // We must concretize the type of index to decide whether this is a slice
         // or not. This is not compatible with full type inference, so we may
         // try to actually represent slicing explicitly in the syntax to fix this.
@@ -3277,10 +3509,28 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         dotted: &EA::ExpDotted,
         expected_type: &Type,
+        index_mutate: bool,
         context: &ErrorMessageContext,
     ) -> ExpData {
         match &dotted.value {
-            EA::ExpDotted_::Exp(e) => self.translate_exp_in_context(e, expected_type, context),
+            EA::ExpDotted_::Exp(e) => {
+                if let EA::Exp_::Index(target, index) = &e.value {
+                    if let Some(call) = self.try_resource_or_vector_index(
+                        &self.to_loc(&e.loc),
+                        target,
+                        index,
+                        context,
+                        &Type::Reference(
+                            ReferenceKind::from_is_mut(index_mutate),
+                            Box::new(expected_type.clone()),
+                        ),
+                        index_mutate,
+                    ) {
+                        return call;
+                    }
+                }
+                self.translate_exp_in_context(e, expected_type, context)
+            },
             EA::ExpDotted_::Dot(e, n) => {
                 let loc = self.to_loc(&dotted.loc);
                 let field_name = self.symbol_pool().make(n.value.as_str());
@@ -3289,7 +3539,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 let ty =
                     self.fresh_type_var_constr(loc.clone(), WideningOrder::RightToLeft, constraint);
-                let exp = self.translate_dotted(e.as_ref(), &ty, &ErrorMessageContext::General);
+                let exp = self.translate_dotted(
+                    e.as_ref(),
+                    &ty,
+                    index_mutate,
+                    &ErrorMessageContext::General,
+                );
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 self.set_node_instantiation(id, vec![ty.clone()]);
                 let oper = if let Type::Struct(mid, sid, _inst) = self.subs.specialize(&ty) {

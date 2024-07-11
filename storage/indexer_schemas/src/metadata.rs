@@ -18,8 +18,10 @@ impl MetadataValue {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Hash, PartialOrd, Ord)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub enum MetadataKey {
     LatestVersion,
+    EventPrunerProgress,
+    TransactionPrunerProgress,
 }

@@ -112,14 +112,14 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
 
     #[inline]
     fn is_allowed(&self, module_id: &EntryFunctionId) -> bool {
-        if !self.module.is_allowed(&module_id.name) {
+        if !self.function.is_allowed(&module_id.name) {
             return false;
         }
 
         if self.address.is_some() || self.function.is_some() {
             if let Some(module) = &module_id.module.as_ref() {
                 if !(self.address.is_allowed(&module.address)
-                    && self.function.is_allowed(&module.name))
+                    && self.module.is_allowed(&module.name))
                 {
                     return false;
                 }
