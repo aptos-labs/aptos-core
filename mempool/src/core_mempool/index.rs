@@ -306,6 +306,7 @@ impl MultiBucketTimelineIndex {
             .map(|bucket_min| bucket_min.to_string())
             .collect();
 
+        info!("bucket_mins_to_string: {:?}", bucket_mins_to_string);
         Ok(Self {
             timelines,
             bucket_mins,
@@ -322,7 +323,7 @@ impl MultiBucketTimelineIndex {
         before: Option<Instant>,
     ) -> Vec<Vec<(AccountAddress, u64)>> {
         assert!(timeline_id.id_per_bucket.len() == self.bucket_mins.len());
-
+        let mut batch_full = false;
         let mut added = 0;
         let mut returned = vec![];
         for (timeline, &timeline_id) in self
@@ -336,12 +337,14 @@ impl MultiBucketTimelineIndex {
             returned.push(txns);
 
             if added == count {
+                batch_full = true;
                 break;
             }
         }
         while returned.len() < self.timelines.len() {
             returned.push(vec![]);
         }
+        info!("timeline_index count: {}, batch_full: {}", count, batch_full);
         returned.iter().rev().cloned().collect()
     }
 
