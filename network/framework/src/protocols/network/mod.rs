@@ -284,15 +284,16 @@ fn received_message_to_event<TMessage: Message>(
         .unwrap()
         .as_micros() as u64;
     let dt_micros = dequeue_at - rx_at;
+    let dt_seconds = (dt_micros as f64) / 1000000.0;
     match message {
         NetworkMessage::RpcRequest(rpc_req) => {
-            crate::counters::inbound_queue_delay_observe(rpc_req.protocol_id, dt_micros);
+            crate::counters::inbound_queue_delay_observe(rpc_req.protocol_id, dt_seconds);
             let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
             request_to_network_event(peer_id, &rpc_req)
                 .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_replier))
         },
         NetworkMessage::DirectSendMsg(request) => {
-            crate::counters::inbound_queue_delay_observe(request.protocol_id, dt_micros);
+            crate::counters::inbound_queue_delay_observe(request.protocol_id, dt_seconds);
             request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
         },
         _ => None,

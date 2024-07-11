@@ -507,7 +507,6 @@ mod tests {
             storage::PeersAndMetadata,
         },
         protocols::{
-            // direct_send::Message,
             network,
             network::{NetworkEvents, NewNetworkSender},
         },

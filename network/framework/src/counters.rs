@@ -649,8 +649,8 @@ pub static INBOUND_QUEUE_DELAY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub fn inbound_queue_delay_observe(protocol_id: ProtocolId, micros: u64) {
+pub fn inbound_queue_delay_observe(protocol_id: ProtocolId, seconds: f64) {
     INBOUND_QUEUE_DELAY
         .with_label_values(&[protocol_id.as_str()])
-        .observe((micros as f64) / 1000000.0)
+        .observe(seconds)
 }

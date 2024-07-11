@@ -138,11 +138,6 @@ impl TestHarness {
         let data = bcs::to_bytes(&HealthCheckerMsg::Ping(Ping(ping))).unwrap();
         // .into();
         let (res_tx, res_rx) = oneshot::channel();
-        // let inbound_rpc_req = InboundRpcRequest {
-        //     protocol_id,
-        //     data,
-        //     res_tx,
-        // };
         let key = (peer_id, ProtocolId::HealthCheckerRpc);
         let (delivered_tx, delivered_rx) = oneshot::channel();
         self.peer_mgr_notifs_tx
