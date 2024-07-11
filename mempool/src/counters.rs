@@ -668,6 +668,15 @@ pub static MEMPOOL_READ_TIMELINE_BEFORE: Lazy<DurationHistogram> = Lazy::new(|| 
     )
 });
 
+pub static MEMPOOL_READ_TIMELINE_OUTPUT_SIZE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_output_size",
+        "The number of transactions returned by read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 #[cfg(test)]
 mod test {
     use crate::counters::RANKING_SCORE_BUCKETS;
