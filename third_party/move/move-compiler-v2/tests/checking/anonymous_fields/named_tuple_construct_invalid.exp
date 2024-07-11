@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: missing field `0`
+  ┌─ tests/checking/anonymous_fields/named_tuple_construct_invalid.move:5:9
+  │
+5 │         S()
+  │         ^^^
+
+error: field `1` not declared in `test::S`
+  ┌─ tests/checking/anonymous_fields/named_tuple_construct_invalid.move:9:14
+  │
+9 │         S(0, 1)
+  │              ^
+
+error: expected `u8` but found a value of type `bool`
+   ┌─ tests/checking/anonymous_fields/named_tuple_construct_invalid.move:13:11
+   │
+13 │         S(false)
+   │           ^^^^^
