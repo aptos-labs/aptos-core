@@ -116,6 +116,7 @@ pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
 }
 
 pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
+    #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
