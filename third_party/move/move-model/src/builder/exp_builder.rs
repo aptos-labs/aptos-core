@@ -2750,6 +2750,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             context,
         ) {
             return value;
+        } else if maccess.value.is_struct_access() {
+            return self.new_error_exp()
         }
 
         // Treat this as a call to a global function.
@@ -2810,11 +2812,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // handles call of struct/variant with anonymous fields
-        match &maccess.value {
-            EA::ModuleAccess_::Name(name) | EA::ModuleAccess_::ModuleAccess(_, name, _)
-                if matches!(name.value.chars().next().expect("nonempty name"), 'A'..='Z') =>
-            {
-                let fields: EA::Fields<_> =
+        if maccess.value.is_struct_access() {
+            let fields: EA::Fields<_> =
                     EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
                         let field_name = move_symbol_pool::Symbol::from(i.to_string());
                         let loc = arg.loc;
@@ -2830,8 +2829,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     expected_type,
                     context,
                 );
-            },
-            _ => {},
         }
 
         // Check for builtin specification functions.

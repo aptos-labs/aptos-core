@@ -377,6 +377,19 @@ pub enum ModuleAccess_ {
     // ModuleAccess(module_ident, member_ident, optional_variant_ident)
     ModuleAccess(ModuleIdent, Name, Option<Name>),
 }
+
+impl ModuleAccess_ {
+    fn get_name(&self) -> Name {
+        match self {
+            ModuleAccess_::Name(n) | ModuleAccess_::ModuleAccess(_, n, _) => *n,
+        }
+    }
+
+    pub fn is_struct_access(&self) -> bool {
+        matches!(self.get_name().value.chars().next().expect("nonempty name"), 'A'..='Z')
+    }
+}
+
 pub type ModuleAccess = Spanned<ModuleAccess_>;
 
 #[derive(Debug, Clone, PartialEq)]
