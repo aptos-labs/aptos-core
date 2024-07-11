@@ -271,9 +271,13 @@ impl<I: Iterator<Item = Token>> Parser<I> {
         Ok(match self.next()? {
             Token::Address(addr) => match self.next()? {
                 Token::Name(s) => ModuleId::new(AccountAddress::from_hex_literal(&addr)?, Identifier::new(s)?),
-                tok => bail!("unexpected token {:?}, expected string", tok),
+                Token::ColonColon => match self.next()? {
+                    Token::Name(s) => ModuleId::new(AccountAddress::from_hex_literal(&addr)?, Identifier::new(s)?),
+                    tok => bail!("unexpected token {:?}, expected string", tok),
+                }
+                tok =>  bail!("unexpected token {:?}, expected string", tok),
             }
-            tok => bail!("unexpected token {:?}, expected string", tok),
+            tok =>  bail!("unexpected token {:?}, expected string", tok),
         })
     }
 
