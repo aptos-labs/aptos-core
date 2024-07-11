@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_vm::get_or_vm_startup_failure,
+    aptos_vm::{get_or_vm_startup_failure, get_system_transaction_output},
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, SessionId},
     system_module_names::{FINISH_WITH_DKG_RESULT, RECONFIGURATION_WITH_DKG_MODULE},
@@ -14,10 +14,9 @@ use crate::{
 };
 use aptos_types::{
     dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
-    fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{ConfigurationResource, OnChainConfig},
-    transaction::{ExecutionStatus, TransactionStatus},
+    transaction::TransactionStatus,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
@@ -121,10 +120,8 @@ impl AptosVM {
             })
             .map_err(|r| Unexpected(r.unwrap_err()))?;
 
-        let output = crate::aptos_vm::get_system_transaction_output(
+        let output = get_system_transaction_output(
             session,
-            FeeStatement::zero(),
-            ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)
                 .map_err(Unexpected)?
                 .change_set_configs,
