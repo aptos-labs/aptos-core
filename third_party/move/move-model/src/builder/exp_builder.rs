@@ -1475,9 +1475,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ExpData::Call(id, Operation::Vector, elems)
             },
             EA::Exp_::Call(maccess, kind, type_params, args) => {
-                if !self.parent.check_no_variant(maccess) {
-                    self.new_error_exp()
-                } else if *kind == CallKind::Macro {
+                if *kind == CallKind::Macro {
                     self.translate_macro_call(maccess, type_params, args, expected_type, context)
                 } else {
                     // Need to make a &[&Exp] out of args.
