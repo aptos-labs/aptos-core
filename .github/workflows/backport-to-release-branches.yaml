@@ -1,0 +1,28 @@
+name: Backport to Release Branches 
+
+on:
+  pull_request_target:
+    types: ["labeled", "closed"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  backport:
+    name: Backport PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backport Action
+        uses: sorenlouv/backport-github-action@v9.5.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          add_original_reviewers: true 
+
+      - name: Info log
+        if: ${{ success() }}
+        run: cat ~/.backport/backport.info.log
+        
+      - name: Debug log
+        if: ${{ failure() }}
+        run: cat ~/.backport/backport.debug.log        
