@@ -581,10 +581,12 @@ impl TransactionStore {
             for (address, sequence_number) in bucket {
                 if let Some(txn) = self.get_mempool_txn(address, *sequence_number) {
                     println!(
-                        "read_timeline: address: {}, sequence_number: {}, time taken: {:?}",
+                        "read_timeline: address: {}, sequence_number: {}, time taken: {:?}, before: {:?}, high_time_taken: {}",
                         address,
                         sequence_number,
-                        SystemTime::now().duration_since(txn.insertion_info.insertion_time)
+                        SystemTime::now().duration_since(txn.insertion_info.insertion_time),
+                        Instant::now().duration_since(before.unwrap_or(Instant::now())),
+                        SystemTime::now().duration_since(txn.insertion_info.insertion_time).unwrap() > Duration::from_millis(15)
                     );
                     let transaction_bytes = txn.txn.raw_txn_bytes_len() as u64;
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
