@@ -8,9 +8,12 @@ use crate::{
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
     network::{BroadcastError, MempoolSyncMsg},
-    shared_mempool::types::{
-        notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
-        SharedMempoolNotification, SubmissionStatusBundle,
+    shared_mempool::{
+        types::{
+            notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
+            SharedMempoolNotification, SubmissionStatusBundle,
+        },
+        use_case_history::UseCaseHistory,
     },
     thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
@@ -545,16 +548,26 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
 /// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
 pub(crate) fn process_committed_transactions(
     mempool: &Mutex<CoreMempool>,
+    use_case_history: &Mutex<UseCaseHistory>,
     transactions: Vec<CommittedTransaction>,
     block_timestamp_usecs: u64,
 ) {
     let mut pool = mempool.lock();
     let block_timestamp = Duration::from_micros(block_timestamp_usecs);
 
+    let tracking_usecases = use_case_history
+        .lock()
+        .update_usecases_and_get_tracking_set(&transactions);
+
     for transaction in transactions {
         pool.log_commit_transaction(
             &transaction.sender,
             transaction.sequence_number,
+            if tracking_usecases.contains(&transaction.use_case) {
+                Some(transaction.use_case.clone())
+            } else {
+                None
+            },
             block_timestamp,
         );
         pool.commit_transaction(&transaction.sender, transaction.sequence_number);

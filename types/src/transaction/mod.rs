@@ -49,6 +49,7 @@ mod module;
 mod multisig;
 mod script;
 pub mod signature_verified_transaction;
+pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
