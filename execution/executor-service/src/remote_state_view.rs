@@ -26,6 +26,7 @@ use dashmap::DashMap;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rayon::ThreadPool;
+use tokio::runtime::Runtime;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
@@ -79,6 +80,7 @@ pub struct RemoteStateViewClient {
     state_view: Arc<RwLock<RemoteStateView>>,
     thread_pool: Arc<rayon::ThreadPool>,
     _join_handle: Option<thread::JoinHandle<()>>,
+    outbound_rpc_runtime: Arc<Runtime>,
 }
 
 impl RemoteStateViewClient {
@@ -124,6 +126,7 @@ impl RemoteStateViewClient {
             state_view,
             thread_pool,
             _join_handle: Some(join_handle),
+            outbound_rpc_runtime: controller.get_outbound_rpc_runtime().clone(),
         }
     }
 
@@ -209,6 +212,12 @@ impl RemoteStateViewClient {
         }
         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
             .with_label_values(&["0_kv_req_grpc_shard_send_1_lock_acquired"]).observe(delta);
+        if seq_num == 200 {
+            info!("Send first batch from a shard with seq_num {} at time {}", seq_num, curr_time);
+        }
+        if seq_num >= 6200 {
+            info!("Send first batch from a shard with seq_num {} at time {}", seq_num, curr_time);
+        }
         sender_lk.send(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
                        &MessageType::new(format!("remote_kv_request_{}", shard_id)));
     }
