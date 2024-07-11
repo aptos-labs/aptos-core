@@ -4,10 +4,10 @@
 
 use poem_openapi::Tags;
 
-mod accept_type;
-mod accounts;
-mod basic;
-mod bcs_payload;
+pub mod accept_type;
+pub mod accounts;
+pub mod basic;
+pub mod bcs_payload;
 mod blocks;
 mod check_size;
 pub mod context;
@@ -19,12 +19,12 @@ mod log;
 pub mod metrics;
 mod page;
 mod response;
-mod runtime;
+pub mod runtime;
 mod set_failpoints;
-mod state;
+pub mod state;
 #[cfg(test)]
 pub mod tests;
-mod transactions;
+pub mod transactions;
 mod view_function;
 
 /// API categories for the OpenAPI spec

@@ -8,10 +8,7 @@ members = [
     "api/types",
     "aptos-move/aptos-abstract-gas-usage",
     "aptos-move/aptos-aggregator",
-    "aptos-move/aptos-debugger",
-    "aptos-move/aptos-e2e-comparison-testing",
     "aptos-move/aptos-gas-algebra",
-    "aptos-move/aptos-gas-calibration",
     "aptos-move/aptos-gas-meter",
     "aptos-move/aptos-gas-profiling",
     "aptos-move/aptos-gas-schedule",
@@ -25,7 +22,6 @@ members = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
-    "aptos-move/aptos-vm-benchmarks",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
@@ -78,6 +74,7 @@ members = [
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
+    "aptos-move/aptos-debugger",
     "crates/aptos-network-checker",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
@@ -124,7 +121,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/indexer-grpc/transaction-filter",
-    "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
@@ -186,7 +182,6 @@ members = [
     "testsuite/forge-cli",
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
-    "testsuite/generate-format",
     "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
@@ -259,14 +254,10 @@ members = [
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-node",
     "consensus/safety-rules",
-    "crates/aptos",
-    "crates/aptos-debugger",
     "crates/aptos-faucet/service",
     "crates/aptos-keygen",
     "crates/aptos-rate-limiter",
-    "crates/aptos-rosetta",
     "crates/transaction-emitter",
     "aptos-move/framework",
     "storage/backup/backup-cli",
@@ -287,7 +278,7 @@ rust-version = "1.78.0"
 [workspace.dependencies]
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
-aptos = { path = "crates/aptos" }
+movement = { path = "crates/aptos" }
 aptos-accumulator = { path = "storage/accumulator" }
 aptos-admin-service = { path = "crates/aptos-admin-service" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
@@ -338,14 +329,13 @@ aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
 aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-service = { path = "crates/aptos-faucet/service" }
 aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
-aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
+aptos-fallible = { path = "crates/fallible" }
 aptos-framework = { path = "aptos-move/framework" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
 aptos-gas-algebra = { path = "aptos-move/aptos-gas-algebra" }
-aptos-gas-calibration = { path = "aptos-move/aptos-gas-calibration" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
 aptos-gas-schedule = { path = "aptos-move/aptos-gas-schedule" }
 aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
@@ -388,7 +378,6 @@ aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
-aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
@@ -542,7 +531,7 @@ derivation-path = "0.2.0"
 derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
-diesel = "2.1"
+diesel = "=2.1.1"
 # Use the crate version once this feature gets released on crates.io:
 # https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
 diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = [
@@ -797,8 +786,9 @@ walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
+x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" } #Set to this version to be compatible with Sovereign Labs
+zeroize = "1.6.0" #Set to this version to be compatible with Sovereign Labs
 whoami = "1.5.0"
-x25519-dalek = "1.2.0"
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES

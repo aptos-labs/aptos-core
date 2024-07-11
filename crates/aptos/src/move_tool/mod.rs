@@ -76,7 +76,11 @@ pub mod package_hooks;
 mod show;
 pub mod stored_package;
 
-/// Tool for Move related operations
+const HELLO_BLOCKCHAIN_EXAMPLE: &str = include_str!(
+    "../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain.move"
+);
+
+/// Tool for Move smart contract related operations
 ///
 /// This tool lets you compile, test, and publish Move code, in addition
 /// to run any other tools that help run, verify, or provide information
@@ -85,7 +89,9 @@ pub mod stored_package;
 pub enum MoveTool {
     BuildPublishPayload(BuildPublishPayload),
     Clean(CleanPackage),
+    #[clap(alias = "build")]
     Compile(CompilePackage),
+    #[clap(alias = "build-script")]
     CompileScript(CompileScript),
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
@@ -94,11 +100,13 @@ pub enum MoveTool {
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
     Disassemble(Disassemble),
     Decompile(Decompile),
+    #[clap(alias = "doc")]
     Document(DocumentPackage),
     Download(DownloadPackage),
     Init(InitPackage),
     List(ListPackage),
     Prove(ProvePackage),
+    #[clap(alias = "deploy")]
     Publish(PublishPackage),
     Run(RunFunction),
     RunScript(RunScript),
@@ -244,6 +252,11 @@ impl FrameworkPackageArgs {
     }
 }
 
+#[derive(ValueEnum, Clone, Copy, Debug)]
+pub enum Template {
+    HelloBlockchain,
+}
+
 /// Creates a new Move package at the given location
 ///
 /// This will create a directory for a Move package and a corresponding
@@ -272,6 +285,10 @@ pub struct InitPackage {
     )]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
+    /// Template name for initialization
+    #[clap(long)]
+    pub(crate) template: Option<Template>,
+
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 
@@ -287,18 +304,48 @@ impl CliCommand<()> for InitPackage {
 
     async fn execute(self) -> CliTypedResult<()> {
         let package_dir = dir_default_to_current(self.package_dir.clone())?;
-        let addresses = self
+        let mut addresses: BTreeMap<String, ManifestNamedAddress> = self
             .named_addresses
             .into_iter()
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
 
-        self.framework_package_args.init_move_dir(
-            package_dir.as_path(),
-            &self.name,
-            addresses,
-            self.prompt_options,
-        )
+        // Add in any template associated
+        match self.template {
+            None => {
+                // Initialize move directory
+                // TODO: Communicate this breaking change before filling in the template as default
+                let package_dir_path = package_dir.as_path();
+                self.framework_package_args.init_move_dir(
+                    package_dir_path,
+                    &self.name,
+                    addresses,
+                    self.prompt_options,
+                )
+            },
+            Some(Template::HelloBlockchain) => {
+                // Setup the Hello blockchain template
+                // Note: We have to override the addresses
+                addresses.insert("hello_blockchain".to_string(), None.into());
+
+                // Initialize move directory
+                let package_dir_path = package_dir.as_path();
+                self.framework_package_args.init_move_dir(
+                    package_dir_path,
+                    "HelloBlockchainExample",
+                    addresses,
+                    self.prompt_options,
+                )?;
+
+                write_to_file(
+                    package_dir_path
+                        .join("sources/hello_blockchain.move")
+                        .as_path(),
+                    "hello_blockchain.move",
+                    HELLO_BLOCKCHAIN_EXAMPLE.as_bytes(),
+                )
+            },
+        }
     }
 }
 

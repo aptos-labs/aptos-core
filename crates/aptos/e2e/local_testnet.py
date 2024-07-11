@@ -17,7 +17,7 @@ LOG = logging.getLogger(__name__)
 def run_node(network: Network, image_repo_with_project: str, pull=True):
     image_name = build_image_name(image_repo_with_project, network)
     container_name = f"aptos-tools-{network}"
-    LOG.info(f"Trying to run aptos CLI localnet from image: {image_name}")
+    LOG.info(f"Trying to run movement CLI localnet from image: {image_name}")
 
     # Confirm that the Docker daemon is running.
     try:
@@ -75,7 +75,7 @@ def run_node(network: Network, image_repo_with_project: str, pull=True):
         **kwargs,
     )
 
-    LOG.info(f"Running aptos CLI localnet from image: {image_name}. Container name: {container_name}")
+    LOG.info(f"Running movement CLI localnet from image: {image_name}. Container name: {container_name}")
     return container_name
 
 

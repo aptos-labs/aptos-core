@@ -3,7 +3,7 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
-use aptos::{
+use movement::{
     account::create::DEFAULT_FUNDED_COINS,
     common::types::GasOptions,
     test::{CliTestFramework, INVALID_ACCOUNT},

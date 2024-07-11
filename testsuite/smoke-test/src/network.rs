@@ -7,7 +7,7 @@ use crate::{
     state_sync::test_all_validator_failures,
     utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
 };
-use aptos::test::CliTestFramework;
+use movement::test::CliTestFramework;
 use aptos_config::{
     config::{
         DiscoveryMethod, FileDiscovery, Identity, NetworkConfig, NodeConfig, OverrideNodeConfig,

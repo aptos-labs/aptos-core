@@ -8,14 +8,14 @@ use aptos_crypto::{
     Uniform,
 };
 use rand::{rngs::StdRng, SeedableRng};
-use serde::ser::Serialize;
+use serde::{Serialize, Deserialize};
 use std::convert::TryFrom;
 
 /// ValidatorSigner associates an author with public and private keys with helpers for signing and
 /// validating. This struct can be used for all signing operations including block and network
 /// signing, respectively.
 #[derive(Debug)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Clone))]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Clone, Serialize, Deserialize))]
 pub struct ValidatorSigner {
     author: AccountAddress,
     private_key: bls12381::PrivateKey,

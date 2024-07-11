@@ -229,7 +229,7 @@ where
                         .start_timer();
                     info!("next_version: {}", parent_output.next_version());
                     CachedStateView::new(
-                        StateViewId::BlockExecution { block_id },
+                        StateViewId::Miscellaneous,
                         Arc::clone(&self.db.reader),
                         parent_output.next_version(),
                         parent_output.state().current.clone(),

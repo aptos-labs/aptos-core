@@ -323,7 +323,7 @@ impl Run {
 #[derive(Clone, Debug, Parser)]
 pub struct RunSimple {
     #[clap(flatten)]
-    api_connection_config: ApiConnectionConfig,
+    pub api_connection_config: ApiConnectionConfig,
 
     /// What address to listen on.
     #[clap(long, default_value = "0.0.0.0")]

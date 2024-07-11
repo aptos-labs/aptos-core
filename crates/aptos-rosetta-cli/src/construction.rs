@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{format_output, NetworkArgs, UrlArgs};
-use aptos::common::types::{EncodingOptions, PrivateKeyInputOptions, ProfileOptions};
+use movement::common::types::{EncodingOptions, PrivateKeyInputOptions, ProfileOptions};
 use aptos_logger::info;
 use aptos_rosetta::types::TransactionIdentifier;
 use aptos_types::account_address::AccountAddress;
@@ -96,10 +96,10 @@ pub struct CreateAccountCommand {
     txn_args: TransactionArgs,
     /// The sending account, since the private key doesn't always match the
     /// AccountAddress if it rotates
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     sender: Option<AccountAddress>,
     /// The new account (TODO: Maybe we want to take in the public key instead)
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     new_account: AccountAddress,
 }
 
@@ -146,10 +146,10 @@ pub struct TransferCommand {
     txn_args: TransactionArgs,
     /// The sending account, since the private key doesn't always match the
     /// AccountAddress if it rotates
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     sender: Option<AccountAddress>,
     /// The receiving account
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     receiver: AccountAddress,
     /// The amount of coins to send
     #[clap(long)]
@@ -199,13 +199,13 @@ pub struct SetOperatorCommand {
     txn_args: TransactionArgs,
     /// The sending account, since the private key doesn't always match the
     /// AccountAddress if it rotates
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     sender: Option<AccountAddress>,
     /// The old operator of the stake pool
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     old_operator: Option<AccountAddress>,
     /// The new operator of the stake pool
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     new_operator: AccountAddress,
 }
 
@@ -252,13 +252,13 @@ pub struct SetVoterCommand {
     txn_args: TransactionArgs,
     /// The sending account, since the private key doesn't always match the
     /// AccountAddress if it rotates
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     sender: Option<AccountAddress>,
     /// The operator of the stake pool
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     operator: Option<AccountAddress>,
     /// The new voter for the stake pool
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     new_voter: AccountAddress,
 }
 
@@ -305,13 +305,13 @@ pub struct CreateStakePoolCommand {
     txn_args: TransactionArgs,
     /// The sending account, since the private key doesn't always match the
     /// AccountAddress if it rotates
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     sender: Option<AccountAddress>,
     /// Operator
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     operator: Option<AccountAddress>,
     /// Voter
-    #[clap(long, value_parser = aptos::common::types::load_account_arg)]
+    #[clap(long, value_parser = movement::common::types::load_account_arg)]
     voter: Option<AccountAddress>,
     /// Amount
     #[clap(long)]

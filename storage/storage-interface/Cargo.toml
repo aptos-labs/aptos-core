@@ -25,6 +25,7 @@ aptos-vm = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+move-core-types = { workspace = true, optional = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
@@ -37,10 +38,11 @@ threadpool = { workspace = true }
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
 assert_unordered = { workspace = true }
+move-core-types = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["aptos-types/fuzzing"]
+fuzzing = ["aptos-types/fuzzing", "move-core-types"]
 
 [package.metadata.cargo-machete]
 ignored = ["proptest"]

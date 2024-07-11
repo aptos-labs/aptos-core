@@ -10,7 +10,7 @@ use crate::{
     },
     smoke_test_environment::SwarmBuilder,
 };
-use aptos::{
+use movement::{
     common::types::{CliError, CliTypedResult, GasOptions, TransactionSummary},
     move_tool::MemberId,
 };

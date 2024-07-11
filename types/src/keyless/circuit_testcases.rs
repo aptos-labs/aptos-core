@@ -10,6 +10,7 @@ use crate::{
         rsa::{INSECURE_TEST_RSA_KEY_PAIR, RSA_JWK},
     },
     keyless::{
+        configuration,
         base64url_encode_str,
         bn254_circom::{G1Bytes, G2Bytes},
         g1_projective_str_to_affine, g2_projective_str_to_affine, Claims, Configuration,
@@ -100,7 +101,7 @@ pub(crate) const SAMPLE_UID_KEY: &str = "sub";
 pub(crate) const SAMPLE_EXP_DATE: u64 = 111_111_111_111;
 
 /// ~31,710 years
-pub(crate) const SAMPLE_EXP_HORIZON_SECS: u64 = 999_999_999_999;
+pub(crate) const SAMPLE_EXP_HORIZON_SECS: u64 = configuration::TESTING_EXP_HORIZON_SECS;
 
 pub(crate) static SAMPLE_PEPPER: Lazy<Pepper> = Lazy::new(|| Pepper::from_number(76));
 

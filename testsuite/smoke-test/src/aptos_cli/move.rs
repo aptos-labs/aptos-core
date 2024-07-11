@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::test::CliTestFramework;
+use movement::test::CliTestFramework;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_logger::info;
 use aptos_types::move_utils::MemberId;

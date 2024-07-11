@@ -210,7 +210,6 @@ impl Context {
             .clone()
             .send(MempoolClientRequest::SubmitTransaction(txn, req_sender))
             .await?;
-
         callback.await?
     }
 

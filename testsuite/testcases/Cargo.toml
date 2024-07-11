@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos = { workspace = true, features = ["fuzzing"] }
+movement = { workspace = true, features = ["fuzzing"] }
 aptos-config = { workspace = true }
 aptos-forge = { workspace = true }
 aptos-global-constants = { workspace = true }

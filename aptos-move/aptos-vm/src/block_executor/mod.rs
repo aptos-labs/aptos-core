@@ -67,14 +67,14 @@ pub struct AptosTransactionOutput {
 }
 
 impl AptosTransactionOutput {
-    pub(crate) fn new(output: VMOutput) -> Self {
+    pub fn new(output: VMOutput) -> Self {
         Self {
             vm_output: Mutex::new(Some(output)),
             committed_output: OnceCell::new(),
         }
     }
 
-    pub(crate) fn committed_output(&self) -> &TransactionOutput {
+    pub fn committed_output(&self) -> &TransactionOutput {
         self.committed_output.get().unwrap()
     }
 

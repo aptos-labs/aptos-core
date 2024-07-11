@@ -1007,7 +1007,7 @@ impl Arbitrary for BlockMetadataExt {
 }
 
 #[derive(Debug)]
-struct ValidatorSetGen {
+pub struct ValidatorSetGen {
     validators: Vec<Index>,
 }
 
@@ -1036,11 +1036,11 @@ impl Arbitrary for ValidatorSetGen {
 
 #[derive(Debug)]
 pub struct BlockInfoGen {
-    id: HashValue,
-    executed_state_id: HashValue,
-    timestamp_usecs: u64,
-    new_epoch: bool,
-    validator_set_gen: ValidatorSetGen,
+    pub id: HashValue,
+    pub executed_state_id: HashValue,
+    pub timestamp_usecs: u64,
+    pub new_epoch: bool,
+    pub validator_set_gen: ValidatorSetGen,
 }
 
 impl BlockInfoGen {
@@ -1115,8 +1115,8 @@ impl Arbitrary for BlockInfoGen {
 
 #[derive(Arbitrary, Debug)]
 pub struct LedgerInfoGen {
-    commit_info_gen: BlockInfoGen,
-    consensus_data_hash: HashValue,
+    pub commit_info_gen: BlockInfoGen,
+    pub consensus_data_hash: HashValue,
 }
 
 impl LedgerInfoGen {

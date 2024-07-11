@@ -5,7 +5,7 @@ use crate::{
     randomness::{decrypt_key_map, num_validators, verify_dkg_transcript, wait_for_dkg_finish},
     smoke_test_environment::SwarmBuilder,
 };
-use aptos::test::CliTestFramework;
+use movement::test::CliTestFramework;
 use aptos_forge::{Node, Swarm};
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use std::sync::Arc;

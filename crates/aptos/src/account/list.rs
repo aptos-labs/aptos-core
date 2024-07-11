@@ -82,7 +82,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
             account
         } else {
             return Err(CliError::CommandArgumentError(
-                "Please provide an account using --account or run aptos init".to_string(),
+                "Please provide an account using --account or run movement init".to_string(),
             ));
         };
 

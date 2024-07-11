@@ -26,13 +26,17 @@ use std::{
 
 mod bn254_circom;
 mod circuit_constants;
-mod circuit_testcases;
 mod configuration;
 mod groth16_sig;
 mod groth16_vk;
 mod openid_sig;
-pub mod test_utils;
 mod zkp_sig;
+
+#[cfg(any(test, feature = "testing"))]
+mod circuit_testcases;
+
+#[cfg(any(test, feature = "testing"))]
+pub mod test_utils;
 
 use crate::keyless::circuit_constants::devnet_prepared_vk;
 pub use bn254_circom::{

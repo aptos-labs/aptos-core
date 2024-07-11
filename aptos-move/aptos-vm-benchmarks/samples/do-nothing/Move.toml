@@ -1,6 +1,0 @@
-[package]
-name = 'do-nothing'
-version = '1.0.0'
-[dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
-AptosStdlib = { local = "../../../framework/aptos-stdlib" }

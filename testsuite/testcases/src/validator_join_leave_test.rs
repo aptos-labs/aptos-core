@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
+use movement::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_forge::{
     reconfig, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result, Swarm,
     SwarmExt, Test, TestReport, FORGE_KEY_SEED,

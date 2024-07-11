@@ -5,7 +5,7 @@ use crate::{
     aptos_cli::validator::generate_blob, smoke_test_environment::SwarmBuilder,
     txn_emitter::generate_traffic,
 };
-use aptos::test::CliTestFramework;
+use movement::test::CliTestFramework;
 use aptos_consensus::QUORUM_STORE_DB_NAME;
 use aptos_forge::{
     args::TransactionTypeArg, reconfig, wait_for_all_nodes_to_catchup, NodeExt, Swarm, SwarmExt,

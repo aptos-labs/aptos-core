@@ -41,6 +41,7 @@ pub mod block_info;
 pub mod cached_state_view;
 pub mod errors;
 mod executed_trees;
+pub mod finality_view;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
@@ -537,6 +538,14 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    fn revert_commit(
+        &self,
+        ledger_info_with_sigs: &LedgerInfoWithSignatures,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
 }
 
 #[derive(Clone)]

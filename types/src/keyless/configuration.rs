@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    invalid_signature,
-    keyless::{
-        circuit_constants, circuit_testcases::SAMPLE_EXP_HORIZON_SECS, KEYLESS_ACCOUNT_MODULE_NAME,
-    },
-    move_utils::as_move_value::AsMoveValue,
+    invalid_signature, keyless::circuit_constants, move_utils::as_move_value::AsMoveValue,
 };
 use move_core_types::{
     ident_str,
@@ -16,6 +12,12 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use serde::{Deserialize, Serialize};
+
+/// The name of the Move module for keyless accounts deployed at 0x1.
+pub const KEYLESS_ACCOUNT_MODULE_NAME: &str = "keyless_account";
+
+/// ~31,710 years
+pub(crate) const TESTING_EXP_HORIZON_SECS: u64 = 999_999_999_999;
 
 /// Reflection of aptos_framework::keyless_account::Configuration
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -71,7 +73,7 @@ impl Configuration {
 
     pub fn new_for_testing() -> Configuration {
         let mut config = Self::new_for_devnet();
-        config.max_exp_horizon_secs = SAMPLE_EXP_HORIZON_SECS + 1; // ~31,689 years
+        config.max_exp_horizon_secs = TESTING_EXP_HORIZON_SECS + 1; // ~31,689 years
         config
     }
 
