@@ -447,6 +447,7 @@ module supra_framework::vesting_without_staking {
     /// Remove the lockup period for the vesting contract. This can only be called by the admin of the vesting contract.
     /// Example usage: If admin find shareholder suspicious, admin can remove it.
     public entry fun remove_shareholder(admin: &signer, contract_address: address, shareholder_address: address) acquires VestingContract {
+		assert_shareholder_exists(contract_address,shareholder_address);
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
         verify_admin(admin, vesting_contract);
         let vesting_signer = get_vesting_account_signer_internal(vesting_contract);
@@ -463,7 +464,6 @@ module supra_framework::vesting_without_staking {
 
         // remove `shareholder_address`` from `vesting_contract.shareholders`
         let shareholders = &mut vesting_contract.shareholders;
-        assert!(simple_map::contains_key(shareholders, &shareholder_address), error::not_found(ESHAREHOLDER_NOT_EXIST));
         let (_, shareholders_vesting) = simple_map::remove(shareholders, &shareholder_address);
 
         // remove `shareholder_address` from `vesting_contract.beneficiaries`

@@ -44,6 +44,7 @@ Vesting without staking contract
 -  [Function `create_vesting_contract_account`](#0x1_vesting_without_staking_create_vesting_contract_account)
 -  [Function `verify_admin`](#0x1_vesting_without_staking_verify_admin)
 -  [Function `assert_vesting_contract_exists`](#0x1_vesting_without_staking_assert_vesting_contract_exists)
+-  [Function `assert_shareholder_exists`](#0x1_vesting_without_staking_assert_shareholder_exists)
 -  [Function `assert_active_vesting_contract`](#0x1_vesting_without_staking_assert_active_vesting_contract)
 -  [Function `get_beneficiary`](#0x1_vesting_without_staking_get_beneficiary)
 -  [Function `set_terminate_vesting_contract`](#0x1_vesting_without_staking_set_terminate_vesting_contract)
@@ -1254,9 +1255,11 @@ Unlock any vested portion of the grant.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_individual">vest_individual</a>(contract_address: <b>address</b>, shareholder_address: <b>address</b>) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
-		<a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_active_vesting_contract">assert_active_vesting_contract</a>(contract_address);
-		//extract beneficiary <b>address</b>
+		//check <b>if</b> contract exist, active and shareholder is a member of the contract
+		<a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_shareholder_exists">assert_shareholder_exists</a>(contract_address,shareholder_address);
+
 		<b>let</b> vesting_signer = <a href="account.md#0x1_account_create_signer_with_capability">account::create_signer_with_capability</a>(&<b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address).signer_cap);
+		//extract beneficiary <b>address</b>
 		<b>let</b> beneficiary = <a href="vesting_without_staking.md#0x1_vesting_without_staking_beneficiary">beneficiary</a>(contract_address,shareholder_address);
        {
            <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
@@ -1264,7 +1267,7 @@ Unlock any vested portion of the grant.
            <b>if</b> (vesting_contract.vesting_schedule.start_timestamp_secs &gt; <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()) {
                <b>return</b>
            };
-
+			
            <b>let</b> vesting_record = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> vesting_contract.shareholders,&shareholder_address);
 
            // Check <b>if</b> the next vested period <b>has</b> already passed. If not, short-circuit since there's nothing <b>to</b> vest.
@@ -1780,6 +1783,31 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_vesting_contract_exists">assert_vesting_contract_exists</a>(contract_address: <b>address</b>) {
     <b>assert</b>!(<b>exists</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_CONTRACT_NOT_FOUND">EVESTING_CONTRACT_NOT_FOUND</a>));
 }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vesting_without_staking_assert_shareholder_exists"></a>
+
+## Function `assert_shareholder_exists`
+
+
+
+<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_shareholder_exists">assert_shareholder_exists</a>(contract_address: <b>address</b>, shareholder_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_shareholder_exists">assert_shareholder_exists</a>(contract_address: <b>address</b>, shareholder_address: <b>address</b>) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
+		<a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_active_vesting_contract">assert_active_vesting_contract</a>(contract_address);
+		<b>assert</b>!(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&<b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address).shareholders,&shareholder_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ESHAREHOLDER_NOT_EXIST">ESHAREHOLDER_NOT_EXIST</a>));
+	}
 </code></pre>
 
 
