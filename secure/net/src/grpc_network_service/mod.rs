@@ -122,7 +122,7 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             if curr_time > msg.start_ms_since_epoch.unwrap() {
                 delta = (curr_time - msg.start_ms_since_epoch.unwrap());
             }
-            if message_type.get_type() == "remote_kv_request" {
+            if message_type.get_type().starts_with("remote_kv_request")  {
                 REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                     .with_label_values(&["2_kv_req_coord_grpc_recv"]).observe(delta as f64);
             } else if message_type.get_type() == "remote_kv_response" {
@@ -138,7 +138,7 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
                 if curr_time > msg.start_ms_since_epoch.unwrap() {
                     delta = (curr_time - msg.start_ms_since_epoch.unwrap());
                 }
-                if message_type.get_type() == "remote_kv_request" {
+                if message_type.get_type().starts_with("remote_kv_request") {
                     REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                         .with_label_values(&["2_kv_req_coord_grpc_recv_got_inbound_lock"]).observe(delta as f64);
                 } else if message_type.get_type() == "remote_kv_response" {
@@ -206,7 +206,7 @@ impl GRPCNetworkMessageServiceClientWrapper {
             if curr_time > message.start_ms_since_epoch.unwrap() {
                 delta = (curr_time - message.start_ms_since_epoch.unwrap()) as f64;
             }
-            if mt.get_type() == "remote_kv_request" {
+            if mt.get_type().starts_with("remote_kv_request") {
                 REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                     .with_label_values(&["1_kv_req_grpc_shard_send"]).observe(delta);
             } else if mt.get_type() == "remote_kv_response" {
