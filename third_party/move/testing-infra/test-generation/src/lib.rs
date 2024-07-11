@@ -32,7 +32,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::TypeTag,
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
@@ -54,12 +54,8 @@ fn run_verifier(module: CompiledModule) -> Result<CompiledModule, String> {
     }
 }
 
-// Creates a storage with Move standard library as well as a single
-// additional module.
-fn storage_with_stdlib_and_module(
-    additional_module_id: ModuleId,
-    additional_blob: Vec<u8>,
-) -> InMemoryStorage {
+// Creates a storage with Move standard library as well as a few additional modules.
+fn storage_with_stdlib_and_modules(additional_modules: Vec<&CompiledModule>) -> InMemoryStorage {
     let mut storage = InMemoryStorage::new();
 
     // First, compile and add standard library.
@@ -82,8 +78,12 @@ fn storage_with_stdlib_and_module(
         storage.publish_or_overwrite_module(module.self_id(), blob);
     }
 
-    // Now add the additional module.
-    storage.publish_or_overwrite_module(additional_module_id, additional_blob);
+    // Now add the additional modules.
+    for module in additional_modules {
+        let mut blob = vec![];
+        module.serialize(&mut blob).unwrap();
+        storage.publish_or_overwrite_module(module.self_id(), blob);
+    }
     storage
 }
 
@@ -146,9 +146,7 @@ fn execute_function_in_module(
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let mut blob = vec![];
-        module.serialize(&mut blob).unwrap();
-        let storage = storage_with_stdlib_and_module(module_id.clone(), blob);
+        let storage = storage_with_stdlib_and_modules(vec![&module]);
 
         let mut sess = vm.new_session(&storage);
         let traversal_storage = TraversalStorage::new();
