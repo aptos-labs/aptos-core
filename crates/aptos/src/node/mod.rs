@@ -1466,6 +1466,7 @@ pub struct Time {
 
 impl Time {
     pub fn new(time: Duration) -> Self {
+        #[allow(deprecated)]
         let date_time =
             NaiveDateTime::from_timestamp_opt(time.as_secs() as i64, time.subsec_nanos()).unwrap();
         #[allow(deprecated)]
