@@ -4,6 +4,7 @@ const {Buffer} = require("buffer");
 let account = Ed25519Account.fromDerivationPath({mnemonic: "divide rule mad goose wolf grab cliff milk visit tag floor join", path: "m/44'/637'/0'/0'/0'"});
 rust
   .then(async (m) => {
+    console.log( await m.default())
     const config = new AptosConfig({ network: "custom" ,fullnode : "http://127.0.0.1:8080/v1",faucet: "http://127.0.0.1:8081",indexer: "http://127.0.0.1:8090"});
     const aptos = new Aptos(config);
     aptos.faucet.fundAccount({
@@ -19,7 +20,7 @@ rust
     let ser2 = new Serializer();
     ser2.serializeU64(1);
     let amount = ser2.toUint8Array();
-    return builder.load_module("testnet", "0x0000000000000000000000000000000000000000000000000000000000000001 aptos_account")
+    return builder.load_module("http://127.0.0.1:8080/v1", "0x0000000000000000000000000000000000000000000000000000000000000001 aptos_account")
       .then(async () => {
       
         builder.add_batched_call(

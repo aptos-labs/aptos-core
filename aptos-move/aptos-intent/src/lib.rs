@@ -154,13 +154,13 @@ impl BatchedFunctionCallBuilder {
 
     async fn load_module_impl(
         &mut self,
-        network: String,
+        api_url: String,
         module_name: String,
     ) -> anyhow::Result<()> {
         let module_id = ModuleId::from_str(&module_name).unwrap();
         let url = format!(
-            "https://api.{}.aptoslabs.com/v1/accounts/{}/module/{}",
-            network, &module_id.address, &module_id.name
+            "{}/{}/{}/{}/{}",
+            api_url,"accounts",&module_id.address,"module",&module_id.name
         );
         let response = reqwest::get(url).await?;
         let result = if response.status().is_success() {
@@ -194,10 +194,10 @@ impl BatchedFunctionCallBuilder {
 
     pub async fn load_module(
         &mut self,
-        network: String,
+        api_url: String,
         module_name: String,
     ) -> Result<(), JsValue> {
-        self.load_module_impl(network, module_name)
+        self.load_module_impl(api_url, module_name)
             .await
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }

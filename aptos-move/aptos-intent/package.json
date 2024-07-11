@@ -12,7 +12,8 @@
     "webpack-dev-server": "^4.15.2"
   },
   "dependencies": {
-    "@wgb5445/aptos-labs-ts-sdk": "^1.22.3",
+    "@wgb5445/aptos-intent-npm": "^0.0.4",
+    "@wgb5445/aptos-labs-ts-sdk": "^1.22.7",
     "buffer": "^6.0.3"
   }
 }

@@ -1,0 +1,35 @@
+{
+  "name": "@wgb5445/aptos-intent-npm",
+  "collaborators": [
+    "Aptos Labs <opensource@aptoslabs.com>"
+  ],
+  "description": "Generating Move Script from intent",
+  "version": "0.0.6",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aptos-labs/aptos-core"
+  },
+  "files": [
+    "dist",
+    "entry.js",
+    "rollup.config.mjs"
+  ],
+  "module": "dist/esm/entry.js",
+  "types": "dist/aptos_intent.d.ts",
+  "homepage": "https://aptoslabs.com",
+  "sideEffects": [
+    "./snippets/*"
+  ],
+  "devDependencies": {
+    "@rollup/plugin-wasm": "^6.2.2"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/aptos_intent.d.ts",
+      "import": "./dist/esm/entry.js",
+      "default": "./dist/cjs/entry.js"
+    } 
+  }
+}
