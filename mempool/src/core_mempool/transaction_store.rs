@@ -614,7 +614,6 @@ impl TransactionStore {
         }
         info!("read_timeline: requested size: {}, batch size: {}, before: {:?}, timeline_id: {:?}, output timeline_id: {:?}, batch_full: {}", count, batch.len(), Instant::now().duration_since(before.unwrap_or(Instant::now())), timeline_id, last_timeline_id, batch_full);
         counters::MEMPOOL_READ_TIMELINE_OUTPUT_SIZE.observe(batch.len() as f64);
-        info!("read_timeline: requested size: {}, batch size: {}, before: {:?}, timeline_id: {:?}, output timeline_id: {:?}, batch_full: {}", count, batch.len(), Instant::now().duration_since(before.unwrap_or(Instant::now())), timeline_id, last_timeline_id, batch_full);
 
         (batch, last_timeline_id.into())
     }
