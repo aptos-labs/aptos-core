@@ -51,6 +51,7 @@ pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_unprocessed_pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
     kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
     //thread_pool: Arc<Vec<rayon::ThreadPool>>,
+    thread_pool_recv: Arc<rayon::ThreadPool>,
     // thread_pool for processing kv requests
     thread_pool: Arc<rayon::ThreadPool>,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
@@ -86,6 +87,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         //     let mut pq = BinaryHeap::new();
         //     unprocessed_pqs.push(pq);
         // }
+        let thread_pool_recv = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_shards)
+            .thread_name(|i| format!("remote-state-view-service-kv-request-handler-{}", i))
+            .build()
+            .unwrap();
         let thread_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
             .thread_name(|i| format!("remote-state-view-service-kv-request-handler-{}", i))
@@ -112,6 +118,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             kv_rx: result_rx,
             kv_unprocessed_pq: Arc::new(ConcurrentPriorityQueue::new()),
             kv_tx: Arc::new(command_txs),
+            thread_pool_recv: Arc::new(thread_pool_recv),
             thread_pool: Arc::new(thread_pool),
             state_view: Arc::new(RwLock::new(None)),
             recv_condition: Arc::new((Mutex::new(false), Condvar::new())),
@@ -133,7 +140,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-        let num_handlers = 30;
+        let num_handlers = 60;
         info!("Num handlers created is {}", num_handlers);
         for i in 0..num_handlers {
             let state_view_clone = self.state_view.clone();
@@ -154,7 +161,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let kv_rx_clone = self.kv_rx[i].clone();
             let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
             let recv_condition_clone = self.recv_condition.clone();
-            thread_pool_clone.spawn(move || {
+            self.thread_pool_recv.spawn(move || {
                 while let Ok(message) = kv_rx_clone.recv() {
                     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
                     let mut delta = 0.0;
