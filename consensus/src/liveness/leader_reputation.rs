@@ -148,21 +148,28 @@ impl AptosDBBackend {
         }
 
         if result.is_empty() {
-            warn!("No events in the requested window could be found");
-            (result, HashValue::zero())
-        } else {
-            let root_hash = self
-                .aptos_db
-                .get_accumulator_root_hash(max_version)
-                .unwrap_or_else(|_| {
-                    error!(
-                        "We couldn't fetch accumulator hash for the {} version, for {} epoch, {} round",
-                        max_version, target_epoch, target_round,
-                    );
-                    HashValue::zero()
-                });
-            (result, root_hash)
+            warn!(
+                "No events in the requested window could be found for Target ({}, {})",
+                target_epoch, target_round
+            );
         }
+
+        let root_hash = self
+            .aptos_db
+            .get_accumulator_root_hash(max_version)
+            .unwrap_or_else(|_| {
+                error!(
+                    "We couldn't fetch accumulator hash for the {} version, for {} epoch, {} round",
+                    max_version, target_epoch, target_round,
+                );
+                HashValue::zero()
+            });
+        // TODO: remove this log
+        info!(
+            "Fetched root_hash: {} for version: {}. Target ({}, {})",
+            root_hash, max_version, target_epoch, target_round
+        );
+        (result, root_hash)
     }
 }
 
