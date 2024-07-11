@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   permission-check:
-    runs-on: ubuntu-latest4
+    runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
         uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
