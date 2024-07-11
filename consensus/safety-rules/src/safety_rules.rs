@@ -377,7 +377,9 @@ impl SafetyRules {
 
         let old_ledger_info = ledger_info.ledger_info();
 
-        if !old_ledger_info.commit_info().is_ordered_only() {
+        if !old_ledger_info.commit_info().is_ordered_only()
+            && old_ledger_info.commit_info() != new_ledger_info.commit_info()
+        {
             return Err(Error::InvalidOrderedLedgerInfo(old_ledger_info.to_string()));
         }
 
