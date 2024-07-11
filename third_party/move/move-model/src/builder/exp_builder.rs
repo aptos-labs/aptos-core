@@ -2809,6 +2809,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             return None;
         }
 
+        // handles call of struct/variant with anonymous fields
+        match &maccess.value {
+            EA::ModuleAccess_::Name(name) | EA::ModuleAccess_::ModuleAccess(_, name, _)
+                if matches!(name.value.chars().next().expect("nonempty name"), 'A'..='Z') =>
+            {
+                let fields: EA::Fields<_> =
+                    EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
+                        let field_name = move_symbol_pool::Symbol::from(i.to_string());
+                        let loc = arg.loc;
+                        let field = PA::Field(Spanned::new(loc, field_name));
+                        (field, (i, arg.clone()))
+                    }))
+                    .expect("duplicate keys");
+                return self.translate_pack(
+                    loc,
+                    maccess,
+                    generics,
+                    Some(&fields),
+                    expected_type,
+                    context,
+                );
+            },
+            _ => {},
+        }
+
         // Check for builtin specification functions.
         if self.is_spec_mode() {
             if let EA::ModuleAccess_::Name(n) = &maccess.value {
