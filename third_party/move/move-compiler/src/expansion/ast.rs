@@ -8,6 +8,7 @@ use crate::{
         ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
         ENTRY_MODIFIER,
     },
+    expansion::translate::is_valid_struct_constant_or_schema_name,
     shared::{
         ast_debug::*,
         known_attributes::{AttributeKind, KnownAttribute},
@@ -386,7 +387,7 @@ impl ModuleAccess_ {
     }
 
     pub fn is_struct_access(&self) -> bool {
-        matches!(self.get_name().value.chars().next().expect("nonempty name"), 'A'..='Z')
+        is_valid_struct_constant_or_schema_name(self.get_name().value.as_str())
     }
 }
 
