@@ -85,7 +85,7 @@ impl AssetUploaderContext {
                     .multipart(form)
                     .send()
                     .await
-                    .context("Failed to upload asset")?;
+                    .context("Failed to send request to Cloudflare API")?;
 
                 let res_text = res.text().await.context("Failed to get response text")?;
                 info!(response = ?res_text, "[Asset Uploader] Received response from Cloudflare");
@@ -147,7 +147,7 @@ impl Server for AssetUploaderContext {
                             cdn_uri = cdn_url,
                             "[Asset Uploader] Writing to Postgres"
                         );
-                        let mut model = NFTMetadataCrawlerURIs::new(&url.to_string());
+                        let mut model = NFTMetadataCrawlerURIs::new(url.as_ref());
                         model.set_cdn_image_uri(Some(cdn_url.clone()));
 
                         let mut conn = self_clone.pool.get().context("Failed to get connection")?;
@@ -172,11 +172,7 @@ impl Server for AssetUploaderContext {
                 for (i, uri) in uris.iter().enumerate() {
                     match uri {
                         Ok(uri) => successes.push(uri.clone()),
-                        Err(e) => {
-                            let asset_uri = &urls.urls[i];
-                            warn!(error = ?e, asset_uri = ?asset_uri, "[Asset Uploader] Failed to upload asset");
-                            failures.push(asset_uri.to_string())
-                        },
+                        Err(_) => failures.push(urls.urls[i].to_string()),
                     }
                 }
 
