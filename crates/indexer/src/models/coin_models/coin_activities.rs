@@ -87,6 +87,7 @@ impl CoinActivity {
         let mut all_event_to_coin_type: EventToCoinType = HashMap::new();
         let mut all_coin_supply = Vec::new();
 
+        #[allow(deprecated)]
         let (txn_info, writesets, events, maybe_user_request, txn_timestamp) = match &transaction {
             APITransaction::GenesisTransaction(inner) => (
                 &inner.info,

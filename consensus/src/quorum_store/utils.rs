@@ -33,12 +33,14 @@ impl<T> Timeouts<T> {
     }
 
     pub(crate) fn add(&mut self, value: T, timeout: usize) {
+        #[allow(deprecated)]
         let expiry = Utc::now().naive_utc().timestamp_millis() + timeout as i64;
         self.timeouts.push_back((expiry, value));
     }
 
     pub(crate) fn expire(&mut self) -> Vec<T> {
-        let cur_time = chrono::Utc::now().naive_utc().timestamp_millis();
+        #[allow(deprecated)]
+        let cur_time = Utc::now().naive_utc().timestamp_millis();
         trace!(
             "QS: expire cur time {} timeouts len {}",
             cur_time,
