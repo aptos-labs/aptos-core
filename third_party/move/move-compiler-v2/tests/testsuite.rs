@@ -457,6 +457,26 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 FILE_FORMAT_STAGE,
             ]),
         },
+        // Instruction reordering tests
+        TestConfig {
+            name: "instruction-reordering",
+            runner: |p| run_test(p, get_config_by_name("instruction-reordering")),
+            include: vec!["/instruction-reordering/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts
+                .clone()
+                .set_experiment(Experiment::INSTRUCTION_REORDERING, true),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "InstructionReorderingProcessor",
+                "LiveVarAnalysisProcessor",
+                FILE_FORMAT_STAGE,
+            ]),
+        },
         // Unreachable code remover
         TestConfig {
             name: "unreachable-code",

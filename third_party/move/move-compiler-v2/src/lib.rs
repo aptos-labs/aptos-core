@@ -28,6 +28,7 @@ use crate::{
         ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
+        instruction_reordering::InstructionReorderingProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
@@ -444,6 +445,12 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
         pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
         pipeline.add_processor(Box::new(DeadStoreElimination {}));
+    }
+
+    if options.experiment_on(Experiment::INSTRUCTION_REORDERING) {
+        // We need to track all usages of variable definitions to be able to reorder instructions.
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
+        pipeline.add_processor(Box::new(InstructionReorderingProcessor {}));
     }
 
     // Run live var analysis again because it could be invalidated by previous pipeline steps,

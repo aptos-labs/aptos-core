@@ -178,6 +178,8 @@ pub enum Operation {
     Drop,
     /// Indicates that the value is no longer borrowed.
     Release,
+    /// Indicates to the code generator that the value should be moved/copied to the stack.
+    Touch,
 
     ReadRef,
     WriteRef,
@@ -276,6 +278,7 @@ impl Operation {
             Operation::Uninit => false,
             Operation::Drop => false,
             Operation::Release => false,
+            Operation::Touch => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
             Operation::FreezeRef(_) => false,
@@ -1225,6 +1228,9 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             },
             Release => {
                 write!(f, "release")?;
+            },
+            Touch => {
+                write!(f, "touch")?;
             },
             ReadRef => {
                 write!(f, "read_ref")?;

@@ -7,7 +7,9 @@ use crate::{
         module_generator::{ModuleContext, ModuleGenerator, SOURCE_MAP_OK},
         peephole_optimizer, Options, MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
     },
-    pipeline::livevar_analysis_processor::LiveVarAnnotation,
+    pipeline::{
+        instruction_reordering::TouchUseAnnotation, livevar_analysis_processor::LiveVarAnnotation,
+    },
 };
 use move_binary_format::{
     file_format as FF,
@@ -560,6 +562,11 @@ impl<'a> FunctionGenerator<'a> {
                 // Move bytecode does not process release, values are released indirectly
                 // when the borrowed head of the borrow chain is destroyed
             },
+            Operation::Touch => {
+                // This is an indication that we need to copy or move the value to the stack.
+                // It is inserted by the instruction reordering optimization pass, and only by it.
+                self.touch_arg(ctx, source[0]);
+            },
             Operation::Drop => {
                 // Currently Destroy is only translated for references. It may also make
                 // sense for other values, as we may figure later. Its known to be required
@@ -895,6 +902,49 @@ impl<'a> FunctionGenerator<'a> {
     /// Emits a file-format bytecode.
     fn emit(&mut self, bc: FF::Bytecode) {
         self.code.push(bc)
+    }
+
+    /// Touch a temporary, i.e., ensure it is on the stack.
+    /// If it is already on the stack, there is no modification to the stack.
+    /// Else, it is moved or copied to the top of the stack.
+    fn touch_arg(&mut self, ctx: &BytecodeContext, temp: TempIndex) {
+        if self.stack.contains(&temp) {
+            return;
+        }
+
+        let fun_ctx = ctx.fun_ctx;
+        let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), temp);
+        // Either move or copy the local to the top of the stack.
+        if !fun_ctx.is_copyable(temp) {
+            self.emit(FF::Bytecode::MoveLoc(local));
+        } else {
+            // `temp` is copyable, but we should copy or move it based on whether it is alive after
+            // the use corresponding to this `Touch` instruction.
+            let TouchUseAnnotation(touch_use_map) = fun_ctx
+                .fun
+                .get_annotations()
+                .get::<TouchUseAnnotation>()
+                .expect("touch use annotation is a prerequisite");
+            let use_offset = *touch_use_map
+                .get(&ctx.code_offset)
+                .expect("code offset for `Touch` must be in the map");
+            let live_var_annotation = fun_ctx
+                .fun
+                .get_annotations()
+                .get::<LiveVarAnnotation>()
+                .expect("livevar analysis is a prerequisite");
+            let alive_after = live_var_annotation
+                .get_live_var_info_at(use_offset)
+                .map(|a| a.after.contains_key(&temp))
+                .unwrap_or(false);
+            if alive_after {
+                self.emit(FF::Bytecode::CopyLoc(local));
+            } else {
+                self.emit(FF::Bytecode::MoveLoc(local));
+            }
+        }
+
+        self.stack.push(temp);
     }
 
     /// Ensure that on the abstract stack of the generator, the given temporaries are ready,

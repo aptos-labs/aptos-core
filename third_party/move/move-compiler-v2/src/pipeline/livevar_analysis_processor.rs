@@ -51,7 +51,7 @@ use move_stackless_bytecode::{
     dataflow_domains::{AbstractDomain, JoinResult, MapDomain},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AttrId, Bytecode},
+    stackless_bytecode::{AttrId, Bytecode, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::{
@@ -349,6 +349,9 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
             },
             Load(_, dst, _) => {
                 state.livevars.remove(dst);
+            },
+            Call(_, _, Operation::Touch, _, _) => {
+                // Touch should be considered as a no-op for live variable analysis.
             },
             Call(id, dsts, _, srcs, _) => {
                 for dst in dsts {

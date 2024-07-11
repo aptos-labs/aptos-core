@@ -557,6 +557,7 @@ impl<'a> FunctionGenerator<'a> {
 
                     // Specification or other operations which can be ignored here
                     Release
+                    | Touch
                     | GetField(_, _, _, _)
                     | GetGlobal(_, _, _)
                     | IsParent(_, _)

@@ -17,6 +17,7 @@ pub mod avail_copies_analysis;
 pub mod copy_propagation;
 pub mod dead_store_elimination;
 pub mod exit_state_analysis;
+pub mod instruction_reordering;
 pub mod livevar_analysis_processor;
 pub mod reference_safety_processor;
 pub mod split_critical_edges_processor;
