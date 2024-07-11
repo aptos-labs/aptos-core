@@ -485,6 +485,10 @@ impl VMChangeSet {
         &self.events
     }
 
+    pub fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
+        self.events().iter().map(|(e, _)| e)
+    }
+
     /// Materializes this change set: all aggregator v1 deltas are converted into writes and
     /// are combined with existing aggregator writes. The aggregator v2 changeset is not touched.
     pub fn try_materialize_aggregator_v1_delta_set(

@@ -8,9 +8,7 @@ use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     state_store::{StateView, StateViewId},
-    transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
-    },
+    transaction::signature_verified_transaction::SignatureVerifiedTransaction,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
@@ -43,6 +41,7 @@ impl ExecutorTask for AptosExecutorTask {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
+        base_view: &impl StateView,
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
@@ -52,6 +51,32 @@ impl ExecutorTask for AptosExecutorTask {
         });
 
         let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
+
+        // We process direct write set payload here, to ensure that VM does not have to lift
+        // storage-level abstractions into more fine-grained types used by the VM.
+        if let Some(change_set) = txn.as_valid_direct_write_set_payload() {
+            let execution_result =
+                self.vm
+                    .execute_direct_write_set_payload(base_view, change_set, &log_context);
+            return match execution_result {
+                Ok(output) => {
+                    // Direct payload triggers reconfiguration, and subsequent transactions are skipped.
+                    // Note that here we read all state keys in the change set from the base state view,
+                    // which is fine: we do not use the results of these reads anyway. Changes made by
+                    // this transaction are applied directly and also do not break any other outputs,
+                    // because of reconfiguration.
+                    speculative_info!(
+                        &log_context,
+                        "Reconfiguration occurred: restart required".into()
+                    );
+                    ExecutionStatus::MaterializedSkipRest(AptosTransactionOutput::new_committed(
+                        output,
+                    ))
+                },
+                Err(vm_status) => ExecutionStatus::Abort(vm_status),
+            };
+        }
+
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
@@ -83,10 +108,6 @@ impl ExecutorTask for AptosExecutorTask {
                     );
                     ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
                 } else {
-                    assert!(
-                        Self::is_transaction_dynamic_change_set_capable(txn),
-                        "DirectWriteSet should always create SkipRest transaction, validate_waypoint_change_set provides this guarantee"
-                    );
                     ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },
@@ -108,17 +129,5 @@ impl ExecutorTask for AptosExecutorTask {
                 }
             },
         }
-    }
-
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {
-        if txn.is_valid() {
-            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
-            {
-                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
-                // resource_groups_split_in_change_set is enabled.
-                return false;
-            }
-        }
-        true
     }
 }
