@@ -383,9 +383,11 @@ module supra_framework::vesting_without_staking {
     }
 
 	public entry fun vest_individual(contract_address: address, shareholder_address: address) acquires VestingContract {
-		assert_active_vesting_contract(contract_address);
-		//extract beneficiary address
+		//check if contract exist, active and shareholder is a member of the contract
+		assert_shareholder_exists(contract_address,shareholder_address);
+
 		let vesting_signer = account::create_signer_with_capability(&borrow_global<VestingContract>(contract_address).signer_cap);
+		//extract beneficiary address
 		let beneficiary = beneficiary(contract_address,shareholder_address);
         {
             let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
@@ -393,7 +395,7 @@ module supra_framework::vesting_without_staking {
             if (vesting_contract.vesting_schedule.start_timestamp_secs > timestamp::now_seconds()) {
                 return
             };
-
+			
             let vesting_record = simple_map::borrow_mut(&mut vesting_contract.shareholders,&shareholder_address);
 
             // Check if the next vested period has already passed. If not, short-circuit since there's nothing to vest.
@@ -649,6 +651,11 @@ module supra_framework::vesting_without_staking {
     fun assert_vesting_contract_exists(contract_address: address) {
         assert!(exists<VestingContract>(contract_address), error::not_found(EVESTING_CONTRACT_NOT_FOUND));
     }
+	
+	fun assert_shareholder_exists(contract_address: address, shareholder_address: address) acquires VestingContract {
+		assert_active_vesting_contract(contract_address);
+		assert!(simple_map::contains_key(&borrow_global<VestingContract>(contract_address).shareholders,&shareholder_address), error::not_found(ESHAREHOLDER_NOT_EXIST));
+	}
 
     fun assert_active_vesting_contract(contract_address: address) acquires VestingContract {
         assert_vesting_contract_exists(contract_address);
