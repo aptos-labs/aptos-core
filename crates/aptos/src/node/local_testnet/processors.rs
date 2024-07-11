@@ -9,6 +9,7 @@ use diesel::Connection;
 use diesel_async::{async_connection_wrapper::AsyncConnectionWrapper, pg::AsyncPgConnection};
 use maplit::hashset;
 use processor::{
+    gap_detectors::DEFAULT_GAP_DETECTION_BATCH_SIZE,
     processors::{
         objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
         token_processor::TokenProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
@@ -75,6 +76,9 @@ impl ProcessorManager {
             },
             ProcessorName::CoinProcessor => ProcessorConfig::CoinProcessor,
             ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor,
+            ProcessorName::DefaultParquetProcessor => {
+                bail!("Default Parquet processor is not supported in the localnet")
+            },
             ProcessorName::EventsProcessor => ProcessorConfig::EventsProcessor,
             ProcessorName::FungibleAssetProcessor => ProcessorConfig::FungibleAssetProcessor,
             ProcessorName::MonitoringProcessor => {
@@ -132,6 +136,8 @@ impl ProcessorManager {
             per_table_chunk_sizes: Default::default(),
             transaction_filter: Default::default(),
             grpc_response_item_timeout_in_secs: 10,
+            deprecated_tables: Default::default(),
+            parquet_gap_detection_batch_size: DEFAULT_GAP_DETECTION_BATCH_SIZE,
         };
         let manager = Self {
             config,
