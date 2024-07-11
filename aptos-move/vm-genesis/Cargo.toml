@@ -36,5 +36,4 @@ proptest-derive = { workspace = true }
 
 [features]
 default = []
-aptos = [] # for excluding upstream code
 fuzzing = ["aptos-types/fuzzing", "move-core-types/fuzzing", "move-vm-types/fuzzing"]
