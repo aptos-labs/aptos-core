@@ -314,8 +314,14 @@ fn parse_identifier(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
 fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let id: Symbol = context.tokens.content().into();
-    if (context.tokens.peek() != Tok::Identifier && context.tokens.peek() != Tok::NumValue) || (context.tokens.peek() == Tok::NumValue && id.as_str().chars().any(|c | !matches!(c, '0'..='9'))) {
-        return Err(unexpected_token_error(context.tokens, "an identifier or an anonymous field `0`, `1`, ..."));
+    if (context.tokens.peek() != Tok::Identifier && context.tokens.peek() != Tok::NumValue)
+        || (context.tokens.peek() == Tok::NumValue
+            && id.as_str().chars().any(|c| !matches!(c, '0'..='9')))
+    {
+        return Err(unexpected_token_error(
+            context.tokens,
+            "an identifier or an anonymous field `0`, `1`, ...",
+        ));
     }
     context.tokens.advance()?;
     let end_loc = context.tokens.previous_end_loc();
