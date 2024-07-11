@@ -40,17 +40,16 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         _account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let mut accounts_to_use =
+        let accounts_to_use =
             self.source_accounts_pool
                 .take_from_pool(num_to_create, true, &mut self.rng);
         if accounts_to_use.is_empty() {
             return Vec::new();
         }
         let txns = accounts_to_use
-            .iter_mut()
+            .iter()
             .flat_map(|account| self.generator.generate_transactions(account, 1))
             .collect();
-
         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
             destination_accounts_pool.add_to_pool(accounts_to_use);
         }

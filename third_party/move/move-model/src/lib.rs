@@ -90,7 +90,10 @@ pub fn run_model_builder_in_compiler_mode(
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
+    warn_of_deprecation_use: bool,
+    warn_of_deprecation_use_in_aptos_libs: bool,
     compile_test_code: bool,
+    compile_verify_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -110,8 +113,13 @@ pub fn run_model_builder_in_compiler_mode(
             ..ModelBuilderOptions::default()
         },
         Flags::model_compilation()
+            .set_warn_of_deprecation_use(warn_of_deprecation_use)
+            .set_warn_of_deprecation_use_in_aptos_libs(warn_of_deprecation_use_in_aptos_libs)
             .set_skip_attribute_checks(skip_attribute_checks)
-            .set_keep_testing_functions(compile_test_code),
+            .set_verify(compile_verify_code)
+            .set_keep_testing_functions(compile_test_code)
+            .set_lang_v2(language_version != LanguageVersion::V1)
+            .set_compiler_v2(true),
         known_attributes,
     )
 }
@@ -438,6 +446,8 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
 
     // After all specs have been processed, warn about any unused schemas.
     builder.warn_unused_schemas();
+
+    builder.add_friend_decl_for_package_visibility();
 
     // Perform any remaining friend-declaration checks and update friend module id information.
     check_and_update_friend_info(builder);
@@ -1029,7 +1039,7 @@ fn downgrade_type_inlining_to_expansion(ty: &N::Type) -> E::Type {
                     E::Type_::Apply(sp(ty.loc, access), rewritten_args)
                 },
                 N::TypeName_::ModuleType(module_ident, struct_name) => {
-                    let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+                    let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
                     E::Type_::Apply(sp(struct_name.loc(), access), rewritten_args)
                 },
                 N::TypeName_::Multiple(size) => {
@@ -1061,7 +1071,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
         UnannotatedExp_::Constant(module_ident_opt, name) => {
             let access = match module_ident_opt {
                 None => E::ModuleAccess_::Name(name.0),
-                Some(module_ident) => E::ModuleAccess_::ModuleAccess(*module_ident, name.0),
+                Some(module_ident) => E::ModuleAccess_::ModuleAccess(*module_ident, name.0, None),
             };
             Exp_::Name(sp(name.loc(), access), None)
         },
@@ -1076,7 +1086,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
                 parameter_types: _,
                 acquires: _,
             } = call.as_ref();
-            let access = E::ModuleAccess_::ModuleAccess(*module, name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module, name.0, None);
             let rewritten_arguments = match downgrade_exp_inlining_to_expansion(arguments).value {
                 Exp_::Unit { .. } => vec![],
                 Exp_::ExpList(exps) => exps,
@@ -1192,7 +1202,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
         ),
 
         UnannotatedExp_::Pack(module_ident, struct_name, ty_args, fields) => {
-            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
             let rewritten_ty_args = ty_args
                 .iter()
                 .map(downgrade_type_inlining_to_expansion)
@@ -1283,7 +1293,7 @@ fn downgrade_lvalue_inlining_to_expansion(val: &T::LValue) -> E::LValue {
         },
         T::LValue_::Unpack(module_ident, struct_name, ty_args, fields)
         | T::LValue_::BorrowUnpack(_, module_ident, struct_name, ty_args, fields) => {
-            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
             let rewritten_ty_args: Vec<_> = ty_args
                 .iter()
                 .map(downgrade_type_inlining_to_expansion)

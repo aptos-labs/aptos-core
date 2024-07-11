@@ -22,7 +22,7 @@ use move_core_types::{identifier::Identifier, vm_status::StatusCode};
 fn access_path_panic() {
     // github.com/aptos-labs/aptos-core/security/advisories/GHSA-rpw2-84hq-48jj
     let mut ty = SignatureToken::Bool;
-    for _ in 0..20 {
+    for _ in 0..18 {
         ty = SignatureToken::StructInstantiation(StructHandleIndex(0), vec![ty]);
     }
 

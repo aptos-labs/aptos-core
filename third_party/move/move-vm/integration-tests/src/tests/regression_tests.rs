@@ -110,10 +110,8 @@ fn script_large_ty() {
     let move_vm = MoveVM::new_with_config(vec![], VMConfig {
         verifier_config,
         paranoid_type_checks: true,
-        type_size_limit: true,
         ..Default::default()
-    })
-    .unwrap();
+    });
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();

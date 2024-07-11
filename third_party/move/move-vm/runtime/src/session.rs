@@ -27,7 +27,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{StructNameIndex, StructType, Type},
+    loaded_data::runtime_types::{StructNameIndex, StructType, Type, TypeBuilder},
     values::{GlobalValue, Value},
 };
 use std::{borrow::Borrow, sync::Arc};
@@ -430,6 +430,10 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn get_vm_config(&self) -> &'l VMConfig {
         self.move_vm.runtime.loader().vm_config()
+    }
+
+    pub fn get_ty_builder(&self) -> &'l TypeBuilder {
+        self.move_vm.runtime.loader().ty_builder()
     }
 
     pub fn get_struct_type(&self, index: StructNameIndex) -> Option<Arc<StructType>> {

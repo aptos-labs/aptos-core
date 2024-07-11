@@ -3,6 +3,7 @@ ResolutionGraph {
     build_options: BuildConfig {
         dev_mode: true,
         test_mode: false,
+        override_std: None,
         generate_docs: false,
         generate_abis: false,
         generate_move_model: false,

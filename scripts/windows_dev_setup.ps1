@@ -7,6 +7,8 @@ param (
 
 $ErrorActionPreference = 'Stop'
 
+Set-PSDebug -Trace 1
+
 Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path) | Out-Null; Set-Location '..' -ErrorAction Stop
 
 $global:user_selection = $null
@@ -276,11 +278,11 @@ function set_msvc_env_variables {  # Sets the environment variables based on the
 function install_rustup {
   $result = check_package "Rustup"
   if ($result) {
-    winget install Rustlang.Rustup --silent
+    winget install Rustlang.Rustup --silent --accept-source-agreements
     Exit
 	}
   else {
-    winget upgrade --id Rustlang.Rustup
+    winget upgrade --id Rustlang.Rustup --accept-source-agreements
   }
   # Reload the PATH environment variables for this session
   $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
@@ -324,42 +326,42 @@ function install_cargo_plugins {  # Installs Grcov, protoc components, and cargo
 function install_llvm {
   $result = check_package "LLVM"
   if ($result) {
-    winget install LLVM.LLVM --silent
+    winget install LLVM.LLVM --silent --accept-source-agreementst
 	}
   else {
-    winget upgrade --id LLVM.LLVM
+    winget upgrade --id LLVM.LLVM --accept-source-agreementsM
   }
 }
 
 function install_openssl {
   $result = check_package "OpenSSL"
   if ($result) {
-    winget install ShiningLight.OpenSSL --silent
+    winget install ShiningLight.OpenSSL --silent --accept-source-agreements
 	}
   else {
-    winget upgrade --id ShiningLight.OpenSSL --silent
+    winget upgrade --id ShiningLight.OpenSSL --silent --accept-source-agreements
   }
 }
 
 function install_nodejs {
   $result = check_package "Node.js"
   if ($result) {
-    winget install OpenJS.NodeJS --silent
+    winget install OpenJS.NodeJS --silent --accept-source-agreementst
 	}
   else {
-    winget upgrade --id OpenJS.NodeJS --silent
+    winget upgrade --id OpenJS.NodeJS --silent --accept-source-agreementst
   }
 }
 
 function install_python {
   $result = check_package "Python"
   if ($result) {
-    winget install Python.Python.3.11 --silent
+    winget install Python.Python.3.11 --silent --accept-source-agreementst
     # Reload the PATH environment variables for this session
     $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
 	}
   else {
-    winget upgrade --id Python.Python.3.11 --silent
+    winget upgrade --id Python.Python.3.11 --silent --accept-source-agreementst
   }
   python -m pip install --upgrade pip
   python -m pip install schemathesis
@@ -368,35 +370,35 @@ function install_python {
 function install_pnpm {
   $result = check_package "pnpm"
   if ($result) {
-    winget install pnpm.pnpm --silent
+    winget install pnpm.pnpm --silent --accept-source-agreements
 	}
   else {
-    winget upgrade --id pnpm.pnpm
+    winget upgrade --id pnpm.pnpm --accept-source-agreementsm
   }
 }
 
 function install_postgresql {
-  $result = check_package "PostgreSQL"
-  $psql_version = winget show -e PostgreSQL | Select-String Version
+  $result = check_package "PostgreSQL 15"
+  $psql_version = winget show -e "PostgreSQL 15" --accept-source-agreements | Select-String Version
   $psql_version = $psql_version.Line.Split(':')[1].Split('.')[0].Trim()
   $psql_path = "$env:PATH;$env:PROGRAMFILES\PostgreSQL\$psql_version\bin"
 
   if ($result) {
-    winget install PostgreSQL.PostgreSQL --silent
+    winget install PostgreSQL.PostgreSQL.15 --silent --accept-source-agreements
     [Environment]::SetEnvironmentVariable("PATH", $psql_path, "User")
   }
   elseif (!(Get-Command psql -ErrorAction SilentlyContinue)) {
     [Environment]::SetEnvironmentVariable("PATH", $psql_path, "User")
   }
   else {
-    winget upgrade --id PostgreSQL.PostgreSQL
+    winget upgrade --id PostgreSQL.PostgreSQL.15 --accept-source-agreements
   }
 }
 
 function install_git {
   if (!(Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Host "Installing Git..."
-    winget install Git.Git --silent
+    winget install Git.Git --silent --accept-source-agreements
   }
   else {
     Write-Host "Git is already installed."

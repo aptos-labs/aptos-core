@@ -53,7 +53,7 @@ impl Corpus {
         match result {
             Ok(registry) => registry,
             Err(error) => {
-                panic!("{}:{}", error, error.explanation());
+                panic!("[corpus {:?}] {}:{}", self, error, error.explanation());
             },
         }
     }

@@ -18,6 +18,7 @@ pub trait UserPayloadClient: Send + Sync {
         &self,
         max_poll_time: Duration,
         max_items: u64,
+        max_unique_items: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
@@ -26,6 +27,7 @@ pub trait UserPayloadClient: Send + Sync {
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
+        block_timestamp: Duration,
     ) -> anyhow::Result<Payload, QuorumStoreError>;
 }
 
@@ -49,6 +51,7 @@ impl UserPayloadClient for DummyClient {
         &self,
         max_poll_time: Duration,
         mut max_items: u64,
+        mut max_unique_items: u64,
         mut max_bytes: u64,
         _max_inline_items: u64,
         _max_inline_bytes: u64,
@@ -57,12 +60,14 @@ impl UserPayloadClient for DummyClient {
         _pending_ordering: bool,
         _pending_uncommitted_blocks: usize,
         _recent_max_fill_fraction: f32,
+        _block_timestamp: Duration,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let timer = Instant::now();
         let mut nxt_txn_idx = 0;
         let mut txns = vec![];
         while timer.elapsed() < max_poll_time
             && max_items >= 1
+            && max_unique_items >= 1
             && max_bytes >= 1
             && nxt_txn_idx < self.txns.len()
         {
@@ -73,6 +78,7 @@ impl UserPayloadClient for DummyClient {
                 break;
             }
             max_items -= 1;
+            max_unique_items -= 1;
             max_bytes -= txn_size;
             nxt_txn_idx += 1;
             txns.push(txn);

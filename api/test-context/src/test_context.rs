@@ -20,6 +20,7 @@ use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_framework::BuiltPackage;
+use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_sdk::{
@@ -94,7 +95,7 @@ impl ApiSpecificConfig {
 
 pub fn new_test_context(
     test_name: String,
-    node_config: NodeConfig,
+    mut node_config: NodeConfig,
     use_db_with_indexer: bool,
 ) -> TestContext {
     // Speculative logging uses a global variable and when many instances use it together, they
@@ -119,17 +120,27 @@ pub fn new_test_context(
     let validator_owner = validator_identity.account_address.unwrap();
 
     let (db, db_rw) = if use_db_with_indexer {
-        DbReaderWriter::wrap(AptosDB::new_for_test_with_indexer(&tmp_dir))
+        DbReaderWriter::wrap(AptosDB::new_for_test_with_indexer(
+            &tmp_dir,
+            node_config.storage.rocksdb_configs.enable_storage_sharding,
+        ))
     } else {
         DbReaderWriter::wrap(
             AptosDB::open(
                 StorageDirPaths::from_path(&tmp_dir),
                 false,                       /* readonly */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-                RocksdbConfigs::default(),
+                RocksdbConfigs {
+                    enable_storage_sharding: node_config
+                        .storage
+                        .rocksdb_configs
+                        .enable_storage_sharding,
+                    ..Default::default()
+                },
                 false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                None,
             )
             .unwrap(),
         )
@@ -140,12 +151,18 @@ pub fn new_test_context(
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
 
+    node_config
+        .storage
+        .set_data_dir(tmp_dir.path().to_path_buf());
+    let mock_indexer_service =
+        MockInternalIndexerDBService::new_for_test(db_rw.reader.clone(), &node_config);
+
     let context = Context::new(
         ChainId::test(),
         db.clone(),
         mempool.ac_client.clone(),
         node_config.clone(),
-        None, /* table info reader */
+        mock_indexer_service.get_indexer_reader(),
     );
 
     // Configure the testing depending on which API version we're testing.

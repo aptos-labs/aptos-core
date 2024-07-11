@@ -37,6 +37,20 @@ fun m::test($t0: bool, $t1: bool) {
  26: return ()
 }
 
+
+Diagnostics:
+warning: Unused assignment to `i`. Consider removing or prefixing with an underscore: `_i`
+  ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:7:17
+  │
+7 │                 i = i + 1;
+  │                 ^^^^^^^^^
+
+warning: Unused assignment to `i`. Consider removing or prefixing with an underscore: `_i`
+   ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:12:13
+   │
+12 │             i = i + 1;
+   │             ^^^^^^^^^
+
 ============ after UnreachableCodeProcessor: ================
 
 [variant baseline]

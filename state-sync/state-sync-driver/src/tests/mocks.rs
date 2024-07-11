@@ -15,6 +15,7 @@ use aptos_data_streaming_service::{
     streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback},
 };
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
+use aptos_schemadb::DB;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbReaderWriter,
     DbWriter, ExecutedTrees, Order, Result, StateSnapshotReceiver,
@@ -473,6 +474,7 @@ mock! {
             epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
             target_ledger_info: LedgerInfoWithSignatures,
             target_output_with_proof: TransactionOutputListWithProof,
+            internal_indexer_db: Option<Arc<DB>>,
         ) -> AnyhowResult<JoinHandle<()>, crate::error::Error>;
 
         fn pending_storage_data(&self) -> bool;

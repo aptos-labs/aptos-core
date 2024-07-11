@@ -84,6 +84,9 @@ pub enum FeatureFlag {
     AGGREGATOR_V2_IS_AT_LEAST_API = 66,
     CONCURRENT_FUNGIBLE_BALANCE = 67,
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
+    LIMIT_VM_TYPE_SIZE = 69,
+    ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
+    DISALLOW_USER_NATIVES = 71,
 }
 
 impl FeatureFlag {
@@ -148,6 +151,9 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
+            FeatureFlag::LIMIT_VM_TYPE_SIZE,
+            FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
+            FeatureFlag::DISALLOW_USER_NATIVES,
         ]
     }
 }
@@ -239,12 +245,6 @@ impl Features {
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
     }
 
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    pub fn is_aggregator_v2_api_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
-    }
-
     /// Whether the Aggregator V2 delayed fields feature is enabled.
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
@@ -285,6 +285,14 @@ impl Features {
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
+    }
+
+    pub fn is_limit_type_size_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE)
+    }
+
+    pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

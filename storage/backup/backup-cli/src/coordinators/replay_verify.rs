@@ -17,7 +17,10 @@ use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::AptosDbError;
-use aptos_types::{on_chain_config::TimedFeatureOverride, transaction::Version};
+use aptos_types::{
+    on_chain_config::TimedFeatureOverride, transaction::Version,
+    vm::configs::set_timed_feature_override,
+};
 use aptos_vm::AptosVM;
 use std::sync::Arc;
 use thiserror::Error;
@@ -99,7 +102,7 @@ impl ReplayVerifyCoordinator {
 
     async fn run_impl(self) -> Result<(), ReplayError> {
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
-        AptosVM::set_timed_feature_override(TimedFeatureOverride::Replay);
+        set_timed_feature_override(TimedFeatureOverride::Replay);
 
         let metadata_view = metadata::cache::sync_and_load(
             &self.metadata_cache_opt,

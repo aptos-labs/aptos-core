@@ -29,9 +29,7 @@ runs:
 
     # Setup pnpm
     - name: Setup pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: 8.2.0
+      uses: pnpm/action-setup@v4
 
     # Install packages for examples and run package build, lint and tests
     - name: Run ecosystem lint

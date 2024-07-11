@@ -36,9 +36,11 @@ hex = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 once_cell = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+sha3 = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 tokio = { workspace = true }

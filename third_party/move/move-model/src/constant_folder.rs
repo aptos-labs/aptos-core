@@ -402,21 +402,12 @@ impl<'env> ExpRewriterFunctions for ConstantFolder<'env> {
                 None
             }
         } else if matches!(oper, Operation::Vector) {
-            if self.in_constant_declaration {
+            // Note that creating an empty vector is less gas than `ld_const_base`,
+            // so if we are optimizing we leave an empty vector as a vector op.
+            if self.in_constant_declaration || !args.is_empty() {
                 self.fold_vector_exp(id, Value::Vector, "vector", args)
             } else {
-                let result_type = self.env.get_node_type(id);
-                let vec_is_of_number = if let Type::Vector(tr) = result_type {
-                    tr.is_number()
-                } else {
-                    false
-                };
-                if !args.is_empty() && vec_is_of_number {
-                    // Nonempty vectors of numbers are probably cheaper as constants.
-                    self.fold_vector_exp(id, Value::Vector, "vector", args)
-                } else {
-                    None
-                }
+                None
             }
         } else if args.len() == 1 {
             // unary op

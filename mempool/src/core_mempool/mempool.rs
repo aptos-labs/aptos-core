@@ -352,7 +352,7 @@ impl Mempool {
                 // check if we can now include some transactions
                 // that were skipped before for given account
                 let mut skipped_txn = (txn.address, tx_seq + 1);
-                while skipped.contains(&skipped_txn) {
+                while skipped.remove(&skipped_txn) {
                     inserted.insert(skipped_txn);
                     result.push(skipped_txn);
                     if (result.len() as u64) == max_txns {
@@ -465,10 +465,7 @@ impl Mempool {
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
-    pub(crate) fn timeline_range(
-        &self,
-        start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+    pub(crate) fn timeline_range(&self, start_end_pairs: &[(u64, u64)]) -> Vec<SignedTransaction> {
         self.transactions.timeline_range(start_end_pairs)
     }
 

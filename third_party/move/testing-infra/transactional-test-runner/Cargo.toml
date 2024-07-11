@@ -14,6 +14,7 @@ anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 move-binary-format = { path = "../../move-binary-format", features = ["testing"] }
 move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
+move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
 move-compiler-v2 = { path = "../../move-compiler-v2" }

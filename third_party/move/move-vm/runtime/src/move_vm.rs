@@ -12,7 +12,7 @@ use crate::{
     session::Session,
 };
 use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
+    errors::{PartialVMError, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -27,20 +27,33 @@ pub struct MoveVM {
 }
 
 impl MoveVM {
+    /// Creates a new VM instance, using default configurations. Panics if there are duplicated
+    /// natives.
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-    ) -> VMResult<Self> {
-        Self::new_with_config(natives, VMConfig::default())
+    ) -> Self {
+        let vm_config = VMConfig {
+            // Keep the paranoid mode on as we most likely want this for tests.
+            paranoid_type_checks: true,
+            ..VMConfig::default()
+        };
+        Self::new_with_config(natives, vm_config)
     }
 
+    /// Creates a new VM instance, with provided VM configurations. Panics if there are duplicated
+    /// natives.
     pub fn new_with_config(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
-    ) -> VMResult<Self> {
-        Ok(Self {
-            runtime: VMRuntime::new(natives, vm_config)
-                .map_err(|err| err.finish(Location::Undefined))?,
-        })
+    ) -> Self {
+        Self {
+            runtime: VMRuntime::new(natives, vm_config),
+        }
+    }
+
+    /// Returns VM configuration used to initialize the VM.
+    pub fn vm_config(&self) -> &VMConfig {
+        self.runtime.loader().vm_config()
     }
 
     /// Create a new Session backed by the given storage.

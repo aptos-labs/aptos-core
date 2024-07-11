@@ -9,10 +9,10 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_types::on_chain_config::OnChainConsensusConfig;
+use aptos_types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use rand::random;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
 pub const MAX_CONNECTIVITY_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to gain connectivity
@@ -117,7 +117,7 @@ pub async fn transfer_coins(
 pub async fn transfer_and_maybe_reconfig(
     client: &RestClient,
     transaction_factory: &TransactionFactory,
-    root_account: &mut LocalAccount,
+    root_account: Arc<LocalAccount>,
     sender: &mut LocalAccount,
     receiver: &LocalAccount,
     num_transfers: usize,
@@ -125,7 +125,7 @@ pub async fn transfer_and_maybe_reconfig(
     for _ in 0..num_transfers {
         // Reconfigurations have a 20% chance of being executed
         if random::<u16>() % 5 == 0 {
-            reconfig(client, transaction_factory, root_account).await;
+            reconfig(client, transaction_factory, root_account.clone()).await;
         }
 
         transfer_coins(client, transaction_factory, sender, receiver, 1).await;
@@ -186,6 +186,22 @@ pub async fn get_current_consensus_config(rest_client: &RestClient) -> OnChainCo
             .get_account_resource_bcs::<Vec<u8>>(
                 CORE_CODE_ADDRESS,
                 "0x1::consensus_config::ConsensusConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+    .unwrap()
+}
+
+pub(crate) async fn get_current_execution_config(
+    rest_client: &RestClient,
+) -> OnChainExecutionConfig {
+    bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::execution_config::ExecutionConfig",
             )
             .await
             .unwrap()

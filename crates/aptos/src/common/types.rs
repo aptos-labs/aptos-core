@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::fund_account;
+use super::utils::{explorer_transaction_link, fund_account};
 use crate::{
     common::{
         init::Network,
@@ -53,6 +53,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -231,6 +232,7 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
+    /// Name of network being used, if setup from aptos init
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
@@ -1047,6 +1049,10 @@ pub struct MovePackageDir {
     #[clap(long, value_parser = crate::common::utils::parse_map::<String, AccountAddressWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 
+    /// Override the standard library version by mainnet/testnet/devnet
+    #[clap(long, value_parser)]
+    pub override_std: Option<StdVersion>,
+
     /// Skip pulling the latest git dependencies
     ///
     /// If you don't have a network connection, the compiler may fail due
@@ -1087,6 +1093,7 @@ impl MovePackageDir {
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
+            override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
@@ -1345,17 +1352,29 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
             },
-            Transaction::ValidatorTransaction(txn) => TransactionSummary {
+            Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
+            Transaction::ValidatorTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.transaction_info().hash,
                 gas_used: None,
                 gas_unit_price: None,
                 pending: None,
                 sender: None,
                 sequence_number: None,
-                success: Some(txn.info.success),
-                timestamp_us: Some(txn.timestamp.0),
-                version: Some(txn.info.version.0),
-                vm_status: Some(txn.info.vm_status.clone()),
+                success: Some(txn.transaction_info().success),
+                timestamp_us: Some(txn.timestamp().0),
+                version: Some(txn.transaction_info().version.0),
+                vm_status: Some(txn.transaction_info().vm_status.clone()),
             },
         }
     }
@@ -1697,25 +1716,19 @@ impl TransactionOptions {
             adjusted_max_gas
         };
 
-        // Sign and submit transaction
+        // Build a transaction
         let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
             .with_transaction_expiration_time(self.gas_options.expiration_secs);
 
-        match self.get_transaction_account_type() {
+        // Sign it with the appropriate signer
+        let transaction = match self.get_transaction_account_type() {
             Ok(AccountType::Local) => {
                 let (private_key, _) = self.get_key_and_address()?;
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
-                let transaction = sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload));
-                let response = client
-                    .submit_and_wait(&transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-                Ok(response.into_inner())
+                sender_account.sign_with_transaction_builder(transaction_factory.payload(payload))
             },
             Ok(AccountType::HardwareWallet) => {
                 let sender_account = &mut HardwareWalletAccount::new(
@@ -1728,17 +1741,33 @@ impl TransactionOptions {
                     HardwareWalletType::Ledger,
                     sequence_number,
                 );
-                let transaction = sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload))?;
-                let response = client
-                    .submit_and_wait(&transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-                Ok(response.into_inner())
+                sender_account
+                    .sign_with_transaction_builder(transaction_factory.payload(payload))?
             },
-            Err(err) => Err(err),
-        }
+            Err(err) => return Err(err),
+        };
+
+        // Submit the transaction, printing out a useful transaction link
+        client
+            .submit_bcs(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+        let transaction_hash = transaction.clone().committed_hash();
+        let network = self
+            .profile_options
+            .profile()
+            .ok()
+            .and_then(|profile| profile.network);
+        eprintln!(
+            "Transaction submitted: {}",
+            explorer_transaction_link(transaction_hash, network)
+        );
+        let response = client
+            .wait_for_signed_transaction(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+        Ok(response.into_inner())
     }
 
     /// Simulates a transaction locally, using the debugger to fetch required data from remote.

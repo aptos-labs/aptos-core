@@ -80,10 +80,14 @@ impl SafetyRules {
     }
 
     pub(crate) fn verify_order_vote_proposal(
-        &self,
+        &mut self,
         order_vote_proposal: &OrderVoteProposal,
     ) -> Result<(), Error> {
         let proposed_block = order_vote_proposal.block();
+        let safety_data = self.persistent_storage.safety_data()?;
+
+        self.verify_epoch(proposed_block.epoch(), &safety_data)?;
+
         let qc = order_vote_proposal.quorum_cert();
         if qc.certified_block() != order_vote_proposal.block_info() {
             return Err(Error::InvalidOneChainQuorumCertificate(

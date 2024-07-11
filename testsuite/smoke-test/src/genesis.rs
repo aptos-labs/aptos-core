@@ -421,7 +421,7 @@ async fn delete_storage_and_wait_for_catchup(env: &mut LocalSwarm, validator_ind
 }
 
 /// Enables sync_only mode for the specified validator and wait for it to become healthy
-async fn enable_sync_only_mode(num_nodes: usize, validator_node: &mut LocalNode) {
+pub(crate) async fn enable_sync_only_mode(num_nodes: usize, validator_node: &mut LocalNode) {
     // Update the validator's config to enable sync_only mode
     let mut validator_config = validator_node.config().clone();
     validator_config.consensus.sync_only = true;

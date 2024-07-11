@@ -31,7 +31,7 @@ async fn jwk_consensus_provider_change_mind() {
     // Big epoch duration to ensure epoch change does not help reset validators if they are stuck.
     let epoch_duration_secs = 1800;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {

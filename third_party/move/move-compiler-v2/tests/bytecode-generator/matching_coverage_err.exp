@@ -1,0 +1,226 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    struct Box {
+        x: u64,
+    }
+    enum Inner {
+        Inner1 {
+            x: u64,
+        }
+        Inner2 {
+            x: u64,
+            y: u64,
+        }
+    }
+    enum Outer {
+        None,
+        One {
+            i: m::Inner,
+        }
+        Two {
+            i: m::Inner,
+            b: m::Box,
+        }
+    }
+    public fun exhaustive_tuple(i: &m::Inner) {
+        match (Tuple(i, i)) {
+          (m::Inner::Inner1{ x: _ }, _: &m::Inner): (&m::Inner, &m::Inner) => {
+            Tuple()
+          }
+          (m::Inner::Inner2{ x: _, y: _ }, _: &m::Inner): (&m::Inner, &m::Inner) => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun exhaustive_via_merge(o: &m::Outer) {
+        match (o) {
+          m::Outer::None => {
+            Tuple()
+          }
+          m::Outer::One{ i: m::Inner::Inner1{ x: _ } } => {
+            Tuple()
+          }
+          m::Outer::One{ i: m::Inner::Inner2{ x: _, y: _ } } => {
+            Tuple()
+          }
+          m::Outer::Two{ i: _, b: _ } => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun non_exhaustive(o: &m::Outer) {
+        match (o) {
+          m::Outer::None => {
+            Tuple()
+          }
+          m::Outer::One{ i: _ } => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun non_exhaustive_because_of_cond(o: &m::Outer) {
+        match (o) {
+          m::Outer::None => {
+            Tuple()
+          }
+          m::Outer::One{ i: _ } => {
+            Tuple()
+          }
+          m::Outer::Two{ i: _, b } if Gt<u64>(select m::Box.x<&m::Box>(b), 0) => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun non_exhaustive_because_of_nested(o: &m::Outer) {
+        match (o) {
+          m::Outer::None => {
+            Tuple()
+          }
+          m::Outer::One{ i: m::Inner::Inner1{ x: _ } } => {
+            Tuple()
+          }
+          m::Outer::Two{ i: _, b: _ } => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun non_exhaustive_tuple(i: &m::Inner) {
+        match (Tuple(i, i)) {
+          (m::Inner::Inner1{ x: _ }, _: &m::Inner): (&m::Inner, &m::Inner) => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun non_exhaustive_tuple2(i: &m::Inner) {
+        match (Tuple(i, i)) {
+          (m::Inner::Inner1{ x: _ }, _: &m::Inner): (&m::Inner, &m::Inner) => {
+            Tuple()
+          }
+          (_: &m::Inner, m::Inner::Inner2{ x: _, y: _ }): (&m::Inner, &m::Inner) => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun unreachable(o: &m::Outer) {
+        match (o) {
+          m::Outer::None => {
+            Tuple()
+          }
+          m::Outer::One{ i: _ } => {
+            Tuple()
+          }
+          m::Outer::Two{ i: _, b: _ } => {
+            Tuple()
+          }
+          _: &m::Outer => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun unreachable_via_overlaying_pattern(o: &m::Outer) {
+        match (o) {
+          m::Outer::None => {
+            Tuple()
+          }
+          m::Outer::One{ i: m::Inner::Inner1{ x: _ } } => {
+            Tuple()
+          }
+          m::Outer::One{ i: _ } => {
+            Tuple()
+          }
+          m::Outer::One{ i: m::Inner::Inner1{ x: _ } } => {
+            Tuple()
+          }
+          _: &m::Outer => {
+            Tuple()
+          }
+        }
+
+    }
+    public fun unreachable_via_repeated_pattern(o: &m::Outer) {
+        match (o) {
+          m::Outer::None => {
+            Tuple()
+          }
+          m::Outer::One{ i: _ } => {
+            Tuple()
+          }
+          m::Outer::One{ i: _ } => {
+            Tuple()
+          }
+          _: &m::Outer => {
+            Tuple()
+          }
+        }
+
+    }
+} // end 0xc0ffee::m
+
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/bytecode-generator/matching_coverage_err.move:21:16
+   │
+21 │         match (o) {
+   │                ^
+   │
+   = missing `Outer::Two{..}`
+
+error: match not exhaustive
+   ┌─ tests/bytecode-generator/matching_coverage_err.move:28:16
+   │
+28 │         match (o) {
+   │                ^
+   │
+   = missing `Outer::Two{..}`
+
+error: match not exhaustive
+   ┌─ tests/bytecode-generator/matching_coverage_err.move:36:16
+   │
+36 │         match (o) {
+   │                ^
+   │
+   = missing `Outer::One{i: Inner::Inner2{..}}`
+
+error: match not exhaustive
+   ┌─ tests/bytecode-generator/matching_coverage_err.move:52:16
+   │
+52 │         match ((i, i)) {
+   │                ^^^^^^
+   │
+   = missing `(Inner::Inner2{..},_)`
+
+error: match not exhaustive
+   ┌─ tests/bytecode-generator/matching_coverage_err.move:65:16
+   │
+65 │         match ((i, i)) {
+   │                ^^^^^^
+   │
+   = missing `(_,Inner::Inner1{..})`
+   = missing `(Inner::Inner2{..},_)`
+
+error: unreachable pattern
+   ┌─ tests/bytecode-generator/matching_coverage_err.move:78:14
+   │
+78 │              _ => {}
+   │              ^
+
+error: unreachable pattern
+   ┌─ tests/bytecode-generator/matching_coverage_err.move:86:14
+   │
+86 │              One{i: _} => {}
+   │              ^^^^^^^^^
+
+error: unreachable pattern
+   ┌─ tests/bytecode-generator/matching_coverage_err.move:96:14
+   │
+96 │              One{i: Inner1{x:_}} => {}
+   │              ^^^^^^^^^^^^^^^^^^^

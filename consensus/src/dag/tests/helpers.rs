@@ -97,7 +97,7 @@ pub(crate) fn generate_dag_nodes(
                 nodes_at_round.push(None);
             }
         }
-        previous_round = nodes_at_round.clone();
+        previous_round.clone_from(&nodes_at_round);
         nodes.push(nodes_at_round);
     }
     nodes

@@ -1628,6 +1628,7 @@ impl ModelValue {
     }
 }
 
+#[allow(dead_code)]
 /// Represents an expression descriptor.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct ExpDescriptor {
