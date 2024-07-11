@@ -251,9 +251,9 @@ where
                     .with_label_values(&["state_checkpoint"])
                     .start_timer();
 
-                THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
-                })?
+                //THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)?
+                //})?
             };
 
         let _ = self.block_tree.add_block(
