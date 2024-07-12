@@ -57,7 +57,7 @@ use aptos_types::{
         OnChainConfig, TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
-    state_store::{StateView, TStateView},
+    state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -856,6 +856,7 @@ impl AptosVM {
 
         let user_session_change_set = self.resolve_pending_code_publish_and_finish_user_session(
             session,
+            resolver,
             gas_meter,
             traversal_context,
             new_published_modules_loaded,
@@ -1241,6 +1242,7 @@ impl AptosVM {
         // modules.
         self.resolve_pending_code_publish_and_finish_user_session(
             session,
+            resolver,
             gas_meter,
             traversal_context,
             new_published_modules_loaded,
@@ -1359,6 +1361,7 @@ impl AptosVM {
     fn resolve_pending_code_publish_and_finish_user_session(
         &self,
         mut session: UserSession<'_, '_>,
+        resolver: &impl AptosMoveResolver,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         new_published_modules_loaded: &mut bool,
@@ -1374,10 +1377,6 @@ impl AptosVM {
                     check_compat: _,
                 } = publish_request;
 
-                // TODO: unfortunately we need to deserialize the entire bundle here to handle
-                // `init_module` and verify some deployment conditions, while the VM need to do
-                // the deserialization again. Consider adding an API to MoveVM which allows to
-                // directly pass CompiledModule.
                 let modules = self.deserialize_module_bundle(&bundle)?;
                 let modules: &Vec<CompiledModule> =
                     traversal_context.referenced_module_bundles.alloc(modules);
@@ -1386,14 +1385,35 @@ impl AptosVM {
                 //       result in shallow-loading of the modules and therefore subtle changes in
                 //       the error semantics.
                 if self.gas_feature_version >= 15 {
-                    // Charge old versions of the modules, in case of upgrades.
-                    session.check_dependencies_and_charge_gas_non_recursive_optional(
-                        gas_meter,
-                        traversal_context,
-                        modules
-                            .iter()
-                            .map(|module| (module.self_addr(), module.self_name())),
-                    )?;
+                    // Charge old versions of existing modules, in case of upgrades.
+                    for module in modules.iter() {
+                        let addr = module.self_addr();
+                        let name = module.self_name();
+                        let state_key = StateKey::module(addr, name);
+
+                        // TODO: Allow the check of special addresses to be customized.
+                        if addr.is_special()
+                            || traversal_context.visited.insert((addr, name), ()).is_some()
+                        {
+                            continue;
+                        }
+
+                        let size_if_module_exists = resolver
+                            .as_executor_view()
+                            .get_module_state_value_size(&state_key)
+                            .map_err(|e| e.finish(Location::Undefined))?;
+
+                        if let Some(size) = size_if_module_exists {
+                            gas_meter
+                                .charge_dependency(false, addr, name, NumBytes::new(size))
+                                .map_err(|err| {
+                                    err.finish(Location::Module(ModuleId::new(
+                                        *addr,
+                                        name.to_owned(),
+                                    )))
+                                })?;
+                        }
+                    }
 
                     // Charge all modules in the bundle that is about to be published.
                     for (module, blob) in modules.iter().zip(bundle.iter()) {
