@@ -55,7 +55,7 @@ pub struct AptosDBBackend {
     window_size: usize,
     seek_len: usize,
     aptos_db: Arc<dyn DbReader>,
-    db_result: Mutex<(Vec<VersionedNewBlockEvent>, u64, bool)>,
+    db_result: Mutex<Option<(Vec<VersionedNewBlockEvent>, u64, bool)>>,
 }
 
 impl AptosDBBackend {
@@ -64,13 +64,13 @@ impl AptosDBBackend {
             window_size,
             seek_len,
             aptos_db,
-            db_result: Mutex::new((vec![], 0u64, true)),
+            db_result: Mutex::new(None),
         }
     }
 
     fn refresh_db_result(
         &self,
-        mut locked: MutexGuard<'_, (Vec<VersionedNewBlockEvent>, u64, bool)>,
+        locked: &mut MutexGuard<'_, Option<(Vec<VersionedNewBlockEvent>, u64, bool)>>,
         latest_db_version: u64,
     ) -> Result<(Vec<VersionedNewBlockEvent>, u64, bool)> {
         // assumes target round is not too far from latest commit
@@ -97,7 +97,7 @@ impl AptosDBBackend {
             std::cmp::max(latest_db_version, max_returned_version),
             hit_end,
         );
-        *locked = result.clone();
+        **locked = Some(result.clone());
         Ok(result)
     }
 
@@ -173,18 +173,28 @@ impl MetadataBackend for AptosDBBackend {
         target_epoch: u64,
         target_round: Round,
     ) -> (Vec<NewBlockEvent>, HashValue) {
-        let locked = self.db_result.lock();
-        let events = &locked.0;
-        let version = locked.1;
-        let hit_end = locked.2;
+        let mut locked = self.db_result.lock();
+        let latest_db_version = self.aptos_db.get_latest_ledger_info_version().unwrap_or(0);
+        // lazy init db_result
+        if locked.is_none() {
+            if let Err(e) = self.refresh_db_result(&mut locked, latest_db_version) {
+                warn!(
+                    error = ?e, "[leader reputation] Fail to initialize db result",
+                );
+                return (vec![], HashValue::zero());
+            }
+        }
+        let (events, version, hit_end) = {
+            let result = locked.as_ref().unwrap();
+            (&result.0, result.1, result.2)
+        };
 
         let has_larger = events.first().map_or(false, |e| {
             (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
         });
-        let latest_db_version = self.aptos_db.get_latest_ledger_info_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
         if !has_larger && version < latest_db_version {
-            let fresh_db_result = self.refresh_db_result(locked, latest_db_version);
+            let fresh_db_result = self.refresh_db_result(&mut locked, latest_db_version);
             match fresh_db_result {
                 Ok((events, _version, hit_end)) => {
                     self.get_from_db_result(target_epoch, target_round, &events, hit_end)
@@ -691,6 +701,13 @@ impl ProposerElection for LeaderReputation {
     ) -> (Author, VotingPowerRatio) {
         let target_round = round.saturating_sub(self.exclude_round);
         let (sliding_window, root_hash) = self.backend.get_block_metadata(self.epoch, target_round);
+        info!(
+            "round: {}, target_round: {}, root_hash: {}, sliding_window.len(): {}",
+            round,
+            target_round,
+            root_hash,
+            sliding_window.len()
+        );
         let voting_power_participation_ratio =
             self.compute_chain_health_and_add_metrics(&sliding_window, round);
         let mut weights =

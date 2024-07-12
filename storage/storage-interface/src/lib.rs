@@ -4,6 +4,7 @@
 
 use crate::cached_state_view::ShardedStateCache;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_logger::info;
 pub use aptos_types::indexer::indexer_db_reader::Order;
 use aptos_types::{
     account_address::AccountAddress,
@@ -468,8 +469,14 @@ pub trait DbReader: Send + Sync {
     /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
     /// N.b. different from `get_synced_version()`.
     fn get_latest_ledger_info_version(&self) -> Result<Version> {
-        self.get_latest_ledger_info()
-            .map(|li| li.ledger_info().version())
+        self.get_latest_ledger_info().map(|li| {
+            info!(
+                "latest ledger info version: {}, round: {}",
+                li.ledger_info().version(),
+                li.ledger_info().round()
+            );
+            li.ledger_info().version()
+        })
     }
 
     /// Returns the latest version and committed block timestamp
