@@ -12,7 +12,9 @@ use crate::{
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
-    scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
+    scheduler::{
+        DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, ValidationMode, Wave,
+    },
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
@@ -102,19 +104,51 @@ where
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
+        fallback: bool,
+        scheduler: &Scheduler,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
         base_view: &S,
         parallel_state: ParallelState<T, X>,
-    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<Option<ValidationMode>, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        let execute_result = executor.execute_transaction_with_version(
+            &sync_view,
+            txn,
+            idx_to_execute,
+            incarnation,
+            fallback,
+        );
+
+        let mut read_set = sync_view.take_parallel_reads();
+
+        let validation_function = if fallback {
+            None
+        } else {
+            Some(|| -> bool {
+                !read_set.is_incorrect_use()
+                    && read_set.validate_data_reads(versioned_cache.data(), idx_to_execute)
+                    && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_execute)
+            })
+        };
+
+        let mut ret_mode = if let Some(is_validated) =
+            scheduler.try_set_execution_flag_writing(idx_to_execute, validation_function)
+        {
+            if is_validated {
+                ValidationMode::None
+            } else {
+                ValidationMode::SelfOnly
+            }
+        } else {
+            return Ok(None);
+        };
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -124,13 +158,10 @@ where
             .delayed_field_keys(idx_to_execute)
             .map_or(HashSet::new(), |keys| keys.collect());
 
-        let mut read_set = sync_view.take_parallel_reads();
-
         // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
         // May happen, for instance, when the recent execution wrote outside of the previous write/delta
         // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
         // (since those resource group validations rely on estimates).
-        let mut needs_suffix_validation = false;
         let mut apply_updates = |output: &E::Output| -> Result<
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
             PanicError,
@@ -140,7 +171,7 @@ where
             {
                 if prev_modified_keys.remove(&group_key).is_none() {
                     // Previously no write to the group at all.
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
 
                 if versioned_cache.data().write_metadata(
@@ -149,7 +180,7 @@ where
                     incarnation,
                     group_metadata_op,
                 ) {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 if versioned_cache.group_data().write(
                     group_key,
@@ -157,7 +188,7 @@ where
                     incarnation,
                     group_ops.into_iter(),
                 ) {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
             }
 
@@ -171,7 +202,7 @@ where
                     .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
             ) {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache
                     .data()
@@ -180,7 +211,7 @@ where
 
             for (k, v) in output.module_write_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache.modules().write(k, idx_to_execute, v);
             }
@@ -188,7 +219,7 @@ where
             // Then, apply deltas.
             for (k, d) in output.aggregator_v1_delta_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
@@ -212,7 +243,7 @@ where
 
                 let entry = change.into_entry_no_additional_history();
 
-                // TODO[agg_v2](optimize): figure out if it is useful for change to update needs_suffix_validation
+                // TODO[agg_v2](optimize): figure out if it is useful for change to add_suffix
                 if let Err(e) =
                     versioned_cache
                         .delayed_fields()
@@ -294,7 +325,7 @@ where
                     // triggering suffix re-validation, a later transaction might
                     // end up with the incorrect read result (corresponding to the
                     // removed group information from an incorrect speculative state).
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
 
                     versioned_cache.data().remove(&k, idx_to_execute);
                     versioned_cache.group_data().remove(&k, idx_to_execute);
@@ -314,7 +345,8 @@ where
                 ParallelBlockExecutionError::ModulePathReadWriteError,
             ));
         }
-        Ok(needs_suffix_validation)
+
+        Ok(Some(ret_mode))
     }
 
     fn validate(
@@ -465,10 +497,13 @@ where
         executor: &E,
         block: &[T],
         num_workers: usize,
-    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<Option<u32>, PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
+        let mut last_commit_idx: Option<u32> = None;
+
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
+            last_commit_idx = Some(txn_idx);
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
 
@@ -477,9 +512,12 @@ where
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
                 // Because of that, we can also ignore _needs_suffix_validation result.
-                let _needs_suffix_validation = Self::execute(
+                println!("executing during commit, idx={}", txn_idx);
+                let _validation_mode = Self::execute(
                     txn_idx,
                     incarnation + 1,
+                    false,
+                    scheduler,
                     block,
                     last_input_output,
                     versioned_cache,
@@ -590,6 +628,7 @@ where
                 }
 
                 if scheduler.halt() {
+                    println!("called halt, txn_idx={}", txn_idx + 1);
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
@@ -603,10 +642,10 @@ where
                     )
                     .into()));
                 }
-                return Ok(());
+                return Ok(None);
             }
         }
-        Ok(())
+        Ok(last_commit_idx)
     }
 
     fn materialize_aggregator_v1_delta_writes(
@@ -766,6 +805,7 @@ where
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
+
         let mut scheduler_task = SchedulerTask::Retry;
 
         let drain_commit_queue = || -> Result<(), PanicError> {
@@ -785,22 +825,67 @@ where
         };
 
         loop {
-            while scheduler.should_coordinate_commits() {
-                self.prepare_and_queue_commit_ready_txns(
-                    &self.config.onchain.block_gas_limit_type,
-                    scheduler,
-                    versioned_cache,
-                    &mut scheduler_task,
-                    last_input_output,
-                    shared_commit_state,
-                    base_view,
-                    start_shared_counter,
-                    shared_counter,
-                    &executor,
-                    block,
-                    num_workers,
-                )?;
-                scheduler.queueing_commits_mark_done();
+            if matches!(scheduler_task, SchedulerTask::Retry) {
+                let mut last_commit_idx = None;
+                while scheduler.should_coordinate_commits() {
+                    if let Some(last_idx) = self.prepare_and_queue_commit_ready_txns(
+                        &self.config.onchain.block_gas_limit_type,
+                        scheduler,
+                        versioned_cache,
+                        &mut scheduler_task,
+                        last_input_output,
+                        shared_commit_state,
+                        base_view,
+                        start_shared_counter,
+                        shared_counter,
+                        &executor,
+                        block,
+                        num_workers,
+                    )? {
+                        last_commit_idx.replace(last_idx);
+                    };
+                    scheduler.queueing_commits_mark_done();
+                }
+
+                if let Some(mut last_commit_idx) = last_commit_idx {
+                    //need to process next task
+                    last_commit_idx += 1;
+                    if let Some(incarnation) = scheduler.try_fallback(last_commit_idx) {
+                        println!("got into fallback, txn={}", last_commit_idx);
+                        if let Some(validation_mode) = Self::execute(
+                            last_commit_idx,
+                            incarnation,
+                            true,
+                            scheduler,
+                            block,
+                            last_input_output,
+                            versioned_cache,
+                            &executor,
+                            base_view,
+                            ParallelState::new(
+                                versioned_cache,
+                                scheduler,
+                                start_shared_counter,
+                                shared_counter,
+                            ),
+                        )? {
+                            //if we are in fallback and won write => no need to validate
+                            println!(
+                                "started finish execution in fallback, idx={}",
+                                last_commit_idx
+                            );
+                            scheduler.finish_execution(
+                                last_commit_idx,
+                                incarnation,
+                                validation_mode,
+                            )?;
+                            println!(
+                                "finished finish execution in fallback, idx={}",
+                                last_commit_idx
+                            );
+                        }
+                    }
+                }
             }
 
             drain_commit_queue()?;
@@ -818,14 +903,17 @@ where
                         scheduler,
                     )?
                 },
+
                 SchedulerTask::ExecutionTask(
                     txn_idx,
                     incarnation,
-                    ExecutionTaskType::Execution,
+                    ExecutionTaskType::Execution, // ATTENTION
                 ) => {
-                    let needs_suffix_validation = Self::execute(
+                    if let Some(validation_mode) = Self::execute(
                         txn_idx,
                         incarnation,
+                        false,
+                        scheduler,
                         block,
                         last_input_output,
                         versioned_cache,
@@ -837,8 +925,12 @@ where
                             start_shared_counter,
                             shared_counter,
                         ),
-                    )?;
-                    scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
+                    )? {
+                        scheduler.finish_execution(txn_idx, incarnation, validation_mode)?
+                    } else {
+                        println!("failed to get write lock, idx={}", txn_idx);
+                        SchedulerTask::Retry
+                    }
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     {
@@ -851,9 +943,12 @@ where
                         cvar.notify_one();
                     }
 
+                    SchedulerTask::Retry
+                },
+                SchedulerTask::Retry => {
+                    /*println!("need to retry"); */
                     scheduler.next_task()
                 },
-                SchedulerTask::Retry => scheduler.next_task(),
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
                     break Ok(());
@@ -930,9 +1025,10 @@ where
                         // and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                            println!("{:?}", err_msg);
                         }
                         shared_maybe_error.store(true, Ordering::SeqCst);
-
+                        println!("calling halt due to panic");
                         // Make sure to halt the scheduler if it hasn't already been halted.
                         scheduler.halt();
                     }
@@ -1066,7 +1162,14 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+
+            let res = executor.execute_transaction_with_version(
+                &latest_view,
+                txn,
+                idx as TxnIndex,
+                0,
+                false,
+            );
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {

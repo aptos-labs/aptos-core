@@ -1,14 +1,13 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
     resolver::TAggregatorV1View,
 };
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
@@ -38,10 +37,7 @@ use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
 
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
@@ -407,10 +403,6 @@ impl<K, E> MockIncarnation<K, E> {
 #[derive(Clone, Debug)]
 pub(crate) enum MockTransaction<K, E> {
     Write {
-        /// Incarnation counter, increased during each mock (re-)execution. Allows tracking the final
-        /// incarnation for each mock transaction, whose behavior should be reproduced for baseline.
-        /// Arc-ed only due to Clone, TODO: clean up the Clone requirement.
-        incarnation_counter: Arc<AtomicUsize>,
         /// A vector of mock behaviors prescribed for each incarnation of the transaction, chosen
         /// round robin depending on the incarnation counter value).
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
@@ -424,14 +416,12 @@ pub(crate) enum MockTransaction<K, E> {
 impl<K, E> MockTransaction<K, E> {
     pub(crate) fn from_behavior(behavior: MockIncarnation<K, E>) -> Self {
         Self::Write {
-            incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
         }
     }
 
     pub(crate) fn from_behaviors(behaviors: Vec<MockIncarnation<K, E>>) -> Self {
         Self::Write {
-            incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
         }
     }
@@ -858,7 +848,7 @@ where
         Self::new()
     }
 
-    fn execute_transaction(
+    /*fn execute_transaction(
         &self,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
@@ -1003,6 +993,156 @@ where
             },
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
+    }*/
+
+    fn execute_transaction_with_version(
+        &self,
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
+              + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
+        txn: &Self::Txn,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        is_fallback: bool,
+    ) -> ExecutionStatus<Self::Output, Self::Error> {
+        match txn {
+            MockTransaction::Write {
+                //incarnation_counter,
+                incarnation_behaviors,
+            } => {
+                // Use incarnation counter value as an index to determine the read-
+                // and write-sets of the execution. Increment incarnation counter to
+                // simulate dynamic behavior when there are multiple possible read-
+                // and write-sets (i.e. each are selected round-robin).
+                let idx = (incarnation + if is_fallback { 1 } else { 0 }) as usize;
+                let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
+
+                // Reads
+                let mut read_results = vec![];
+                for k in behavior.reads.iter() {
+                    // TODO: later test errors as well? (by fixing state_view behavior).
+                    // TODO: test aggregator reads.
+                    if k.is_module_path() {
+                        match view.get_module_bytes(k) {
+                            Ok(v) => read_results.push(v.map(Into::into)),
+                            Err(_) => read_results.push(None),
+                        }
+                    } else {
+                        match view.get_resource_bytes(k, None) {
+                            Ok(v) => read_results.push(v.map(Into::into)),
+                            Err(_) => read_results.push(None),
+                        }
+                    }
+                }
+                // Read from groups.
+                // TODO: also read group sizes (if there are any group reads).
+                for (group_key, resource_tag) in behavior.group_reads.iter() {
+                    match view.get_resource_from_group(group_key, resource_tag, None) {
+                        Ok(v) => read_results.push(v.map(Into::into)),
+                        Err(_) => read_results.push(None),
+                    }
+                }
+
+                let read_group_size_or_metadata = behavior
+                    .group_queries
+                    .iter()
+                    .map(|(group_key, query_metadata)| {
+                        let res = if *query_metadata {
+                            GroupSizeOrMetadata::Metadata(
+                                view.get_resource_state_value_metadata(group_key)
+                                    .expect("Group must exist and size computation must succeed"),
+                            )
+                        } else {
+                            GroupSizeOrMetadata::Size(
+                                view.resource_group_size(group_key)
+                                    .expect("Group must exist and size computation must succeed")
+                                    .get(),
+                            )
+                        };
+
+                        (group_key.clone(), res)
+                    })
+                    .collect();
+
+                let mut group_writes = vec![];
+                for (key, metadata, inner_ops) in behavior.group_writes.iter() {
+                    let mut new_inner_ops = HashMap::new();
+                    for (tag, inner_op) in inner_ops.iter() {
+                        let exists = view
+                            .get_resource_from_group(key, tag, None)
+                            .unwrap()
+                            .is_some();
+                        assert!(
+                            *tag != RESERVED_TAG || exists,
+                            "RESERVED_TAG must always be present in groups in tests"
+                        );
+
+                        // inner op is either deletion or creation.
+                        assert!(!inner_op.is_modification());
+                        if exists == inner_op.is_deletion() {
+                            // insert the provided inner op.
+                            new_inner_ops.insert(*tag, inner_op.clone());
+                        }
+
+                        if exists && inner_op.is_creation() {
+                            // Adjust the type, otherwise executor will assert.
+                            if inner_op.bytes().unwrap()[0] % 4 < 3 || *tag == RESERVED_TAG {
+                                new_inner_ops.insert(
+                                    *tag,
+                                    ValueType::new(
+                                        inner_op.bytes.clone(),
+                                        StateValueMetadata::none(),
+                                        WriteOpKind::Modification,
+                                    ),
+                                );
+                            } else {
+                                new_inner_ops.insert(
+                                    *tag,
+                                    ValueType::new(
+                                        None,
+                                        StateValueMetadata::none(),
+                                        WriteOpKind::Deletion,
+                                    ),
+                                );
+                            }
+                        }
+                    }
+
+                    if !inner_ops.is_empty() {
+                        // Not testing metadata_op here, always modification.
+                        group_writes.push((
+                            key.clone(),
+                            ValueType::new(
+                                Some(Bytes::new()),
+                                metadata.clone(),
+                                WriteOpKind::Modification,
+                            ),
+                            new_inner_ops,
+                        ));
+                    }
+                }
+
+                // generate group_writes.
+                ExecutionStatus::Success(MockOutput {
+                    writes: behavior.writes.clone(),
+                    group_writes,
+                    deltas: behavior.deltas.clone(),
+                    events: behavior.events.to_vec(),
+                    read_results,
+                    read_group_size_or_metadata,
+                    materialized_delta_writes: OnceCell::new(),
+                    total_gas: behavior.gas,
+                    skipped: false,
+                    incarnation,
+                    is_fallback,
+                })
+            },
+            MockTransaction::SkipRest(gas) => {
+                let mut mock_output = MockOutput::skip_output();
+                mock_output.total_gas = *gas;
+                ExecutionStatus::SkipRest(mock_output)
+            },
+            MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
+        }
     }
 
     fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
@@ -1032,6 +1172,8 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) total_gas: u64,
     pub(crate) skipped: bool,
+    pub(crate) incarnation: Incarnation,
+    pub(crate) is_fallback: bool,
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -1137,6 +1279,8 @@ where
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
             skipped: true,
+            incarnation: 0,
+            is_fallback: false,
         }
     }
 
@@ -1151,6 +1295,8 @@ where
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
             skipped: true,
+            incarnation: 0,
+            is_fallback: false,
         }
     }
 

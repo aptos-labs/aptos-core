@@ -450,7 +450,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
             .expect("[BlockSTM]: Output must be recorded after execution");
-
+        
+        //try to unwrap in while loop, log the error once
         Arc::try_unwrap(owning_ptr)
             .expect("[BlockSTM]: Output should be uniquely owned after execution")
     }

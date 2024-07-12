@@ -5,7 +5,7 @@
 use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::{
     state_store::{StateView, StateViewId},
     transaction::{
@@ -41,11 +41,13 @@ impl ExecutorTask for AptosExecutorTask {
     // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). It can be as a part of sequential
     // execution, or speculatively as a part of a parallel execution.
-    fn execute_transaction(
+    fn execute_transaction_with_version(
         &self,
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
+        _incarnation: Incarnation,
+        _is_fallback: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())

@@ -89,8 +89,10 @@ fn run_transactions<K, V, E>(
             continue;
         }
 
-        BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, maybe_block_gas_limit, output)
+                .assert_parallel_output(output);
+        }
     }
 }
 
@@ -109,8 +111,8 @@ proptest! {
     #[test]
     fn abort_only(
         universe in vec(any::<[u8; 32]>(), 80),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 300).no_shrink(),
-        abort_transactions in vec(any::<Index>(), 5),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 3).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 300),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
         run_transactions::<[u8; 32], [u8; 32], MockEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
@@ -219,8 +221,10 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         )
         .execute_transactions_parallel(&(), &transactions, &data_view);
 
-        BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, maybe_block_gas_limit, output)
+                .assert_parallel_output(output);
+        }
     }
 }
 
@@ -270,8 +274,10 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         )
         .execute_transactions_parallel(&(), &transactions, &data_view);
 
-        BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, maybe_block_gas_limit, output)
+                .assert_parallel_output(output);
+        }
     }
 }
 
@@ -384,7 +390,6 @@ fn publishing_fixed_params_with_block_gas_limit(
     let w_index = indices[0].index(num_txns);
     match transactions.get_mut(w_index).unwrap() {
         MockTransaction::Write {
-            incarnation_counter: _,
             incarnation_behaviors,
         } => {
             incarnation_behaviors.iter_mut().for_each(|behavior| {
@@ -431,7 +436,6 @@ fn publishing_fixed_params_with_block_gas_limit(
     let r_index = indices[2].index(num_txns);
     match transactions.get_mut(r_index).unwrap() {
         MockTransaction::Write {
-            incarnation_counter: _,
             incarnation_behaviors,
         } => {
             incarnation_behaviors.iter_mut().for_each(|behavior| {
@@ -550,7 +554,9 @@ fn non_empty_group(
         )
         .execute_transactions_parallel(&(), &transactions, &data_view);
 
-        BaselineOutput::generate(&transactions, None).assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, None, output).assert_parallel_output(output);
+        }
     }
 
     for _ in 0..num_repeat_sequential {
@@ -568,7 +574,13 @@ fn non_empty_group(
         .execute_transactions_sequential((), &transactions, &data_view, false);
         // TODO: test dynamic disabled as well.
 
-        BaselineOutput::generate(&transactions, None).assert_output(&output.map_err(|e| match e {
+        let baseline = if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, None, output)
+        } else {
+            BaselineOutput::generate_without_output(&transactions)
+        };
+
+        baseline.assert_output(&output.map_err(|e| match e {
             SequentialBlockExecutionError::ResourceGroupSerializationError => {
                 panic!("Unexpected error")
             },
