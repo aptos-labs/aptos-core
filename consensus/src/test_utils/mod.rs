@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use crate::block_storage::{BlockReader, BlockStore};
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
@@ -179,6 +181,7 @@ impl TreeInserter {
             .insert_single_quorum_cert(self.create_qc_for_block(block, committed_block))
             .unwrap()
     }
+
 
     pub fn create_block_with_qc(
         &self,

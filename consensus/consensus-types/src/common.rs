@@ -165,6 +165,7 @@ impl ProofWithData {
         }
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn extend(&mut self, other: ProofWithData) {
         let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);

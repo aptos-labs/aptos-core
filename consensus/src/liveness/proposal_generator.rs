@@ -383,7 +383,7 @@ impl ProposalGenerator {
 
             if !payload.is_direct()
                 && max_txns_from_block_to_execute.is_some()
-                && payload.len() as u64 > max_txns_from_block_to_execute.unwrap()
+                && payload.len() as u64 > max_txns_from_block_to_execute.unwrap_or(0)
             {
                 payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
             }
@@ -422,6 +422,7 @@ impl ProposalGenerator {
         Ok(block)
     }
 
+    #[allow(clippy::unwrap_used)]
     async fn calculate_max_block_sizes(
         &mut self,
         voting_power_ratio: f64,
@@ -462,7 +463,7 @@ impl ProposalGenerator {
         } else {
             PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(0.0);
         };
-
+        // the unwrap are safe because we always have at least one value in the vectors, see initialization.
         let max_block_txns = values_max_block_txns.into_iter().min().unwrap();
         let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
         let proposal_delay = values_proposal_delay.into_iter().max().unwrap();

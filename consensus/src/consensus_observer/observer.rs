@@ -622,10 +622,7 @@ impl ConsensusObserver {
     /// Processes the ordered block
     async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
         // Unpack the ordered block
-        let OrderedBlock {
-            blocks,
-            ordered_proof,
-        } = ordered_block.clone();
+        let OrderedBlock { blocks, ordered_proof, } = ordered_block.clone();
 
         // Verify that we have at least one ordered block
         if blocks.is_empty() {
@@ -646,25 +643,29 @@ impl ConsensusObserver {
             self.pending_ordered_blocks
                 .insert_ordered_block(ordered_block);
 
-            // If we are not in sync mode, forward the blocks to the execution pipeline
-            if self.sync_handle.is_none() {
-                debug!(
+                // If we are not in sync mode, forward the blocks to the execution pipeline
+                if self.sync_handle.is_none() {
+                    debug!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Forwarding blocks to the execution pipeline: {}",
+                            ordered_proof.commit_info()
+                        ))
+                    );
+
+                    // Finalize the ordered block
+                    self.finalize_ordered_block(&blocks, ordered_proof).await;
+                }
+            } else {
+                warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Forwarding blocks to the execution pipeline: {}",
+                        "Parent block is missing! Ignoring: {:?}",
                         ordered_proof.commit_info()
                     ))
                 );
-
-                // Finalize the ordered block
-                self.finalize_ordered_block(&blocks, ordered_proof).await;
             }
         } else {
-            warn!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Parent block is missing! Ignoring: {:?}",
-                    ordered_proof.commit_info()
-                ))
-            );
+            // Handle the case where first block is unexpectedly missing
+            warn!("Expected to find a first block but none was found.");
         }
     }
 
@@ -1136,6 +1137,7 @@ async fn extract_on_chain_configs(
 
 /// Spawns a task to sync to the given commit decision and notifies
 /// the consensus observer. Also, returns an abort handle to cancel the task.
+#[allow(clippy::unwrap_used)]
 fn sync_to_commit_decision(
     commit_decision: CommitDecision,
     decision_epoch: u64,

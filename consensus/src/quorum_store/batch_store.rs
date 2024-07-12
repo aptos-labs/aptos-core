@@ -172,13 +172,13 @@ impl BatchStore {
             "QS: Batchreader recovery expired keys len {}",
             expired_keys.len()
         );
-        db_clone.delete_batches(expired_keys).unwrap();
+        db_clone.delete_batches(expired_keys).expect("Deletion of expired keys should not fail");
 
         batch_store
     }
 
     fn epoch(&self) -> u64 {
-        *self.epoch.get().unwrap()
+        *self.epoch.get().expect("Epoch should always be set")
     }
 
     fn free_quota(&self, value: PersistedValue) {
@@ -244,10 +244,13 @@ impl BatchStore {
         }
 
         // Add expiration for the inserted entry, no need to be atomic w. insertion.
-        self.expirations
+        #[allow(clippy::unwrap_used)]
+        {
+            self.expirations
             .lock()
             .unwrap()
             .add_item(digest, expiration_time);
+        }
         Ok(true)
     }
 
@@ -274,6 +277,7 @@ impl BatchStore {
     }
 
     // pub(crate) for testing
+    #[allow(clippy::unwrap_used)]
     pub(crate) fn clear_expired_payload(&self, certified_time: u64) -> Vec<HashValue> {
         let expired_digests = self.expirations.lock().unwrap().expire(certified_time);
         let mut ret = Vec::new();
@@ -306,6 +310,7 @@ impl BatchStore {
                 let batch_info = persist_request.batch_info().clone();
                 trace!("QS: sign digest {}", persist_request.digest());
                 if needs_db {
+                    #[allow(clippy::unwrap_in_result)]
                     self.db
                         .save_batch(persist_request)
                         .expect("Could not write to DB");

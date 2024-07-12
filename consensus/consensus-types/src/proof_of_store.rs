@@ -269,6 +269,7 @@ pub enum SignedBatchInfoError {
     InvalidAuthor,
     NotFound,
     AlreadyCommitted,
+    NoTimeStamps,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]

@@ -256,7 +256,10 @@ impl DagStateSynchronizer {
 
         self.execution_client.sync_to(commit_li).await?;
 
-        Ok(Arc::into_inner(sync_dag_store).unwrap())
+        match Arc::try_unwrap(sync_dag_store) {
+            Ok(inner) => Ok(inner),
+            Err(_) => bail!("Failed to unwrap Arc, more than one strong reference exists"),
+        }
     }
 }
 

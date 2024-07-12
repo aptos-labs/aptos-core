@@ -692,7 +692,7 @@ impl BlockRetriever {
                     // extend the result blocks
                     let batch = result.blocks().clone();
                     progress += batch.len() as u64;
-                    last_block_id = batch.last().unwrap().parent_id();
+                    last_block_id = batch.last().expect("Batch should not be empty").parent_id();
                     result_blocks.extend(batch);
                 },
                 Ok(result)
@@ -712,7 +712,7 @@ impl BlockRetriever {
                 },
             }
         }
-        assert_eq!(result_blocks.last().unwrap().id(), target_block_id);
+        assert_eq!(result_blocks.last().expect("Expected at least a result_block").id(), target_block_id);
         Ok(result_blocks)
     }
 

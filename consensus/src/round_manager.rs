@@ -1293,6 +1293,7 @@ impl RoundManager {
     }
 
     /// Mainloop of processing messages.
+    #[allow(clippy::unwrap_used)]
     pub async fn start(
         mut self,
         mut event_rx: aptos_channel::Receiver<
