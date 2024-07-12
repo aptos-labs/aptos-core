@@ -148,10 +148,7 @@ fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyh
     .run::<PASS_PARSER>()?;
     let diags = move_check_for_errors(comments_and_compiler_res);
     let warning_was_promoted = if warnings_are_errors {
-        match diags.max_severity() {
-            Some(max) if max == Severity::Warning => true,
-            _ => false,
-        }
+        matches!(diags.max_severity(), Some(Severity::Warning))
     } else {
         false
     };

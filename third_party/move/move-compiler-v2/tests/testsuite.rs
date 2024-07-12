@@ -947,16 +947,7 @@ fn check_diags(baseline: &mut String, env: &GlobalEnv, had_warnings: &mut bool) 
     env.report_diag(&mut error_writer, Severity::Note);
     let diag = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
     if !diag.is_empty() {
-        if false && *DUMP_BACKTRACE {
-            let bt = Backtrace::capture();
-            if BacktraceStatus::Captured == bt.status() {
-                *baseline += &format!("\nDiagnostics Backtrace:\n{}\nDiagnostics:\n{}", bt, diag);
-            } else {
-                *baseline += &format!("\nDiagnostics:\n{}", diag);
-            }
-        } else {
-            *baseline += &format!("\nDiagnostics:\n{}", diag);
-        }
+        *baseline += &format!("\nDiagnostics:\n{}", diag);
     }
     let ok = !env.has_errors();
     let has_warnings = env.has_warnings();
