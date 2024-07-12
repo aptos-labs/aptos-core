@@ -185,7 +185,6 @@ impl AssetUploaderContext {
     }
 }
 
-#[async_trait::async_trait]
 impl Server for AssetUploaderContext {
     fn build_router(self: Arc<Self>) -> Router {
         Router::new()
