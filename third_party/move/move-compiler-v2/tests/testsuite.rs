@@ -18,7 +18,6 @@ use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
 use once_cell::sync::Lazy;
 use std::{
-    backtrace::{Backtrace, BacktraceStatus},
     cell::{RefCell, RefMut},
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -933,11 +932,6 @@ fn bytecode_dump_enabled(config: &TestConfig, is_last: bool, name: &str) -> bool
                 .unwrap()
                 .contains(&name))
 }
-
-static DUMP_BACKTRACE: Lazy<bool> = Lazy::new(|| {
-    read_bool_env_var(cli::MOVE_COMPILER_BACKTRACE_ENV_VAR)
-        | read_bool_env_var(cli::MVC_BACKTRACE_ENV_VAR)
-});
 
 /// Checks for diagnostics and adds them to the baseline.
 /// Returns (has_errors, has_warnings), where has_warnings is ORed with had_warnings,
