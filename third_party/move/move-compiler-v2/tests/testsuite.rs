@@ -6,8 +6,6 @@ use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use datatest_stable::Requirements;
 use itertools::Itertools;
 use log::debug;
-use move_command_line_common::env::read_bool_env_var;
-use move_compiler::command_line as cli;
 use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
     logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
