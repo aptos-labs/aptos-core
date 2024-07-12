@@ -10468,6 +10468,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - ed25519_signature
             example: ed25519_signature
       - $ref: '#/components/schemas/Ed25519Signature'
     AccountSignature_MultiEd25519Signature:
@@ -10478,6 +10480,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multi_ed25519_signature
             example: multi_ed25519_signature
       - $ref: '#/components/schemas/MultiEd25519Signature'
     AccountSignature_MultiKeySignature:
@@ -10488,6 +10492,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multi_key_signature
             example: multi_key_signature
       - $ref: '#/components/schemas/MultiKeySignature'
     AccountSignature_SingleKeySignature:
@@ -10498,6 +10504,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - single_key_signature
             example: single_key_signature
       - $ref: '#/components/schemas/SingleKeySignature'
     Address:
@@ -11090,6 +11098,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - write_set_payload
             example: write_set_payload
       - $ref: '#/components/schemas/WriteSetPayload'
     GenesisTransaction:
@@ -11677,6 +11687,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - entry_function_payload
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
     PendingTransaction:
@@ -11729,6 +11741,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - ed25519
             example: ed25519
       - $ref: '#/components/schemas/Ed25519'
     PublicKey_Keyless:
@@ -11739,6 +11753,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - keyless
             example: keyless
       - $ref: '#/components/schemas/Keyless'
     PublicKey_Secp256k1Ecdsa:
@@ -11749,6 +11765,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - secp256k1_ecdsa
             example: secp256k1_ecdsa
       - $ref: '#/components/schemas/Secp256k1Ecdsa'
     PublicKey_Secp256r1Ecdsa:
@@ -11759,6 +11777,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - secp256r1_ecdsa
             example: secp256r1_ecdsa
       - $ref: '#/components/schemas/Secp256r1Ecdsa'
     RSA_JWK:
@@ -11861,6 +11881,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - ed25519
             example: ed25519
       - $ref: '#/components/schemas/Ed25519'
     Signature_Keyless:
@@ -11871,6 +11893,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - keyless
             example: keyless
       - $ref: '#/components/schemas/Keyless'
     Signature_Secp256k1Ecdsa:
@@ -11881,6 +11905,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - secp256k1_ecdsa
             example: secp256k1_ecdsa
       - $ref: '#/components/schemas/Secp256k1Ecdsa'
     Signature_WebAuthn:
@@ -11891,6 +11917,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - web_authn
             example: web_authn
       - $ref: '#/components/schemas/WebAuthn'
     SingleKeySignature:
@@ -12038,6 +12066,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - module_bundle_payload
             example: module_bundle_payload
       - $ref: '#/components/schemas/DeprecatedModuleBundlePayload'
     TransactionPayload_EntryFunctionPayload:
@@ -12048,6 +12078,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - entry_function_payload
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
     TransactionPayload_MultisigPayload:
@@ -12058,6 +12090,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multisig_payload
             example: multisig_payload
       - $ref: '#/components/schemas/MultisigPayload'
     TransactionPayload_ScriptPayload:
@@ -12068,6 +12102,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - script_payload
             example: script_payload
       - $ref: '#/components/schemas/ScriptPayload'
     TransactionSignature:
@@ -12095,6 +12131,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - single_sender
             example: single_sender
       - $ref: '#/components/schemas/AccountSignature'
     TransactionSignature_Ed25519Signature:
@@ -12105,6 +12143,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - ed25519_signature
             example: ed25519_signature
       - $ref: '#/components/schemas/Ed25519Signature'
     TransactionSignature_FeePayerSignature:
@@ -12115,6 +12155,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - fee_payer_signature
             example: fee_payer_signature
       - $ref: '#/components/schemas/FeePayerSignature'
     TransactionSignature_MultiAgentSignature:
@@ -12125,6 +12167,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multi_agent_signature
             example: multi_agent_signature
       - $ref: '#/components/schemas/MultiAgentSignature'
     TransactionSignature_MultiEd25519Signature:
@@ -12135,6 +12179,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multi_ed25519_signature
             example: multi_ed25519_signature
       - $ref: '#/components/schemas/MultiEd25519Signature'
     Transaction_BlockEpilogueTransaction:
@@ -12145,6 +12191,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - block_epilogue_transaction
             example: block_epilogue_transaction
       - $ref: '#/components/schemas/BlockEpilogueTransaction'
     Transaction_BlockMetadataTransaction:
@@ -12155,6 +12203,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - block_metadata_transaction
             example: block_metadata_transaction
       - $ref: '#/components/schemas/BlockMetadataTransaction'
     Transaction_GenesisTransaction:
@@ -12165,6 +12215,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - genesis_transaction
             example: genesis_transaction
       - $ref: '#/components/schemas/GenesisTransaction'
     Transaction_PendingTransaction:
@@ -12175,6 +12227,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - pending_transaction
             example: pending_transaction
       - $ref: '#/components/schemas/PendingTransaction'
     Transaction_StateCheckpointTransaction:
@@ -12185,6 +12239,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - state_checkpoint_transaction
             example: state_checkpoint_transaction
       - $ref: '#/components/schemas/StateCheckpointTransaction'
     Transaction_UserTransaction:
@@ -12195,6 +12251,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - user_transaction
             example: user_transaction
       - $ref: '#/components/schemas/UserTransaction'
     Transaction_ValidatorTransaction:
@@ -12205,6 +12263,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - validator_transaction
             example: validator_transaction
       - $ref: '#/components/schemas/ValidatorTransaction'
     TransactionsBatchSingleSubmissionFailure:
@@ -12366,6 +12426,8 @@ components:
         properties:
           validator_transaction_type:
             type: string
+            enum:
+            - dkg_result
             example: dkg_result
       - $ref: '#/components/schemas/DKGResultTransaction'
     ValidatorTransaction_JWKUpdateTransaction:
@@ -12376,6 +12438,8 @@ components:
         properties:
           validator_transaction_type:
             type: string
+            enum:
+            - observed_jwk_update
             example: observed_jwk_update
       - $ref: '#/components/schemas/JWKUpdateTransaction'
     VersionedEvent:
@@ -12492,6 +12556,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - delete_module
             example: delete_module
       - $ref: '#/components/schemas/DeleteModule'
     WriteSetChange_DeleteResource:
@@ -12502,6 +12568,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - delete_resource
             example: delete_resource
       - $ref: '#/components/schemas/DeleteResource'
     WriteSetChange_DeleteTableItem:
@@ -12512,6 +12580,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - delete_table_item
             example: delete_table_item
       - $ref: '#/components/schemas/DeleteTableItem'
     WriteSetChange_WriteModule:
@@ -12522,6 +12592,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - write_module
             example: write_module
       - $ref: '#/components/schemas/WriteModule'
     WriteSetChange_WriteResource:
@@ -12532,6 +12604,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - write_resource
             example: write_resource
       - $ref: '#/components/schemas/WriteResource'
     WriteSetChange_WriteTableItem:
@@ -12542,6 +12616,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - write_table_item
             example: write_table_item
       - $ref: '#/components/schemas/WriteTableItem'
     WriteSetPayload:
@@ -12560,6 +12636,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - direct_write_set
             example: direct_write_set
       - $ref: '#/components/schemas/DirectWriteSet'
     WriteSet_ScriptWriteSet:
@@ -12570,6 +12648,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - script_write_set
             example: script_write_set
       - $ref: '#/components/schemas/ScriptWriteSet'
     WriteTableItem:
