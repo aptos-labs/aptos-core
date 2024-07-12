@@ -1,12 +1,17 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{dropper::DROPPER, map::LayeredMap, metrics::LAYER, node::NodeRef};
+use crate::{
+    dropper::DROPPER,
+    map::{DefaultHashBuilder, LayeredMap},
+    metrics::LAYER,
+    node::NodeRef,
+};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::ArcAsyncDrop;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::IntGaugeHelper;
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 #[derive(Debug)]
 struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
@@ -78,16 +83,16 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
 }
 
 #[derive(Debug)]
-pub struct MapLayer<K: ArcAsyncDrop, V: ArcAsyncDrop> {
+pub struct MapLayer<K: ArcAsyncDrop, V: ArcAsyncDrop, S = DefaultHashBuilder> {
     inner: Arc<LayerInner<K, V>>,
+    /// Carried only for type safety: a LayeredMap can only be with layers of the same hasher type.
+    _hash_builder: PhantomData<S>,
 }
 
 /// Manual implementation because `LayerInner` is deliberately not `Clone`.
 impl<K: ArcAsyncDrop, V: ArcAsyncDrop> Clone for MapLayer<K, V> {
     fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
+        Self::new(self.inner.clone())
     }
 }
 
@@ -97,7 +102,10 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
     }
 
     fn new(inner: Arc<LayerInner<K, V>>) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            _hash_builder: PhantomData,
+        }
     }
 
     pub fn into_layers_view_since(self, bottom_layer: MapLayer<K, V>) -> LayeredMap<K, V> {

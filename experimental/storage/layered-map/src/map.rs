@@ -8,14 +8,20 @@ use crate::{
 };
 use aptos_drop_helper::ArcAsyncDrop;
 use aptos_metrics_core::TimerHelper;
+use std::marker::PhantomData;
+
+pub(crate) type DefaultHashBuilder = core::hash::BuildHasherDefault<ahash::AHasher>;
 
 #[derive(Clone, Debug)]
-pub struct LayeredMap<K: ArcAsyncDrop, V: ArcAsyncDrop> {
+pub struct LayeredMap<K: ArcAsyncDrop, V: ArcAsyncDrop, S = DefaultHashBuilder> {
     bottom_layer: MapLayer<K, V>,
     top_layer: MapLayer<K, V>,
+    /// Hasher is needed only for spawning a new layer, i.e. for a read only map there's no need to
+    /// pay the overhead of constructing it.
+    _hash_builder: PhantomData<S>,
 }
 
-impl<K, V> LayeredMap<K, V>
+impl<K, V, S> LayeredMap<K, V, S>
 where
     K: ArcAsyncDrop,
     V: ArcAsyncDrop,
@@ -24,6 +30,7 @@ where
         Self {
             bottom_layer,
             top_layer,
+            _hash_builder: PhantomData,
         }
     }
 
@@ -31,6 +38,7 @@ where
         let Self {
             bottom_layer,
             top_layer,
+            _hash_builder,
         } = self;
 
         (bottom_layer, top_layer)
@@ -53,7 +61,7 @@ where
     }
 }
 
-impl<K, V> LayeredMap<K, V>
+impl<K, V, S> LayeredMap<K, V, S>
 where
     K: ArcAsyncDrop + Key,
     V: ArcAsyncDrop + Value,
