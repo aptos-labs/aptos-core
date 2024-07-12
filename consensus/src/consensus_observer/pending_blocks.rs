@@ -7,7 +7,7 @@ use crate::consensus_observer::{
 };
 use aptos_consensus_types::{common::Round, pipeline::commit_decision::CommitDecision};
 use aptos_infallible::Mutex;
-use aptos_logger::debug;
+use aptos_logger::{debug, warn};
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -41,7 +41,7 @@ impl PendingOrderedBlocks {
     pub fn get_last_pending_block(&self) -> Option<BlockInfo> {
         let pending_ordered_blocks = self.pending_ordered_blocks.lock();
         if let Some((_, (ordered_block, _))) = pending_ordered_blocks.last_key_value() {
-            Some(ordered_block.blocks.last().unwrap().block_info())
+            ordered_block.blocks.last().map(|block| block.block_info())
         } else {
             None // No pending blocks were found
         }
@@ -65,10 +65,19 @@ impl PendingOrderedBlocks {
         );
 
         // Insert the ordered block into the pending ordered blocks
-        let last_block_round = ordered_block.blocks.last().unwrap().round();
-        self.pending_ordered_blocks
-            .lock()
-            .insert(last_block_round, (ordered_block, None));
+        if let Some(last_block) = ordered_block.blocks.last() {
+            let last_block_round = last_block.round();
+            self.pending_ordered_blocks
+                .lock()
+                .insert(last_block_round, (ordered_block, None));
+        } else {
+            warn!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(
+                    &format!("Ordered block has no blocks. Ignoring: {:?}",
+                    ordered_block.ordered_proof.commit_info())
+                )
+            );
+        }
     }
 
     /// Removes the pending blocks for the given commit ledger info.

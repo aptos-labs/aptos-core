@@ -640,22 +640,24 @@ impl ConsensusObserver {
         if let Some(block) = blocks.first() {
             // If the block is a child of our last block, we can insert it
             if self.get_last_block().id() == block.parent_id() {
+
                 // Insert the ordered block into the pending blocks
                 self.pending_ordered_blocks
                     .insert_ordered_block(ordered_block);
 
-                    // If we are not in sync mode, forward the blocks to the execution pipeline
-                    if self.sync_handle.is_none() {
-                        debug!(
-                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                "Forwarding blocks to the execution pipeline: {}",
-                                ordered_proof.commit_info()
-                            ))
-                        );
+                // If we are not in sync mode, forward the blocks to the execution pipeline
+                if self.sync_handle.is_none() {
+                    debug!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Forwarding blocks to the execution pipeline: {}",
+                            ordered_proof.commit_info()
+                        ))
+                    );
 
-                        // Finalize the ordered block
-                        self.finalize_ordered_block(&blocks, ordered_proof).await;
-                    }
+                    // Finalize the ordered block
+                    self.finalize_ordered_block(&blocks, ordered_proof).await;
+                }
+                
             } else {
                 warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
