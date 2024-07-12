@@ -26,7 +26,7 @@ use aptos_network::{
         PeerManagerRequestSender,
     },
     protocols::{
-        network::{NewNetworkEvents, SerializedRequest},
+        network::{NewNetworkEvents, RpcError, SerializedRequest},
         rpc::InboundRpcRequest,
         wire::handshake::v1::ProtocolIdSet,
     },
@@ -75,6 +75,8 @@ pub struct NetworkPlayground {
     outbound_msgs_tx: mpsc::Sender<(TwinId, PeerManagerRequest)>,
     /// NetworkPlayground reads all nodes' outbound messages through this queue.
     outbound_msgs_rx: mpsc::Receiver<(TwinId, PeerManagerRequest)>,
+    /// Allow test code to timeout RPC messages between peers.
+    timeout_config: Arc<RwLock<TimeoutConfig>>,
     /// Allow test code to drop direct-send messages between peers.
     drop_config: Arc<RwLock<DropConfig>>,
     /// Allow test code to drop direct-send messages between peers per round.
@@ -96,6 +98,7 @@ impl NetworkPlayground {
             node_consensus_txs: Arc::new(Mutex::new(HashMap::new())),
             outbound_msgs_tx,
             outbound_msgs_rx,
+            timeout_config: Arc::new(RwLock::new(TimeoutConfig::default())),
             drop_config: Arc::new(RwLock::new(DropConfig::default())),
             drop_config_round: DropConfigRound::default(),
             executor,
@@ -122,6 +125,7 @@ impl NetworkPlayground {
     /// Rpc messages are immediately sent to the destination for handling, so
     /// they don't block.
     async fn start_node_outbound_handler(
+        timeout_config: Arc<RwLock<TimeoutConfig>>,
         drop_config: Arc<RwLock<DropConfig>>,
         src_twin_id: TwinId,
         mut network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
@@ -160,6 +164,14 @@ impl NetworkPlayground {
                         None => continue, // drop rpc
                     };
 
+                    if timeout_config
+                        .read()
+                        .is_message_timedout(&src_twin_id, dst_twin_id)
+                    {
+                        outbound_req.res_tx.send(Err(RpcError::TimedOut)).unwrap();
+                        continue;
+                    }
+
                     let node_consensus_tx =
                         node_consensus_txs.lock().get(dst_twin_id).unwrap().clone();
 
@@ -195,10 +207,12 @@ impl NetworkPlayground {
     ) {
         self.node_consensus_txs.lock().insert(twin_id, consensus_tx);
         self.drop_config.write().add_node(twin_id);
+        self.timeout_config.write().add_node(twin_id);
 
         self.extend_author_to_twin_ids(twin_id.author, twin_id);
 
         let fut1 = NetworkPlayground::start_node_outbound_handler(
+            Arc::clone(&self.timeout_config),
             Arc::clone(&self.drop_config),
             twin_id,
             network_reqs_rx,
@@ -374,6 +388,10 @@ impl NetworkPlayground {
         ret
     }
 
+    pub fn timeout_config(&self) -> Arc<RwLock<TimeoutConfig>> {
+        self.timeout_config.clone()
+    }
+
     pub async fn start(mut self) {
         // Take the next queued message
         while let Some((src_twin_id, net_req)) = self.outbound_msgs_rx.next().await {
@@ -446,6 +464,23 @@ impl DropConfig {
                 done &= self.drop_message_for(n2, n1);
                 done
             })
+    }
+
+    fn add_node(&mut self, src: TwinId) {
+        self.0.insert(src, HashSet::new());
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct TimeoutConfig(HashMap<TwinId, HashSet<TwinId>>);
+
+impl TimeoutConfig {
+    pub fn is_message_timedout(&self, src: &TwinId, dst: &TwinId) -> bool {
+        self.0.get(src).map_or(false, |set| set.contains(dst))
+    }
+
+    pub fn timeout_message_for(&mut self, src: &TwinId, dst: &TwinId) -> bool {
+        self.0.entry(*src).or_default().insert(*dst)
     }
 
     fn add_node(&mut self, src: TwinId) {
