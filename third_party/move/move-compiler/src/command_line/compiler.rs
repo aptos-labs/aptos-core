@@ -251,14 +251,15 @@ impl<'a> Compiler<'a> {
         let (files, res) = self.run::<PASS_COMPILATION>()?;
         Ok((
             files,
-            res.map(|(_comments, stepped)| stepped.into_compiled_units()),
+            res.and_then(|(_comments, stepped)| stepped.into_compiled_units()),
         ))
     }
 
     pub fn build_and_report(self) -> anyhow::Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)> {
+        let warnings_are_errors = self.flags.warnings_are_errors();
         let (files, units_res) = self.build()?;
         let (units, warnings) = unwrap_or_report_diagnostics(&files, units_res);
-        report_warnings(&files, warnings);
+        report_warnings(&files, warnings, warnings_are_errors);
         Ok((files, units))
     }
 }
@@ -367,8 +368,7 @@ macro_rules! ast_stepped_compilers {
                 pub fn build(
                     self
                 ) -> Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics> {
-                    let units = self.run::<PASS_COMPILATION>()?.into_compiled_units();
-                    Ok(units)
+                    self.run::<PASS_COMPILATION>()?.into_compiled_units()
                 }
 
                 pub fn check_and_report(self, files: &FilesSourceText)  {
@@ -380,9 +380,10 @@ macro_rules! ast_stepped_compilers {
                     self,
                     files: &FilesSourceText,
                 ) -> Vec<AnnotatedCompiledUnit> {
+                    let warnings_are_errors = self.compilation_env.flags().warnings_are_errors();
                     let units_result = self.build();
                     let (units, warnings) = unwrap_or_report_diagnostics(&files, units_result);
-                    report_warnings(&files, warnings);
+                    report_warnings(&files, warnings, warnings_are_errors);
                     units
                 }
             }
@@ -413,14 +414,26 @@ ast_stepped_compilers!(
 );
 
 impl<'a> SteppedCompiler<'a, PASS_COMPILATION> {
-    pub fn into_compiled_units(self) -> (Vec<AnnotatedCompiledUnit>, Diagnostics) {
+    pub fn into_compiled_units(
+        self,
+    ) -> Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics> {
         let Self {
-            compilation_env: _,
+            compilation_env,
             pre_compiled_lib: _,
             program,
         } = self;
+        let warnings_are_errors = compilation_env.flags().warnings_are_errors();
         match program {
-            Some(PassResult::Compilation(units, warnings)) => (units, warnings),
+            Some(PassResult::Compilation(units, warnings)) => {
+                if warnings_are_errors {
+                    match warnings.max_severity() {
+                        Some(max) if max >= Severity::Warning => Err(warnings),
+                        _ => Ok((units, warnings)),
+                    }
+                } else {
+                    Ok((units, warnings))
+                }
+            },
             _ => panic!(),
         }
     }

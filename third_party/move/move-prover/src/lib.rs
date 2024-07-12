@@ -62,6 +62,7 @@ pub fn run_move_prover<W: WriteColor>(
         options.model_builder.clone(),
         options.skip_attribute_checks,
         KnownAttribute::get_all_attribute_names(),
+        options.warnings_are_errors,
     )?;
     run_move_prover_with_model(&mut env, error_writer, options, Some(now))
 }
@@ -90,6 +91,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
+        warnings_are_errors: cloned_options.warnings_are_errors,
     };
 
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;

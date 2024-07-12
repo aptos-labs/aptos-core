@@ -387,6 +387,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.language_version,
                     self.move_options.skip_attribute_checks,
                     self.move_options.check_test_code,
+                    self.move_options.warnings_are_errors,
                 )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -451,6 +452,7 @@ impl CompileScript {
                 self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
+                self.move_options.warnings_are_errors,
             )
         };
         let package_dir = self.move_options.get_package_path()?;
@@ -535,6 +537,7 @@ impl CliCommand<&'static str> for TestPackage {
                 known_attributes: known_attributes.clone(),
                 skip_attribute_checks: self.move_options.skip_attribute_checks,
                 compiler_version: self.move_options.compiler_version,
+                warnings_are_errors: self.move_options.warnings_are_errors,
                 ..Default::default()
             },
             ..Default::default()
@@ -620,6 +623,7 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
+                move_options.warnings_are_errors,
             )
         })
         .await
@@ -672,6 +676,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
+            warnings_are_errors: false,
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -741,6 +746,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
+                self.move_options.warnings_are_errors,
             );
         let package = BuiltPackage::build(package_path, options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
@@ -813,6 +819,7 @@ impl IncludedArtifacts {
         language_version: Option<LanguageVersion>,
         skip_attribute_checks: bool,
         check_test_code: bool,
+        warnings_are_errors: bool,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
@@ -831,6 +838,7 @@ impl IncludedArtifacts {
                 language_version,
                 skip_attribute_checks,
                 check_test_code,
+                warnings_are_errors,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
@@ -848,6 +856,7 @@ impl IncludedArtifacts {
                 language_version,
                 skip_attribute_checks,
                 check_test_code,
+                warnings_are_errors,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
@@ -865,6 +874,7 @@ impl IncludedArtifacts {
                 language_version,
                 skip_attribute_checks,
                 check_test_code,
+                warnings_are_errors,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
@@ -987,6 +997,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
+                self.move_options.warnings_are_errors,
             );
         let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
         let message = format!(
@@ -1065,6 +1076,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
+                self.move_options.warnings_are_errors,
             );
         let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
         let url = self
@@ -1191,6 +1203,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.language_version,
             move_options.skip_attribute_checks,
             move_options.check_test_code,
+            move_options.warnings_are_errors,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -1344,6 +1357,7 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
+                self.move_options.warnings_are_errors,
             )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)

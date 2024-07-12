@@ -152,6 +152,7 @@ fn run_benchmark(
     options.move_deps.append(&mut dep_dirs.to_vec());
     let skip_attribute_checks = true;
     let known_attributes = KnownAttribute::get_all_attribute_names().clone();
+    let warnings_are_errors = false;
     let env = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
@@ -167,6 +168,7 @@ fn run_benchmark(
         options.model_builder.clone(),
         skip_attribute_checks,
         &known_attributes,
+        warnings_are_errors,
     )?;
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
 

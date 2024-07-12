@@ -32,6 +32,7 @@ ResolutionGraph {
                 V2_0,
             ),
             language_version: None,
+            warnings_are_errors: false,
         },
     },
     root_package: SourceManifest {

@@ -19,8 +19,13 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use clap::*;
+use move_command_line_common::env::{bool_to_str, read_bool_env_var};
 use move_compiler::{
-    command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
+    command_line::{
+        MOVE_COMPILER_WARNINGS_ARE_ERRORS_ENV_VAR, MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG,
+        SKIP_ATTRIBUTE_CHECKS,
+    },
+    shared::known_attributes::KnownAttribute,
 };
 use move_core_types::account_address::AccountAddress;
 use move_model::{
@@ -179,6 +184,10 @@ pub struct CompilerConfig {
     #[clap(long = "language-version", global = true,
            value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
+
+    /// Turn warnings into errors when compiling Move code.
+    #[clap(long = MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG, default_value = bool_to_str(read_bool_env_var(MOVE_COMPILER_WARNINGS_ARE_ERRORS_ENV_VAR)))]
+    pub warnings_are_errors: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]

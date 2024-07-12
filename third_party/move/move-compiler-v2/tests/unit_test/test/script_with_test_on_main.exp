@@ -5,6 +5,3 @@ error: unable to generate test
   │
 3 │     #[test]
   │       ^^^^ Testing attributes are not allowed in scripts.
-
-
-============ bytecode verification succeeded ========

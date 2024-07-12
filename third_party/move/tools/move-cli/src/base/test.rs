@@ -224,15 +224,16 @@ pub fn run_move_unit_tests<W: Write + Send>(
                 diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
             let (mut compiler, cfgir) = compiler.into_ast();
             let compilation_env = compiler.compilation_env();
+            let warnings_are_errors = compilation_env.flags().warnings_are_errors();
             let built_test_plan = construct_test_plan(compilation_env, Some(root_package), &cfgir);
             if let Err(diags) = compilation_env.check_diags_at_or_above_severity(
-                if unit_test_config.ignore_compile_warnings {
+                if unit_test_config.ignore_compile_warnings && !warnings_are_errors {
                     Severity::NonblockingError
                 } else {
                     Severity::Warning
                 },
             ) {
-                diagnostics::report_diagnostics_exit_on_error(&files, diags);
+                diagnostics::report_diagnostics_exit_on_error(&files, diags, warnings_are_errors);
             }
 
             let compilation_result = compiler.at_cfgir(cfgir).build();

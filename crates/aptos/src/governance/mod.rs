@@ -1006,6 +1006,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             move_options.compiler_version,
             move_options.language_version,
             move_options.skip_attribute_checks,
+            move_options.warnings_are_errors,
             move_options.check_test_code,
         );
         let package = BuiltPackage::build(package_path, options)?;

@@ -9,3 +9,5 @@ Error: compilation errors:
   │                ^^^^^^^^^^^^                               - Parameter `f` has a function type.
 
 
+Exiting with checking errors
+

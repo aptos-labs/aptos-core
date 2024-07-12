@@ -1,0 +1,22 @@
+processed 5 tasks
+
+task 1 'publish'. lines 4-31:
+Error: compilation errors:
+ warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ TEMPFILE:15:13
+   │
+15 │         let x = 3;
+   │             ^
+
+
+Exiting: Warnings found, and configuration requests that warnings be treated as errors.
+
+
+task 2 'run'. lines 33-33:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(None)
+
+task 3 'run'. lines 35-35:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(None)
+
+task 4 'view'. lines 37-37:
+[No Resource Exists]

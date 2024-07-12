@@ -125,16 +125,19 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         // Enable access control file format generation for those tests
         v2_experiments.push((Experiment::GEN_ACCESS_SPECIFIERS.to_string(), true))
     }
+    let warnings_are_errors = path.to_string_lossy().contains("/warnings-are-errors/");
     let language_version = config.language_version;
     let vm_test_config = if p.contains(SKIP_V1_COMPARISON_PATH) || move_test_debug() {
         TestRunConfig::CompilerV2 {
             language_version,
             v2_experiments,
+            warnings_are_errors,
         }
     } else {
         TestRunConfig::ComparisonV1V2 {
             language_version,
             v2_experiments,
+            warnings_are_errors,
         }
     };
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
