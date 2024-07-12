@@ -56,9 +56,18 @@ module aggregator_examples::counter_with_milestone {
         let milestone_counter = borrow_global_mut<MilestoneCounter>(@aggregator_examples);
         assert!(aggregator_v2::try_add(&mut milestone_counter.count, 1), ECOUNTER_INCREMENT_FAIL);
 
-        if (aggregator_v2::is_at_least(&milestone_counter.count, milestone_counter.next_milestone) && !aggregator_v2::is_at_least(&milestone_counter.count, milestone_counter.next_milestone + 1)) {
+        if (is_at_least(&mut milestone_counter.count, milestone_counter.next_milestone) && !is_at_least(&mut milestone_counter.count, milestone_counter.next_milestone + 1)) {
             event::emit(MilestoneReached { milestone: milestone_counter.next_milestone});
             milestone_counter.next_milestone = milestone_counter.next_milestone + milestone_counter.milestone_every;
+        }
+    }
+
+    fun is_at_least<IntElement: copy + drop>(agg: &mut Aggregator<IntElement>, min_amount: IntElement): bool {
+        if (aggregator_v2::try_sub(agg, min_amount)) {
+            aggregator_v2::add(agg, min_amount);
+            true
+        } else {
+            false
         }
     }
 }
