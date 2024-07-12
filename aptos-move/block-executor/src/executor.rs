@@ -12,7 +12,9 @@ use crate::{
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
-    scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
+    scheduler::{
+        DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, ValidationMode, Wave,
+    },
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
@@ -60,6 +62,7 @@ use std::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
+    time::{Duration, Instant},
 };
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -102,19 +105,74 @@ where
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
+        fallback: bool,
+        scheduler: &Scheduler,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
         base_view: &S,
         parallel_state: ParallelState<T, X>,
-    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
+        start_time_all: &Instant,
+        thread_id: &usize,
+    ) -> Result<Option<ValidationMode>, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        
+
+        if idx_to_execute <= 2 {
+            let cur = Instant::now();
+            println!("critical path, about to execute transaction with version, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+        }
+        let execute_result = executor.execute_transaction_with_version(
+            &sync_view,
+            txn,
+            idx_to_execute,
+            incarnation,
+            fallback,
+        );
+
+        if idx_to_execute <= 2 {
+            let cur = Instant::now();
+            println!("critical path, executed transaction with vertsion, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+        }
+
+        let mut read_set = sync_view.take_parallel_reads();
+
+        let validation_function = if fallback {
+            None
+        } else {
+            Some(|| -> bool {
+                !read_set.is_incorrect_use()
+                    && read_set.validate_data_reads(versioned_cache.data(), idx_to_execute)
+                    && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_execute)
+            })
+        };
+
+        if idx_to_execute <= 2 {
+            let cur = Instant::now();
+            println!("critical path, about to execute execution flag writing, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+        }
+        let mut ret_mode = if let Some(is_validated) =
+            scheduler.try_set_execution_flag_writing(idx_to_execute, validation_function)
+        {
+            if is_validated {
+                ValidationMode::None
+            } else {
+                ValidationMode::SelfOnly
+            }
+        } else {
+            return Ok(None);
+        };
+
+
+       if idx_to_execute <= 2 {                                                                                                          
+           let cur = Instant::now();
+           println!("critical path, executed execution flag writing, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+       }
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -124,13 +182,10 @@ where
             .delayed_field_keys(idx_to_execute)
             .map_or(HashSet::new(), |keys| keys.collect());
 
-        let mut read_set = sync_view.take_parallel_reads();
-
         // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
         // May happen, for instance, when the recent execution wrote outside of the previous write/delta
         // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
         // (since those resource group validations rely on estimates).
-        let mut needs_suffix_validation = false;
         let mut apply_updates = |output: &E::Output| -> Result<
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
             PanicError,
@@ -140,7 +195,7 @@ where
             {
                 if prev_modified_keys.remove(&group_key).is_none() {
                     // Previously no write to the group at all.
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
 
                 if versioned_cache.data().write_metadata(
@@ -149,7 +204,7 @@ where
                     incarnation,
                     group_metadata_op,
                 ) {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 if versioned_cache.group_data().write(
                     group_key,
@@ -157,7 +212,7 @@ where
                     incarnation,
                     group_ops.into_iter(),
                 ) {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
             }
 
@@ -171,7 +226,7 @@ where
                     .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
             ) {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache
                     .data()
@@ -180,7 +235,7 @@ where
 
             for (k, v) in output.module_write_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache.modules().write(k, idx_to_execute, v);
             }
@@ -188,7 +243,7 @@ where
             // Then, apply deltas.
             for (k, d) in output.aggregator_v1_delta_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
@@ -212,7 +267,7 @@ where
 
                 let entry = change.into_entry_no_additional_history();
 
-                // TODO[agg_v2](optimize): figure out if it is useful for change to update needs_suffix_validation
+                // TODO[agg_v2](optimize): figure out if it is useful for change to add_suffix
                 if let Err(e) =
                     versioned_cache
                         .delayed_fields()
@@ -294,7 +349,7 @@ where
                     // triggering suffix re-validation, a later transaction might
                     // end up with the incorrect read result (corresponding to the
                     // removed group information from an incorrect speculative state).
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
 
                     versioned_cache.data().remove(&k, idx_to_execute);
                     versioned_cache.group_data().remove(&k, idx_to_execute);
@@ -314,7 +369,8 @@ where
                 ParallelBlockExecutionError::ModulePathReadWriteError,
             ));
         }
-        Ok(needs_suffix_validation)
+
+        Ok(Some(ret_mode))
     }
 
     fn validate(
@@ -465,21 +521,28 @@ where
         executor: &E,
         block: &[T],
         num_workers: usize,
-    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<Option<u32>, PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
+        let mut last_commit_idx: Option<u32> = None;
+
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
+            last_commit_idx = Some(txn_idx);
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
-
+                assert!(false, "failed validation on commitready");
                 Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
                 // Because of that, we can also ignore _needs_suffix_validation result.
-                let _needs_suffix_validation = Self::execute(
+                let cur = Instant::now();
+                let dummy_id: usize = 0;
+                let _validation_mode = Self::execute(
                     txn_idx,
                     incarnation + 1,
+                    false,
+                    scheduler,
                     block,
                     last_input_output,
                     versioned_cache,
@@ -491,6 +554,8 @@ where
                         start_shared_counter,
                         shared_counter,
                     ),
+                    &cur,
+                    &dummy_id,
                 )?;
 
                 scheduler.finish_execution_during_commit(txn_idx)?;
@@ -603,10 +668,10 @@ where
                     )
                     .into()));
                 }
-                return Ok(());
+                return Ok(None);
             }
         }
-        Ok(())
+        Ok(last_commit_idx)
     }
 
     fn materialize_aggregator_v1_delta_writes(
@@ -759,6 +824,8 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
+        worker_id: &usize,
+        start_time_all: &Instant,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -766,6 +833,7 @@ where
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
+
         let mut scheduler_task = SchedulerTask::Retry;
 
         let drain_commit_queue = || -> Result<(), PanicError> {
@@ -784,26 +852,105 @@ where
             Ok(())
         };
 
+        let mut commit_time = Duration::from_secs(0);
+        let mut fallback_time = Duration::from_secs(0);
+        let mut extra_time = Duration::from_secs(0);
+
         loop {
-            while scheduler.should_coordinate_commits() {
-                self.prepare_and_queue_commit_ready_txns(
-                    &self.config.onchain.block_gas_limit_type,
-                    scheduler,
-                    versioned_cache,
-                    &mut scheduler_task,
-                    last_input_output,
-                    shared_commit_state,
-                    base_view,
-                    start_shared_counter,
-                    shared_counter,
-                    &executor,
-                    block,
-                    num_workers,
-                )?;
-                scheduler.queueing_commits_mark_done();
+            let start = Instant::now();
+
+            if matches!(scheduler_task, SchedulerTask::Retry) {
+                let mut last_commit_idx = None;
+                while scheduler.should_coordinate_commits() {
+                    if let Some(last_idx) = self.prepare_and_queue_commit_ready_txns(
+                        &self.config.onchain.block_gas_limit_type,
+                        scheduler,
+                        versioned_cache,
+                        &mut scheduler_task,
+                        last_input_output,
+                        shared_commit_state,
+                        base_view,
+                        start_shared_counter,
+                        shared_counter,
+                        &executor,
+                        block,
+                        num_workers,
+                    )? {
+                            if last_idx <= 2 {
+                                let cur = Instant::now();
+                                println!("critical path, thread_id={}, transaction_id={}, commited at time={:?}", *worker_id, last_idx, cur-*start_time_all);
+                            }
+                        last_commit_idx.replace(last_idx);
+                    };
+                    scheduler.queueing_commits_mark_done();
+                }
+                let end = Instant::now();
+
+                commit_time += end - start;
+
+                let start3 = Instant::now();
+
+                if let Some(mut last_commit_idx) = last_commit_idx {
+                    //need to process next task
+                    last_commit_idx += 1;
+                    
+                    if last_commit_idx <= 2 {
+                        let cur = Instant::now();
+                        println!("critical path, thread_id={}, transaction_id={}, trying fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                    }
+                    if let Some(incarnation) = scheduler.try_fallback(last_commit_idx) {
+                        if last_commit_idx <= 2 {                                                                                                                                             
+                            let cur = Instant::now();
+                            println!("critical path, thread_id={}, transaction_id={}, inside fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                        }
+                        if let Some(validation_mode) = Self::execute(
+                            last_commit_idx,
+                            incarnation,
+                            true,
+                            scheduler,
+                            block,
+                            last_input_output,
+                            versioned_cache,
+                            &executor,
+                            base_view,
+                            ParallelState::new(
+                                versioned_cache,
+                                scheduler,
+                                start_shared_counter,
+                                shared_counter,
+                            ),
+                            start_time_all,
+                            worker_id
+                        )? {
+                            //if we are in fallback and won write => no need to validate
+                                if last_commit_idx <= 2 { 
+                                    let cur = Instant::now();
+                                    println!("executed fallback on critical path, thread_id={}, transaction_id={}, time elapsed={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                                }
+                                scheduler.finish_execution(
+                                    last_commit_idx,
+                                    incarnation,
+                                validation_mode,
+                            )?;
+                            let end3 = Instant::now();
+                            fallback_time += end3 - start3;
+                            drain_commit_queue()?;
+                            continue;
+                        }
+                    }
+                }
+
+                let end3 = Instant::now();
+                fallback_time += end3 - start3;
             }
 
+            let end = Instant::now();
+
+            commit_time += end - start;
+
             drain_commit_queue()?;
+
+            let start2 = Instant::now();
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
@@ -818,14 +965,17 @@ where
                         scheduler,
                     )?
                 },
+
                 SchedulerTask::ExecutionTask(
                     txn_idx,
                     incarnation,
-                    ExecutionTaskType::Execution,
+                    ExecutionTaskType::Execution, // ATTENTION
                 ) => {
-                    let needs_suffix_validation = Self::execute(
+                    if let Some(validation_mode) = Self::execute(
                         txn_idx,
                         incarnation,
+                        false,
+                        scheduler,
                         block,
                         last_input_output,
                         versioned_cache,
@@ -837,8 +987,19 @@ where
                             start_shared_counter,
                             shared_counter,
                         ),
-                    )?;
-                    scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
+                        start_time_all,
+                        worker_id,
+                    )? {
+                        let temp =
+                            scheduler.finish_execution(txn_idx, incarnation, validation_mode)?;
+                        if txn_idx <= 1 {
+                            let cur = Instant::now();
+                            println!("critical path, finished execution in main, thread_id={}, txn_idx={}, at time={:?}", *worker_id, txn_idx, cur-*start_time_all);
+                        }
+                        temp
+                    } else {
+                        SchedulerTask::Retry
+                    }
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     {
@@ -851,15 +1012,26 @@ where
                         cvar.notify_one();
                     }
 
+                    SchedulerTask::Retry
+                },
+                SchedulerTask::Retry => {
+                    /*println!("need to retry"); */
                     scheduler.next_task()
                 },
-                SchedulerTask::Retry => scheduler.next_task(),
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
-                    break Ok(());
+                    break;
                 },
-            }
+            };
+            let end2 = Instant::now();
+            extra_time += end2 - start2;
         }
+
+        println!(
+            "num_threads={}, thread_id={}, time in commit={:?}, time in fallback={:?}, time outside commit/fallback={:?}",
+            num_workers, worker_id, commit_time, fallback_time, extra_time
+        );
+        Ok(())
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -908,9 +1080,11 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let start = Instant::now();
+        let worker_ids: Vec<usize> = (0..num_workers).collect();
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..num_workers {
+            for worker_id in &worker_ids {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         env,
@@ -924,15 +1098,17 @@ where
                         &shared_commit_state,
                         &final_results,
                         num_workers,
+                        worker_id,
+                        &start,
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,
                         // and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                            println!("{:?}", err_msg);
                         }
                         shared_maybe_error.store(true, Ordering::SeqCst);
-
                         // Make sure to halt the scheduler if it hasn't already been halted.
                         scheduler.halt();
                     }
@@ -941,6 +1117,10 @@ where
         });
         drop(timer);
 
+        println!(
+            "total number of dependencies={}",
+            scheduler.get_num_dep_total()
+        );
         counters::update_state_counters(versioned_cache.stats(), true);
 
         // Explicit async drops.
@@ -1066,7 +1246,14 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+
+            let res = executor.execute_transaction_with_version(
+                &latest_view,
+                txn,
+                idx as TxnIndex,
+                0,
+                false,
+            );
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {

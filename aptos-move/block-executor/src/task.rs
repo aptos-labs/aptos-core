@@ -6,7 +6,7 @@ use crate::types::InputOutputKey;
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::{
     delayed_fields::PanicError,
     fee_statement::FeeStatement,
@@ -70,7 +70,7 @@ pub trait ExecutorTask: Sync {
     ) -> Self;
 
     /// Execute a single transaction given the view of the current state.
-    fn execute_transaction(
+    /*fn execute_transaction(
         &self,
         view: &(impl TExecutorView<
             <Self::Txn as Transaction>::Key,
@@ -85,6 +85,25 @@ pub trait ExecutorTask: Sync {
         >),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
+    ) -> ExecutionStatus<Self::Output, Self::Error>;*/
+
+    fn execute_transaction_with_version(
+        &self,
+        view: &(impl TExecutorView<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Tag,
+            MoveTypeLayout,
+            <Self::Txn as Transaction>::Identifier,
+            <Self::Txn as Transaction>::Value,
+        > + TResourceGroupView<
+            GroupKey = <Self::Txn as Transaction>::Key,
+            ResourceTag = <Self::Txn as Transaction>::Tag,
+            Layout = MoveTypeLayout,
+        >),
+        txn: &Self::Txn,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        is_fallback: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;

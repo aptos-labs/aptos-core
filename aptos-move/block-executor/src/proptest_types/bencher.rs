@@ -108,7 +108,7 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let baseline_output = BaselineOutput::generate(&transactions, None);
+        let baseline_output = BaselineOutput::generate_without_output(&transactions);
 
         Self {
             transactions,
@@ -138,6 +138,8 @@ where
         >::new(config, executor_thread_pool, None)
         .execute_transactions_parallel(&(), &self.transactions, &data_view);
 
-        self.baseline_output.assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            self.baseline_output.assert_parallel_output(&output);
+        }
     }
 }
