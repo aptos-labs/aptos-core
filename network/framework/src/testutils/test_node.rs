@@ -317,7 +317,7 @@ pub trait TestNode: ApplicationNode + Sync {
                         raw_request: msg.data.into(),
                     }),
                     sender: self.peer_network_id(network_id),
-                    rx_at: 0,
+                    receive_timestamp_micros: 0,
                     rpc_replier: Some(Arc::new(msg.res_tx)),
                 };
                 (peer_id, msg.protocol_id, rmsg)
@@ -330,7 +330,7 @@ pub trait TestNode: ApplicationNode + Sync {
                         raw_msg: msg.mdata.into(),
                     }),
                     sender: self.peer_network_id(network_id),
-                    rx_at: 0,
+                    receive_timestamp_micros: 0,
                     rpc_replier: None,
                 };
                 (peer_id, msg.protocol_id, rmsg)

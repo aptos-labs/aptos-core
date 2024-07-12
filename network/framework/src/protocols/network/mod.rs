@@ -138,7 +138,7 @@ pub struct ReceivedMessage {
     pub sender: PeerNetworkId,
 
     // unix microseconds
-    pub rx_at: u64,
+    pub receive_timestamp_micros: u64,
 
     pub rpc_replier: Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
 }
@@ -153,7 +153,7 @@ impl ReceivedMessage {
         Self {
             message,
             sender,
-            rx_at,
+            receive_timestamp_micros: rx_at,
             rpc_replier: None,
         }
     }
@@ -183,7 +183,7 @@ impl ReceivedMessage {
 impl PartialEq for ReceivedMessage {
     fn eq(&self, other: &Self) -> bool {
         (self.message == other.message)
-            && (self.rx_at == other.rx_at)
+            && (self.receive_timestamp_micros == other.receive_timestamp_micros)
             && (self.sender == other.sender)
     }
 }
@@ -275,7 +275,7 @@ fn received_message_to_event<TMessage: Message>(
     let ReceivedMessage {
         message,
         sender: _sender,
-        rx_at,
+        receive_timestamp_micros: rx_at,
         rpc_replier,
     } = message;
     let now = std::time::SystemTime::now();
@@ -284,15 +284,16 @@ fn received_message_to_event<TMessage: Message>(
         .unwrap()
         .as_micros() as u64;
     let dt_micros = dequeue_at - rx_at;
+    let dt_seconds = (dt_micros as f64) / 1000000.0;
     match message {
         NetworkMessage::RpcRequest(rpc_req) => {
-            crate::counters::inbound_queue_delay_observe(rpc_req.protocol_id, dt_micros);
+            crate::counters::inbound_queue_delay_observe(rpc_req.protocol_id, dt_seconds);
             let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
             request_to_network_event(peer_id, &rpc_req)
                 .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_replier))
         },
         NetworkMessage::DirectSendMsg(request) => {
-            crate::counters::inbound_queue_delay_observe(request.protocol_id, dt_micros);
+            crate::counters::inbound_queue_delay_observe(request.protocol_id, dt_seconds);
             request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
         },
         _ => None,

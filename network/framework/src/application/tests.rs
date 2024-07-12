@@ -1218,7 +1218,7 @@ async fn wait_for_network_event(
                             raw_request: outbound_rpc_request.data.into(),
                         }),
                         sender: PeerNetworkId::new(expected_network_id, peer_id),
-                        rx_at: 0,
+                        receive_timestamp_micros: 0,
                         rpc_replier: Some(Arc::new(outbound_rpc_request.res_tx)),
                     };
                     (outbound_rpc_request.protocol_id, rmsg)
@@ -1237,7 +1237,7 @@ async fn wait_for_network_event(
                             raw_msg: message.mdata.into(),
                         }),
                         sender: PeerNetworkId::new(expected_network_id, peer_id),
-                        rx_at: 0,
+                        receive_timestamp_micros: 0,
                         rpc_replier: None,
                     };
                     (message.protocol_id, rmsg)

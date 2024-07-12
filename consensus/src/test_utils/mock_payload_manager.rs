@@ -68,6 +68,7 @@ impl PayloadClient for MockPayloadManager {
         _pending_ordering: bool,
         _pending_uncommitted_blocks: usize,
         _recent_fill_fraction: f32,
+        _block_timestamp: Duration,
     ) -> Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
         // generate 1k txn is too slow with coverage instrumentation
         Ok((

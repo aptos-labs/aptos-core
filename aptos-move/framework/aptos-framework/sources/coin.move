@@ -328,7 +328,7 @@ module aptos_framework::coin {
                 };
             primary_fungible_store::create_primary_store_enabled_fungible_asset(
                 &metadata_object_cref,
-                option::map(coin_supply<CoinType>(), |_| MAX_U128),
+                option::none(),
                 name<CoinType>(),
                 symbol<CoinType>(),
                 decimals<CoinType>(),
@@ -2080,6 +2080,7 @@ module aptos_framework::coin {
         let (mint_ref, mint_ref_receipt) = get_paired_mint_ref(&mint_cap);
         let (burn_ref, burn_ref_receipt) = get_paired_burn_ref(&burn_cap);
         let fungible_asset = fungible_asset::mint(&mint_ref, 50);
+        assert!(option::is_none(&fungible_asset::maximum(ensure_paired_metadata<FakeMoney>())), 0);
         assert!(supply<FakeMoney>() == option::some(150), 0);
         assert!(coin_supply<FakeMoney>() == option::some(100), 0);
         assert!(fungible_asset::supply(ensure_paired_metadata<FakeMoney>()) == option::some(50), 0);
