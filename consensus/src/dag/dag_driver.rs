@@ -257,6 +257,7 @@ impl DagDriver {
             .pull_payload(
                 Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
                 max_txns,
+                max_txns,
                 max_size_bytes,
                 // TODO: Set max_inline_items and max_inline_bytes correctly
                 100,
@@ -267,6 +268,7 @@ impl DagDriver {
                 false,
                 0,
                 0.0,
+                self.time_service.now_unix_time(),
             )
             .await
         {

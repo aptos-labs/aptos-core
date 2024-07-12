@@ -23,7 +23,10 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::user_transaction_context::UserTransactionContext,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
+};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
@@ -112,7 +115,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<VMChangeSet> {
+    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
         let move_vm = self.inner.get_move_vm();
 
         let resource_converter = |value: Value,
@@ -161,18 +164,18 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
 
-        let change_set = Self::convert_change_set(
+        let (change_set, module_write_set) = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
             events,
             table_change_set,
             aggregator_change_set,
-            configs,
+            configs.legacy_resource_creation_as_modification(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
 
-        Ok(change_set)
+        Ok((change_set, module_write_set))
     }
 
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
@@ -247,12 +250,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If group or data doesn't exist, Unreachable
     ///   * Otherwise modify
     /// * Delete -- remove element from container
-    ///   * If group or data does't exist, Unreachable
+    ///   * If group or data doesn't exist, Unreachable
     ///   * If elements remain, Modify
     ///   * Otherwise delete
     ///
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
-    /// merging them into the a single op corresponding to the whole resource group (V0).
+    /// merging them into a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         resolver: &dyn AptosMoveResolver,
@@ -348,18 +351,21 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         Ok((change_set_filtered, resource_group_change_set))
     }
 
-    pub(crate) fn convert_change_set(
+    fn convert_change_set(
         woc: &WriteOpConverter,
         change_set: ChangeSet,
         resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
-        configs: &ChangeSetConfigs,
-    ) -> PartialVMResult<VMChangeSet> {
+        legacy_resource_creation_as_modification: bool,
+    ) -> PartialVMResult<(VMChangeSet, ModuleWriteSet)> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
-        let mut module_write_set = BTreeMap::new();
+
+        let mut has_modules_published_to_special_address = false;
+        let mut module_write_ops = BTreeMap::new();
+
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
 
@@ -370,16 +376,19 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let op = woc.convert_resource(
                     &state_key,
                     blob_and_layout_op,
-                    configs.legacy_resource_creation_as_modification(),
+                    legacy_resource_creation_as_modification,
                 )?;
 
                 resource_write_set.insert(state_key, op);
             }
 
             for (name, blob_op) in modules {
+                if addr.is_special() {
+                    has_modules_published_to_special_address = true;
+                }
                 let state_key = StateKey::module(&addr, &name);
                 let op = woc.convert_module(&state_key, blob_op, false)?;
-                module_write_set.insert(state_key, op);
+                module_write_ops.insert(state_key, op);
             }
         }
 
@@ -436,18 +445,20 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
             .collect();
 
-        VMChangeSet::new_expanded(
+        let change_set = VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
-            module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
             aggregator_change_set.delayed_field_changes,
             reads_needing_exchange,
             group_reads_needing_change,
             events,
-            configs,
-        )
+        )?;
+        let module_write_set =
+            ModuleWriteSet::new(has_modules_published_to_special_address, module_write_ops);
+
+        Ok((change_set, module_write_set))
     }
 }
 

@@ -1079,7 +1079,13 @@ impl<'env> Generator<'env> {
             },
             ExpData::Call(_arg_id, Operation::Deref, args) => {
                 // Optimize `Borrow(Deref(x)) => x`
-                return self.gen(vec![target], &args[0]);
+                // only when `kind` is equal to the reference kind of `x`
+                let arg_type = self.env().get_node_type(args[0].node_id());
+                if let Type::Reference(ref_kind, _) = arg_type {
+                    if ref_kind == kind {
+                        return self.gen(vec![target], &args[0]);
+                    }
+                }
             },
             ExpData::LocalVar(_arg_id, sym) => return self.gen_borrow_local(target, id, *sym),
             ExpData::Temporary(_arg_id, temp) => return self.gen_borrow_temp(target, id, *temp),

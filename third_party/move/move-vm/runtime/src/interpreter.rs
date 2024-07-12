@@ -604,6 +604,13 @@ impl Interpreter {
                         ));
                 }
 
+                if resolver.loader().vm_config().disallow_dispatch_for_native
+                    && target_func.is_native()
+                {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message("Invoking native function during dispatch".to_string()));
+                }
+
                 // Checking type of the dispatch target function
                 //
                 // MoveVM will check that the native function that performs the dispatch will have the same

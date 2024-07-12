@@ -13,6 +13,7 @@ impl AptosDB {
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
         skip_index_and_usage: bool,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Self {
         let ledger_db = Arc::new(ledger_db);
         let state_merkle_db = Arc::new(state_merkle_db);
@@ -41,7 +42,7 @@ impl AptosDB {
         ));
 
         let ledger_pruner =
-            LedgerPrunerManager::new(Arc::clone(&ledger_db), pruner_config.ledger_pruner_config);
+            LedgerPrunerManager::new(Arc::clone(&ledger_db), pruner_config.ledger_pruner_config, internal_indexer_db);
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_db),
@@ -70,6 +71,7 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -92,6 +94,7 @@ impl AptosDB {
             readonly,
             empty_buffered_state_for_restore,
             rocksdb_configs.enable_storage_sharding,
+            internal_indexer_db,
         );
 
         if !readonly && enable_indexer {
@@ -152,15 +155,20 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
+        enable_sharding: bool,
     ) -> Self {
         Self::open(
             StorageDirPaths::from_path(db_root_path),
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfigs::default(),
+            RocksdbConfigs {
+                enable_storage_sharding: enable_sharding,
+                ..Default::default()
+            },
             enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
+            None,
         )
         .expect("Unable to open AptosDB")
     }

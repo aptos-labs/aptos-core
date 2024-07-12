@@ -17,7 +17,6 @@ use crate::{
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value::StateValueSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
-        state_value_index::StateValueIndexSchema,
         version_data::VersionDataSchema,
     },
     state_kv_db::StateKvDb,
@@ -574,12 +573,13 @@ impl StateStore {
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
+        // this can only handle non-sharded db scenario.
+        // For sharded db, should look at API side using internal indexer to handle this request
         PrefixedStateValueIterator::new(
             &self.state_kv_db,
             key_prefix.clone(),
             first_key_opt.cloned(),
             desired_version,
-            self.state_kv_db.enabled_sharding(),
         )
     }
 
@@ -599,7 +599,6 @@ impl StateStore {
         first_version: Version,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        state_kv_metadata_batch: &SchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -637,7 +636,6 @@ impl StateStore {
             value_state_sets.to_vec(),
             first_version,
             sharded_state_kv_batches,
-            state_kv_metadata_batch,
             enable_sharding,
         )?;
 
@@ -653,7 +651,6 @@ impl StateStore {
         sharded_state_cache: Option<&ShardedStateCache>,
         ledger_batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        state_kv_metadata_batch: &SchemaBatch,
         enable_sharding: bool,
         skip_usage: bool,
         last_checkpoint_index: Option<usize>,
@@ -682,7 +679,6 @@ impl StateStore {
             value_state_sets,
             first_version,
             sharded_state_kv_batches,
-            state_kv_metadata_batch,
             enable_sharding,
         )
     }
@@ -692,7 +688,6 @@ impl StateStore {
         value_state_sets: Vec<&ShardedStateUpdates>,
         first_version: Version,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        state_kv_metadata_batch: &SchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
         sharded_state_kv_batches
@@ -718,23 +713,6 @@ impl StateStore {
                     })
                     .collect::<Result<_>>()
             })?;
-
-        // Eventually this index will move to indexer side. For now we temporarily write this into
-        // metadata db to unblock the sharded DB migration.
-        // TODO(grao): Remove when we are ready.
-        if enable_sharding {
-            value_state_sets
-                .par_iter()
-                .enumerate()
-                .try_for_each(|(i, updates)| {
-                    let version = first_version + i as Version;
-                    updates.iter().flatten().try_for_each(|(k, _)| {
-                        state_kv_metadata_batch
-                            .put::<StateValueIndexSchema>(&(k.clone(), version), &())
-                    })
-                })?;
-        }
-
         Ok(())
     }
 
@@ -1185,13 +1163,11 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
-
         self.shard_state_value_batch(
             &sharded_schema_batch,
             node_batch,
             self.state_kv_db.enabled_sharding(),
         )?;
-
         self.state_kv_db
             .commit(version, batch, sharded_schema_batch)
     }

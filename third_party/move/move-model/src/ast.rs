@@ -2704,6 +2704,10 @@ impl Address {
             panic!("expected numerical address, found symbolic")
         }
     }
+
+    pub fn is_one(&self) -> bool {
+        matches!(self, Address::Numerical(AccountAddress::ONE))
+    }
 }
 
 // enables `env.display(address)`

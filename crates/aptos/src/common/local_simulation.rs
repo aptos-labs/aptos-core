@@ -83,6 +83,7 @@ pub fn benchmark_transaction_using_debugger(
 
             times.push(t2 - t1);
         }
+        times.sort();
 
         times[n / 2]
     };

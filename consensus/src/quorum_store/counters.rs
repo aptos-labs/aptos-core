@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
-    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, Histogram,
+    HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -184,6 +184,24 @@ pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static TOTAL_BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_total_block_size_when_pull",
+        "Histogram for the total size of transactions per block when pulled for consensus.",
+        BYTE_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static KNOWN_DUPLICATE_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_known_duplicate_txns_when_pull",
+        "Histogram for the number of known duplicate transactions in a block when pulled for consensus.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
 pub static NUM_INLINE_BATCHES: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "num_inline_batches_in_block_proposal",
@@ -356,34 +374,47 @@ pub fn pos_to_commit(bucket: u64, secs: f64) {
 // Proof Queue
 //////////////////////
 
-pub static PROOFS_WITHOUT_BATCH_DATA: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static PROOFS_WITHOUT_BATCH_SUMMARY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
         "quorum_store_proofs_without_batch_data",
-        "Number of proofs received without batch data"
+        "Number of proofs received without batch data",
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub static TXNS_WITH_DUPLICATE_BATCHES: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static PROOFS_WITH_BATCH_SUMMARY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_proofs_with_batch_data",
+        "Number of proofs received without batch data",
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static TXNS_WITH_DUPLICATE_BATCHES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
         "quorum_store_txns_with_duplicate_batches",
-        "Number of transactions received with duplicate batches"
+        "Number of transactions received with duplicate batches",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub static TXNS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_txns_in_proof_queue",
-        "Number of transactions in the proof queue"
+pub static TXNS_IN_PROOFS_WITH_SUMMARIES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_txns_in_proof_queue_with_summaries",
+        "Number of transactions in the proof queue",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub static PROOFS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_proofs_in_proof_queue",
-        "Number of proofs in the proof queue"
+pub static TXNS_IN_PROOFS_WITHOUT_SUMMARIES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_txns_in_proof_queue_without_summaries",
+        "Number of transactions in the proof queue",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });

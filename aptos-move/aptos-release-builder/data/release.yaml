@@ -13,3 +13,7 @@ proposals:
           git_hash: ~
       - Gas:
           new: current
+      - FeatureFlag:
+          enabled:
+            - disallow_user_native
+

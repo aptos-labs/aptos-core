@@ -474,7 +474,6 @@ mod dbtool_tests {
                 StateKeyPrefix::new(AccessPath, b"".to_vec()),
                 None,
                 ver,
-                force_sharding,
             )
             .unwrap();
             let old_iter = db

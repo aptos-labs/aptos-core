@@ -152,7 +152,7 @@ module 0xcafe::deflation_token_tests {
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none(),
+            option::none()
         );
     }
 
@@ -218,7 +218,7 @@ module 0xcafe::deflation_token_tests {
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::some(withdraw),
+            option::some(withdraw)
         );
     }
 
@@ -241,7 +241,7 @@ module 0xcafe::deflation_token_tests {
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none(),
+            option::none()
         );
     }
 
@@ -263,7 +263,7 @@ module 0xcafe::deflation_token_tests {
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none(),
+            option::none()
         );
     }
 
@@ -303,7 +303,7 @@ module 0xcafe::deflation_token_tests {
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none(),
+            option::none()
         );
     }
 

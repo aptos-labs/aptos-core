@@ -109,13 +109,16 @@ fn test_pruner_config() {
         assert_eq!(state_merkle_pruner.is_pruner_enabled(), enable);
         assert_eq!(state_merkle_pruner.get_prune_window(), 20);
 
-        let ledger_pruner =
-            LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
+        let ledger_pruner = LedgerPrunerManager::new(
+            Arc::clone(&aptos_db.ledger_db),
+            LedgerPrunerConfig {
                 enable,
                 prune_window: 100,
                 batch_size: 1,
                 user_pruning_window_offset: 0,
-            });
+            },
+            None,
+        );
         assert_eq!(ledger_pruner.is_pruner_enabled(), enable);
         assert_eq!(ledger_pruner.get_prune_window(), 100);
     }
@@ -237,6 +240,7 @@ pub fn test_state_merkle_pruning_impl(
         false, /* enable_indexer */
         BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None,
     )
     .unwrap();
 
