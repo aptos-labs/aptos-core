@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{emitter::local_account_generator::LocalAccountGenerator, EmitJobRequest};
+use crate::EmitJobRequest;
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -19,11 +19,10 @@ use aptos_transaction_generator_lib::{
     CounterState, ReliableTransactionSubmitter, RootAccountHandle, SEND_AMOUNT,
 };
 use core::{
-    cmp::min,
     result::Result::{Err, Ok},
 };
 use futures::StreamExt;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng};
 use std::{
     path::Path,
     sync::Arc,
@@ -250,7 +249,7 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         txn_executor: &dyn ReliableTransactionSubmitter,
         req: &EmitJobRequest,
-        account_generator: Box<dyn LocalAccountGenerator>,
+        seed_accounts: Vec<Arc<LocalAccount>>,
         max_submit_batch_size: usize,
         local_accounts: Vec<Arc<LocalAccount>>,
     ) -> Result<()> {
@@ -261,11 +260,9 @@ impl<'t> AccountMinter<'t> {
             num_accounts, req.expected_max_txns,
         );
 
-        let expected_num_seed_accounts =
-            (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
         let coins_per_account = self.get_needed_balance_per_account(req, num_accounts);
         let expected_children_per_seed_account =
-            (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
+            (num_accounts + seed_accounts.len() - 1) / seed_accounts.len();
 
         let coins_per_seed_account = Self::funds_needed_for_multi_transfer(
             "seed",
@@ -276,7 +273,7 @@ impl<'t> AccountMinter<'t> {
         );
         let coins_for_source = Self::funds_needed_for_multi_transfer(
             if req.mint_to_root { "root" } else { "source" },
-            expected_num_seed_accounts as u64,
+            seed_accounts.len() as u64,
             coins_per_seed_account,
             self.txn_factory.get_max_gas_amount(),
             self.txn_factory.get_gas_unit_price(),
@@ -313,18 +310,16 @@ impl<'t> AccountMinter<'t> {
 
         // Create seed accounts with which we can create actual accounts concurrently. Adding
         // additional fund for paying gas fees later.
-        let seed_accounts = self
+        self
             .create_and_fund_seed_accounts(
                 new_source_account,
                 txn_executor,
-                account_generator,
-                expected_num_seed_accounts,
+                &seed_accounts,
                 coins_per_seed_account,
                 max_submit_batch_size,
                 &request_counters,
             )
             .await?;
-        let actual_num_seed_accounts = seed_accounts.len();
 
         info!(
             "Completed creating {} seed accounts in {}s, each with {} coins, request stats: {}",
@@ -344,7 +339,7 @@ impl<'t> AccountMinter<'t> {
         let request_counters = txn_executor.create_counter_state();
 
         let approx_accounts_per_seed =
-            (num_accounts + actual_num_seed_accounts - 1) / actual_num_seed_accounts;
+            (num_accounts + seed_accounts.len() - 1) / seed_accounts.len();
 
         let local_accounts_by_seed: Vec<Vec<Arc<LocalAccount>>> = local_accounts
             .chunks(approx_accounts_per_seed)
@@ -395,24 +390,16 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         mut new_source_account: Option<LocalAccount>,
         txn_executor: &dyn ReliableTransactionSubmitter,
-        account_generator: Box<dyn LocalAccountGenerator>,
-        seed_account_num: usize,
+        seed_accounts: &[Arc<LocalAccount>],
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
         counters: &CounterState,
-    ) -> Result<Vec<LocalAccount>> {
+    ) -> Result<()> {
         info!(
             "Creating and funding seeds accounts (txn {} gas price)",
             self.txn_factory.get_gas_unit_price()
         );
-        let mut i = 0;
-        let mut seed_accounts = vec![];
-        while i < seed_account_num {
-            let batch_size = min(max_submit_batch_size, seed_account_num - i);
-            let mut rng = StdRng::from_rng(self.rng()).unwrap();
-            let mut batch = account_generator
-                .gen_local_accounts(txn_executor, batch_size, &mut rng)
-                .await?;
+        for batch in seed_accounts.chunks(max_submit_batch_size) {
             let txn_factory = &self.txn_factory;
             let create_requests: Vec<_> = batch
                 .iter()
@@ -432,12 +419,9 @@ impl<'t> AccountMinter<'t> {
             txn_executor
                 .execute_transactions_with_counter(&create_requests, counters)
                 .await?;
-
-            i += batch_size;
-            seed_accounts.append(&mut batch);
         }
 
-        Ok(seed_accounts)
+        Ok(())
     }
 
     pub async fn load_vasp_account(
@@ -518,7 +502,7 @@ impl<'t> AccountMinter<'t> {
 /// Create `num_new_accounts` by transferring coins from `source_account`. Return Vec of created
 /// accounts
 async fn create_and_fund_new_accounts(
-    source_account: LocalAccount,
+    source_account: Arc<LocalAccount>,
     accounts: Vec<Arc<LocalAccount>>,
     coins_per_new_account: u64,
     max_num_accounts_per_batch: usize,

@@ -58,7 +58,7 @@ const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 2000 + 8;
 // this for submitting transactions, as we have a way to handle when that fails.
 // This retry policy means an operation will take 8 seconds at most.
 pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
-    RetryPolicy::exponential(Duration::from_millis(125))
+    RetryPolicy::exponential(Duration::from_secs(2))
         .with_max_retries(MAX_RETRIES)
         .with_jitter(true)
 });
@@ -437,7 +437,7 @@ impl EmitJobRequest {
                 // That's why we set wait_seconds conservativelly, to make sure all processing and
                 // client calls finish within that time.
 
-                let wait_seconds = self.txn_expiration_time_secs + 180;
+                let wait_seconds = self.txn_expiration_time_secs * 2 + 5;
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
@@ -1171,10 +1171,20 @@ pub async fn create_accounts(
         .gen_local_accounts(&txn_executor, num_accounts, &mut rng)
         .await?;
 
+    let num_seed_accounts =
+        (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
+    let seed_accounts = account_generator
+        .gen_local_accounts(&txn_executor, num_seed_accounts, &mut rng)
+        .await?;
+
     info!("Generated re-usable accounts for seed {:?}", seed);
 
     let all_accounts_already_exist = accounts.iter().all(|account| account.sequence_number() > 0);
-    let send_money_gas = if all_accounts_already_exist {
+    let all_seed_accounts_already_exist = seed_accounts.iter().all(|account| account.sequence_number() > 0);
+
+    info!("Accounts exist: {}, seed accounts exist: {}", all_accounts_already_exist, all_seed_accounts_already_exist);
+
+    let send_money_gas = if all_accounts_already_exist && all_seed_accounts_already_exist {
         req.get_expected_gas_per_transfer()
     } else {
         req.get_expected_gas_per_account_create()
@@ -1188,11 +1198,13 @@ pub async fn create_accounts(
 
     if !skip_minting_accounts {
         let accounts: Vec<_> = accounts.into_iter().map(Arc::new).collect();
+        let seed_accounts: Vec<_> = seed_accounts.into_iter().map(Arc::new).collect();
+
         account_minter
             .create_and_fund_accounts(
                 &txn_executor,
                 req,
-                account_generator,
+                seed_accounts,
                 max_submit_batch_size,
                 accounts.clone(),
             )

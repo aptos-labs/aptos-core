@@ -87,7 +87,7 @@ impl SubmissionWorker {
                 && loop_start_time.duration_since(wait_until) > Duration::from_secs(5)
             {
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(120)),
+                    SampleRate::Duration(Duration::from_secs(5)),
                     warn!(
                         "[{:?}] txn_emitter worker drifted out of sync too much: {}s",
                         self.client.path_prefix_string(),
@@ -166,7 +166,7 @@ impl SubmissionWorker {
                     // we also don't want to be stuck waiting for txn_expiration_time_secs
                     // after stop is called, so we sleep until time or stop is set.
                     self.sleep_check_done(Duration::from_secs(
-                        self.params.txn_expiration_time_secs + 20,
+                        self.params.txn_expiration_time_secs + 3,
                     ))
                     .await
                 }
