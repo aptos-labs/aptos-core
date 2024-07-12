@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Context;
-use axum::response::Response;
-use bytes::Bytes;
+use axum::Router;
 use reqwest::{header, Client};
 use std::{sync::Arc, time::Duration};
 use utils::constants::MAX_HEAD_REQUEST_RETRY_SECONDS;
@@ -16,10 +15,9 @@ pub mod schema;
 pub mod utils;
 pub mod worker;
 
-/// Trait for handling requests to the server
-#[async_trait::async_trait]
+/// Trait for building a router for axum
 trait Server: Send + Sync {
-    async fn handle_request(self: Arc<Self>, bytes: Bytes) -> anyhow::Result<Response<String>>;
+    fn build_router(self: Arc<Self>) -> Router;
 }
 
 /// HEAD request to get MIME type and size of content

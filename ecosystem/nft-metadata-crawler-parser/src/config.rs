@@ -14,11 +14,9 @@ use crate::{
     Server,
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use axum::{response::Response, routing::post, Router};
-use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
-use tracing::{info, warn};
+use tracing::info;
 
 /// Required account data and auth keys for Cloudflare
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -120,25 +118,13 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
             },
         };
 
-        // Create web server
-        let router = Router::new().route(
-            "/",
-            post(|bytes| async move {
-                context.handle_request(bytes).await.unwrap_or_else(|e| {
-                    warn!(error = ?e, "Error handling request");
-                    Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(e.to_string())
-                        .unwrap()
-                })
-            }),
-        );
-
+        let router = context.build_router();
         let addr = SocketAddr::from(([0, 0, 0, 0], self.server_port));
         axum::Server::bind(&addr)
             .serve(router.into_make_service())
             .await
             .unwrap();
+
         Ok(())
     }
 

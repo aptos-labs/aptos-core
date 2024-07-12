@@ -13,7 +13,7 @@ use crate::{
     worker::Worker,
     Server,
 };
-use axum::response::Response;
+use axum::{response::Response, routing::post, Router};
 use bytes::Bytes;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
@@ -184,24 +184,26 @@ impl ParserContext {
     }
 }
 
-#[async_trait::async_trait]
 impl Server for ParserContext {
-    /// Handles calling parser for the root endpoint
-    async fn handle_request(self: Arc<Self>, msg: Bytes) -> anyhow::Result<Response<String>> {
-        self.spawn_parser(msg).await;
+    fn build_router(self: Arc<Self>) -> Router {
+        Router::new().route(
+            "/",
+            post(|bytes| async move {
+                self.spawn_parser(bytes).await;
 
-        if !self.parser_config.ack_parsed_uris {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body("".to_string())
-                .unwrap());
-        }
+                if !self.parser_config.ack_parsed_uris {
+                    return Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body("".to_string())
+                        .unwrap();
+                }
 
-        PUBSUB_ACK_SUCCESS_COUNT.inc();
-
-        Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body("".to_string())
-            .unwrap())
+                PUBSUB_ACK_SUCCESS_COUNT.inc();
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .body("".to_string())
+                    .unwrap()
+            }),
+        )
     }
 }

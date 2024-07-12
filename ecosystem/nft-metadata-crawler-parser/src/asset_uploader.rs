@@ -11,15 +11,14 @@ use crate::{
     Server,
 };
 use anyhow::Context;
-use axum::response::Response;
+use axum::{routing::post, Extension, Json, Router};
 use backoff::{future::retry, ExponentialBackoff};
-use bytes::Bytes;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
     PgConnection,
 };
 use futures::{future::try_join_all, FutureExt};
-use reqwest::{multipart::Form, Client, StatusCode};
+use reqwest::{multipart::Form, Client};
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use tracing::{info, warn};
@@ -40,6 +39,17 @@ struct CloudflareImageUploadResponseResult {
 #[derive(Debug, Deserialize)]
 struct CloudflareImageUploadResponse {
     result: CloudflareImageUploadResponseResult,
+}
+
+#[derive(Debug, Deserialize)]
+struct AssetUploaderRequest {
+    urls: Vec<Url>,
+}
+
+#[derive(Debug, Serialize)]
+struct AssetUploaderResponse {
+    successes: Vec<String>,
+    failures: Vec<String>,
 }
 
 impl AssetUploaderContext {
@@ -114,29 +124,14 @@ impl AssetUploaderContext {
             Err(e) => Err(e),
         }
     }
-}
 
-#[derive(Debug, Deserialize)]
-struct AssetUploaderRequest {
-    urls: Vec<Url>,
-}
-
-#[derive(Debug, Serialize)]
-struct AssetUploaderResponse {
-    successes: Vec<String>,
-    failures: Vec<String>,
-}
-
-#[async_trait::async_trait]
-impl Server for AssetUploaderContext {
-    /// Handles calling parser for the root endpoint
-    async fn handle_request(self: Arc<Self>, msg: Bytes) -> anyhow::Result<Response<String>> {
-        let urls: AssetUploaderRequest =
-            serde_json::from_slice(&msg).context("Failed to parse request")?;
-
+    async fn handle_urls(
+        Extension(context): Extension<Arc<Self>>,
+        Json(urls): Json<AssetUploaderRequest>,
+    ) -> Json<AssetUploaderResponse> {
         // Spawn a task for each URL
         let mut tasks = Vec::with_capacity(urls.urls.len());
-        let self_clone = self.clone();
+        let self_clone = context.clone();
         for url in urls.urls.clone() {
             let self_clone = self_clone.clone();
             tasks.push(tokio::spawn(async move {
@@ -177,25 +172,24 @@ impl Server for AssetUploaderContext {
                 }
 
                 info!(successes = ?successes, failures = ?failures, "[Asset Uploader] Uploaded assets");
-                Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .header("content-type", "application/json")
-                    .body(
-                        serde_json::to_string(&AssetUploaderResponse {
-                            successes,
-                            failures,
-                        })
-                        .unwrap(),
-                    )
-                    .unwrap())
+                Json(AssetUploaderResponse {
+                    successes,
+                    failures,
+                })
             },
-            Err(e) => {
-                warn!(error = ?e, "[Asset Uploader] Failed to upload all assets");
-                Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(e.to_string())
-                    .unwrap())
-            },
+            Err(_) => Json(AssetUploaderResponse {
+                successes: vec![],
+                failures: urls.urls.iter().map(|url| url.to_string()).collect(),
+            }),
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl Server for AssetUploaderContext {
+    fn build_router(self: Arc<Self>) -> Router {
+        Router::new()
+            .route("/", post(Self::handle_urls))
+            .layer(Extension(self.clone()))
     }
 }
