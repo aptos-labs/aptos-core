@@ -66,7 +66,7 @@ impl BlocksApi {
     /// Get blocks by version
     ///
     /// This endpoint allows you to get the transactions in a block
-    /// and the corresponding block information given a version in the block.
+    /// and the corresponding block information is given a version in the block.
     ///
     /// Transactions are limited by max default transactions size.  If not all transactions
     /// are present, the user will need to query for the rest of the transactions via the
