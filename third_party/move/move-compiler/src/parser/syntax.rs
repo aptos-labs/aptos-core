@@ -747,11 +747,12 @@ fn parse_bind_field(context: &mut Context) -> Result<(Field, Bind), Box<Diagnost
 //      Bind =
 //          <Var>
 //          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindField> "}"
+//          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<BindField> "," "}"
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     if context.tokens.peek() == Tok::Identifier {
         let next_tok = context.tokens.lookahead()?;
-        if next_tok != Tok::LBrace && next_tok != Tok::Less && next_tok != Tok::ColonColon {
+        if next_tok != Tok::LBrace && next_tok != Tok::LParen && next_tok != Tok::Less && next_tok != Tok::ColonColon {
             let v = Bind_::Var(parse_var(context)?);
             let end_loc = context.tokens.previous_end_loc();
             return Ok(spanned(context.tokens.file_hash(), start_loc, end_loc, v));
@@ -770,6 +771,8 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
             parse_bind_field,
             "a field binding",
         )?
+    } else if context.tokens.peek() == Tok::LParen {
+        parse_anonymous_field_binds(context)?
     } else {
         vec![]
     };
@@ -781,6 +784,33 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
         end_loc,
         unpack,
     ))
+}
+
+// Parse a comma separated list of anonymous field bindings:
+//      Comma<Bind>
+// Each field bind is accompanied by a field name, which is its index in the list.
+fn parse_anonymous_field_binds(context: &mut Context) -> Result<Vec<(Field, Bind)>, Box<Diagnostic>> {
+    let fields = parse_comma_list(
+        context,
+        Tok::LParen,
+        Tok::RParen,
+        parse_bind,
+        "an anonymous field binding",
+    )?;
+    Ok(
+        fields
+            .into_iter()
+            .enumerate()
+            .map(|(idx, field_bind)| {
+                let field_name = Name::new(
+                    field_bind.loc,
+                    Symbol::from(format!("{}", idx)),
+                );
+                let field_name = Field(field_name);
+                (field_name, field_bind)
+            })
+            .collect(),
+    )
 }
 
 // Parse a list of bindings, which can be zero, one, or more bindings:
