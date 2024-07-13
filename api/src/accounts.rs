@@ -452,7 +452,7 @@ impl Account {
     /// Retrieves an event key from a [`MoveStructTag`] and a [`Identifier`] field name
     ///
     /// e.g. If there's the `CoinStore` module, it has a field named `withdraw_events` for
-    /// the withdraw events to lookup the key
+    /// the withdrawal events to lookup the key
     pub fn find_event_key(
         &self,
         struct_tag: MoveStructTag,
