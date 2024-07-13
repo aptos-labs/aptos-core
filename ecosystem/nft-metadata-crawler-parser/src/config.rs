@@ -15,7 +15,7 @@ use crate::{
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 use tracing::info;
 
 /// Required account data and auth keys for Cloudflare
@@ -119,11 +119,10 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
         };
 
         let router = context.build_router();
-        let addr = SocketAddr::from(([0, 0, 0, 0], self.server_port));
-        axum::Server::bind(&addr)
-            .serve(router.into_make_service())
+        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.server_port))
             .await
-            .unwrap();
+            .expect("Failed to bind TCP listener");
+        axum::serve(listener, router).await.unwrap();
 
         Ok(())
     }

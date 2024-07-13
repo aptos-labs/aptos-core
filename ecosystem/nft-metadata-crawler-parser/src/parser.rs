@@ -13,14 +13,13 @@ use crate::{
     worker::Worker,
     Server,
 };
-use axum::{response::Response, routing::post, Router};
+use axum::{http::StatusCode, response::Response, routing::post, Router};
 use bytes::Bytes;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
     PgConnection,
 };
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
-use reqwest::StatusCode;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
