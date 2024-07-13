@@ -311,6 +311,7 @@ fn parse_identifier(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
 }
 
 // Parse an identifier or an anonymous field
+//     <Identifier> | (0-9)*
 fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let id: Symbol = context.tokens.content().into();
