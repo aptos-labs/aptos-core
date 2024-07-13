@@ -323,9 +323,14 @@ fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Bo
             "an identifier or an anonymous field `0`, `1`, ...",
         ));
     }
+    let is_anonymous_field =  context.tokens.peek() == Tok::NumValue;
     context.tokens.advance()?;
     let end_loc = context.tokens.previous_end_loc();
-    Ok(spanned(context.tokens.file_hash(), start_loc, end_loc, id))
+    let loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
+    if is_anonymous_field {
+        require_move_2(context, loc, "anonymous field");
+    }
+    Ok(Spanned::new(loc, id))
 }
 
 // Parse a numerical address value
