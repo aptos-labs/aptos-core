@@ -15,6 +15,7 @@ use aptos_mvhashmap::{
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
+    versioned_module_storage::{ModuleReadError, VersionedModuleStorage},
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
@@ -579,6 +580,30 @@ impl<T: Transaction> CapturedReads<T> {
                 | Err(Unresolved(_))
                 | Err(DeltaApplicationFailure)
                 | Err(Uninitialized) => false,
+            }
+        })
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn validate_module_reads(
+        &self,
+        // TODO(George): Add concrete or generic type for module storage entry instead of unit.
+        module_storage: &VersionedModuleStorage<T::Key, ()>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        if self.speculative_failure {
+            return false;
+        }
+
+        self.module_reads.iter().all(|k| {
+            use ModuleReadError::*;
+
+            match module_storage.read(k, idx_to_validate) {
+                Ok(_) => {
+                    // TODO(George): Use hash or transaction index to distinguish the reads.
+                    true
+                },
+                Err(Dependency(_)) | Err(Uninitialized) => false,
             }
         })
     }
