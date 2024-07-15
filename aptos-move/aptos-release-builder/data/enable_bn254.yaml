@@ -10,4 +10,4 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - bn_254_structures
+            - bn254_structures
