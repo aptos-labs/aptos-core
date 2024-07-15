@@ -317,7 +317,7 @@ fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Bo
     let id: Symbol = context.tokens.content().into();
     if (context.tokens.peek() != Tok::Identifier && context.tokens.peek() != Tok::NumValue)
         || (context.tokens.peek() == Tok::NumValue
-            && id.as_str().chars().any(|c| c.is_ascii_digit()))
+            && id.as_str().chars().any(|c| !c.is_ascii_digit()))
     {
         return Err(unexpected_token_error(
             context.tokens,
