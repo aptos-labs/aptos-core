@@ -701,13 +701,6 @@ impl ProposerElection for LeaderReputation {
     ) -> (Author, VotingPowerRatio) {
         let target_round = round.saturating_sub(self.exclude_round);
         let (sliding_window, root_hash) = self.backend.get_block_metadata(self.epoch, target_round);
-        info!(
-            "round: {}, target_round: {}, root_hash: {}, sliding_window.len(): {}",
-            round,
-            target_round,
-            root_hash,
-            sliding_window.len()
-        );
         let voting_power_participation_ratio =
             self.compute_chain_health_and_add_metrics(&sliding_window, round);
         let mut weights =
