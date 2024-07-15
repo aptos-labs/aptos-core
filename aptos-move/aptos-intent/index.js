@@ -4,7 +4,7 @@ const {Buffer} = require("buffer");
 let account = Ed25519Account.fromDerivationPath({mnemonic: "divide rule mad goose wolf grab cliff milk visit tag floor join", path: "m/44'/637'/0'/0'/0'"});
 rust
   .then(async (m) => {
-    console.log( await m.default())
+    // console.log( await m.default())
     const config = new AptosConfig({ network: "custom" ,fullnode : "http://127.0.0.1:8080/v1",faucet: "http://127.0.0.1:8081",indexer: "http://127.0.0.1:8090"});
     const aptos = new Aptos(config);
     aptos.faucet.fundAccount({
@@ -20,15 +20,29 @@ rust
     let ser2 = new Serializer();
     ser2.serializeU64(1);
     let amount = ser2.toUint8Array();
-    return builder.load_module("http://127.0.0.1:8080/v1", "0x0000000000000000000000000000000000000000000000000000000000000001 aptos_account")
+    return builder.load_module("http://127.0.0.1:8080/v1", "0x0000000000000000000000000000000000000000000000000000000000000001::coin")
       .then(async () => {
       
+        await builder.load_module("http://127.0.0.1:8080/v1", "0x0000000000000000000000000000000000000000000000000000000000000001::primary_fungible_store");
+        let returns_1 = builder.add_batched_call(
+          "0x0000000000000000000000000000000000000000000000000000000000000001::coin",
+          "withdraw",
+          ["0x1::aptos_coin::AptosCoin"],
+          [m.BatchArgument.new_signer(0), m.BatchArgument.new_bytes(amount)]
+        );
+        let returns_2 = builder.add_batched_call(
+          "0x0000000000000000000000000000000000000000000000000000000000000001::coin",
+          "coin_to_fungible_asset",
+          ["0x1::aptos_coin::AptosCoin"],
+          [returns_1[0]]
+        );
         builder.add_batched_call(
-          "0x0000000000000000000000000000000000000000000000000000000000000001 aptos_account",
-          "transfer",
+          "0x0000000000000000000000000000000000000000000000000000000000000001::primary_fungible_store",
+          "deposit",
           [],
-          [m.BatchArgument.new_signer(0),m.BatchArgument.new_bytes(address), m.BatchArgument.new_bytes(amount)]
-        )
+          [m.BatchArgument.new_bytes(address), returns_2[0]]
+        );
+        console.log(builder.to_string());
         let i = builder.generate_batched_calls();
         console.log(Buffer.from(i).toString("hex"))
 

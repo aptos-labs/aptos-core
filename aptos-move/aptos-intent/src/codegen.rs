@@ -34,14 +34,14 @@ struct Context {
     returned_val_to_local: Vec<u16>,
     args_to_local: Vec<u16>,
 
-    type_params_per_call: Vec<u16>,
     return_counts: Vec<u16>,
     signer_counts: u16,
     locals: Vec<SignatureToken>,
     parameters: Vec<SignatureToken>,
+    ty_args_to_idx: BTreeMap<TypeTag, u16>,
 }
 
-fn instantiate(token: &SignatureToken, offset: u16) -> SignatureToken {
+fn instantiate(token: &SignatureToken, subst_mapping: &BTreeMap<u16, u16>) -> SignatureToken {
     use SignatureToken::*;
 
     match token {
@@ -54,18 +54,18 @@ fn instantiate(token: &SignatureToken, offset: u16) -> SignatureToken {
         U256 => U256,
         Address => Address,
         Signer => Signer,
-        Vector(ty) => Vector(Box::new(instantiate(ty, offset))),
+        Vector(ty) => Vector(Box::new(instantiate(ty, subst_mapping))),
         Struct(idx) => Struct(*idx),
         StructInstantiation(idx, struct_type_args) => StructInstantiation(
             *idx,
             struct_type_args
                 .iter()
-                .map(|ty| instantiate(ty, offset))
+                .map(|ty| instantiate(ty, subst_mapping))
                 .collect(),
         ),
-        Reference(ty) => Reference(Box::new(instantiate(ty, offset))),
-        MutableReference(ty) => MutableReference(Box::new(instantiate(ty, offset))),
-        TypeParameter(idx) => TypeParameter(*idx + offset),
+        Reference(ty) => Reference(Box::new(instantiate(ty, subst_mapping))),
+        MutableReference(ty) => MutableReference(Box::new(instantiate(ty, subst_mapping))),
+        TypeParameter(idx) => TypeParameter(*subst_mapping.get(idx).unwrap()),
     }
 }
 
@@ -263,21 +263,6 @@ impl Context {
         Ok(())
     }
 
-    fn allocate_type_parameters(&mut self, calls: &[BatchedFunctionCall]) -> PartialVMResult<()> {
-        let mut total_ty_args_count = 0;
-        for call in calls {
-            self.type_params_per_call.push(total_ty_args_count as u16);
-            total_ty_args_count += call.ty_args.len();
-            if total_ty_args_count >= TableIndex::MAX as usize {
-                return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
-            }
-            for ty_arg in call.ty_args.iter() {
-                self.ty_args.push(ty_arg.clone());
-            }
-        }
-        Ok(())
-    }
-
     fn import_call(
         &mut self,
         module_id: &ModuleId,
@@ -330,15 +315,23 @@ impl Context {
         module_resolver: &BTreeMap<ModuleId, CompiledModule>,
     ) -> PartialVMResult<()> {
         let func_id = self.import_call(&call.module, &call.function, module_resolver)?;
-        self.returned_val_to_local
-            .push(self.locals.len() as u16);
 
         let func_handle = self.script.function_handle_at(func_id).clone();
-        let type_args_offset = self.script.type_parameters.len() as u16;
-        // Set constraints for type parameter
-        self.script
-            .type_parameters
-            .extend(func_handle.type_parameters.iter().cloned());
+        let mut subst_mapping = BTreeMap::new();
+        for (idx, ty_param) in call.ty_args.iter().enumerate() {
+            subst_mapping.insert(idx as u16, if let Some(stored_idx) = self.ty_args_to_idx.get(ty_param) {
+                *stored_idx
+            } else {
+                let new_call_idx = self.ty_args.len() as u16;
+                if new_call_idx >= TableIndex::MAX {
+                    return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
+                }
+                self.script.type_parameters.push(*func_handle.type_parameters.get(idx).unwrap());
+                self.ty_args_to_idx.insert(ty_param.clone(), new_call_idx);
+                self.ty_args.push(ty_param.clone());
+                new_call_idx
+            });
+        }
 
         // Instructions for loading parameters
         for (idx, arg) in call.args.iter().enumerate() {
@@ -379,7 +372,7 @@ impl Context {
                     let inst_ty = if call.ty_args.is_empty() {
                         type_.clone()
                     } else {
-                        instantiate(type_, type_args_offset)
+                        instantiate(type_, &subst_mapping)
                     };
                     let param_idx = self.parameters.len() as u8;
                     self.parameters.push(inst_ty);
@@ -397,8 +390,9 @@ impl Context {
             }
             let fi_idx =
                 FunctionInstantiationIndex(self.script.function_instantiations.len() as u16);
-            let inst_sig = (type_args_offset..type_args_offset + call.ty_args.len() as u16)
-                .map(|idx| SignatureToken::TypeParameter(idx))
+            let inst_sig = subst_mapping
+                .values()
+                .map(|idx| SignatureToken::TypeParameter(*idx))
                 .collect();
 
             let type_parameters = self.add_signature(Signature(inst_sig))?;
@@ -426,7 +420,7 @@ impl Context {
                 if call.ty_args.is_empty() {
                     ret.clone()
                 } else {
-                    instantiate(ret, type_args_offset)
+                    instantiate(ret, &subst_mapping)
                 }
             })
             .collect::<Vec<_>>();
@@ -466,13 +460,13 @@ pub fn generate_script_from_batched_calls(
     context.script.signatures = vec![];
     context.add_signers(signer_count)?;
     context.allocate_parameters(calls)?;
-    context.allocate_type_parameters(calls)?;
     for call in calls.iter() {
         context.compile_batched_call(call, module_resolver)?;
     }
     context.script.code.code.push(Bytecode::Ret);
     context.script.parameters = context.add_signature(Signature(context.parameters.clone()))?;
     context.script.code.locals = context.add_signature(Signature(context.locals.clone()))?;
+    move_bytecode_verifier::verify_script(&context.script).map_err(|err| err.to_partial().with_message(format!("{:?}", context.script)))?;
     let mut bytes = vec![];
     context
         .script

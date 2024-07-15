@@ -2301,6 +2301,7 @@ dependencies = [
  "getrandom 0.2.11",
  "hex",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "reqwest 0.12.5",
  "reqwest-wasm",

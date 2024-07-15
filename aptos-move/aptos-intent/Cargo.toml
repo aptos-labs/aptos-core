@@ -20,6 +20,7 @@ anyhow = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
