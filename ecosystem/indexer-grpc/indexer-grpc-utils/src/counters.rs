@@ -58,6 +58,8 @@ pub enum IndexerGrpcStep {
     TableInfoProcessedBatch,
     // [Indexer Table Info] Processed transactions from fullnode
     TableInfoProcessed,
+    // [Indexer Indices] Processed transactions from AptosDB
+    InternalIndexerDBProcessed,
 }
 
 impl IndexerGrpcStep {
@@ -91,6 +93,7 @@ impl IndexerGrpcStep {
             // Table info service steps
             IndexerGrpcStep::TableInfoProcessedBatch => "1",
             IndexerGrpcStep::TableInfoProcessed => "2",
+            IndexerGrpcStep::InternalIndexerDBProcessed => "1",
         }
     }
 
@@ -135,6 +138,9 @@ impl IndexerGrpcStep {
             }
             IndexerGrpcStep::TableInfoProcessed => {
                 "[Indexer Table Info] Processed successfully"
+            }
+            IndexerGrpcStep::InternalIndexerDBProcessed => {
+                "[Indexer DB indices] Processed successfully"
             }
         }
     }

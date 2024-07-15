@@ -6,8 +6,8 @@ use super::*;
 use crate::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::{
-        self, conn_notifs_channel, ConnectionRequest, ConnectionRequestSender,
-        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
+        self, ConnectionRequest, ConnectionRequestSender, PeerManagerNotification,
+        PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{
         network::{NetworkSender, NewNetworkEvents, NewNetworkSender},
@@ -31,7 +31,7 @@ struct TestHarness {
     peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
-    connection_notifs_tx: conn_notifs_channel::Sender,
+    connection_notifs_tx: tokio::sync::mpsc::Sender<ConnectionNotification>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
@@ -47,14 +47,13 @@ impl TestHarness {
             aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 1, None);
-        let (connection_notifs_tx, connection_notifs_rx) = conn_notifs_channel::new();
+        let (connection_notifs_tx, connection_notifs_rx) = tokio::sync::mpsc::channel(10);
 
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(peer_mgr_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        let hc_network_rx =
-            HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx, None);
+        let hc_network_rx = HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, None, true);
 
         let network_context = NetworkContext::mock();
         let peers_and_metadata = PeersAndMetadata::new(&[network_context.network_id()]);
@@ -65,7 +64,7 @@ impl TestHarness {
             peers_and_metadata.clone(),
         );
 
-        let health_checker = HealthChecker::new(
+        let mut health_checker = HealthChecker::new(
             network_context,
             mock_time.clone(),
             HealthCheckNetworkInterface::new(network_client, hc_network_rx),
@@ -73,6 +72,7 @@ impl TestHarness {
             PING_TIMEOUT,
             ping_failures_tolerated,
         );
+        health_checker.set_connection_source(connection_notifs_rx);
 
         (
             Self {
@@ -165,16 +165,15 @@ impl TestHarness {
     }
 
     async fn send_new_peer_notification(&mut self, peer_id: PeerId) {
-        let (delivered_tx, delivered_rx) = oneshot::channel();
         let network_context = NetworkContext::mock();
         let notif = peer_manager::ConnectionNotification::NewPeer(
             ConnectionMetadata::mock(peer_id),
-            network_context,
+            network_context.network_id(),
         );
-        self.connection_notifs_tx
-            .push_with_feedback(peer_id, notif, Some(delivered_tx))
-            .unwrap();
-        delivered_rx.await.unwrap();
+        self.connection_notifs_tx.send(notif).await.unwrap();
+
+        // hacky `yield` to let thread on other side run, fast enough to make the test not suck, long enough it should almost always work
+        tokio::time::sleep(Duration::from_millis(10)).await;
 
         // Insert a new connection metadata into the peers and metadata
         let mut connection_metadata = ConnectionMetadata::mock(peer_id);

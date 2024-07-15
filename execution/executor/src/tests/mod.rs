@@ -493,6 +493,7 @@ fn apply_transaction_by_writeset(
         state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
         sharded_state_cache,
         transaction_accumulator: _,
+        block_end_info: _,
     } = ledger_update_output;
 
     db.writer
@@ -710,6 +711,7 @@ fn run_transactions_naive(
             state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
             sharded_state_cache,
             transaction_accumulator: _,
+            block_end_info: _,
         } = ledger_update_output;
         db.writer
             .save_transactions(

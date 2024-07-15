@@ -14,12 +14,14 @@
 use crate::{
     errors::{BlockExecutionError, BlockExecutionResult},
     proptest_types::types::{
-        MockOutput, MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE,
+        raw_metadata, GroupSizeOrMetadata, MockOutput, MockTransaction, ValueType, RESERVED_TAG,
+        STORAGE_AGGREGATOR_VALUE,
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
-    contract_event::TransactionEvent, transaction::BlockOutput, write_set::TransactionWrite,
+    contract_event::TransactionEvent, state_store::state_value::StateValueMetadata,
+    transaction::BlockOutput, write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
@@ -225,6 +227,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     fn assert_success<E: Debug>(&self, block_output: &BlockOutput<MockOutput<K, E>>) {
         let base_map: HashMap<u32, Bytes> = HashMap::from([(RESERVED_TAG, vec![0].into())]);
         let mut group_world = HashMap::new();
+        let mut group_metadata: HashMap<K, Option<StateValueMetadata>> = HashMap::new();
 
         let results = block_output.get_transaction_outputs_forced();
         let committed = self.read_values.len();
@@ -232,12 +235,13 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
         // Check read values & delta writes.
         izip!(
+            (0..committed),
             results.iter().take(committed),
             self.read_values.iter(),
             self.resolved_deltas.iter(),
             self.group_reads.iter(),
         )
-        .for_each(|(output, reads, resolved_deltas, group_reads)| {
+        .for_each(|(idx, output, reads, resolved_deltas, group_reads)| {
             // Compute group read results.
             let group_read_results: Vec<Option<Bytes>> = group_reads
                 .as_ref()
@@ -264,15 +268,35 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 assert!(result_group_read.clone().map(Into::<Bytes>::into) == baseline_group_read);
             });
 
-            for (group_key, size) in output.read_group_sizes.iter() {
+            for (group_key, size_or_metadata) in output.read_group_size_or_metadata.iter() {
                 let group_map = group_world.entry(group_key).or_insert(base_map.clone());
 
-                assert_eq!(
-                    group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
-                        .unwrap()
-                        .get(),
-                    *size
-                );
+                match size_or_metadata {
+                    GroupSizeOrMetadata::Size(size) => {
+                        let baseline_size =
+                            group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
+                                .unwrap()
+                                .get();
+
+                        assert_eq!(
+                            baseline_size, *size,
+                            "ERR: idx = {} group_key {:?}, baseline size {} != output_size {}",
+                            idx, group_key, baseline_size, size
+                        );
+                    },
+                    GroupSizeOrMetadata::Metadata(metadata) => {
+                        if !group_metadata.contains_key(group_key) {
+                            assert_eq!(
+                                *metadata,
+                                Some(raw_metadata(5)) /* default metadata */
+                            );
+                        } else {
+                            let baseline_metadata =
+                                group_metadata.get(group_key).cloned().flatten();
+                            assert_eq!(*metadata, baseline_metadata);
+                        }
+                    },
+                }
             }
 
             // Test normal reads.
@@ -286,7 +310,9 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
             .for_each(|(baseline_read, result_read)| baseline_read.assert_read_result(result_read));
 
             // Update group world.
-            for (group_key, _, updates) in output.group_writes.iter() {
+            for (group_key, v, updates) in output.group_writes.iter() {
+                group_metadata.insert(group_key.clone(), v.as_state_value_metadata());
+
                 for (tag, v) in updates {
                     let group_map = group_world.entry(group_key).or_insert(base_map.clone());
                     if v.is_deletion() {

@@ -1,0 +1,31 @@
+[package]
+name = "aptos-transaction-filter"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-protos = { workspace = true }
+
+derive_builder = { workspace = true }
+
+prost = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+thiserror = { workspace = true }
+
+[dev-dependencies]
+# we only decompress the fixture protos in test
+lz4 = { workspace = true }

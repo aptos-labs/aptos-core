@@ -4,59 +4,58 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-import subprocess
 import shutil
+import subprocess
 import sys
-from multiprocessing import Pool, freeze_support
-from typing import Tuple
 from collections import deque
+from multiprocessing import Pool, freeze_support
+from typing import List, Tuple
 
+from verify_core.common import clear_artifacts, warm_cache_and_get_latest_backup_version
 
-from verify_core.common import clear_artifacts, query_backup_latest_version
-
-
-TESTNET_RANGES = [
-    [250000000, 255584106],
-    [255584107, 271874718],
-    [271874719, 300009463],
-    [300009464, 324904819],
-    [324904820, 347234877],
-    [347234878, 366973577],
-    [366973578, 399489396],
-    [399489397, 430909965],
-    [430909966, 449999999],
-    [450000000, 462114510],
-    [462114511, 478825432],
-    [478825433, 483500000],
-    [483500001, 516281795],
-    [516281796, 551052675],
-    [551052676, 582481398],
-    [582481399, 640_000_000],
-    [640_000_001, 980_000_000],
-    [980_000_000, 1_000_000_000],
-    [1_000_000_001, sys.maxsize],
+TESTNET_RANGES: List[Tuple[int, int]] = [
+    (862_000_000, 878_000_000),
+    (878_000_000, 894_000_000),
+    (894_000_000, 910_000_000),
+    (910_000_000, 926_000_000),
+    (942_000_000, 958_000_000),
+    (958_000_000, 974_000_000),
+    (974_000_000, 990_000_000),
+    (990_000_000, 1_006_000_000),
+    (1_006_000_000, 1_022_000_000),
+    (1_022_000_000, 1_038_000_000),
+    (1_038_000_000, 1_054_000_000),
+    (1_054_000_000, 1_070_000_000),
+    (1_070_000_000, 1_086_000_000),
+    (1_086_000_000, 1_102_000_000),
+    (1_102_000_000, 1_115_000_000),
+    (1_115_000_000, 1_128_000_000),
+    (1_128_000_000, 1_141_000_000),
+    (1_141_000_000, 1_154_000_000),
+    (1_154_000_000, 1_167_000_000),
 ]
 
-MAINNET_RANGES = [
-    [155_000_001, 180_000_000],
-    [180_000_001, 190_000_000],
-    [190_000_001, 200_000_000],
-    [200_000_001, 215_000_000],
-    [215_000_001, 225_000_000],
-    [225_000_001, 235_000_000],
-    [235_000_001, 246_000_000],
-    [246_000_001, 270_000_000],
-    [270_000_001, 295_000_000],
-    [295_000_001, 321_000_000],
-    [321_000_001, 331_000_000],
-    [331_000_001, 354_000_000],
-    [354_000_001, 400_000_000],
-    [400_000_001, 490_000_000],
-    [490_000_000, 550_000_000],
-    [550_000_001, 600_000_000],
-    [600_000_001, 640_000_000],
-    [948_918_390, 950_000_000],
-    [950_000_001, sys.maxsize],
+MAINNET_RANGES: List[Tuple[int, int]] = [
+    (408_000_000, 424_000_000),
+    (424_000_000, 439_000_000),
+    (439_000_000, 455_000_000),
+    (455_000_000, 471_000_000),
+    (471_000_000, 487_000_000),
+    (487_000_000, 503_000_000),
+    (503_000_000, 518_000_000),
+    (518_000_000, 534_000_000),
+    (534_000_000, 550_000_000),
+    (550_000_000, 566_000_000),
+    (566_000_000, 581_000_000),
+    (581_000_000, 597_000_000),
+    (597_000_000, 613_000_000),
+    (613_000_000, 629_000_000),
+    (629_000_000, 640_000_000),
+    # Skip tapos range
+    (949_000_000, 954_000_000),
+    (954_000_000, 969_000_000),
+    (969_000_000, 984_000_000),
+    (984_000_000, 1_000_000_000),
 ]
 
 
@@ -114,6 +113,7 @@ def replay_verify_partition(
             "target/release/aptos-debugger",
             "aptos-db",
             "replay-verify",
+            # "--enable-storage-sharding",
             *txns_to_skip_args,
             "--concurrent-downloads",
             "8",
@@ -194,11 +194,11 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
     ), "runner_cnt must match the number of runners in the mapping"
     runner_start = runner_mapping[runner_no][0]
     runner_end = runner_mapping[runner_no][1]
-    latest_version = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
+    latest_version = warm_cache_and_get_latest_backup_version(
+        BACKUP_CONFIG_TEMPLATE_PATH
+    )
     if runner_no == runner_cnt - 1:
-        runner_end = latest_version
-        if runner_end is None:
-            raise Exception("Failed to query latest version from backup")
+        runner_end = min(runner_end, latest_version)
     print("runner start %d end %d" % (runner_start, runner_end))
     if start_version is not None and end_version is not None:
         runner_start = start_version

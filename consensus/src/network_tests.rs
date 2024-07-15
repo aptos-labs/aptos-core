@@ -22,11 +22,11 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_network::{
     application::storage::PeersAndMetadata,
     peer_manager::{
-        conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
+        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
         PeerManagerRequestSender,
     },
     protocols::{
-        network::{NewNetworkEvents, SerializedRequest},
+        network::{NewNetworkEvents, RpcError, SerializedRequest},
         rpc::InboundRpcRequest,
         wire::handshake::v1::ProtocolIdSet,
     },
@@ -75,6 +75,8 @@ pub struct NetworkPlayground {
     outbound_msgs_tx: mpsc::Sender<(TwinId, PeerManagerRequest)>,
     /// NetworkPlayground reads all nodes' outbound messages through this queue.
     outbound_msgs_rx: mpsc::Receiver<(TwinId, PeerManagerRequest)>,
+    /// Allow test code to timeout RPC messages between peers.
+    timeout_config: Arc<RwLock<TimeoutConfig>>,
     /// Allow test code to drop direct-send messages between peers.
     drop_config: Arc<RwLock<DropConfig>>,
     /// Allow test code to drop direct-send messages between peers per round.
@@ -96,6 +98,7 @@ impl NetworkPlayground {
             node_consensus_txs: Arc::new(Mutex::new(HashMap::new())),
             outbound_msgs_tx,
             outbound_msgs_rx,
+            timeout_config: Arc::new(RwLock::new(TimeoutConfig::default())),
             drop_config: Arc::new(RwLock::new(DropConfig::default())),
             drop_config_round: DropConfigRound::default(),
             executor,
@@ -122,6 +125,7 @@ impl NetworkPlayground {
     /// Rpc messages are immediately sent to the destination for handling, so
     /// they don't block.
     async fn start_node_outbound_handler(
+        timeout_config: Arc<RwLock<TimeoutConfig>>,
         drop_config: Arc<RwLock<DropConfig>>,
         src_twin_id: TwinId,
         mut network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
@@ -160,6 +164,14 @@ impl NetworkPlayground {
                         None => continue, // drop rpc
                     };
 
+                    if timeout_config
+                        .read()
+                        .is_message_timedout(&src_twin_id, dst_twin_id)
+                    {
+                        outbound_req.res_tx.send(Err(RpcError::TimedOut)).unwrap();
+                        continue;
+                    }
+
                     let node_consensus_tx =
                         node_consensus_txs.lock().get(dst_twin_id).unwrap().clone();
 
@@ -195,10 +207,12 @@ impl NetworkPlayground {
     ) {
         self.node_consensus_txs.lock().insert(twin_id, consensus_tx);
         self.drop_config.write().add_node(twin_id);
+        self.timeout_config.write().add_node(twin_id);
 
         self.extend_author_to_twin_ids(twin_id.author, twin_id);
 
         let fut1 = NetworkPlayground::start_node_outbound_handler(
+            Arc::clone(&self.timeout_config),
             Arc::clone(&self.drop_config),
             twin_id,
             network_reqs_rx,
@@ -374,6 +388,10 @@ impl NetworkPlayground {
         ret
     }
 
+    pub fn timeout_config(&self) -> Arc<RwLock<TimeoutConfig>> {
+        self.timeout_config.clone()
+    }
+
     pub async fn start(mut self) {
         // Take the next queued message
         while let Some((src_twin_id, net_req)) = self.outbound_msgs_rx.next().await {
@@ -446,6 +464,23 @@ impl DropConfig {
                 done &= self.drop_message_for(n2, n1);
                 done
             })
+    }
+
+    fn add_node(&mut self, src: TwinId) {
+        self.0.insert(src, HashSet::new());
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct TimeoutConfig(HashMap<TwinId, HashSet<TwinId>>);
+
+impl TimeoutConfig {
+    pub fn is_message_timedout(&self, src: &TwinId, dst: &TwinId) -> bool {
+        self.0.get(src).map_or(false, |set| set.contains(dst))
+    }
+
+    pub fn timeout_message_for(&mut self, src: &TwinId, dst: &TwinId) -> bool {
+        self.0.entry(*src).or_default().insert(*dst)
     }
 
     fn add_node(&mut self, src: TwinId) {
@@ -585,7 +620,6 @@ mod tests {
             let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(1024);
-            let (_, conn_status_rx) = conn_notifs_channel::new();
 
             add_peer_to_storage(&peers_and_metadata, peer, &[
                 ProtocolId::ConsensusDirectSendJson,
@@ -619,7 +653,7 @@ mod tests {
                 validator_verifier.clone(),
             );
 
-            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
+            let network_events = NetworkEvents::new(consensus_rx, None, true);
             let network_service_events =
                 NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
             let (task, receiver) = NetworkTask::new(network_service_events, self_receiver);
@@ -702,7 +736,6 @@ mod tests {
             let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(1024);
-            let (_, conn_status_rx) = conn_notifs_channel::new();
             let network_sender = network::NetworkSender::new(
                 PeerManagerRequestSender::new(network_reqs_tx),
                 ConnectionRequestSender::new(connection_reqs_tx),
@@ -736,7 +769,7 @@ mod tests {
                 validator_verifier.clone(),
             );
 
-            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
+            let network_events = NetworkEvents::new(consensus_rx, None, true);
             let network_service_events =
                 NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
             let (task, receiver) = NetworkTask::new(network_service_events, self_receiver);
@@ -806,9 +839,7 @@ mod tests {
 
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (connection_notifs_tx, connection_notifs_rx) =
-            aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let network_events = NetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx, None);
+        let network_events = NetworkEvents::new(peer_mgr_notifs_rx, None, true);
         let network_service_events =
             NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
         let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
@@ -847,7 +878,6 @@ mod tests {
             assert!(network_receivers.rpc_rx.next().await.is_some());
 
             drop(peer_mgr_notifs_tx);
-            drop(connection_notifs_tx);
             drop(self_sender);
 
             assert!(network_receivers.rpc_rx.next().await.is_none());

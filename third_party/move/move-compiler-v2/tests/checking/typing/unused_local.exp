@@ -74,7 +74,7 @@ module 0x8675309::M {
     }
     private fun t2() {
         {
-          let M::S{ f: f: u64, g: g: bool }: M::S;
+          let M::S{ f, g };
           Tuple()
         }
     }

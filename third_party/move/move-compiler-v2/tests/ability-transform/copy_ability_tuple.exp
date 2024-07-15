@@ -57,6 +57,40 @@ public fun M::g($t0: &signer) {
   5: return ()
 }
 
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun M::f($t0: M::R): (M::R, u64) {
+     var $t1: M::R
+     var $t2: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: $t2 := 0
+     # live vars: $t1, $t2
+  2: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public fun M::g($t0: &signer) {
+     var $t1: M::R
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := pack M::R($t2)
+     # live vars: $t0, $t1
+  2: $t3 := 3
+     # live vars: $t0, $t1
+  3: ($t1, $t3) := M::f($t1)
+     # live vars: $t0, $t1
+  4: move_to<M::R>($t0, $t1)
+     # live vars:
+  5: return ()
+}
+
 ============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]

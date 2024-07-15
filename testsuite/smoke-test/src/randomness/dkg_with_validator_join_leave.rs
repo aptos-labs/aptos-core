@@ -16,7 +16,7 @@ async fn dkg_with_validator_join_leave() {
     let estimated_dkg_latency_secs = 80;
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
 
-    let mut swarm = SwarmBuilder::new_local(7)
+    let swarm = SwarmBuilder::new_local(7)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {

@@ -106,14 +106,14 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             | MoveBytecode::Branch(code_offset) = bytecode
             {
                 let offs = *code_offset as CodeOffset;
-                if label_map.get(&offs).is_none() {
+                if !label_map.contains_key(&offs) {
                     let label = Label::new(label_map.len());
                     label_map.insert(offs, label);
                 }
             }
             if let MoveBytecode::BrTrue(_) | MoveBytecode::BrFalse(_) = bytecode {
                 let next_offs = (pos + 1) as CodeOffset;
-                if label_map.get(&next_offs).is_none() {
+                if !label_map.contains_key(&next_offs) {
                     let fall_through_label = Label::new(label_map.len());
                     label_map.insert(next_offs, fall_through_label);
                     self.fallthrough_labels.insert(fall_through_label);

@@ -13,8 +13,8 @@ module 0xc0ffee::m {
     fun swap2(): (u32, u32) {
         let x = 44;
         let y = 55;
-        let S { f: x, g: y } = S { f: y, g: x };
-        (x, y)
+        let S { f: _x, g: _y } = S { f: y, g: x };
+        (_x, _y)
     }
 
     fun test1(): (u32, u32) {

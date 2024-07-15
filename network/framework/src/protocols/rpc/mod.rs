@@ -70,8 +70,7 @@ use bytes::Bytes;
 use error::RpcError;
 use futures::{
     channel::oneshot,
-    future::{BoxFuture, FusedFuture, Future, FutureExt},
-    sink::SinkExt,
+    future::{BoxFuture, FusedFuture, FutureExt},
     stream::{FuturesUnordered, StreamExt},
 };
 use serde::Serialize;
@@ -317,16 +316,16 @@ impl InboundRpcs {
     /// `futures::select!`.
     pub fn next_completed_response(
         &mut self,
-    ) -> impl Future<Output = Result<(RpcResponse, ProtocolId), RpcError>> + FusedFuture + '_ {
+    ) -> impl FusedFuture<Output = Result<(RpcResponse, ProtocolId), RpcError>> + '_ {
         self.inbound_rpc_tasks.select_next_some()
     }
 
     /// Handle a completed response from the application handler. If successful,
     /// we update the appropriate counters and enqueue the response message onto
     /// the outbound write queue.
-    pub async fn send_outbound_response(
+    pub fn send_outbound_response(
         &mut self,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
         maybe_response: Result<(RpcResponse, ProtocolId), RpcError>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
@@ -354,7 +353,7 @@ impl InboundRpcs {
             response.request_id,
         );
         let message = NetworkMessage::RpcResponse(response);
-        write_reqs_tx.send(message).await?;
+        write_reqs_tx.push((), message)?;
 
         // Update the outbound RPC response metrics
         self.update_outbound_rpc_response_metrics(protocol_id, res_len);
@@ -433,10 +432,10 @@ impl OutboundRpcs {
     }
 
     /// Handle a new outbound rpc request from the application layer.
-    pub async fn handle_outbound_request(
+    pub fn handle_outbound_request(
         &mut self,
         request: OutboundRpcRequest,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
         let peer_id = &self.remote_peer_id;
@@ -499,7 +498,7 @@ impl OutboundRpcs {
             priority: Priority::default(),
             raw_request: Vec::from(request_data.as_ref()),
         });
-        write_reqs_tx.send(message).await?;
+        write_reqs_tx.push((), message)?;
 
         // Update the outbound RPC request metrics
         self.update_outbound_rpc_request_metrics(protocol_id, req_len);
@@ -598,7 +597,7 @@ impl OutboundRpcs {
     /// `futures::select!`.
     pub fn next_completed_request(
         &mut self,
-    ) -> impl Future<Output = (RequestId, Result<(f64, u64), RpcError>)> + FusedFuture + '_ {
+    ) -> impl FusedFuture<Output = (RequestId, Result<(f64, u64), RpcError>)> + '_ {
         self.outbound_rpc_tasks.select_next_some()
     }
 

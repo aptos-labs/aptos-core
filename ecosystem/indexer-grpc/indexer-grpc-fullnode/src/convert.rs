@@ -2,23 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{
-    AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId,
-    EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction,
-    MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
-    MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType,
-    MultiEd25519Signature, MultiKeySignature, MultisigPayload, MultisigTransactionPayload,
-    PublicKey, ScriptPayload, Signature, SingleKeySignature, Transaction, TransactionInfo,
-    TransactionPayload, TransactionSignature, WriteSet, WriteSetChange,
+    transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
+    DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
+    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
+    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
+    MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, MultiKeySignature,
+    MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature,
+    SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
+    WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
 use aptos_protos::{
-    transaction::{
-        v1 as transaction,
-        v1::{any_signature, Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn},
+    transaction::v1::{
+        self as transaction, any_signature, validator_transaction,
+        validator_transaction::observed_jwk_update::exported_provider_jw_ks::{
+            jwk::{JwkType, Rsa, UnsupportedJwk},
+            Jwk as ProtoJwk,
+        },
+        Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
     },
     util::timestamp,
 };
+use aptos_types::jwks::jwk::JWK;
 use hex;
 use move_binary_format::file_format::Ability;
 use std::time::Duration;
@@ -581,32 +587,32 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
     match signature {
         Signature::Ed25519(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Ed25519 as i32,
-            signature: s.0.clone(),
+            signature: s.value.clone().into(),
             signature_variant: Some(any_signature::SignatureVariant::Ed25519(Ed25519 {
-                signature: s.0.clone(),
+                signature: s.value.clone().into(),
             })),
         },
         Signature::Secp256k1Ecdsa(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Secp256k1Ecdsa as i32,
-            signature: s.0.clone(),
+            signature: s.value.clone().into(),
             signature_variant: Some(any_signature::SignatureVariant::Secp256k1Ecdsa(
                 Secp256k1Ecdsa {
-                    signature: s.0.clone(),
+                    signature: s.value.clone().into(),
                 },
             )),
         },
         Signature::WebAuthn(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Webauthn as i32,
-            signature: s.0.clone(),
+            signature: s.value.clone().into(),
             signature_variant: Some(any_signature::SignatureVariant::Webauthn(WebAuthn {
-                signature: s.0.clone(),
+                signature: s.value.clone().into(),
             })),
         },
         Signature::Keyless(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Keyless as i32,
-            signature: s.0.clone(),
+            signature: s.value.clone().into(),
             signature_variant: Some(any_signature::SignatureVariant::Keyless(Keyless {
-                signature: s.0.clone(),
+                signature: s.value.clone().into(),
             })),
         },
     }
@@ -616,19 +622,19 @@ fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
     match public_key {
         PublicKey::Ed25519(p) => transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::Ed25519 as i32,
-            public_key: p.0.clone(),
+            public_key: p.value.clone().into(),
         },
         PublicKey::Secp256k1Ecdsa(p) => transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::Secp256k1Ecdsa as i32,
-            public_key: p.0.clone(),
+            public_key: p.value.clone().into(),
         },
         PublicKey::Secp256r1Ecdsa(p) => transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::Secp256r1Ecdsa as i32,
-            public_key: p.0.clone(),
+            public_key: p.value.clone().into(),
         },
         PublicKey::Keyless(p) => transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::Keyless as i32,
-            public_key: p.0.clone(),
+            public_key: p.value.clone().into(),
         },
     }
 }
@@ -753,6 +759,9 @@ pub fn convert_transaction(
         Transaction::StateCheckpointTransaction(_) => {
             transaction::transaction::TransactionType::StateCheckpoint
         },
+        Transaction::BlockEpilogueTransaction(_) => {
+            transaction::transaction::TransactionType::BlockEpilogue
+        },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction is not supported"),
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TransactionType::Validator
@@ -762,6 +771,7 @@ pub fn convert_transaction(
     let txn_data = match &transaction {
         Transaction::UserTransaction(ut) => {
             timestamp = Some(convert_timestamp_usecs(ut.timestamp.0));
+            #[allow(deprecated)]
             let expiration_timestamp_secs = Some(convert_timestamp_secs(std::cmp::min(
                 ut.request.expiration_timestamp_secs.0,
                 chrono::NaiveDateTime::MAX.timestamp() as u64,
@@ -806,9 +816,25 @@ pub fn convert_transaction(
                 transaction::StateCheckpointTransaction {},
             )
         },
+        Transaction::BlockEpilogueTransaction(block_epilogue) => {
+            transaction::transaction::TxnData::BlockEpilogue(
+                transaction::BlockEpilogueTransaction {
+                    block_end_info: block_epilogue
+                        .block_end_info
+                        .as_ref()
+                        .map(|block_end_info| transaction::BlockEndInfo {
+                            block_gas_limit_reached: block_end_info.block_gas_limit_reached,
+                            block_output_limit_reached: block_end_info.block_output_limit_reached,
+                            block_effective_block_gas_units: block_end_info
+                                .block_effective_block_gas_units,
+                            block_approx_output_size: block_end_info.block_approx_output_size,
+                        }),
+                },
+            )
+        },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
-        Transaction::ValidatorTransaction(_) => {
-            transaction::transaction::TxnData::Validator(transaction::ValidatorTransaction {})
+        Transaction::ValidatorTransaction(api_validator_txn) => {
+            convert_validator_transaction(api_validator_txn)
         },
     };
 
@@ -836,4 +862,83 @@ pub fn convert_transaction(
         txn_data: Some(txn_data),
         size_info: Some(size_info),
     }
+}
+
+fn convert_validator_transaction(
+    api_validator_txn: &aptos_api_types::transaction::ValidatorTransaction,
+) -> transaction::transaction::TxnData {
+    transaction::transaction::TxnData::Validator(transaction::ValidatorTransaction {
+        validator_transaction_type: match api_validator_txn {
+            ApiValidatorTransactionEnum::DkgResult(dgk_result) => {
+                Some(
+                    validator_transaction::ValidatorTransactionType::DkgUpdate(
+                        validator_transaction::DkgUpdate {
+                            dkg_transcript: Some(validator_transaction::dkg_update::DkgTranscript {
+                                author: dgk_result.dkg_transcript.author.to_string(),
+                                epoch: dgk_result.dkg_transcript.epoch.0,
+                                payload: dgk_result.dkg_transcript.payload.0.clone(),
+                            }),
+                        },
+                    )
+                )
+            },
+            ApiValidatorTransactionEnum::ObservedJwkUpdate(observed_jwk_update) => {
+                Some(
+                    validator_transaction::ValidatorTransactionType::ObservedJwkUpdate(
+                        validator_transaction::ObservedJwkUpdate {
+                            quorum_certified_update: Some(
+                                validator_transaction::observed_jwk_update::QuorumCertifiedUpdate {
+                                    update: Some(
+                                        validator_transaction::observed_jwk_update::ExportedProviderJwKs {
+                                            issuer: observed_jwk_update.quorum_certified_update.update.issuer.clone(),
+                                            version: observed_jwk_update.quorum_certified_update.update.version,
+                                            jwks: observed_jwk_update.quorum_certified_update.update.jwks.iter().map(|jwk| {
+                                                match jwk {
+                                                    JWK::RSA(rsa) => {
+                                                        ProtoJwk {
+                                                            jwk_type: Some(
+                                                                JwkType::Rsa(
+                                                                    Rsa {
+                                                                        kid: rsa.kid.clone(),
+                                                                        n: rsa.n.clone(),
+                                                                        e: rsa.e.clone(),
+                                                                        kty: rsa.kty.clone(),
+                                                                        alg: rsa.alg.clone(),
+                                                                    }
+                                                                )
+                                                            )
+                                                        }
+                                                    },
+                                                    JWK::Unsupported(unsupported) => {
+                                                        ProtoJwk {
+                                                            jwk_type: Some(
+                                                                JwkType::UnsupportedJwk(
+                                                                    UnsupportedJwk {
+                                                                        id: unsupported.id.clone(),
+                                                                        payload: unsupported.payload.clone()
+                                                                    }
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }).collect(),
+                                        }
+                                    ),
+                                    multi_sig: Some(aptos_protos::transaction::v1::validator_transaction::observed_jwk_update::ExportedAggregateSignature {
+                                        signer_indices: observed_jwk_update.quorum_certified_update.multi_sig.signer_indices.clone().into_iter().map(|i| i as u64).collect(),
+                                        sig: match &observed_jwk_update.quorum_certified_update.multi_sig.sig {
+                                            Some(sig) =>  sig.0.clone(),
+                                            None => vec![],
+                                        },
+                                    }),
+                                }
+                            )
+                        },
+                    )
+                )
+            },
+        },
+        events: convert_events(api_validator_txn.events()),
+    })
 }

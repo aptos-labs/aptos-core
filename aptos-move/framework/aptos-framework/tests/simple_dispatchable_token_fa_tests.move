@@ -28,7 +28,7 @@ module aptos_framework::simple_token_fa_tests {
         aaron: &signer,
     ) {
         let (creator_ref, test_token) = create_test_token(creator);
-        let (mint_ref, transfer_ref, _burn_ref) = init_test_metadata(&creator_ref);
+        let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(test_token);
         simple_token::initialize(creator, &creator_ref);
 
@@ -49,7 +49,7 @@ module aptos_framework::simple_token_fa_tests {
     #[test(creator = @0xcafe)]
     fun test_merge_and_exact(creator: &signer) {
         let (creator_ref, _test_token) = create_test_token(creator);
-        let (mint_ref, _transfer_ref, burn_ref) = init_test_metadata(&creator_ref);
+        let (mint_ref, _transfer_ref, burn_ref, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
         simple_token::initialize(creator, &creator_ref);
 
         let fa = mint(&mint_ref, 100);
@@ -70,11 +70,10 @@ module aptos_framework::simple_token_fa_tests {
         creator: &signer
     ) {
         let feature = features::get_concurrent_fungible_assets_feature();
-        let agg_feature = features::get_aggregator_v2_api_feature();
-        features::change_feature_flags_for_testing(fx, vector[], vector[feature, agg_feature]);
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
 
         let (creator_ref, token_object) = create_test_token(creator);
-        let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
+        let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
         let test_token = object::convert<TestToken, Metadata>(token_object);
         simple_token::initialize(creator, &creator_ref);
 
@@ -85,7 +84,7 @@ module aptos_framework::simple_token_fa_tests {
 
         deposit_with_ref(&transfer_ref, creator_store, fa);
 
-        features::change_feature_flags_for_testing(fx, vector[feature, agg_feature], vector[]);
+        features::change_feature_flags_for_testing(fx, vector[feature], vector[]);
 
         let extend_ref = object::generate_extend_ref(&creator_ref);
         upgrade_to_concurrent(&extend_ref);
@@ -102,7 +101,7 @@ module aptos_framework::simple_token_fa_tests {
         creator: &signer
     ) {
         let (creator_ref, test_token) = create_test_token(creator);
-        let (mint_ref, transfer_ref, _burn_ref) = init_test_metadata(&creator_ref);
+        let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(test_token);
         simple_token::initialize(creator, &creator_ref);
 

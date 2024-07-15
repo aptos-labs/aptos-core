@@ -105,7 +105,7 @@ pub async fn write_to_big_query(
             .to_str()
             .context("Big query key path was invalid")?,
     )
-    .await;
+    .await?;
 
     info!(
         "Creating dataset if necessary: {}",

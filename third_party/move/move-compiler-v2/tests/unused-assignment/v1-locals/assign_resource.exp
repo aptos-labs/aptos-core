@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/unused-assignment/v1-locals/assign_resource.move:5:17
+  │
+5 │         let r = R{};
+  │                 ^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/unused-assignment/v1-locals/assign_resource.move:29:17
+   │
+29 │         let r = R{};
+   │                 ^^^

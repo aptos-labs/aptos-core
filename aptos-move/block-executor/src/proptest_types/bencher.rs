@@ -136,7 +136,7 @@ where
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(config, executor_thread_pool, None)
-        .execute_transactions_parallel((), &self.transactions, &data_view);
+        .execute_transactions_parallel(&(), &self.transactions, &data_view);
 
         self.baseline_output.assert_parallel_output(&output);
     }

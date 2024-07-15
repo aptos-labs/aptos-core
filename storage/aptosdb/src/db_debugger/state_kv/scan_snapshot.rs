@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_debugger::common::DbDir, schema::state_value::StateValueSchema};
+use crate::{
+    db_debugger::common::DbDir,
+    schema::{state_value::StateValueSchema, state_value_by_key_hash::StateValueByKeyHashSchema},
+};
+use aptos_crypto::hash::CryptoHash;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_schemadb::ReadOptions;
 use aptos_storage_interface::Result;
@@ -75,21 +79,38 @@ impl Cmd {
                             let mut read_opts = ReadOptions::default();
                             // We want `None` if the state_key changes in iteration.
                             read_opts.set_prefix_same_as_start(true);
-                            let mut iter = state_kv_db
-                                .db_shard(key.get_shard_id())
-                                .iter::<StateValueSchema>(read_opts)
-                                .unwrap();
-                            iter.seek(&(key.clone(), key_version)).unwrap();
-                            let (value_version, value) = iter
-                                .next()
-                                .transpose()
-                                .unwrap()
-                                .and_then(|((_, version), value_opt)| {
-                                    value_opt.map(|value| (version, value))
-                                })
-                                .expect("Value must exist.");
-                            let elapsed = t.elapsed();
 
+                            let enable_sharding = state_kv_db.enabled_sharding();
+
+                            let (value_version, value) = if enable_sharding {
+                                let mut iter = state_kv_db
+                                    .db_shard(key.get_shard_id())
+                                    .iter::<StateValueByKeyHashSchema>()
+                                    .unwrap();
+                                iter.seek(&(key.hash(), key_version)).unwrap();
+                                iter.next()
+                                    .transpose()
+                                    .unwrap()
+                                    .and_then(|((_, version), value_opt)| {
+                                        value_opt.map(|value| (version, value))
+                                    })
+                                    .expect("Value must exist.")
+                            } else {
+                                let mut iter = state_kv_db
+                                    .db_shard(key.get_shard_id())
+                                    .iter::<StateValueSchema>()
+                                    .unwrap();
+                                iter.seek(&(key.clone(), key_version)).unwrap();
+                                iter.next()
+                                    .transpose()
+                                    .unwrap()
+                                    .and_then(|((_, version), value_opt)| {
+                                        value_opt.map(|value| (version, value))
+                                    })
+                                    .expect("Value must exist.")
+                            };
+
+                            let elapsed = t.elapsed();
                             result_tx
                                 .send((index, key, key_version, value_version, value, elapsed))
                                 .unwrap();

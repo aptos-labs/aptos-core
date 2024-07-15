@@ -1,0 +1,207 @@
+// -- Model dump before bytecode pipeline
+module 0x815::m {
+    use 0x815::m; // resolved as: 0x815::m
+    enum Color {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    enum ColorUsesBlockNoComma {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    enum CommonFields {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            z: u32,
+        }
+    }
+    private fun t1(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
+          }
+          m::Color::Red => {
+            true
+          }
+          m::Color::Blue => {
+            false
+          }
+        }
+
+    }
+    private fun t1_address_qualified(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
+          }
+          m::Color::Red => {
+            true
+          }
+          m::Color::Blue => {
+            false
+          }
+        }
+
+    }
+    private fun t1_field_named(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red: r, green: g, blue } => {
+            Gt<u64>(Add<u64>(Add<u64>(r, g), blue), 0)
+          }
+          m::Color::Red => {
+            true
+          }
+          m::Color::Blue => {
+            false
+          }
+        }
+
+    }
+    private fun t1_module_qualified(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
+          }
+          m::Color::Red => {
+            true
+          }
+          m::Color::Blue => {
+            false
+          }
+        }
+
+    }
+    private fun t1_uses_block(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
+          }
+          m::Color::Red => {
+            true
+          }
+          m::Color::Blue => {
+            false
+          }
+        }
+
+    }
+    private fun t1_uses_block_no_comma(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
+          }
+          m::Color::Red => {
+            true
+          }
+          m::Color::Blue => {
+            false
+          }
+        }
+
+    }
+    private fun t2(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
+          }
+          _: m::Color => {
+            true
+          }
+        }
+
+    }
+    private fun t3(self: m::Color): bool {
+        match (Borrow(Immutable)(self)) {
+          m::Color::RGB{ red, green, blue } => {
+            Gt<u64>(Add<u64>(Add<u64>(Deref(red), Deref(green)), Deref(blue)), 0)
+          }
+          _: &m::Color => {
+            true
+          }
+        }
+
+    }
+    private fun t4(self: m::Color): m::Color {
+        match (Borrow(Mutable)(self)) {
+          m::Color::RGB{ red, green: _, blue: _ } => {
+            red = 2
+          }
+          _: &mut m::Color => {
+            Tuple()
+          }
+        }
+        ;
+        self
+    }
+    private fun t5_freeze(self: m::Color): u64 {
+        {
+          let x: u64 = 1;
+          {
+            let r: &u64 = match (Borrow(Mutable)(self)) {
+              m::Color::Red => {
+                Borrow(Immutable)(x)
+              }
+              m::Color::Blue => {
+                Freeze(false)(Borrow(Mutable)(x))
+              }
+              _: &mut m::Color => {
+                Freeze(false)(Borrow(Mutable)(x))
+              }
+            }
+            ;
+            Deref(r)
+          }
+        }
+    }
+    private fun t6_construct(self: m::Color): m::Color {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            pack m::Color::RGB(Add<u64>(red, 1), Sub<u64>(green, 1), blue)
+          }
+          _: m::Color => {
+            self
+          }
+        }
+
+    }
+    private fun t7_let_unpack(self: m::Color): u64 {
+        {
+          let m::Color::RGB{ red, green, blue } = self;
+          Add<u64>(Add<u64>(red, green), blue)
+        }
+    }
+    private fun t8_unqualified_variant(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            And(Neq<u64>(red, green), Neq<u64>(green, blue))
+          }
+          m::Color::Red => {
+            true
+          }
+          m::Color::Blue => {
+            false
+          }
+        }
+
+    }
+    private fun t9_common_field(self: m::CommonFields): u64 {
+        select m::CommonFields.x<m::CommonFields>(self)
+    }
+    private fun t9_common_field_ref(self: &m::CommonFields): &u64 {
+        Borrow(Immutable)(select m::CommonFields.x<&m::CommonFields>(self))
+    }
+} // end 0x815::m

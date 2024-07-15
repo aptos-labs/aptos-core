@@ -22,8 +22,6 @@ impl crate::Key for u8 {
     }
 }
 
-impl crate::Value for u8 {}
-
 fn naive_view_layers<K: Ord, V>(
     layers: impl Iterator<Item = BTreeMap<K, Option<V>>>,
 ) -> BTreeMap<K, Option<V>> {

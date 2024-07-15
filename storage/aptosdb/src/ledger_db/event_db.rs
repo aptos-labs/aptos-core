@@ -7,8 +7,6 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         event::EventSchema,
         event_accumulator::EventAccumulatorSchema,
-        event_by_key::EventByKeySchema,
-        event_by_version::EventByVersionSchema,
     },
     utils::iterators::EventsByVersionIter,
 };
@@ -17,7 +15,10 @@ use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
 };
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_db_indexer_schemas::schema::{
+    event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
+};
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_config::new_block_event_key, contract_event::ContractEvent, transaction::Version,
@@ -63,7 +64,7 @@ impl EventDb {
     pub(crate) fn get_events_by_version(&self, version: Version) -> Result<Vec<ContractEvent>> {
         let mut events = vec![];
 
-        let mut iter = self.db.iter::<EventSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<EventSchema>()?;
         // Grab the first event and then iterate until we get all events for this version.
         iter.seek(&version)?;
         while let Some(((ver, _index), event)) = iter.next().transpose()? {
@@ -98,7 +99,7 @@ impl EventDb {
         start_version: Version,
         num_versions: usize,
     ) -> Result<EventsByVersionIter> {
-        let mut iter = self.db.iter::<EventSchema>(Default::default())?;
+        let mut iter = self.db.iter::<EventSchema>()?;
         iter.seek(&start_version)?;
 
         Ok(EventsByVersionIter::new(
@@ -112,7 +113,7 @@ impl EventDb {
 
     /// Returns the version of the latest event committed in the event db.
     pub(crate) fn latest_version(&self) -> Result<Option<Version>> {
-        let mut iter = self.db.iter::<EventSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<EventSchema>()?;
         iter.seek_to_last();
         if let Some(((version, _), _)) = iter.next().transpose()? {
             Ok(Some(version))
@@ -189,17 +190,21 @@ impl EventDb {
         start: Version,
         end: Version,
         db_batch: &SchemaBatch,
+        indices_batch: Option<&SchemaBatch>,
     ) -> anyhow::Result<()> {
         let mut current_version = start;
+
         for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
             for (idx, event) in (events?).into_iter().enumerate() {
                 if let ContractEvent::V1(v1) = event {
-                    db_batch.delete::<EventByVersionSchema>(&(
-                        *v1.key(),
-                        current_version,
-                        v1.sequence_number(),
-                    ))?;
-                    db_batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
+                    if let Some(batch) = indices_batch {
+                        batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
+                        batch.delete::<EventByVersionSchema>(&(
+                            *v1.key(),
+                            current_version,
+                            v1.sequence_number(),
+                        ))?;
+                    }
                 }
                 db_batch.delete::<EventSchema>(&(current_version, idx as u64))?;
             }
