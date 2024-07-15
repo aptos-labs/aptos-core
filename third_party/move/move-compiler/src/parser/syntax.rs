@@ -2778,6 +2778,8 @@ fn parse_struct_decl(
                 StructLayout::Variants(list)
             } else {
                 let list = if context.tokens.peek() == Tok::LParen {
+                    let loc = current_token_loc(context.tokens);
+                    require_move_2(context, loc, "anonymous fields");
                     let list = parse_anonymous_fields(context)?;
                     consume_token(context.tokens, Tok::Semicolon)?;
                     list
@@ -2829,6 +2831,8 @@ fn parse_struct_variant(context: &mut Context) -> Result<(StructVariant, bool), 
             true,
         )
     } else if context.tokens.peek() == Tok::LParen {
+        let loc = current_token_loc(context.tokens);
+        require_move_2(context, loc, "anonymous fields");
         (parse_anonymous_fields(context)?, true)
     } else {
         (vec![], false)
