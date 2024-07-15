@@ -657,7 +657,6 @@ impl ConsensusObserver {
                     // Finalize the ordered block
                     self.finalize_ordered_block(&blocks, ordered_proof).await;
                 }
-                
             } else {
                 warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
