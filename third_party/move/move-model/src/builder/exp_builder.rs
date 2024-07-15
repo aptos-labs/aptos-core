@@ -2801,8 +2801,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             context,
         ) {
             return value;
-        } else if maccess.value.is_struct_access() {
-            return self.new_error_exp()
         }
 
         // Treat this as a call to a global function.
