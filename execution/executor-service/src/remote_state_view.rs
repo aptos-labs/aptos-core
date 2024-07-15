@@ -113,7 +113,7 @@ impl RemoteStateViewClient {
             result_rx,
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("remote-state-view-shard-recv-resp-{}-{}", shard_id, index))
-                .num_threads(4)//num_cpus::get() / 2)
+                .num_threads(30)//num_cpus::get() / 2)
                 .build()
                 .unwrap(),
         );
@@ -218,8 +218,8 @@ impl RemoteStateViewClient {
         if seq_num == 200 {
             info!("Send first batch from a shard with seq_num {} at time {}", seq_num, curr_time);
         }
-        if seq_num >= 6200 {
-            info!("Send first batch from a shard with seq_num {} at time {}", seq_num, curr_time);
+        if seq_num >= 4000 {
+            info!("Send last batch from a shard with seq_num {} at time {}", seq_num, curr_time);
         }
 
         OUTBOUND_RUNTIME.get().unwrap().spawn(async move {
@@ -333,7 +333,13 @@ impl RemoteStateValueReceiver {
             .for_each(|(state_key, state_value)| {
                 state_view_lock.set_state_value(&state_key, state_value);
             });
-
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        if message.seq_num.unwrap() == 200 {
+            info!("Received and processed first batch from a cord with seq_num {} at time {}", message.seq_num.unwrap(), curr_time);
+        }
+        if message.seq_num.unwrap() >= 4000 {
+            info!("Received and processed last batch from a cord with seq_num {} at time {}", message.seq_num.unwrap(), curr_time);
+        }
         {
             let curr_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)

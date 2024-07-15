@@ -170,7 +170,7 @@ impl RemoteCoordinatorClient {
                         if num_txns_processed == 200 {
                             info!("Send first batch from a shard with seq_num {} at time {}", num_txns_processed, curr_time);
                         }
-                        if num_txns_processed >= 6200 {
+                        if num_txns_processed >= 4000 {
                             info!("Send first batch from a shard with seq_num {} at time {}", num_txns_processed, curr_time);
                         }
 
