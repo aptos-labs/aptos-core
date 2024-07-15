@@ -9,7 +9,6 @@ use crate::{
         ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
         ENTRY_MODIFIER,
     },
-    expansion::translate::is_valid_struct_constant_or_schema_name,
     shared::{
         ast_debug::*,
         known_attributes::{AttributeKind, KnownAttribute},
