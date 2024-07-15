@@ -932,8 +932,8 @@ fn bytecode_dump_enabled(config: &TestConfig, is_last: bool, name: &str) -> bool
 }
 
 /// Checks for diagnostics and adds them to the baseline.
-/// Returns (has_errors, has_warnings), where has_warnings is ORed with had_warnings,
-/// to capture cumulative warnings over a run.
+/// Sets `*had_warnings` to `true` if there were any warnings, and returns
+/// `true` if there were no errors.
 fn check_diags(baseline: &mut String, env: &GlobalEnv, had_warnings: &mut bool) -> bool {
     let mut error_writer = Buffer::no_color();
     env.report_diag(&mut error_writer, Severity::Note);

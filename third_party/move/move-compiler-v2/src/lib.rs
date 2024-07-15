@@ -618,24 +618,6 @@ where
     }
 }
 
-/// Report any diags in the env to the writer and fail if there are warnings.
-pub fn check_warnings<W>(
-    env: &GlobalEnv,
-    error_writer: &mut W,
-    msg: &'static str,
-) -> anyhow::Result<()>
-where
-    W: WriteColor + Write,
-{
-    let options = env.get_extension::<Options>().unwrap_or_default();
-    env.report_diag(error_writer, options.report_severity());
-    if env.has_warnings() {
-        bail!("Exiting with {}", msg);
-    } else {
-        Ok(())
-    }
-}
-
 /// Annotate the given compiled units.
 pub fn annotate_units(units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
     units

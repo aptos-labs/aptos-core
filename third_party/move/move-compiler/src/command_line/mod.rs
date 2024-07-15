@@ -73,7 +73,7 @@ pub const MOVE_COMPILER_WARNINGS_ARE_ERRORS_ENV_VAR: &str = "MOVE_COMPILER_WARNI
 pub const MVC_WARNINGS_ARE_ERRORS_ENV_VAR: &str = "MVC_WARNINGS_ARE_ERRORS";
 pub const MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG: &str = "warnings-are-errors";
 
-pub const WARN_UNUSED_FLAG: &str = "Wunused";
+pub const WARN_UNUSED_FLAG: &str = "warn-unused";
 
 pub const LANG_V2_FLAG: &str = "lang_v2";
 pub const COMPILER_V2_FLAG: &str = "compiler_v2";

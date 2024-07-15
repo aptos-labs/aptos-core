@@ -92,7 +92,8 @@ pub struct Options {
     pub compiler_v2: bool,
     /// The language version to use
     pub language_version: Option<LanguageVersion>,
-    /// Whether to give up on any compilation error
+    /// Treat warnings as non-blocking errors,
+    /// stopping at the end of compilation if there were any warnings.
     pub warnings_are_errors: bool,
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the model builder.
@@ -214,7 +215,7 @@ impl Options {
                 Arg::new("warnings-are-errors")
                     .long(MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG)
                     .default_value(bool_to_str(read_bool_env_var(MOVE_COMPILER_WARNINGS_ARE_ERRORS_ENV_VAR)))
-                    .help("whether to use Move compiler v2 to compile to bytecode")
+                    .help("whether to stop if any warnings occured during compilation")
             )
             .arg(
                 Arg::new("output")

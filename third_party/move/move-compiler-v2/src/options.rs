@@ -106,11 +106,12 @@ pub struct Options {
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
     /// Show warnings about unused functions, fields, constants, etc.
-    /// Note that the current value of this constant is "Wunused"
+    /// Note that the current value of this constant is "warn-unused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
     pub warn_unused: bool,
 
-    /// Error out after compilation on any warning as if it were an error.
+    /// Treat warnings as non-blocking errors,
+    /// stopping at the end of compilation if there were any warnings.
     #[clap(long = cli::MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG, default_value="false")]
     pub warnings_are_errors: bool,
 
