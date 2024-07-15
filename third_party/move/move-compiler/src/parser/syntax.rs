@@ -772,7 +772,12 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
             "a field binding",
         )?
     } else if context.tokens.peek() == Tok::LParen {
-        parse_anonymous_field_binds(context)?
+        let start_loc = context.tokens.start_loc();
+        let binds = parse_anonymous_field_binds(context)?;
+        let end_loc = context.tokens.previous_end_loc();
+        let loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
+        require_move_2(context, loc, "anonymous field");
+        binds
     } else {
         vec![]
     };
