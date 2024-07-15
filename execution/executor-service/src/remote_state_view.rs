@@ -224,7 +224,7 @@ impl RemoteStateViewClient {
 
         OUTBOUND_RUNTIME.get().unwrap().spawn(async move {
             sender[rand_send_thread_idx].lock().await.send_async(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
-                                              &MessageType::new("remote_kv_response".to_string())).await;
+                                              &MessageType::new(format!("remote_kv_request_{}", shard_id))).await;
         });
 
         //sender_lk.send(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
