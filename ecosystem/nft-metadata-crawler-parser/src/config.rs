@@ -170,7 +170,7 @@ async fn spawn_parser(
         // Sends ack to PubSub only if ack_parsed_uris flag is true
         info!(
             pubsub_message = pubsub_message,
-            "[NFT Metadata Crawler] Number of commans != 5, skipping message"
+            "[NFT Metadata Crawler] Number of commas != 5, skipping message"
         );
         SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
         return;
