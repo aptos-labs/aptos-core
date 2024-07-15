@@ -34,6 +34,7 @@ use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::SystemTime;
 use rayon::prelude::IntoParallelIterator;
 use serde::{Deserialize, Serialize};
 use aptos_block_executor::transaction_provider::TxnProvider;
@@ -346,6 +347,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             drop(exe_timer);
 
             self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            info!("Processed block at time {}", curr_time);
 
             stream_results_tx.send(TransactionIdxAndOutput {
                 txn_idx: u32::MAX,

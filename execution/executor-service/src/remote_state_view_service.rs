@@ -189,7 +189,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                     {
                         let (lock, cvar) = &*recv_condition_clone;
                         let _lg = lock.lock().unwrap();
-                        kv_unprocessed_pq_clone.push(message, (priority / 200) as u64);
+                        kv_unprocessed_pq_clone.push(message, ((priority + 199) / 200) as u64);
                         //self.recv_condition.1.notify_all();
                         //recv_condition_clone.1.notify_all();
                         recv_condition_clone.1.notify_one();
