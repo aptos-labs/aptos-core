@@ -7,7 +7,7 @@ use crate::{
     core_mempool::{CoreMempool, TimelineState},
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
-    network::{BroadcastError, MempoolSyncMsg},
+    network::{BroadcastError, BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::types::{
         notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
         SharedMempoolNotification, SubmissionStatusBundle,
@@ -127,7 +127,13 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     } else {
         TimelineState::NotReady
     };
-    let statuses = process_incoming_transactions(&smp, vec![transaction], timeline_state, true);
+    let statuses = process_incoming_transactions(
+        &smp,
+        vec![transaction],
+        timeline_state,
+        true,
+        BroadcastPeerPriority::Primary,
+    );
     log_txn_process_results(&statuses, None);
 
     if let Some(status) = statuses.first() {
@@ -172,13 +178,15 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
     timeline_state: TimelineState,
     peer: PeerNetworkId,
     timer: HistogramTimer,
+    priority: BroadcastPeerPriority,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
-    let results = process_incoming_transactions(&smp, transactions, timeline_state, false);
+    let results =
+        process_incoming_transactions(&smp, transactions, timeline_state, false, priority);
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(request_id, results, &peer);
@@ -257,6 +265,7 @@ pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>
     transactions: Vec<SignedTransaction>,
     timeline_state: TimelineState,
     client_submitted: bool,
+    priority: BroadcastPeerPriority,
 ) -> Vec<SubmissionStatusBundle>
 where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
@@ -325,6 +334,7 @@ where
         timeline_state,
         &mut statuses,
         client_submitted,
+        priority,
     );
     notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
     statuses
@@ -339,6 +349,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
     client_submitted: bool,
+    priority: BroadcastPeerPriority,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
@@ -365,6 +376,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
                             sequence_info,
                             timeline_state,
                             client_submitted,
+                            priority.clone(),
                         );
                         statuses.push((transaction, (mempool_status, None)));
                     },

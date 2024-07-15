@@ -273,6 +273,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                 MempoolSyncMsg::BroadcastTransactionsRequest {
                     request_id,
                     transactions,
+                    priority,
                 } => {
                     let smp_clone = smp.clone();
                     let peer = PeerNetworkId::new(network_id, peer_id);
@@ -304,6 +305,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                             timeline_state,
                             peer,
                             task_start_timer,
+                            priority,
                         ))
                         .await;
                 },

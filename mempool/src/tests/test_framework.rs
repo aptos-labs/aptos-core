@@ -4,8 +4,9 @@
 
 use crate::{
     core_mempool::CoreMempool,
+    network::BroadcastPeerPriority,
     shared_mempool::{start_shared_mempool, types::MultiBatchId},
-    tests::{common, common::TestTransaction},
+    tests::common::{self, TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -258,6 +259,7 @@ impl MempoolNode {
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
             request_id: batch_id.clone(),
             transactions: sign_transactions(txns),
+            priority: BroadcastPeerPriority::Primary,
         };
         let data = protocol_id.to_bytes(&msg).unwrap().into();
         let (notif, maybe_receiver) = match protocol_id {
@@ -366,6 +368,7 @@ impl MempoolNode {
             MempoolSyncMsg::BroadcastTransactionsRequest {
                 request_id,
                 transactions,
+                priority: _,
             } => {
                 if !block_only_contains_transactions(&transactions, expected_txns) {
                     let txns: Vec<_> = transactions

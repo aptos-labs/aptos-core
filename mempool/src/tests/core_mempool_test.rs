@@ -4,6 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, MempoolTransaction, SubmittedBy, TimelineState},
+    network::BroadcastPeerPriority,
     tests::common::{
         add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool,
         setup_mempool_with_broadcast_buckets, txn_bytes_len, TestTransaction,
@@ -75,6 +76,7 @@ fn test_transaction_metrics() {
         0,
         TimelineState::NotReady,
         false,
+        BroadcastPeerPriority::Primary,
     );
     let txn = TestTransaction::new(1, 0, 1).make_signed_transaction();
     mempool.add_txn(
@@ -83,6 +85,7 @@ fn test_transaction_metrics() {
         0,
         TimelineState::NonQualified,
         false,
+        BroadcastPeerPriority::Primary,
     );
     let txn = TestTransaction::new(2, 0, 1).make_signed_transaction();
     mempool.add_txn(
@@ -91,23 +94,24 @@ fn test_transaction_metrics() {
         0,
         TimelineState::NotReady,
         true,
+        BroadcastPeerPriority::Primary,
     );
 
     // Check timestamp returned as end-to-end for broadcast-able transaction
-    let (insertion_info, _bucket) = mempool
+    let (insertion_info, _bucket, _priority) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(0), 0)
         .unwrap();
     assert_eq!(insertion_info.submitted_by, SubmittedBy::Downstream);
 
     // Check timestamp returned as not end-to-end for non-broadcast-able transaction
-    let (insertion_info, _bucket) = mempool
+    let (insertion_info, _bucket, _priority) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(1), 0)
         .unwrap();
     assert_eq!(insertion_info.submitted_by, SubmittedBy::PeerValidator);
 
-    let (insertion_info, _bucket) = mempool
+    let (insertion_info, _bucket, _priority) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(2), 0)
         .unwrap();
@@ -595,6 +599,7 @@ fn test_capacity_bytes() {
                 txn.sequence_info.account_sequence_number,
                 txn.timeline_state,
                 false,
+                BroadcastPeerPriority::Primary,
             );
             assert_eq!(status.code, MempoolStatusCode::Accepted);
         });
@@ -606,6 +611,7 @@ fn test_capacity_bytes() {
                 txn.sequence_info.account_sequence_number,
                 txn.timeline_state,
                 false,
+                BroadcastPeerPriority::Primary,
             );
             assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
         }
@@ -624,6 +630,7 @@ fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> Mempool
         0,
         SystemTime::now(),
         false,
+        BroadcastPeerPriority::Primary,
     )
 }
 
@@ -692,7 +699,14 @@ fn test_gc_ready_transaction() {
 
     // Insert in the middle transaction that's going to be expired.
     let txn = TestTransaction::new(1, 1, 1).make_signed_transaction_with_expiration_time(0);
-    pool.add_txn(txn, 1, 0, TimelineState::NotReady, false);
+    pool.add_txn(
+        txn,
+        1,
+        0,
+        TimelineState::NotReady,
+        false,
+        BroadcastPeerPriority::Primary,
+    );
 
     // Insert few transactions after it.
     // They are supposed to be ready because there's a sequential path from 0 to them.
@@ -731,7 +745,14 @@ fn test_clean_stuck_transactions() {
     }
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
-    pool.add_txn(txn, 1, db_sequence_number, TimelineState::NotReady, false);
+    pool.add_txn(
+        txn,
+        1,
+        db_sequence_number,
+        TimelineState::NotReady,
+        false,
+        BroadcastPeerPriority::Primary,
+    );
     let block = pool.get_batch(1, 1024, true, btreemap![]);
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 10);
@@ -748,6 +769,7 @@ fn test_get_transaction_by_hash() {
         db_sequence_number,
         TimelineState::NotReady,
         false,
+        BroadcastPeerPriority::Primary,
     );
     let hash = txn.committed_hash();
     let ret = pool.get_by_hash(hash);
@@ -768,6 +790,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         db_sequence_number,
         TimelineState::NotReady,
         false,
+        BroadcastPeerPriority::Primary,
     );
     let hash = txn.committed_hash();
 
@@ -779,6 +802,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         db_sequence_number,
         TimelineState::NotReady,
         false,
+        BroadcastPeerPriority::Primary,
     );
     let new_txn_hash = new_txn.committed_hash();
 

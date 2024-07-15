@@ -326,6 +326,7 @@ impl TestHarness {
                     MempoolSyncMsg::BroadcastTransactionsRequest {
                         transactions,
                         request_id: _request_id,
+                        priority: _priority,
                     } => {
                         // Check that the number of received transactions exactly matches
                         if let Some(num_transactions_in_message) = num_transactions_in_message {
