@@ -386,7 +386,7 @@ impl ModuleAccess_ {
         }
     }
 
-    pub fn is_struct_access(&self) -> bool {
+    pub fn is_struct_or_schema_name(&self) -> bool {
         is_valid_struct_constant_or_schema_name(self.get_name().value.as_str())
     }
 }

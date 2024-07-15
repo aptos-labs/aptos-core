@@ -2748,8 +2748,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             context,
         ) {
             return value;
-        } else if maccess.value.is_struct_access() {
-            return self.new_error_exp()
         }
 
         // Treat this as a call to a global function.
@@ -2791,6 +2789,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         result
     }
 
+    /// Checks whether the given name can be resolve to a struct.
+    fn can_resolve_to_struct(&self, maccess: &EA::ModuleAccess) -> bool {
+        let (struct_name, _variant) = self.parent.module_access_to_qualified_with_variant(maccess);
+        self.parent.parent.struct_table.get(&struct_name).is_some()
+    }
+
     fn translate_fun_call_special_cases(
         &mut self,
         expected_type: &Type,
@@ -2810,7 +2814,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // handles call of struct/variant with anonymous fields
-        if maccess.value.is_struct_access() {
+        if maccess.value.is_struct_or_schema_name() && self.can_resolve_to_struct(maccess) {
             self.check_language_version(loc, "anonymous fields", LanguageVersion::V2_0);
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =
@@ -2828,7 +2832,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Some(&fields),
                     expected_type,
                     context,
-                );
+                ).or_else(|| Some(self.new_error_exp()));
         }
 
         // Check for builtin specification functions.
