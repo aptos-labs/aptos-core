@@ -819,7 +819,9 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
 // Parse a comma separated list of anonymous field bindings:
 //      Comma<Bind>
 // Each field bind is accompanied by a field name, which is its index in the list.
-fn parse_anonymous_field_binds(context: &mut Context) -> Result<Vec<(Field, Bind)>, Box<Diagnostic>> {
+fn parse_anonymous_field_binds(
+    context: &mut Context,
+) -> Result<Vec<(Field, Bind)>, Box<Diagnostic>> {
     let fields = parse_comma_list(
         context,
         Tok::LParen,
@@ -827,20 +829,15 @@ fn parse_anonymous_field_binds(context: &mut Context) -> Result<Vec<(Field, Bind
         parse_bind,
         "an anonymous field binding",
     )?;
-    Ok(
-        fields
-            .into_iter()
-            .enumerate()
-            .map(|(idx, field_bind)| {
-                let field_name = Name::new(
-                    field_bind.loc,
-                    Symbol::from(format!("{}", idx)),
-                );
-                let field_name = Field(field_name);
-                (field_name, field_bind)
-            })
-            .collect(),
-    )
+    Ok(fields
+        .into_iter()
+        .enumerate()
+        .map(|(idx, field_bind)| {
+            let field_name = Name::new(field_bind.loc, Symbol::from(format!("{}", idx)));
+            let field_name = Field(field_name);
+            (field_name, field_bind)
+        })
+        .collect())
 }
 
 // Parse a list of bindings, which can be zero, one, or more bindings:
