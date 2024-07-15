@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: enable_bn254_algebra
+proposals:
+  - name: enable_bn254_algebra
+    metadata:
+      title: "Enable BN254 algebra"
+      description: "Enable BN254 algebra"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - bn_254_structures
