@@ -23,6 +23,7 @@ use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECU
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_vm::sharded_block_executor::sharded_executor_service::{CmdsAndMetaData, TransactionIdxAndOutput};
 use aptos_vm::sharded_block_executor::streamed_transactions_provider::BlockingTransactionsProvider;
+use crate::remote_state_view::OUTBOUND_RUNTIME;
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
@@ -56,6 +57,8 @@ impl RemoteCoordinatorClient {
 
         let state_view_client =
             RemoteStateViewClient::new(shard_id, controller, coordinator_address);
+
+        OUTBOUND_RUNTIME.set(controller.get_outbound_rpc_runtime().clone()).ok();
 
         Self {
             state_view_client: Arc::new(state_view_client),

@@ -23,6 +23,7 @@ use aptos_types::{
     },
 };
 use dashmap::DashMap;
+use once_cell::sync::OnceCell;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rayon::ThreadPool;
@@ -32,6 +33,8 @@ use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_
 
 pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 200;
 pub static REMOTE_KV_REQUEST_MSG_TYPE: &str = "remote_kv_request";
+
+pub static OUTBOUND_RUNTIME: OnceCell<Arc<Runtime>> = OnceCell::new();
 
 pub struct RemoteStateView {
     state_values: DashMap<StateKey, RemoteStateValue>,
@@ -76,7 +79,7 @@ impl RemoteStateView {
 
 pub struct RemoteStateViewClient {
     shard_id: ShardId,
-    kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
+    kv_tx: Arc<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>,
     state_view: Arc<RwLock<RemoteStateView>>,
     thread_pool: Arc<rayon::ThreadPool>,
     _join_handle: Option<thread::JoinHandle<()>>,
@@ -93,7 +96,7 @@ impl RemoteStateViewClient {
         let thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("remote-state-view-shard-send-request-{}-{}", shard_id, index))
-                .num_threads(num_kv_req_threads)
+                .num_threads(4) //num_kv_req_threads)
                 .build()
                 .unwrap(),
         );
@@ -101,7 +104,7 @@ impl RemoteStateViewClient {
         let result_rx = controller.create_inbound_channel(kv_response_type.to_string());
         let mut command_tx = vec![];
         for _ in 0..num_kv_req_threads {
-            command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
+            command_tx.push(tokio::sync::Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
         }
         let state_view = Arc::new(RwLock::new(RemoteStateView::new()));
         let state_value_receiver = RemoteStateValueReceiver::new(
@@ -110,7 +113,7 @@ impl RemoteStateViewClient {
             result_rx,
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("remote-state-view-shard-recv-resp-{}-{}", shard_id, index))
-                .num_threads(num_cpus::get() / 2)
+                .num_threads(4)//num_cpus::get() / 2)
                 .build()
                 .unwrap(),
         );
@@ -140,7 +143,7 @@ impl RemoteStateViewClient {
     fn insert_keys_and_fetch_values(
         state_view_clone: Arc<RwLock<RemoteStateView>>,
         thread_pool: Arc<ThreadPool>,
-        kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
+        kv_tx: Arc<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>,
         shard_id: ShardId,
         state_keys: Vec<StateKey>,
         last_txn_indx: usize,
@@ -193,7 +196,7 @@ impl RemoteStateViewClient {
 
     fn send_state_value_request(
         shard_id: ShardId,
-        sender: Arc<Vec<Mutex<OutboundRpcHelper>>>,
+        sender: Arc<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>,
         state_keys: Vec<StateKey>,
         rand_send_thread_idx: usize,
         seq_num: u64,
@@ -204,7 +207,7 @@ impl RemoteStateViewClient {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap().as_millis() as u64;
 
-        let mut sender_lk = sender[rand_send_thread_idx].lock().unwrap();
+        //let mut sender_lk = sender[rand_send_thread_idx].lock().unwrap();
         let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         let mut delta = 0.0;
         if curr_time > duration_since_epoch {
@@ -218,8 +221,14 @@ impl RemoteStateViewClient {
         if seq_num >= 6200 {
             info!("Send first batch from a shard with seq_num {} at time {}", seq_num, curr_time);
         }
-        sender_lk.send(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
-                       &MessageType::new(format!("remote_kv_request_{}", shard_id)));
+
+        OUTBOUND_RUNTIME.get().unwrap().spawn(async move {
+            sender[rand_send_thread_idx].lock().await.send_async(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
+                                              &MessageType::new("remote_kv_response".to_string())).await;
+        });
+
+        //sender_lk.send(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
+        //               &MessageType::new(format!("remote_kv_request_{}", shard_id)));
     }
 }
 
