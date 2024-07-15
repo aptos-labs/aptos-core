@@ -2818,21 +2818,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.check_language_version(loc, "anonymous fields", LanguageVersion::V2_0);
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =
-                    EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
-                        let field_name = move_symbol_pool::Symbol::from(i.to_string());
-                        let loc = arg.loc;
-                        let field = PA::Field(Spanned::new(loc, field_name));
-                        (field, (i, arg.clone()))
-                    }))
-                    .expect("duplicate keys");
-                return self.translate_pack(
+                EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
+                    let field_name = move_symbol_pool::Symbol::from(i.to_string());
+                    let loc = arg.loc;
+                    let field = PA::Field(Spanned::new(loc, field_name));
+                    (field, (i, arg.clone()))
+                }))
+                .expect("duplicate keys");
+            return self
+                .translate_pack(
                     loc,
                     maccess,
                     generics,
                     Some(&fields),
                     expected_type,
                     context,
-                ).or_else(|| Some(self.new_error_exp()));
+                )
+                .or_else(|| Some(self.new_error_exp()));
         }
 
         // Check for builtin specification functions.

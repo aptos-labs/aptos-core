@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    expansion::translate::is_valid_struct_constant_or_schema_name,
     parser::ast::{
         self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName,
         ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
         ENTRY_MODIFIER,
     },
-    expansion::translate::is_valid_struct_constant_or_schema_name,
     shared::{
         ast_debug::*,
         known_attributes::{AttributeKind, KnownAttribute},
