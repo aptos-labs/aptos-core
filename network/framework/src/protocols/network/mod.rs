@@ -145,11 +145,7 @@ pub struct ReceivedMessage {
 
 impl ReceivedMessage {
     pub fn new(message: NetworkMessage, sender: PeerNetworkId) -> Self {
-        let now = std::time::SystemTime::now();
-        let rx_at = now
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_micros() as u64;
+        let rx_at = unix_micros();
         Self {
             message,
             sender,
@@ -266,6 +262,13 @@ impl<TMessage> Stream for NetworkEvents<TMessage> {
     }
 }
 
+fn unix_micros() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64
+}
+
 /// Deserialize inbound direct send and rpc messages into the application `TMessage`
 /// type, logging and dropping messages that fail to deserialize.
 fn received_message_to_event<TMessage: Message>(
@@ -278,11 +281,7 @@ fn received_message_to_event<TMessage: Message>(
         receive_timestamp_micros: rx_at,
         rpc_replier,
     } = message;
-    let now = std::time::SystemTime::now();
-    let dequeue_at = now
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_micros() as u64;
+    let dequeue_at = unix_micros();
     let dt_micros = dequeue_at - rx_at;
     let dt_seconds = (dt_micros as f64) / 1000000.0;
     match message {
