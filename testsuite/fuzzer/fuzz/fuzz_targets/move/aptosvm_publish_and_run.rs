@@ -13,8 +13,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
-        TransactionStatus,
+        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload, TransactionStatus
     },
     write_set::WriteSet,
 };
@@ -39,6 +38,7 @@ use std::{
     convert::TryInto,
     sync::Arc,
 };
+use std::time::Instant;
 
 #[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Copy)]
 pub enum FundAmount {
@@ -162,6 +162,8 @@ macro_rules! tdbg {
 }
 
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
+
+const EXECUTION_TIME_GAS_RATEO: u8 = 35;
 
 // used for ordering modules topologically
 fn sort_by_deps(
@@ -425,6 +427,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         // only create sender pub/priv key. do not initialize
         Account::new()
     };
+
     // build tx
     let tx = match input.exec_variant.clone() {
         ExecVariant::Script {
@@ -491,13 +494,14 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 )))
         },
     };
-
     let raw_tx = tx.raw();
     let tx = match input.tx_auth_type {
-        Authenticator::Ed25519 { sender: _ } => raw_tx
+        Authenticator::Ed25519 { sender: _ } => {
+            raw_tx
             .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
             .map_err(|_| Corpus::Keep)?
-            .into_inner(),
+            .into_inner()
+        },
         Authenticator::MultiAgent {
             sender: _,
             secondary_signers,
@@ -563,7 +567,13 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         }
         old_res = Some(res);
     }
-    let res = vm.execute_block(vec![tx]);
+
+    let now = Instant::now();
+
+    let res = vm.execute_block(vec![tx.clone()]);
+
+    let elapsed = now.elapsed();
+
     // check main execution as well
     if let Some(old_res) = old_res {
         assert!(old_res == res);
@@ -603,6 +613,19 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         },
         _ => return Err(Corpus::Keep),
     };
+
+    let fee = res.try_extract_fee_statement().unwrap().unwrap();
+
+    // EXECUTION_TIME_GAS_RATEO is a rateo between execution time and gas used. If the rateo is higher than EXECUTION_TIME_GAS_RATEO, we consider the gas usage as unexpected.
+    // EXPERIMENTAL: This very sensible to excution enviroment, e.g. local run, OSS-Fuzz. It may cause false positive. Real data from production does not apply to this rateo.
+    // We only wants to catch big unexpected gas usage.
+    if (elapsed.as_millis()/(fee.execution_gas_used()+fee.io_gas_used()) as u128)>EXECUTION_TIME_GAS_RATEO {
+        tdbg!("Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}", elapsed, fee.execution_gas_used()+fee.io_gas_used());
+        tdbg!("Transaction: {:?}", tx);
+        if !DEBUG{
+            panic!("Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}", elapsed, fee.execution_gas_used()+fee.io_gas_used());
+        }
+    }
 
     Ok(())
 }
