@@ -11,7 +11,7 @@ spec aptos_framework::dkg {
         aborts_if aptos_framework_addr != @aptos_framework;
     }
 
-    spec start(
+    spec on_async_reconfig_start(
         dealer_epoch: u64,
         randomness_config: RandomnessConfig,
         dealer_validator_set: vector<ValidatorConsensusInfo>,

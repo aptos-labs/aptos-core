@@ -6,8 +6,11 @@ module aptos_framework::mpc {
     use aptos_std::copyable_any::Any;
     use aptos_framework::event::emit;
 
-    struct SharedSecret has store {
-        transcript_serialized: vector<u8>,
+    struct SharedSecretState has store {
+        transcript_for_cur_epoch: Option<vector<u8>>,
+        transcript_for_next_epoch: Option<vector<u8>>,
+        /// Some secret needs to be revealed.
+        revealed: Option<vector<u8>>,
     }
 
     struct TaskSpec has copy, drop, store {
@@ -25,7 +28,7 @@ module aptos_framework::mpc {
     }
 
     struct State has key {
-        shared_secrets: vector<SharedSecret>,
+        shared_secrets: vector<SharedSecretState>,
         tasks: vector<TaskState>,
     }
 
@@ -39,6 +42,28 @@ module aptos_framework::mpc {
     struct TaskCompletedEvent has drop, store {
         task_idx: u64,
         result: Option<vector<u8>>,
+    }
+
+    /// This resource exists under 0x1 iff MPC is enabled.
+    struct FeatureEnabledFlag has key {}
+
+    public fun on_async_reconfig_start() {
+        if (exists<FeatureEnabledFlag>(@aptos_framework)) {
+
+        }
+    }
+
+    public fun ready_for_new_epoch(): bool acquires State {
+        if (exists<FeatureEnabledFlag>(@aptos_framework)) {
+            let state = borrow_global<State>(@aptos_framework);
+            if (vector::length(&state.shared_secrets) == 0) {
+
+            } else {
+
+            }
+        } else {
+            true
+        }
     }
 
     public fun raise_by_secret(group_element: vector<u8>, secret_idx: u64): u64 acquires State {

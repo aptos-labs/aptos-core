@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+blstrs = { workspace = true }
 anyhow = { workspace = true }
 aptos = { workspace = true, features = ["fuzzing"] }
 aptos-bitvec = { path = "../../crates/aptos-bitvec" }

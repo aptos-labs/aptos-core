@@ -1,4 +1,4 @@
-/// Reconfiguration with DKG helper functions.
+/// Async reconfiguration state management.
 module aptos_framework::reconfiguration_with_dkg {
     use std::features;
     use std::option;
@@ -9,6 +9,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::jwk_consensus_config;
     use aptos_framework::jwks;
     use aptos_framework::keyless_account;
+    use aptos_framework::mpc;
     use aptos_framework::randomness_api_v0_config;
     use aptos_framework::randomness_config;
     use aptos_framework::randomness_config_seqnum;
@@ -31,12 +32,13 @@ module aptos_framework::reconfiguration_with_dkg {
         };
         reconfiguration_state::on_reconfig_start();
         let cur_epoch = reconfiguration::current_epoch();
-        dkg::start(
+        dkg::on_async_reconfig_start(
             cur_epoch,
             randomness_config::current(),
             stake::cur_validator_consensus_infos(),
             stake::next_validator_consensus_infos(),
         );
+        mpc::on_async_reconfig_start();
     }
 
     /// Clear incomplete DKG session, if it exists.
