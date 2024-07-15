@@ -10214,7 +10214,7 @@
           "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
           "data": {
             "decimals": 8,
-            "name": "Aptos Coin",
+            "name": "Move Coin",
             "supply": {
               "vec": [
                 {
@@ -10233,7 +10233,7 @@
                 }
               ]
             },
-            "symbol": "APT"
+            "symbol": "MOVE"
           }
         },
         "type": "write_resource"
@@ -24701,7 +24701,7 @@
               "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
               "data": {
                 "decimals": 8,
-                "name": "Aptos Coin",
+                "name": "Move Coin",
                 "supply": {
                   "vec": [
                     {
@@ -24720,7 +24720,7 @@
                     }
                   ]
                 },
-                "symbol": "APT"
+                "symbol": "MOVE"
               }
             },
             "type": "write_resource"
