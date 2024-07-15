@@ -352,15 +352,13 @@ impl BlockStore {
             blocks.first().expect("blocks are empty").id(),
         );
 
-        // Confirm retrieval ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
-        // assert_eq!(
-        //     blocks.last().expect("blocks are empty").id(),
-        //     highest_commit_cert.commit_info().id()
-        // );
-        info!(
-            "Last fetched block id: {} vs highest commit cert: {}",
-            blocks.last().expect("blocks are empty").id(),
-            highest_commit_cert.commit_info().id()
+        // Confirm retrieval ended when it hit the last block we care about, by round.
+        assert_eq!(
+            blocks.last().expect("blocks are empty").round(),
+            target_round,
+            "Expecting in the retrieval response, last block should be round {}, but got {}",
+            target_round,
+            blocks.last().expect("blocks are empty").round(),
         );
 
         let mut quorum_certs = vec![highest_quorum_cert.clone()];
