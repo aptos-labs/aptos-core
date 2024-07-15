@@ -165,7 +165,7 @@ impl MockClient {
         let notification = ReceivedMessage {
             message: NetworkMessage::RpcRequest(RpcRequest {
                 protocol_id,
-                request_id: 0, // TODO: rand? inc?
+                request_id: 0,
                 priority: 0,
                 raw_request: data,
             }),
