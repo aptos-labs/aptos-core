@@ -566,6 +566,7 @@ dependencies = [
  "aptos-executor",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
+ "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, NodeConfig};
 use aptos_db_indexer::{
     db_indexer::{DBIndexer, InternalIndexerDB},
     db_ops::open_internal_indexer_db,
@@ -11,7 +11,10 @@ use aptos_db_indexer::{
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_storage_interface::DbReader;
 use aptos_types::{indexer::indexer_db_reader::IndexerReader, transaction::Version};
-use std::sync::Arc;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio::runtime::Handle;
 
 const SERVICE_TYPE: &str = "internal_indexer_db_service";
@@ -27,6 +30,21 @@ impl InternalIndexerDBService {
         Self {
             db_indexer: internal_db_indexer,
         }
+    }
+
+    pub fn get_indexer_db_for_restore(db_dir: &Path) -> Option<InternalIndexerDB> {
+        let db_path_buf = PathBuf::from(db_dir).join(INTERNAL_INDEXER_DB);
+        let rocksdb_config = NodeConfig::default()
+            .storage
+            .rocksdb_configs
+            .index_db_config;
+        let arc_db = Arc::new(
+            open_internal_indexer_db(db_path_buf.as_path(), &rocksdb_config)
+                .expect("Failed to open internal indexer db"),
+        );
+
+        let internal_indexer_db_config = InternalIndexerDBConfig::new(false, false, true, 10_000);
+        Some(InternalIndexerDB::new(arc_db, internal_indexer_db_config))
     }
 
     pub fn get_indexer_db(node_config: &NodeConfig) -> Option<InternalIndexerDB> {
@@ -66,12 +84,14 @@ impl InternalIndexerDBService {
             .bootstrapping_mode
             .is_fast_sync();
         let mut db_min_version = self.db_indexer.get_main_db_lowest_viable_version()?;
+        let mut main_db_synced_version = self.db_indexer.main_db_reader.get_synced_version()?;
 
         // Wait till fast sync is done
-        while fast_sync_enabled && db_min_version == 0 {
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            db_min_version = self.db_indexer.get_main_db_lowest_viable_version()?;
+        while fast_sync_enabled && main_db_synced_version == 0 {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            main_db_synced_version = self.db_indexer.main_db_reader.get_synced_version()?;
         }
+        
         let fast_sync_version_opt = self
             .db_indexer
             .indexer_db

@@ -210,7 +210,7 @@ impl Account {
             .enable_storage_sharding;
 
         let (latest_ledger_info, requested_version) = if sharding_enabled && require_state_indices {
-            context.get_latest_internal_indexer_ledger_info_and_verify_lookup_version(
+            context.get_latest_ledger_info_and_verify_internal_indexer_lookup_version(
                 requested_ledger_version.map(|inner| inner.0),
             )?
         } else {

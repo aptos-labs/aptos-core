@@ -47,7 +47,7 @@ use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
-    db_ensure as ensure,
+    db_ensure as ensure, db_other_bail as bail,
     state_delta::StateDelta,
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
@@ -1163,24 +1163,30 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let sharded_schema_batch = new_sharded_kv_schema_batch();
 
         batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateSnapshotRestoreProgress(version),
+            &DbMetadataKey::StateSnapshotKvRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
-        self.shard_state_value_batch(
-            &sharded_schema_batch,
-            node_batch,
-            self.state_kv_db.enabled_sharding(),
-        )?;
-        self.state_kv_db
-            .commit(version, batch, sharded_schema_batch)?;
-        if self.internal_indexer_db.is_some() {
+
+        if self.internal_indexer_db.is_some()
+            && self
+                .internal_indexer_db
+                .as_ref()
+                .unwrap()
+                .statekeys_enabled()
+        {
             let keys = node_batch.iter().map(|(key, _)| key.0.clone()).collect();
             self.internal_indexer_db
                 .as_ref()
                 .unwrap()
                 .write_keys_to_indexer_db(&keys, version, progress)?;
         }
-        Ok(())
+        self.shard_state_value_batch(
+            &sharded_schema_batch,
+            node_batch,
+            self.state_kv_db.enabled_sharding(),
+        )?;
+        self.state_kv_db
+            .commit(version, batch, sharded_schema_batch)
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
@@ -1191,19 +1197,43 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let main_db_progress = self
             .state_kv_db
             .metadata_db()
-            .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
+            .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotKvRestoreProgress(version))?
             .map(|v| v.expect_state_snapshot_progress());
 
-        if self.internal_indexer_db.is_some() {
+        // verify if internal indexer db and main db are consistent before starting the restore
+        if self.internal_indexer_db.is_some()
+            && self
+                .internal_indexer_db
+                .as_ref()
+                .unwrap()
+                .statekeys_enabled()
+        {
             let progress_opt = self
                 .internal_indexer_db
                 .as_ref()
                 .unwrap()
                 .get_restore_progress(version)?;
-            ensure!(
-                main_db_progress == progress_opt,
-                "Inconsistent progress between main db and internal indexer db."
-            );
+
+            match (main_db_progress, progress_opt) {
+                (None, None) => (),
+                (None, Some(_)) => (),
+                (Some(main_progres), Some(indexer_progress)) => {
+                    if main_progres.key_hash > indexer_progress.key_hash {
+                        bail!(
+                            "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
+                            main_progres,
+                            indexer_progress,
+                        );
+                    }
+                },
+                _ => {
+                    bail!(
+                        "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
+                        main_db_progress,
+                        progress_opt,
+                    );
+                },
+            }
         }
 
         Ok(main_db_progress)
