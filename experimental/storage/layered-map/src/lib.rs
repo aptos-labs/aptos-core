@@ -40,3 +40,24 @@ impl Key for HashValue {
 pub trait Value: Clone {}
 
 impl<T: Clone> Value for T {}
+
+/// Wrapper for the hash value of a key.
+///
+/// Addressing bits in the order of MSB to LSB, so that sorting by the numeric order is the same
+/// as sorting by bits.
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) struct KeyHash(u64);
+
+impl KeyHash {
+    fn bit(&self, n: usize) -> bool {
+        *self
+            .0
+            .view_bits::<Msb0>()
+            .get(n)
+            .expect("Caller guarantees range.")
+    }
+
+    fn iter_bits(&self) -> impl Iterator<Item = bool> + '_ {
+        self.0.view_bits::<Msb0>().iter().by_vals()
+    }
+}

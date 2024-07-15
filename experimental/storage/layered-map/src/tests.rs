@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::layer::MapLayer;
+use crate::{layer::MapLayer, KeyHash};
 use bitvec::{order::Msb0, view::BitView};
+use itertools::Itertools;
 use proptest::{
     collection::{btree_map, vec},
     prelude::*,
@@ -88,5 +89,16 @@ proptest! {
         }
 
         // TODO(aldenhu): test that layered_map doesn't have any unexpected keys -- need ability to traverse
+    }
+
+    #[test]
+    fn test_key_hash_order(nums in vec(any::<u64>(), 0..100)) {
+        let mut a = nums.into_iter().map(KeyHash).collect_vec();
+        let mut b = a.clone();
+
+        a.sort();
+        b.sort_by_key(|num| num.iter_bits().collect_vec() );
+
+        prop_assert_eq!(a, b);
     }
 }
