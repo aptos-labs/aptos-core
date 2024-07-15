@@ -10,8 +10,11 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_consensus_types::{
-    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    timeout_2chain::TwoChainTimeoutCertificate, wrapped_ledger_info::WrappedLedgerInfo,
+    block::Block,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    quorum_cert::QuorumCert,
+    timeout_2chain::TwoChainTimeoutCertificate,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -222,6 +225,51 @@ impl BlockTree {
         block_id: &HashValue,
     ) -> Option<Arc<QuorumCert>> {
         self.id_to_quorum_cert.get(block_id).cloned()
+    }
+
+    // TODO: return an error when not enough blocks?
+    // TODO: how to know if the window is complete?
+    pub fn get_block_window(&self, block: &Block) -> Option<OrderedBlockWindow> {
+        let min_round = (block.round() + 1).saturating_sub(self.window_size as u64);
+        let window_size = block.round() - min_round;
+        assert!(window_size > 0, "window_size must be greater than 0");
+        match self.get_block(&block.parent_id()) {
+            // TODO: something cleaner?
+            None => {
+                if window_size == 1 {
+                    Some(OrderedBlockWindow::new(vec![]))
+                } else {
+                    None
+                }
+            },
+            Some(parent_block) => {
+                let mut current_block = &parent_block;
+                let mut block_window = vec![];
+                let mut reached_root = false;
+                for _ in 1..window_size {
+                    if current_block.parent_id() == HashValue::zero() {
+                        reached_root = true;
+                    }
+                    if current_block.round() < min_round {
+                        break;
+                    }
+                    info!(
+                        "current_block: {}, parent_block: {}, reached_root: {}",
+                        current_block.id(),
+                        current_block.parent_id(),
+                        reached_root
+                    );
+                    current_block = match self.get_linkable_block(&current_block.parent_id()) {
+                        Some(parent_block) => {
+                            block_window.push(parent_block.executed_block().block().clone());
+                            parent_block.executed_block()
+                        },
+                        None => break,
+                    };
+                }
+                Some(OrderedBlockWindow::new(block_window))
+            },
+        }
     }
 
     pub(super) fn insert_block(
