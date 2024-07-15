@@ -237,9 +237,6 @@ impl DbWriter for AptosDB {
         )?;
         truncate_state_merkle_db(&self.state_store.state_merkle_db, target_version)?;
 
-        // Reset buffered state after truncation
-        state_lock.reset();
-
         // Revert block index if event index is skipped.
         if self.skip_index_and_usage {
             let batch = SchemaBatch::new();
@@ -248,6 +245,9 @@ impl DbWriter for AptosDB {
                 .truncate_block_info(target_version, &batch)?;
             self.ledger_db.metadata_db().write_schemas(batch)?;
         }
+
+        // Reset buffered state after truncation
+        state_lock.reset();
 
         Ok(())
     }
