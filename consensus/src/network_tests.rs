@@ -21,10 +21,7 @@ use aptos_consensus_types::{
 use aptos_infallible::{Mutex, RwLock};
 use aptos_network::{
     application::storage::PeersAndMetadata,
-    peer_manager::{
-        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
-        PeerManagerRequestSender,
-    },
+    peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
         network::{NewNetworkEvents, ReceivedMessage, RpcError, SerializedRequest},
         wire::{
@@ -232,7 +229,7 @@ impl NetworkPlayground {
         &mut self,
         src_twin_id: TwinId,
         dst_twin_id: TwinId,
-        msg_notif: PeerManagerNotification,
+        rmsg: ReceivedMessage,
     ) -> (Author, ConsensusMsg) {
         let node_consensus_tx = self
             .node_consensus_txs
@@ -242,31 +239,24 @@ impl NetworkPlayground {
             .clone();
 
         // copy message data
-        let (source_address, msg, rmsg) = match &msg_notif {
-            PeerManagerNotification::RecvMessage(src, msg) => {
-                let rmsg = ReceivedMessage {
-                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                        protocol_id: msg.protocol_id,
-                        priority: 0,
-                        raw_msg: msg.mdata.clone().into(),
-                    }),
-                    sender: PeerNetworkId::new(NetworkId::Validator, *src),
-                    receive_timestamp_micros: 0,
-                    rpc_replier: None,
-                };
-                let msg: ConsensusMsg = msg.to_message().unwrap();
-                (*src, msg, rmsg)
+        let source_address = rmsg.sender.peer_id();
+        let consensus_msg = match &rmsg.message {
+            NetworkMessage::DirectSendMsg(dmsg) => dmsg
+                .protocol_id
+                .from_bytes(dmsg.raw_msg.as_slice())
+                .unwrap(),
+            wrong_message => {
+                panic!(
+                    "[network playground] Unexpected ReceivedMessage: {:?}",
+                    wrong_message
+                );
             },
-            msg_notif => panic!(
-                "[network playground] Unexpected PeerManagerNotification: {:?}",
-                msg_notif
-            ),
         };
         let _ = node_consensus_tx.push(
             (src_twin_id.author, ProtocolId::ConsensusDirectSendBcs),
             rmsg,
         );
-        (source_address, msg)
+        (source_address, consensus_msg)
     }
 
     /// Wait for exactly `num_messages` to be enqueued and delivered. Return a
@@ -287,7 +277,7 @@ impl NetworkPlayground {
             let (src_twin_id, net_req) = self.outbound_msgs_rx.next().await
                 .expect("[network playground] waiting for messages, but message queue has shutdown unexpectedly");
 
-            // Convert PeerManagerRequest to corresponding PeerManagerNotification,
+            // Convert PeerManagerRequest to corresponding ReceivedMessage,
             // and extract destination peer
             let (dst, msg) = match &net_req {
                 PeerManagerRequest::SendDirectSend(dst_inner, msg_inner) => {
@@ -305,11 +295,17 @@ impl NetworkPlayground {
 
                 // Deliver and copy message if it's not dropped
                 if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {
-                    let msg_notif =
-                        PeerManagerNotification::RecvMessage(src_twin_id.author, msg.clone());
-                    let msg_copy = self
-                        .deliver_message(src_twin_id, *dst_twin_id, msg_notif)
-                        .await;
+                    let rmsg = ReceivedMessage {
+                        message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                            protocol_id: msg.protocol_id,
+                            priority: 0,
+                            raw_msg: msg.mdata.clone().into(),
+                        }),
+                        sender: PeerNetworkId::new(NetworkId::Validator, src_twin_id.author),
+                        receive_timestamp_micros: 0,
+                        rpc_replier: None,
+                    };
+                    let msg_copy = self.deliver_message(src_twin_id, *dst_twin_id, rmsg).await;
 
                     // Only insert msg_copy once for twins (if delivered)
                     if idx == 0 && msg_inspector(&msg_copy) {
@@ -406,7 +402,7 @@ impl NetworkPlayground {
     pub async fn start(mut self) {
         // Take the next queued message
         while let Some((src_twin_id, net_req)) = self.outbound_msgs_rx.next().await {
-            // Convert PeerManagerRequest to corresponding PeerManagerNotification,
+            // Convert PeerManagerRequest to corresponding ReceivedMessage,
             // and extract destination peer
             let (dst, msg) = match &net_req {
                 PeerManagerRequest::SendDirectSend(dst_inner, msg_inner) => {
@@ -421,14 +417,21 @@ impl NetworkPlayground {
             let dst_twin_ids = self.get_twin_ids(dst);
 
             for dst_twin_id in dst_twin_ids.iter() {
-                let msg_notif =
-                    PeerManagerNotification::RecvMessage(src_twin_id.author, msg.clone());
+                let rmsg = ReceivedMessage {
+                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                        protocol_id: msg.protocol_id,
+                        priority: 0,
+                        raw_msg: msg.mdata.clone().into(),
+                    }),
+                    sender: PeerNetworkId::new(NetworkId::Validator, src_twin_id.author),
+                    receive_timestamp_micros: 0,
+                    rpc_replier: None,
+                };
                 let consensus_msg = msg.to_message().unwrap();
 
                 // Deliver and copy message it if it's not dropped
                 if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {
-                    self.deliver_message(src_twin_id, *dst_twin_id, msg_notif)
-                        .await;
+                    self.deliver_message(src_twin_id, *dst_twin_id, rmsg).await;
                 }
             }
         }
