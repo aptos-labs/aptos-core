@@ -126,10 +126,12 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
+                    let start = Instant::now();
                     v.verify(validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote"])
                         .observe(start_time.elapsed().as_secs_f64());
+                    counters::ORDER_VOTE_VERIFICATION_TIME.observe_duration(start.elapsed());
                 }
                 VerifiedEvent::OrderVoteMsg(v)
             },
