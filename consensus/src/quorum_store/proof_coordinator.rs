@@ -232,11 +232,12 @@ impl ProofCoordinator {
                 #[allow(deprecated)]
                 let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
                     - self
-                    .batch_info_to_time
-                    .remove(signed_batch_info.batch_info())
-                    .ok_or(
-                        // Batch created without recording the time!
-                        SignedBatchInfoError::NoTimeStamps)?;
+                        .batch_info_to_time
+                        .remove(signed_batch_info.batch_info())
+                        .ok_or(
+                            // Batch created without recording the time!
+                            SignedBatchInfoError::NoTimeStamps,
+                        )?;
                 counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
                 return Ok(Some(proof));
             }

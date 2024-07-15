@@ -70,7 +70,9 @@ impl TransactionShuffler for SenderAwareShuffler {
 
             // If we can't find any candidate in above steps, then lastly
             // add pending transactions in the order if we can't find any other candidate
-            pending_txns.remove_first_pending().expect("Pending should return a transaction")
+            pending_txns
+                .remove_first_pending()
+                .expect("Pending should return a transaction")
         };
         while sliding_window.num_txns() < num_transactions {
             let txn = next_to_add(&mut sliding_window);
@@ -198,7 +200,11 @@ impl SlidingWindowState {
     pub fn last_dropped_sender(&self) -> Option<AccountAddress> {
         if self.start_index > 0 {
             let prev_start_index = self.start_index - 1;
-            if let Some(last_sender) = self.txns.get(prev_start_index as usize).map(|txn| txn.sender()) {
+            if let Some(last_sender) = self
+                .txns
+                .get(prev_start_index as usize)
+                .map(|txn| txn.sender())
+            {
                 if let Some(&count) = self.senders_in_window.get(&last_sender) {
                     if count == 0 {
                         return Some(last_sender);

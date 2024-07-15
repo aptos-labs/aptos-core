@@ -325,7 +325,11 @@ impl InMemDag {
         filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
-        let initial_round = targets.clone().map(|t| t.round()).max().expect("Round should be not empty!");
+        let initial_round = targets
+            .clone()
+            .map(|t| t.round())
+            .max()
+            .expect("Round should be not empty!");
         let initial = targets.map(|t| *t.digest()).collect();
 
         let mut reachable_filter = Self::reachable_filter(initial);

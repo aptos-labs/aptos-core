@@ -622,7 +622,10 @@ impl ConsensusObserver {
     /// Processes the ordered block
     async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
         // Unpack the ordered block
-        let OrderedBlock { blocks, ordered_proof, } = ordered_block.clone();
+        let OrderedBlock {
+            blocks,
+            ordered_proof,
+        } = ordered_block.clone();
 
         // Verify that we have at least one ordered block
         if blocks.is_empty() {
@@ -640,7 +643,6 @@ impl ConsensusObserver {
         if let Some(block) = blocks.first() {
             // If the block is a child of our last block, we can insert it
             if self.get_last_block().id() == block.parent_id() {
-
                 // Insert the ordered block into the pending blocks
                 self.pending_ordered_blocks
                     .insert_ordered_block(ordered_block);

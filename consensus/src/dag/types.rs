@@ -579,7 +579,11 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
                 .check_voting_power(partial_signatures.signatures().keys(), true)
                 .is_ok()
         {
-            let aggregated_signature = match self.epoch_state.verifier.aggregate_signatures(partial_signatures) {
+            let aggregated_signature = match self
+                .epoch_state
+                .verifier
+                .aggregate_signatures(partial_signatures)
+            {
                 Ok(signature) => signature,
                 Err(_) => return Err(anyhow::anyhow!("Signature aggregation failed")),
             };
@@ -587,7 +591,10 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
             let certificate = NodeCertificate::new(self.metadata.clone(), aggregated_signature);
 
             // Invariant Violation: The one-shot channel sender must exist to send the NodeCertificate
-            _ = tx.take().expect("The one-shot channel sender must exist to send the NodeCertificate").send(certificate);
+            _ = tx
+                .take()
+                .expect("The one-shot channel sender must exist to send the NodeCertificate")
+                .send(certificate);
         }
 
         if partial_signatures.signatures().len() == self.epoch_state.verifier.len() {

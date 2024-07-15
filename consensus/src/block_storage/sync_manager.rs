@@ -712,7 +712,13 @@ impl BlockRetriever {
                 },
             }
         }
-        assert_eq!(result_blocks.last().expect("Expected at least a result_block").id(), target_block_id);
+        assert_eq!(
+            result_blocks
+                .last()
+                .expect("Expected at least a result_block")
+                .id(),
+            target_block_id
+        );
         Ok(result_blocks)
     }
 

@@ -512,7 +512,9 @@ impl BlockStore {
                 // latency not known without non-genesis blocks
                 Duration::ZERO
             } else {
-                proposal_timestamp.checked_sub(timestamp).expect("latency must not be negative")
+                proposal_timestamp
+                    .checked_sub(timestamp)
+                    .expect("latency must not be negative")
             }
         }
 

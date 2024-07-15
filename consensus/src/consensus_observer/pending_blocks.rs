@@ -72,10 +72,10 @@ impl PendingOrderedBlocks {
                 .insert(last_block_round, (ordered_block, None));
         } else {
             warn!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(
-                    &format!("Ordered block has no blocks. Ignoring: {:?}",
-                    ordered_block.ordered_proof.commit_info())
-                )
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Ordered block has no blocks. Ignoring: {:?}",
+                    ordered_block.ordered_proof.commit_info()
+                ))
             );
         }
     }

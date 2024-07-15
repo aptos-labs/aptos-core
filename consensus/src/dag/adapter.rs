@@ -141,7 +141,9 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) {
-        let anchor = ordered_nodes.last().expect("ordered_nodes shuld not be empty");
+        let anchor = ordered_nodes
+            .last()
+            .expect("ordered_nodes shuld not be empty");
         let epoch = anchor.epoch();
         let round = anchor.round();
         let timestamp = anchor.metadata().timestamp();

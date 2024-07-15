@@ -65,7 +65,9 @@ impl TShare for Share {
             WVUF::verify_share(
                 &rand_config.vuf_pp,
                 apk,
-                bcs::to_bytes(&rand_metadata).map_err(|e| anyhow!("Serialization failed: {}", e))?.as_slice(),
+                bcs::to_bytes(&rand_metadata)
+                    .map_err(|e| anyhow!("Serialization failed: {}", e))?
+                    .as_slice(),
                 &self.share,
             )?;
         } else {

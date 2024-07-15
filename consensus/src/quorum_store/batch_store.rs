@@ -172,7 +172,9 @@ impl BatchStore {
             "QS: Batchreader recovery expired keys len {}",
             expired_keys.len()
         );
-        db_clone.delete_batches(expired_keys).expect("Deletion of expired keys should not fail");
+        db_clone
+            .delete_batches(expired_keys)
+            .expect("Deletion of expired keys should not fail");
 
         batch_store
     }
@@ -247,9 +249,9 @@ impl BatchStore {
         #[allow(clippy::unwrap_used)]
         {
             self.expirations
-            .lock()
-            .unwrap()
-            .add_item(digest, expiration_time);
+                .lock()
+                .unwrap()
+                .add_item(digest, expiration_time);
         }
         Ok(true)
     }

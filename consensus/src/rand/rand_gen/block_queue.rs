@@ -46,7 +46,10 @@ impl QueueItem {
     }
 
     pub fn offset(&self, round: Round) -> usize {
-        *self.offsets_by_round.get(&round).expect("Round should be in the queue")
+        *self
+            .offsets_by_round
+            .get(&round)
+            .expect("Round should be in the queue")
     }
 
     pub fn num_undecided(&self) -> usize {

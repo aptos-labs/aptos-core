@@ -586,7 +586,10 @@ impl LeaderReputation {
         history: &[NewBlockEvent],
         round: Round,
     ) -> VotingPowerRatio {
-        let candidates = self.epoch_to_proposers.get(&self.epoch).expect("Epoch should always map to proposers");
+        let candidates = self
+            .epoch_to_proposers
+            .get(&self.epoch)
+            .expect("Epoch should always map to proposers");
         // use f64 counter, as total voting power is u128
         let total_voting_power = self.voting_powers.iter().map(|v| *v as f64).sum();
         CHAIN_HEALTH_TOTAL_VOTING_POWER.set(total_voting_power);

@@ -60,7 +60,6 @@ impl StatelessPipeline for ExecutionSchedulePhase {
 
     const NAME: &'static str = "execution_schedule";
 
-
     async fn process(&self, req: ExecutionRequest) -> ExecutionWaitRequest {
         let ExecutionRequest {
             ordered_blocks,
@@ -69,9 +68,11 @@ impl StatelessPipeline for ExecutionSchedulePhase {
 
         let block_id = match ordered_blocks.last() {
             Some(block) => block.id(),
-            None => return ExecutionWaitRequest {
-                block_id: HashValue::zero(),
-                fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
+            None => {
+                return ExecutionWaitRequest {
+                    block_id: HashValue::zero(),
+                    fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
+                }
             },
         };
 

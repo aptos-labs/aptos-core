@@ -295,7 +295,9 @@ impl PendingVotes {
             Some((_, li_with_sig)) => {
                 match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
                     // a quorum of signature was reached, a new QC is formed
-                    Ok(_) => Self::aggregate_qc_now(validator_verifier, li_with_sig, vote.vote_data()),
+                    Ok(_) => {
+                        Self::aggregate_qc_now(validator_verifier, li_with_sig, vote.vote_data())
+                    },
 
                     // not enough votes
                     Err(VerifyError::TooLittleVotingPower { .. }) => {
@@ -313,7 +315,10 @@ impl PendingVotes {
                 }
             },
             None => {
-                error!("No LedgerInfoWithSignatures found for the given digest: {}", li_digest);
+                error!(
+                    "No LedgerInfoWithSignatures found for the given digest: {}",
+                    li_digest
+                );
                 VoteReceptionResult::ErrorAddingVote(VerifyError::EmptySignature)
             },
         }

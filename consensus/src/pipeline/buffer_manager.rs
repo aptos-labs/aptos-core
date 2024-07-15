@@ -382,7 +382,11 @@ impl BufferManager {
             }
             if item.block_id() == target_block_id {
                 let aggregated_item = item.unwrap_aggregated();
-                let block = aggregated_item.executed_blocks.last().expect("executed_blocks should be not empty").block();
+                let block = aggregated_item
+                    .executed_blocks
+                    .last()
+                    .expect("executed_blocks should be not empty")
+                    .block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // As all the validators broadcast commit votes directly to all other validators,
                 // the proposer do not have to broadcast commit decision again.

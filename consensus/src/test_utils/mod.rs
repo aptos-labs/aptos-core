@@ -182,7 +182,6 @@ impl TreeInserter {
             .unwrap()
     }
 
-
     pub fn create_block_with_qc(
         &self,
         parent_qc: QuorumCert,

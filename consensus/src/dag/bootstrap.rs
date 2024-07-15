@@ -432,7 +432,12 @@ impl DagBootstrapper {
             .epoch_state
             .verifier
             .get_ordered_account_addresses_iter()
-            .map(|p| self.epoch_state.verifier.get_voting_power(&p).expect("No voting power associated with AccountAddress!"))
+            .map(|p| {
+                self.epoch_state
+                    .verifier
+                    .get_voting_power(&p)
+                    .expect("No voting power associated with AccountAddress!")
+            })
             .collect();
 
         Arc::new(LeaderReputationAdapter::new(

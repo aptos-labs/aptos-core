@@ -348,7 +348,7 @@ impl TExecutionClient for ExecutionProxyClient {
             None => {
                 debug!("Failed to send to buffer manager, maybe epoch ends");
                 return Ok(());
-            }
+            },
         };
 
         for block in blocks {
