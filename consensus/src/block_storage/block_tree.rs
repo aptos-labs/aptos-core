@@ -10,6 +10,7 @@ use crate::{
 };
 use anyhow::{bail, ensure};
 use aptos_consensus_types::{
+    block::Block,
     pipelined_block::{OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeoutCertificate,
@@ -235,6 +236,51 @@ impl BlockTree {
         self.id_to_quorum_cert.get(block_id).cloned()
     }
 
+    // TODO: return an error when not enough blocks?
+    // TODO: how to know if the window is complete?
+    pub fn get_block_window(&self, block: &Block) -> Option<OrderedBlockWindow> {
+        let min_round = (block.round() + 1).saturating_sub(self.window_size as u64);
+        let window_size = block.round() - min_round;
+        assert!(window_size > 0, "window_size must be greater than 0");
+        match self.get_block(&block.parent_id()) {
+            // TODO: something cleaner?
+            None => {
+                if window_size == 1 {
+                    Some(OrderedBlockWindow::new(vec![]))
+                } else {
+                    None
+                }
+            },
+            Some(parent_block) => {
+                let mut current_block = &parent_block;
+                let mut block_window = vec![];
+                let mut reached_root = false;
+                for _ in 1..window_size {
+                    if current_block.parent_id() == HashValue::zero() {
+                        reached_root = true;
+                    }
+                    if current_block.round() < min_round {
+                        break;
+                    }
+                    info!(
+                        "current_block: {}, parent_block: {}, reached_root: {}",
+                        current_block.id(),
+                        current_block.parent_id(),
+                        reached_root
+                    );
+                    current_block = match self.get_linkable_block(&current_block.parent_id()) {
+                        Some(parent_block) => {
+                            block_window.push(parent_block.executed_block().block().clone());
+                            parent_block.executed_block()
+                        },
+                        None => break,
+                    };
+                }
+                Some(OrderedBlockWindow::new(block_window))
+            },
+        }
+    }
+
     pub(super) fn insert_block(
         &mut self,
         block: PipelinedBlock,
@@ -248,51 +294,15 @@ impl BlockTree {
             checked_verify_eq!(existing_block.compute_result(), block.compute_result());
             Ok(existing_block)
         } else {
-            let window_size = std::cmp::min(block.round() + 1, self.window_size as u64);
-            assert!(window_size > 0, "window_size must be greater than 0");
-            let mut current_block = &block;
-            let mut block_window = vec![];
-            let mut reached_root = false;
-            for _ in 1..window_size {
-                if current_block.parent_id() == HashValue::zero() {
-                    reached_root = true;
-                }
-                info!(
-                    "current_block: {}, parent_block: {}",
-                    current_block.id(),
-                    current_block.parent_id()
-                );
-                current_block = match self.get_linkable_block(&current_block.parent_id()) {
-                    Some(parent_block) => {
-                        block_window.push(parent_block.executed_block().block().clone());
-                        parent_block.executed_block()
-                    },
-                    None => break,
-                };
-            }
-            ensure!(
-                block_window.len() as u64 == window_size - 1 || reached_root,
-                "Block window is not complete. block_window.len: {}, window_size: {}, epoch: {}, round: {}, window: {:?}",
-                block_window.len(),
-                window_size,
-                block.epoch(),
-                block.round(),
-                block_window.iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
-            );
-
             match self.get_linkable_block_mut(&block.parent_id()) {
-                Some(parent_block) => {
-                    parent_block.add_child(block_id);
-
-                    let block = block.set_block_window(OrderedBlockWindow::new(block_window));
-                    let linkable_block = LinkableBlock::new(block);
-                    let arc_block = Arc::clone(linkable_block.executed_block());
-                    assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
-                    counters::NUM_BLOCKS_IN_TREE.inc();
-                    Ok(arc_block)
-                },
+                Some(parent_block) => parent_block.add_child(block_id),
                 None => bail!("Parent block {} not found", block.parent_id()),
-            }
+            };
+            let linkable_block = LinkableBlock::new(block);
+            let arc_block = Arc::clone(linkable_block.executed_block());
+            assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
+            counters::NUM_BLOCKS_IN_TREE.inc();
+            Ok(arc_block)
         }
     }
 

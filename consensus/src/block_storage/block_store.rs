@@ -356,28 +356,37 @@ impl BlockStore {
             );
         }
 
-        let pipelined_block = PipelinedBlock::new_ordered(block.clone());
         // ensure local time past the block time
-        let block_time = Duration::from_micros(pipelined_block.timestamp_usecs());
+        let block_time = Duration::from_micros(block.timestamp_usecs());
         let current_timestamp = self.time_service.get_current_timestamp();
         if let Some(t) = block_time.checked_sub(current_timestamp) {
             if t > Duration::from_secs(1) {
-                warn!(
-                    "Long wait time {}ms for block {}",
-                    t.as_millis(),
-                    pipelined_block.block()
-                );
+                warn!("Long wait time {}ms for block {}", t.as_millis(), block);
             }
             self.time_service.wait_until(block_time).await;
         }
-        if let Some(payload) = pipelined_block.block().payload() {
+        if let Some(payload) = block.payload() {
             self.payload_manager
-                .prefetch_payload_data(payload, pipelined_block.block().timestamp_usecs());
+                .prefetch_payload_data(payload, block.timestamp_usecs());
         }
         self.storage
-            .save_tree(vec![pipelined_block.block().clone()], vec![])
+            .save_tree(vec![block.clone()], vec![])
             .context("Insert block failed when saving block")?;
-        self.inner.write().insert_block(pipelined_block)
+        let mut block_tree = self.inner.write();
+        if let Some(block_window) = block_tree.get_block_window(&block) {
+            info!(
+                "block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}",
+                block.id(),
+                block.parent_id(),
+                block.round(),
+                block.epoch(),
+                block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
+            );
+            let pipelined_block = PipelinedBlock::new_ordered(block.clone(), block_window);
+            block_tree.insert_block(pipelined_block)
+        } else {
+            bail!("Could not get block window for {}", block.id())
+        }
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.

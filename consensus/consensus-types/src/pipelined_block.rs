@@ -141,20 +141,6 @@ impl PipelinedBlock {
         self
     }
 
-    pub fn set_block_window(mut self, block_window: OrderedBlockWindow) -> Self {
-        info!(
-            "set_block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}",
-            self.block.id(),
-            self.block.parent_id(),
-            self.block.round(),
-            self.block.epoch(),
-            block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
-        );
-
-        self.block_window = block_window;
-        self
-    }
-
     pub fn set_randomness(&self, randomness: Randomness) {
         assert!(self.randomness.set(randomness).is_ok());
     }
@@ -201,7 +187,7 @@ impl PipelinedBlock {
         }
     }
 
-    pub fn new_ordered(block: Block) -> Self {
+    pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
         info!(
             "New Ordered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
             block.id(),
@@ -212,7 +198,7 @@ impl PipelinedBlock {
         );
         Self {
             block,
-            block_window: OrderedBlockWindow::new(vec![]),
+            block_window: window,
             input_transactions: vec![],
             state_compute_result: StateComputeResult::new_dummy(),
             randomness: OnceCell::new(),
