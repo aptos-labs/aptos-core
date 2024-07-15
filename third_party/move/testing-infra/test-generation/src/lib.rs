@@ -20,7 +20,6 @@ use getrandom::getrandom;
 use module_generation::generate_module;
 use move_binary_format::{
     access::ModuleAccess,
-    errors::PartialVMError,
     file_format::{
         AbilitySet, CompiledModule, FunctionDefinitionIndex, SignatureToken, StructHandleIndex,
     },
@@ -33,16 +32,13 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
     language_storage::TypeTag,
-    resolver::MoveResolver,
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
-use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
+use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
-use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{fs, io::Write, panic, thread};
 use tracing::{debug, error, info};
@@ -58,8 +54,11 @@ fn run_verifier(module: CompiledModule) -> Result<CompiledModule, String> {
     }
 }
 
-static STORAGE_WITH_MOVE_STDLIB: Lazy<InMemoryStorage> = Lazy::new(|| {
+// Creates a storage with Move standard library as well as a few additional modules.
+fn storage_with_stdlib_and_modules(additional_modules: Vec<&CompiledModule>) -> InMemoryStorage {
     let mut storage = InMemoryStorage::new();
+
+    // First, compile and add standard library.
     let (_, compiled_units) = Compiler::from_files(
         move_stdlib::move_stdlib_files(),
         vec![],
@@ -78,8 +77,15 @@ static STORAGE_WITH_MOVE_STDLIB: Lazy<InMemoryStorage> = Lazy::new(|| {
         module.serialize(&mut blob).unwrap();
         storage.publish_or_overwrite_module(module.self_id(), blob);
     }
+
+    // Now add the additional modules.
+    for module in additional_modules {
+        let mut blob = vec![];
+        module.serialize(&mut blob).unwrap();
+        storage.publish_or_overwrite_module(module.self_id(), blob);
+    }
     storage
-});
+}
 
 /// This function runs a verified module in the VM runtime
 fn run_vm(module: CompiledModule) -> Result<(), VMStatus> {
@@ -118,13 +124,7 @@ fn run_vm(module: CompiledModule) -> Result<(), VMStatus> {
         })
         .collect();
 
-    execute_function_in_module(
-        module,
-        entry_idx,
-        vec![],
-        main_args,
-        &*STORAGE_WITH_MOVE_STDLIB,
-    )
+    execute_function_in_module(module, entry_idx, vec![], main_args)
 }
 
 /// Execute the first function in a module
@@ -133,7 +133,6 @@ fn execute_function_in_module(
     idx: FunctionDefinitionIndex,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-    storage: &impl MoveResolver<PartialVMError>,
 ) -> Result<(), VMStatus> {
     let module_id = module.self_id();
     let entry_name = {
@@ -147,16 +146,10 @@ fn execute_function_in_module(
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let mut changeset = ChangeSet::new();
-        let mut blob = vec![];
-        module.serialize(&mut blob).unwrap();
-        changeset
-            .add_module_op(module_id.clone(), Op::New(blob.into()))
-            .unwrap();
-        let delta_storage = DeltaStorage::new(storage, &changeset);
-        let mut sess = vm.new_session(&delta_storage);
-        let traversal_storage = TraversalStorage::new();
+        let storage = storage_with_stdlib_and_modules(vec![&module]);
 
+        let mut sess = vm.new_session(&storage);
+        let traversal_storage = TraversalStorage::new();
         sess.execute_function_bypass_visibility(
             &module_id,
             entry_name,

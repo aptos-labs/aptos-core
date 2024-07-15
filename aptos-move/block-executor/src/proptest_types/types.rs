@@ -10,7 +10,6 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     contract_event::TransactionEvent,
     delayed_fields::PanicError,
@@ -29,14 +28,13 @@ use aptos_types::{
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet, HashMap, HashSet},
-    convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -154,21 +152,12 @@ pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
 );
 
 impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> {
-    fn module_path(&self) -> Option<AccessPath> {
-        // Since K is generic, use its hash to assign addresses.
-        let mut hasher = DefaultHasher::new();
-        self.0.hash(&mut hasher);
-        let mut hashed_address = vec![1u8; AccountAddress::LENGTH - 8];
-        hashed_address.extend_from_slice(&hasher.finish().to_ne_bytes());
+    fn is_module_path(&self) -> bool {
+        self.1
+    }
 
-        if self.1 {
-            Some(AccessPath {
-                address: AccountAddress::new(hashed_address.try_into().unwrap()),
-                path: b"/foo/b".to_vec(),
-            })
-        } else {
-            None
-        }
+    fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
+        unimplemented!()
     }
 }
 
@@ -894,15 +883,16 @@ where
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
-                    match k.module_path() {
-                        Some(_) => match view.get_module_bytes(k) {
+                    if k.is_module_path() {
+                        match view.get_module_bytes(k) {
                             Ok(v) => read_results.push(v.map(Into::into)),
                             Err(_) => read_results.push(None),
-                        },
-                        None => match view.get_resource_bytes(k, None) {
+                        }
+                    } else {
+                        match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),
                             Err(_) => read_results.push(None),
-                        },
+                        }
                     }
                 }
                 // Read from groups.
@@ -1057,7 +1047,7 @@ where
     fn resource_write_set(&self) -> Vec<(K, Arc<ValueType>, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
-            .filter(|(k, _)| k.module_path().is_none())
+            .filter(|(k, _)| !k.is_module_path())
             .cloned()
             .map(|(k, v)| (k, Arc::new(v), None))
             .collect()
@@ -1066,7 +1056,7 @@ where
     fn module_write_set(&self) -> BTreeMap<K, ValueType> {
         self.writes
             .iter()
-            .filter(|(k, _)| k.module_path().is_some())
+            .filter(|(k, _)| k.is_module_path())
             .cloned()
             .collect()
     }
