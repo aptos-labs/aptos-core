@@ -22,6 +22,7 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-debugger \
     -p aptos-transaction-emitter \
     -p aptos-api-tester \
+    -p aptos-framework \
     "$@"
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
@@ -36,6 +37,7 @@ BINS=(
     aptos-debugger
     aptos-transaction-emitter
     aptos-api-tester
+    aptos-framework
 )
 
 mkdir dist
@@ -46,4 +48,4 @@ done
 
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
 echo "Building the Aptos Move framework..."
-(cd dist && cargo run --locked --profile=$PROFILE --package aptos-framework -- release)
+(cd dist && ./aptos-framework -- release)
