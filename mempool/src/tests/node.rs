@@ -34,11 +34,15 @@ impl NodeId {
 
 /// Yet another type, to determine the differences between
 /// Validators, ValidatorFullNodes, and FullNodes
+/// TODO: much code is currently disabled under [cfg(wrong_network_abstraction)], NodeType may or may not come back when that changes?
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub enum NodeType {
-    // Validator,
-    // ValidatorFullNode,
-    // FullNode,
+    #[allow(unused)]
+    Validator,
+    #[allow(unused)]
+    ValidatorFullNode,
+    #[allow(unused)]
+    FullNode,
 }
 
 /// A union type for all types of simulated nodes

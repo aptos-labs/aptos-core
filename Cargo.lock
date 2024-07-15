@@ -11254,6 +11254,7 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "bcs 0.1.4",
+ "bytes",
  "claims",
  "derivative",
  "itertools 0.12.1",
@@ -15430,7 +15431,6 @@ dependencies = [
  "move-vm-test-utils",
  "move-vm-types",
  "num_cpus",
- "once_cell",
  "rand 0.8.5",
  "tracing",
  "tracing-subscriber 0.3.18",
