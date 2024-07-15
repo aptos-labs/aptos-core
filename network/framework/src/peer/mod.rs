@@ -522,8 +522,9 @@ where
                 }
             },
             NetworkMessage::RpcResponse(_) => {
+                // non-reference cast identical to this match case
                 let NetworkMessage::RpcResponse(response) = message else {
-                    panic!()
+                    unreachable!("NetworkMessage type changed between match and let")
                 };
                 self.outbound_rpcs.handle_inbound_response(response)
             },

@@ -1213,7 +1213,7 @@ async fn wait_for_network_event(
                     let rmsg = ReceivedMessage {
                         message: NetworkMessage::RpcRequest(RpcRequest{
                             protocol_id: outbound_rpc_request.protocol_id,
-                            request_id: 0, // TODO: rand? seq?
+                            request_id: 0,
                             priority: 0,
                             raw_request: outbound_rpc_request.data.into(),
                         }),
