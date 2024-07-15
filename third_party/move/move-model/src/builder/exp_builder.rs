@@ -2792,7 +2792,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Checks whether the given name can be resolve to a struct.
     fn can_resolve_to_struct(&self, maccess: &EA::ModuleAccess) -> bool {
         let (struct_name, _variant) = self.parent.module_access_to_qualified_with_variant(maccess);
-        self.parent.parent.struct_table.get(&struct_name).is_some()
+        self.parent.parent.struct_table.contains_key(&struct_name)
     }
 
     fn translate_fun_call_special_cases(
