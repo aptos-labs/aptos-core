@@ -136,7 +136,6 @@ impl TestHarness {
     ) -> oneshot::Receiver<Result<Bytes, RpcError>> {
         let protocol_id = ProtocolId::HealthCheckerRpc;
         let data = bcs::to_bytes(&HealthCheckerMsg::Ping(Ping(ping))).unwrap();
-        // .into();
         let (res_tx, res_rx) = oneshot::channel();
         let key = (peer_id, ProtocolId::HealthCheckerRpc);
         let (delivered_tx, delivered_rx) = oneshot::channel();

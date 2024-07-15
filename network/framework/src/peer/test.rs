@@ -83,10 +83,6 @@ fn build_test_peer(
     let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(1);
     let (peer_reqs_tx, peer_reqs_rx) =
         aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
-    // let (peer_notifs_tx, peer_notifs_rx) =
-    //     aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
-    // upstream_handlers: Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
-    // let upstream_handlers = Arc::new(HashMap::new());
 
     let peer = Peer::new(
         NetworkContext::mock(),
@@ -558,7 +554,6 @@ fn peer_recv_rpc_timeout() {
 
         // Server receives the rpc request from client.
         let received = prot_rx.next().await.unwrap();
-        // assert_eq!(received, recv_msg);
 
         // Pull out the request completion handle.
         let mut res_tx = match &received.message {
@@ -619,7 +614,6 @@ fn peer_recv_rpc_cancel() {
 
         // Server receives the rpc request from client.
         let received = prot_rx.next().await.unwrap();
-        // assert_eq!(received, recv_msg);
 
         // Pull out the request completion handle.
         let res_tx = match &received.message {
