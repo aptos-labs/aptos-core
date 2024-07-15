@@ -1,16 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod config;
-pub mod models;
-pub mod schema;
-pub mod utils;
-pub mod worker;
-
 use anyhow::Context;
 use reqwest::{header, Client};
 use std::time::Duration;
 use utils::constants::MAX_HEAD_REQUEST_RETRY_SECONDS;
+
+pub mod asset_uploader;
+pub mod config;
+pub mod models;
+pub mod parser;
+pub mod schema;
+pub mod utils;
+pub mod worker;
 
 /// HEAD request to get MIME type and size of content
 pub async fn get_uri_metadata(url: &str) -> anyhow::Result<(String, u32)> {
