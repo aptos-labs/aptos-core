@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Context;
-use axum::Router;
 use reqwest::{header, Client};
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 use utils::constants::MAX_HEAD_REQUEST_RETRY_SECONDS;
 
 pub mod asset_uploader;
@@ -14,11 +13,6 @@ pub mod parser;
 pub mod schema;
 pub mod utils;
 pub mod worker;
-
-/// Trait for building a router for axum
-trait Server: Send + Sync {
-    fn build_router(self: Arc<Self>) -> Router;
-}
 
 /// HEAD request to get MIME type and size of content
 pub async fn get_uri_metadata(url: &str) -> anyhow::Result<(String, u32)> {

@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::AssetUploaderConfig,
+    config::{AssetUploaderConfig, Server},
     models::nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
     utils::{
         constants::{MAX_ASSET_UPLOAD_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
         database::upsert_uris,
     },
-    Server,
 };
 use anyhow::Context;
 use axum::{routing::post, Extension, Json, Router};
@@ -53,7 +52,7 @@ struct AssetUploaderResponse {
 }
 
 impl AssetUploaderContext {
-    pub async fn new(
+    pub fn new(
         asset_uploader_config: AssetUploaderConfig,
         pool: Pool<ConnectionManager<PgConnection>>,
     ) -> Self {
@@ -186,9 +185,10 @@ impl AssetUploaderContext {
 }
 
 impl Server for AssetUploaderContext {
-    fn build_router(self: Arc<Self>) -> Router {
+    fn build_router(&self) -> Router {
+        let self_arc = Arc::new(self.clone());
         Router::new()
             .route("/", post(Self::handle_urls))
-            .layer(Extension(self.clone()))
+            .layer(Extension(self_arc.clone()))
     }
 }

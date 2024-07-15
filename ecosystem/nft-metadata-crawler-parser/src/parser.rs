@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::ParserConfig,
+    config::{ParserConfig, Server},
     utils::{
         counters::{
             GOT_CONNECTION_COUNT, PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT,
@@ -11,7 +11,6 @@ use crate::{
         database::check_or_update_chain_id,
     },
     worker::Worker,
-    Server,
 };
 use axum::{http::StatusCode, response::Response, routing::post, Router};
 use bytes::Bytes;
@@ -184,13 +183,14 @@ impl ParserContext {
 }
 
 impl Server for ParserContext {
-    fn build_router(self: Arc<Self>) -> Router {
+    fn build_router(&self) -> Router {
+        let self_arc = Arc::new(self.clone());
         Router::new().route(
             "/",
             post(|bytes| async move {
-                self.spawn_parser(bytes).await;
+                self_arc.spawn_parser(bytes).await;
 
-                if !self.parser_config.ack_parsed_uris {
+                if !self_arc.parser_config.ack_parsed_uris {
                     return Response::builder()
                         .status(StatusCode::BAD_REQUEST)
                         .body("".to_string())

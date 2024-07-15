@@ -2961,6 +2961,7 @@ dependencies = [
  "clap 4.4.14",
  "diesel",
  "diesel_migrations",
+ "enum_dispatch",
  "field_count",
  "futures",
  "google-cloud-storage",

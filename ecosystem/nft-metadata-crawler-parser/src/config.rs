@@ -11,12 +11,22 @@ use crate::{
         },
         database::{establish_connection_pool, run_migrations},
     },
-    Server,
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
+use axum::Router;
+use diesel::{
+    r2d2::{ConnectionManager, Pool},
+    PgConnection,
+};
+use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tracing::info;
+
+/// Trait for building a router for axum
+#[enum_dispatch]
+pub trait Server: Send + Sync {
+    fn build_router(&self) -> Router;
+}
 
 /// Required account data and auth keys for Cloudflare
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -90,6 +100,30 @@ impl NFTMetadataCrawlerConfig {
     }
 }
 
+#[derive(Clone)]
+#[enum_dispatch(Server)]
+pub enum ServerContext {
+    Parser(ParserContext),
+    AssetUploader(AssetUploaderContext),
+}
+
+impl ServerConfig {
+    pub async fn build_context(
+        &self,
+        pool: Pool<ConnectionManager<PgConnection>>,
+        max_num_retries: i32,
+    ) -> ServerContext {
+        match self {
+            ServerConfig::Parser(parser_config) => ServerContext::Parser(
+                ParserContext::new(parser_config.clone(), pool, max_num_retries).await,
+            ),
+            ServerConfig::AssetUploader(asset_uploader_config) => ServerContext::AssetUploader(
+                AssetUploaderContext::new(asset_uploader_config.clone(), pool),
+            ),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl RunnableConfig for NFTMetadataCrawlerConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
@@ -108,21 +142,14 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
         info!("[NFT Metadata Crawler] Finished migrations");
 
         // Create request context
-        // Dynamic dispatch over different variations of servers
-        let context: Arc<dyn Server> = match &self.server_config {
-            ServerConfig::Parser(parser_config) => Arc::new(
-                ParserContext::new(parser_config.clone(), pool, self.max_num_parse_retries).await,
-            ),
-            ServerConfig::AssetUploader(asset_uploader_config) => {
-                Arc::new(AssetUploaderContext::new(asset_uploader_config.clone(), pool).await)
-            },
-        };
-
-        let router = context.build_router();
+        let context = self
+            .server_config
+            .build_context(pool, self.max_num_parse_retries)
+            .await;
         let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.server_port))
             .await
             .expect("Failed to bind TCP listener");
-        axum::serve(listener, router).await.unwrap();
+        axum::serve(listener, context.build_router()).await.unwrap();
 
         Ok(())
     }
