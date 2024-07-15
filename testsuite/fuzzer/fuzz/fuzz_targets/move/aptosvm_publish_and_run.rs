@@ -35,7 +35,6 @@ use move_core_types::{
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
-    convert::TryInto,
     sync::Arc,
 };
 use std::time::Instant;
@@ -619,7 +618,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // EXECUTION_TIME_GAS_RATEO is a rateo between execution time and gas used. If the rateo is higher than EXECUTION_TIME_GAS_RATEO, we consider the gas usage as unexpected.
     // EXPERIMENTAL: This very sensible to excution enviroment, e.g. local run, OSS-Fuzz. It may cause false positive. Real data from production does not apply to this rateo.
     // We only wants to catch big unexpected gas usage.
-    if (elapsed.as_millis()/(fee.execution_gas_used()+fee.io_gas_used()) as u128)>EXECUTION_TIME_GAS_RATEO {
+    if (elapsed.as_millis()/(fee.execution_gas_used()+fee.io_gas_used()) as u128) > EXECUTION_TIME_GAS_RATEO as u128 {
         tdbg!("Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}", elapsed, fee.execution_gas_used()+fee.io_gas_used());
         tdbg!("Transaction: {:?}", tx);
         if !DEBUG{
