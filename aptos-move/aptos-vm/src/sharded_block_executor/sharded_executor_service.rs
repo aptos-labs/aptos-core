@@ -250,9 +250,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     if transactions.len() == num_txns_in_the_block {
                         self.coordinator_client.lock().unwrap().reset_block_init();
                     }
-                    let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
-                        blocking_transactions_provider.set_txn(idx + batch_start_index, txn);
-                    });
                     (state_view, num_txns_in_the_block, shard_txns_start_index, onchain_config, blocking_transactions_provider)
                 },
                 StreamedExecutorShardCommand::Stop => {
