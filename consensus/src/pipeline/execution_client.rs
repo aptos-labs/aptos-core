@@ -67,7 +67,7 @@ pub trait TExecutionClient: Send + Sync {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        highest_ordered_round: Round,
+        highest_committed_round: Round,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -186,7 +186,7 @@ impl ExecutionProxyClient {
         fast_rand_config: Option<RandConfig>,
         onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        highest_ordered_round: Round,
+        highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) {
@@ -235,7 +235,7 @@ impl ExecutionProxyClient {
                     rand_msg_rx,
                     reset_rand_manager_rx,
                     self.bounded_executor.clone(),
-                    highest_ordered_round,
+                    highest_committed_round,
                 ));
 
                 (
@@ -298,7 +298,7 @@ impl TExecutionClient for ExecutionProxyClient {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        highest_ordered_round: Round,
+        highest_committed_round: Round,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             commit_signer_provider,
@@ -307,7 +307,7 @@ impl TExecutionClient for ExecutionProxyClient {
             fast_rand_config,
             onchain_consensus_config,
             rand_msg_rx,
-            highest_ordered_round,
+            highest_committed_round,
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
         );
@@ -482,7 +482,7 @@ impl TExecutionClient for DummyExecutionClient {
         _rand_config: Option<RandConfig>,
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        _highest_ordered_round: Round,
+        _highest_committed_round: Round,
     ) {
     }
 
