@@ -30,7 +30,7 @@ pub(crate) fn generate_next_execution_hash_blob(
     if next_execution_hash == "vector::empty<u8>()".as_bytes() {
         emitln!(
                 writer,
-                "let framework_signer = aptos_governance::resolve_multi_step_proposal(proposal_id, @{}, {});\n",
+                "let framework_signer = supra_governance::resolve_multi_step_proposal(proposal_id, @{}, {});\n",
                 for_address,
                 "vector::empty<u8>()",
             );
@@ -38,7 +38,7 @@ pub(crate) fn generate_next_execution_hash_blob(
         println!("{:?}", next_execution_hash);
         emitln!(
             writer,
-            "let framework_signer = aptos_governance::resolve_multi_step_proposal("
+            "let framework_signer = supra_governance::resolve_multi_step_proposal("
         );
         writer.indent();
         emitln!(writer, "proposal_id,");
@@ -62,7 +62,7 @@ pub(crate) fn generate_governance_proposal_header(
     emitln!(writer, "script {");
     writer.indent();
 
-    emitln!(writer, "use aptos_framework::aptos_governance;");
+    emitln!(writer, "use aptos_framework::supra_governance;");
     for deps_name in deps_names {
         emitln!(writer, "use {};", deps_name);
     }
@@ -79,7 +79,7 @@ pub(crate) fn generate_governance_proposal_header(
     } else {
         emitln!(
             writer,
-            "let framework_signer = aptos_governance::resolve(proposal_id, @{});\n",
+            "let framework_signer = supra_governance::resolve(proposal_id, @{});\n",
             AccountAddress::ONE,
         );
     }
@@ -89,7 +89,7 @@ pub(crate) fn generate_testnet_header(writer: &CodeWriter, deps_names: &[&str]) 
     emitln!(writer, "script {");
     writer.indent();
 
-    emitln!(writer, "use aptos_framework::aptos_governance;");
+    emitln!(writer, "use aptos_framework::supra_governance;");
     for deps_name in deps_names {
         emitln!(writer, "use {};", deps_name);
     }
@@ -100,7 +100,7 @@ pub(crate) fn generate_testnet_header(writer: &CodeWriter, deps_names: &[&str]) 
 
     emitln!(
         writer,
-        "let core_signer = aptos_governance::get_signer_testnet_only(core_resources, @{});\n",
+        "let core_signer = supra_governance::get_signer_testnet_only(core_resources, @{});\n",
         AccountAddress::ONE,
     );
     emitln!(writer, "let framework_signer = &core_signer;\n");

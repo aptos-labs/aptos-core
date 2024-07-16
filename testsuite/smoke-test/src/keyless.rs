@@ -324,11 +324,11 @@ async fn spawn_network_and_execute_gov_proposals(
 script {{
 use aptos_framework::jwks;
 use aptos_framework::{};
-use aptos_framework::aptos_governance;
+use aptos_framework::supra_governance;
 use std::string::utf8;
 use std::option;
 fun main(core_resources: &signer) {{
-    let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+    let framework_signer = supra_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
     let jwk_0 = jwks::new_rsa_jwk(
         utf8(b"{}"),
         utf8(b"{}"),

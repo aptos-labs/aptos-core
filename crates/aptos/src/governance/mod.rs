@@ -175,7 +175,7 @@ impl CliCommand<Vec<ProposalSummary>> for ListProposals {
         let events = client
             .get_account_events_bcs(
                 AccountAddress::ONE,
-                "0x1::aptos_governance::GovernanceEvents",
+                "0x1::supra_governance::GovernanceEvents",
                 "create_proposal_events",
                 None,
                 Some(100),
@@ -381,7 +381,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
         let txn: Transaction = if self.args.is_multi_step {
             self.args
                 .txn_options
-                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal_v2(
+                .submit_transaction(aptos_stdlib::supra_governance_create_proposal_v2(
                     self.pool_address_args.pool_address,
                     script_hash.to_vec(),
                     self.args.metadata_url.to_string().as_bytes().to_vec(),
@@ -392,7 +392,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
         } else {
             self.args
                 .txn_options
-                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
+                .submit_transaction(aptos_stdlib::supra_governance_create_proposal(
                     self.pool_address_args.pool_address,
                     script_hash.to_vec(),
                     self.args.metadata_url.to_string().as_bytes().to_vec(),
@@ -441,7 +441,7 @@ fn extract_proposal_id(txn: &Transaction) -> CliTypedResult<Option<u64>> {
     if let Transaction::UserTransaction(inner) = txn {
         // Find event with proposal id
         let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
-            event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
+            event.typ.to_string().as_str() == "0x1::supra_governance::CreateProposalEvent"
         }) {
             let data: CreateProposalEvent =
                 serde_json::from_value(event.data.clone()).map_err(|_| {
@@ -529,7 +529,7 @@ impl SubmitVote {
         let voting_records = client
             .get_account_resource_bcs::<VotingRecords>(
                 CORE_CODE_ADDRESS,
-                "0x1::aptos_governance::VotingRecords",
+                "0x1::supra_governance::VotingRecords",
             )
             .await
             .unwrap()
@@ -541,7 +541,7 @@ impl SubmitVote {
             let voting_record = client
                 .get_table_item(
                     voting_records,
-                    "0x1::aptos_governance::RecordKey",
+                    "0x1::supra_governance::RecordKey",
                     "bool",
                     VotingRecord {
                         proposal_id: proposal_id.to_string(),
@@ -578,7 +578,7 @@ impl SubmitVote {
             summaries.push(
                 self.args
                     .txn_options
-                    .submit_transaction(aptos_stdlib::aptos_governance_vote(
+                    .submit_transaction(aptos_stdlib::supra_governance_vote(
                         *pool_address,
                         proposal_id,
                         vote,
@@ -631,7 +631,7 @@ impl SubmitVote {
                 .args
                 .txn_options
                 .view(ViewRequest {
-                    function: "0x1::aptos_governance::get_remaining_voting_power"
+                    function: "0x1::supra_governance::get_remaining_voting_power"
                         .parse()
                         .unwrap(),
                     type_arguments: vec![],
@@ -670,7 +670,7 @@ impl SubmitVote {
             summaries.push(
                 self.args
                     .txn_options
-                    .submit_transaction(aptos_stdlib::aptos_governance_partial_vote(
+                    .submit_transaction(aptos_stdlib::supra_governance_partial_vote(
                         *pool_address,
                         proposal_id,
                         voting_power,
@@ -732,7 +732,7 @@ impl CliCommand<TransactionSummary> for ApproveExecutionHash {
         Ok(self
             .txn_options
             .submit_transaction(
-                aptos_stdlib::aptos_governance_add_approved_script_hash_script(self.proposal_id),
+                aptos_stdlib::supra_governance_add_approved_script_hash_script(self.proposal_id),
             )
             .await
             .map(TransactionSummary::from)?)

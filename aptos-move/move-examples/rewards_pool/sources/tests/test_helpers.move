@@ -1,7 +1,7 @@
 #[test_only]
 module rewards_pool::test_helpers {
     use supra_framework::account;
-    use supra_framework::aptos_governance;
+    use supra_framework::supra_governance;
     use supra_framework::coin::{Self, Coin};
     use supra_framework::fungible_asset::{Self, FungibleAsset};
     use supra_framework::object;
@@ -16,7 +16,7 @@ module rewards_pool::test_helpers {
     use std::vector;
 
     public fun set_up() {
-        aptos_governance::toggle_features_for_test(vector[features::get_auids()], vector[]);
+        supra_governance::toggle_features_for_test(vector[features::get_auids()], vector[]);
         timestamp::set_time_has_started_for_testing(&account::create_signer_for_test(@0x1));
         epoch::fast_forward(100);
     }

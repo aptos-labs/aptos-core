@@ -14,7 +14,7 @@ module supra_framework::reconfiguration {
     use supra_framework::storage_gas;
     use supra_framework::transaction_fee;
 
-    friend supra_framework::aptos_governance;
+    friend supra_framework::supra_governance;
     friend supra_framework::block;
     friend supra_framework::consensus_config;
     friend supra_framework::execution_config;

@@ -1,4 +1,4 @@
-spec supra_framework::aptos_governance {
+spec supra_framework::supra_governance {
     /// <high-level-req>
     /// No.: 1
     /// Requirement: The create proposal function calls create proposal v2.

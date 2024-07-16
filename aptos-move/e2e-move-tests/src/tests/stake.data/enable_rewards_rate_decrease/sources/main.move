@@ -1,13 +1,13 @@
 script {
-    use supra_framework::aptos_governance;
+    use supra_framework::supra_governance;
     use supra_framework::staking_config;
     use supra_framework::timestamp;
     use aptos_std::fixed_point64;
     use std::features;
-    use supra_framework::aptos_governance::reconfigure;
+    use supra_framework::supra_governance::reconfigure;
 
     fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @supra_framework);
+        let framework_signer = supra_governance::get_signer_testnet_only(core_resources, @supra_framework);
         staking_config::initialize_rewards(
             &framework_signer,
             fixed_point64::create_from_rational(1, 100),

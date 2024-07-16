@@ -187,7 +187,7 @@ impl StakeEvent {
         txn_version: i64,
     ) -> Result<Option<Self>> {
         match data_type {
-            "0x1::aptos_governance::VoteEvent" => serde_json::from_value(data.clone())
+            "0x1::supra_governance::VoteEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::GovernanceVoteEvent(inner))),
             "0x1::stake::DistributeRewardsEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner))),

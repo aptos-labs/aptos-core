@@ -17,6 +17,6 @@ impl ApprovedExecutionHashes {
 }
 
 impl OnChainConfig for ApprovedExecutionHashes {
-    const MODULE_IDENTIFIER: &'static str = "aptos_governance";
+    const MODULE_IDENTIFIER: &'static str = "supra_governance";
     const TYPE_IDENTIFIER: &'static str = "ApprovedExecutionHashes";
 }

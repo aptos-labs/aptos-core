@@ -121,7 +121,7 @@ module supra_framework::delegation_pool {
     use supra_framework::account;
     use supra_framework::aptos_account;
     use supra_framework::supra_coin::SupraCoin;
-    use supra_framework::aptos_governance;
+    use supra_framework::supra_governance;
     use supra_framework::coin;
     use supra_framework::event::{Self, EventHandle, emit};
     use supra_framework::stake;
@@ -624,7 +624,7 @@ module supra_framework::delegation_pool {
         assert_partial_governance_voting_enabled(pool_address);
         // If the whole stake pool has no voting power(e.g. it has already voted before partial
         // governance voting flag is enabled), the delegator also has no voting power.
-        if (aptos_governance::get_remaining_voting_power(pool_address, proposal_id) == 0) {
+        if (supra_governance::get_remaining_voting_power(pool_address, proposal_id) == 0) {
             return 0
         };
 
@@ -777,7 +777,7 @@ module supra_framework::delegation_pool {
         *used_voting_power = *used_voting_power + voting_power;
 
         let pool_signer = retrieve_stake_pool_owner(borrow_global<DelegationPool>(pool_address));
-        aptos_governance::partial_vote(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
+        supra_governance::partial_vote(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
 
         event::emit_event(
             &mut governance_records.vote_events,
@@ -793,7 +793,7 @@ module supra_framework::delegation_pool {
 
     /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
     /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
-    /// `aptos_governance.move`.
+    /// `supra_governance.move`.
     public entry fun create_proposal(
         voter: &signer,
         pool_address: address,
@@ -812,10 +812,10 @@ module supra_framework::delegation_pool {
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
         let total_voting_power = calculate_and_update_delegated_votes(pool, governance_records, voter_addr);
         assert!(
-            total_voting_power >= aptos_governance::get_required_proposer_stake(),
+            total_voting_power >= supra_governance::get_required_proposer_stake(),
             error::invalid_argument(EINSUFFICIENT_PROPOSER_STAKE));
         let pool_signer = retrieve_stake_pool_owner(borrow_global<DelegationPool>(pool_address));
-        let proposal_id = aptos_governance::create_proposal_v2_impl(
+        let proposal_id = supra_governance::create_proposal_v2_impl(
             &pool_signer,
             pool_address,
             execution_hash,
@@ -1679,8 +1679,8 @@ module supra_framework::delegation_pool {
     inline fun assert_and_update_proposal_used_voting_power(
         governance_records: &mut GovernanceRecords, pool_address : address, proposal_id : u64, voting_power: u64
     ) {
-        let stake_pool_remaining_voting_power = aptos_governance::get_remaining_voting_power(pool_address, proposal_id);
-        let stake_pool_used_voting_power = aptos_governance::get_voting_power(pool_address) - stake_pool_remaining_voting_power;
+        let stake_pool_remaining_voting_power = supra_governance::get_remaining_voting_power(pool_address, proposal_id);
+        let stake_pool_used_voting_power = supra_governance::get_voting_power(pool_address) - stake_pool_remaining_voting_power;
         let proposal_used_voting_power = smart_table::borrow_mut_with_default(&mut governance_records.votes_per_proposal, proposal_id, 0);
         // A edge case: Before enabling partial governance voting on a delegation pool, the delegation pool has
         // a voter which can vote with all voting power of this delegation pool. If the voter votes on a proposal after
@@ -3700,13 +3700,13 @@ module supra_framework::delegation_pool {
         // delegator2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(supra_framework);
-        aptos_governance::initialize_for_test(
+        supra_governance::initialize_for_test(
             supra_framework,
             (10 * ONE_APT as u128),
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(supra_framework);
+        supra_governance::initialize_partial_voting(supra_framework);
         features::change_feature_flags(
             supra_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
@@ -3745,13 +3745,13 @@ module supra_framework::delegation_pool {
         delegator1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(supra_framework);
-        aptos_governance::initialize_for_test(
+        supra_governance::initialize_for_test(
             supra_framework,
             (10 * ONE_APT as u128),
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(supra_framework);
+        supra_governance::initialize_partial_voting(supra_framework);
         features::change_feature_flags(
             supra_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
@@ -3793,13 +3793,13 @@ module supra_framework::delegation_pool {
         voter2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test_no_reward(supra_framework);
-        aptos_governance::initialize_for_test(
+        supra_governance::initialize_for_test(
             supra_framework,
             (10 * ONE_APT as u128),
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(supra_framework);
+        supra_governance::initialize_partial_voting(supra_framework);
         features::change_feature_flags(
             supra_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
@@ -3943,13 +3943,13 @@ module supra_framework::delegation_pool {
         voter1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test_no_reward(supra_framework);
-        aptos_governance::initialize_for_test(
+        supra_governance::initialize_for_test(
             supra_framework,
             (10 * ONE_APT as u128),
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(supra_framework);
+        supra_governance::initialize_partial_voting(supra_framework);
 
         initialize_test_validator(validator, 100 * ONE_APT, true, false);
 
@@ -4017,13 +4017,13 @@ module supra_framework::delegation_pool {
             100,
             1000000
         );
-        aptos_governance::initialize_for_test(
+        supra_governance::initialize_for_test(
             supra_framework,
             (10 * ONE_APT as u128),
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(supra_framework);
+        supra_governance::initialize_partial_voting(supra_framework);
         features::change_feature_flags(
             supra_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
@@ -4120,7 +4120,7 @@ module supra_framework::delegation_pool {
         // Create 2 proposals and vote for proposal1.
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let proposal2_id = aptos_governance::create_proposal_v2_impl(
+        let proposal2_id = supra_governance::create_proposal_v2_impl(
             validator,
             pool_address,
             execution_hash,
@@ -4128,7 +4128,7 @@ module supra_framework::delegation_pool {
             b"",
             true,
         );
-        aptos_governance::vote(validator, pool_address, proposal1_id, true);
+        supra_governance::vote(validator, pool_address, proposal1_id, true);
 
         // Enable partial governance voting feature flag.
         features::change_feature_flags(
@@ -4188,7 +4188,7 @@ module supra_framework::delegation_pool {
         add_stake(delegator1, pool_address, 10 * ONE_APT);
         end_aptos_epoch();
 
-        aptos_governance::vote(validator, pool_address, proposal1_id, true);
+        supra_governance::vote(validator, pool_address, proposal1_id, true);
 
         // Enable partial governance voting feature flag.
         features::change_feature_flags(
@@ -4232,7 +4232,7 @@ module supra_framework::delegation_pool {
         );
 
         // The operator voter votes on the proposal after partial governace voting flag is enabled but before partial voting is enabled on the pool.
-        aptos_governance::vote(validator, pool_address, proposal1_id, true);
+        supra_governance::vote(validator, pool_address, proposal1_id, true);
 
         // Enable partial governance voting on this delegation pool.
         enable_partial_governance_voting(pool_address);
@@ -4343,13 +4343,13 @@ module supra_framework::delegation_pool {
         enable_partial_voting: bool,
     ): u64 acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test_no_reward(supra_framework);
-        aptos_governance::initialize_for_test(
+        supra_governance::initialize_for_test(
             supra_framework,
             (10 * ONE_APT as u128),
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(supra_framework);
+        supra_governance::initialize_partial_voting(supra_framework);
 
         initialize_test_validator(validator, 100 * ONE_APT, true, false);
 
@@ -4364,7 +4364,7 @@ module supra_framework::delegation_pool {
         // Create 1 proposals and vote for proposal1.
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let proposal_id = aptos_governance::create_proposal_v2_impl(
+        let proposal_id = supra_governance::create_proposal_v2_impl(
             validator,
             pool_address,
             execution_hash,

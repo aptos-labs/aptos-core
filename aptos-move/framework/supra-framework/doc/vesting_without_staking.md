@@ -1232,6 +1232,10 @@ Unlock any vested portion of the grant.
 			<b>let</b> shareholder = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> shareholders);
 			<a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_individual">vest_individual</a>(contract_address,shareholder);
 		};
+        <b>let</b> total_balance = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(contract_address);
+        <b>if</b> (total_balance == 0) {
+            <a href="vesting_without_staking.md#0x1_vesting_without_staking_set_terminate_vesting_contract">set_terminate_vesting_contract</a>(contract_address);
+        };
 }
 </code></pre>
 
@@ -1308,10 +1312,6 @@ Unlock any vested portion of the grant.
                vesting_record.last_vested_period = next_period_to_vest;
                next_period_to_vest = next_period_to_vest + 1;
        };
-           <b>let</b> total_balance = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(contract_address);
-           <b>if</b> (total_balance == 0) {
-               <a href="vesting_without_staking.md#0x1_vesting_without_staking_set_terminate_vesting_contract">set_terminate_vesting_contract</a>(contract_address);
-           };
 
        };
 	}
@@ -1339,6 +1339,7 @@ Example usage: If admin find shareholder suspicious, admin can remove it.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_remove_shareholder">remove_shareholder</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, shareholder_address: <b>address</b>) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
+		<a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_shareholder_exists">assert_shareholder_exists</a>(contract_address,shareholder_address);
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_verify_admin">verify_admin</a>(admin, vesting_contract);
     <b>let</b> vesting_signer = <a href="vesting_without_staking.md#0x1_vesting_without_staking_get_vesting_account_signer_internal">get_vesting_account_signer_internal</a>(vesting_contract);
@@ -1355,7 +1356,6 @@ Example usage: If admin find shareholder suspicious, admin can remove it.
 
     // remove `shareholder_address`` from `vesting_contract.shareholders`
     <b>let</b> shareholders = &<b>mut</b> vesting_contract.shareholders;
-    <b>assert</b>!(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(shareholders, &shareholder_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ESHAREHOLDER_NOT_EXIST">ESHAREHOLDER_NOT_EXIST</a>));
     <b>let</b> (_, shareholders_vesting) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(shareholders, &shareholder_address);
 
     // remove `shareholder_address` from `vesting_contract.beneficiaries`

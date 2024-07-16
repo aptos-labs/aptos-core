@@ -43,12 +43,12 @@ pub async fn put_provider_on_chain(
     let add_dummy_provider_script = format!(
         r#"
 script {{
-    use aptos_framework::aptos_governance;
+    use aptos_framework::supra_governance;
     use aptos_framework::jwks;
     fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        let framework_signer = supra_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
         {implementation}
-        aptos_governance::reconfigure(&framework_signer);
+        supra_governance::reconfigure(&framework_signer);
     }}
 }}
 "#,
@@ -87,9 +87,9 @@ async fn jwk_patching() {
     let jwk_patch_script = r#"
 script {
     use aptos_framework::jwks;
-    use aptos_framework::aptos_governance;
+    use aptos_framework::supra_governance;
     fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        let framework_signer = supra_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
         let alice_jwk_0 = jwks::new_unsupported_jwk(b"alice_jwk_id_0", b"alice_jwk_payload_0");
         let patches = vector[
             jwks::new_patch_remove_all(),

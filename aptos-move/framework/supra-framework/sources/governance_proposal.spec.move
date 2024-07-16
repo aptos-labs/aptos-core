@@ -10,7 +10,7 @@ spec supra_framework::governance_proposal {
     /// Requirement: The governance proposal module should only be accessible to the aptos governance.
     /// Criticality: Medium
     /// Implementation: Both create_proposal and create_empty_proposal functions are only available to the friend module
-    /// supra_framework::aptos_governance.
+    /// supra_framework::supra_governance.
     /// Enforcement: Enforced via friend module relationship.
     /// </high-level-req>
     ///

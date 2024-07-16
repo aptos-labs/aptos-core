@@ -260,11 +260,11 @@
 //     misc.abs_val.per_address_packed                                     : 32
 
 script {
-    use aptos_framework::aptos_governance;
+    use aptos_framework::supra_governance;
     use aptos_framework::gas_schedule;
 
     fun main(proposal_id: u64) {
-        let framework_signer = aptos_governance::resolve_multi_step_proposal(
+        let framework_signer = supra_governance::resolve_multi_step_proposal(
             proposal_id,
             @0000000000000000000000000000000000000000000000000000000000000001,
             vector[18u8,231u8,184u8,113u8,231u8,92u8,149u8,190u8,58u8,103u8,85u8,221u8,36u8,91u8,161u8,105u8,58u8,86u8,205u8,120u8,106u8,8u8,219u8,130u8,248u8,167u8,164u8,79u8,146u8,210u8,117u8,82u8,],

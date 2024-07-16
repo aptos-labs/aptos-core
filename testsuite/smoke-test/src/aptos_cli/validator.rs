@@ -286,10 +286,10 @@ async fn test_onchain_config_change() {
     let update_consensus_config_script = format!(
         r#"
     script {{
-        use aptos_framework::aptos_governance;
+        use aptos_framework::supra_governance;
         use aptos_framework::consensus_config;
         fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let framework_signer = supra_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
             let config_bytes = {};
             consensus_config::set(&framework_signer, config_bytes);
         }}
@@ -400,10 +400,10 @@ async fn test_onchain_shuffling_change() {
     let update_execution_config_script = format!(
         r#"
     script {{
-        use aptos_framework::aptos_governance;
+        use aptos_framework::supra_governance;
         use aptos_framework::execution_config;
         fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let framework_signer = supra_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
             let config_bytes = {};
             execution_config::set(&framework_signer, config_bytes);
         }}

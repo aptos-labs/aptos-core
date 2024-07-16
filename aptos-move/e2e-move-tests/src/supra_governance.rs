@@ -38,7 +38,7 @@ pub fn create_proposal_v2(
 ) -> TransactionStatus {
     harness.run_transaction_payload(
         account,
-        aptos_stdlib::aptos_governance_create_proposal_v2(
+        aptos_stdlib::supra_governance_create_proposal_v2(
             stake_pool,
             execution_hash,
             metadata_location,
@@ -58,7 +58,7 @@ pub fn partial_vote(
 ) -> TransactionStatus {
     harness.run_transaction_payload(
         account,
-        aptos_stdlib::aptos_governance_partial_vote(
+        aptos_stdlib::supra_governance_partial_vote(
             stake_pool,
             proposal_id,
             voting_power,
@@ -72,7 +72,7 @@ pub fn get_remaining_voting_power(
     stake_pool: AccountAddress,
     proposal_id: u64,
 ) -> u64 {
-    let fun = MemberId::from_str("0x1::aptos_governance::get_remaining_voting_power").unwrap();
+    let fun = MemberId::from_str("0x1::supra_governance::get_remaining_voting_power").unwrap();
     let res = harness
         .execute_view_function(fun, vec![], vec![
             bcs::to_bytes(&stake_pool).unwrap(),
