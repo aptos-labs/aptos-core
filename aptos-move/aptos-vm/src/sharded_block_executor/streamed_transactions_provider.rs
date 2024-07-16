@@ -7,6 +7,9 @@ use aptos_block_executor::transaction_provider::TxnProvider;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 use execution_metrics::REMOTE_EXECUTOR_TIMER_V2;
+use dashmap::DashMap;
+use rayon::iter::{IntoParallelIterator, ParallelBridge};
+use rayon::iter::ParallelIterator;
 
 static SHARD_ID: OnceCell<usize> = OnceCell::new();
 
@@ -49,15 +52,19 @@ impl TxnProvider<SignatureVerifiedTransaction> for StreamedTransactionsProvider 
 }
 
 pub struct BlockingTransactionsProvider {
+    //txns: DashMap<usize, (Mutex<CommandValue>, Condvar)>,
     txns: Vec<(Mutex<CommandValue>, Condvar)>,
 }
 
 impl BlockingTransactionsProvider {
     pub fn new(num_txns: usize) -> Self {
-        let mut txns = Vec::new();
-        for _ in 0..num_txns {
-            txns.push((Mutex::new(CommandValue::Waiting), Condvar::new()));
-        }
+        let mut txns = (0..num_txns).into_par_iter()
+            .map(|_| (Mutex::new(CommandValue::Waiting), Condvar::new()))
+            .collect();
+        // let mut txns = Vec::new();
+        // for _ in 0..num_txns {
+        //     txns.push((Mutex::new(CommandValue::Waiting), Condvar::new()));
+        // }
         Self {
             txns
         }

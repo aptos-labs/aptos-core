@@ -58,6 +58,7 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 execution-metrics = { path = "../../execution/execution-metrics" }
+dashmap = "5.5.3"
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
