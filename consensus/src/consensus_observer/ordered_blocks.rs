@@ -155,8 +155,20 @@ impl PendingOrderedBlocks {
 
     /// Updates the metrics for the pending blocks
     pub fn update_pending_blocks_metrics(&self) {
-        // Update the number of pending blocks
-        let num_pending_blocks = self.pending_blocks.lock().len() as u64;
+        // Update the number of pending block entries
+        let pending_blocks = self.pending_blocks.lock();
+        let num_entries = pending_blocks.len() as u64;
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
+            metrics::PENDING_ORDERED_ENTRIES_LABEL,
+            num_entries,
+        );
+
+        // Update the total number of pending blocks
+        let num_pending_blocks = pending_blocks
+            .values()
+            .map(|(block, _, _)| block.blocks().len() as u64)
+            .sum();
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
             metrics::PENDING_ORDERED_BLOCKS_LABEL,
@@ -164,9 +176,7 @@ impl PendingOrderedBlocks {
         );
 
         // Update the highest round for the pending blocks
-        let highest_pending_round = self
-            .pending_blocks
-            .lock()
+        let highest_pending_round = pending_blocks
             .last_key_value()
             .map(|(_, (ordered_block, _, _))| ordered_block.last_block().round())
             .unwrap_or(0);
