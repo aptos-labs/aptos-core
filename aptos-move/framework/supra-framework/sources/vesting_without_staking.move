@@ -380,12 +380,18 @@ module supra_framework::vesting_without_staking {
 			let shareholder = vector::pop_back(&mut shareholders);
 			vest_individual(contract_address,shareholder);
 		};
+            let total_balance = coin::balance<SupraCoin>(contract_address);
+            if (total_balance == 0) {
+                set_terminate_vesting_contract(contract_address);
+            };
     }
 
 	public entry fun vest_individual(contract_address: address, shareholder_address: address) acquires VestingContract {
-		assert_active_vesting_contract(contract_address);
-		//extract beneficiary address
+		//check if contract exist, active and shareholder is a member of the contract
+		assert_shareholder_exists(contract_address,shareholder_address);
+
 		let vesting_signer = account::create_signer_with_capability(&borrow_global<VestingContract>(contract_address).signer_cap);
+		//extract beneficiary address
 		let beneficiary = beneficiary(contract_address,shareholder_address);
         {
             let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
@@ -393,7 +399,7 @@ module supra_framework::vesting_without_staking {
             if (vesting_contract.vesting_schedule.start_timestamp_secs > timestamp::now_seconds()) {
                 return
             };
-
+			
             let vesting_record = simple_map::borrow_mut(&mut vesting_contract.shareholders,&shareholder_address);
 
             // Check if the next vested period has already passed. If not, short-circuit since there's nothing to vest.
@@ -434,10 +440,6 @@ module supra_framework::vesting_without_staking {
                 vesting_record.last_vested_period = next_period_to_vest;
                 next_period_to_vest = next_period_to_vest + 1;
         };
-            let total_balance = coin::balance<SupraCoin>(contract_address);
-            if (total_balance == 0) {
-                set_terminate_vesting_contract(contract_address);
-            };
 
         };
 	}
@@ -445,6 +447,7 @@ module supra_framework::vesting_without_staking {
     /// Remove the lockup period for the vesting contract. This can only be called by the admin of the vesting contract.
     /// Example usage: If admin find shareholder suspicious, admin can remove it.
     public entry fun remove_shareholder(admin: &signer, contract_address: address, shareholder_address: address) acquires VestingContract {
+		assert_shareholder_exists(contract_address,shareholder_address);
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
         verify_admin(admin, vesting_contract);
         let vesting_signer = get_vesting_account_signer_internal(vesting_contract);
@@ -461,7 +464,6 @@ module supra_framework::vesting_without_staking {
 
         // remove `shareholder_address`` from `vesting_contract.shareholders`
         let shareholders = &mut vesting_contract.shareholders;
-        assert!(simple_map::contains_key(shareholders, &shareholder_address), error::not_found(ESHAREHOLDER_NOT_EXIST));
         let (_, shareholders_vesting) = simple_map::remove(shareholders, &shareholder_address);
 
         // remove `shareholder_address` from `vesting_contract.beneficiaries`
@@ -649,6 +651,11 @@ module supra_framework::vesting_without_staking {
     fun assert_vesting_contract_exists(contract_address: address) {
         assert!(exists<VestingContract>(contract_address), error::not_found(EVESTING_CONTRACT_NOT_FOUND));
     }
+	
+	fun assert_shareholder_exists(contract_address: address, shareholder_address: address) acquires VestingContract {
+		assert_active_vesting_contract(contract_address);
+		assert!(simple_map::contains_key(&borrow_global<VestingContract>(contract_address).shareholders,&shareholder_address), error::not_found(ESHAREHOLDER_NOT_EXIST));
+	}
 
     fun assert_active_vesting_contract(contract_address: address) acquires VestingContract {
         assert_vesting_contract_exists(contract_address);
