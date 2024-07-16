@@ -8,7 +8,7 @@ use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 use execution_metrics::REMOTE_EXECUTOR_TIMER_V2;
 use dashmap::DashMap;
-use rayon::iter::{IntoParallelIterator, ParallelBridge};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelBridge};
 use rayon::iter::ParallelIterator;
 
 static SHARD_ID: OnceCell<usize> = OnceCell::new();
@@ -58,9 +58,10 @@ pub struct BlockingTransactionsProvider {
 
 impl BlockingTransactionsProvider {
     pub fn new(num_txns: usize) -> Self {
-        let mut txns = (0..num_txns).into_par_iter()
+        let mut txns = vec![];
+        (0..num_txns).into_par_iter()
             .map(|_| (Mutex::new(CommandValue::Waiting), Condvar::new()))
-            .collect();
+            .collect_into_vec(&mut txns);
         // let mut txns = Vec::new();
         // for _ in 0..num_txns {
         //     txns.push((Mutex::new(CommandValue::Waiting), Condvar::new()));

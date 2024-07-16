@@ -261,10 +261,21 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                     .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
                     .start_timer();
 
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint {} at time {}", 1.1, curr_time);
                 self.state_view_client.init_for_block();
                 let num_txns = txns.num_txns;
+
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint {} at time {}", 1.2, curr_time);
                 let blocking_transactions_provider = Arc::new(BlockingTransactionsProvider::new(num_txns));
+
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint {} at time {}", 1.3, curr_time);
                 self.is_block_init_done.store(true, std::sync::atomic::Ordering::Relaxed);
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint {} at time {}", 1.4, curr_time);
+
                 let num_txns_in_the_batch = txns.cmds.len();
                 let shard_txns_start_index = txns.shard_txns_start_index;
                 let batch_start_index = txns.batch_start_index;
