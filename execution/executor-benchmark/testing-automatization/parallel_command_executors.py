@@ -162,7 +162,7 @@ def run_sessions_on_instances(instances, username, private_key_path):
         thread = threading.Thread(target=instance_session, args=(instance, username, private_key_path, close_event, git_update_command[i]))
         thread.start()
         threads.append(thread)
-        #i = i + 1
+        # i = i + 1
 
     for thread in threads:
         thread.join()

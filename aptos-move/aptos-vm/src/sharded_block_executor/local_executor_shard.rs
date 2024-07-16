@@ -276,6 +276,10 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
     fn record_execution_complete_time_on_shard(&self) {
         // no op
     }
+
+    fn reset_state_view(&self) {
+        // no_op
+    }
 }
 
 /// A cross shard client used by the global shard to receive cross-shard messages from other shards.

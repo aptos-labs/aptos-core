@@ -354,6 +354,11 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 txn_output: TransactionOutput::default(),
             }).unwrap();
             stream_results_thread.join().unwrap();
+            let drop_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+                .with_label_values(&[&self.shard_id.to_string(), "dropping state vie"])
+                .start_timer();
+            // clearing the state value
+            self.coordinator_client.lock().unwrap().reset_state_view();
             if (i % 50 == 49) {
                 let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
                     .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])

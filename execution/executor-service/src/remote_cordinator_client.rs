@@ -332,7 +332,6 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             Err(_) => StreamedExecutorShardCommand::Stop,
         }
     }
-
     fn reset_block_init(&self) {
         self.is_block_init_done.store(false, std::sync::atomic::Ordering::Relaxed);
     }
@@ -364,5 +363,9 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         let delta = get_delta_time(duration_since_epoch);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["6_exe_complete_on_shard"]).observe(delta as f64);
+    }
+
+    fn reset_state_view(&self) {
+        self.state_view_client.init_for_block();
     }
 }
