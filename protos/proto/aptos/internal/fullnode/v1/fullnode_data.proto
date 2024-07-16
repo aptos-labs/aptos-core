@@ -15,7 +15,7 @@ import "aptos/transaction/v1/transaction.proto";
 //    StreamStatus: BATCH_END with version x + (k + 1) * n - 1
 
 message TransactionsOutput {
-  repeated aptos.transaction.v1.Transaction transactions  = 1;
+  repeated aptos.transaction.v1.Transaction transactions = 1;
 }
 
 message StreamStatus {
@@ -53,5 +53,5 @@ message TransactionsFromNodeResponse {
 }
 
 service FullnodeData {
-    rpc GetTransactionsFromNode(GetTransactionsFromNodeRequest) returns (stream TransactionsFromNodeResponse);
+  rpc GetTransactionsFromNode(GetTransactionsFromNodeRequest) returns (stream TransactionsFromNodeResponse);
 }
