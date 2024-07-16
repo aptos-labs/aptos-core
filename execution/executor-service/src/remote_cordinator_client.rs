@@ -266,12 +266,14 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let num_txns_in_the_batch = txns.cmds.len();
                 let shard_txns_start_index = txns.shard_txns_start_index;
                 let batch_start_index = txns.batch_start_index;
+                let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
+                let state_view_client_clone = self.state_view_client.clone();
 
                 self.cmd_rx_thread_pool.spawn(move || {
                     let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
-                    self.state_view_client.pre_fetch_state_values(state_keys, true, txns.cmds.len());
+                    state_view_client_clone.pre_fetch_state_values(state_keys, true, txns.cmds.len());
                     let _ = txns.cmds.into_iter().enumerate().for_each(|(idx, txn)| {
-                        blocking_transactions_provider.set_txn(idx + batch_start_index, txn);
+                        blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
                     });
                 });
 
@@ -301,7 +303,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
 
                 return StreamedExecutorShardCommand::InitBatch(
                     self.state_view_client.clone(),
-                    txns.cmds,
+                    vec![], //NOTE: for now its empty, but is used later txns.cmds,
                     num_txns,
                     shard_txns_start_index,
                     txns.onchain_config,
