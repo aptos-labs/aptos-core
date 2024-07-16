@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(dead_code)]
+
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
 use aptos_framework::natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy};
@@ -69,7 +71,6 @@ pub enum Authenticator {
     },
 }
 
-#[allow(dead_code)]
 impl UserAccount {
     pub fn fund_amount(&self) -> u64 {
         match self.fund {
@@ -88,7 +89,6 @@ impl UserAccount {
     }
 }
 
-#[allow(dead_code)]
 impl Authenticator {
     pub fn sender(&self) -> UserAccount {
         match self {
@@ -128,7 +128,6 @@ pub struct RunnableState {
     pub tx_auth_type: Authenticator,
 }
 
-#[allow(dead_code)]
 // used for ordering modules topologically
 pub(crate) fn sort_by_deps(
     map: &BTreeMap<ModuleId, CompiledModule>,
@@ -156,7 +155,6 @@ pub(crate) fn sort_by_deps(
     Ok(())
 }
 
-#[allow(dead_code)]
 fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload {
     let modules_metadatas: Vec<_> = modules
         .iter()
@@ -202,7 +200,6 @@ fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload
     code_publish_package_txn(pkg_metadata, pkg_code)
 }
 
-#[allow(dead_code)]
 // panic to catch invariant violations
 pub(crate) fn check_for_invariant_violation(e: VMStatus) {
     if e.status_type() == StatusType::InvariantViolation {
@@ -213,7 +210,6 @@ pub(crate) fn check_for_invariant_violation(e: VMStatus) {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn publish_group(vm: &mut FakeExecutor, acc: &Account, group: &[CompiledModule], sequence_number: u64) -> Result<(), Corpus> {
     let tx = acc
         .transaction()
@@ -260,7 +256,6 @@ pub(crate) fn publish_group(vm: &mut FakeExecutor, acc: &Account, group: &[Compi
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
     use MoveTypeLayout as L;
 
@@ -281,7 +276,6 @@ pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn compiled_module_serde(module: &CompiledModule) -> Result<(), ()> {
     let mut blob = vec![];
     module.serialize(&mut blob).map_err(|_| ())?;
