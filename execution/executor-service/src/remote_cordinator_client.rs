@@ -270,7 +270,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 self.cmd_rx_thread_pool.spawn(move || {
                     let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
                     self.state_view_client.pre_fetch_state_values(state_keys, true, txns.cmds.len());
-                    let _ = txns.into_iter().enumerate().for_each(|(idx, txn)| {
+                    let _ = txns.cmds.into_iter().enumerate().for_each(|(idx, txn)| {
                         blocking_transactions_provider.set_txn(idx + batch_start_index, txn);
                     });
                 });
