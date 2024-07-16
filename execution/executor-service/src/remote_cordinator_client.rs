@@ -254,6 +254,8 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let txns: CmdsAndMetaData = bcs::from_bytes(&message.data).unwrap();
                 drop(bcs_deser_timer);
 
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint {} at time {}", 1, curr_time);
 
                 let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
                     .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
@@ -269,6 +271,9 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
                 let state_view_client_clone = self.state_view_client.clone();
 
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint {} at time {}", 2, curr_time);
+
                 self.cmd_rx_thread_pool.spawn(move || {
                     let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
                     state_view_client_clone.pre_fetch_state_values(state_keys, true, txns.cmds.len());
@@ -276,6 +281,9 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                         blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
                     });
                 });
+
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint {} at time {}", 3, curr_time);
 
                 let command_rx = self.command_rx.clone();
                 let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
