@@ -6,15 +6,15 @@ use crate::{
         error::Error,
         logging::{LogEntry, LogSchema},
         metrics,
-        missing_blocks::MissingBlockStore,
         network_client::ConsensusObserverClient,
         network_events::{ConsensusObserverNetworkEvents, NetworkMessage, ResponseSender},
         network_message::{
             BlockPayload, CommitDecision, ConsensusObserverDirectSend, ConsensusObserverMessage,
             ConsensusObserverRequest, ConsensusObserverResponse, OrderedBlock,
         },
+        ordered_blocks::PendingOrderedBlocks,
         payload_store::BlockPayloadStore,
-        pending_blocks::PendingOrderedBlocks,
+        pending_blocks::PendingBlockStore,
         publisher::ConsensusPublisher,
         subscription,
         subscription::ConsensusObserverSubscription,
@@ -80,8 +80,8 @@ pub struct ConsensusObserver {
 
     // The payload store holds block transaction payloads
     block_payload_store: BlockPayloadStore,
-    // The missing block store holds pending ordered blocks that are missing payloads
-    missing_block_store: MissingBlockStore,
+    // The pending block store holds pending blocks that are without payloads
+    pending_block_store: PendingBlockStore,
     // The pending ordered blocks (these are also ordered when in state sync mode)
     pending_ordered_blocks: PendingOrderedBlocks,
     // The execution client to the buffer manager
@@ -129,7 +129,7 @@ impl ConsensusObserver {
             quorum_store_enabled: false, // Updated on epoch changes
             root: Arc::new(Mutex::new(root)),
             block_payload_store: BlockPayloadStore::new(),
-            missing_block_store: MissingBlockStore::new(consensus_observer_config),
+            pending_block_store: PendingBlockStore::new(consensus_observer_config),
             pending_ordered_blocks: PendingOrderedBlocks::new(consensus_observer_config),
             execution_client,
             sync_handle: None,
@@ -481,9 +481,9 @@ impl ConsensusObserver {
         self.block_payload_store
             .insert_block_payload(block, transactions, limit);
 
-        // Check if there are blocks that were missing payloads
+        // Check if there are blocks that were pending payloads
         // but are now ready because of the new payload.
-        if let Some(ordered_block) = self.missing_block_store.remove_ready_block(
+        if let Some(ordered_block) = self.pending_block_store.remove_ready_block(
             block_epoch,
             block_round,
             &self.block_payload_store,
@@ -695,11 +695,11 @@ impl ConsensusObserver {
         };
 
         // If all payloads exist, process the block. Otherwise, store it
-        // in the missing block store and wait for the payloads to arrive.
+        // in the pending block store and wait for the payloads to arrive.
         if self.all_payloads_exist(ordered_block.blocks()) {
             self.process_ordered_block(ordered_block).await;
         } else {
-            self.missing_block_store.insert_missing_block(ordered_block);
+            self.pending_block_store.insert_pending_block(ordered_block);
         }
     }
 
@@ -920,11 +920,11 @@ impl ConsensusObserver {
 
     /// Updates the metrics for the processed blocks
     fn update_processed_blocks_metrics(&self) {
-        // Update the missing block metrics
-        self.missing_block_store.update_missing_blocks_metrics();
-
         // Update the payload store metrics
         self.block_payload_store.update_payload_store_metrics();
+
+        // Update the pending block metrics
+        self.pending_block_store.update_pending_blocks_metrics();
 
         // Update the pending block metrics
         self.pending_ordered_blocks.update_pending_blocks_metrics();
