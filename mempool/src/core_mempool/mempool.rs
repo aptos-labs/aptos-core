@@ -207,6 +207,9 @@ impl Mempool {
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
+
+            info!("Mempool txn committed: {} {} insertion: {:?} insertion: {:?} block: {:?} difference: {:?}", account, sequence_number, insertion_info.insertion_time, insertion_timestamp, block_timestamp, block_timestamp.checked_sub(insertion_timestamp));
+
             if let Some(insertion_to_block) = block_timestamp.checked_sub(insertion_timestamp) {
                 counters::core_mempool_txn_commit_latency(
                     counters::COMMIT_ACCEPTED_BLOCK_LABEL,
@@ -250,6 +253,16 @@ impl Mempool {
         let now = SystemTime::now();
         let expiration_time =
             aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
+
+        info!(
+            "Mempool txn inserted: {} {} insertion: {:?} db: {:?} hash: {:?} timeline: {:?}",
+            txn.sender(),
+            txn.sequence_number(),
+            now,
+            db_sequence_number,
+            txn.committed_hash(),
+            timeline_state
+        );
 
         let txn_info = MempoolTransaction::new(
             txn,
