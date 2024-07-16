@@ -15,7 +15,7 @@ jobs:
       - name: Maximize build space
         uses: easimon/maximize-build-space@fc881a613ad2a34aca9c9624518214ebc21dfc0c
         with:
-          root-reserve-mb: 2048
+          root-reserve-mb: 4096
           swap-size-mb: 1024
           remove-dotnet: 'true'
           remove-android: 'true'
