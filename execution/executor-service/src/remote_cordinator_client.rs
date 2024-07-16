@@ -166,13 +166,13 @@ impl RemoteCoordinatorClient {
 
                         let transactions = txns.cmds;
 
-                        // let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-                        // if num_txns_processed == 200 {
-                        //     info!("Send first batch from a shard with seq_num {} at time {}", num_txns_processed, curr_time);
-                        // }
-                        // if num_txns_processed >= 4000 {
-                        //     info!("Send first batch from a shard with seq_num {} at time {}", num_txns_processed, curr_time);
-                        // }
+                        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                        if num_txns_processed == 200 {
+                            info!("Received & deser first cmd batch with seq_num {} at time {}", num_txns_processed, curr_time);
+                        }
+                        if num_txns_processed >= 4000 {
+                            info!("Received & deser last cmd batch with seq_num {} at time {}", num_txns_processed, curr_time);
+                        }
 
                         let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
                             .with_label_values(&[&shard_id.to_string(), "init_prefetch"])

@@ -396,10 +396,23 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                     let execute_command_type = format!("execute_command_{}", shard_id);
                     let mut rng = StdRng::from_entropy();
                     let rand_send_thread_idx = rng.gen_range(0, senders[shard_id].len());
+
                     senders[shard_id][rand_send_thread_idx]
                         .lock()
                         .unwrap()
                         .send(msg, &MessageType::new(execute_command_type));
+
+                    let curr_time = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+
+                    if chunk_idx == 0 {
+                        info!("Sent first cmd batch to shard {} at time {}", msg.shard_id.unwrap(), curr_time);
+                    }
+                    if chunk_idx == max_batch_size - 1 {
+                        info!("Sent last cmd batch to shard {} at time {}", msg.shard_id.unwrap(), curr_time);
+                    }
 
                         // rpc_outbound_runtime_clone.spawn(async move {
                     //     senders[shard_id][rand_send_thread_idx]

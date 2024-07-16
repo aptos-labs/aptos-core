@@ -215,12 +215,6 @@ impl RemoteStateViewClient {
         }
         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
             .with_label_values(&["0_kv_req_grpc_shard_send_1_lock_acquired"]).observe(delta);
-        if seq_num == 200 {
-            info!("Sending first batch from a shard with seq_num {} at time {}", seq_num, curr_time);
-        }
-        if seq_num >= 4000 {
-            info!("Sending last batch from a shard with seq_num {} at time {}", seq_num, curr_time);
-        }
 
         // OUTBOUND_RUNTIME.get().unwrap().spawn(async move {
         //     sender[rand_send_thread_idx].lock().await.send_async(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
@@ -229,6 +223,13 @@ impl RemoteStateViewClient {
 
         sender_lk.send(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
                       &MessageType::new(format!("remote_kv_request_{}", shard_id)));
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        if seq_num == 200 {
+            info!("Sent first kv batch from a shard with seq_num {} at time {}", seq_num, curr_time);
+        }
+        if seq_num >= 4000 {
+            info!("Sent last kv batch from a shard with seq_num {} at time {}", seq_num, curr_time);
+        }
     }
 }
 

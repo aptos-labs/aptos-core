@@ -287,7 +287,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         outbound_rpc_runtime: Arc<Runtime>,
     ) {
         let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
-        //{
+        {
             let curr_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
@@ -299,7 +299,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                 .with_label_values(&["3_kv_req_coord_handler_st"])
                 .observe(delta);
-        //}
+        }
         // we don't know the shard id until we deserialize the message, so lets default it to 0
         let _timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests"])
@@ -334,6 +334,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             })
             .collect_vec();
         drop(timer_2);
+
+        let curr_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
 
         if message.seq_num.unwrap() == 200 {
             info!("Processed first batch from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
