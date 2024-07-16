@@ -4,7 +4,7 @@
     "Aptos Labs <opensource@aptoslabs.com>"
   ],
   "description": "Generating Move Script from intent",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
@@ -31,5 +31,8 @@
       "import": "./dist/esm/entry.js",
       "default": "./dist/cjs/entry.js"
     } 
+  },
+  "scripts": {
+    "build": "npx rollup -c rollup.config.mjs"
   }
 }
