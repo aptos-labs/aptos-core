@@ -39,7 +39,7 @@ fn match_unresolved(
 
 #[test]
 fn unsync_map_data_basic() {
-    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
+    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue> =
         UnsyncMap::new();
 
     let ap = KeyType(b"/foo/b".to_vec());
@@ -101,8 +101,14 @@ impl TransactionWrite for TestMetadataValue {
 fn write_metadata() {
     let ap = KeyType(b"/foo/b".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestMetadataValue, ExecutableTestType, ()> =
-        MVHashMap::new();
+    let mvtbl: MVHashMap<
+        KeyType<Vec<u8>>,
+        usize,
+        TestMetadataValue,
+        ExecutableTestType,
+        (),
+        TestValue,
+    > = MVHashMap::new();
 
     let metadata_5 = TestMetadataValue { metadata: 5 };
     let metadata_6 = TestMetadataValue { metadata: 6 };
@@ -131,7 +137,7 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, (), TestValue> =
         MVHashMap::new();
 
     // Reads that should go the DB return Err(Uninitialized)

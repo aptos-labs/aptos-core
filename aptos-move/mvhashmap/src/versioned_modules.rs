@@ -5,7 +5,7 @@ use crate::types::{Flag, MVModulesError, MVModulesOutput, TxnIndex};
 use aptos_crypto::hash::{DefaultHasher, HashValue};
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor},
-    write_set::TransactionWrite,
+    vm::module_write_op::ModuleWrite,
 };
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -17,14 +17,14 @@ use std::{
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-struct Entry<V: TransactionWrite> {
+struct Entry<M: ModuleWrite> {
     /// Used to mark the entry as a "write estimate".
     flag: Flag,
 
     /// The contents of the module as produced by the VM (can be WriteOp based on a
     /// blob or CompiledModule, but must satisfy TransactionWrite to be able to
     /// generate the hash below.
-    module: Arc<V>,
+    module: Arc<M>,
     /// The hash of the blob, used instead of incarnation for validation purposes,
     /// and also for uniquely identifying associated executables.
     hash: HashValue,
@@ -32,28 +32,23 @@ struct Entry<V: TransactionWrite> {
 
 /// A VersionedValue internally contains a BTreeMap from indices of transactions
 /// that update the given access path alongside the corresponding entries.
-struct VersionedValue<V: TransactionWrite, X: Executable> {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
+struct VersionedValue<M: ModuleWrite, X: Executable> {
+    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<M>>>,
 
     /// Executables corresponding to published versions of the module, based on hash.
     executables: HashMap<HashValue, Arc<X>>,
 }
 
 /// Maps each key (access path) to an internal VersionedValue.
-pub struct VersionedModules<K, V: TransactionWrite, X: Executable> {
-    values: DashMap<K, VersionedValue<V, X>>,
+pub struct VersionedModules<K, M: ModuleWrite, X: Executable> {
+    values: DashMap<K, VersionedValue<M, X>>,
 }
 
-impl<V: TransactionWrite> Entry<V> {
-    pub fn new_write_from(module: V) -> Entry<V> {
-        let hash = module
-            .extract_raw_bytes()
-            .map(|bytes| {
-                let mut hasher = DefaultHasher::new(b"Module");
-                hasher.update(&bytes);
-                hasher.finish()
-            })
-            .expect("Module can't be deleted");
+impl<M: ModuleWrite> Entry<M> {
+    pub fn new_write_from(module: M) -> Entry<M> {
+        let mut hasher = DefaultHasher::new(b"Module");
+        hasher.update(module.serialized_module_bytes());
+        let hash = hasher.finish();
 
         Entry {
             flag: Flag::Done,
@@ -71,7 +66,7 @@ impl<V: TransactionWrite> Entry<V> {
     }
 }
 
-impl<V: TransactionWrite, X: Executable> VersionedValue<V, X> {
+impl<M: ModuleWrite, X: Executable> VersionedValue<M, X> {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -79,7 +74,7 @@ impl<V: TransactionWrite, X: Executable> VersionedValue<V, X> {
         }
     }
 
-    fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<(Arc<V>, HashValue), MVModulesError> {
+    fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<(Arc<M>, HashValue), MVModulesError> {
         match self.versioned_map.range(0..txn_idx).next_back() {
             Some((idx, entry)) => {
                 if entry.flag() == Flag::Estimate {
@@ -94,13 +89,13 @@ impl<V: TransactionWrite, X: Executable> VersionedValue<V, X> {
     }
 }
 
-impl<V: TransactionWrite, X: Executable> Default for VersionedValue<V, X> {
+impl<M: ModuleWrite, X: Executable> Default for VersionedValue<M, X> {
     fn default() -> Self {
         VersionedValue::new()
     }
 }
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<K, V, X> {
+impl<K: Hash + Clone + Eq, M: ModuleWrite, X: Executable> VersionedModules<K, M, X> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -122,7 +117,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
     }
 
     /// Versioned write of module at a given key (and version).
-    pub fn write(&self, key: K, txn_idx: TxnIndex, data: V) {
+    pub fn write(&self, key: K, txn_idx: TxnIndex, data: M) {
         let mut v = self.values.entry(key).or_default();
         v.versioned_map
             .insert(txn_idx, CachePadded::new(Entry::new_write_from(data)));
@@ -145,7 +140,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<V, X>, MVModulesError> {
+    ) -> anyhow::Result<MVModulesOutput<M, X>, MVModulesError> {
         use MVModulesError::*;
         use MVModulesOutput::*;
 

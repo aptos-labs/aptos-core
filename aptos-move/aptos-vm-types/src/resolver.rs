@@ -3,6 +3,7 @@
 
 use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
+    on_chain_config::{Features, OnChainConfig},
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,
@@ -11,11 +12,23 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
+    vm::configs::aptos_prod_deserializer_config,
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
+use move_binary_format::{
+    access::ModuleAccess,
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    language_storage::StructTag,
+    metadata::Metadata,
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
+};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 
@@ -141,37 +154,48 @@ pub trait TResourceGroupView {
 }
 
 /// Allows to query modules from the state.
-pub trait TModuleView {
-    type Key;
-
-    /// Returns
-    ///   -  Ok(None)         if the module is not in storage,
-    ///   -  Ok(Some(...))    if the module exists in storage,
-    ///   -  Err(...)         otherwise (e.g. storage error).
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>>;
-
-    fn get_module_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<Bytes>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
-    }
-
-    fn get_module_state_value_metadata(
+pub trait AptosModuleStorage {
+    fn check_module_exists(
         &self,
-        state_key: &Self::Key,
-    ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
-    }
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<bool>;
 
-    fn get_module_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
-    }
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes>;
 
-    fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        self.get_module_state_value(state_key)
-            .map(|maybe_state_value| maybe_state_value.is_some())
-    }
+    fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<usize>;
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata>;
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>>;
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>>;
+
+    fn fetch_module_immediate_friends(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>>;
 }
 
 /// Allows to query state information, e.g. its usage.
@@ -200,7 +224,7 @@ pub trait StateStorageView {
 /// doesn't provide a value exchange functionality).
 pub trait TExecutorView<K, T, L, I, V>:
     TResourceView<Key = K, Layout = L>
-    + TModuleView<Key = K>
+    + AptosModuleStorage
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView
@@ -209,7 +233,7 @@ pub trait TExecutorView<K, T, L, I, V>:
 
 impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
     A: TResourceView<Key = K, Layout = L>
-        + TModuleView<Key = K>
+        + AptosModuleStorage
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView
@@ -258,20 +282,123 @@ where
     }
 }
 
-impl<S> TModuleView for S
+impl<S> AptosModuleStorage for S
 where
     S: StateView,
 {
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
-            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for module at {:?}: {:?}",
-                state_key, e
-            ))
-        })
+    fn check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        Ok(get_module_state_value(self, address, module_name)?.is_some())
     }
+
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        Ok(get_existing_module_state_value(self, address, module_name)?
+            .bytes()
+            .clone())
+    }
+
+    fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        Ok(self.fetch_module_bytes(address, module_name)?.len())
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        Ok(get_existing_module_state_value(self, address, module_name)?.into_metadata())
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        let module_bytes = self.fetch_module_bytes(address, module_name)?;
+
+        let features = Features::fetch_config(self).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+        let compiled_module =
+            CompiledModule::deserialize_with_config(&module_bytes, &deserializer_config)?;
+
+        Ok(compiled_module.metadata.clone())
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        let module_bytes = self.fetch_module_bytes(address, module_name)?;
+
+        let features = Features::fetch_config(self).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+        let compiled_module =
+            CompiledModule::deserialize_with_config(&module_bytes, &deserializer_config)?;
+
+        Ok(compiled_module
+            .immediate_dependencies()
+            .into_iter()
+            .map(|module_id| (*module_id.address(), module_id.name().to_owned()))
+            .collect())
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        let module_bytes = self.fetch_module_bytes(address, module_name)?;
+
+        let features = Features::fetch_config(self).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+        let compiled_module =
+            CompiledModule::deserialize_with_config(&module_bytes, &deserializer_config)?;
+
+        Ok(compiled_module
+            .immediate_friends()
+            .into_iter()
+            .map(|module_id| (*module_id.address(), module_id.name().to_owned()))
+            .collect())
+    }
+}
+
+fn get_existing_module_state_value(
+    state_view: &impl StateView,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+) -> PartialVMResult<StateValue> {
+    get_module_state_value(state_view, address, module_name)?.ok_or_else(|| {
+        PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!(
+            "Linker Error: Module {}::{} doesn't exist",
+            address, module_name
+        ))
+    })
+}
+
+fn get_module_state_value(
+    state_view: &impl StateView,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+) -> PartialVMResult<Option<StateValue>> {
+    let state_key = StateKey::module(address, module_name);
+    state_view.get_state_value(&state_key).map_err(|e| {
+        PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+            "Unexpected storage error for module {}::{}: {:?}",
+            address, module_name, e
+        ))
+    })
 }
 
 impl<S> StateStorageView for S

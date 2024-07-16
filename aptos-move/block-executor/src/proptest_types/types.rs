@@ -23,12 +23,18 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
+    vm::module_write_op::ModuleWrite,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
+use move_binary_format::{deserializer::DeserializerConfig, errors::PartialVMResult};
+use move_core_types::{
+    identifier::{IdentStr, Identifier},
+    metadata::Metadata,
+    value::MoveTypeLayout,
+};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -244,6 +250,35 @@ impl ValueType {
     }
 }
 
+impl ModuleWrite for ValueType {
+    fn serialized_module_bytes(&self) -> &Bytes {
+        todo!()
+    }
+
+    fn module_state_value_metadata(&self) -> StateValueMetadata {
+        todo!()
+    }
+
+    fn module_metadata(&self) -> Vec<Metadata> {
+        todo!()
+    }
+
+    fn immediate_dependencies(&self) -> Vec<(AccountAddress, Identifier)> {
+        todo!()
+    }
+
+    fn immediate_friends(&self) -> Vec<(AccountAddress, Identifier)> {
+        todo!()
+    }
+
+    fn from_state_value(
+        _state_value: StateValue,
+        _deserializer_config: &DeserializerConfig,
+    ) -> PartialVMResult<Self> {
+        todo!()
+    }
+}
+
 impl TransactionWrite for ValueType {
     fn bytes(&self) -> Option<&Bytes> {
         self.bytes.as_ref()
@@ -456,6 +491,7 @@ impl<
     type Event = E;
     type Identifier = DelayedFieldID;
     type Key = K;
+    type Module = ValueType;
     type Tag = u32;
     type Value = ValueType;
 
@@ -884,10 +920,11 @@ where
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
                     if k.is_module_path() {
-                        match view.get_module_bytes(k) {
-                            Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
-                        }
+                        todo!()
+                        // match view.fetch_module_bytes(k) {
+                        //     Ok(v) => read_results.push(v.map(Into::into)),
+                        //     Err(_) => read_results.push(None),
+                        // }
                     } else {
                         match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),

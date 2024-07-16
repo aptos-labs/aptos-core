@@ -10,11 +10,16 @@ use crate::types::ValueWithLayout;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
     executable::ExecutableTestType,
-    state_store::state_value::StateValue,
+    state_store::state_value::{StateValue, StateValueMetadata},
+    vm::module_write_op::ModuleWrite,
     write_set::{TransactionWrite, WriteOpKind},
 };
 use bytes::Bytes;
 use claims::assert_none;
+use move_binary_format::{deserializer::DeserializerConfig, errors::PartialVMResult};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+};
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -63,6 +68,35 @@ impl<V: Into<Vec<u8>> + Clone> Value<V> {
             maybe_value,
             maybe_bytes,
         }
+    }
+}
+
+impl<V: Into<Vec<u8>> + Clone + Debug> ModuleWrite for Value<V> {
+    fn serialized_module_bytes(&self) -> &Bytes {
+        todo!()
+    }
+
+    fn module_state_value_metadata(&self) -> StateValueMetadata {
+        todo!()
+    }
+
+    fn module_metadata(&self) -> Vec<Metadata> {
+        todo!()
+    }
+
+    fn immediate_dependencies(&self) -> Vec<(AccountAddress, Identifier)> {
+        todo!()
+    }
+
+    fn immediate_friends(&self) -> Vec<(AccountAddress, Identifier)> {
+        todo!()
+    }
+
+    fn from_state_value(
+        _state_value: StateValue,
+        _deserializer_config: &DeserializerConfig,
+    ) -> PartialVMResult<Self> {
+        todo!()
     }
 }
 
@@ -222,7 +256,7 @@ where
 
     let baseline = Baseline::new(transactions.as_slice(), test_group);
     // Only testing data, provide executable type ().
-    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType, ()>::new();
+    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType, (), Value<V>>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.

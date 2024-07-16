@@ -13,7 +13,7 @@ use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChangeSet, ChangeSet, Op},
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     value::MoveTypeLayout,
@@ -38,12 +38,52 @@ impl BlankStorage {
 }
 
 impl ModuleResolver for BlankStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        Ok(false)
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        Ok(None)
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        Err(PartialVMError::new(StatusCode::LINKER_ERROR))
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        Err(PartialVMError::new(StatusCode::LINKER_ERROR))
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        Err(PartialVMError::new(StatusCode::LINKER_ERROR))
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        Err(PartialVMError::new(StatusCode::LINKER_ERROR))
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        Err(PartialVMError::new(StatusCode::LINKER_ERROR))
     }
 }
 
@@ -90,7 +130,7 @@ impl CompiledModuleView for InMemoryStorage {
     type Item = CompiledModule;
 
     fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
-        Ok(match self.get_module(id)? {
+        Ok(match self.fetch_module_bytes(id.address(), id.name())? {
             Some(bytes) => {
                 let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
                 Some(CompiledModule::deserialize_with_config(&bytes, &config)?)
@@ -254,16 +294,64 @@ impl InMemoryStorage {
 }
 
 impl ModuleResolver for InMemoryStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        todo!()
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.accounts.get(module_id.address()) {
-            return Ok(account_storage.modules.get(module_id.name()).cloned());
-        }
-        Ok(None)
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        todo!()
     }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        todo!()
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        todo!()
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        todo!()
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        todo!()
+    }
+
+    // fn fetch_module_bytes(
+    //     &self,
+    //     address: &AccountAddress,
+    //     module_name: &IdentStr,
+    // ) -> PartialVMResult<Option<Bytes>> {
+    //     if let Some(account_storage) = self.accounts.get(address) {
+    //         return Ok(account_storage.modules.get(module_name).cloned());
+    //     }
+    //     Ok(None)
+    // }
 }
 
 impl ResourceResolver for InMemoryStorage {

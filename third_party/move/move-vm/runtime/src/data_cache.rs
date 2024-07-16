@@ -24,7 +24,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    resolver::MoveResolver,
+    resolver::{ModuleResolver, ResourceResolver},
     value_serde::deserialize_and_allow_delayed_values,
     values::{GlobalValue, Value},
 };
@@ -51,7 +51,7 @@ impl AccountDataCache {
 }
 
 fn load_module_impl(
-    remote: &dyn MoveResolver,
+    module_resolver: &(impl ModuleResolver + ?Sized),
     account_map: &BTreeMap<AccountAddress, AccountDataCache>,
     module_id: &ModuleId,
 ) -> PartialVMResult<Bytes> {
@@ -60,10 +60,12 @@ fn load_module_impl(
             return Ok(blob.clone());
         }
     }
-    remote.get_module(module_id)?.ok_or_else(|| {
-        PartialVMError::new(StatusCode::LINKER_ERROR)
-            .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
-    })
+    module_resolver
+        .fetch_module_bytes(module_id.address(), module_id.name())?
+        .ok_or_else(|| {
+            PartialVMError::new(StatusCode::LINKER_ERROR)
+                .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
+        })
 }
 
 /// Transaction data cache. Keep updates within a transaction so they can all be published at
@@ -80,7 +82,7 @@ fn load_module_impl(
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver,
+    resource_resolver: &'r dyn ResourceResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
 
     deserializer_config: DeserializerConfig,
@@ -95,10 +97,10 @@ impl<'r> TransactionDataCache<'r> {
     /// not updated in the transaction.
     pub(crate) fn new(
         deserializer_config: DeserializerConfig,
-        remote: &'r impl MoveResolver,
+        resource_resolver: &'r impl ResourceResolver,
     ) -> Self {
         TransactionDataCache {
-            remote,
+            resource_resolver,
             account_map: BTreeMap::new(),
             deserializer_config,
             compiled_scripts: BTreeMap::new(),
@@ -231,16 +233,18 @@ impl<'r> TransactionDataCache<'r> {
             // If we need to process aggregator lifting, we pass type layout to remote.
             // Remote, in turn ensures that all aggregator values are lifted if the resolved
             // resource comes from storage.
-            let (data, bytes_loaded) = self.remote.get_resource_bytes_with_metadata_and_layout(
-                &addr,
-                &ty_tag,
-                metadata,
-                if has_aggregator_lifting {
-                    Some(&ty_layout)
-                } else {
-                    None
-                },
-            )?;
+            let (data, bytes_loaded) = self
+                .resource_resolver
+                .get_resource_bytes_with_metadata_and_layout(
+                    &addr,
+                    &ty_tag,
+                    metadata,
+                    if has_aggregator_lifting {
+                        Some(&ty_layout)
+                    } else {
+                        None
+                    },
+                )?;
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
             let gv = match data {
@@ -277,8 +281,12 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
-        load_module_impl(self.remote, &self.account_map, module_id)
+    pub(crate) fn load_module(
+        &self,
+        module_resolver: &impl ModuleResolver,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<Bytes> {
+        load_module_impl(module_resolver, &self.account_map, module_id)
     }
 
     pub(crate) fn load_compiled_script_to_cache(
@@ -310,6 +318,7 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn load_compiled_module_to_cache(
         &mut self,
         id: ModuleId,
+        module_resolver: &(impl ModuleResolver + ?Sized),
         allow_loading_failure: bool,
     ) -> VMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
         let cache = &mut self.compiled_modules;
@@ -317,7 +326,7 @@ impl<'r> TransactionDataCache<'r> {
             btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
             btree_map::Entry::Vacant(entry) => {
                 // bytes fetching, allow loading to fail if the flag is set
-                let bytes = match load_module_impl(self.remote, &self.account_map, entry.key())
+                let bytes = match load_module_impl(module_resolver, &self.account_map, entry.key())
                     .map_err(|err| err.finish(Location::Undefined))
                 {
                     Ok(bytes) => bytes,
@@ -366,18 +375,5 @@ impl<'r> TransactionDataCache<'r> {
             .insert(module_id.name().to_owned(), (blob.into(), is_republishing));
 
         Ok(())
-    }
-
-    pub(crate) fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
-        if let Some(account_cache) = self.account_map.get(module_id.address()) {
-            if account_cache.module_map.contains_key(module_id.name()) {
-                return Ok(true);
-            }
-        }
-        Ok(self
-            .remote
-            .get_module(module_id)
-            .map_err(|e| e.finish(Location::Undefined))?
-            .is_some())
     }
 }

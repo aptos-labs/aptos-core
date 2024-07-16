@@ -258,6 +258,7 @@ fn call_script_with_args_ty_args_signers(
             ty_args,
             combine_signers_and_args(signers, non_signer_args),
             &mut UnmeteredGasMeter,
+            &remote_view,
             &mut TraversalContext::new(&traversal_storage),
         )
         .map(|_| ())
@@ -290,6 +291,7 @@ fn call_script_function_with_args_ty_args_signers(
         ty_args,
         combine_signers_and_args(signers, non_signer_args),
         &mut UnmeteredGasMeter,
+        &remote_view,
         &mut TraversalContext::new(&traversal_storage),
     )?;
     Ok(())
@@ -787,6 +789,7 @@ fn call_missing_item() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &remote_view,
             &mut TraversalContext::new(&traversal_storage),
         )
         .err()
@@ -811,6 +814,7 @@ fn call_missing_item() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &remote_view,
             &mut TraversalContext::new(&traversal_storage),
         )
         .err()

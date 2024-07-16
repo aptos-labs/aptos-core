@@ -26,7 +26,6 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
-    vm::configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_types::{
     resolver::{
@@ -35,10 +34,11 @@ use aptos_vm_types::{
     resource_group_adapter::ResourceGroupAdapter,
 };
 use bytes::Bytes;
-use move_binary_format::{deserializer::DeserializerConfig, errors::*, CompiledModule};
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     account_address::AccountAddress,
-    language_storage::{ModuleId, StructTag},
+    identifier::{IdentStr, Identifier},
+    language_storage::StructTag,
     metadata::Metadata,
     value::MoveTypeLayout,
 };
@@ -71,7 +71,6 @@ pub fn get_resource_group_member_from_metadata(
 /// for (non-group) resources and subsequent handling in the StorageAdapter itself.
 pub struct StorageAdapter<'e, E> {
     executor_view: &'e E,
-    deserializer_config: DeserializerConfig,
     resource_group_view: ResourceGroupAdapter<'e>,
     accessed_groups: RefCell<HashSet<StateKey>>,
 }
@@ -83,7 +82,6 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         features: &Features,
         maybe_resource_group_view: Option<&'e dyn ResourceGroupView>,
     ) -> Self {
-        let deserializer_config = aptos_prod_deserializer_config(features);
         let resource_group_adapter = ResourceGroupAdapter::new(
             maybe_resource_group_view,
             executor_view,
@@ -91,17 +89,12 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
 
-        Self::new(executor_view, deserializer_config, resource_group_adapter)
+        Self::new(executor_view, resource_group_adapter)
     }
 
-    fn new(
-        executor_view: &'e E,
-        deserializer_config: DeserializerConfig,
-        resource_group_view: ResourceGroupAdapter<'e>,
-    ) -> Self {
+    fn new(executor_view: &'e E, resource_group_view: ResourceGroupAdapter<'e>) -> Self {
         Self {
             executor_view,
-            deserializer_config,
             resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),
         }
@@ -186,23 +179,63 @@ impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
 }
 
 impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
-    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
-        let module_bytes = match self.get_module(module_id) {
-            Ok(Some(bytes)) => bytes,
-            _ => return vec![],
-        };
-        let module =
-            match CompiledModule::deserialize_with_config(&module_bytes, &self.deserializer_config)
-            {
-                Ok(module) => module,
-                _ => return vec![],
-            };
-        module.metadata
+    fn check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        self.executor_view.check_module_exists(address, module_name)
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
+    fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
         self.executor_view
-            .get_module_bytes(&StateKey::module_id(module_id))
+            .fetch_module_size_in_bytes(address, module_name)
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        self.executor_view
+            .fetch_module_immediate_dependencies(address, module_name)
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        self.executor_view
+            .fetch_module_immediate_friends(address, module_name)
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        Ok(if self.check_module_exists(address, module_name)? {
+            let module_bytes = self
+                .executor_view
+                .fetch_module_bytes(address, module_name)?;
+            Some(module_bytes)
+        } else {
+            None
+        })
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        self.executor_view
+            .fetch_module_metadata(address, module_name)
     }
 }
 
@@ -212,7 +245,7 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
+    ) -> PartialVMResult<Option<Bytes>> {
         let state_key = StateKey::table_item(&(*handle).into(), key);
         self.executor_view
             .get_resource_bytes(&state_key, maybe_layout)
@@ -299,7 +332,6 @@ pub trait AsMoveResolver<S> {
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         let features = Features::fetch_config(self).unwrap_or_default();
-        let deserializer_config = aptos_prod_deserializer_config(&features);
 
         let (_, gas_feature_version) = get_gas_config_from_storage(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
@@ -308,7 +340,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
             gas_feature_version,
             features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
-        StorageAdapter::new(self, deserializer_config, resource_group_adapter)
+        StorageAdapter::new(self, resource_group_adapter)
     }
 }
 
@@ -363,8 +395,6 @@ pub(crate) mod tests {
             resource_groups_split_in_vm_change_set_enabled,
         );
 
-        let features = Features::fetch_config(state_view).unwrap_or_default();
-        let deserializer_config = aptos_prod_deserializer_config(&features);
-        StorageAdapter::new(state_view, deserializer_config, group_adapter)
+        StorageAdapter::new(state_view, group_adapter)
     }
 }

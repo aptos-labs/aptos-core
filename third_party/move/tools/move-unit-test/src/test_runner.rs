@@ -15,7 +15,7 @@ use move_bytecode_utils::Modules;
 use move_compiler::unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
+    effects::{AccountChanges, ChangeSet, Changes, Op},
     identifier::IdentStr,
     value::serialize_values,
     vm_status::StatusCode,
@@ -32,7 +32,7 @@ use move_vm_test_utils::{
     InMemoryStorage,
 };
 use rayon::prelude::*;
-use std::{io::Write, marker::Send, sync::Mutex, time::Instant};
+use std::{collections::BTreeMap, io::Write, marker::Send, sync::Mutex, time::Instant};
 #[cfg(feature = "evm-backend")]
 use {
     evm::{backend::MemoryVicinity, ExitReason},
@@ -50,7 +50,8 @@ pub struct SharedTestingConfig {
     execution_bound: u64,
     cost_table: CostTable,
     native_function_table: NativeFunctionTable,
-    starting_storage_state: InMemoryStorage,
+    starting_storage_resource_state: InMemoryStorage,
+    starting_storage_module_state: InMemoryStorage,
     #[allow(dead_code)] // used by some features
     source_files: Vec<String>,
     record_writeset: bool,
@@ -76,7 +77,7 @@ fn unit_cost_table() -> CostTable {
 }
 
 /// Setup storage state with the set of modules that will be needed for all tests
-fn setup_test_storage<'a>(
+fn setup_test_module_storage<'a>(
     modules: impl Iterator<Item = &'a CompiledModule>,
 ) -> Result<InMemoryStorage> {
     let mut storage = InMemoryStorage::new();
@@ -94,16 +95,15 @@ fn setup_test_storage<'a>(
     Ok(storage)
 }
 
-/// Print the updates to storage represented by `cs` in the context of the starting storage state
-/// `storage`.
+/// Print the updates to storage represented by `cs` in the context of the starting storage state.
 fn print_resources_and_extensions(
     cs: &ChangeSet,
     extensions: NativeContextExtensions,
-    storage: &InMemoryStorage,
+    resource_storage: &InMemoryStorage,
 ) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
-    let annotator = MoveValueAnnotator::new(storage.clone());
+    let annotator = MoveValueAnnotator::new(resource_storage.clone());
     for (account_addr, account_state) in cs.accounts() {
         writeln!(&mut buf, "0x{}:", account_addr.short_str_lossless())?;
 
@@ -143,10 +143,29 @@ impl TestRunner {
             .map(|(filepath, _)| filepath.to_string())
             .collect();
         let modules = tests.module_info.values().map(|info| &info.module);
-        let mut starting_storage_state = setup_test_storage(modules)?;
+        let mut starting_storage_module_state = setup_test_module_storage(modules)?;
+
+        let mut starting_storage_resource_state = InMemoryStorage::new();
         if let Some(genesis_state) = genesis_state {
-            starting_storage_state.apply(genesis_state)?;
+            // Split change set into resources and modules so that they can be applied
+            // tp resource and module storage separately.
+            let mut resource_change_set = Changes::new();
+            let mut module_change_set = Changes::new();
+            for (address, account_change_set) in genesis_state.into_inner() {
+                let (modules, resources) = account_change_set.into_inner();
+
+                let resource_account_change_set =
+                    AccountChanges::from_modules_resources(BTreeMap::new(), resources);
+                resource_change_set.add_account_changeset(address, resource_account_change_set)?;
+
+                let module_account_change_set =
+                    AccountChanges::from_modules_resources(modules, BTreeMap::new());
+                module_change_set.add_account_changeset(address, module_account_change_set)?;
+            }
+            starting_storage_resource_state.apply(resource_change_set)?;
+            starting_storage_module_state.apply(module_change_set)?;
         }
+
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -157,7 +176,8 @@ impl TestRunner {
             testing_config: SharedTestingConfig {
                 save_storage_state_on_failure,
                 report_stacktrace_on_abort,
-                starting_storage_state,
+                starting_storage_resource_state,
+                starting_storage_module_state,
                 execution_bound,
                 native_function_table,
                 // TODO: our current implementation uses a unit cost table to prevent programs from
@@ -269,7 +289,7 @@ impl SharedTestingConfig {
         let move_vm = MoveVM::new(self.native_function_table.clone());
         let extensions = extensions::new_extensions();
         let mut session =
-            move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
+            move_vm.new_session_with_extensions(&self.starting_storage_resource_state, extensions);
         let mut gas_meter = GasStatus::new(&self.cost_table, Gas::new(self.execution_bound));
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
@@ -281,6 +301,7 @@ impl SharedTestingConfig {
             vec![], // no ty args, at least for now
             serialize_values(test_info.arguments.iter()),
             &mut gas_meter,
+            &self.starting_storage_module_state,
             &mut TraversalContext::new(&storage),
         );
         let mut return_result = serialized_return_values_result.map(|res| {
@@ -336,7 +357,7 @@ impl SharedTestingConfig {
                             print_resources_and_extensions(
                                 &changeset,
                                 extensions,
-                                &self.starting_storage_state,
+                                &self.starting_storage_resource_state,
                             )
                             .ok()
                         })

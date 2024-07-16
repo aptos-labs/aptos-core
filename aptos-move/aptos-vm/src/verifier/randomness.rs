@@ -13,7 +13,7 @@ pub(crate) fn get_randomness_annotation(
 ) -> VMResult<Option<RandomnessAnnotation>> {
     let module = session
         .get_move_vm()
-        .load_module(entry_fn.module(), resolver)?;
+        .load_module(entry_fn.module(), resolver, resolver)?;
     let metadata = aptos_framework::get_metadata_from_compiled_module(&module);
     if let Some(metadata) = metadata {
         let maybe_annotation = metadata

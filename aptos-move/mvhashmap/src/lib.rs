@@ -9,6 +9,7 @@ use crate::{
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
+    vm::module_write_op::ModuleWrite,
     write_set::TransactionWrite,
 };
 use serde::Serialize;
@@ -34,11 +35,11 @@ mod unit_tests;
 ///
 /// TODO: separate V into different generic types for data and code modules with specialized
 /// traits (currently both WriteOp for executor).
-pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
+pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone, M: ModuleWrite> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
-    modules: VersionedModules<K, V, X>,
+    modules: VersionedModules<K, M, X>,
 
     // TODO(George): Redirect from modules to module_storage.
     #[allow(dead_code)]
@@ -51,12 +52,13 @@ impl<
         V: TransactionWrite,
         X: Executable,
         I: Copy + Clone + Eq + Hash + Debug,
-    > MVHashMap<K, T, V, X, I>
+        M: ModuleWrite,
+    > MVHashMap<K, T, V, X, I, M>
 {
     // -----------------------------------
     // Functions shared for data and modules.
 
-    pub fn new() -> MVHashMap<K, T, V, X, I> {
+    pub fn new() -> MVHashMap<K, T, V, X, I, M> {
         MVHashMap {
             data: VersionedData::new(),
             group_data: VersionedGroupData::new(),
@@ -93,7 +95,7 @@ impl<
         &self.delayed_fields
     }
 
-    pub fn modules(&self) -> &VersionedModules<K, V, X> {
+    pub fn modules(&self) -> &VersionedModules<K, M, X> {
         &self.modules
     }
 }
@@ -104,7 +106,8 @@ impl<
         V: TransactionWrite,
         X: Executable,
         I: Copy + Clone + Eq + Hash + Debug,
-    > Default for MVHashMap<K, T, V, X, I>
+        M: ModuleWrite,
+    > Default for MVHashMap<K, T, V, X, I, M>
 {
     fn default() -> Self {
         Self::new()

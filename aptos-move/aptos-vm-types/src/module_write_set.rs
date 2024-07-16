@@ -4,80 +4,81 @@
 use crate::{change_set::WriteOpInfo, resolver::ExecutorView};
 use aptos_types::{
     state_store::state_key::StateKey,
-    write_set::{TransactionWrite, WriteOp, WriteOpSize},
+    vm::module_write_op::ModuleWriteOp,
+    write_set::{WriteOp, WriteOpSize},
 };
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::vm_status::StatusCode;
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 use std::collections::BTreeMap;
 
-#[must_use]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ModuleWriteSet {
-    // True if there are write ops which write to 0x1, etc. A special flag
-    // is used for performance reasons, as otherwise we would need traverse
-    // the write ops and deserializes access paths.
-    has_writes_to_special_address: bool,
-    write_ops: BTreeMap<StateKey, WriteOp>,
+    module_write_ops: BTreeMap<StateKey, ModuleWriteOp>,
 }
 
 impl ModuleWriteSet {
     pub fn empty() -> Self {
         Self {
-            has_writes_to_special_address: false,
-            write_ops: BTreeMap::new(),
+            module_write_ops: BTreeMap::new(),
         }
     }
 
-    pub fn new(
-        has_writes_to_special_address: bool,
-        write_ops: BTreeMap<StateKey, WriteOp>,
-    ) -> Self {
-        Self {
-            has_writes_to_special_address,
-            write_ops,
-        }
+    pub fn new(module_write_ops: BTreeMap<StateKey, ModuleWriteOp>) -> Self {
+        Self { module_write_ops }
     }
 
     pub fn into_write_ops(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
-        self.write_ops.into_iter()
+        self.module_write_ops
+            .into_iter()
+            .map(|(k, w)| (k, w.into_write_op()))
     }
 
-    pub fn write_ops(&self) -> &BTreeMap<StateKey, WriteOp> {
-        &self.write_ops
+    pub fn module_write_ops(&self) -> &BTreeMap<StateKey, ModuleWriteOp> {
+        &self.module_write_ops
+    }
+
+    pub fn module_addresses_and_names(&self) -> impl Iterator<Item = (&AccountAddress, &IdentStr)> {
+        self.module_write_ops.values().map(|w| {
+            let compiled_module = w.compiled_module();
+            (compiled_module.self_addr(), compiled_module.self_name())
+        })
     }
 
     pub fn num_write_ops(&self) -> usize {
-        self.write_ops.len()
+        self.module_write_ops.len()
     }
 
     pub fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
-        self.write_ops.iter().map(|(k, v)| (k, v.write_op_size()))
+        self.module_write_ops
+            .iter()
+            .map(|(k, v)| (k, v.write_op_size()))
     }
 
     pub fn write_op_info_iter_mut<'a>(
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        self.write_ops.iter_mut().map(|(key, op)| {
+        self.module_write_ops.iter_mut().map(|(key, op)| {
+            let compiled_module = op.compiled_module();
+            let address = compiled_module.self_addr();
+            let module_name = compiled_module.self_name();
+
+            let prev_size = if executor_view.check_module_exists(address, module_name)? {
+                executor_view.fetch_module_size_in_bytes(address, module_name)? as u64
+            } else {
+                0
+            };
             Ok(WriteOpInfo {
                 key,
                 op_size: op.write_op_size(),
-                prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
+                prev_size,
                 metadata_mut: op.get_metadata_mut(),
             })
         })
     }
 
     pub fn has_writes_to_special_address(&self) -> bool {
-        self.has_writes_to_special_address
-    }
-
-    pub fn is_empty_or_invariant_violation(&self) -> PartialVMResult<()> {
-        if !self.write_ops().is_empty() {
-            return Err(PartialVMError::new(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            ));
-        }
-        Ok(())
+        self.module_addresses_and_names()
+            .any(|(address, _)| address.is_special())
     }
 }

@@ -28,7 +28,10 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
     language_storage::StructTag,
@@ -115,7 +118,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
+    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
 
         let resource_converter = |value: Value,
@@ -164,7 +167,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
 
-        let (change_set, module_write_set) = Self::convert_change_set(
+        let change_set = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
@@ -175,7 +178,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         )
         .map_err(|e| e.finish(Location::Undefined))?;
 
-        Ok((change_set, module_write_set))
+        Ok(change_set)
     }
 
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
@@ -351,6 +354,38 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         Ok((change_set_filtered, resource_group_change_set))
     }
 
+    pub(crate) fn create_module_write_set(
+        &self,
+        modules_and_bytes: impl IntoIterator<Item = (CompiledModule, Vec<u8>)>,
+        change_set_configs: &ChangeSetConfigs,
+    ) -> VMResult<ModuleWriteSet> {
+        let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
+
+        let mut module_write_ops = BTreeMap::new();
+        for (module, module_bytes) in modules_and_bytes {
+            let address = module.self_addr();
+            let module_name = module.self_name();
+            let state_key = StateKey::module(address, module_name);
+
+            let is_creation = !self
+                .resolver
+                .check_module_exists(address, module_name)
+                .map_err(|e| e.finish(Location::Undefined))?;
+
+            let write_op = woc
+                .convert_module(
+                    is_creation,
+                    module,
+                    module_bytes.into(),
+                    change_set_configs.legacy_resource_creation_as_modification(),
+                )
+                .map_err(|e| e.finish(Location::Undefined))?;
+
+            module_write_ops.insert(state_key, write_op);
+        }
+        Ok(ModuleWriteSet::new(module_write_ops))
+    }
+
     fn convert_change_set(
         woc: &WriteOpConverter,
         change_set: ChangeSet,
@@ -359,12 +394,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         legacy_resource_creation_as_modification: bool,
-    ) -> PartialVMResult<(VMChangeSet, ModuleWriteSet)> {
+    ) -> PartialVMResult<VMChangeSet> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
-
-        let mut has_modules_published_to_special_address = false;
-        let mut module_write_ops = BTreeMap::new();
 
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
@@ -382,13 +414,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 resource_write_set.insert(state_key, op);
             }
 
-            for (name, blob_op) in modules {
-                if addr.is_special() {
-                    has_modules_published_to_special_address = true;
-                }
-                let state_key = StateKey::module(&addr, &name);
-                let op = woc.convert_module(&state_key, blob_op, false)?;
-                module_write_ops.insert(state_key, op);
+            if !modules.is_empty() {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "Modules should always be published via native code context"
+                                .to_string(),
+                        ),
+                );
             }
         }
 
@@ -455,10 +488,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             group_reads_needing_change,
             events,
         )?;
-        let module_write_set =
-            ModuleWriteSet::new(has_modules_published_to_special_address, module_write_ops);
 
-        Ok((change_set, module_write_set))
+        Ok(change_set)
     }
 }
 
@@ -473,5 +504,14 @@ impl<'r, 'l> Deref for SessionExt<'r, 'l> {
 impl<'r, 'l> DerefMut for SessionExt<'r, 'l> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    fn test_create_module_write_set() {
+        // FIXME(George): Add a test here to check different combinations based on existence and state value metadata.
     }
 }

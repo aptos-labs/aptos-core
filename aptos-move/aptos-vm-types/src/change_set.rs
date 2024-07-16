@@ -23,9 +23,13 @@ use aptos_types::{
         state_value::StateValueMetadata,
     },
     transaction::ChangeSet as StorageChangeSet,
+    vm::module_write_op::ModuleWriteOp,
     write_set::{TransactionWrite, WriteOp, WriteOpSize, WriteSetMut},
 };
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -790,7 +794,8 @@ impl VMChangeSet {
 /// Note: does not separate out individual resource group updates.
 pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled(
     change_set: StorageChangeSet,
-) -> (VMChangeSet, ModuleWriteSet) {
+    deserializer_config: &DeserializerConfig,
+) -> PartialVMResult<(VMChangeSet, ModuleWriteSet)> {
     let (write_set, events) = change_set.into_inner();
 
     // There should be no aggregator writes if we have a change set from
@@ -800,7 +805,10 @@ pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimizatio
 
     for (state_key, write_op) in write_set {
         if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
-            module_write_ops.insert(state_key, write_op);
+            module_write_ops.insert(
+                state_key,
+                ModuleWriteOp::from_write_op(write_op, deserializer_config)?,
+            );
         } else {
             // TODO[agg_v1](fix) While everything else must be a resource, first
             // version of aggregators is implemented as a table item. Revisit when
@@ -821,10 +829,8 @@ pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimizatio
         BTreeMap::new(),
     );
 
-    // The flag if modules have been published to a special address is irrelevant because
-    // write set transaction does not run an epilogue. Therefore, it is simply set to true.
-    let module_write_set = ModuleWriteSet::new(true, module_write_ops);
-    (change_set, module_write_set)
+    let module_write_set = ModuleWriteSet::new(module_write_ops);
+    Ok((change_set, module_write_set))
 }
 
 pub struct WriteOpInfo<'a> {

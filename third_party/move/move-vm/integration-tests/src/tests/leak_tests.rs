@@ -60,6 +60,7 @@ fn leak_with_abort() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         );
     }

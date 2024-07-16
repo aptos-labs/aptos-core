@@ -16,6 +16,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
+    vm::module_write_op::ModuleWriteOp,
     write_set::WriteOp,
 };
 use move_core_types::{
@@ -77,8 +78,8 @@ impl VMOutput {
         self.change_set.resource_write_set()
     }
 
-    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
-        self.module_write_set.write_ops()
+    pub fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWriteOp> {
+        self.module_write_set.module_write_ops()
     }
 
     pub fn delayed_field_change_set(
@@ -123,13 +124,16 @@ impl VMOutput {
         size
     }
 
-    pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
-        self.change_set.concrete_write_set_iter().chain(
-            self.module_write_set
-                .write_ops()
-                .iter()
-                .map(|(k, v)| (k, Some(v))),
-        )
+    pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<WriteOp>)> {
+        self.change_set
+            .concrete_write_set_iter()
+            .map(|(k, w)| (k, w.cloned()))
+            .chain(
+                self.module_write_set
+                    .module_write_ops()
+                    .iter()
+                    .map(|(k, v)| (k, Some(v.clone().into_write_op()))),
+            )
     }
 
     /// Materializes delta sets.

@@ -33,7 +33,10 @@ macro_rules! value_deserialization_error {
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<T, VMStatus> {
-    let metadata = resolver.get_module_metadata(&T::struct_tag().module_id());
+    let module_id = T::struct_tag().module_id();
+    let metadata = resolver
+        .fetch_module_metadata(module_id.address(), module_id.name())
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
     let bytes = resolver
         .get_resource_bytes_with_metadata_and_layout(
             &CORE_CODE_ADDRESS,

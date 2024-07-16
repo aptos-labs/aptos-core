@@ -7,7 +7,7 @@ use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     value::{serialize_values, MoveTypeLayout, MoveValue},
@@ -102,6 +102,7 @@ fn test_malformed_resource() {
         vec![],
         vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
         &mut UnmeteredGasMeter,
+        &storage,
         &mut TraversalContext::new(&traversal_storage),
     )
     .map(|_| ())
@@ -121,6 +122,7 @@ fn test_malformed_resource() {
             vec![],
             vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .map(|_| ())
@@ -149,6 +151,7 @@ fn test_malformed_resource() {
                 vec![],
                 vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .map(|_| ())
@@ -190,6 +193,7 @@ fn test_malformed_module() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -217,6 +221,7 @@ fn test_malformed_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
@@ -258,6 +263,7 @@ fn test_unverifiable_module() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -284,6 +290,7 @@ fn test_unverifiable_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
@@ -336,6 +343,7 @@ fn test_missing_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -357,6 +365,7 @@ fn test_missing_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
@@ -409,6 +418,7 @@ fn test_malformed_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -436,6 +446,7 @@ fn test_malformed_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
@@ -489,6 +500,7 @@ fn test_unverifiable_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -516,6 +528,7 @@ fn test_unverifiable_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
@@ -529,11 +542,51 @@ struct BogusModuleStorage {
 }
 
 impl ModuleResolver for BogusModuleStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        Err(PartialVMError::new(self.bad_status_code))
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }
@@ -552,17 +605,58 @@ impl ResourceResolver for BogusModuleStorage {
 
 // Need another bogus storage implementation to allow querying modules but not resources.
 struct BogusResourceStorage {
+    #[allow(dead_code)]
     module_storage: InMemoryStorage,
     bad_status_code: StatusCode,
 }
 
 impl ModuleResolver for BogusResourceStorage {
-    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
-        self.module_storage.get_module_metadata(module_id)
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        todo!()
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        self.module_storage.get_module(module_id)
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        todo!()
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        todo!()
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(AccountAddress, Identifier)>> {
+        todo!()
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        todo!()
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        todo!()
     }
 }
 
@@ -608,6 +702,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
@@ -677,6 +772,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
@@ -688,6 +784,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
                 vec![],
                 serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
                 &mut UnmeteredGasMeter,
+                &storage,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();

@@ -29,7 +29,7 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use claims::{assert_err, assert_matches, assert_ok, assert_some_eq};
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::{deserializer::DeserializerConfig, errors::PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -325,7 +325,9 @@ fn test_roundtrip_to_storage_change_set() {
     let (change_set, module_write_set) =
         create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled(
             storage_change_set_before.clone(),
-        );
+            &DeserializerConfig::default(),
+        )
+        .unwrap();
 
     let storage_change_set_after =
         assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));

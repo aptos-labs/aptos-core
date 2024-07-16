@@ -33,6 +33,7 @@ fn call_non_existent_module() {
             vec![],
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap_err();
@@ -61,7 +62,7 @@ fn call_non_existent_function() {
 
     let fun_name = Identifier::new("foo").unwrap();
 
-    let storage = TraversalStorage::new();
+    let traversal_storage = TraversalStorage::new();
 
     let err = sess
         .execute_function_bypass_visibility(
@@ -70,7 +71,8 @@ fn call_non_existent_function() {
             vec![],
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&storage),
+            &storage,
+            &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap_err();
 

@@ -27,6 +27,7 @@ use move_vm_runtime::{
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
     loaded_data::runtime_types::Type,
+    resolver::ModuleResolver,
 };
 use once_cell::sync::Lazy;
 use std::{
@@ -103,6 +104,7 @@ pub(crate) fn get_allowed_structs(
 /// after validation, add senders and non-signer arguments to generate the final args
 pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
@@ -173,6 +175,7 @@ pub fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
+        module_resolver,
         &func.param_tys()[signer_param_cnt..],
         args,
         func.ty_args(),
@@ -219,6 +222,7 @@ pub(crate) fn is_valid_txn_arg(
 // TODO: This needs a more solid story and a tighter integration with the VM.
 pub(crate) fn construct_args(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     types: &[Type],
     args: Vec<Vec<u8>>,
     ty_args: &[Type],
@@ -241,7 +245,15 @@ pub(crate) fn construct_args(
             subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?
         };
 
-        let arg = construct_arg(session, &ty, allowed_structs, arg, &mut gas_meter, is_view)?;
+        let arg = construct_arg(
+            session,
+            module_resolver,
+            &ty,
+            allowed_structs,
+            arg,
+            &mut gas_meter,
+            is_view,
+        )?;
         res_args.push(arg);
     }
     Ok(res_args)
@@ -253,6 +265,7 @@ fn invalid_signature() -> VMStatus {
 
 fn construct_arg(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     arg: Vec<u8>,
@@ -269,6 +282,7 @@ fn construct_arg(
             let mut max_invocations = 10; // Read from config in the future
             recursively_construct_arg(
                 session,
+                module_resolver,
                 ty,
                 allowed_structs,
                 &mut cursor,
@@ -305,6 +319,7 @@ fn construct_arg(
 // constructed types into the output parameter arg.
 pub(crate) fn recursively_construct_arg(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
@@ -323,6 +338,7 @@ pub(crate) fn recursively_construct_arg(
             while len > 0 {
                 recursively_construct_arg(
                     session,
+                    module_resolver,
                     inner,
                     allowed_structs,
                     cursor,
@@ -347,6 +363,7 @@ pub(crate) fn recursively_construct_arg(
             // of the argument.
             arg.append(&mut validate_and_construct(
                 session,
+                module_resolver,
                 ty,
                 constructor,
                 allowed_structs,
@@ -373,6 +390,7 @@ pub(crate) fn recursively_construct_arg(
 // value and returning the BCS serialized representation.
 fn validate_and_construct(
     session: &mut SessionExt,
+    module_resolver: &impl ModuleResolver,
     expected_type: &Type,
     constructor: &FunctionId,
     allowed_structs: &ConstructorMap,
@@ -435,6 +453,7 @@ fn validate_and_construct(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
+        module_resolver,
     )?;
     let mut args = vec![];
     let ty_builder = session.get_ty_builder();
@@ -446,6 +465,7 @@ fn validate_and_construct(
 
         recursively_construct_arg(
             session,
+            module_resolver,
             &arg_ty,
             allowed_structs,
             cursor,
@@ -460,6 +480,7 @@ fn validate_and_construct(
     let serialized_result = session.execute_loaded_function(
         function,
         args,
+        module_resolver,
         gas_meter,
         &mut TraversalContext::new(&storage),
     )?;

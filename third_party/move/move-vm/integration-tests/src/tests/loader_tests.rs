@@ -92,7 +92,7 @@ impl Adapter {
                 .serialize(&mut binary)
                 .unwrap_or_else(|_| panic!("failure in module serialization: {:#?}", module));
             session
-                .publish_module(binary, WORKING_ACCOUNT, &mut UnmeteredGasMeter)
+                .publish_module(binary, WORKING_ACCOUNT, &self.store, &mut UnmeteredGasMeter)
                 .unwrap_or_else(|_| panic!("failure publishing module: {:#?}", module));
         }
         let changeset = session.finish().expect("failure getting write set");
@@ -110,7 +110,7 @@ impl Adapter {
                 .serialize(&mut binary)
                 .unwrap_or_else(|_| panic!("failure in module serialization: {:#?}", module));
             session
-                .publish_module(binary, WORKING_ACCOUNT, &mut UnmeteredGasMeter)
+                .publish_module(binary, WORKING_ACCOUNT, &self.store, &mut UnmeteredGasMeter)
                 .expect_err("publishing must fail");
         }
     }
@@ -137,6 +137,7 @@ impl Adapter {
                             vec![],
                             Vec::<Vec<u8>>::new(),
                             &mut UnmeteredGasMeter,
+                            &data_store,
                             &mut TraversalContext::new(&traversal_storage),
                         )
                         .unwrap_or_else(|_| {
@@ -160,6 +161,7 @@ impl Adapter {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &self.store,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module, name));
@@ -230,7 +232,10 @@ fn load_phantom_module() {
 
     let module_id = module.self_id();
     adapter.publish_modules(vec![module]);
-    adapter.vm.load_module(&module_id, &adapter.store).unwrap();
+    adapter
+        .vm
+        .load_module(&module_id, &adapter.store, &adapter.store)
+        .unwrap();
 }
 
 #[test]
@@ -264,7 +269,10 @@ fn load_with_extra_ability() {
 
     let module_id = module.self_id();
     adapter.publish_modules(vec![module]);
-    adapter.vm.load_module(&module_id, &adapter.store).unwrap();
+    adapter
+        .vm
+        .load_module(&module_id, &adapter.store, &adapter.store)
+        .unwrap();
 }
 
 #[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]

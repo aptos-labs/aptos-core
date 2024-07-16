@@ -59,6 +59,7 @@ fn mutated_accounts() {
         vec![],
         serialize_values(&vec![MoveValue::Signer(account1)]),
         &mut UnmeteredGasMeter,
+        &storage,
         &mut TraversalContext::new(&traversal_storage),
     )
     .unwrap();
@@ -74,6 +75,7 @@ fn mutated_accounts() {
         vec![],
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
+        &storage,
         &mut TraversalContext::new(&traversal_storage),
     )
     .unwrap();
@@ -86,6 +88,7 @@ fn mutated_accounts() {
         vec![],
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
+        &storage,
         &mut TraversalContext::new(&traversal_storage),
     )
     .unwrap();
@@ -101,6 +104,7 @@ fn mutated_accounts() {
         vec![],
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
+        &storage,
         &mut TraversalContext::new(&traversal_storage),
     )
     .unwrap();

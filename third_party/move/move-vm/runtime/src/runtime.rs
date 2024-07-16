@@ -26,6 +26,7 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
+    resolver::ModuleResolver,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -62,12 +63,85 @@ impl VMRuntime {
         }
     }
 
+    pub(crate) fn verify_module_bundle_for_publish(
+        &self,
+        modules: &[CompiledModule],
+        sender: &AccountAddress,
+        data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
+        module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
+        compat: Compatibility,
+    ) -> VMResult<()> {
+        // Make sure all modules' self addresses matches the transaction sender. The self address is
+        // where the module will actually be published. If we did not check this, the sender could
+        // publish a module under anyone's account.
+        for module in modules {
+            if module.address() != sender {
+                return Err(verification_error(
+                    StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
+                    IndexKind::AddressIdentifier,
+                    module.self_handle_idx().0,
+                )
+                .finish(Location::Undefined));
+            }
+        }
+
+        // Collect ids for modules that are published together
+        let mut bundle_unverified = BTreeSet::new();
+
+        // For now, we assume that all modules can be republished, as long as the new module is
+        // backward compatible with the old module.
+        //
+        // TODO: in the future, we may want to add restrictions on module republishing, possibly by
+        // changing the bytecode format to include an `is_upgradable` flag in the CompiledModule.
+        for module in modules {
+            let module_id = module.self_id();
+
+            if module_resolver
+                .fetch_module_bytes(module_id.address(), module_id.name())
+                .map_err(|e| e.finish(Location::Undefined))?
+                .is_some()
+                && compat.need_check_compat()
+            {
+                let old_module_ref = self.loader.load_module(
+                    &module_id,
+                    data_store,
+                    module_store,
+                    module_resolver,
+                )?;
+                let old_module = old_module_ref.module();
+                #[allow(deprecated)]
+                let old_m = normalized::Module::new(old_module);
+                #[allow(deprecated)]
+                let new_m = normalized::Module::new(module);
+                compat
+                    .check(&old_m, &new_m)
+                    .map_err(|e| e.finish(Location::Undefined))?;
+            }
+            if !bundle_unverified.insert(module_id) {
+                return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)
+                    .finish(Location::Undefined));
+            }
+        }
+
+        // Perform bytecode and loading verification. Modules must be sorted in topological order.
+        self.loader.verify_module_bundle_for_publication(
+            modules,
+            data_store,
+            module_store,
+            module_resolver,
+        )
+    }
+
     pub(crate) fn publish_module_bundle(
         &self,
         modules: Vec<Vec<u8>>,
         sender: AccountAddress,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         _gas_meter: &mut impl GasMeter,
         compat: Compatibility,
     ) -> VMResult<()> {
@@ -94,55 +168,13 @@ impl VMRuntime {
             },
         };
 
-        // Make sure all modules' self addresses matches the transaction sender. The self address is
-        // where the module will actually be published. If we did not check this, the sender could
-        // publish a module under anyone's account.
-        for module in &compiled_modules {
-            if module.address() != &sender {
-                return Err(verification_error(
-                    StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
-                    IndexKind::AddressIdentifier,
-                    module.self_handle_idx().0,
-                )
-                .finish(Location::Undefined));
-            }
-        }
-
-        // Collect ids for modules that are published together
-        let mut bundle_unverified = BTreeSet::new();
-
-        // For now, we assume that all modules can be republished, as long as the new module is
-        // backward compatible with the old module.
-        //
-        // TODO: in the future, we may want to add restrictions on module republishing, possibly by
-        // changing the bytecode format to include an `is_upgradable` flag in the CompiledModule.
-        for module in &compiled_modules {
-            let module_id = module.self_id();
-
-            if data_store.exists_module(&module_id)? && compat.need_check_compat() {
-                let old_module_ref =
-                    self.loader
-                        .load_module(&module_id, data_store, module_store)?;
-                let old_module = old_module_ref.module();
-                #[allow(deprecated)]
-                let old_m = normalized::Module::new(old_module);
-                #[allow(deprecated)]
-                let new_m = normalized::Module::new(module);
-                compat
-                    .check(&old_m, &new_m)
-                    .map_err(|e| e.finish(Location::Undefined))?;
-            }
-            if !bundle_unverified.insert(module_id) {
-                return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)
-                    .finish(Location::Undefined));
-            }
-        }
-
-        // Perform bytecode and loading verification. Modules must be sorted in topological order.
-        self.loader.verify_module_bundle_for_publication(
+        self.verify_module_bundle_for_publish(
             &compiled_modules,
+            &sender,
             data_store,
             module_store,
+            module_resolver,
+            compat,
         )?;
 
         // NOTE: we want to (informally) argue that all modules pass the linking check before being
@@ -200,7 +232,10 @@ impl VMRuntime {
 
         // All modules verified, publish them to data cache
         for (module, blob) in compiled_modules.into_iter().zip(modules.into_iter()) {
-            let is_republishing = data_store.exists_module(&module.self_id())?;
+            let is_republishing = module_resolver
+                .fetch_module_bytes(module.self_addr(), module.self_name())
+                .map_err(|e| e.finish(Location::Undefined))?
+                .is_some();
             if is_republishing {
                 // This is an upgrade, so invalidate the loader cache, which still contains the
                 // old module.
@@ -360,7 +395,9 @@ impl VMRuntime {
         func: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -398,6 +435,7 @@ impl VMRuntime {
             deserialized_args,
             data_store,
             module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             extensions,
@@ -433,7 +471,9 @@ impl VMRuntime {
         func: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -443,6 +483,7 @@ impl VMRuntime {
             serialized_args,
             data_store,
             module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             extensions,
@@ -455,20 +496,27 @@ impl VMRuntime {
         ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<()> {
         // Load the script first, verify it, and then execute the entry-point main function.
-        let main = self
-            .loader
-            .load_script(script.borrow(), &ty_args, data_store, module_store)?;
+        let main = self.loader.load_script(
+            script.borrow(),
+            &ty_args,
+            data_store,
+            module_store,
+            module_resolver,
+        )?;
         self.execute_function_impl(
             main,
             serialized_args,
             data_store,
             module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             extensions,

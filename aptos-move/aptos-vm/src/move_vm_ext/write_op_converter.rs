@@ -6,6 +6,7 @@ use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    vm::module_write_op::ModuleWriteOp,
     write_set::WriteOp,
 };
 use aptos_vm_types::{
@@ -13,7 +14,10 @@ use aptos_vm_types::{
     resource_group_adapter::group_tagged_resource_size,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{
     effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -24,27 +28,6 @@ use std::{collections::BTreeMap, sync::Arc};
 pub(crate) struct WriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,
     new_slot_metadata: Option<StateValueMetadata>,
-}
-
-macro_rules! convert_impl {
-    ($convert_func_name:ident, $get_metadata_callback:ident) => {
-        pub(crate) fn $convert_func_name(
-            &self,
-            state_key: &StateKey,
-            move_storage_op: MoveStorageOp<Bytes>,
-            legacy_creation_as_modification: bool,
-        ) -> PartialVMResult<WriteOp> {
-            let state_value_metadata = self
-                .remote
-                .as_executor_view()
-                .$get_metadata_callback(state_key)?;
-            self.convert(
-                state_value_metadata,
-                move_storage_op,
-                legacy_creation_as_modification,
-            )
-        }
-    };
 }
 
 // We set SPECULATIVE_EXECUTION_ABORT_ERROR here, as the error can happen due to
@@ -138,9 +121,46 @@ fn check_size_and_existence_match(
 }
 
 impl<'r> WriteOpConverter<'r> {
-    convert_impl!(convert_module, get_module_state_value_metadata);
+    pub(crate) fn convert_module(
+        &self,
+        is_creation: bool,
+        module: CompiledModule,
+        module_bytes: Bytes,
+        legacy_creation_as_modification: bool,
+    ) -> PartialVMResult<ModuleWriteOp> {
+        Ok(if is_creation {
+            match &self.new_slot_metadata {
+                None if legacy_creation_as_modification => {
+                    ModuleWriteOp::legacy_modification(module, module_bytes)
+                },
+                None => ModuleWriteOp::legacy_creation(module, module_bytes),
+                Some(metadata) => ModuleWriteOp::creation(metadata.clone(), module, module_bytes),
+            }
+        } else {
+            let state_value_metadata = self
+                .remote
+                .as_executor_view()
+                .fetch_module_state_value_metadata(module.self_addr(), module.self_name())?;
+            ModuleWriteOp::modification(state_value_metadata, module, module_bytes)
+        })
+    }
 
-    convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
+    pub(crate) fn convert_aggregator(
+        &self,
+        state_key: &StateKey,
+        move_storage_op: MoveStorageOp<Bytes>,
+        legacy_creation_as_modification: bool,
+    ) -> PartialVMResult<WriteOp> {
+        let state_value_metadata = self
+            .remote
+            .as_executor_view()
+            .get_aggregator_v1_state_value_metadata(state_key)?;
+        self.convert(
+            state_value_metadata,
+            move_storage_op,
+            legacy_creation_as_modification,
+        )
+    }
 
     pub(crate) fn new(
         remote: &'r dyn AptosMoveResolver,

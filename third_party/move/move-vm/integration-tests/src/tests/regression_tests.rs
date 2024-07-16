@@ -137,6 +137,7 @@ fn script_large_ty() {
             vec![input_type],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap_err();

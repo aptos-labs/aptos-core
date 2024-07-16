@@ -156,6 +156,7 @@ fn execute_function_in_module(
             ty_args,
             args,
             &mut UnmeteredGasMeter,
+            &storage,
             &mut TraversalContext::new(&traversal_storage),
         )?;
 

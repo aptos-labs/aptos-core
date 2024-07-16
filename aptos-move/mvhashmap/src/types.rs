@@ -247,12 +247,18 @@ pub(crate) mod test {
     use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
         executable::ModulePath,
-        state_store::state_value::StateValue,
+        state_store::state_value::{StateValue, StateValueMetadata},
+        vm::module_write_op::ModuleWrite,
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
     use claims::{assert_err, assert_ok_eq};
-    use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+    use move_binary_format::{deserializer::DeserializerConfig, errors::PartialVMResult};
+    use move_core_types::{
+        account_address::AccountAddress,
+        identifier::{IdentStr, Identifier},
+        metadata::Metadata,
+    };
     use std::{fmt::Debug, hash::Hash, sync::Arc};
 
     #[derive(Clone, Eq, Hash, PartialEq, Debug)]
@@ -370,6 +376,35 @@ pub(crate) mod test {
 
         fn set_bytes(&mut self, bytes: Bytes) {
             self.bytes = bytes;
+        }
+    }
+
+    impl ModuleWrite for TestValue {
+        fn serialized_module_bytes(&self) -> &Bytes {
+            &self.bytes
+        }
+
+        fn module_state_value_metadata(&self) -> StateValueMetadata {
+            todo!()
+        }
+
+        fn module_metadata(&self) -> Vec<Metadata> {
+            todo!()
+        }
+
+        fn immediate_dependencies(&self) -> Vec<(AccountAddress, Identifier)> {
+            todo!()
+        }
+
+        fn immediate_friends(&self) -> Vec<(AccountAddress, Identifier)> {
+            todo!()
+        }
+
+        fn from_state_value(
+            _state_value: StateValue,
+            _deserializer_config: &DeserializerConfig,
+        ) -> PartialVMResult<Self> {
+            todo!()
         }
     }
 

@@ -53,7 +53,10 @@ mod type_loader;
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
-use move_vm_types::loaded_data::runtime_types::{legacy_count_type_nodes, TypeBuilder};
+use move_vm_types::{
+    loaded_data::runtime_types::{legacy_count_type_nodes, TypeBuilder},
+    resolver::ModuleResolver,
+};
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -259,7 +262,9 @@ impl Loader {
 
     pub(crate) fn check_script_dependencies_and_check_gas(
         &self,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -275,6 +280,7 @@ impl Loader {
         // TODO(Gas): Should we charge dependency gas for the script itself?
         self.check_dependencies_and_charge_gas(
             module_store,
+            module_resolver,
             data_store,
             gas_meter,
             &mut traversal_context.visited,
@@ -298,7 +304,9 @@ impl Loader {
         script_blob: &[u8],
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<LoadedFunction> {
         // Retrieve or load the script.
         let mut sha3_256 = Sha3_256::new();
@@ -314,6 +322,7 @@ impl Loader {
                     hash_value,
                     data_store,
                     module_store,
+                    module_resolver,
                 )?;
                 let script = Script::new(ver_script, &hash_value, module_store, &self.name_cache)?;
                 scripts.insert(hash_value, script)
@@ -322,7 +331,7 @@ impl Loader {
 
         let ty_args = ty_args
             .iter()
-            .map(|ty| self.load_type(ty, data_store, module_store))
+            .map(|ty| self.load_type(ty, data_store, module_store, module_resolver))
             .collect::<VMResult<Vec<_>>>()?;
 
         #[allow(clippy::collapsible_if)]
@@ -362,7 +371,9 @@ impl Loader {
         script: &[u8],
         hash_value: [u8; 32],
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<Arc<CompiledScript>> {
         let script = data_store.load_compiled_script_to_cache(script, hash_value)?;
 
@@ -376,7 +387,9 @@ impl Loader {
         let loaded_deps = script
             .immediate_dependencies()
             .into_iter()
-            .map(|module_id| self.load_module(&module_id, data_store, module_store))
+            .map(|module_id| {
+                self.load_module(&module_id, data_store, module_store, module_resolver)
+            })
             .collect::<VMResult<Vec<_>>>()?;
         dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.module()))?;
         Ok(script)
@@ -392,10 +405,12 @@ impl Loader {
         module_id: &ModuleId,
         function_name: &IdentStr,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<Arc<Function>> {
         // Need to load the module first, before resolving the function.
-        self.load_module(module_id, data_store, module_store)?;
+        self.load_module(module_id, data_store, module_store, module_resolver)?;
         module_store
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))
@@ -494,13 +509,16 @@ impl Loader {
         function_name: &IdentStr,
         expected_return_type: &Type,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<LoadedFunction> {
         let function = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
             module_store,
+            module_resolver,
         )?;
 
         if function.return_tys().len() != 1 {
@@ -547,18 +565,21 @@ impl Loader {
         function_name: &IdentStr,
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<LoadedFunction> {
         let function = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
             module_store,
+            module_resolver,
         )?;
 
         let ty_args = ty_args
             .iter()
-            .map(|ty_arg| self.load_type(ty_arg, data_store, module_store))
+            .map(|ty_arg| self.load_type(ty_arg, data_store, module_store, module_resolver))
             .collect::<VMResult<Vec<_>>>()
             .map_err(|mut err| {
                 // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
@@ -582,7 +603,9 @@ impl Loader {
         &self,
         modules: &[CompiledModule],
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<()> {
         fail::fail_point!("verifier-failpoint-1", |_| { Ok(()) });
 
@@ -598,6 +621,7 @@ impl Loader {
                 &bundle_unverified,
                 data_store,
                 module_store,
+                module_resolver,
             )?;
             bundle_verified.insert(module_id.clone(), module.clone());
         }
@@ -621,7 +645,9 @@ impl Loader {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<()> {
         // Performs all verification steps to load the module without loading it, i.e., the new
         // module will NOT show up in `module_cache`. In the module republishing case, it means
@@ -643,6 +669,7 @@ impl Loader {
             bundle_verified,
             data_store,
             module_store,
+            module_resolver,
             &mut visited,
             &mut friends_discovered,
             /* allow_dependency_loading_failure */ true,
@@ -657,6 +684,7 @@ impl Loader {
             bundle_unverified,
             data_store,
             module_store,
+            module_resolver,
             /* allow_friend_loading_failure */ true,
         )?;
 
@@ -739,11 +767,13 @@ impl Loader {
         &self,
         ty_tag: &TypeTag,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<Type> {
         let resolver = |struct_tag: &StructTag| -> VMResult<Arc<StructType>> {
             let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
-            self.load_module(&module_id, data_store, module_store)?;
+            self.load_module(&module_id, data_store, module_store, module_resolver)?;
             module_store
                 .get_struct_type_by_identifier(&struct_tag.name, &module_id)
                 .map_err(|e| e.finish(Location::Undefined))
@@ -769,7 +799,9 @@ impl Loader {
     /// TODO: Revisit the order of traversal. Consider switching to alphabetical order.
     pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
@@ -800,6 +832,7 @@ impl Loader {
                 None => {
                     let (module, size, _) = data_store.load_compiled_module_to_cache(
                         ModuleId::new(*addr, name.to_owned()),
+                        module_resolver,
                         allow_loading_failure,
                     )?;
                     (module, size)
@@ -841,7 +874,9 @@ impl Loader {
         &self,
         id: &ModuleId,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &(impl ModuleResolver + ?Sized),
     ) -> VMResult<Arc<Module>> {
         // if the module is already in the code cache, load the cached version
         if let Some(cached) = module_store.module_at(id) {
@@ -856,6 +891,7 @@ impl Loader {
             &BTreeSet::new(),
             data_store,
             module_store,
+            module_resolver,
             /* allow_module_loading_failure */ true,
         )?;
 
@@ -875,10 +911,14 @@ impl Loader {
         &self,
         id: &ModuleId,
         data_store: &mut TransactionDataCache,
+        module_resolver: &(impl ModuleResolver + ?Sized),
         allow_loading_failure: bool,
     ) -> VMResult<(Arc<CompiledModule>, usize)> {
-        let (module, size, hash_value) =
-            data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
+        let (module, size, hash_value) = data_store.load_compiled_module_to_cache(
+            id.clone(),
+            module_resolver,
+            allow_loading_failure,
+        )?;
 
         fail::fail_point!("verifier-failpoint-2", |_| { Ok((module.clone(), size)) });
 
@@ -913,7 +953,9 @@ impl Loader {
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &(impl ModuleResolver + ?Sized),
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
         allow_module_loading_failure: bool,
@@ -925,8 +967,12 @@ impl Loader {
         }
 
         // module self-check
-        let (module, size) =
-            self.load_and_verify_module(id, data_store, allow_module_loading_failure)?;
+        let (module, size) = self.load_and_verify_module(
+            id,
+            data_store,
+            module_resolver,
+            allow_module_loading_failure,
+        )?;
         visited.insert(id.clone());
         friends_discovered.extend(module.immediate_friends());
 
@@ -937,6 +983,7 @@ impl Loader {
             bundle_verified,
             data_store,
             module_store,
+            module_resolver,
             visited,
             friends_discovered,
             /* allow_dependency_loading_failure */ false,
@@ -955,7 +1002,9 @@ impl Loader {
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &(impl ModuleResolver + ?Sized),
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
         allow_dependency_loading_failure: bool,
@@ -976,6 +1025,7 @@ impl Loader {
                         bundle_verified,
                         data_store,
                         module_store,
+                        module_resolver,
                         visited,
                         friends_discovered,
                         allow_dependency_loading_failure,
@@ -1012,7 +1062,9 @@ impl Loader {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &(impl ModuleResolver + ?Sized),
         allow_module_loading_failure: bool,
     ) -> VMResult<Arc<Module>> {
         // load the closure of the module in terms of dependency relation
@@ -1023,6 +1075,7 @@ impl Loader {
             bundle_verified,
             data_store,
             module_store,
+            module_resolver,
             &mut visited,
             &mut friends_discovered,
             allow_module_loading_failure,
@@ -1037,6 +1090,7 @@ impl Loader {
             bundle_unverified,
             data_store,
             module_store,
+            module_resolver,
             /* allow_friend_loading_failure */ false,
         )?;
         Ok(module_ref)
@@ -1049,7 +1103,9 @@ impl Loader {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &(impl ModuleResolver + ?Sized),
         allow_friend_loading_failure: bool,
     ) -> VMResult<()> {
         // for each new module discovered in the frontier, load them fully and expand the frontier.
@@ -1084,6 +1140,7 @@ impl Loader {
                 bundle_unverified,
                 data_store,
                 module_store,
+                module_resolver,
                 allow_friend_loading_failure,
             )?;
         }
@@ -1121,33 +1178,40 @@ enum BinaryType {
 pub(crate) struct Resolver<'a> {
     loader: &'a Loader,
     module_store: &'a ModuleStorageAdapter,
+    module_resolver: &'a dyn ModuleResolver,
     binary: BinaryType,
 }
 
 impl<'a> Resolver<'a> {
     fn for_module(
         loader: &'a Loader,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &'a ModuleStorageAdapter,
+        module_resolver: &'a dyn ModuleResolver,
         module: Arc<Module>,
     ) -> Self {
         let binary = BinaryType::Module(module);
         Self {
             loader,
-            binary,
             module_store,
+            module_resolver,
+            binary,
         }
     }
 
     fn for_script(
         loader: &'a Loader,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &'a ModuleStorageAdapter,
+        module_resolver: &'a dyn ModuleResolver,
         script: Arc<Script>,
     ) -> Self {
         let binary = BinaryType::Script(script);
         Self {
             loader,
-            binary,
             module_store,
+            module_resolver,
+            binary,
         }
     }
 
@@ -1467,6 +1531,10 @@ impl<'a> Resolver<'a> {
     // get the loader
     pub(crate) fn module_store(&self) -> &ModuleStorageAdapter {
         self.module_store
+    }
+
+    pub(crate) fn module_resolver(&self) -> &dyn ModuleResolver {
+        self.module_resolver
     }
 }
 
@@ -2101,10 +2169,12 @@ impl Loader {
         &self,
         type_tag: &TypeTag,
         move_storage: &mut TransactionDataCache,
-        module_storage: &ModuleStorageAdapter,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
+        module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<MoveTypeLayout> {
-        let ty = self.load_type(type_tag, move_storage, module_storage)?;
-        self.type_to_type_layout(&ty, module_storage)
+        let ty = self.load_type(type_tag, move_storage, module_store, module_resolver)?;
+        self.type_to_type_layout(&ty, module_store)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -2112,10 +2182,12 @@ impl Loader {
         &self,
         type_tag: &TypeTag,
         move_storage: &mut TransactionDataCache,
-        module_storage: &ModuleStorageAdapter,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
+        module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
     ) -> VMResult<MoveTypeLayout> {
-        let ty = self.load_type(type_tag, move_storage, module_storage)?;
-        self.type_to_fully_annotated_layout(&ty, module_storage)
+        let ty = self.load_type(type_tag, move_storage, module_store, module_resolver)?;
+        self.type_to_fully_annotated_layout(&ty, module_store)
             .map_err(|e| e.finish(Location::Undefined))
     }
 }

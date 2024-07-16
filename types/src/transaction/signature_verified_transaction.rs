@@ -5,6 +5,7 @@ use crate::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{BlockExecutableTransaction, Transaction},
+    vm::module_write_op::ModuleWriteOp,
     write_set::WriteOp,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -63,6 +64,7 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
     type Event = ContractEvent;
     type Identifier = DelayedFieldID;
     type Key = StateKey;
+    type Module = ModuleWriteOp;
     type Tag = StructTag;
     type Value = WriteOp;
 

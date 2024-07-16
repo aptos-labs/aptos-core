@@ -33,6 +33,7 @@ use move_vm_types::{
         runtime_types::Type,
     },
     natives::function::NativeResult,
+    resolver::ModuleResolver,
     values::{
         self, GlobalValue, IntegerValue, Locals, Reference, Struct, StructRef, VMValueCast, Value,
         Vector, VectorRef,
@@ -89,7 +90,9 @@ impl Interpreter {
         ty_args: Vec<Type>,
         args: Vec<Value>,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -106,6 +109,7 @@ impl Interpreter {
             loader,
             data_store,
             module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             extensions,
@@ -125,7 +129,9 @@ impl Interpreter {
         mut self,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -153,7 +159,7 @@ impl Interpreter {
             .enter_function(&current_frame, current_frame.function.as_ref())
             .map_err(|e| self.set_location(e))?;
         loop {
-            let resolver = current_frame.resolver(loader, module_store);
+            let resolver = current_frame.resolver(loader, module_store, module_resolver);
             let exit_code =
                 current_frame //self
                     .execute_code(&resolver, &mut self, data_store, module_store, gas_meter)
@@ -227,6 +233,7 @@ impl Interpreter {
                             &resolver,
                             data_store,
                             module_store,
+                            module_resolver,
                             gas_meter,
                             traversal_context,
                             extensions,
@@ -275,6 +282,7 @@ impl Interpreter {
                             &resolver,
                             data_store,
                             module_store,
+                            module_resolver,
                             gas_meter,
                             traversal_context,
                             extensions,
@@ -425,7 +433,9 @@ impl Interpreter {
         current_frame: &mut Frame,
         resolver: &Resolver,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -438,6 +448,7 @@ impl Interpreter {
             resolver,
             data_store,
             module_store,
+            module_resolver,
             gas_meter,
             traversal_context,
             extensions,
@@ -467,7 +478,9 @@ impl Interpreter {
         current_frame: &mut Frame,
         resolver: &Resolver,
         data_store: &mut TransactionDataCache,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &ModuleStorageAdapter,
+        module_resolver: &impl ModuleResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -587,7 +600,7 @@ impl Interpreter {
                 // and charge properly.
                 resolver
                     .loader()
-                    .load_module(&module_name, data_store, module_store)
+                    .load_module(&module_name, data_store, module_store, module_resolver)
                     .map_err(|_| {
                         PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                             .with_message(format!("Module {} doesn't exist", module_name))
@@ -657,6 +670,7 @@ impl Interpreter {
                     .loader()
                     .check_dependencies_and_charge_gas(
                         module_store,
+                        module_resolver,
                         data_store,
                         gas_meter,
                         &mut traversal_context.visited,
@@ -670,7 +684,7 @@ impl Interpreter {
                         ))?;
                 resolver
                     .loader()
-                    .load_module(&module_name, data_store, module_store)
+                    .load_module(&module_name, data_store, module_store, module_resolver)
                     .map_err(|_| {
                         PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                             .with_message(format!("Module {} doesn't exist", module_name))
@@ -2844,9 +2858,12 @@ impl Frame {
     fn resolver<'a>(
         &self,
         loader: &'a Loader,
+        // TODO(George): Combine module_store and module_resolver into a single trait.
         module_store: &'a ModuleStorageAdapter,
+        module_resolver: &'a dyn ModuleResolver,
     ) -> Resolver<'a> {
-        self.function.get_resolver(loader, module_store)
+        self.function
+            .get_resolver(loader, module_store, module_resolver)
     }
 
     fn location(&self) -> Location {
