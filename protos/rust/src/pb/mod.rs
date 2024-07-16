@@ -4,6 +4,13 @@
 // @generated
 pub mod aptos {
     pub mod indexer {
+        pub mod sdk {
+            // @@protoc_insertion_point(attribute:aptos.indexer.sdk.v1)
+            pub mod v1 {
+                include!("aptos.indexer.sdk.v1.rs");
+                // @@protoc_insertion_point(aptos.indexer.sdk.v1)
+            }
+        }
         // @@protoc_insertion_point(attribute:aptos.indexer.v1)
         pub mod v1 {
             include!("aptos.indexer.v1.rs");

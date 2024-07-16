@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aptos-protos"
-version = "1.1.2"
+version = "1.4.0"
 description = "Code generated from protobuf definitions for the Aptos tech stack"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 license = "Apache-2.0"

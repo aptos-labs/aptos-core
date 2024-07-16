@@ -288,7 +288,7 @@ dependencies = [
  "aptos-move-debugger",
  "aptos-network-checker",
  "aptos-node",
- "aptos-protos 1.3.1",
+ "aptos-protos 1.4.0",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -2007,7 +2007,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.3.1",
+ "aptos-protos 1.4.0",
  "async-trait",
  "clap 4.4.14",
  "futures",
@@ -2034,7 +2034,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.3.1",
+ "aptos-protos 1.4.0",
  "aptos-transaction-filter",
  "async-trait",
  "clap 4.4.14",
@@ -2097,7 +2097,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
  "aptos-proptest-helpers",
- "aptos-protos 1.3.1",
+ "aptos-protos 1.4.0",
  "aptos-runtimes",
  "aptos-sdk",
  "aptos-secure-storage",
@@ -2134,7 +2134,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-utils",
- "aptos-protos 1.3.1",
+ "aptos-protos 1.4.0",
  "futures",
  "jemallocator",
  "lazy_static",
@@ -2226,7 +2226,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-protos 1.3.1",
+ "aptos-protos 1.4.0",
  "async-trait",
  "backoff",
  "base64 0.13.1",
@@ -3269,7 +3269,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.3.1"
+version = "1.4.0"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3596,7 +3596,7 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-protos 1.3.1",
+ "aptos-protos 1.4.0",
  "bcs 0.1.4",
  "crossbeam-channel",
  "once_cell",
@@ -4065,7 +4065,7 @@ name = "aptos-transaction-filter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-protos 1.3.1",
+ "aptos-protos 1.4.0",
  "derive_builder",
  "lz4",
  "prost 0.12.3",

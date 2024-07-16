@@ -1,0 +1,37 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.indexer.sdk.v1;
+
+import "aptos/transaction/v1/transaction.proto";
+import "aptos/util/timestamp/timestamp.proto";
+
+/**
+ * The SDK is the client in this model. It sends transactions to the lambda step over
+ * the stream (SdkEventsStepRequest) and receives a response (SdkEventsStepResponse)
+ * from the lambda step.
+ */
+service SdkEventsStepService {
+  rpc BidirectionalStream (stream SdkEventsStepRequest) returns (stream SdkEventsStepResponse);
+}
+
+message SdkEventsStepRequest {
+  TransactionContext transaction_context = 1;
+}
+
+// todo create a way to surface errors. errors should be recoverable or not.
+message SdkEventsStepResponse {
+  uint64 start_version = 1;
+  uint64 end_version = 2;
+}
+
+message TransactionContext {
+  repeated aptos.transaction.v1.Event events = 1;
+  uint64 start_version = 2;
+  uint64 end_version = 3;
+  aptos.util.timestamp.Timestamp start_transaction_timestamp = 4;
+  aptos.util.timestamp.Timestamp end_transaction_timestamp = 5;
+  uint64 total_size_in_bytes = 6;
+}
