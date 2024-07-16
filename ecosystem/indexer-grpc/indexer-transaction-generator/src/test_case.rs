@@ -11,8 +11,9 @@ const TEST_CONFIG_FILE: &str = "config.json";
 const SETUP_FOLDER_PATTERN: &str = r"^setup_(\d+)(?:_[a-zA-Z0-9-]*)?$";
 const ACTION_FOLDER_PATTERN: &str = r"^action_(\d+)(?:_[a-zA-Z0-9-]*)?$";
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TestCaseConfig {
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+pub struct TestStepConfig {
+    // config.json under the setup or action folder.
     pub fund_amount: Option<u64>,
 }
 
@@ -20,26 +21,16 @@ pub struct TestCaseConfig {
 /// Each test case is a folder containing:
 ///  - folder: setup_1, setup_2, ...: the setup __folders__ to prepare the test environment.
 ///  - action_1, action_2, ...: the action __folders__ to execute the test.
-///  - test_config.json: the test case configuration file.
 /// Test case is expected to be run in order: setups first, then actions.
 pub struct TestCase {
     // Test case name.
     pub name: String,
     // Ordered steps from setup to action.
     pub steps: Vec<Step>,
-    // Test case configuration.
-    pub test_config: TestCaseConfig,
 }
 
 impl TestCase {
     pub fn load(test_case_path: PathBuf) -> Result<Self, anyhow::Error> {
-        // Load the test case configuration.
-        let test_config_path = test_case_path.join(TEST_CONFIG_FILE);
-        let test_config_raw_string = std::fs::read_to_string(test_config_path)
-            .context("Failed to read test config file.")?;
-        let test_config: TestCaseConfig = serde_json::from_str(&test_config_raw_string)
-            .context("Failed to parse test config file.")?;
-
         // Get steps.
         let mut steps = vec![];
         let test_case = std::fs::read_dir(&test_case_path).context(format!(
@@ -77,11 +68,7 @@ impl TestCase {
                 &test_case_path
             ))?
             .to_string();
-        Ok(TestCase {
-            name,
-            steps,
-            test_config,
-        })
+        Ok(TestCase { name, steps })
     }
 }
 
@@ -94,7 +81,7 @@ impl TestCase {
 ///   e.g., README.md, .gitignore, etc.
 #[derive(PartialEq, Eq, Debug, Hash)]
 pub enum Step {
-    Setup((PathBuf, u64)),
+    Setup((PathBuf, u64, Option<TestStepConfig>)),
     Action((PathBuf, u64)),
     /// This is to handle the case when the step is not a setup or action folder.
     UNKNOWN,
@@ -103,7 +90,7 @@ pub enum Step {
 impl Step {
     fn priority(&self) -> u64 {
         match self {
-            Step::Setup((_, index)) => *index,
+            Step::Setup((_, index, _)) => *index,
             Step::Action((_, index)) => *index + u64::MAX / 2,
             Step::UNKNOWN => u64::MAX,
         }
@@ -113,7 +100,7 @@ impl Step {
 impl Display for Step {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Step::Setup((_, index)) => write!(f, "Setup {}", index),
+            Step::Setup((_, index, _)) => write!(f, "Setup {}", index),
             Step::Action((_, index)) => write!(f, "Action {}", index),
             Step::UNKNOWN => write!(f, "UNKNOWN"),
         }
@@ -146,7 +133,20 @@ impl TryFrom<PathBuf> for Step {
             if !path.is_dir() {
                 return Err(anyhow::anyhow!("Setup step is not a folder."));
             }
-            return Ok(Step::Setup((path, index)));
+            // Load the test case configuration.
+            let test_config_path = path.join(TEST_CONFIG_FILE);
+            let test_config = match test_config_path.exists() {
+                true => {
+                    let test_config_raw_string = std::fs::read_to_string(test_config_path)
+                        .context("Failed to read test config file.")?;
+                    let test_config: TestStepConfig = serde_json::from_str(&test_config_raw_string)
+                        .context("Failed to parse test config file.")?;
+                    Some(test_config)
+                },
+                false => None,
+            };
+
+            return Ok(Step::Setup((path, index, test_config)));
         }
 
         if let Some(index) = action_folder.captures(file_name) {
@@ -195,7 +195,7 @@ mod tests {
         let setup_step_with_suffix = Step::try_from(setup_folder_with_suffix).unwrap();
         let action_step_with_suffix = Step::try_from(action_folder_with_suffix).unwrap();
         match setup_step {
-            Step::Setup((_, index)) => assert_eq!(index, 1),
+            Step::Setup((_, index, _)) => assert_eq!(index, 1),
             _ => panic!("Setup step is not parsed correctly."),
         }
         match action_step {
@@ -207,7 +207,7 @@ mod tests {
             _ => panic!("Unknown step is not parsed correctly."),
         }
         match setup_step_with_suffix {
-            Step::Setup((_, index)) => assert_eq!(index, 1),
+            Step::Setup((_, index, _)) => assert_eq!(index, 1),
             _ => panic!("Setup step with suffix is not parsed correctly."),
         }
         match action_step_with_suffix {
@@ -251,8 +251,12 @@ mod tests {
         let test_case_path = PathBuf::from("src/tests/simple_test");
         let test_case = TestCase::load(test_case_path).unwrap();
         assert_eq!(test_case.name, "simple_test");
-        assert_eq!(test_case.steps.len(), 4);
-        assert_eq!(test_case.test_config.fund_amount, Some(100));
+        assert_eq!(test_case.steps.len(), 3);
+        let setup_1_test_config = match &test_case.steps[0] {
+            Step::Setup((_, _, config)) => config,
+            _ => panic!("Setup 1 is not parsed correctly."),
+        };
+        assert_eq!(setup_1_test_config.as_ref().unwrap().fund_amount, Some(100));
     }
 
     #[test]
