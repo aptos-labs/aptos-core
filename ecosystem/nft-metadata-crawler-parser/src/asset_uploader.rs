@@ -3,7 +3,10 @@
 
 use crate::{
     config::{AssetUploaderConfig, Server},
-    models::nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
+    models::{
+        nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
+        nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
+    },
     utils::{
         constants::{MAX_ASSET_UPLOAD_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
         database::upsert_uris,
@@ -134,6 +137,23 @@ impl AssetUploaderContext {
         for url in urls.urls.clone() {
             let self_clone = self_clone.clone();
             tasks.push(tokio::spawn(async move {
+                let mut conn = self_clone.pool.get().context("Failed to get connection")?;
+                if let Some(model) = NFTMetadataCrawlerURIsQuery::get_by_asset_uri(&mut conn, url.as_ref()) {
+                    if let Some(cdn_image_uri) = model.cdn_image_uri {
+                        info!(
+                            asset_uri = ?url,
+                            cdn_image_uri,
+                            "[Asset Uploader] Asset already exists, skipping asset upload"
+                        );
+                        return Ok(cdn_image_uri);
+                    }
+
+                    info!(
+                        asset_uri = ?url,
+                        "[Asset Uploader] Asset exists but does not have a CDN URI, attempting to upload asset"
+                    );
+                }
+
                 match self_clone.upload_asset(url.clone()).await {
                     Ok(cdn_url) => {
                         info!(
@@ -144,7 +164,6 @@ impl AssetUploaderContext {
                         let mut model = NFTMetadataCrawlerURIs::new(url.as_ref());
                         model.set_cdn_image_uri(Some(cdn_url.clone()));
 
-                        let mut conn = self_clone.pool.get().context("Failed to get connection")?;
                         upsert_uris(&mut conn, &model, -1).context("Failed to upsert URIs")?;
 
                         Ok(cdn_url)
