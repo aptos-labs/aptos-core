@@ -26,7 +26,7 @@ pub struct Balance {
 
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
-    #[clap(flatten)]
+    #[clap(flatten)]a
     pub(crate) profile_options: ProfileOptions,
 }
 
