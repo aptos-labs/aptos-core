@@ -408,10 +408,10 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         .as_millis() as u64;
 
                     if chunk_idx == 0 {
-                        info!("Sent first cmd batch to shard {} at time {}", msg.shard_id.unwrap(), curr_time);
+                        info!("Sent first cmd batch to shard {} at time {}", shard_id, curr_time);
                     }
                     if chunk_idx == max_batch_size - 1 {
-                        info!("Sent last cmd batch to shard {} at time {}", msg.shard_id.unwrap(), curr_time);
+                        info!("Sent last cmd batch to shard {} at time {}", shard_id, curr_time);
                     }
 
                         // rpc_outbound_runtime_clone.spawn(async move {
