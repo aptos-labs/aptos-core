@@ -380,6 +380,10 @@ module supra_framework::vesting_without_staking {
 			let shareholder = vector::pop_back(&mut shareholders);
 			vest_individual(contract_address,shareholder);
 		};
+            let total_balance = coin::balance<SupraCoin>(contract_address);
+            if (total_balance == 0) {
+                set_terminate_vesting_contract(contract_address);
+            };
     }
 
 	public entry fun vest_individual(contract_address: address, shareholder_address: address) acquires VestingContract {
@@ -436,10 +440,6 @@ module supra_framework::vesting_without_staking {
                 vesting_record.last_vested_period = next_period_to_vest;
                 next_period_to_vest = next_period_to_vest + 1;
         };
-            let total_balance = coin::balance<SupraCoin>(contract_address);
-            if (total_balance == 0) {
-                set_terminate_vesting_contract(contract_address);
-            };
 
         };
 	}
