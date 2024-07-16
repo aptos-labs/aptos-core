@@ -328,6 +328,11 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         onchain_config: BlockExecutorConfigFromOnchain,
         duration_since_epoch: u64
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let current_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        info!("Starting executing block on a coordinator at time {}", current_time);
         trace!("RemoteExecutorClient Sending block to shards");
         self.state_view_service.set_state_view(state_view);
         let (sub_blocks, global_txns) = transactions.get_ref();

@@ -234,6 +234,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         let mut i = 0;
         loop {
            // info!("Looping back to recv cmd after execution of a block********************");
+           let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+           info!("Started processing block in time {}", curr_time);
             let mut command = self.coordinator_client.lock().unwrap().receive_execute_command_stream();
             let (state_view, num_txns_in_the_block, shard_txns_start_index, onchain_config, blocking_transactions_provider) = match command {
                 StreamedExecutorShardCommand::InitBatch(

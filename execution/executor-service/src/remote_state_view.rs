@@ -159,7 +159,7 @@ impl RemoteStateViewClient {
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
                 let priority = {if state_keys.len() == 1 {0} else {seq_num}};
-                info!("Sending a state value request with priority {}", priority);
+                // info!("Sending a state value request with priority {}", priority);
                 thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();
                     let rand_send_thread_idx = rng.gen_range(0, sender.len());

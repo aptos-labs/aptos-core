@@ -181,7 +181,7 @@ impl RemoteCoordinatorClient {
                         let batch_start_index = txns.batch_start_index;
                         let state_keys = Self::extract_state_keys_from_txns(&transactions);
 
-                        state_view_client_clone.pre_fetch_state_values(state_keys, false, num_txns_processed);
+                        state_view_client_clone.pre_fetch_state_values(state_keys, true, num_txns_processed);
 
                         let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
                             blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
@@ -258,7 +258,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
 
                 self.state_view_client.init_for_block();
                 let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
-                self.state_view_client.pre_fetch_state_values(state_keys, false, txns.cmds.len());
+                self.state_view_client.pre_fetch_state_values(state_keys, true, txns.cmds.len());
                 let num_txns = txns.num_txns;
                 let num_txns_in_the_batch = txns.cmds.len();
                 let shard_txns_start_index = txns.shard_txns_start_index;
@@ -273,6 +273,10 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let state_view_client_clone = self.state_view_client.clone();
                 let is_block_init_done_clone = self.is_block_init_done.clone();
                 let cmd_rx_thread_pool_clone = self.cmd_rx_thread_pool.clone();
+
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Received & deser first cmd batch with seq_num {} at time {}", 200, curr_time);
+
                 self.cmd_rx_thread_pool.spawn(move || {
                     Self::receive_execute_command_stream_follow_up(
                         state_view_client_clone,
