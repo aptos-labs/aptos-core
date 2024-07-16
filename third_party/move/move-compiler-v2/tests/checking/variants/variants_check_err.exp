@@ -18,6 +18,12 @@ error: undeclared struct `m::missplaced_variant`
 28 │         0x815::m::missplaced_variant::Red();
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+error: the function takes 1 argument but 0 were provided
+   ┌─ tests/checking/variants/variants_check_err.move:22:9
+   │
+22 │         0x815::m::missplaced_variant::Red();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error: variants not allowed in this context
    ┌─ tests/checking/variants/variants_check_err.move:32:29
    │
