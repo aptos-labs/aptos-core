@@ -58,14 +58,10 @@ pub struct BlockingTransactionsProvider {
 
 impl BlockingTransactionsProvider {
     pub fn new(num_txns: usize) -> Self {
-        let mut txns = vec![];
-        (0..num_txns).into_par_iter()
-            .map(|_| (Mutex::new(CommandValue::Waiting), Condvar::new()))
-            .collect_into_vec(&mut txns);
-        // let mut txns = Vec::new();
-        // for _ in 0..num_txns {
-        //     txns.push((Mutex::new(CommandValue::Waiting), Condvar::new()));
-        // }
+        let mut txns = Vec::new();
+        for _ in 0..num_txns {
+            txns.push((Mutex::new(CommandValue::Waiting), Condvar::new()));
+        }
         Self {
             txns
         }

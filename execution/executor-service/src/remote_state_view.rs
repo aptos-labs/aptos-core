@@ -134,6 +134,7 @@ impl RemoteStateViewClient {
     }
 
     pub fn init_for_block(&self) {
+        assert!(!*self.state_view.try_write().is_err());
         *self.state_view.write().unwrap() = RemoteStateView::new();
         /*REMOTE_EXECUTOR_REMOTE_KV_COUNT
             .with_label_values(&[&self.shard_id.to_string(), "prefetch_kv"])
