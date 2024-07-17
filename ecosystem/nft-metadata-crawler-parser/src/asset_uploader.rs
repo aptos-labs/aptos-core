@@ -80,7 +80,7 @@ impl AssetUploaderContext {
 
     /// Uploads an asset to Cloudflare and returns the CDN URL used to access it
     /// The CDN URL uses the default variant specified in the config
-    /// Flow: 
+    /// Flow:
     /// 1. Send a POST request to Cloudflare API to upload the asset
     /// 2. If fails, handle the error
     ///   2.1 If the asset already exists, check DB for asset and return the CDN URL if it exists
@@ -148,7 +148,7 @@ impl AssetUploaderContext {
                                 asset_uri,
                                 "[Asset Uploader] Asset already exists, skipping asset upload"
                             );
-                            
+
                             let mut conn = self.pool.get().context("Failed to get connection")?;
                             if let Some(model) = NFTMetadataCrawlerURIsQuery::get_by_asset_uri(&mut conn, url.as_ref()) {
                                 if let Some(cdn_image_uri) = model.cdn_image_uri {
@@ -199,7 +199,7 @@ impl AssetUploaderContext {
             let self_clone = self_clone.clone();
             let asset_uri = url.to_string();
             tasks.push(tokio::spawn(async move {
-                
+
                 match self_clone.upload_asset(url.clone()).await {
                     Ok(cdn_url) => {
                         info!(
