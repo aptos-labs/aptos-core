@@ -61,7 +61,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
-use move_vm_types::resolver::ModuleResolver;
+use move_core_types::resolver::ModuleResolver;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::Serialize;
