@@ -383,7 +383,7 @@ impl ProposalGenerator {
 
             if !payload.is_direct()
                 && max_txns_from_block_to_execute.is_some()
-                && payload.len() as u64 > max_txns_from_block_to_execute.unwrap_or(0)
+                && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
             {
                 payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
             }
