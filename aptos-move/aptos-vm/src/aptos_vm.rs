@@ -2117,40 +2117,80 @@ impl AptosVM {
             randomness,
         } = block_metadata_with_randomness;
 
-        let args = vec![
-            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
-            MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
-            MoveValue::U64(epoch),
-            MoveValue::U64(round),
-            MoveValue::Address(proposer),
-            failed_proposer_indices
-                .into_iter()
-                .map(|i| i as u64)
-                .collect::<Vec<_>>()
-                .as_move_value(),
-            previous_block_votes_bitvec.as_move_value(),
-            MoveValue::U64(timestamp_usecs),
-            randomness
-                .as_ref()
-                .map(Randomness::randomness_cloned)
-                .as_move_value(),
-        ];
+        let features = Features::fetch_config(resolver).ok_or_else(||VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, Some("Feature not found for block metadata ext".to_string())))?;
+        if features.is_enabled(FeatureFlag::RECONFIG_REFACTORING) {
+            let args = vec![
+                MoveValue::Signer(AccountAddress::ZERO),
+                MoveValue::Signer(AccountAddress::ONE),
+                MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
+                MoveValue::U64(epoch),
+                MoveValue::U64(round),
+                MoveValue::Address(proposer),
+                failed_proposer_indices
+                    .into_iter()
+                    .map(|i| i as u64)
+                    .collect::<Vec<_>>()
+                    .as_move_value(),
+                previous_block_votes_bitvec.as_move_value(),
+                MoveValue::U64(timestamp_usecs),
+                randomness
+                    .as_ref()
+                    .map(Randomness::randomness_cloned)
+                    .as_move_value(),
+            ];
 
-        let storage = TraversalStorage::new();
+            let storage = TraversalStorage::new();
 
-        session
-            .execute_function_bypass_visibility(
-                &BLOCK_MODULE,
-                BLOCK_PROLOGUE_EXT,
-                vec![],
-                serialize_values(&args),
-                &mut gas_meter,
-                &mut TraversalContext::new(&storage),
-            )
-            .map(|_return_vals| ())
-            .or_else(|e| {
-                expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
-            })?;
+            session
+                .execute_function_bypass_visibility(
+                    &BLOCK_MODULE,
+                    BLOCK_PROLOGUE_EXT_V2,
+                    vec![],
+                    serialize_values(&args),
+                    &mut gas_meter,
+                    &mut TraversalContext::new(&storage),
+                )
+                .map(|_return_vals| ())
+                .or_else(|e| {
+                    expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT_V2.as_str(), log_context)
+                })?;
+        } else {
+            let args = vec![
+                MoveValue::Signer(AccountAddress::ZERO),
+                MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
+                MoveValue::U64(epoch),
+                MoveValue::U64(round),
+                MoveValue::Address(proposer),
+                failed_proposer_indices
+                    .into_iter()
+                    .map(|i| i as u64)
+                    .collect::<Vec<_>>()
+                    .as_move_value(),
+                previous_block_votes_bitvec.as_move_value(),
+                MoveValue::U64(timestamp_usecs),
+                randomness
+                    .as_ref()
+                    .map(Randomness::randomness_cloned)
+                    .as_move_value(),
+            ];
+
+            let storage = TraversalStorage::new();
+
+            session
+                .execute_function_bypass_visibility(
+                    &BLOCK_MODULE,
+                    BLOCK_PROLOGUE_EXT,
+                    vec![],
+                    serialize_values(&args),
+                    &mut gas_meter,
+                    &mut TraversalContext::new(&storage),
+                )
+                .map(|_return_vals| ())
+                .or_else(|e| {
+                    expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
+                })?;
+        }
+
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = get_system_transaction_output(

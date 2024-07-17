@@ -77,6 +77,7 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
+    async_reconfig_v2_enabled: bool,
 }
 
 /// Basic communication with the Execution module;
@@ -133,6 +134,7 @@ impl ExecutionProxy {
         executed_block: &PipelinedBlock,
         validators: &[AccountAddress],
         randomness_enabled: bool,
+        async_reconfig_v2_enabled: bool,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
         if executed_block.is_reconfiguration_suffix() {
@@ -141,7 +143,7 @@ impl ExecutionProxy {
 
         let user_txns = executed_block.input_transactions().clone();
         let validator_txns = executed_block.validator_txns().cloned().unwrap_or_default();
-        let metadata = if randomness_enabled {
+        let metadata = if async_reconfig_v2_enabled || randomness_enabled {
             executed_block
                 .block()
                 .new_metadata_with_randomness(validators, executed_block.randomness().cloned())
@@ -181,6 +183,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            async_reconfig_v2_enabled,
         } = self
             .state
             .read()
@@ -199,11 +202,12 @@ impl StateComputer for ExecutionProxy {
         let block_executor_onchain_config = block_executor_onchain_config.clone();
 
         let timestamp = block.timestamp_usecs();
-        let metadata = if is_randomness_enabled {
-            block.new_metadata_with_randomness(&validators, randomness)
-        } else {
-            block.new_block_metadata(&validators).into()
-        };
+        let metadata =
+            if async_reconfig_v2_enabled || is_randomness_enabled {
+                block.new_metadata_with_randomness(&validators, randomness)
+            } else {
+                block.new_block_metadata(&validators).into()
+            };
 
         let fut = self
             .execution_pipeline
@@ -280,6 +284,7 @@ impl StateComputer for ExecutionProxy {
             payload_manager,
             validators,
             is_randomness_enabled,
+            async_reconfig_v2_enabled,
             ..
         } = self
             .state
@@ -294,7 +299,7 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled));
+            txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled, async_reconfig_v2_enabled));
             subscribable_txn_events.extend(block.subscribable_events());
         }
 
@@ -387,6 +392,7 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        async_reconfig_v2_enabled: bool,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -399,6 +405,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
+            async_reconfig_v2_enabled,
         });
     }
 

@@ -6,11 +6,11 @@ module aptos_framework::mpc {
     use aptos_std::copyable_any::Any;
     use aptos_framework::event::emit;
 
+    friend aptos_framework::reconfiguration_with_dkg;
+
     struct SharedSecretState has store {
         transcript_for_cur_epoch: Option<vector<u8>>,
         transcript_for_next_epoch: Option<vector<u8>>,
-        /// Some secret needs to be revealed.
-        revealed: Option<vector<u8>>,
     }
 
     struct TaskSpec has copy, drop, store {
@@ -29,6 +29,7 @@ module aptos_framework::mpc {
 
     struct State has key {
         shared_secrets: vector<SharedSecretState>,
+        /// tasks[0] should always be `raise_by_secret(GENERATOR)`
         tasks: vector<TaskState>,
     }
 
@@ -49,22 +50,38 @@ module aptos_framework::mpc {
 
     public fun on_async_reconfig_start() {
         if (exists<FeatureEnabledFlag>(@aptos_framework)) {
-
+            //mpc todo: emit an event to trigger validator components.
         }
     }
 
-    public fun ready_for_new_epoch(): bool acquires State {
-        if (exists<FeatureEnabledFlag>(@aptos_framework)) {
-            let state = borrow_global<State>(@aptos_framework);
-            if (vector::length(&state.shared_secrets) == 0) {
+    public(friend) fun ready_for_next_epoch(): bool acquires State {
+        if (!exists<FeatureEnabledFlag>(@aptos_framework)) {
+            return true;
+        };
 
-            } else {
+        if (!exists<State>(@aptos_framework)) {
+            return false;
+        };
 
-            }
-        } else {
-            true
-        }
+        let state = borrow_global<State>(@aptos_framework);
+        let num_secrets = vector::length(&state.shared_secrets);
+        if (num_secrets == 0) {
+            return false;
+        };
+
+        let secret_state = vector::borrow(&state.shared_secrets, 0);
+        let maybe_trx = &secret_state.transcript_for_next_epoch;
+        if (option::is_none(maybe_trx)) {
+            return false;
+        };
+
+        true
     }
+
+    public(friend) fun on_new_epoch(framework: &signer) {
+        //mpc todo: should clean up any in-progress session states.
+    }
+
 
     public fun raise_by_secret(group_element: vector<u8>, secret_idx: u64): u64 acquires State {
         let task_spec = TaskSpec {

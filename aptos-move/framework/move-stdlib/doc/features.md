@@ -129,6 +129,8 @@ return true.
 -  [Function `default_to_concurrent_fungible_balance_enabled`](#0x1_features_default_to_concurrent_fungible_balance_enabled)
 -  [Function `get_abort_if_multisig_payload_mismatch_feature`](#0x1_features_get_abort_if_multisig_payload_mismatch_feature)
 -  [Function `abort_if_multisig_payload_mismatch_enabled`](#0x1_features_abort_if_multisig_payload_mismatch_enabled)
+-  [Function `get_reconfig_refactoring_feature`](#0x1_features_get_reconfig_refactoring_feature)
+-  [Function `reconfig_refactoring_enabled`](#0x1_features_reconfig_refactoring_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -746,6 +748,22 @@ Deprecated by <code>aptos_framework::randomness_config::RandomnessConfig</code>.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 45;
+</code></pre>
+
+
+
+<a id="0x1_features_RECONFIG_REFACTORING"></a>
+
+Some async reconfig refactorings.
+- Decouple async reconfiguration from randomness.
+- Randomness and any future feature (potentially MPC) depend on this feature (and very likely also <code>ValidatorTransactions</code>).
+- Epoch switches (and related events) are guaranteed to occur in BlockMetadataExt transactions.
+- When no async reconfig-dependent features are enabled, async reconfig becomes instant.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIG_REFACTORING">RECONFIG_REFACTORING</a>: u64 = 72;
 </code></pre>
 
 
@@ -3147,6 +3165,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">abort_if_multisig_payload_mismatch_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_reconfig_refactoring_feature"></a>
+
+## Function `get_reconfig_refactoring_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfig_refactoring_feature">get_reconfig_refactoring_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfig_refactoring_feature">get_reconfig_refactoring_feature</a>(): u64 { <a href="features.md#0x1_features_RECONFIG_REFACTORING">RECONFIG_REFACTORING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_reconfig_refactoring_enabled"></a>
+
+## Function `reconfig_refactoring_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfig_refactoring_enabled">reconfig_refactoring_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfig_refactoring_enabled">reconfig_refactoring_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RECONFIG_REFACTORING">RECONFIG_REFACTORING</a>)
 }
 </code></pre>
 

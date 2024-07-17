@@ -62,14 +62,4 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<keyless_account::Configuration>;
         include config_buffer::OnNewEpochRequirement<keyless_account::Groth16VerificationKey>;
     }
-
-    spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
-        use aptos_framework::dkg;
-        pragma verify_duration_estimate = 1500;
-        include FinishRequirement {
-            framework: account
-        };
-        requires dkg::has_incomplete_session();
-        aborts_if false;
-    }
 }

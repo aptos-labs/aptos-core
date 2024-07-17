@@ -1,7 +1,6 @@
 /// Async reconfiguration state management.
 module aptos_framework::reconfiguration_with_dkg {
     use std::features;
-    use std::option;
     use aptos_framework::consensus_config;
     use aptos_framework::dkg;
     use aptos_framework::execution_config;
@@ -23,22 +22,11 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Trigger a reconfiguration with DKG.
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
-        let incomplete_dkg_session = dkg::incomplete_session();
-        if (option::is_some(&incomplete_dkg_session)) {
-            let session = option::borrow(&incomplete_dkg_session);
-            if (dkg::session_dealer_epoch(session) == reconfiguration::current_epoch()) {
-                return
-            }
-        };
-        reconfiguration_state::on_reconfig_start();
-        let cur_epoch = reconfiguration::current_epoch();
-        dkg::on_async_reconfig_start(
-            cur_epoch,
-            randomness_config::current(),
-            stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos(),
-        );
-        mpc::on_async_reconfig_start();
+        if (!reconfiguration_state::is_in_progress()) {
+            reconfiguration_state::on_reconfig_start();
+            dkg::on_async_reconfig_start();
+            mpc::on_async_reconfig_start();
+        }
     }
 
     /// Clear incomplete DKG session, if it exists.
@@ -48,6 +36,9 @@ module aptos_framework::reconfiguration_with_dkg {
     public(friend) fun finish(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         dkg::try_clear_incomplete_session(framework);
+        mpc::on_new_epoch(framework);
+
+        // Apply buffered config changes.
         consensus_config::on_new_epoch(framework);
         execution_config::on_new_epoch(framework);
         gas_schedule::on_new_epoch(framework);
@@ -62,8 +53,21 @@ module aptos_framework::reconfiguration_with_dkg {
         reconfiguration::reconfigure();
     }
 
+    /// Complete the current reconfiguration with DKG if possible.
+    public(friend) fun try_finish(account: &signer) {
+        let ready_for_next_epoch = true;
+        ready_for_next_epoch = ready_for_next_epoch && dkg::ready_for_next_epoch();
+        ready_for_next_epoch = ready_for_next_epoch && mpc::ready_for_next_epoch();
+        if (ready_for_next_epoch) {
+            finish(account);
+        }
+    }
+
     /// Complete the current reconfiguration with DKG.
+    ///
     /// Abort if no DKG is in progress.
+    ///
+    /// Used only when feature `RECONFIG_REFACTORING` is not enabled.
     fun finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
         dkg::finish(dkg_result);
         finish(account);

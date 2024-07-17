@@ -61,6 +61,7 @@ use move_core_types::account_address::AccountAddress;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
+use aptos_types::on_chain_config::Features;
 
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
@@ -884,7 +885,7 @@ impl ConsensusObserver {
     /// Waits for a new epoch to start
     async fn wait_for_epoch_start(&mut self) {
         // Extract the epoch state and on-chain configs
-        let (epoch_state, consensus_config, execution_config, randomness_config) = if let Some(
+        let (epoch_state, consensus_config, execution_config, features, randomness_config) = if let Some(
             reconfig_events,
         ) =
             &mut self.reconfig_events
@@ -929,6 +930,7 @@ impl ConsensusObserver {
                 &consensus_config,
                 &execution_config,
                 &randomness_config,
+                &features,
                 None,
                 None,
                 rand_msg_rx,
@@ -1067,6 +1069,7 @@ async fn extract_on_chain_configs(
     Arc<EpochState>,
     OnChainConsensusConfig,
     OnChainExecutionConfig,
+    Features,
     OnChainRandomnessConfig,
 ) {
     // Fetch the next reconfiguration notification
@@ -1110,6 +1113,8 @@ async fn extract_on_chain_configs(
     let execution_config =
         onchain_execution_config.unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
 
+    let features = on_chain_configs.get::<Features>().unwrap();
+
     // Extract the randomness config (or use the default if it's missing)
     let onchain_randomness_config: anyhow::Result<RandomnessConfigMoveStruct> =
         on_chain_configs.get();
@@ -1130,6 +1135,7 @@ async fn extract_on_chain_configs(
         epoch_state,
         consensus_config,
         execution_config,
+        features,
         onchain_randomness_config,
     )
 }

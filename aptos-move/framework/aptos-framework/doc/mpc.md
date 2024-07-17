@@ -5,13 +5,17 @@
 
 
 
--  [Struct `SharedSecret`](#0x1_mpc_SharedSecret)
+-  [Struct `SharedSecretState`](#0x1_mpc_SharedSecretState)
 -  [Struct `TaskSpec`](#0x1_mpc_TaskSpec)
 -  [Struct `TaskState`](#0x1_mpc_TaskState)
 -  [Struct `TaskRaiseBySecret`](#0x1_mpc_TaskRaiseBySecret)
 -  [Resource `State`](#0x1_mpc_State)
 -  [Struct `NewTaskEvent`](#0x1_mpc_NewTaskEvent)
 -  [Struct `TaskCompletedEvent`](#0x1_mpc_TaskCompletedEvent)
+-  [Resource `FeatureEnabledFlag`](#0x1_mpc_FeatureEnabledFlag)
+-  [Function `on_async_reconfig_start`](#0x1_mpc_on_async_reconfig_start)
+-  [Function `ready_for_next_epoch`](#0x1_mpc_ready_for_next_epoch)
+-  [Function `on_new_epoch`](#0x1_mpc_on_new_epoch)
 -  [Function `raise_by_secret`](#0x1_mpc_raise_by_secret)
 -  [Function `fulfill_task`](#0x1_mpc_fulfill_task)
 -  [Function `get_result`](#0x1_mpc_get_result)
@@ -24,13 +28,13 @@
 
 
 
-<a id="0x1_mpc_SharedSecret"></a>
+<a id="0x1_mpc_SharedSecretState"></a>
 
-## Struct `SharedSecret`
+## Struct `SharedSecretState`
 
 
 
-<pre><code><b>struct</b> <a href="mpc.md#0x1_mpc_SharedSecret">SharedSecret</a> <b>has</b> store
+<pre><code><b>struct</b> <a href="mpc.md#0x1_mpc_SharedSecretState">SharedSecretState</a> <b>has</b> store
 </code></pre>
 
 
@@ -41,7 +45,13 @@
 
 <dl>
 <dt>
-<code>transcript_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>transcript_for_cur_epoch: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>transcript_for_next_epoch: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -161,7 +171,7 @@
 
 <dl>
 <dt>
-<code>shared_secrets: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="mpc.md#0x1_mpc_SharedSecret">mpc::SharedSecret</a>&gt;</code>
+<code>shared_secrets: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="mpc.md#0x1_mpc_SharedSecretState">mpc::SharedSecretState</a>&gt;</code>
 </dt>
 <dd>
 
@@ -170,7 +180,7 @@
 <code>tasks: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="mpc.md#0x1_mpc_TaskState">mpc::TaskState</a>&gt;</code>
 </dt>
 <dd>
-
+ tasks[0] should always be <code><a href="mpc.md#0x1_mpc_raise_by_secret">raise_by_secret</a>(GENERATOR)</code>
 </dd>
 </dl>
 
@@ -241,6 +251,128 @@
 
 </dd>
 </dl>
+
+
+</details>
+
+<a id="0x1_mpc_FeatureEnabledFlag"></a>
+
+## Resource `FeatureEnabledFlag`
+
+This resource exists under 0x1 iff MPC is enabled.
+
+
+<pre><code><b>struct</b> <a href="mpc.md#0x1_mpc_FeatureEnabledFlag">FeatureEnabledFlag</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_mpc_on_async_reconfig_start"></a>
+
+## Function `on_async_reconfig_start`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="mpc.md#0x1_mpc_on_async_reconfig_start">on_async_reconfig_start</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="mpc.md#0x1_mpc_on_async_reconfig_start">on_async_reconfig_start</a>() {
+    <b>if</b> (<b>exists</b>&lt;<a href="mpc.md#0x1_mpc_FeatureEnabledFlag">FeatureEnabledFlag</a>&gt;(@aptos_framework)) {
+        //<a href="mpc.md#0x1_mpc">mpc</a> todo: emit an <a href="event.md#0x1_event">event</a> <b>to</b> trigger validator components.
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_mpc_ready_for_next_epoch"></a>
+
+## Function `ready_for_next_epoch`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_ready_for_next_epoch">ready_for_next_epoch</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_ready_for_next_epoch">ready_for_next_epoch</a>(): bool <b>acquires</b> <a href="mpc.md#0x1_mpc_State">State</a> {
+    <b>if</b> (!<b>exists</b>&lt;<a href="mpc.md#0x1_mpc_FeatureEnabledFlag">FeatureEnabledFlag</a>&gt;(@aptos_framework)) {
+        <b>return</b> <b>true</b>;
+    };
+
+    <b>if</b> (!<b>exists</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework)) {
+        <b>return</b> <b>false</b>;
+    };
+
+    <b>let</b> state = <b>borrow_global</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework);
+    <b>let</b> num_secrets = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&state.shared_secrets);
+    <b>if</b> (num_secrets == 0) {
+        <b>return</b> <b>false</b>;
+    };
+
+    <b>let</b> secret_state = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&state.shared_secrets, 0);
+    <b>let</b> maybe_trx = &secret_state.transcript_for_next_epoch;
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(maybe_trx)) {
+        <b>return</b> <b>false</b>;
+    };
+
+    <b>true</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_mpc_on_new_epoch"></a>
+
+## Function `on_new_epoch`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    //<a href="mpc.md#0x1_mpc">mpc</a> todo: should clean up <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> in-progress session states.
+}
+</code></pre>
+
 
 
 </details>

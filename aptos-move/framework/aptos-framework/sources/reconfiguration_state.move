@@ -12,6 +12,7 @@ module aptos_framework::reconfiguration_state {
     friend aptos_framework::reconfiguration;
     friend aptos_framework::reconfiguration_with_dkg;
     friend aptos_framework::stake;
+    friend aptos_framework::block;
 
     const ERECONFIG_NOT_IN_PROGRESS: u64 = 1;
 

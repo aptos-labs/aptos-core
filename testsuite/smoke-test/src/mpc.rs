@@ -8,15 +8,17 @@ use aptos_logger::info;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
-use std::collections::btree_map::BTreeMap;
+use std::ops::Mul;
 use std::time::Instant;
+use rand::rngs::OsRng;
 use rand::thread_rng;
 use tokio::time::sleep;
 use aptos_crypto::bls12381;
+use aptos_types::mpc::MpcState;
+use crate::utils::get_on_chain_resource;
+use ff::Field;
+use group::prime::PrimeCurveAffine;
 
-/// Publish the `on-chain-dice` example module,
-/// run its function that consume on-chain randomness, and
-/// print out the random results.
 #[tokio::test]
 async fn raise_by_secret() {
     let epoch_duration_secs = 20;
@@ -34,7 +36,7 @@ async fn raise_by_secret() {
         .build_with_cli(0)
         .await;
 
-    let rest_client = swarm.validators().next().unwrap().rest_client();
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
 
     info!("Wait for epoch 2. Epoch 1 does not have randomness.");
     swarm
@@ -59,26 +61,34 @@ async fn raise_by_secret() {
         max_gas: Some(10_000),
         expiration_secs: 60,
     };
-    let element = aptos_crypto::rand_bls12381_g1(&mut rng);
 
+    let my_secret = blstrs::Scalar::from(55555);
+    let my_epk = blstrs::G1Affine::generator().mul(&my_secret);
+    let my_epk_bytes = my_epk.to_compressed().to_vec();
+    let arg0 = format!("0x{}", hex::encode(my_epk_bytes));
     let txn_summary = cli
-        .run_function(0, Some(gas_options), trigger_func_id.clone(), vec![], vec![])
+        .run_function(0, Some(gas_options), trigger_func_id.clone(), vec![arg0.as_str()], vec![])
         .await
         .unwrap();
     println!("txn_summary={:?}", txn_summary);
-
+    let mpc_state = get_on_chain_resource::<MpcState>(&rest_cli).await;
+    let chain_pk_bytes = <[u8; 48]>::try_from(mpc_state.tasks[0].result.clone().unwrap()).unwrap();
+    let chain_pk = blstrs::G1Affine::from_compressed(&chain_pk_bytes).unwrap();
+    let expected = chain_pk.mul(&my_secret);
+    let expected_bytes = expected.to_compressed().to_vec();
+    let arg0 = format!("0x{}", hex::encode(expected_bytes));
+    let vrfy_func_id = MemberId::from_str(&format!("{}::mpc_example::fetch_and_verify", account)).unwrap();
     info!("Wait for correct result.");
     let timer = Instant::now();
     let time_limit = Duration::from_secs(10);
     while timer.elapsed() < time_limit {
-        let vrfy_func_id = MemberId::from_str(&format!("{}::mpc_example::fetch_and_verify", account)).unwrap();
         let gas_options = GasOptions {
             gas_unit_price: Some(100),
             max_gas: Some(10_000),
             expiration_secs: 60,
         };
         let txn_summary = cli
-            .run_function(0, Some(gas_options), vrfy_func_id.clone(), vec![], vec![])
+            .run_function(0, Some(gas_options), vrfy_func_id.clone(), vec![arg0.as_str()], vec![])
             .await
             .unwrap();
         println!("txn_summary={:?}", txn_summary);
@@ -109,7 +119,7 @@ async fn publish_module(
         .unwrap();
 
     let content =
-        include_str!("../../../../aptos-move/move-examples/mpc/sources/mpc_example.move")
+        include_str!("../../../aptos-move/move-examples/mpc/sources/mpc_example.move")
             .to_string();
     cli.add_file_in_package("sources/mpc_example.move", content);
 
