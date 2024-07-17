@@ -61,7 +61,7 @@ use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
 // Whether to log messages at the info level (useful for debugging)
-const LOG_MESSAGES_AT_INFO_LEVEL: bool = false;
+const LOG_MESSAGES_AT_INFO_LEVEL: bool = true;
 
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
