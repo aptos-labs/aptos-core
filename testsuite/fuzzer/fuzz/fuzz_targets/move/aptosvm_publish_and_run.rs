@@ -9,7 +9,8 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload, TransactionStatus
+        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
+        TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -27,8 +28,8 @@ use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
+    time::Instant,
 };
-use std::time::Instant;
 mod utils;
 use utils::*;
 
@@ -254,12 +255,10 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     };
     let raw_tx = tx.raw();
     let tx = match input.tx_auth_type {
-        Authenticator::Ed25519 { sender: _ } => {
-            raw_tx
+        Authenticator::Ed25519 { sender: _ } => raw_tx
             .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
             .map_err(|_| Corpus::Keep)?
-            .into_inner()
-        },
+            .into_inner(),
         Authenticator::MultiAgent {
             sender: _,
             secondary_signers,
@@ -375,13 +374,22 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // EXECUTION_TIME_GAS_RATIO is a ratio between execution time and gas used. If the ratio is higher than EXECUTION_TIME_GAS_ratio, we consider the gas usage as unexpected.
     // EXPERIMENTAL: This very sensible to excution enviroment, e.g. local run, OSS-Fuzz. It may cause false positive. Real data from production does not apply to this ratio.
     // We only want to catch big unexpected gas usage.
-    if (elapsed.as_millis()/(fee.execution_gas_used()+fee.io_gas_used()) as u128) > EXECUTION_TIME_GAS_RATIO as u128 {
-        if std::env::var("DEBUG").is_ok()
-        {
-            tdbg!("Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}", elapsed, fee.execution_gas_used()+fee.io_gas_used());
+    if (elapsed.as_millis() / (fee.execution_gas_used() + fee.io_gas_used()) as u128)
+        > EXECUTION_TIME_GAS_RATIO as u128
+    {
+        if std::env::var("DEBUG").is_ok() {
+            tdbg!(
+                "Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}",
+                elapsed,
+                fee.execution_gas_used() + fee.io_gas_used()
+            );
             tdbg!("Transaction: {:?}", tx);
         } else {
-            panic!("Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}", elapsed, fee.execution_gas_used()+fee.io_gas_used());
+            panic!(
+                "Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}",
+                elapsed,
+                fee.execution_gas_used() + fee.io_gas_used()
+            );
         }
     }
 

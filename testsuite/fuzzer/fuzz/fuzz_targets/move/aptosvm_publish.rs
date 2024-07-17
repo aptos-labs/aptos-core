@@ -4,14 +4,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod utils;
-use aptos_language_e2e_tests::{
-    data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor,
-};
-use aptos_types::{
-    chain_id::ChainId,
-
-    write_set::WriteSet,
-};
+use aptos_language_e2e_tests::{data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor};
+use aptos_types::{chain_id::ChainId, write_set::WriteSet};
 use aptos_vm::AptosVM;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
@@ -20,11 +14,11 @@ use move_binary_format::{
     file_format::{CompiledModule, CompiledScript},
 };
 use once_cell::sync::Lazy;
-use utils::*;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
 };
+use utils::*;
 
 // genesis write set generated once for each fuzzing session
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
