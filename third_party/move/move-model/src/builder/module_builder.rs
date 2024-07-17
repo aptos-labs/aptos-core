@@ -1805,6 +1805,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
                         et.define_local(loc, receiver_param_name, struct_type, None, None);
                     }
+                } else if let StructLayout::Variants(_) = &entry.layout {
+                    et.enter_scope();
+                    if et.env().language_version.is_at_least(LanguageVersion::V2_0) {
+                        let receiver_param_name =
+                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        et.define_local(loc, receiver_param_name, struct_type, None, None);
+                    }
                 }
 
                 et

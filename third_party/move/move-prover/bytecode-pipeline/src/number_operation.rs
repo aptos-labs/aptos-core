@@ -277,26 +277,29 @@ impl GlobalNumberOperationState {
         let struct_env = struct_env.module_env.env.get_module(mid).into_struct(sid);
         let mut field_oper_map = BTreeMap::new();
 
-        for (i, field) in struct_env.get_fields().enumerate() {
-            if field_idx_vec.contains(&i) {
-                field_oper_map.insert(field.get_id(), Bitwise);
-            } else {
-                let field_ty = field.get_type();
-                let arith_flag = if let Type::Reference(_, tr) = field_ty {
-                    tr.is_number()
-                } else if let Type::Vector(tr) = field_ty {
-                    tr.is_number()
+        // TODO(#14349): add support for enum type
+        if !struct_env.has_variants() {
+            for (i, field) in struct_env.get_fields().enumerate() {
+                if field_idx_vec.contains(&i) {
+                    field_oper_map.insert(field.get_id(), Bitwise);
                 } else {
-                    field_ty.is_number()
-                };
-                if arith_flag {
-                    field_oper_map.insert(field.get_id(), Arithmetic);
-                } else {
-                    field_oper_map.insert(field.get_id(), Bottom);
+                    let field_ty = field.get_type();
+                    let arith_flag = if let Type::Reference(_, tr) = field_ty {
+                        tr.is_number()
+                    } else if let Type::Vector(tr) = field_ty {
+                        tr.is_number()
+                    } else {
+                        field_ty.is_number()
+                    };
+                    if arith_flag {
+                        field_oper_map.insert(field.get_id(), Arithmetic);
+                    } else {
+                        field_oper_map.insert(field.get_id(), Bottom);
+                    }
                 }
             }
+            self.struct_operation_map.insert((mid, sid), field_oper_map);
         }
-        self.struct_operation_map.insert((mid, sid), field_oper_map);
     }
 
     /// Updates the number operation for the given node id.
