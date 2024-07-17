@@ -30,7 +30,11 @@ use aptos_transaction_generator_lib::{
 use aptos_types::account_config::aptos_test_root_address;
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, seq::IteratorRandom, Rng};
+use rand::{
+    rngs::StdRng,
+    seq::{IteratorRandom, SliceRandom},
+    Rng,
+};
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -781,8 +785,10 @@ impl TxnEmitter {
         // traffic pattern to be correct.
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
+        let all_clients = Arc::new(req.rest_clients.clone());
         for index in 0..num_accounts {
-            let client = &req.rest_clients[index % req.rest_clients.len()];
+            let main_client_index = index % all_clients.len();
+
             let accounts = all_accounts.split_off(all_accounts.len() - 1);
             let stop = stop.clone();
             let stats = Arc::clone(&stats);
@@ -791,7 +797,8 @@ impl TxnEmitter {
 
             let worker = SubmissionWorker::new(
                 accounts,
-                client.clone(),
+                all_clients.clone(),
+                main_client_index,
                 stop,
                 mode_params.clone(),
                 stats,
@@ -897,6 +904,10 @@ impl TxnEmitter {
     }
 }
 
+fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
+    clients.choose(&mut rand::thread_rng()).unwrap()
+}
+
 /// This function waits for the submitted transactions to be committed, up to
 /// a wait_timeout (counted from the start_time passed in, not from the function call).
 /// It returns number of transactions that expired without being committed,
@@ -906,7 +917,7 @@ impl TxnEmitter {
 /// we were able to fetch last.
 async fn wait_for_accounts_sequence(
     start_time: Instant,
-    client: &RestClient,
+    clients: &Vec<RestClient>,
     account_seqs: &HashMap<AccountAddress, (u64, u64)>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
@@ -916,6 +927,7 @@ async fn wait_for_accounts_sequence(
 
     let mut sum_of_completion_timestamps_millis = 0u128;
     loop {
+        let client = pick_client(clients);
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();
