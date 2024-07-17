@@ -65,6 +65,11 @@ impl BlockPayloadStore {
         })
     }
 
+    /// Clears all the payloads from the block payload store
+    pub fn clear_all_payloads(&self) {
+        self.block_transaction_payloads.lock().clear();
+    }
+
     /// Returns a reference to the block transaction payloads
     pub fn get_block_payloads(&self) -> Arc<Mutex<HashMap<HashValue, BlockPayloadStatus>>> {
         self.block_transaction_payloads.clone()
@@ -170,6 +175,32 @@ mod test {
 
         // Check that the payloads no longer exist in the block payload store
         assert!(!block_payload_store.all_payloads_exist(subset_pipelined_blocks));
+    }
+
+    #[test]
+    fn test_clear_all_payloads() {
+        // Create a new block payload store
+        let block_payload_store = BlockPayloadStore::new();
+
+        // Add some blocks to the payload store
+        let num_blocks_in_store = 100;
+        let pipelined_blocks =
+            create_and_add_blocks_to_store(block_payload_store.clone(), num_blocks_in_store);
+
+        // Check that all the payloads exist in the block payload store
+        assert!(block_payload_store.all_payloads_exist(&pipelined_blocks));
+
+        // Clear all the payloads from the block payload store
+        block_payload_store.clear_all_payloads();
+
+        // Check that all the payloads exist in the block payload store
+        assert!(!block_payload_store.all_payloads_exist(&pipelined_blocks));
+
+        // Check that the block payload store is empty
+        assert!(block_payload_store
+            .block_transaction_payloads
+            .lock()
+            .is_empty());
     }
 
     #[test]

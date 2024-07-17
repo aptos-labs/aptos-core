@@ -36,6 +36,11 @@ impl PendingOrderedBlocks {
         }
     }
 
+    /// Clears all pending blocks
+    pub fn clear_all_pending_blocks(&self) {
+        self.pending_blocks.lock().clear();
+    }
+
     /// Returns a copy of the verified pending blocks
     pub fn get_all_verified_pending_blocks(
         &self,
@@ -256,7 +261,40 @@ mod test {
     };
 
     #[test]
-    pub fn test_get_last_pending_block() {
+    fn test_clear_all_pending_blocks() {
+        // Create new pending ordered blocks
+        let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
+
+        // Insert several verified blocks for the current epoch
+        let current_epoch = 0;
+        let num_verified_blocks = 10;
+        create_and_add_pending_blocks(
+            &pending_ordered_blocks,
+            num_verified_blocks,
+            current_epoch,
+            true,
+        );
+
+        // Insert several unverified blocks for the next epoch
+        let next_epoch = current_epoch + 1;
+        let num_unverified_blocks = 20;
+        create_and_add_pending_blocks(
+            &pending_ordered_blocks,
+            num_unverified_blocks,
+            next_epoch,
+            false,
+        );
+
+        // Clear all pending blocks
+        pending_ordered_blocks.clear_all_pending_blocks();
+
+        // Check all the pending blocks were removed
+        let num_pending_blocks = pending_ordered_blocks.pending_blocks.lock().len();
+        assert_eq!(num_pending_blocks, 0);
+    }
+
+    #[test]
+    fn test_get_last_pending_block() {
         // Create new pending ordered blocks
         let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
@@ -313,7 +351,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_get_verified_pending_block() {
+    fn test_get_verified_pending_block() {
         // Create new pending ordered blocks
         let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
@@ -369,7 +407,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_insert_ordered_block_limit() {
+    fn test_insert_ordered_block_limit() {
         // Create a consensus observer config with a maximum of 10 pending blocks
         let max_num_pending_blocks = 10;
         let consensus_observer_config = ConsensusObserverConfig {
@@ -418,7 +456,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_remove_blocks_for_commit() {
+    fn test_remove_blocks_for_commit() {
         // Create new pending ordered blocks
         let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
@@ -517,7 +555,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_update_commit_decision() {
+    fn test_update_commit_decision() {
         // Create new pending ordered blocks
         let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
