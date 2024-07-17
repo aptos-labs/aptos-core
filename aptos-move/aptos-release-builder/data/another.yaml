@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: "Some random feature"
+proposals:
+  - name: set the random feature
+    metadata:
+      title: "Set a random feature"
+      description: "Change a random feature"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - disallow_user_native
