@@ -11,8 +11,9 @@ use crate::{
     types::{auth::Claims, common::NodeType},
 };
 use aptos_types::PeerId;
+use rand::Rng;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
-use std::time::Duration;
+use std::{env, time::Duration};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
@@ -44,15 +45,34 @@ pub async fn handle_metrics_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling prometheus metrics ingest");
 
-    let mut extra_labels = Vec::new();
-    extra_labels.extend(claims_to_extra_labels(
-        &claims,
-        context
-            .peer_identities()
-            .get(&claims.chain_id)
-            .and_then(|peers| peers.get(&claims.peer_id)),
-    ));
-    extra_labels.extend(peer_location_labels(&context, &claims.peer_id));
+    let enable_random_label = env::var("FEATURE_RANDOM_LABEL_ENABLED")
+        .map(|val| val.parse::<bool>().unwrap_or(false))
+        .unwrap_or(false);
+
+    let max_random_value = env::var("FEATURE_RANDOM_LABEL_MAX_VALUE")
+        .map(|val| val.parse::<i32>().unwrap_or(20))
+        .unwrap_or(20);
+
+    let extra_labels = [
+        claims_to_extra_labels(
+            &claims,
+            context
+                .peer_identities()
+                .get(&claims.chain_id)
+                .and_then(|peers| peers.get(&claims.peer_id)),
+        ),
+        peer_location_labels(&context, &claims.peer_id),
+    ]
+    .concat();
+
+    let extra_labels_with_random_label = if enable_random_label {
+        let random_num = rand::thread_rng().gen_range(0, max_random_value);
+        let mut labels = extra_labels.clone();
+        labels.push(format!("random_label={}", random_num));
+        labels
+    } else {
+        extra_labels.clone()
+    };
 
     let client = match claims.node_type {
         NodeType::UnknownValidator | NodeType::UnknownFullNode => {
@@ -64,6 +84,11 @@ pub async fn handle_metrics_ingest(
     let start_timer = Instant::now();
 
     let post_futures = client.iter().map(|(name, client)| async {
+        let extra_labels = if client.is_selfhosted_vm_client() {
+            extra_labels_with_random_label.clone()
+        } else {
+            extra_labels.clone()
+        };
         let result = tokio::time::timeout(
             Duration::from_secs(MAX_METRICS_POST_WAIT_DURATION_SECS),
             client.post_prometheus_metrics(

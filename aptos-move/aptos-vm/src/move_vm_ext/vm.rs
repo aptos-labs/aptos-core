@@ -8,7 +8,8 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{
-    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+    gas_feature_versions::RELEASE_V1_16, AptosGasParameters, MiscGasParameters,
+    NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
@@ -21,7 +22,7 @@ use aptos_vm_types::{
     environment::{aptos_default_ty_builder, aptos_prod_ty_builder, Environment},
     storage::change_set_configs::ChangeSetConfigs,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use move_vm_runtime::move_vm::MoveVM;
 use std::{ops::Deref, sync::Arc};
 
 /// MoveVM wrapper which is used to run genesis initializations. Designed as a
@@ -39,13 +40,11 @@ impl GenesisMoveVM {
         let features = Features::default();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
-        // Genesis runs sessions, where there is no concept of block execution.
-        // Hence, delayed fields are not enabled.
-        let delayed_field_optimization_enabled = false;
+        let pseudo_meter_vector_ty_to_ty_tag_construction = true;
         let vm_config = aptos_prod_vm_config(
             &features,
             &timed_features,
-            delayed_field_optimization_enabled,
+            pseudo_meter_vector_ty_to_ty_tag_construction,
             aptos_default_ty_builder(&features),
         );
 
@@ -142,18 +141,13 @@ impl MoveVmExt {
         );
 
         // TODO(George): Move gas configs to environment to avoid this clone!
-        let vm_config = VMConfig {
-            verifier_config: env.vm_config().verifier_config.clone(),
-            deserializer_config: env.vm_config().deserializer_config.clone(),
-            paranoid_type_checks: env.vm_config().paranoid_type_checks,
-            check_invariant_in_swap_loc: env.vm_config().check_invariant_in_swap_loc,
-            max_value_nest_depth: env.vm_config().max_value_nest_depth,
-            type_max_cost: env.vm_config().type_max_cost,
-            type_base_cost: env.vm_config().type_base_cost,
-            type_byte_cost: env.vm_config().type_byte_cost,
-            delayed_field_optimization_enabled: env.vm_config().delayed_field_optimization_enabled,
-            ty_builder,
-        };
+        let mut vm_config = env.vm_config().clone();
+        vm_config.pseudo_meter_vector_ty_to_ty_tag_construction =
+            gas_feature_version >= RELEASE_V1_16;
+        vm_config.ty_builder = ty_builder;
+        vm_config.disallow_dispatch_for_native = env
+            .features()
+            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
 
         Self {
             inner: WarmVmCache::get_warm_vm(

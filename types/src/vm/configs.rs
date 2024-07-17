@@ -69,7 +69,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
 pub fn aptos_prod_vm_config(
     features: &Features,
     timed_features: &TimedFeatures,
-    delayed_field_optimization_enabled: bool,
+    pseudo_meter_vector_ty_to_ty_tag_construction: bool,
     ty_builder: TypeBuilder,
 ) -> VMConfig {
     let check_invariant_in_swap_loc =
@@ -98,8 +98,12 @@ pub fn aptos_prod_vm_config(
         type_max_cost,
         type_base_cost,
         type_byte_cost,
-        delayed_field_optimization_enabled,
+        pseudo_meter_vector_ty_to_ty_tag_construction,
+        // By default, do not use delayed field optimization. Instead, clients should enable it
+        // manually where applicable.
+        delayed_field_optimization_enabled: false,
         ty_builder,
+        disallow_dispatch_for_native: false,
     }
 }
 

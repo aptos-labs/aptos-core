@@ -28,13 +28,11 @@ aptos-runtimes = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
-hyper = { workspace = true }
 itertools = { workspace = true }
 mime = { workspace = true }
 mini-moka = { workspace = true }

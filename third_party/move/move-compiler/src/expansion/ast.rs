@@ -192,6 +192,7 @@ pub struct StructVariant {
 pub enum Visibility {
     Public(Loc),
     Friend(Loc),
+    Package(Loc),
     Internal,
 }
 
@@ -487,7 +488,7 @@ pub enum Exp_ {
 
     Borrow(bool, Box<Exp>),
     ExpDotted(Box<ExpDotted>),
-    Index(Box<Exp>, Box<Exp>), // spec only (no mutation needed right now)
+    Index(Box<Exp>, Box<Exp>), // spec only unless language >= v2
 
     Cast(Box<Exp>, Type),
     Annotate(Box<Exp>, Type),
@@ -727,11 +728,14 @@ impl AbilitySet {
 impl Visibility {
     pub const FRIEND: &'static str = P::Visibility::FRIEND;
     pub const INTERNAL: &'static str = P::Visibility::INTERNAL;
+    pub const PACKAGE: &'static str = P::Visibility::PACKAGE;
     pub const PUBLIC: &'static str = P::Visibility::PUBLIC;
 
     pub fn loc(&self) -> Option<Loc> {
         match self {
-            Visibility::Public(loc) | Visibility::Friend(loc) => Some(*loc),
+            Visibility::Public(loc) | Visibility::Friend(loc) | Visibility::Package(loc) => {
+                Some(*loc)
+            },
             Visibility::Internal => None,
         }
     }
@@ -849,6 +853,7 @@ impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", match &self {
             Visibility::Public(_) => Visibility::PUBLIC,
+            Visibility::Package(_) => Visibility::PACKAGE,
             Visibility::Friend(_) => Visibility::FRIEND,
             Visibility::Internal => Visibility::INTERNAL,
         })
@@ -1650,7 +1655,9 @@ impl AstDebug for Exp_ {
                 rhs.ast_debug(w);
             },
             E::Mutate(lhs, rhs) => {
-                w.write("*");
+                if !matches!(lhs.value, E::Index(_, _)) {
+                    w.write("*");
+                }
                 lhs.ast_debug(w);
                 w.write(" = ");
                 rhs.ast_debug(w);

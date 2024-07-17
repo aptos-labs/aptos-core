@@ -71,7 +71,7 @@ jobs:
 
       # Self hosted runners don't have pnpm preinstalled.
       # https://github.com/actions/setup-node/issues/182
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         if: ${{ !inputs.SKIP_JOB }}
 
       # When using high-perf-docker, the CI is actually run with two containers

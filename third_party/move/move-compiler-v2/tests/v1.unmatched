@@ -31,22 +31,7 @@ move-compiler/tests/move_check/control_flow/{
 }
 move-compiler/tests/move_check/deprecated/{
   assert_function.move,
-  deprecated_constant_duplicated_struct.move,
-  deprecated_constant_duplicated_struct2.move,
-  deprecated_field_type.move,
-  deprecated_field_type2.move,
-  deprecated_placement_address.move,
-  deprecated_placement_address_module_members.move,
   deprecated_placement_basecase.move,
-  deprecated_placement_members.move,
-  deprecated_placement_module.move,
-  deprecated_placement_module2.move,
-  deprecated_placement_module_members.move,
-  public_script.move,
-}
-move-compiler/tests/move_check/examples/{
-  multi_pool_money_market_token.move,
-  simple_money_market_token.move,
 }
 move-compiler/tests/move_check/liveness/{
   copy_after_move.move,
@@ -278,11 +263,4 @@ move-compiler/tests/move_check/typing/{
 }
 move-compiler/tests/move_check/v2-not-supported/{
   no_receiver_calls.move,
-}
-move-compiler/tests/move_check/verification/{
-  cross_module_invalid.move,
-  cross_module_valid.move,
-  double_annotation.move,
-  single_module_invalid.move,
-  single_module_valid.move,
 }

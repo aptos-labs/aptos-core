@@ -41,7 +41,6 @@ members = [
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
     "aptos-move/vm-genesis",
-    "aptos-move/writeset-transaction-generator",
     "aptos-node",
     "aptos-utils",
     "config",
@@ -179,9 +178,6 @@ members = [
     "storage/schemadb",
     "storage/scratchpad",
     "storage/storage-interface",
-    "testsuite/dos/http_test",
-    "testsuite/dos/listener",
-    "testsuite/dos/sender",
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/fuzzer",
@@ -249,6 +245,7 @@ members = [
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
+    "tools/compute-module-expansion-size",
     "types",
     "vm-validator",
 ]
@@ -454,7 +451,6 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
-aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
@@ -485,7 +481,7 @@ async-mutex = "1.4.0"
 async-recursion = "1.0.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
-axum = "0.5.16"
+axum = "0.7.5"
 base64 = "0.13.0"
 base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
@@ -644,7 +640,6 @@ num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
 num-traits = "0.2.15"
-number_range = "0.3.2"
 once_cell = "1.10.0"
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"
@@ -666,9 +661,10 @@ percent-encoding = "2.1.0"
 petgraph = "0.5.1"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
-poem = { version = "=1.3.59", features = ["anyhow", "rustls"] }
-poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
-poem-openapi-derive = "=2.0.11"
+# We're using git deps until https://github.com/poem-web/poem/pull/829 gets formally released.
+poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["anyhow", "rustls"] }
+poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["swagger-ui", "url"] }
+poem-openapi-derive = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b" }
 poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
 pretty = "0.10.0"
@@ -702,6 +698,7 @@ reqwest = { version = "0.11.11", features = [
     "blocking",
     "cookies",
     "json",
+    "multipart",
     "stream",
 ] }
 reqwest-middleware = "0.2.0"

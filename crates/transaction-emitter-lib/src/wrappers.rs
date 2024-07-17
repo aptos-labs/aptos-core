@@ -5,18 +5,19 @@ use crate::{
     args::{ClusterArgs, EmitArgs},
     cluster::Cluster,
     emitter::{
-        create_accounts, local_account_generator::PrivateKeyAccountGenerator, parse_seed,
-        stats::TxnStats, EmitJobMode, EmitJobRequest, NumAccountsMode, TxnEmitter,
+        account_minter::bulk_create_accounts, get_needed_balance_per_account_from_req,
+        local_account_generator::PrivateKeyAccountGenerator, stats::TxnStats,
+        transaction_executor::RestApiReliableTransactionSubmitter, EmitJobMode, EmitJobRequest,
+        NumAccountsMode, TxnEmitter,
     },
     instance::Instance,
     CreateAccountsArgs,
 };
 use anyhow::{bail, Context, Result};
-use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -156,8 +157,8 @@ pub async fn emit_transactions_with_cluster(
             .latency_polling_interval(Duration::from_secs_f32(latency_polling_interval_s));
     }
 
-    if args.skip_minting_accounts {
-        emit_job_request = emit_job_request.skip_minting_accounts();
+    if args.skip_funding_accounts {
+        emit_job_request = emit_job_request.skip_funding_accounts();
     }
 
     let coin_source_account = std::sync::Arc::new(coin_source_account);
@@ -185,30 +186,32 @@ pub async fn create_accounts_command(
     let txn_factory = TransactionFactory::new(cluster.chain_id)
         .with_transaction_expiration_time(60)
         .with_max_gas_amount(create_accounts_args.max_gas_per_txn);
-    let emit_job_request =
-        EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
-            .init_gas_price_multiplier(1)
-            .expected_gas_per_txn(create_accounts_args.max_gas_per_txn)
-            .max_gas_per_txn(create_accounts_args.max_gas_per_txn)
-            .coins_per_account_override(0)
-            .expected_max_txns(0)
-            .prompt_before_spending();
-    let seed = match &create_accounts_args.account_minter_seed {
-        Some(str) => parse_seed(str),
-        None => StdRng::from_entropy().gen(),
-    };
+    let rest_clients = cluster
+        .all_instances()
+        .map(Instance::rest_client)
+        .collect::<Vec<_>>();
+    let mut emit_job_request = EmitJobRequest::new(rest_clients.clone())
+        .init_gas_price_multiplier(1)
+        .expected_gas_per_txn(create_accounts_args.max_gas_per_txn)
+        .max_gas_per_txn(create_accounts_args.max_gas_per_txn)
+        .coins_per_account_override(0)
+        .expected_max_txns(0)
+        .prompt_before_spending();
 
-    create_accounts(
+    if let Some(seed) = &create_accounts_args.account_minter_seed {
+        emit_job_request = emit_job_request.account_minter_seed(seed);
+    }
+
+    bulk_create_accounts(
         coin_source_account,
+        &RestApiReliableTransactionSubmitter::new(rest_clients, 6, Duration::from_secs(10)),
         &txn_factory,
         Box::new(PrivateKeyAccountGenerator),
-        &emit_job_request,
-        DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
-        false,
-        seed,
+        (&emit_job_request).into(),
         create_accounts_args.count,
-        4,
+        get_needed_balance_per_account_from_req(&emit_job_request, create_accounts_args.count),
     )
     .await?;
+
     Ok(())
 }

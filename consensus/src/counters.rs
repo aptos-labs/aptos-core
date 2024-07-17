@@ -320,6 +320,36 @@ pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for max number of transactions (after filtering for dedup, expirations, etc) proposer uses when creating block.
+pub static PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_max_block_txns_after_filtering",
+        "Histogram for max number of transactions (after filtering) proposer uses when creating block.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for max number of transactions proposer uses when creating block.
+pub static PROPOSER_MAX_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_max_block_txns",
+        "Histogram for max number of transactions proposer uses when creating block.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for max number of transactions to execute proposer uses when creating block.
+pub static PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_max_block_txns_to_execute",
+        "Histogram for max number of transactions to execute proposer uses when creating block.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 /// How many pending blocks are there, when we make a proposal
 pub static PROPOSER_PENDING_BLOCKS_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

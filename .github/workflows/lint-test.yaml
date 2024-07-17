@@ -83,6 +83,19 @@ jobs:
       - run: echo "Skipping rust lints! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
+  # Run cargo deny. This is a PR required job.
+  rust-cargo-deny:
+    needs: file_change_determinator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check licenses
+      - run: echo "Skipping cargo deny! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+
   # Run all rust smoke tests. This is a PR required job.
   rust-smoke-tests:
     needs: file_change_determinator
@@ -108,6 +121,10 @@ jobs:
 
   # Run only the targeted rust unit tests. This is a PR required job.
   rust-targeted-unit-tests:
+    if: | # Don't run on release branches. Instead, all unit tests will be triggered.
+      (
+        !contains(github.event.pull_request.base.ref, '-release-')
+      )
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
@@ -126,7 +143,8 @@ jobs:
       (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests')
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests') ||
+        contains(github.event.pull_request.base.ref, '-release-')
       )
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
