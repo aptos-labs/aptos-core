@@ -50,7 +50,7 @@ impl RemoteCoordinatorClient {
         let cmd_rx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("remote-state-view-shard-send-request-{}-{}", shard_id, index))
-                .num_threads(16)
+                .num_threads(8)
                 .build()
                 .unwrap(),
         );

@@ -355,7 +355,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             }).unwrap();
             stream_results_thread.join().unwrap();
             let drop_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
-                .with_label_values(&[&self.shard_id.to_string(), "dropping state vie"])
+                .with_label_values(&[&self.shard_id.to_string(), "dropping state view"])
                 .start_timer();
             // clearing the state value
             self.coordinator_client.lock().unwrap().reset_state_view();
