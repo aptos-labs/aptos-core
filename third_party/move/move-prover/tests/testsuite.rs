@@ -51,6 +51,7 @@ struct Feature {
     /// The first name is the name of the test group, the second the path to the test
     /// source.
     enabling_condition: fn(&str, &str) -> bool,
+    dump: bool,
 }
 
 /// An inclusion mode. A feature may be run in one of these modes.
@@ -78,6 +79,7 @@ fn get_features() -> &'static [Feature] {
                 v2: false,
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("default")),
                 enabling_condition: |_, _| true,
+                dump: true,
             },
             // Tests the default configuration with the v2 compiler chain
             Feature {
@@ -90,6 +92,7 @@ fn get_features() -> &'static [Feature] {
                 v2: true,
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("v2")),
                 enabling_condition: |_, _| true,
+                dump: true,
             },
             // Tests with cvc5 as a backend for boogie.
             Feature {
@@ -102,6 +105,7 @@ fn get_features() -> &'static [Feature] {
                 v2: false,
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc5")),
                 enabling_condition: |group, _| group == "unit",
+                dump: true,
             },
         ]
     })
@@ -244,12 +248,16 @@ fn get_flags_and_baseline(
     // Add flags specified via environment variable.
     flags.extend(shell_words::split(&read_env_var(ENV_FLAGS))?);
 
+    if feature.dump {
+        flags.push("--keep".to_string());
+    }
+
     // Create a temporary file for output. We inject the modifier to potentially prevent
     // any races between similar named files in different directories, as it appears TempPath
     // isn't working always.
     let base_name = format!("{}.bpl", path.file_stem().unwrap().to_str().unwrap());
-    let output = temp_dir.join(base_name).to_str().unwrap().to_string();
-    flags.push(format!("--output={}", output));
+    let _output = temp_dir.join(base_name).to_str().unwrap().to_string();
+    // flags.push(format!("--output={}", output));
     Ok((flags, baseline_path))
 }
 

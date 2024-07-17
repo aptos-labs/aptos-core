@@ -1789,6 +1789,30 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             None,
                         );
                     }
+                } else if let StructLayout::Variants(variants) = &entry.layout {
+                    // TODO: language V2 only
+                    et.enter_scope();
+                    let mut common_fields = vec![];
+                    if !variants.is_empty() {
+                        for field_data in variants[0].fields.values() {
+                            if field_data.common_for_variants {
+                                common_fields.push(field_data.clone());
+                            }
+                        }
+                        for f in &common_fields {
+                            et.define_local(
+                                loc,
+                                f.name,
+                                f.ty.clone(),
+                                Some(Operation::Select(
+                                    entry.module_id,
+                                    entry.struct_id,
+                                    FieldId::new(f.name),
+                                )),
+                                None,
+                            );
+                        }
+                    }
                 }
 
                 et
