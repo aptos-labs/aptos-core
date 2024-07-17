@@ -33,7 +33,7 @@ const NUM_DEFAULT_OCTAS: u64 = 100000000;
 
 /// Tool to initialize current directory for the Movement tool
 ///
-/// Configuration will be pushed into .aptos/config.yaml
+/// Configuration will be pushed into .movement/config.yaml
 #[derive(Debug, Parser)]
 pub struct InitTool {
     /// Network to use for default settings

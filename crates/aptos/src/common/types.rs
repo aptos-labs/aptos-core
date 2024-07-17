@@ -227,7 +227,7 @@ pub struct CliConfig {
 
 const CONFIG_FILE: &str = "config.yaml";
 const LEGACY_CONFIG_FILE: &str = "config.yml";
-pub const CONFIG_FOLDER: &str = ".aptos";
+pub const CONFIG_FOLDER: &str = ".movement";
 
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
