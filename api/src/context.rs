@@ -16,7 +16,7 @@ use aptos_api_types::{
     AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
     TransactionOnChainData,
 };
-use aptos_config::config::{NodeConfig, RoleType};
+use aptos_config::config::{GasEstimationConfig, NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, info, Schema};
@@ -29,7 +29,6 @@ use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent},
-    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
@@ -42,7 +41,9 @@ use aptos_types::{
         TStateView,
     },
     transaction::{
-        block_epilogue::BlockEndInfo, SignedTransaction, Transaction, TransactionWithProof, Version,
+        block_epilogue::BlockEndInfo,
+        use_case::{UseCaseAwareTransaction, UseCaseKey},
+        SignedTransaction, Transaction, TransactionWithProof, Version,
     },
 };
 use futures::{channel::oneshot, SinkExt};
@@ -124,8 +125,7 @@ impl Context {
             })),
             gas_limit_cache: Arc::new(RwLock::new(GasLimitCache {
                 last_updated_epoch: None,
-                block_executor_onchain_config: OnChainExecutionConfig::default_if_missing()
-                    .block_executor_onchain_config(),
+                execution_onchain_config: OnChainExecutionConfig::default_if_missing(),
             })),
             view_function_stats,
             simulate_txn_stats,
@@ -992,9 +992,10 @@ impl Context {
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<(Vec<(u64, u64)>, Vec<BlockEndInfo>)> {
+        count_majority_usecase: bool,
+    ) -> Result<(Vec<(u64, u64)>, Vec<BlockEndInfo>, Option<f32>)> {
         if start_version > ledger_version || limit == 0 {
-            return Ok((vec![], vec![]));
+            return Ok((vec![], vec![], None));
         }
 
         // This is just an estimation, so we can just skip over errors
@@ -1006,11 +1007,16 @@ impl Context {
 
         let mut gas_prices = Vec::new();
         let mut block_end_infos = Vec::new();
+        let mut count_by_usecase = HashMap::new();
         for (txn, info) in txns.zip(infos) {
             match txn.as_ref() {
                 Ok(Transaction::UserTransaction(txn)) => {
                     if let Ok(info) = info.as_ref() {
                         gas_prices.push((txn.gas_unit_price(), info.gas_used()));
+                        if count_majority_usecase {
+                            let use_case_key = txn.parse_use_case();
+                            *count_by_usecase.entry(use_case_key).or_insert(0) += 1;
+                        }
                     }
                 },
                 Ok(Transaction::BlockEpilogue(txn)) => {
@@ -1022,7 +1028,77 @@ impl Context {
             }
         }
 
-        Ok((gas_prices, block_end_infos))
+        let majority_usecase_fraction = if count_majority_usecase {
+            count_by_usecase
+                .iter()
+                .max_by_key(|(_, v)| *v)
+                .and_then(|(max_usecase, max_value)| {
+                    if let UseCaseKey::ContractAddress(_) = max_usecase {
+                        Some(*max_value as f32 / count_by_usecase.values().sum::<u64>() as f32)
+                    } else {
+                        None
+                    }
+                })
+        } else {
+            None
+        };
+        Ok((gas_prices, block_end_infos, majority_usecase_fraction))
+    }
+
+    fn block_min_inclusion_price(
+        &self,
+        ledger_info: &LedgerInfo,
+        first: Version,
+        last: Version,
+        gas_estimation_config: &GasEstimationConfig,
+        execution_config: &OnChainExecutionConfig,
+    ) -> Option<u64> {
+        let user_use_case_spread_factor = execution_config
+            .transaction_shuffler_type()
+            .user_use_case_spread_factor();
+
+        match self.get_gas_prices_and_used(
+            first,
+            last - first,
+            ledger_info.ledger_version.0,
+            user_use_case_spread_factor.is_some(),
+        ) {
+            Ok((prices_and_used, block_end_infos, majority_usecase_fraction)) => {
+                let is_full_block =
+                    if majority_usecase_fraction.map_or(false, |fraction| fraction > 0.5) {
+                        // If majority usecase is above half of transactions, UseCaseAware block reordering
+                        // will allow other transactions to get in the block (AIP-68)
+                        false
+                    } else if prices_and_used.len() >= gas_estimation_config.full_block_txns {
+                        true
+                    } else if !block_end_infos.is_empty() {
+                        assert_eq!(1, block_end_infos.len());
+                        block_end_infos.first().unwrap().limit_reached()
+                    } else if let Some(block_gas_limit) =
+                        execution_config.block_gas_limit_type().block_gas_limit()
+                    {
+                        let gas_used = prices_and_used.iter().map(|(_, used)| *used).sum::<u64>();
+                        gas_used >= block_gas_limit
+                    } else {
+                        false
+                    };
+
+                if is_full_block {
+                    Some(
+                        self.next_bucket(
+                            prices_and_used
+                                .iter()
+                                .map(|(price, _)| *price)
+                                .min()
+                                .unwrap(),
+                        ),
+                    )
+                } else {
+                    None
+                }
+            },
+            Err(_) => None,
+        }
     }
 
     pub fn estimate_gas_price<E: InternalError>(
@@ -1031,7 +1107,7 @@ impl Context {
     ) -> Result<GasEstimation, E> {
         let config = &self.node_config.api.gas_estimation;
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
-        let block_config = self.block_executor_onchain_config(ledger_info)?;
+        let execution_config = self.execution_onchain_config(ledger_info)?;
         if !config.enabled {
             return Ok(self.default_gas_estimation(min_gas_unit_price));
         }
@@ -1112,40 +1188,9 @@ impl Context {
         let mut min_inclusion_prices = vec![];
         // TODO: if multiple calls to db is a perf issue, combine into a single call and then split
         for (first, last) in blocks {
-            let min_inclusion_price = match self.get_gas_prices_and_used(
-                first,
-                last - first,
-                ledger_info.ledger_version.0,
-            ) {
-                Ok((prices_and_used, block_end_infos)) => {
-                    let is_full_block = if prices_and_used.len() >= config.full_block_txns {
-                        true
-                    } else if !block_end_infos.is_empty() {
-                        assert_eq!(1, block_end_infos.len());
-                        block_end_infos.first().unwrap().limit_reached()
-                    } else if let Some(block_gas_limit) =
-                        block_config.block_gas_limit_type.block_gas_limit()
-                    {
-                        let gas_used = prices_and_used.iter().map(|(_, used)| *used).sum::<u64>();
-                        gas_used >= block_gas_limit
-                    } else {
-                        false
-                    };
-
-                    if is_full_block {
-                        self.next_bucket(
-                            prices_and_used
-                                .iter()
-                                .map(|(price, _)| *price)
-                                .min()
-                                .unwrap(),
-                        )
-                    } else {
-                        min_gas_unit_price
-                    }
-                },
-                Err(_) => min_gas_unit_price,
-            };
+            let min_inclusion_price = self
+                .block_min_inclusion_price(ledger_info, first, last, config, &execution_config)
+                .unwrap_or(min_gas_unit_price);
             min_inclusion_prices.push(min_inclusion_price);
             cache
                 .min_inclusion_prices
@@ -1313,16 +1358,16 @@ impl Context {
         }
     }
 
-    pub fn block_executor_onchain_config<E: InternalError>(
+    pub fn execution_onchain_config<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
-    ) -> Result<BlockExecutorConfigFromOnchain, E> {
+    ) -> Result<OnChainExecutionConfig, E> {
         // If it's the same epoch, use the cached results
         {
             let cache = self.gas_limit_cache.read().unwrap();
             if let Some(ref last_updated_epoch) = cache.last_updated_epoch {
                 if *last_updated_epoch == ledger_info.epoch.0 {
-                    return Ok(cache.block_executor_onchain_config.clone());
+                    return Ok(cache.execution_onchain_config.clone());
                 }
             }
         }
@@ -1333,7 +1378,7 @@ impl Context {
             // If a different thread updated the cache, we can exit early
             if let Some(ref last_updated_epoch) = cache.last_updated_epoch {
                 if *last_updated_epoch == ledger_info.epoch.0 {
-                    return Ok(cache.block_executor_onchain_config.clone());
+                    return Ok(cache.execution_onchain_config.clone());
                 }
             }
 
@@ -1345,14 +1390,13 @@ impl Context {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
 
-            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&state_view)
-                .unwrap_or_else(OnChainExecutionConfig::default_if_missing)
-                .block_executor_onchain_config();
+            let execution_onchain_config = OnChainExecutionConfig::fetch_config(&state_view)
+                .unwrap_or_else(OnChainExecutionConfig::default_if_missing);
 
             // Update the cache
-            cache.block_executor_onchain_config = block_executor_onchain_config.clone();
+            cache.execution_onchain_config = execution_onchain_config.clone();
             cache.last_updated_epoch = Some(ledger_info.epoch.0);
-            Ok(block_executor_onchain_config)
+            Ok(execution_onchain_config)
         }
     }
 
@@ -1412,7 +1456,7 @@ pub struct GasEstimationCache {
 
 pub struct GasLimitCache {
     last_updated_epoch: Option<u64>,
-    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
+    execution_onchain_config: OnChainExecutionConfig,
 }
 
 /// This function just calls tokio::task::spawn_blocking with the given closure and in
