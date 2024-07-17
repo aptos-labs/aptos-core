@@ -158,6 +158,17 @@ impl ConsensusObserver {
         debug!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("Checking consensus observer progress!"));
 
+        // If we're in state sync mode, we should wait for state sync to complete
+        if self.in_state_sync_mode() {
+            info!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Waiting for state sync to reach target: {:?}!",
+                    self.root.lock().commit_info()
+                ))
+            );
+            return;
+        }
+
         // Get the peer ID of the currently active subscription (if any)
         let active_subscription_peer = self
             .active_observer_subscription
@@ -192,8 +203,12 @@ impl ConsensusObserver {
             self.create_new_observer_subscription(active_subscription_peer)
                 .await;
 
-            // If we successfully created a new subscription, update the subscription creation metrics
+            // If we successfully created a new subscription, clear the state and update the metrics
             if let Some(active_subscription) = &self.active_observer_subscription {
+                // Clear the block state
+                self.clear_pending_block_state().await;
+
+                // Update the subscription creation metrics
                 self.update_subscription_creation_metrics(
                     active_subscription.get_peer_network_id(),
                 );
@@ -223,8 +238,7 @@ impl ConsensusObserver {
             // Verify the subscription has not timed out
             active_subscription.check_subscription_timeout()?;
 
-            // Verify that the DB is continuing to sync and commit new data.
-            // Note: we should only do this if we're not waiting for state sync.
+            // Verify that the DB is continuing to sync and commit new data
             active_subscription.check_syncing_progress()?;
 
             // Verify that the subscription peer is optimal
@@ -237,6 +251,30 @@ impl ConsensusObserver {
         }
 
         Ok(())
+    }
+
+    /// Clears the pending block state (this is useful for changing
+    /// subscriptions, where we want to wipe all state and restart).
+    async fn clear_pending_block_state(&self) {
+        // Clear the payload store
+        self.block_payload_store.clear_all_payloads();
+
+        // Clear the pending blocks
+        self.pending_block_store.clear_missing_blocks();
+
+        // Clear the ordered blocks
+        self.pending_ordered_blocks.clear_all_pending_blocks();
+
+        // Reset the execution pipeline for the root
+        let root = self.root.lock().clone();
+        if let Err(error) = self.execution_client.reset(&root).await {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to reset the execution pipeline for the root! Error: {:?}",
+                    error
+                ))
+            );
+        }
     }
 
     /// Creates and returns a commit callback (to be called after the execution pipeline)
@@ -375,6 +413,14 @@ impl ConsensusObserver {
 
     /// Finalizes the ordered block by sending it to the execution pipeline
     async fn finalize_ordered_block(&mut self, ordered_block: OrderedBlock) {
+        info!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Forwarding ordered blocks to the execution pipeline: {}",
+                ordered_block.proof_block_info()
+            ))
+        );
+
+        // Send the ordered block to the execution pipeline
         if let Err(error) = self
             .execution_client
             .finalize_order(
@@ -455,6 +501,11 @@ impl ConsensusObserver {
                 None
             },
         }
+    }
+
+    /// Returns true iff we are waiting for state sync to complete
+    fn in_state_sync_mode(&self) -> bool {
+        self.sync_handle.is_some()
     }
 
     /// Processes the block payload message
@@ -580,8 +631,8 @@ impl ConsensusObserver {
                     .update_commit_decision(commit_decision);
 
                 // If we are not in sync mode, forward the commit decision to the execution pipeline
-                if self.sync_handle.is_none() {
-                    debug!(
+                if !self.in_state_sync_mode() {
+                    info!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                             "Forwarding commit decision to the execution pipeline: {}",
                             commit_decision.proof_block_info()
@@ -734,15 +785,7 @@ impl ConsensusObserver {
                 .insert_ordered_block(ordered_block.clone(), verified_ordered_proof);
 
             // If we verified the proof, and we're not in sync mode, finalize the ordered blocks
-            if verified_ordered_proof && self.sync_handle.is_none() {
-                debug!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Forwarding blocks to the execution pipeline: {}",
-                        ordered_block.proof_block_info()
-                    ))
-                );
-
-                // Finalize the ordered block
+            if verified_ordered_proof && !self.in_state_sync_mode() {
                 self.finalize_ordered_block(ordered_block).await;
             }
         } else {
@@ -815,8 +858,9 @@ impl ConsensusObserver {
             self.wait_for_epoch_start().await;
 
             // Verify the pending blocks for the new epoch
+            let new_epoch_state = self.get_epoch_state();
             self.pending_ordered_blocks
-                .verify_pending_blocks(&current_epoch_state);
+                .verify_pending_blocks(&new_epoch_state);
         }
 
         // Reset and drop the sync handle
