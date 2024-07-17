@@ -24,9 +24,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::{
-    common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
-};
+use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorError;
 use aptos_logger::prelude::*;
@@ -393,9 +391,8 @@ impl BufferManager {
                     self.reset().await;
                 }
                 if let Some(consensus_publisher) = &self.consensus_publisher {
-                    let message = ConsensusObserverMessage::new_commit_decision_message(
-                        CommitDecision::new(commit_proof.clone()),
-                    );
+                    let message =
+                        ConsensusObserverMessage::new_commit_decision_message(commit_proof.clone());
                     consensus_publisher.publish_message(message).await;
                 }
                 self.persisting_phase_tx
