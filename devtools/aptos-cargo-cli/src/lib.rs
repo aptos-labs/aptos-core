@@ -45,7 +45,8 @@ const RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
     ["aptos-framework", "aptos-release-builder"];
 
 // The targeted unit test packages to ignore (these will be run separately, by other jobs)
-const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
+const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 3] =
+    ["aptos-testcases", "smoke-test", "aptos-keyless-circuit"];
 
 #[derive(Args, Clone, Debug)]
 #[command(disable_help_flag = true)]
@@ -474,7 +475,7 @@ fn output_affected_packages(packages: Vec<String>) -> anyhow::Result<()> {
     if packages.is_empty() {
         println!("No packages were affected!");
     } else {
-        println!("Affected packages detected:");
+        println!("Affected packages detected ({:?} total):", packages.len());
         for package in packages {
             println!("\t{:?}", package)
         }

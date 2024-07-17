@@ -1,11 +1,5 @@
 
 Diagnostics:
-error: value of type `M::S<signer>` does not have the `copy` ability
-  ┌─ tests/ability-check/v1-signer/read_ref_transitive.move:5:9
-  │
-5 │         *&x
-  │         ^^^ reference content copied here
-
 error: value of type `signer` does not have the `copy` ability
    ┌─ tests/ability-check/v1-signer/read_ref_transitive.move:15:9
    │

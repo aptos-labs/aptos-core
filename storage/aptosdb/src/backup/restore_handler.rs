@@ -133,7 +133,7 @@ impl RestoreHandler {
 
     pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
         let db = self.aptosdb.ledger_db.metadata_db_arc();
-        let mut iter = db.iter::<DbMetadataSchema>(Default::default())?;
+        let mut iter = db.iter::<DbMetadataSchema>()?;
         iter.seek_to_first();
         while let Some((k, _v)) = iter.next().transpose()? {
             if let DbMetadataKey::StateSnapshotRestoreProgress(version) = k {

@@ -23,6 +23,7 @@ aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
+aptos-indexer-grpc-table-info = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-mempool-notifications = { workspace = true }
 aptos-sdk = { workspace = true }

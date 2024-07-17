@@ -3,7 +3,8 @@
 
 use crate::{
     consensus_observer::{
-        network::ObserverMessage, observer::ObserverDataStatus, publisher::Publisher,
+        network_message::ConsensusObserverMessage, payload_store::BlockPayloadStatus,
+        publisher::ConsensusPublisher,
     },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
@@ -38,11 +39,11 @@ pub enum PayloadManager {
     InQuorumStore(
         Arc<dyn BatchReader>,
         Sender<CoordinatorCommand>,
-        Option<Publisher>,
+        Option<Arc<ConsensusPublisher>>,
     ),
-    Observer(
-        Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
-        Option<Publisher>,
+    ConsensusObserver(
+        Arc<Mutex<HashMap<HashValue, BlockPayloadStatus>>>,
+        Option<Arc<ConsensusPublisher>>,
     ),
 }
 
@@ -81,7 +82,7 @@ impl PayloadManager {
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
     pub fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
         match self {
-            PayloadManager::DirectMempool | PayloadManager::Observer(_, _) => {},
+            PayloadManager::DirectMempool | PayloadManager::ConsensusObserver(_, _) => {},
             PayloadManager::InQuorumStore(batch_reader, coordinator_tx, _) => {
                 batch_reader.update_certified_timestamp(block_timestamp);
 
@@ -136,6 +137,9 @@ impl PayloadManager {
     pub fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
         let request_txns_and_update_status =
             move |proof_with_status: &ProofWithData, batch_reader: Arc<dyn BatchReader>| {
+                if proof_with_status.status.lock().is_some() {
+                    return;
+                }
                 let receivers = PayloadManager::request_transactions(
                     proof_with_status.proofs.clone(),
                     timestamp,
@@ -148,7 +152,7 @@ impl PayloadManager {
             };
 
         match self {
-            PayloadManager::DirectMempool | PayloadManager::Observer(_, _) => {},
+            PayloadManager::DirectMempool | PayloadManager::ConsensusObserver(_, _) => {},
             PayloadManager::InQuorumStore(batch_reader, _, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     request_txns_and_update_status(proof_with_status, batch_reader.clone());
@@ -174,19 +178,19 @@ impl PayloadManager {
     pub async fn get_transactions(
         &self,
         block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<usize>)> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok((Vec::new(), None)),
         };
 
-        if let PayloadManager::Observer(txns_pool, maybe_publisher) = self {
+        if let PayloadManager::ConsensusObserver(txns_pool, consensus_publisher) = self {
             // If the data is already available, return it, otherwise put the tx in the pool and wait for it.
             // It's important to make sure this doesn't race with the payload insertion part.
             let result = match txns_pool.lock().entry(block.id()) {
                 Entry::Occupied(mut value) => match value.get_mut() {
-                    ObserverDataStatus::Available(data) => Either::Left(data.clone()),
-                    ObserverDataStatus::Requested(tx) => {
+                    BlockPayloadStatus::Available(data) => Either::Left(data.clone()),
+                    BlockPayloadStatus::Requested(tx) => {
                         let (new_tx, rx) = oneshot::channel();
                         *tx = new_tx;
                         Either::Right(rx)
@@ -194,24 +198,29 @@ impl PayloadManager {
                 },
                 Entry::Vacant(entry) => {
                     let (tx, rx) = oneshot::channel();
-                    entry.insert(ObserverDataStatus::Requested(tx));
+                    entry.insert(BlockPayloadStatus::Requested(tx));
                     Either::Right(rx)
                 },
             };
-            let data = match result {
+            let block_transaction_payload = match result {
                 Either::Left(data) => data,
                 Either::Right(rx) => timeout(Duration::from_millis(300), rx)
                     .await
                     .map_err(|_| ExecutorError::CouldNotGetData)?
                     .map_err(|_| ExecutorError::CouldNotGetData)?,
             };
-            if let Some(publisher) = maybe_publisher {
-                publisher.publish(ObserverMessage::Payload((
+            if let Some(consensus_publisher) = consensus_publisher {
+                let message = ConsensusObserverMessage::new_block_payload_message(
                     block.gen_block_info(HashValue::zero(), 0, None),
-                    data.clone(),
-                )));
+                    block_transaction_payload.transactions.clone(),
+                    block_transaction_payload.limit,
+                );
+                consensus_publisher.publish_message(message).await;
             }
-            return Ok(data);
+            return Ok((
+                block_transaction_payload.transactions,
+                block_transaction_payload.limit,
+            ));
         }
 
         async fn process_payload(
@@ -339,11 +348,13 @@ impl PayloadManager {
                 block.id()
             ),
         };
-        if let PayloadManager::InQuorumStore(_, _, Some(publisher)) = self {
-            publisher.publish(ObserverMessage::Payload((
+        if let PayloadManager::InQuorumStore(_, _, Some(consensus_publisher)) = self {
+            let message = ConsensusObserverMessage::new_block_payload_message(
                 block.gen_block_info(HashValue::zero(), 0, None),
-                result.clone(),
-            )));
+                result.0.clone(),
+                result.1,
+            );
+            consensus_publisher.publish_message(message).await;
         }
         Ok(result)
     }

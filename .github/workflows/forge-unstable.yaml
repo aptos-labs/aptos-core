@@ -101,7 +101,7 @@ jobs:
 
   run-forge-state-sync-slow-processing-catching-up-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, forge-continuous] # Only run after the previous job completes
+    needs: [ determine-test-metadata, forge-continuous ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -116,7 +116,7 @@ jobs:
 
   run-forge-twin-validator-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-state-sync-slow-processing-catching-up-test] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-state-sync-slow-processing-catching-up-test ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -130,7 +130,7 @@ jobs:
 
   run-forge-state-sync-failures-catching-up-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-twin-validator-test] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-twin-validator-test ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -145,7 +145,7 @@ jobs:
 
   run-forge-validator-reboot-stress-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-state-sync-failures-catching-up-test] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-state-sync-failures-catching-up-test ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -155,4 +155,19 @@ jobs:
       FORGE_NAMESPACE: forge-validator-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 2400 # Run for 40 minutes
       FORGE_TEST_SUITE: validator_reboot_stress_test
+      POST_TO_SLACK: true
+
+  run-forge-haproxy:
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [ determine-test-metadata, run-forge-validator-reboot-stress-test ] # Only run after the previous job completes
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # GCP cluster
+      FORGE_CLUSTER_NAME: aptos-forge-1
+      FORGE_NAMESPACE: forge-haproxy-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
+      FORGE_RUNNER_DURATION_SECS: 600 # Run for 10 minutes
+      FORGE_ENABLE_HAPROXY: true
+      FORGE_TEST_SUITE: realistic_env_max_load
       POST_TO_SLACK: true

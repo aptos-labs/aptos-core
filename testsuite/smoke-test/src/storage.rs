@@ -4,7 +4,7 @@
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    test_utils::{
+    utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
         transfer_and_maybe_reconfig, transfer_coins, MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },

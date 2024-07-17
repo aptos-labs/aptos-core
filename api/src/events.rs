@@ -184,10 +184,7 @@ impl EventsApi {
                 let events = self
                     .context
                     .latest_state_view_poem(&latest_ledger_info)?
-                    .as_converter(
-                        self.context.db.clone(),
-                        self.context.table_info_reader.clone(),
-                    )
+                    .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                     .try_into_versioned_events(&events)
                     .context("Failed to convert events from storage into response")
                     .map_err(|err| {

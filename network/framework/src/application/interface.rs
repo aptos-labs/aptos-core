@@ -11,8 +11,9 @@ use crate::{
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
-use aptos_types::network_address::NetworkAddress;
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use async_trait::async_trait;
+use bytes::Bytes;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
@@ -52,9 +53,13 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
     /// method does not guarantee message delivery or handle responses.
     fn send_to_peer(&self, _message: Message, _peer: PeerNetworkId) -> Result<(), Error>;
 
+    /// Sends the given message bytes to the specified peer. Note: this
+    /// method does not guarantee message delivery or handle responses.
+    fn send_to_peer_raw(&self, _message: Bytes, _peer: PeerNetworkId) -> Result<(), Error>;
+
     /// Sends the given message to each peer in the specified peer list.
     /// Note: this method does not guarantee message delivery or handle responses.
-    fn send_to_peers(&self, _message: Message, _peers: &[PeerNetworkId]) -> Result<(), Error>;
+    fn send_to_peers(&self, _message: Message, _peers: Vec<PeerNetworkId>) -> Result<(), Error>;
 
     /// Sends the given message to the specified peer with the corresponding
     /// timeout. Awaits a response from the peer, or hits the timeout
@@ -65,6 +70,21 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
         _rpc_timeout: Duration,
         _peer: PeerNetworkId,
     ) -> Result<Message, Error>;
+
+    async fn send_to_peer_rpc_raw(
+        &self,
+        _message: Bytes,
+        _rpc_timeout: Duration,
+        _peer: PeerNetworkId,
+    ) -> Result<Message, Error>;
+
+    fn to_bytes_by_protocol(
+        &self,
+        _peers: Vec<PeerNetworkId>,
+        _message: Message,
+    ) -> anyhow::Result<HashMap<PeerNetworkId, Bytes>>;
+
+    fn sort_peers_by_latency(&self, _network: NetworkId, _peers: &mut [PeerId]);
 }
 
 /// A network component that can be used by client applications (e.g., consensus,
@@ -132,6 +152,39 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
             peer, protocols_supported_by_peer
         )))
     }
+
+    fn group_peers_by_protocol(
+        &self,
+        peers: Vec<PeerNetworkId>,
+    ) -> HashMap<ProtocolId, Vec<PeerNetworkId>> {
+        // Sort peers by protocol
+        let mut peers_per_protocol = HashMap::new();
+        let mut peers_without_a_protocol = vec![];
+        for peer in peers {
+            match self
+                .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)
+            {
+                Ok(protocol) => peers_per_protocol
+                    .entry(protocol)
+                    .or_insert_with(Vec::new)
+                    .push(peer),
+                Err(_) => peers_without_a_protocol.push(peer),
+            }
+        }
+
+        // We only periodically log any unavailable peers (to prevent log spamming)
+        if !peers_without_a_protocol.is_empty() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(10)),
+                warn!(
+                    "Unavailable peers (without a common network protocol): {:?}",
+                    peers_without_a_protocol
+                )
+            );
+        }
+
+        peers_per_protocol
+    }
 }
 
 #[async_trait]
@@ -170,32 +223,15 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         Ok(network_sender.send_to(peer.peer_id(), direct_send_protocol_id, message)?)
     }
 
-    fn send_to_peers(&self, message: Message, peers: &[PeerNetworkId]) -> Result<(), Error> {
-        // Sort peers by protocol
-        let mut peers_per_protocol = HashMap::new();
-        let mut peers_without_a_protocol = vec![];
-        for peer in peers {
-            match self
-                .get_preferred_protocol_for_peer(peer, &self.direct_send_protocols_and_preferences)
-            {
-                Ok(protocol) => peers_per_protocol
-                    .entry(protocol)
-                    .or_insert_with(Vec::new)
-                    .push(peer),
-                Err(_) => peers_without_a_protocol.push(peer),
-            }
-        }
+    fn send_to_peer_raw(&self, message: Bytes, peer: PeerNetworkId) -> Result<(), Error> {
+        let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
+        let direct_send_protocol_id = self
+            .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
+        Ok(network_sender.send_to_raw(peer.peer_id(), direct_send_protocol_id, message)?)
+    }
 
-        // We only periodically log any unavailable peers (to prevent log spamming)
-        if !peers_without_a_protocol.is_empty() {
-            sample!(
-                SampleRate::Duration(Duration::from_secs(10)),
-                warn!(
-                    "Unavailable peers (without a common network protocol): {:?}",
-                    peers_without_a_protocol
-                )
-            );
-        }
+    fn send_to_peers(&self, message: Message, peers: Vec<PeerNetworkId>) -> Result<(), Error> {
+        let peers_per_protocol = self.group_peers_by_protocol(peers);
 
         // Send to all peers in each protocol group and network
         for (protocol_id, peers) in peers_per_protocol {
@@ -223,6 +259,43 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         Ok(network_sender
             .send_rpc(peer.peer_id(), rpc_protocol_id, message, rpc_timeout)
             .await?)
+    }
+
+    async fn send_to_peer_rpc_raw(
+        &self,
+        message: Bytes,
+        rpc_timeout: Duration,
+        peer: PeerNetworkId,
+    ) -> Result<Message, Error> {
+        let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
+        let rpc_protocol_id =
+            self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
+        Ok(network_sender
+            .send_rpc_raw(peer.peer_id(), rpc_protocol_id, message, rpc_timeout)
+            .await?)
+    }
+
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<PeerNetworkId>,
+        message: Message,
+    ) -> anyhow::Result<HashMap<PeerNetworkId, Bytes>> {
+        let peers_per_protocol = self.group_peers_by_protocol(peers);
+        // Convert to bytes per protocol
+        let mut bytes_per_peer = HashMap::new();
+        for (protocol_id, peers) in peers_per_protocol {
+            let bytes: Bytes = protocol_id.to_bytes(&message)?.into();
+            for peer in peers {
+                bytes_per_peer.insert(peer, bytes.clone());
+            }
+        }
+
+        Ok(bytes_per_peer)
+    }
+
+    fn sort_peers_by_latency(&self, network_id: NetworkId, peers: &mut [PeerId]) {
+        self.peers_and_metadata
+            .sort_peers_by_latency(network_id, peers)
     }
 }
 

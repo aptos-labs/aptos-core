@@ -175,7 +175,7 @@ impl BlockTree {
 
     pub(super) fn get_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
         self.get_linkable_block(block_id)
-            .map(|lb| Arc::clone(lb.executed_block()))
+            .map(|lb| lb.executed_block().clone())
     }
 
     pub(super) fn ordered_root(&self) -> Arc<PipelinedBlock> {

@@ -10,7 +10,7 @@
 
 use aptos_indexer_grpc_utils::{
     compression_util::{CacheEntry, StorageFormat},
-    in_memory_cache::{InMemoryCache, MAX_REDIS_FETCH_BATCH_SIZE},
+    in_memory_cache::{InMemoryCache, InMemoryCacheConfig, MAX_REDIS_FETCH_BATCH_SIZE},
 };
 use aptos_protos::transaction::v1::{Transaction, TransactionInfo};
 use lazy_static::lazy_static;
@@ -132,6 +132,7 @@ async fn run_transaction_test(
     let redis_connection = create_mock_redis(transaction_size);
     let cache = Arc::new(
         InMemoryCache::new_with_redis_connection(
+            InMemoryCacheConfig::default(),
             redis_connection,
             StorageFormat::Lz4CompressedProto,
         )

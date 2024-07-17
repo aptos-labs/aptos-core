@@ -23,6 +23,7 @@ use proptest::{
 };
 use std::collections::BTreeSet;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct TypeSignatureIndex(u16);
 

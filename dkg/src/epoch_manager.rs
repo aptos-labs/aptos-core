@@ -206,6 +206,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             let network_sender = self.create_network_sender();
             let rb = ReliableBroadcast::new(
+                self.my_addr,
                 epoch_state.verifier.get_ordered_account_addresses(),
                 Arc::new(network_sender),
                 ExponentialBackoff::from_millis(self.rb_config.backoff_policy_base_ms)

@@ -6,7 +6,7 @@ use super::transaction_filter_type::{Filter, Matcher};
 use crate::{
     config::{
         config_sanitizer::ConfigSanitizer, gas_estimation_config::GasEstimationConfig,
-        node_config_loader::NodeType, Error, NodeConfig, MAX_SENDING_BLOCK_TXNS,
+        node_config_loader::NodeType, Error, NodeConfig, MAX_RECEIVING_BLOCK_TXNS,
     },
     utils,
 };
@@ -125,7 +125,7 @@ impl Default for ApiConfig {
             transaction_submission_enabled: default_enabled(),
             transaction_simulation_enabled: default_enabled(),
             max_submit_transaction_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
-            max_block_transactions_page_size: MAX_SENDING_BLOCK_TXNS as u16,
+            max_block_transactions_page_size: *MAX_RECEIVING_BLOCK_TXNS as u16,
             max_transactions_page_size: DEFAULT_MAX_PAGE_SIZE,
             max_events_page_size: DEFAULT_MAX_PAGE_SIZE,
             max_account_resources_page_size: DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE,

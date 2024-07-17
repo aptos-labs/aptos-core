@@ -23,15 +23,16 @@ use arbitrary::Arbitrary;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
+    deserializer::DeserializerConfig,
     errors::VMError,
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex, SignatureToken},
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
     vm_status::{StatusCode, StatusType, VMStatus},
 };
-use move_vm_runtime::config::VMConfig;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -284,7 +285,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // filter modules
     filter_modules(&input)?;
 
-    let vm_config = VMConfig::production();
+    let verifier_config = VerifierConfig::production();
+    let deserializer_config = DeserializerConfig::default();
 
     for m in input.dep_modules.iter_mut() {
         // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
@@ -293,14 +295,12 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         // reject bad modules fast
         let mut module_code: Vec<u8> = vec![];
         m.serialize(&mut module_code).map_err(|_| Corpus::Keep)?;
-        let m_de =
-            CompiledModule::deserialize_with_config(&module_code, &vm_config.deserializer_config)
-                .map_err(|_| Corpus::Keep)?;
-        move_bytecode_verifier::verify_module_with_config(&vm_config.verifier_config, &m_de)
-            .map_err(|e| {
-                check_for_invariant_violation_vmerror(e);
-                Corpus::Keep
-            })?
+        let m_de = CompiledModule::deserialize_with_config(&module_code, &deserializer_config)
+            .map_err(|_| Corpus::Keep)?;
+        move_bytecode_verifier::verify_module_with_config(&verifier_config, &m_de).map_err(|e| {
+            check_for_invariant_violation_vmerror(e);
+            Corpus::Keep
+        })?
     }
 
     if let ExecVariant::Script {
@@ -312,14 +312,12 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         // reject bad scripts fast
         let mut script_code: Vec<u8> = vec![];
         s.serialize(&mut script_code).map_err(|_| Corpus::Keep)?;
-        let s_de =
-            CompiledScript::deserialize_with_config(&script_code, &vm_config.deserializer_config)
-                .map_err(|_| Corpus::Keep)?;
-        move_bytecode_verifier::verify_script_with_config(&vm_config.verifier_config, &s_de)
-            .map_err(|e| {
-                check_for_invariant_violation_vmerror(e);
-                Corpus::Keep
-            })?
+        let s_de = CompiledScript::deserialize_with_config(&script_code, &deserializer_config)
+            .map_err(|_| Corpus::Keep)?;
+        move_bytecode_verifier::verify_script_with_config(&verifier_config, &s_de).map_err(|e| {
+            check_for_invariant_violation_vmerror(e);
+            Corpus::Keep
+        })?
     }
 
     // check no duplicates

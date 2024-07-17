@@ -7,6 +7,7 @@ use crate::{
     node::{NodeRef, NodeStrongRef},
 };
 use aptos_crypto::HashValue;
+use aptos_drop_helper::ArcAsyncDrop;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use std::sync::Arc;
@@ -22,7 +23,7 @@ mod tests;
 /// When recursively creating a new `MapLayer` (a crit bit tree overlay), passing down `Vec<(K, Option<V>)>`
 /// That's why we require `Key: Clone` and clone the key and value only when the leaf node is
 /// created.
-pub trait Key: Clone + Send + Sync + Eq + 'static {
+pub trait Key: Clone + Eq {
     fn iter_bits(&self) -> impl Iterator<Item = bool>;
 
     fn bit(&self, depth: usize) -> bool;
@@ -30,10 +31,11 @@ pub trait Key: Clone + Send + Sync + Eq + 'static {
 
 /// Similar to `Key`, we require `Value: Clone`, another reason being it's tricky to figure out the
 /// lifetime if `get()` returns a reference to the value -- we simply clone the value.
-pub trait Value: Clone + Send + Sync + 'static {}
+pub trait Value: Clone {}
+impl<T: Clone> Value for T {}
 
 #[derive(Debug)]
-struct LayerInner<K: Key, V: Value> {
+struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
     root: NodeRef<K, V>,
     children: Mutex<Vec<Arc<LayerInner<K, V>>>>,
     use_case: &'static str,
@@ -44,7 +46,7 @@ struct LayerInner<K: Key, V: Value> {
     base_layer: u64,
 }
 
-impl<K: Key, V: Value> Drop for LayerInner<K, V> {
+impl<K: ArcAsyncDrop, V: ArcAsyncDrop> Drop for LayerInner<K, V> {
     fn drop(&mut self) {
         // Drop the tree nodes in a different thread, because that's the slowest part.
         DROPPER.schedule_drop(self.root.take_for_drop());
@@ -64,7 +66,7 @@ impl<K: Key, V: Value> Drop for LayerInner<K, V> {
     }
 }
 
-impl<K: Key, V: Value> LayerInner<K, V> {
+impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
     fn new_family(use_case: &'static str) -> Arc<Self> {
         let family = HashValue::random();
         Arc::new(Self {
@@ -102,12 +104,12 @@ impl<K: Key, V: Value> LayerInner<K, V> {
 }
 
 #[derive(Debug)]
-pub struct MapLayer<K: Key, V: Value> {
+pub struct MapLayer<K: ArcAsyncDrop, V: ArcAsyncDrop> {
     inner: Arc<LayerInner<K, V>>,
 }
 
 /// Manual implementation because `LayerInner` is deliberately not `Clone`.
-impl<K: Key, V: Value> Clone for MapLayer<K, V> {
+impl<K: ArcAsyncDrop, V: ArcAsyncDrop> Clone for MapLayer<K, V> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -115,7 +117,7 @@ impl<K: Key, V: Value> Clone for MapLayer<K, V> {
     }
 }
 
-impl<K: Key, V: Value> MapLayer<K, V> {
+impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
     pub fn new_family(use_case: &'static str) -> Self {
         Self {
             inner: LayerInner::new_family(use_case),
@@ -150,15 +152,15 @@ impl<K: Key, V: Value> MapLayer<K, V> {
 }
 
 #[derive(Clone, Debug)]
-pub struct LayeredMap<K: Key, V: Value> {
+pub struct LayeredMap<K: ArcAsyncDrop, V: ArcAsyncDrop> {
     bottom_layer: MapLayer<K, V>,
     top_layer: MapLayer<K, V>,
 }
 
-impl<K: Key, V: Value> LayeredMap<K, V>
+impl<K, V> LayeredMap<K, V>
 where
-    K: Key,
-    V: Value,
+    K: ArcAsyncDrop + Key,
+    V: ArcAsyncDrop + Value,
 {
     pub fn unpack(self) -> (MapLayer<K, V>, MapLayer<K, V>) {
         let Self {

@@ -20,7 +20,7 @@ use crate::{
     utils,
     utils::{OutputFallbackHandler, PENDING_DATA_LOG_FREQ_SECS},
 };
-use aptos_config::config::{RoleType, StateSyncDriverConfig};
+use aptos_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
@@ -32,6 +32,7 @@ use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_schemadb::DB;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -53,6 +54,9 @@ pub struct DriverConfiguration {
     // The config file of the driver
     pub config: StateSyncDriverConfig,
 
+    // The config for consensus observer
+    pub consensus_observer_config: ConsensusObserverConfig,
+
     // The role of the node
     pub role: RoleType,
 
@@ -61,9 +65,15 @@ pub struct DriverConfiguration {
 }
 
 impl DriverConfiguration {
-    pub fn new(config: StateSyncDriverConfig, role: RoleType, waypoint: Waypoint) -> Self {
+    pub fn new(
+        config: StateSyncDriverConfig,
+        consensus_observer_config: ConsensusObserverConfig,
+        role: RoleType,
+        waypoint: Waypoint,
+    ) -> Self {
         Self {
             config,
+            consensus_observer_config,
             role,
             waypoint,
         }
@@ -142,6 +152,7 @@ impl<
         StreamingClient,
     >
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_notification_listener: ClientNotificationListener,
         commit_notification_listener: CommitNotificationListener,
@@ -159,6 +170,7 @@ impl<
         streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
         time_service: TimeService,
+        internal_indexer_db: Option<Arc<DB>>,
     ) -> Self {
         let output_fallback_handler =
             OutputFallbackHandler::new(driver_configuration.clone(), time_service.clone());
@@ -169,6 +181,7 @@ impl<
             streaming_client.clone(),
             storage.clone(),
             storage_synchronizer.clone(),
+            internal_indexer_db,
         );
         let continuous_syncer = ContinuousSyncer::new(
             driver_configuration.clone(),
@@ -303,8 +316,6 @@ impl<
             ))
         );
         self.update_consensus_commit_metrics(&consensus_commit_notification);
-
-        // TODO(joshlind): can we get consensus to forward the events?
 
         // Handle the commit notification
         let committed_transactions = CommittedTransactions {
@@ -538,7 +549,10 @@ impl<
     /// Returns true iff this node enables consensus
     fn is_consensus_enabled(&self) -> bool {
         self.driver_configuration.role == RoleType::Validator
-            || self.driver_configuration.config.observer_enabled
+            || self
+                .driver_configuration
+                .consensus_observer_config
+                .observer_enabled
     }
 
     /// Returns true iff consensus is currently executing

@@ -1,4 +1,16 @@
 Move prover returns: exiting with verification errors
+warning: Unused assignment to `k`. Consider removing or prefixing with an underscore: `_k`
+    ┌─ tests/sources/functional/verify_custom_table.move:115:22
+    │
+115 │         let (k, v) = table::remove_return_key(&mut t, 2);
+    │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `v`. Consider removing or prefixing with an underscore: `_v`
+    ┌─ tests/sources/functional/verify_custom_table.move:115:22
+    │
+115 │         let (k, v) = table::remove_return_key(&mut t, 2);
+    │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error: post-condition does not hold
    ┌─ tests/sources/functional/verify_custom_table.move:76:9
    │

@@ -58,7 +58,7 @@ module 0xcafe::deflation_token {
         creator: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
-        let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         let creator_store = fungible_asset::create_test_store(creator, metadata);

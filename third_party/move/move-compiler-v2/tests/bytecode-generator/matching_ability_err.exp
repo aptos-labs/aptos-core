@@ -1,0 +1,168 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    struct Box {
+        x: u64,
+    }
+    enum Inner {
+        Inner1 {
+            x: u64,
+        }
+        Inner2 {
+            x: u64,
+            y: u64,
+        }
+    }
+    enum Outer {
+        None,
+        One {
+            i: m::Inner,
+        }
+        Two {
+            i: m::Inner,
+            b: m::Box,
+        }
+    }
+    public fun condition_requires_copy(o: m::Outer): m::Outer {
+        match (o) {
+          m::Outer::One{ i } if m::consume(i) => {
+            pack m::Outer::One(i)
+          }
+          o: m::Outer => {
+            o
+          }
+        }
+
+    }
+    private fun consume(self: m::Inner): bool {
+        match (self) {
+          m::Inner::Inner1{ x: _ } => {
+            Tuple()
+          }
+          m::Inner::Inner2{ x: _, y: _ } => {
+            Tuple()
+          }
+        }
+        ;
+        true
+    }
+    public fun matched_value_not_consumed(o: m::Outer) {
+        match (o) {
+          m::Outer::One{ i: _ } => {
+            Tuple()
+          }
+          _: m::Outer => {
+            Tuple()
+          }
+        }
+
+    }
+} // end 0xc0ffee::m
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::condition_requires_copy($t0: m::Outer): m::Outer {
+     var $t1: m::Outer
+     var $t2: &m::Outer
+     var $t3: bool
+     var $t4: &m::Inner
+     var $t5: m::Inner
+     var $t6: m::Inner
+     var $t7: m::Outer
+     var $t8: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := test_variant m::Outer::One($t2)
+  2: if ($t3) goto 3 else goto 12
+  3: label L2
+  4: $t4 := borrow_field_variant<m::Outer::One>.i($t2)
+  5: $t5 := read_ref($t4)
+  6: $t3 := m::consume($t5)
+  7: if ($t3) goto 8 else goto 12
+  8: label L3
+  9: $t6 := unpack_variant m::Outer::One($t0)
+ 10: $t1 := pack_variant m::Outer::One($t6)
+ 11: goto 19
+ 12: label L1
+ 13: $t7 := infer($t0)
+ 14: $t1 := infer($t7)
+ 15: goto 19
+ 16: label L4
+ 17: $t8 := 15621340914461310977
+ 18: abort($t8)
+ 19: label L0
+ 20: return $t1
+}
+
+
+[variant baseline]
+fun m::consume($t0: m::Inner): bool {
+     var $t1: bool
+     var $t2: &m::Inner
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := test_variant m::Inner::Inner1($t2)
+  2: if ($t3) goto 3 else goto 6
+  3: label L2
+  4: $t4 := unpack_variant m::Inner::Inner1($t0)
+  5: goto 15
+  6: label L1
+  7: $t3 := test_variant m::Inner::Inner2($t2)
+  8: if ($t3) goto 9 else goto 12
+  9: label L4
+ 10: ($t5, $t6) := unpack_variant m::Inner::Inner2($t0)
+ 11: goto 15
+ 12: label L3
+ 13: $t7 := 15621340914461310977
+ 14: abort($t7)
+ 15: label L0
+ 16: $t1 := true
+ 17: return $t1
+}
+
+
+[variant baseline]
+public fun m::matched_value_not_consumed($t0: m::Outer) {
+     var $t1: &m::Outer
+     var $t2: bool
+     var $t3: m::Inner
+     var $t4: m::Outer
+     var $t5: u64
+  0: $t1 := borrow_local($t0)
+  1: $t2 := test_variant m::Outer::One($t1)
+  2: if ($t2) goto 3 else goto 6
+  3: label L2
+  4: $t3 := unpack_variant m::Outer::One($t0)
+  5: goto 12
+  6: label L1
+  7: $t4 := infer($t0)
+  8: goto 12
+  9: label L3
+ 10: $t5 := 15621340914461310977
+ 11: abort($t5)
+ 12: label L0
+ 13: return ()
+}
+
+
+Diagnostics:
+error: value of type `m::Inner` does not have the `drop` ability
+   ┌─ tests/bytecode-generator/matching_ability_err.move:28:13
+   │
+28 │             One{i: _} => {}
+   │             ^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `m::Outer` does not have the `drop` ability
+   ┌─ tests/bytecode-generator/matching_ability_err.move:29:13
+   │
+29 │             _ => {}
+   │             ^ implicitly dropped here since it is no longer used
+
+error: local `i` of type `m::Inner` does not have the `copy` ability
+   ┌─ tests/bytecode-generator/matching_ability_err.move:35:31
+   │
+35 │             One{i} if consume(i) => Outer::One{i},
+   │                               ^ reference content copied here

@@ -6,7 +6,7 @@ use aptos_forge::Swarm;
 
 #[tokio::test]
 async fn test_package_publish() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));

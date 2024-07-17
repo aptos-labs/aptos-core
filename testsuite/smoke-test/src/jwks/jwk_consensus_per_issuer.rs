@@ -29,7 +29,7 @@ use tokio::time::sleep;
 async fn jwk_consensus_per_issuer() {
     let epoch_duration_secs = 30;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {

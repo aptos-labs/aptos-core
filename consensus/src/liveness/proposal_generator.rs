@@ -9,7 +9,8 @@ use crate::{
     block_storage::BlockReader,
     counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
-        PROPOSER_DELAY_PROPOSAL, PROPOSER_PENDING_BLOCKS_COUNT,
+        PROPOSER_DELAY_PROPOSAL, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
+        PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     payload_client::PayloadClient,
@@ -164,6 +165,8 @@ pub struct ProposalGenerator {
     quorum_store_poll_time: Duration,
     // Max number of transactions to be added to a proposed block.
     max_block_txns: u64,
+    // Max number of unique transactions to be added to a proposed block.
+    max_block_txns_after_filtering: u64,
     // Max number of bytes to be added to a proposed block.
     max_block_bytes: u64,
     // Max number of inline transactions to be added to a proposed block.
@@ -193,6 +196,7 @@ impl ProposalGenerator {
         time_service: Arc<dyn TimeService>,
         quorum_store_poll_time: Duration,
         max_block_txns: u64,
+        max_block_txns_after_filtering: u64,
         max_block_bytes: u64,
         max_inline_txns: u64,
         max_inline_bytes: u64,
@@ -210,6 +214,7 @@ impl ProposalGenerator {
             time_service,
             quorum_store_poll_time,
             max_block_txns,
+            max_block_txns_after_filtering,
             max_block_bytes,
             max_inline_txns,
             max_inline_bytes,
@@ -312,9 +317,19 @@ impl ProposalGenerator {
 
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-            let (max_block_txns, max_block_bytes, max_txns_from_block_to_execute, proposal_delay) =
-                self.calculate_max_block_sizes(voting_power_ratio, timestamp, round)
-                    .await;
+            let (
+                max_block_txns_after_filtering,
+                max_block_bytes,
+                max_txns_from_block_to_execute,
+                proposal_delay,
+            ) = self
+                .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
+                .await;
+
+            PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING.observe(max_block_txns_after_filtering as f64);
+            PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE.observe(
+                max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering) as f64,
+            );
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -349,7 +364,8 @@ impl ProposalGenerator {
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
-                    max_block_txns,
+                    self.max_block_txns,
+                    max_block_txns_after_filtering,
                     max_block_bytes,
                     // TODO: Set max_inline_txns and max_inline_bytes correctly
                     self.max_inline_txns,
@@ -360,13 +376,14 @@ impl ProposalGenerator {
                     pending_ordering,
                     pending_blocks.len(),
                     max_fill_fraction,
+                    timestamp,
                 )
                 .await
                 .context("Fail to retrieve payload")?;
 
             if !payload.is_direct()
                 && max_txns_from_block_to_execute.is_some()
-                && payload.len() > max_txns_from_block_to_execute.unwrap()
+                && payload.len() as u64 > max_txns_from_block_to_execute.unwrap()
             {
                 payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
             }
@@ -410,8 +427,8 @@ impl ProposalGenerator {
         voting_power_ratio: f64,
         timestamp: Duration,
         round: Round,
-    ) -> (u64, u64, Option<usize>, Duration) {
-        let mut values_max_block_txns = vec![self.max_block_txns];
+    ) -> (u64, u64, Option<u64>, Duration) {
+        let mut values_max_block_txns = vec![self.max_block_txns_after_filtering];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
         let mut values_max_txns_from_block_to_execute = vec![];

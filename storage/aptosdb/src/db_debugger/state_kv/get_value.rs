@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_debugger::common::DbDir, schema::state_value::StateValueSchema};
-use aptos_schemadb::ReadOptions;
+use crate::db_debugger::common::DbDir;
 use aptos_storage_interface::Result;
 use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use clap::Parser;
@@ -49,19 +48,7 @@ impl Cmd {
             );
         }
 
-        let mut read_opts = ReadOptions::default();
-        // We want `None` if the state_key changes in iteration.
-        read_opts.set_prefix_same_as_start(true);
-        let mut iter = db
-            .db_shard(key.get_shard_id())
-            .iter::<StateValueSchema>(read_opts)?;
-        iter.seek(&(key.clone(), self.version))?;
-        let res = iter
-            .next()
-            .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value)));
-
-        match res {
+        match db.get_state_value_with_version_by_version(&key, self.version)? {
             None => {
                 println!("{}", "Value not found.".to_string().yellow());
             },

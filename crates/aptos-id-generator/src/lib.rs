@@ -35,11 +35,18 @@ impl U32IdGenerator {
         }
     }
 }
+
 impl IdGenerator<u32> for U32IdGenerator {
     /// Retrieves the next ID, wrapping on overflow
     #[inline]
     fn next(&self) -> u32 {
         self.inner.fetch_add(1, Ordering::Relaxed)
+    }
+}
+
+impl Default for U32IdGenerator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

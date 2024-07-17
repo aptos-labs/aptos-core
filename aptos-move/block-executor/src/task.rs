@@ -8,9 +8,11 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    delayed_fields::PanicError, fee_statement::FeeStatement,
-    state_store::state_value::StateValueMetadata,
-    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
+    delayed_fields::PanicError,
+    fee_statement::FeeStatement,
+    state_store::{state_value::StateValueMetadata, TStateView},
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
@@ -57,12 +59,15 @@ pub trait ExecutorTask: Sync {
     /// Type of error when the executor failed to process a transaction and needs to abort.
     type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
-    /// Type to initialize the single thread transaction executor. Copy and Sync are required because
+    /// Type to initialize the single thread transaction executor. Clone and Sync are required because
     /// we will create an instance of executor on each individual thread.
-    type Argument: Sync + Copy;
+    type Environment: Sync + Clone;
 
     /// Create an instance of the transaction executor.
-    fn init(args: Self::Argument) -> Self;
+    fn init(
+        env: Self::Environment,
+        state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+    ) -> Self;
 
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(

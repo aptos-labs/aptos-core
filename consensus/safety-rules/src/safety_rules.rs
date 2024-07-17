@@ -80,10 +80,14 @@ impl SafetyRules {
     }
 
     pub(crate) fn verify_order_vote_proposal(
-        &self,
+        &mut self,
         order_vote_proposal: &OrderVoteProposal,
     ) -> Result<(), Error> {
         let proposed_block = order_vote_proposal.block();
+        let safety_data = self.persistent_storage.safety_data()?;
+
+        self.verify_epoch(proposed_block.epoch(), &safety_data)?;
+
         let qc = order_vote_proposal.quorum_cert();
         if qc.certified_block() != order_vote_proposal.block_info() {
             return Err(Error::InvalidOneChainQuorumCertificate(
@@ -373,7 +377,17 @@ impl SafetyRules {
 
         let old_ledger_info = ledger_info.ledger_info();
 
-        if !old_ledger_info.commit_info().is_ordered_only() {
+        if !old_ledger_info.commit_info().is_ordered_only()
+            // When doing fast forward sync, we pull the latest blocks and quorum certs from peers
+            // and store them in storage. We then compute the root ordered cert and root commit cert
+            // from storage and start the consensus from there. But given that we are not storing the
+            // ordered cert obtained from order votes in storage, instead of obtaining the root ordered cert
+            // from storage, we set root ordered cert to commit certificate.
+            // This means, the root ordered cert will not have a dummy executed_state_id in this case.
+            // To handle this, we do not raise error if the old_ledger_info.commit_info() matches with
+            // new_ledger_info.commit_info().
+            && old_ledger_info.commit_info() != new_ledger_info.commit_info()
+        {
             return Err(Error::InvalidOrderedLedgerInfo(old_ledger_info.to_string()));
         }
 

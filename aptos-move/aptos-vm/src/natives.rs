@@ -85,10 +85,6 @@ impl TDelayedFieldView for AptosBlankStorage {
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        false
-    }
-
     fn get_delayed_field_value(
         &self,
         _id: &Self::Identifier,
@@ -163,6 +159,7 @@ pub fn aptos_natives(
         misc_gas_params,
         timed_features,
         features,
+        None,
     );
 
     aptos_natives_with_builder(&mut builder)
@@ -237,6 +234,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeAggregatorContext::new(
         [0; 32],
         &*DUMMY_RESOLVER,
+        false,
         &*DUMMY_RESOLVER,
     ));
     exts.add(NativeRistrettoPointContext::new());

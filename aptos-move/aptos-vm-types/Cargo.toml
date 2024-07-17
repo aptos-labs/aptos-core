@@ -24,6 +24,7 @@ claims = { workspace = true }
 either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
