@@ -50,6 +50,7 @@ mod modules;
 mod script;
 mod type_loader;
 
+use crate::loader::script::ScriptCacheEntry;
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
@@ -60,7 +61,6 @@ use type_loader::intern_type;
 type ScriptHash = [u8; 32];
 
 // A simple cache that offers both a HashMap and a Vector lookup.
-// Values are forced into a `Arc` so they can be used from multiple thread.
 // Access to this cache is always under a `RwLock`.
 #[derive(Clone)]
 pub(crate) struct BinaryCache<K, V> {
@@ -68,7 +68,7 @@ pub(crate) struct BinaryCache<K, V> {
     // one from std, as it allows alternative key representations to be used for lookup,
     // making certain optimizations possible.
     id_map: hashbrown::HashMap<K, usize>,
-    binaries: Vec<Arc<V>>,
+    binaries: Vec<V>,
 }
 
 impl<K, V> BinaryCache<K, V>
@@ -82,8 +82,8 @@ where
         }
     }
 
-    fn insert(&mut self, key: K, binary: V) -> &Arc<V> {
-        self.binaries.push(Arc::new(binary));
+    fn insert(&mut self, key: K, binary: V) -> &V {
+        self.binaries.push(binary);
         let idx = self.binaries.len() - 1;
         self.id_map.insert(key, idx);
         self.binaries
@@ -91,7 +91,7 @@ where
             .expect("BinaryCache: last() after push() impossible failure")
     }
 
-    fn get<Q>(&self, key: &Q) -> Option<&Arc<V>>
+    fn get<Q>(&self, key: &Q) -> Option<&V>
     where
         Q: Hash + Eq + Equivalent<K>,
     {
@@ -269,7 +269,15 @@ impl Loader {
         sha3_256.update(script_blob);
         let hash_value: [u8; 32] = sha3_256.finalize().into();
 
-        let script = data_store.load_compiled_script_to_cache(script_blob, hash_value)?;
+        let mut scripts = self.scripts.write();
+        let script = match scripts.get(&hash_value) {
+            Some(ScriptCacheEntry::Verified(script)) => script.script.clone(),
+            Some(ScriptCacheEntry::Deserialized(compiled_script)) => compiled_script.clone(),
+            None => {
+                let compiled_script = self.deserialize_script(script_blob)?;
+                scripts.insert_compiled_script(hash_value, compiled_script)
+            },
+        };
         let script = traversal_context.referenced_scripts.alloc(script);
 
         // TODO(Gas): Should we charge dependency gas for the script itself?
@@ -307,16 +315,27 @@ impl Loader {
 
         let mut scripts = self.scripts.write();
         let main = match scripts.get(&hash_value) {
-            Some(cached) => cached,
-            None => {
-                let ver_script = self.deserialize_and_verify_script(
-                    script_blob,
-                    hash_value,
-                    data_store,
+            Some(ScriptCacheEntry::Verified(script)) => script.entry_point(),
+            Some(ScriptCacheEntry::Deserialized(compiled_script)) => {
+                self.verify_script(compiled_script.as_ref(), data_store, module_store)?;
+                let script = Script::new(
+                    Arc::clone(compiled_script),
+                    &hash_value,
                     module_store,
+                    &self.name_cache,
                 )?;
-                let script = Script::new(ver_script, &hash_value, module_store, &self.name_cache)?;
-                scripts.insert(hash_value, script)
+                scripts.insert_verified_script(hash_value, script)
+            },
+            None => {
+                let compiled_script = self.deserialize_script(script_blob)?;
+                self.verify_script(&compiled_script, data_store, module_store)?;
+                let script = Script::new(
+                    Arc::new(compiled_script),
+                    &hash_value,
+                    module_store,
+                    &self.name_cache,
+                )?;
+                scripts.insert_verified_script(hash_value, script)
             },
         };
 
@@ -353,33 +372,37 @@ impl Loader {
         })
     }
 
-    // The process of deserialization and verification is not and it must not be under lock.
+    fn deserialize_script(&self, script: &[u8]) -> VMResult<CompiledScript> {
+        CompiledScript::deserialize_with_config(script, &self.vm_config().deserializer_config)
+            .map_err(|err| {
+                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Script)
+            })
+    }
+
+    // The process of verification must not be under lock.
     // So when publishing modules through the dependency DAG it may happen that a different
     // thread had loaded the module after this process fetched it from storage.
     // Caching will take care of that by asking for each dependency module again under lock.
-    fn deserialize_and_verify_script(
+    fn verify_script(
         &self,
-        script: &[u8],
-        hash_value: [u8; 32],
+        script: &CompiledScript,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<Arc<CompiledScript>> {
-        let script = data_store.load_compiled_script_to_cache(script, hash_value)?;
-
+    ) -> VMResult<()> {
         // Verification:
         //   - Local, using a bytecode verifier.
         //   - Global, loading & verifying module dependencies.
-        move_bytecode_verifier::verify_script_with_config(
-            &self.vm_config.verifier_config,
-            script.as_ref(),
-        )?;
+        move_bytecode_verifier::verify_script_with_config(&self.vm_config.verifier_config, script)?;
         let loaded_deps = script
             .immediate_dependencies()
             .into_iter()
             .map(|module_id| self.load_module(&module_id, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
-        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.module()))?;
-        Ok(script)
+        dependencies::verify_script(script, loaded_deps.iter().map(|m| m.module()))?;
+        Ok(())
     }
 
     //
@@ -1095,13 +1118,16 @@ impl Loader {
     //
 
     fn get_script(&self, hash: &ScriptHash) -> Arc<Script> {
-        Arc::clone(
-            self.scripts
-                .read()
-                .scripts
-                .get(hash)
-                .expect("Script hash on Function must exist"),
-        )
+        let scripts = self.scripts.read();
+        let entry = scripts
+            .get(hash)
+            .expect("Script hash on Function must exist");
+        match entry {
+            ScriptCacheEntry::Verified(script) => script.clone(),
+            ScriptCacheEntry::Deserialized(_) => {
+                unreachable!("Script must be verified before it is main function scope is accessed")
+            },
+        }
     }
 }
 
