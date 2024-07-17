@@ -195,7 +195,7 @@ pub fn start_consensus_observer(
     // Create the consensus observer
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let consensus_observer = ConsensusObserver::new(
-        node_config.consensus_observer,
+        node_config.clone(),
         consensus_observer_client,
         aptos_db.reader.clone(),
         execution_client,
