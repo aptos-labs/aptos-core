@@ -92,7 +92,7 @@ where
             }, /* bound */
         );
 
-        let (partition_end_tx, partition_end_rx) = if config.delay_execution_start {
+        let (partition_end_tx, partition_end_rx) = if config.split_stages {
             let (partition_end_tx, partition_end_rx) = mpsc::sync_channel::<()>(1);
             (Some(partition_end_tx), Some(partition_end_rx))
         } else {
