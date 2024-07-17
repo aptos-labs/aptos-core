@@ -9,7 +9,7 @@
 /// track proposal creation and proposal ids.
 /// 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
 /// on a proposal multiple times as long as the total voting power of these votes doesn't exceed its total voting power.
-module supra_framework::aptos_governance {
+module supra_framework::supra_governance {
     use std::error;
     use std::option;
     use std::signer;

@@ -6,11 +6,11 @@
 // source digest: 0E08A737463C233B100E2E877A8EC11C9A1BAF47326170149626706DAC27F3FF
 script {
     use std::vector;
-    use aptos_framework::aptos_governance;
+    use aptos_framework::supra_governance;
     use aptos_framework::code;
 
     fun main(proposal_id: u64){
-        let framework_signer = aptos_governance::resolve_multi_step_proposal(
+        let framework_signer = supra_governance::resolve_multi_step_proposal(
             proposal_id,
             @0000000000000000000000000000000000000000000000000000000000000003,
             vector[10u8,250u8,103u8,46u8,177u8,194u8,183u8,47u8,7u8,178u8,167u8,92u8,126u8,197u8,250u8,184u8,210u8,21u8,17u8,2u8,99u8,199u8,181u8,147u8,192u8,11u8,129u8,35u8,12u8,38u8,84u8,54u8,],

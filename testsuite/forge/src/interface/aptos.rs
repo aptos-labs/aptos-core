@@ -224,7 +224,7 @@ impl<'t> AptosPublicInfo<'t> {
         TransactionFactory::new(self.chain_id).with_gas_unit_price(unit_price)
     }
 
-    pub async fn get_approved_execution_hash_at_aptos_governance(
+    pub async fn get_approved_execution_hash_at_supra_governance(
         &self,
         proposal_id: u64,
     ) -> Vec<u8> {
@@ -232,7 +232,7 @@ impl<'t> AptosPublicInfo<'t> {
             .rest_client
             .get_account_resource_bcs::<SimpleMap<u64, Vec<u8>>>(
                 CORE_CODE_ADDRESS,
-                "0x1::aptos_governance::ApprovedExecutionHashes",
+                "0x1::supra_governance::ApprovedExecutionHashes",
             )
             .await;
         let hashes = approved_execution_hashes.unwrap().into_inner().data;

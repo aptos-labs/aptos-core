@@ -450,13 +450,13 @@ fn generate_genesis_transaction(
         r#"
         script {{
             use aptos_framework::stake;
-            use aptos_framework::aptos_governance;
+            use aptos_framework::supra_governance;
             use aptos_framework::block;
 
             fun main(vm_signer: &signer, framework_signer: &signer) {{
                 stake::remove_validators(framework_signer, &vector[@0x{}]);
                 block::emit_writeset_block_event(vm_signer, @0x1);
-                aptos_governance::reconfigure(framework_signer);
+                supra_governance::reconfigure(framework_signer);
             }}
     }}
     "#,

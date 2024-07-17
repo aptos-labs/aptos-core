@@ -64,7 +64,7 @@ fn generate_script(gas_schedule: &GasScheduleV2) -> Result<String> {
     emitln!(writer, "script {");
     writer.indent();
 
-    emitln!(writer, "use aptos_framework::aptos_governance;");
+    emitln!(writer, "use aptos_framework::supra_governance;");
     emitln!(writer, "use aptos_framework::gas_schedule;");
     emitln!(writer);
 
@@ -73,7 +73,7 @@ fn generate_script(gas_schedule: &GasScheduleV2) -> Result<String> {
 
     emitln!(
         writer,
-        "let framework_signer = aptos_governance::resolve(proposal_id, @{});\n",
+        "let framework_signer = supra_governance::resolve(proposal_id, @{});\n",
         AccountAddress::ONE,
     );
 

@@ -6,11 +6,11 @@
 // source digest: 1D4ED5929F42A72E62C7E3DF754A7EBB336DC734C24C5DFCC72E00B54CE886A0
 script {
     use std::vector;
-    use aptos_framework::aptos_governance;
+    use aptos_framework::supra_governance;
     use aptos_framework::code;
 
     fun main(core_resources: &signer){
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        let framework_signer = supra_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
         let code = vector::empty();
         let chunk0 =
         vector[

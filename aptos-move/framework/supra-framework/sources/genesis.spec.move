@@ -77,7 +77,7 @@ spec supra_framework::genesis {
 
         // property 1: All the core resources and modules should be created during genesis and owned by the Aptos framework account.
         /// [high-level-req-1]
-        ensures exists<aptos_governance::GovernanceResponsbility>(@supra_framework);
+        ensures exists<supra_governance::GovernanceResponsbility>(@supra_framework);
         ensures exists<consensus_config::ConsensusConfig>(@supra_framework);
         ensures exists<execution_config::ExecutionConfig>(@supra_framework);
         ensures exists<version::Version>(@supra_framework);

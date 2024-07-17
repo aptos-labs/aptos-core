@@ -10,7 +10,7 @@ module supra_framework::genesis {
     use supra_framework::account;
     use supra_framework::aggregator_factory;
     use supra_framework::supra_coin::{Self, SupraCoin};
-    use supra_framework::aptos_governance;
+    use supra_framework::supra_governance;
     use supra_framework::block;
     use supra_framework::chain_id;
     use supra_framework::chain_status;
@@ -138,14 +138,14 @@ module supra_framework::genesis {
         );
 
         // Give the decentralized on-chain governance control over the core framework account.
-        aptos_governance::store_signer_cap(&supra_framework_account, @supra_framework, supra_framework_signer_cap);
+        supra_governance::store_signer_cap(&supra_framework_account, @supra_framework, supra_framework_signer_cap);
 
         // put reserved framework reserved accounts under aptos governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
         while (!vector::is_empty(&framework_reserved_addresses)) {
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
             let (_, framework_signer_cap) = account::create_framework_reserved_account(address);
-            aptos_governance::store_signer_cap(&supra_framework_account, address, framework_signer_cap);
+            supra_governance::store_signer_cap(&supra_framework_account, address, framework_signer_cap);
         };
 
         consensus_config::initialize(&supra_framework_account, consensus_config);
@@ -661,7 +661,7 @@ module supra_framework::genesis {
         );
         features::change_feature_flags(supra_framework, vector[1, 2, 11], vector[]);
         initialize_supra_coin(supra_framework);
-        aptos_governance::initialize_for_verification(
+        supra_governance::initialize_for_verification(
             supra_framework,
             min_voting_threshold,
             required_proposer_stake,
