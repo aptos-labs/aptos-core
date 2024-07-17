@@ -627,19 +627,9 @@ impl ConsensusObserver {
             ordered_proof,
         } = ordered_block.clone();
 
-        // Verify that we have at least one ordered block
-        if blocks.is_empty() {
-            warn!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Received empty ordered block! Ignoring: {:?}",
-                    ordered_proof.commit_info()
-                ))
-            );
-            return;
-        }
-
         // TODO: verify the ordered block!
 
+        // Verify that we have at least one ordered block
         if let Some(block) = blocks.first() {
             // If the block is a child of our last block, we can insert it
             if self.get_last_block().id() == block.parent_id() {
@@ -670,7 +660,7 @@ impl ConsensusObserver {
         } else {
             warn!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Expected to find a first block but none was found! Ignoring: {:?}",
+                    "Received empty ordered block! Ignoring: {:?}",
                     ordered_proof.commit_info()
                 ))
             );
