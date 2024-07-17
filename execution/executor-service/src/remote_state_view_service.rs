@@ -68,7 +68,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = 90; // 3 * remote_shard_addresses.len();//remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = 120; // 3 * remote_shard_addresses.len();//remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
         let num_kv_req_threads = 16; //= num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -140,7 +140,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-        let num_handlers = 90; //6 * self.num_shards;
+        let num_handlers = 120; //6 * self.num_shards;
         info!("Num handlers created is {}", num_handlers);
         for i in 0..num_handlers {
             let state_view_clone = self.state_view.clone();
@@ -179,12 +179,12 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                         .with_label_values(&["0", "kv_requests_handler_timer"])
                         .start_timer();
                     let priority = message.seq_num.unwrap() as i64;
-                    if priority == 200 {
-                        info!("Received first message from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
-                    }
-                    if priority >= 4000 {
-                        info!("Received last message from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
-                    }
+                    // if priority == 200 {
+                    //     info!("Received first message from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
+                    // }
+                    // if priority >= 4000 {
+                    //     info!("Received last message from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
+                    // }
                     //Self::handle_message(message, state_view_clone.clone(), kv_tx_clone.clone(), rng.gen_range(0, kv_tx_clone[0].len()), outbound_rpc_runtime_clone.clone());
                     {
                         let (lock, cvar) = &*recv_condition_clone;
@@ -340,12 +340,12 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .unwrap()
             .as_millis() as u64;
 
-        if message.seq_num.unwrap() == 200 {
-            info!("Processed first batch from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
-        }
-        if message.seq_num.unwrap() >= 4000 {
-            info!("Processes last batch from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
-        }
+        // if message.seq_num.unwrap() == 200 {
+        //     info!("Processed first batch from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
+        // }
+        // if message.seq_num.unwrap() >= 4000 {
+        //     info!("Processes last batch from shard {} with seq_num {} at time {}", message.shard_id.unwrap(), message.seq_num.unwrap(), curr_time);
+        // }
 
         // let mut resp = vec![];
         // state_keys
