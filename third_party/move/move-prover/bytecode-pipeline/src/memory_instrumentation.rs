@@ -163,7 +163,7 @@ impl<'a> Instrumenter<'a> {
         if let Call(attr_id, dests, op, _, _) = bytecode {
             use Operation::*;
             match op {
-                BorrowLoc | BorrowField(..) | BorrowGlobal(..) => {
+                BorrowLoc | BorrowField(..) | BorrowGlobal(..) | BorrowVariantField(..) => {
                     let ty = &self
                         .builder
                         .get_target()
