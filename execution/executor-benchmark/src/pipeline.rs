@@ -92,13 +92,6 @@ where
             }, /* bound */
         );
 
-        let (partition_end_tx, partition_end_rx) = if config.split_stages {
-            let (partition_end_tx, partition_end_rx) = mpsc::sync_channel::<()>(1);
-            (Some(partition_end_tx), Some(partition_end_rx))
-        } else {
-            (None, None)
-        };
-
         let (start_execution_tx, start_execution_rx) = if config.delay_execution_start {
             let (start_execution_tx, start_execution_rx) = mpsc::sync_channel::<()>(1);
             (Some(start_execution_tx), Some(start_execution_rx))
@@ -131,7 +124,7 @@ where
             LedgerUpdateStage::new(executor_2, Some(commit_sender), version);
 
         let (executable_block_sender, executable_block_receiver) =
-            mpsc::sync_channel::<ExecuteBlockMessage>((num_blocks.unwrap() + 1));
+            mpsc::sync_channel::<ExecuteBlockMessage>(3);
 
         let partitioning_thread = std::thread::Builder::new()
             .name("block_partitioning".to_string())
@@ -143,7 +136,6 @@ where
                     let exe_block_msg = partitioning_stage.process(txns);
                     executable_block_sender.send(exe_block_msg).unwrap();
                 }
-                partition_end_tx.map(|tx| tx.send(()));
             })
             .expect("Failed to spawn block partitioner thread.");
         join_handles.push(partitioning_thread);
@@ -152,7 +144,6 @@ where
             .name("txn_executor".to_string())
             .spawn(move || {
                 start_execution_rx.map(|rx| rx.recv());
-                partition_end_rx.map(|rx| rx.recv());
                 let overall_measuring = OverallMeasuring::start();
                 let mut executed = 0;
 

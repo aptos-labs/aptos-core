@@ -412,12 +412,12 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         .unwrap()
                         .as_millis() as u64;
 
-                    if chunk_idx == 0 {
-                        info!("Sent first cmd batch to shard {} at time {}", shard_id, curr_time);
-                    }
-                    if chunk_idx == max_batch_size - 1 {
-                        info!("Sent last cmd batch to shard {} at time {}", shard_id, curr_time);
-                    }
+                    // if chunk_idx == 0 {
+                    //     info!("Sent first cmd batch to shard {} at time {}", shard_id, curr_time);
+                    // }
+                    // if chunk_idx == max_batch_size - 1 {
+                    //     info!("Sent last cmd batch to shard {} at time {}", shard_id, curr_time);
+                    // }
 
                         // rpc_outbound_runtime_clone.spawn(async move {
                     //     senders[shard_id][rand_send_thread_idx]
