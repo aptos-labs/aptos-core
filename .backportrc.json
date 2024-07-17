@@ -7,5 +7,6 @@
     },
     "commitConflicts": true,
     "prTitle": "[cp][{{targetBranch}}] {{sourcePullRequest.title}}",
-    "targetPRLabels": ["cherry-pick"]
+    "targetPRLabels": ["cherry-pick"],
+    "assignees": ["thepomeranian"]
 }

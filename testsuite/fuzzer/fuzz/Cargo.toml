@@ -64,3 +64,9 @@ name = "move_aptosvm_publish_and_run"
 path = "fuzz_targets/move/aptosvm_publish_and_run.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "move_aptosvm_publish"
+path = "fuzz_targets/move/aptosvm_publish.rs"
+test = false
+doc = false

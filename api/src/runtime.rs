@@ -3,9 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    accounts::AccountsApi, basic::BasicApi, blocks::BlocksApi, check_size::PostSizeLimit,
-    context::Context, error_converter::convert_error, events::EventsApi, index::IndexApi,
-    log::middleware_log, set_failpoints, state::StateApi, transactions::TransactionsApi,
+    accounts::AccountsApi,
+    basic::BasicApi,
+    blocks::BlocksApi,
+    check_size::PostSizeLimit,
+    context::Context,
+    error_converter::convert_error,
+    events::EventsApi,
+    index::IndexApi,
+    log::middleware_log,
+    set_failpoints,
+    spec::{spec_endpoint_json, spec_endpoint_yaml},
+    state::StateApi,
+    transactions::TransactionsApi,
     view_function::ViewFunctionApi,
 };
 use anyhow::Context as AnyhowContext;
@@ -164,8 +174,8 @@ pub fn attach_poem_to_runtime(
 
     let api_service = get_api_service(context.clone());
 
-    let spec_json = api_service.spec_endpoint();
-    let spec_yaml = api_service.spec_endpoint_yaml();
+    let spec_json = spec_endpoint_json(&api_service);
+    let spec_yaml = spec_endpoint_yaml(&api_service);
 
     let mut address = config.api.address;
 
