@@ -209,7 +209,7 @@ impl AssetUploaderContext {
                         );
                         let mut model = NFTMetadataCrawlerURIs::new(url.as_ref());
                         model.set_cdn_image_uri(Some(cdn_url.clone()));
-                        
+
                         let mut conn = self_clone.pool.get().context("Failed to get connection")?;
                         upsert_uris(&mut conn, &model, -1).context("Failed to upsert URIs")?;
 
