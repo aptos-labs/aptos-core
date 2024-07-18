@@ -31,7 +31,6 @@ python -m grpc_tools.protoc \
     --python_out $OUT_DIR \
     --pyi_out $OUT_DIR \
     --grpc_python_out $OUT_DIR \
-    $PROTO_DIR/aptos/bigquery_schema/v1/transaction.proto \
     $PROTO_DIR/aptos/indexer/v1/raw_data.proto \
     $PROTO_DIR/aptos/internal/fullnode/v1/fullnode_data.proto \
     $PROTO_DIR/aptos/transaction/v1/transaction.proto \

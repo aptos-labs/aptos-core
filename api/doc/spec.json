@@ -13990,6 +13990,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "ed25519_signature"
+                ],
                 "example": "ed25519_signature"
               }
             }
@@ -14009,6 +14012,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multi_ed25519_signature"
+                ],
                 "example": "multi_ed25519_signature"
               }
             }
@@ -14028,6 +14034,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multi_key_signature"
+                ],
                 "example": "multi_key_signature"
               }
             }
@@ -14047,6 +14056,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "single_key_signature"
+                ],
                 "example": "single_key_signature"
               }
             }
@@ -14842,6 +14854,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "write_set_payload"
+                ],
                 "example": "write_set_payload"
               }
             }
@@ -15539,6 +15554,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "entry_function_payload"
+                ],
                 "example": "entry_function_payload"
               }
             }
@@ -15623,6 +15641,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "ed25519"
+                ],
                 "example": "ed25519"
               }
             }
@@ -15642,6 +15663,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "keyless"
+                ],
                 "example": "keyless"
               }
             }
@@ -15661,6 +15685,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "secp256k1_ecdsa"
+                ],
                 "example": "secp256k1_ecdsa"
               }
             }
@@ -15680,6 +15707,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "secp256r1_ecdsa"
+                ],
                 "example": "secp256r1_ecdsa"
               }
             }
@@ -15835,6 +15865,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "ed25519"
+                ],
                 "example": "ed25519"
               }
             }
@@ -15854,6 +15887,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "keyless"
+                ],
                 "example": "keyless"
               }
             }
@@ -15873,6 +15909,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "secp256k1_ecdsa"
+                ],
                 "example": "secp256k1_ecdsa"
               }
             }
@@ -15892,6 +15931,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "web_authn"
+                ],
                 "example": "web_authn"
               }
             }
@@ -16111,6 +16153,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "module_bundle_payload"
+                ],
                 "example": "module_bundle_payload"
               }
             }
@@ -16130,6 +16175,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "entry_function_payload"
+                ],
                 "example": "entry_function_payload"
               }
             }
@@ -16149,6 +16197,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multisig_payload"
+                ],
                 "example": "multisig_payload"
               }
             }
@@ -16168,6 +16219,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "script_payload"
+                ],
                 "example": "script_payload"
               }
             }
@@ -16218,6 +16272,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "single_sender"
+                ],
                 "example": "single_sender"
               }
             }
@@ -16237,6 +16294,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "ed25519_signature"
+                ],
                 "example": "ed25519_signature"
               }
             }
@@ -16256,6 +16316,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "fee_payer_signature"
+                ],
                 "example": "fee_payer_signature"
               }
             }
@@ -16275,6 +16338,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multi_agent_signature"
+                ],
                 "example": "multi_agent_signature"
               }
             }
@@ -16294,6 +16360,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multi_ed25519_signature"
+                ],
                 "example": "multi_ed25519_signature"
               }
             }
@@ -16313,6 +16382,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "block_epilogue_transaction"
+                ],
                 "example": "block_epilogue_transaction"
               }
             }
@@ -16332,6 +16404,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "block_metadata_transaction"
+                ],
                 "example": "block_metadata_transaction"
               }
             }
@@ -16351,6 +16426,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "genesis_transaction"
+                ],
                 "example": "genesis_transaction"
               }
             }
@@ -16370,6 +16448,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "pending_transaction"
+                ],
                 "example": "pending_transaction"
               }
             }
@@ -16389,6 +16470,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "state_checkpoint_transaction"
+                ],
                 "example": "state_checkpoint_transaction"
               }
             }
@@ -16408,6 +16492,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "user_transaction"
+                ],
                 "example": "user_transaction"
               }
             }
@@ -16427,6 +16514,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "validator_transaction"
+                ],
                 "example": "validator_transaction"
               }
             }
@@ -16632,6 +16722,9 @@
             "properties": {
               "validator_transaction_type": {
                 "type": "string",
+                "enum": [
+                  "dkg_result"
+                ],
                 "example": "dkg_result"
               }
             }
@@ -16651,6 +16744,9 @@
             "properties": {
               "validator_transaction_type": {
                 "type": "string",
+                "enum": [
+                  "observed_jwk_update"
+                ],
                 "example": "observed_jwk_update"
               }
             }
@@ -16831,6 +16927,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "delete_module"
+                ],
                 "example": "delete_module"
               }
             }
@@ -16850,6 +16949,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "delete_resource"
+                ],
                 "example": "delete_resource"
               }
             }
@@ -16869,6 +16971,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "delete_table_item"
+                ],
                 "example": "delete_table_item"
               }
             }
@@ -16888,6 +16993,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "write_module"
+                ],
                 "example": "write_module"
               }
             }
@@ -16907,6 +17015,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "write_resource"
+                ],
                 "example": "write_resource"
               }
             }
@@ -16926,6 +17037,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "write_table_item"
+                ],
                 "example": "write_table_item"
               }
             }
@@ -16957,6 +17071,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "direct_write_set"
+                ],
                 "example": "direct_write_set"
               }
             }
@@ -16976,6 +17093,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "script_write_set"
+                ],
                 "example": "script_write_set"
               }
             }

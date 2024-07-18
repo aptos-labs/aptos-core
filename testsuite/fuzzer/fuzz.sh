@@ -4,7 +4,7 @@ export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
-CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip")
+CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip" "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip")
 
 function info() {
     echo "[info] $1"
@@ -177,7 +177,7 @@ function run() {
         fi
     fi
     info "Running $fuzz_target"
-    cargo_fuzz run $fuzz_target $testcase
+    cargo_fuzz run --sanitizer none $fuzz_target $testcase
 }
 
 function test() {

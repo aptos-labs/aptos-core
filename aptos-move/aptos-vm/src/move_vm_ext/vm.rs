@@ -45,7 +45,7 @@ impl GenesisMoveVM {
             &features,
             &timed_features,
             pseudo_meter_vector_ty_to_ty_tag_construction,
-            aptos_default_ty_builder(&features),
+            aptos_default_ty_builder(),
         );
 
         // All genesis sessions run with unmetered gas meter, and here we set
@@ -113,8 +113,7 @@ impl MoveVmExt {
         //            We should clean up the logic here once we get that refactored.
         let (native_gas_params, misc_gas_params, ty_builder) = match gas_params {
             Ok(gas_params) => {
-                let ty_builder =
-                    aptos_prod_ty_builder(env.features(), gas_feature_version, gas_params);
+                let ty_builder = aptos_prod_ty_builder(gas_feature_version, gas_params);
                 (
                     gas_params.natives.clone(),
                     gas_params.vm.misc.clone(),
@@ -122,7 +121,7 @@ impl MoveVmExt {
                 )
             },
             Err(_) => {
-                let ty_builder = aptos_default_ty_builder(env.features());
+                let ty_builder = aptos_default_ty_builder();
                 (
                     NativeGasParameters::zeros(),
                     MiscGasParameters::zeros(),
@@ -147,7 +146,7 @@ impl MoveVmExt {
         vm_config.ty_builder = ty_builder;
         vm_config.disallow_dispatch_for_native = env
             .features()
-            .is_enabled(FeatureFlag::DISALLOW_NATIVE_DISPATCH);
+            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
 
         Self {
             inner: WarmVmCache::get_warm_vm(

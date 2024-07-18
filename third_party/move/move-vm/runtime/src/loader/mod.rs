@@ -53,7 +53,7 @@ mod type_loader;
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
-use move_vm_types::loaded_data::runtime_types::{legacy_count_type_nodes, TypeBuilder};
+use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -324,20 +324,6 @@ impl Loader {
             .iter()
             .map(|ty| self.load_type(ty, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
-
-        #[allow(clippy::collapsible_if)]
-        if self.ty_builder().is_legacy() {
-            if ty_args.iter().map(legacy_count_type_nodes).sum::<u64>()
-                > TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES
-            {
-                return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES)
-                    .with_message(format!(
-                        "Too many type nodes when instantiating a type for script {}",
-                        &main.name
-                    ))
-                    .finish(Location::Script));
-            };
-        }
 
         Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args).map_err(|e| {
             e.with_message(format!(
@@ -835,48 +821,6 @@ impl Loader {
         Ok(())
     }
 
-    /// Similar to `check_dependencies_and_charge_gas`, except that this does not recurse
-    /// into transitive dependencies and allows non-existent modules.
-    pub(crate) fn check_dependencies_and_charge_gas_non_recursive_optional<'a, I>(
-        &self,
-        module_store: &ModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
-        ids: I,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-    {
-        for (addr, name) in ids.into_iter() {
-            // TODO: Allow the check of special addresses to be customized.
-            if addr.is_special() || visited.insert((addr, name), ()).is_some() {
-                continue;
-            }
-
-            // Load and deserialize the module only if it has not been cached by the loader.
-            // Otherwise this will cause a significant regression in performance.
-            let size = match module_store.module_at_by_ref(addr, name) {
-                Some(module) => module.size,
-                None => match data_store
-                    .load_compiled_module_to_cache(ModuleId::new(*addr, name.to_owned()), true)
-                {
-                    Ok((_module, size, _hash)) => size,
-                    Err(err) if err.major_status() == StatusCode::LINKER_ERROR => continue,
-                    Err(err) => return Err(err),
-                },
-            };
-
-            gas_meter
-                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
-                .map_err(|err| {
-                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                })?;
-        }
-
-        Ok(())
-    }
-
     // The interface for module loading. Aligned with `load_type` and `load_function`, this function
     // verifies that the module is OK instead of expect it.
     pub(crate) fn load_module(
@@ -1260,22 +1204,9 @@ impl<'a> Resolver<'a> {
         let ty_builder = self.loader().ty_builder();
         let mut instantiation = vec![];
         for ty in &func_inst.instantiation {
-            let ty = ty_builder.create_ty_with_subst_with_legacy_check(ty, ty_args)?;
+            let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
             instantiation.push(ty);
         }
-
-        if ty_builder.is_legacy() {
-            // Check if the function instantiation over all generics is larger
-            // than MAX_TYPE_INSTANTIATION_NODES.
-            let mut sum_nodes = 1u64;
-            for ty in ty_args.iter().chain(instantiation.iter()) {
-                sum_nodes = sum_nodes.saturating_add(legacy_count_type_nodes(ty));
-                if sum_nodes > TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
-                    return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-                }
-            }
-        }
-
         Ok(instantiation)
     }
 
@@ -1304,28 +1235,9 @@ impl<'a> Resolver<'a> {
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
 
-        let ty_builder = self.loader().ty_builder();
-        if ty_builder.is_legacy() {
-            let mut sum_nodes = 1u64;
-            for ty in ty_args.iter().chain(struct_inst.instantiation.iter()) {
-                sum_nodes = sum_nodes.saturating_add(legacy_count_type_nodes(ty));
-                if sum_nodes > TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
-                    return Err(
-                        PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                            "Number of type instantiation nodes exceeded the maximum of {}",
-                            TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES
-                        )),
-                    );
-                }
-            }
-        }
-
         let struct_ty = &struct_inst.definition_struct_type;
-        ty_builder.create_struct_instantiation_ty_with_legacy_check(
-            struct_ty,
-            &struct_inst.instantiation,
-            ty_args,
-        )
+        let ty_builder = self.loader().ty_builder();
+        ty_builder.create_struct_instantiation_ty(struct_ty, &struct_inst.instantiation, ty_args)
     }
 
     pub(crate) fn get_field_ty(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
@@ -1410,9 +1322,7 @@ impl<'a> Resolver<'a> {
         let ty = self.single_type_at(idx);
 
         if !ty_args.is_empty() {
-            self.loader()
-                .ty_builder()
-                .create_ty_with_subst_with_legacy_check(ty, ty_args)
+            self.loader().ty_builder().create_ty_with_subst(ty, ty_args)
         } else {
             Ok(ty.clone())
         }
@@ -1703,10 +1613,7 @@ impl Loader {
         let field_tys = struct_type
             .field_tys
             .iter()
-            .map(|ty| {
-                self.ty_builder()
-                    .create_ty_with_subst_with_legacy_check(ty, ty_args)
-            })
+            .map(|ty| self.ty_builder().create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
             field_tys
@@ -1919,9 +1826,7 @@ impl Loader {
             .iter()
             .zip(&struct_type.field_tys)
             .map(|(n, ty)| {
-                let ty = self
-                    .ty_builder()
-                    .create_ty_with_subst_with_legacy_check(ty, ty_args)?;
+                let ty = self.ty_builder().create_ty_with_subst(ty, ty_args)?;
                 let l =
                     self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth)?;
                 Ok(MoveFieldLayout::new(n.clone(), l))

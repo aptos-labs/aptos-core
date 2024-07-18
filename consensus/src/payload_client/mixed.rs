@@ -78,6 +78,7 @@ impl PayloadClient for MixedPayloadClient {
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
+        block_timestamp: Duration,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
         // Pull validator txns first.
         let validator_txn_pull_timer = Instant::now();
@@ -124,6 +125,7 @@ impl PayloadClient for MixedPayloadClient {
                 pending_ordering,
                 pending_uncommitted_blocks,
                 recent_max_fill_fraction,
+                block_timestamp,
             )
             .await?;
 
@@ -165,6 +167,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()
@@ -189,6 +192,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()
@@ -213,6 +217,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()
@@ -237,6 +242,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()
@@ -279,6 +285,7 @@ async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()

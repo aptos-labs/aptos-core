@@ -365,7 +365,7 @@ impl Interpreter {
                 if !ty_args.is_empty() {
                     let expected_ty = loader
                         .ty_builder()
-                        .create_ty_with_subst_with_legacy_check(expected_ty, &ty_args)?;
+                        .create_ty_with_subst(expected_ty, &ty_args)?;
                     ty.paranoid_check_eq(&expected_ty)?;
                 } else {
                     // Directly check against the expected type to save a clone here.
@@ -399,11 +399,7 @@ impl Interpreter {
                 function
                     .local_tys()
                     .iter()
-                    .map(|ty| {
-                        loader
-                            .ty_builder()
-                            .create_ty_with_subst_with_legacy_check(ty, &ty_args)
-                    })
+                    .map(|ty| loader.ty_builder().create_ty_with_subst(ty, &ty_args))
                     .collect::<PartialVMResult<Vec<_>>>()?
             }
         } else {
@@ -488,8 +484,7 @@ impl Interpreter {
                 let ty = self.operand_stack.pop_ty()?;
                 let expected_ty = &function.param_tys()[expected_args - i - 1];
                 if !ty_args.is_empty() {
-                    let expected_ty =
-                        ty_builder.create_ty_with_subst_with_legacy_check(expected_ty, &ty_args)?;
+                    let expected_ty = ty_builder.create_ty_with_subst(expected_ty, &ty_args)?;
                     ty.paranoid_check_eq(&expected_ty)?;
                 } else {
                     ty.paranoid_check_eq(expected_ty)?;
@@ -546,7 +541,7 @@ impl Interpreter {
 
                 if self.paranoid_type_checks {
                     for ty in function.return_tys() {
-                        let ty = ty_builder.create_ty_with_subst_with_legacy_check(ty, &ty_args)?;
+                        let ty = ty_builder.create_ty_with_subst(ty, &ty_args)?;
                         self.operand_stack.push_ty(ty)?;
                     }
                 }
