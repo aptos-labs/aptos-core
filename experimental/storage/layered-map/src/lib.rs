@@ -196,7 +196,7 @@ where
                 NodeStrongRef::Empty => return None,
                 NodeStrongRef::Leaf(leaf) => {
                     return if &leaf.key == key {
-                        leaf.value.clone()
+                        Some(leaf.value.clone())
                     } else {
                         None
                     }
@@ -217,7 +217,7 @@ where
         } // end loop
     }
 
-    fn new_leaf(&self, item: &(K, Option<V>)) -> NodeRef<K, V> {
+    fn new_leaf(&self, item: &(K, V)) -> NodeRef<K, V> {
         let (key, value) = item.clone();
         NodeRef::new_leaf(key, value, self.top_layer() + 1)
     }
@@ -264,7 +264,7 @@ where
         &self,
         depth: usize,
         current_root: NodeStrongRef<K, V>,
-        items: &[(K, Option<V>)],
+        items: &[(K, V)],
     ) -> NodeRef<K, V> {
         if items.is_empty() {
             return current_root.weak_ref();
@@ -292,7 +292,7 @@ where
         )
     }
 
-    pub fn new_layer(&self, items: &[(K, Option<V>)]) -> MapLayer<K, V> {
+    pub fn new_layer(&self, items: &[(K, V)]) -> MapLayer<K, V> {
         let _timer = TIMER.timer_with(&[self.top_layer.inner.use_case, "new_layer"]);
         let root = self.create_tree(0, self.root(), items);
         MapLayer {

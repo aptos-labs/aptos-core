@@ -22,9 +22,7 @@ impl crate::Key for u8 {
     }
 }
 
-fn naive_view_layers<K: Ord, V>(
-    layers: impl Iterator<Item = BTreeMap<K, Option<V>>>,
-) -> BTreeMap<K, Option<V>> {
+fn naive_view_layers<K: Ord, V>(layers: impl Iterator<Item = BTreeMap<K, V>>) -> BTreeMap<K, V> {
     layers.flat_map(|layer| layer.into_iter()).collect()
 }
 
@@ -47,7 +45,7 @@ fn arb_test_case() -> impl Strategy<Value = (Vec<BTreeMap<u8, Option<u8>>>, usiz
 fn layers(
     items_per_layer: &[BTreeMap<u8, Option<u8>>],
     max_base_layer: u64,
-) -> Vec<MapLayer<u8, u8>> {
+) -> Vec<MapLayer<u8, Option<u8>>> {
     let mut base_layer = MapLayer::new_family("test");
     let mut latest_layer = base_layer.clone();
 
@@ -61,7 +59,7 @@ fn layers(
             .new_layer(&items_vec);
         layers.push(latest_layer.clone());
 
-        // advance base layer occationally to expose more edge cases
+        // advance base layer occasionally to expose more edge cases
         if base_layer_idx < max_base_layer as usize && layer_idx % 2 == 1 {
             base_layer_idx += 1;
             base_layer = layers[base_layer_idx].clone();
@@ -83,10 +81,10 @@ proptest! {
 
         let layered_map = top_layer.into_layers_view_since(bottom_layer);
 
-        for (key, value ) in naive_view_layers(
+        for (key, value_opt) in naive_view_layers(
             items_per_layer.drain(bottom..=top)
         ) {
-            prop_assert_eq!(layered_map.get(&key), value);
+            prop_assert_eq!(layered_map.get(&key), Some(value_opt));
         }
 
         // TODO(aldenhu): test that layered_map doesn't have any unexpected keys -- need ability to traverse

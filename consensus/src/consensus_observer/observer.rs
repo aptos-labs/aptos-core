@@ -12,8 +12,9 @@ use crate::{
             BlockPayload, CommitDecision, ConsensusObserverDirectSend, ConsensusObserverMessage,
             ConsensusObserverRequest, ConsensusObserverResponse, OrderedBlock,
         },
+        ordered_blocks::PendingOrderedBlocks,
         payload_store::BlockPayloadStore,
-        pending_blocks::PendingOrderedBlocks,
+        pending_blocks::PendingBlockStore,
         publisher::ConsensusPublisher,
         subscription,
         subscription::ConsensusObserverSubscription,
@@ -27,7 +28,7 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_consensus_types::pipeline;
+use aptos_consensus_types::{pipeline, pipelined_block::PipelinedBlock};
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
@@ -59,6 +60,9 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
+// Whether to log messages at the info level (useful for debugging)
+const LOG_MESSAGES_AT_INFO_LEVEL: bool = false;
+
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
     // The configuration of the consensus observer
@@ -69,12 +73,16 @@ pub struct ConsensusObserver {
 
     // The current epoch state
     epoch_state: Option<Arc<EpochState>>,
+    // Whether quorum store is enabled (updated on epoch changes)
+    quorum_store_enabled: bool,
     // The latest ledger info (updated via a callback)
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
 
     // The payload store holds block transaction payloads
     block_payload_store: BlockPayloadStore,
-    // The pending ordered blocks (these are also buffered when in state sync mode)
+    // The pending block store holds pending blocks that are without payloads
+    pending_block_store: PendingBlockStore,
+    // The pending ordered blocks (these are also ordered when in state sync mode)
     pending_ordered_blocks: PendingOrderedBlocks,
     // The execution client to the buffer manager
     execution_client: Arc<dyn TExecutionClient>,
@@ -118,10 +126,12 @@ impl ConsensusObserver {
             consensus_observer_config,
             consensus_observer_client,
             epoch_state: None,
+            quorum_store_enabled: false, // Updated on epoch changes
             root: Arc::new(Mutex::new(root)),
+            block_payload_store: BlockPayloadStore::new(),
+            pending_block_store: PendingBlockStore::new(consensus_observer_config),
             pending_ordered_blocks: PendingOrderedBlocks::new(consensus_observer_config),
             execution_client,
-            block_payload_store: BlockPayloadStore::new(),
             sync_handle: None,
             sync_notification_sender,
             reconfig_events,
@@ -130,6 +140,17 @@ impl ConsensusObserver {
             db_reader,
             time_service,
         }
+    }
+
+    /// Returns true iff all payloads exist for the given blocks
+    fn all_payloads_exist(&self, blocks: &[Arc<PipelinedBlock>]) -> bool {
+        // If quorum store is disabled, all payloads exist (they're already in the blocks)
+        if !self.quorum_store_enabled {
+            return true;
+        }
+
+        // Otherwise, check if all the payloads exist in the payload store
+        self.block_payload_store.all_payloads_exist(blocks)
     }
 
     /// Checks the progress of the consensus observer
@@ -436,22 +457,51 @@ impl ConsensusObserver {
         }
     }
 
-    /// Processes the block payload
-    fn process_block_payload(&mut self, block_payload: BlockPayload) {
-        // Unpack the block payload
+    /// Processes the block payload message
+    async fn process_block_payload_message(&mut self, block_payload: BlockPayload) {
+        // Get the block round and epoch
         let block = block_payload.block;
+        let block_round = block.round();
+        let block_epoch = block.epoch();
+
+        // Get the block transactions and limit
         let transactions = block_payload.transactions;
         let limit = block_payload.limit;
+
+        // Update the metrics for the received block payload
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
+            metrics::BLOCK_PAYLOAD_LABEL,
+            block_round,
+        );
 
         // TODO: verify the block payload!
 
         // Update the payload store with the payload
         self.block_payload_store
             .insert_block_payload(block, transactions, limit);
+
+        // Check if there are blocks that were pending payloads
+        // but are now ready because of the new payload.
+        if let Some(ordered_block) = self.pending_block_store.remove_ready_block(
+            block_epoch,
+            block_round,
+            &self.block_payload_store,
+        ) {
+            // Process the ordered block
+            self.process_ordered_block(ordered_block).await;
+        }
     }
 
-    /// Processes the commit decision
-    fn process_commit_decision(&mut self, commit_decision: CommitDecision) {
+    /// Processes the commit decision message
+    fn process_commit_decision_message(&mut self, commit_decision: CommitDecision) {
+        // Update the metrics for the received commit decision
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
+            metrics::COMMIT_DECISION_LABEL,
+            commit_decision.round(),
+        );
+
         // If the commit decision is for the current epoch, verify it
         let epoch_state = self.get_epoch_state();
         let commit_decision_epoch = commit_decision.epoch();
@@ -518,11 +568,8 @@ impl ConsensusObserver {
 
         // Process the pending block
         if let Some(pending_block) = pending_block {
-            // If the payload exists, add the commit decision to the pending blocks
-            if self
-                .block_payload_store
-                .all_payloads_exist(pending_block.blocks())
-            {
+            // If all payloads exist, add the commit decision to the pending blocks
+            if self.all_payloads_exist(pending_block.blocks()) {
                 debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Adding decision to pending block: {}",
@@ -593,39 +640,48 @@ impl ConsensusObserver {
         // Process the message based on the type
         match message {
             ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
-                debug!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Received ordered block: {}, from peer: {}!",
-                        ordered_block.proof_block_info(),
-                        peer_network_id
-                    ))
+                // Log the received ordered block message
+                let log_message = format!(
+                    "Received ordered block: {}, from peer: {}!",
+                    ordered_block.proof_block_info(),
+                    peer_network_id
                 );
-                self.process_ordered_block(ordered_block).await;
+                log_received_message(log_message);
+
+                // Process the ordered block message
+                self.process_ordered_block_message(ordered_block).await;
             },
             ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
-                debug!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Received commit decision: {}, from peer: {}!",
-                        commit_decision.proof_block_info(),
-                        peer_network_id
-                    ))
+                // Log the received commit decision message
+                let log_message = format!(
+                    "Received commit decision: {}, from peer: {}!",
+                    commit_decision.proof_block_info(),
+                    peer_network_id
                 );
-                self.process_commit_decision(commit_decision);
+                log_received_message(log_message);
+
+                // Process the commit decision message
+                self.process_commit_decision_message(commit_decision);
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
-                debug!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Received block payload: {}, from peer: {}!",
-                        block_payload.block, peer_network_id
-                    ))
+                // Log the received block payload message
+                let log_message = format!(
+                    "Received block payload: {}, from peer: {}!",
+                    block_payload.block, peer_network_id
                 );
-                self.process_block_payload(block_payload);
+                log_received_message(log_message);
+
+                // Process the block payload message
+                self.process_block_payload_message(block_payload).await;
             },
         }
+
+        // Update the metrics for the processed blocks
+        self.update_processed_blocks_metrics();
     }
 
     /// Processes the ordered block
-    async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
+    async fn process_ordered_block_message(&mut self, ordered_block: OrderedBlock) {
         // Verify the ordered blocks before processing
         if let Err(error) = ordered_block.verify_ordered_blocks() {
             error!(
@@ -638,6 +694,18 @@ impl ConsensusObserver {
             return;
         };
 
+        // If all payloads exist, process the block. Otherwise, store it
+        // in the pending block store and wait for the payloads to arrive.
+        if self.all_payloads_exist(ordered_block.blocks()) {
+            self.process_ordered_block(ordered_block).await;
+        } else {
+            self.pending_block_store.insert_pending_block(ordered_block);
+        }
+    }
+
+    /// Processes the ordered block. This assumes the ordered block
+    /// has been sanity checked and that all payloads exist.
+    async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
         // If the ordered block is for the current epoch, verify the proof
         let epoch_state = self.get_epoch_state();
         let verified_ordered_proof =
@@ -850,6 +918,18 @@ impl ConsensusObserver {
         });
     }
 
+    /// Updates the metrics for the processed blocks
+    fn update_processed_blocks_metrics(&self) {
+        // Update the payload store metrics
+        self.block_payload_store.update_payload_store_metrics();
+
+        // Update the pending block metrics
+        self.pending_block_store.update_pending_blocks_metrics();
+
+        // Update the pending block metrics
+        self.pending_ordered_blocks.update_pending_blocks_metrics();
+    }
+
     /// Updates the subscription creation metrics for the given peer
     fn update_subscription_creation_metrics(&self, peer_network_id: PeerNetworkId) {
         // Set the number of active subscriptions
@@ -901,17 +981,18 @@ impl ConsensusObserver {
             panic!("Reconfig events are required to wait for a new epoch to start! Something has gone wrong!")
         };
 
-        // Update the local epoch state
+        // Update the local epoch state and quorum store config
         self.epoch_state = Some(epoch_state.clone());
+        self.quorum_store_enabled = consensus_config.quorum_store_enabled();
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "New epoch started: {}. Updated the epoch state!",
-                epoch_state.epoch
+                "New epoch started: {:?}. Updated the epoch state! Quorum store enabled: {:?}",
+                epoch_state.epoch, self.quorum_store_enabled,
             ))
         );
 
         // Create the payload manager
-        let payload_manager = if consensus_config.quorum_store_enabled() {
+        let payload_manager = if self.quorum_store_enabled {
             PayloadManager::ConsensusObserver(
                 self.block_payload_store.get_block_payloads(),
                 self.consensus_publisher.clone(),
@@ -1139,6 +1220,17 @@ async fn extract_on_chain_configs(
         execution_config,
         onchain_randomness_config,
     )
+}
+
+/// Logs the received message using an appropriate log level
+fn log_received_message(message: String) {
+    // Log the message at the appropriate level
+    let log_schema = LogSchema::new(LogEntry::ConsensusObserver).message(&message);
+    if LOG_MESSAGES_AT_INFO_LEVEL {
+        info!(log_schema);
+    } else {
+        debug!(log_schema);
+    }
 }
 
 /// Spawns a task to sync to the given commit decision and notifies

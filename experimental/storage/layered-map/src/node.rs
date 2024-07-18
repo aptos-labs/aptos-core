@@ -14,7 +14,7 @@ pub(crate) struct InternalNode<K, V> {
 #[derive(Debug)]
 pub(crate) struct LeafNode<K, V> {
     pub key: K,
-    pub value: Option<V>,
+    pub value: V,
     pub layer: u64,
 }
 
@@ -26,7 +26,7 @@ pub(crate) enum NodeRef<K, V> {
 }
 
 impl<K, V> NodeRef<K, V> {
-    pub fn new_leaf(key: K, value: Option<V>, layer: u64) -> Self {
+    pub fn new_leaf(key: K, value: V, layer: u64) -> Self {
         Self::Leaf(Ref::Strong(Arc::new(LeafNode { key, value, layer })))
     }
 
