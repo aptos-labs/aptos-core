@@ -124,6 +124,7 @@ impl Mempool {
         insertion_info: &InsertionInfo,
         bucket: &str,
         stage: &'static str,
+        priority: &str,
     ) {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             counters::core_mempool_txn_commit_latency(
@@ -131,19 +132,25 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 time_delta,
+                priority,
             );
         }
     }
 
     fn log_consensus_pulled_latency(&self, account: AccountAddress, sequence_number: u64) {
-        if let Some((insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket, priority)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
             let prev_count = insertion_info
                 .consensus_pulled_counter
                 .fetch_add(1, Ordering::Relaxed);
-            Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
+            Self::log_txn_latency(
+                insertion_info,
+                bucket,
+                counters::CONSENSUS_PULLED_LABEL,
+                priority.to_string().as_str(),
+            );
             counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
         }
     }
@@ -154,15 +161,15 @@ impl Mempool {
         sequence_number: u64,
         stage: &'static str,
     ) {
-        if let Some((insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket, priority)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_latency(insertion_info, bucket, stage);
+            Self::log_txn_latency(insertion_info, bucket, stage, priority.to_string().as_str());
         }
     }
 
-    fn log_commit_and_parked_latency(insertion_info: &InsertionInfo, bucket: &str) {
+    fn log_commit_and_parked_latency(insertion_info: &InsertionInfo, bucket: &str, priority: &str) {
         let parked_duration = if let Some(park_time) = insertion_info.park_time {
             let parked_duration = insertion_info
                 .ready_time
@@ -173,6 +180,7 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 parked_duration,
+                priority,
             );
             parked_duration
         } else {
@@ -189,6 +197,7 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 commit_minus_parked,
+                priority,
             );
         }
     }
@@ -199,12 +208,21 @@ impl Mempool {
         sequence_number: u64,
         block_timestamp: Duration,
     ) {
-        if let Some((insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket, priority)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_latency(insertion_info, bucket, counters::COMMIT_ACCEPTED_LABEL);
-            Self::log_commit_and_parked_latency(insertion_info, bucket);
+            Self::log_txn_latency(
+                insertion_info,
+                bucket,
+                counters::COMMIT_ACCEPTED_LABEL,
+                priority.to_string().as_str(),
+            );
+            Self::log_commit_and_parked_latency(
+                insertion_info,
+                bucket,
+                priority.to_string().as_str(),
+            );
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
@@ -214,6 +232,7 @@ impl Mempool {
                     insertion_info.submitted_by_label(),
                     bucket,
                     insertion_to_block,
+                    priority.to_string().as_str(),
                 );
             }
         }
@@ -258,7 +277,7 @@ impl Mempool {
             aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
         let txn_info = MempoolTransaction::new(
-            txn,
+            txn.clone(),
             expiration_time,
             ranking_score,
             timeline_state,
@@ -271,8 +290,8 @@ impl Mempool {
         let submitted_by_label = txn_info.insertion_info.submitted_by_label();
         let status = self.transactions.insert(txn_info);
 
-        if priority == BroadcastPeerPriority::Primary && status.code == MempoolStatusCode::Accepted
-        {
+        info!("txn added to mempool: {} {} status {}, priority {:?}, client_submitted {}, now: {:?}, inserted_at_sender {:?}, time_since: {:?}", txn.sender(), txn.sequence_number(), status, priority.clone(), client_submitted, now, insertion_time_at_sender, SystemTime::now().duration_since(insertion_time_at_sender.unwrap_or(SystemTime::now())));
+        if status.code == MempoolStatusCode::Accepted {
             if let Some(insertion_time_at_sender) = insertion_time_at_sender {
                 if let Ok(time_delta) = now.duration_since(insertion_time_at_sender) {
                     counters::core_mempool_txn_commit_latency(
@@ -280,6 +299,7 @@ impl Mempool {
                         submitted_by_label,
                         self.transactions.get_bucket(ranking_score),
                         time_delta,
+                        priority.to_string().as_str(),
                     );
                 }
             }

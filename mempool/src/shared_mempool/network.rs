@@ -34,6 +34,7 @@ use fail::fail_point;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
+    fmt::Display,
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -91,6 +92,15 @@ pub enum BroadcastError {
 pub enum BroadcastPeerPriority {
     Primary,
     Failover,
+}
+
+impl Display for BroadcastPeerPriority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BroadcastPeerPriority::Primary => write!(f, "Primary"),
+            BroadcastPeerPriority::Failover => write!(f, "Failover"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
