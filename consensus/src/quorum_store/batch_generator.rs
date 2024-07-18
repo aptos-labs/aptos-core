@@ -484,7 +484,7 @@ impl BatchGenerator {
                         if batches.len() as u64 >= self.config.minimum_batch_size
                             || (!batches.is_empty() && since_last_non_empty_pull_ms >= self.config.batch_generation_max_interval_ms) {
                             last_non_empty_pull = tick_start;
-
+                            pulled_txns_window.push_back((tick_start, batches.len() as u64));
                             let persist_start = Instant::now();
                             let mut persist_requests = vec![];
                             for batch in batches.clone().into_iter() {
