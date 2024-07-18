@@ -90,21 +90,21 @@ module aptos_framework::dkg {
 
     public(friend) fun ready_for_next_epoch(): bool acquires DKGState {
         if (!randomness_config::enabled()) {
-            return true;
+            return true
         };
 
         if (!exists<DKGState>(@aptos_framework)) {
-            return false;
+            return false
         };
 
         let maybe_session = &borrow_global<DKGState>(@aptos_framework).last_completed;
         if (option::is_none(maybe_session)) {
-            return false;
+            return false
         };
 
         let session = option::borrow(maybe_session);
         if (session.metadata.dealer_epoch != reconfiguration::current_epoch()) {
-            return false;
+            return false
         };
 
         true

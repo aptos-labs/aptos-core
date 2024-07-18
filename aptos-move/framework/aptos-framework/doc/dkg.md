@@ -316,21 +316,21 @@ Abort if a DKG is already in progress.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_ready_for_next_epoch">ready_for_next_epoch</a>(): bool <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
     <b>if</b> (!<a href="randomness_config.md#0x1_randomness_config_enabled">randomness_config::enabled</a>()) {
-        <b>return</b> <b>true</b>;
+        <b>return</b> <b>true</b>
     };
 
     <b>if</b> (!<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework)) {
-        <b>return</b> <b>false</b>;
+        <b>return</b> <b>false</b>
     };
 
     <b>let</b> maybe_session = &<b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).last_completed;
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(maybe_session)) {
-        <b>return</b> <b>false</b>;
+        <b>return</b> <b>false</b>
     };
 
     <b>let</b> session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_session);
     <b>if</b> (session.metadata.dealer_epoch != <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>()) {
-        <b>return</b> <b>false</b>;
+        <b>return</b> <b>false</b>
     };
 
     <b>true</b>

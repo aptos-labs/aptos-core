@@ -65,7 +65,7 @@ async fn raise_by_secret() {
     let my_secret = blstrs::Scalar::from(55555);
     let my_epk = blstrs::G1Affine::generator().mul(&my_secret);
     let my_epk_bytes = my_epk.to_compressed().to_vec();
-    let arg0 = format!("vector<u8>:0x{}", hex::encode(my_epk_bytes));
+    let arg0 = format!("hex:0x{}", hex::encode(my_epk_bytes));
     let txn_summary = cli
         .run_function(0, Some(gas_options), trigger_func_id.clone(), vec![arg0.as_str()], vec![])
         .await
@@ -76,7 +76,7 @@ async fn raise_by_secret() {
     let chain_pk = blstrs::G1Affine::from_compressed(&chain_pk_bytes).unwrap();
     let expected = chain_pk.mul(&my_secret);
     let expected_bytes = expected.to_compressed().to_vec();
-    let arg0 = format!("vector<u8>:0x{}", hex::encode(expected_bytes));
+    let arg0 = format!("hex:0x{}", hex::encode(expected_bytes));
     let vrfy_func_id = MemberId::from_str(&format!("{}::mpc_example::fetch_and_verify", account)).unwrap();
     info!("Wait for correct result.");
     let timer = Instant::now();

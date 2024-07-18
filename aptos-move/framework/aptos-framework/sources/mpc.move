@@ -56,29 +56,29 @@ module aptos_framework::mpc {
 
     public(friend) fun ready_for_next_epoch(): bool acquires State {
         if (!exists<FeatureEnabledFlag>(@aptos_framework)) {
-            return true;
+            return true
         };
 
         if (!exists<State>(@aptos_framework)) {
-            return false;
+            return false
         };
 
         let state = borrow_global<State>(@aptos_framework);
         let num_secrets = vector::length(&state.shared_secrets);
         if (num_secrets == 0) {
-            return false;
+            return false
         };
 
         let secret_state = vector::borrow(&state.shared_secrets, 0);
         let maybe_trx = &secret_state.transcript_for_next_epoch;
         if (option::is_none(maybe_trx)) {
-            return false;
+            return false
         };
 
         true
     }
 
-    public(friend) fun on_new_epoch(framework: &signer) {
+    public(friend) fun on_new_epoch(_framework: &signer) {
         //mpc todo: should clean up any in-progress session states.
     }
 
