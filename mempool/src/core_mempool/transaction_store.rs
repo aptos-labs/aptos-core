@@ -599,6 +599,16 @@ impl TransactionStore {
                             last_timeline_id[i] = timeline_id;
                         }
                         let bucket = self.timeline_index.get_bucket(txn.ranking_score);
+                        info!(
+                            "read_timeline: {} {}, time taken: {:?}, before: {:?}, high_time_taken: {}, priority: {}, submitted_by: {}",
+                            address,
+                            sequence_number,
+                            SystemTime::now().duration_since(txn.insertion_info.insertion_time),
+                            Instant::now().duration_since(before.unwrap_or(Instant::now())),
+                            SystemTime::now().duration_since(txn.insertion_info.insertion_time).unwrap() > Duration::from_millis(15),
+                            txn.priority_of_sender.to_string().as_str(),
+                            txn.insertion_info.submitted_by_label(),
+                        );
                         Mempool::log_txn_latency(
                             &txn.insertion_info,
                             bucket,
