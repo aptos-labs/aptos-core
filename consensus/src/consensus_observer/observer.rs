@@ -12,7 +12,7 @@ use crate::{
             BlockPayload, CommitDecision, ConsensusObserverDirectSend, ConsensusObserverMessage,
             ConsensusObserverRequest, ConsensusObserverResponse, OrderedBlock,
         },
-        ordered_blocks::PendingOrderedBlocks,
+        ordered_blocks::OrderedBlockStore,
         payload_store::BlockPayloadStore,
         pending_blocks::PendingBlockStore,
         publisher::ConsensusPublisher,
@@ -78,12 +78,12 @@ pub struct ConsensusObserver {
     // The latest ledger info (updated via a callback)
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
 
-    // The payload store holds block transaction payloads
+    // The block payload store holds block transaction payloads
     block_payload_store: BlockPayloadStore,
+    // The ordered block store holds ordered blocks that are ready for execution
+    ordered_block_store: OrderedBlockStore,
     // The pending block store holds pending blocks that are without payloads
     pending_block_store: PendingBlockStore,
-    // The pending ordered blocks (these are also ordered when in state sync mode)
-    pending_ordered_blocks: PendingOrderedBlocks,
     // The execution client to the buffer manager
     execution_client: Arc<dyn TExecutionClient>,
 
@@ -129,9 +129,9 @@ impl ConsensusObserver {
             epoch_state: None,
             quorum_store_enabled: false, // Updated on epoch changes
             root: Arc::new(Mutex::new(root)),
+            ordered_block_store: OrderedBlockStore::new(consensus_observer_config),
             block_payload_store: BlockPayloadStore::new(consensus_observer_config),
             pending_block_store: PendingBlockStore::new(consensus_observer_config),
-            pending_ordered_blocks: PendingOrderedBlocks::new(consensus_observer_config),
             execution_client,
             sync_handle: None,
             sync_notification_sender,
@@ -264,7 +264,7 @@ impl ConsensusObserver {
         self.pending_block_store.clear_missing_blocks();
 
         // Clear the ordered blocks
-        self.pending_ordered_blocks.clear_all_pending_blocks();
+        self.ordered_block_store.clear_all_ordered_blocks();
 
         // Reset the execution pipeline for the root
         let root = self.root.lock().clone();
@@ -282,7 +282,7 @@ impl ConsensusObserver {
     fn create_commit_callback(&self) -> StateComputerCommitCallBackType {
         // Clone the root, pending blocks and payload store
         let root = self.root.clone();
-        let pending_ordered_blocks = self.pending_ordered_blocks.clone();
+        let pending_ordered_blocks = self.ordered_block_store.clone();
         let block_payload_store = self.block_payload_store.clone();
 
         // Create the commit callback
@@ -473,7 +473,7 @@ impl ConsensusObserver {
 
     /// Returns the last known block
     fn get_last_block(&self) -> BlockInfo {
-        if let Some(last_pending_block) = self.pending_ordered_blocks.get_last_pending_block() {
+        if let Some(last_pending_block) = self.ordered_block_store.get_last_ordered_block() {
             last_pending_block
         } else {
             // Return the root ledger info
@@ -639,7 +639,7 @@ impl ConsensusObserver {
             *self.root.lock() = commit_decision.commit_proof().clone();
             self.block_payload_store
                 .remove_blocks_for_epoch_round(commit_decision_epoch, commit_decision_round);
-            self.pending_ordered_blocks
+            self.ordered_block_store
                 .remove_blocks_for_commit(commit_decision.commit_proof());
 
             // Start the state sync process
@@ -660,8 +660,8 @@ impl ConsensusObserver {
     fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
         // Get the pending block for the commit decision
         let pending_block = self
-            .pending_ordered_blocks
-            .get_verified_pending_block(commit_decision.epoch(), commit_decision.round());
+            .ordered_block_store
+            .get_ordered_block(commit_decision.epoch(), commit_decision.round());
 
         // Process the pending block
         if let Some(pending_block) = pending_block {
@@ -673,7 +673,7 @@ impl ConsensusObserver {
                         commit_decision.proof_block_info()
                     ))
                 );
-                self.pending_ordered_blocks
+                self.ordered_block_store
                     .update_commit_decision(commit_decision);
 
                 // If we are not in sync mode, forward the commit decision to the execution pipeline
@@ -803,41 +803,45 @@ impl ConsensusObserver {
     /// Processes the ordered block. This assumes the ordered block
     /// has been sanity checked and that all payloads exist.
     async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
-        // If the ordered block is for the current epoch, verify the proof
+        // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
-        let verified_ordered_proof =
-            if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
-                // Verify the ordered proof
-                if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
-                    warn!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Failed to verify ordered proof! Ignoring: {:?}, Error: {:?}",
-                            ordered_block.proof_block_info(),
-                            error
-                        ))
-                    );
-                    return;
-                }
+        if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
+            if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Failed to verify ordered proof! Ignoring: {:?}, Error: {:?}",
+                        ordered_block.proof_block_info(),
+                        error
+                    ))
+                );
+                return;
+            }
+        } else {
+            // Drop the block and log an error (the block should always be for the current epoch)
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Received ordered block for a different epoch! Ignoring: {:?}",
+                    ordered_block.proof_block_info()
+                ))
+            );
+            return;
+        };
 
-                true // We have successfully verified the proof
-            } else {
-                false // We can't verify the proof yet
-            };
-
-        // If the block is a child of our last block, we can insert it
+        // The block was verified correctly. If the block is a child of our
+        // last block, we can insert it into the ordered block store.
         if self.get_last_block().id() == ordered_block.first_block().parent_id() {
             // Insert the ordered block into the pending blocks
-            self.pending_ordered_blocks
-                .insert_ordered_block(ordered_block.clone(), verified_ordered_proof);
+            self.ordered_block_store
+                .insert_ordered_block(ordered_block.clone());
 
-            // If we verified the proof, and we're not in sync mode, finalize the ordered blocks
-            if verified_ordered_proof && !self.in_state_sync_mode() {
+            // If we're not in sync mode, finalize the ordered blocks
+            if !self.in_state_sync_mode() {
                 self.finalize_ordered_block(ordered_block).await;
             }
         } else {
             warn!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Parent block is missing! Ignoring: {:?}",
+                    "Parent block for ordered block is missing! Ignoring: {:?}",
                     ordered_block.proof_block_info()
                 ))
             );
@@ -925,9 +929,8 @@ impl ConsensusObserver {
         self.sync_handle = None;
 
         // Process all the newly ordered blocks
-        for (_, (ordered_block, commit_decision)) in self
-            .pending_ordered_blocks
-            .get_all_verified_pending_blocks()
+        for (_, (ordered_block, commit_decision)) in
+            self.ordered_block_store.get_all_ordered_blocks()
         {
             // Finalize the ordered block
             self.finalize_ordered_block(ordered_block).await;
@@ -1029,7 +1032,7 @@ impl ConsensusObserver {
         self.pending_block_store.update_pending_blocks_metrics();
 
         // Update the pending block metrics
-        self.pending_ordered_blocks.update_pending_blocks_metrics();
+        self.ordered_block_store.update_ordered_blocks_metrics();
     }
 
     /// Updates the subscription creation metrics for the given peer
