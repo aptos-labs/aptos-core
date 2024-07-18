@@ -10,8 +10,11 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_consensus_types::{
-    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    timeout_2chain::TwoChainTimeoutCertificate, wrapped_ledger_info::WrappedLedgerInfo,
+    block::Block,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    quorum_cert::QuorumCert,
+    timeout_2chain::TwoChainTimeoutCertificate,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -75,6 +78,8 @@ pub struct BlockTree {
     ordered_root_id: HashValue,
     /// Commit Root id: this is the root of commit phase
     commit_root_id: HashValue,
+    /// Window Root id: this is the `parent_id` of the first item in the [`OrderedBlockWindow`](OrderedBlockWindow)
+    window_root_id: HashValue,
     /// A certified block id with highest round
     highest_certified_block_id: HashValue,
 
@@ -92,31 +97,30 @@ pub struct BlockTree {
     pruned_block_ids: VecDeque<HashValue>,
     /// Num pruned blocks to keep in memory.
     max_pruned_blocks_in_mem: usize,
-
     /// Round to Block index. We expect only one block per round.
     round_to_ids: BTreeMap<Round, HashValue>,
 }
 
 impl BlockTree {
     pub(super) fn new(
-        root: PipelinedBlock,
+        root_block_id: HashValue,
+        // TODO: need the certs?
+        window_root: PipelinedBlock,
         root_quorum_cert: QuorumCert,
         root_ordered_cert: WrappedLedgerInfo,
         root_commit_cert: WrappedLedgerInfo,
         max_pruned_blocks_in_mem: usize,
         highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     ) -> Self {
-        assert_eq!(
-            root.id(),
-            root_ordered_cert.commit_info().id(),
-            "inconsistent root and ledger info"
-        );
-        let root_id = root.id();
+        assert_eq!(window_root.epoch(), root_ordered_cert.commit_info().epoch());
+        assert!(window_root.round() <= root_ordered_cert.commit_info().round());
+        let window_root_id = window_root.id();
 
+        // Build the tree from the window root block which is <= the commit root block.
         let mut id_to_block = HashMap::new();
         let mut round_to_ids = BTreeMap::new();
-        round_to_ids.insert(root.round(), root_id);
-        id_to_block.insert(root_id, LinkableBlock::new(root));
+        round_to_ids.insert(window_root.round(), window_root_id);
+        id_to_block.insert(window_root_id, LinkableBlock::new(window_root));
         counters::NUM_BLOCKS_IN_TREE.set(1);
 
         let root_quorum_cert = Arc::new(root_quorum_cert);
@@ -130,9 +134,10 @@ impl BlockTree {
 
         BlockTree {
             id_to_block,
-            ordered_root_id: root_id,
-            commit_root_id: root_id, // initially we set commit_root_id = root_id
-            highest_certified_block_id: root_id,
+            ordered_root_id: root_block_id,
+            commit_root_id: root_block_id, // initially we set commit_root_id = root_id
+            window_root_id,
+            highest_certified_block_id: root_block_id,
             highest_quorum_cert: Arc::clone(&root_quorum_cert),
             highest_ordered_cert: Arc::new(root_ordered_cert),
             highest_commit_cert: Arc::new(root_commit_cert),
@@ -172,7 +177,13 @@ impl BlockTree {
             .expect("Root must exist")
     }
 
+    fn linkable_window_root(&self) -> &LinkableBlock {
+        self.get_linkable_block(&self.window_root_id)
+            .expect("Window root must exist")
+    }
+
     fn remove_block(&mut self, block_id: HashValue) {
+        info!("remove_block: {}", block_id);
         // Remove the block from the store
         if let Some(block) = self.id_to_block.remove(&block_id) {
             let round = block.executed_block().round();
@@ -239,6 +250,114 @@ impl BlockTree {
         self.id_to_quorum_cert.get(block_id).cloned()
     }
 
+    pub(super) fn window_root(&self) -> Arc<PipelinedBlock> {
+        self.get_block(&self.window_root_id)
+            .expect("Window root not found")
+    }
+
+    // TODO: return an error when not enough blocks?
+    // TODO: how to know if the window is complete?
+    /// Retrieves a Window of Recent Blocks
+    ///
+    /// Returns an [`OrderedBlockWindow`](OrderedBlockWindow) containing the previous `window_size`
+    /// blocks, EXCLUDING the provided `current_block`. Returns an `OrderedBlockWindow` containing
+    /// the recent blocks in ascending order by round (oldest -> newest).
+    ///
+    /// # Parameters
+    /// - `current_block`: The reference block to base the window on.
+    /// - `window_size`: The number of recent blocks to include in the window, excluding the `current_block`.
+    ///
+    /// # Example
+    /// Given a `current_block` with `round: 30` and a `window_size` of 3:
+    ///
+    /// ```text
+    /// get_block_window(current_block, window_size)
+    /// // returns vec![
+    /// //     Block { BlockData { round: 28 } },
+    /// //     Block { BlockData { round: 29 } }
+    /// // ]
+    /// ```
+    ///
+    /// *Note*: The output vector in this example contains 2 blocks, not 3, as only blocks with rounds
+    /// preceding `current_block.round()` are included.
+    pub fn get_ordered_block_window(
+        &self,
+        block: &Block,
+        window_size: usize,
+    ) -> Option<OrderedBlockWindow> {
+        // TODO: any other special cases that need to always have an empty window?
+        if block.is_nil_block() {
+            return Some(OrderedBlockWindow::new(vec![]));
+        }
+
+        // TODO Currently we do not check to see if the `block` provided exists in the `BlockTree`
+        // See `insert_block()` for more context.
+        //
+        // It's a little strange because you can call `get_block_window` with a recently pruned block,
+        // and it will return a seemingly valid OrderedBlockWindow... which is a bit unintuitive.
+        // Maybe rename this function or scope it to be non-public to not confuse people in the future.
+        // Revisit this later
+
+        let round = block.round();
+        let window_start_round = (round + 1).saturating_sub(window_size as u64);
+        let window_size = (round + 1) - window_start_round;
+        assert!(window_size > 0, "window_size must be greater than 0");
+        if window_size == 1 {
+            return Some(OrderedBlockWindow::new(vec![]));
+        }
+
+        let mut window = vec![];
+        let mut current_block = block.clone();
+        loop {
+            if current_block.parent_id() == HashValue::zero() {
+                info!(
+                    "Break at block: {}, for window of block: {}",
+                    current_block, block
+                );
+                break;
+            }
+            if let Some(parent_block) = self.get_block(&current_block.parent_id()) {
+                current_block = parent_block.block().clone();
+                info!(
+                    "Visiting block: {}, for window of block: {}",
+                    current_block, block
+                );
+                // Note: This is not less than or equal to so that we exclude the current block
+                if current_block.round() < window_start_round {
+                    info!(
+                        "Break at block: {}, for window of block: {}",
+                        current_block, block
+                    );
+                    break;
+                }
+                if current_block.is_genesis_block() {
+                    info!(
+                        "Break at genesis block: {}, for window of block: {}",
+                        current_block, block
+                    );
+                    break;
+                }
+                info!(
+                    "Added block: {}, for window of block: {}",
+                    current_block, block
+                );
+                window.push(parent_block);
+            } else {
+                info!(
+                    "Visiting block: {} was not found, parent of block: {}, for window of block: {}",
+                    current_block.parent_id(),
+                    current_block,
+                    block
+                );
+                return None;
+            }
+        }
+        // The window order is lower round -> higher round
+        window.reverse();
+        assert!(window.len() < window_size as usize);
+        Some(OrderedBlockWindow::new(window))
+    }
+
     pub(super) fn insert_block(
         &mut self,
         block: PipelinedBlock,
@@ -277,6 +396,12 @@ impl BlockTree {
         if new_commit_cert.commit_info().round() > self.highest_commit_cert.commit_info().round() {
             self.highest_commit_cert = Arc::new(new_commit_cert);
             self.update_commit_root(self.highest_commit_cert.commit_info().id());
+        } else {
+            warn!(
+                "Trying to update highest commit cert with lower round: {} <= {}",
+                new_commit_cert.commit_info().round(),
+                self.highest_commit_cert.commit_info().round()
+            );
         }
     }
 
@@ -336,20 +461,33 @@ impl BlockTree {
     /// B3--> B4, root = B3
     ///
     /// Note this function is read-only, use with process_pruned_blocks to do the actual prune.
-    pub(super) fn find_blocks_to_prune(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
-        // Nothing to do if this is the commit root
-        if next_root_id == self.commit_root_id {
+    pub(super) fn find_blocks_to_prune(
+        &self,
+        next_window_root_id: HashValue,
+    ) -> VecDeque<HashValue> {
+        // Nothing to do if this is the window root
+        if next_window_root_id == self.window_root_id {
             return VecDeque::new();
         }
 
+        // TODO revisit potentially...
+        // Given the commit root and the window root, use the root with the min round
+        // let min_root = if self.commit_root().round() < self.window_root().round() {
+        //     self.linkable_root()
+        // } else {
+        //     self.linkable_window_root()
+        // };
+
         let mut blocks_pruned = VecDeque::new();
-        let mut blocks_to_be_pruned = vec![self.linkable_root()];
+        let mut blocks_to_be_pruned = vec![self.linkable_window_root()];
+
         while let Some(block_to_remove) = blocks_to_be_pruned.pop() {
             block_to_remove.executed_block().abort_pipeline();
+            block_to_remove.executed_block.block_window().clear();
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
             for child_id in block_to_remove.children() {
-                if next_root_id == *child_id {
+                if next_window_root_id == *child_id {
                     continue;
                 }
                 blocks_to_be_pruned.push(
@@ -371,6 +509,51 @@ impl BlockTree {
     pub(super) fn update_commit_root(&mut self, root_id: HashValue) {
         assert!(self.block_exists(&root_id));
         self.commit_root_id = root_id;
+    }
+
+    pub(super) fn update_window_root(&mut self, root_id: HashValue) {
+        assert!(
+            self.block_exists(&root_id),
+            "Block {} not found, previous window_root: {}",
+            root_id,
+            self.window_root_id
+        );
+        self.window_root_id = root_id;
+    }
+
+    /// `window_root` is the parent_id of the first block in the [OrderedBlockWindow](OrderedBlockWindow)
+    ///
+    /// ```text
+    ///              ┌──────────────────┐
+    ///  Genesis ──> │ A1 ──> A2 ──> A3 │ ──> A4
+    ///              └──────────────────┘
+    ///      ↑                 ↑               ↑
+    /// window_root      block_window   block_to_commit
+    /// ```
+    pub(super) fn find_window_root(
+        &self,
+        block_to_commit_id: HashValue,
+        window_size: usize,
+    ) -> HashValue {
+        assert_ne!(window_size, 0, "Window size must be greater than 0");
+
+        // Try to get the block, then the ordered window, then the first block's parent ID
+        let block = self
+            .get_block(&block_to_commit_id)
+            .expect("Block not found");
+        let ordered_block_window = self
+            .get_ordered_block_window(block.block(), window_size)
+            .expect("Ordered block window not found");
+        let pipelined_blocks = ordered_block_window.pipelined_blocks();
+        let first_block = pipelined_blocks
+            .iter()
+            .chain(std::iter::once(&block))
+            .next()
+            .expect("Ordered block window not found");
+        let parent_block = self
+            .get_linkable_block(&first_block.parent_id())
+            .expect("Parent block not found");
+        parent_block.id()
     }
 
     /// Process the data returned by the prune_tree, they're separated because caller might
@@ -455,7 +638,10 @@ impl BlockTree {
         blocks_to_commit: &[Arc<PipelinedBlock>],
         finality_proof: WrappedLedgerInfo,
         commit_decision: LedgerInfoWithSignatures,
+        window_size: usize,
     ) {
+        info!("commit_callback blocks_to_commit: {:?}", blocks_to_commit);
+
         let commit_proof = finality_proof
             .create_merged_with_executed_state(commit_decision)
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
@@ -465,7 +651,17 @@ impl BlockTree {
         let block_id = last_block.id();
         let block_round = last_block.round();
 
-        self.commit_callback(storage, block_id, block_round, commit_proof);
+        // TODO blocks_to_commit changed from being a single block to a vector of blocks after
+        // Zekun's pipeline commit. Make sure this is rebased correctly and the last block can
+        // be used here for find_window_root
+        //
+        // For posterity, since this calls commit_callback() I will be moving:
+        // 1. the update_window_root() call to the commit_callback() function so that others
+        // calling commit_callback instead of commit_callback_deprecated are updating the window root
+        // 2. storage.prune_tree() function to only the commit_callback() function instead of both
+        // commit_callback() and commit_callback_deprecated()
+
+        self.commit_callback(storage, block_id, block_round, commit_proof, window_size);
     }
 
     pub fn commit_callback(
@@ -474,6 +670,7 @@ impl BlockTree {
         block_id: HashValue,
         block_round: Round,
         commit_proof: WrappedLedgerInfo,
+        window_size: usize,
     ) {
         let current_round = self.commit_root().round();
         let committed_round = block_round;
@@ -484,13 +681,17 @@ impl BlockTree {
             block_id = block_id,
         );
 
-        let ids_to_remove = self.find_blocks_to_prune(block_id);
+        let window_root_id = self.find_window_root(block_id, window_size);
+        let ids_to_remove = self.find_blocks_to_prune(window_root_id);
+
+        info!("Pruning blocks: {:?}", ids_to_remove);
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with
             // executor.
             warn!(error = ?e, "fail to delete block");
         }
+        self.update_window_root(window_root_id);
         self.process_pruned_blocks(ids_to_remove);
         self.update_highest_commit_cert(commit_proof);
     }
