@@ -475,15 +475,15 @@ impl BatchGenerator {
                             self.config.sender_max_total_txns as u64,
                         );
                         let batches = self.handle_scheduled_pull(pull_max_txn).await;
-
-                        info!("pulled_txns_window: {:?}, current_time: {:?}, pulled_in_last_sec: {}, pull_max_txn: {}, batch size: {}", pulled_txns_window, Instant::now(), pulled_in_last_sec, pull_max_txn, batches.len());
+                        let num_txns_in_batches: u64 = batches.iter().map(|b| b.batch_info().num_txns()).sum();
+                        info!("pulled_txns_window: {:?}, current_time: {:?}, pulled_in_last_sec: {}, pull_max_txn: {}, batch size: {}, num_txns_in_batches: {}", pulled_txns_window, Instant::now(), pulled_in_last_sec, pull_max_txn, batches.len(), num_txns_in_batches);
 
                         // Ignore the batch if batch is smaller than minimum batch size and pull again in 25ms
                         // If a batch hasn't been created for a while, send it out even if it's smaller than minimum batch size
-                        if batches.len() as u64 >= self.config.minimum_batch_size
+                        if num_txns_in_batches as u64 >= self.config.minimum_batch_size
                             || (!batches.is_empty() && since_last_non_empty_pull_ms >= self.config.batch_generation_max_interval_ms) {
                             last_non_empty_pull = tick_start;
-                            pulled_txns_window.push_back((tick_start, batches.len() as u64));
+                            pulled_txns_window.push_back((tick_start, num_txns_in_batches as u64));
                             let persist_start = Instant::now();
                             let mut persist_requests = vec![];
                             for batch in batches.clone().into_iter() {
