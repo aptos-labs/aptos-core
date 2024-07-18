@@ -224,11 +224,13 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     where
     {
         let mut a_bytes: [u8; 32] = [0; 32];
-        rng.fill_bytes(&mut a_bytes);
-        let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
-        let mut b_bytes: [u8; 32] = [0; 32];
-        rng.fill_bytes(&mut b_bytes);
-        let b = E::ScalarField::from_random_bytes(&b_bytes).unwrap();
+        //rng.fill_bytes(&mut a_bytes);
+        //let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
+        let a = Self::generate_random_scalar(rng);
+        let b = Self::generate_random_scalar(rng);
+        //let mut b_bytes: [u8; 32] = [0; 32];
+        //rng.fill_bytes(&mut b_bytes);
+        //let b = E::ScalarField::from_random_bytes(&b_bytes).unwrap();
         //let a = E::ScalarField::rand(rng);
         //let b = E::ScalarField::rand(rng);
 
@@ -356,9 +358,10 @@ where
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
         //let a = E::ScalarField::rand(&mut rng);
-        let mut a_bytes: [u8; 32] = [0; 32];
-        rng.fill_bytes(&mut a_bytes);
-        let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
+        //let mut a_bytes: [u8; 32] = [0; 32];
+        //rng.fill_bytes(&mut a_bytes);
+        //let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
+        let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
