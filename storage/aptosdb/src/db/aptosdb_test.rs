@@ -241,25 +241,32 @@ fn test_revert_single_commit() {
     assert_eq!(db.get_synced_version().unwrap(), pre_revert_version);
 
     // Get the latest ledger info before revert
-    let latest_ledger_info_before_revert = blocks[1].1.clone();
-    let version_to_revert_to = latest_ledger_info_before_revert.commit_info().version();
+    let revert_ledger_info = blocks[1].1.clone();
+    let version_to_revert_to = revert_ledger_info.commit_info().version();
 
     // Revert the last commit
-    db.revert_commit(&latest_ledger_info_before_revert).unwrap();
+    db.revert_commit(&revert_ledger_info).unwrap();
 
     assert_eq!(db.get_synced_version().unwrap(), version_to_revert_to);
     let ledger_info = db.get_latest_ledger_info().unwrap();
-    assert_eq!(ledger_info, latest_ledger_info_before_revert);
+    assert_eq!(ledger_info, revert_ledger_info);
+
+    // Check the ledger database has been cleaned up.
+    let event_db = db.ledger_db.event_db();
     let tx_acc_db = db.ledger_db.transaction_accumulator_db();
     for i in version_to_revert_to + 1..=pre_revert_version {
         let _ = tx_acc_db
             .get_root_hash(i)
             .expect_err(&format!("expected no state for {i}"));
+        let events = event_db.get_events_by_version(i).unwrap();
+        assert!(events.is_empty(), "events not removed for version {i}")
     }
+
+    // Check consistency of the transaction accumulator DB
     let root_hash = tx_acc_db.get_root_hash(version_to_revert_to).unwrap();
     assert_eq!(
         root_hash,
-        latest_ledger_info_before_revert
+        revert_ledger_info
             .commit_info()
             .executed_state_id()
     );
@@ -315,20 +322,42 @@ fn test_revert_nth_commit() {
     }
 
     // Check expected before revert commit
-    let expected_version = cur_ver - 1;
-    assert_eq!(db.get_synced_version().unwrap(), expected_version);
+    let pre_revert_version = cur_ver - 1;
+    assert_eq!(db.get_synced_version().unwrap(), pre_revert_version);
 
     // Get the 3rd block back from the latest block
     let revert_block_num = blockheight - 3;
     let revert = committed_blocks.get(&revert_block_num).unwrap();
-    let pre_revert_ledger_info = committed_blocks[&(revert_block_num - 1)].info.clone();
+    let revert_ledger_info = committed_blocks[&(revert_block_num - 1)].info.clone();
 
     // Get the version to revert to
-    let version_to_revert = revert.first_version;
+    let version_to_revert_to = revert.first_version - 1;
 
-    db.revert_commit(&pre_revert_ledger_info).unwrap();
+    db.revert_commit(&revert_ledger_info).unwrap();
 
-    assert_eq!(db.get_synced_version().unwrap(), version_to_revert - 1);
+    assert_eq!(db.get_synced_version().unwrap(), version_to_revert_to);
+    let ledger_info = db.get_latest_ledger_info().unwrap();
+    assert_eq!(ledger_info, revert_ledger_info);
+
+    // Check the ledger database has been cleaned up.
+    let event_db = db.ledger_db.event_db();
+    let tx_acc_db = db.ledger_db.transaction_accumulator_db();
+    for i in version_to_revert_to + 1..=pre_revert_version {
+        let _ = tx_acc_db
+            .get_root_hash(i)
+            .expect_err(&format!("expected no state for {i}"));
+        let events = event_db.get_events_by_version(i).unwrap();
+        assert!(events.is_empty(), "events not removed for version {i}")
+    }
+
+    // Check consistency of the transaction accumulator DB
+    let root_hash = tx_acc_db.get_root_hash(version_to_revert_to).unwrap();
+    assert_eq!(
+        root_hash,
+        revert_ledger_info
+            .commit_info()
+            .executed_state_id()
+    );
 }
 
 pub fn test_state_merkle_pruning_impl(
