@@ -285,6 +285,7 @@ impl NodeSetup {
             10,
             Arc::from(DirectMempoolPayloadManager::new()),
             false,
+            1,
             Arc::new(Mutex::new(PendingBlocks::new())),
         ));
 
@@ -359,7 +360,10 @@ impl NodeSetup {
     pub fn restart(self, playground: &mut NetworkPlayground, executor: Handle) -> Self {
         let recover_data = self
             .storage
-            .try_start(self.onchain_consensus_config.order_vote_enabled())
+            .try_start(
+                self.onchain_consensus_config.order_vote_enabled(),
+                self.onchain_consensus_config.window_size(),
+            )
             .unwrap_or_else(|e| panic!("fail to restart due to: {}", e));
         Self::new(
             playground,
