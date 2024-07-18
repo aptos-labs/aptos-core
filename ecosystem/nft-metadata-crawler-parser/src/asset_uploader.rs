@@ -170,9 +170,9 @@ impl AssetUploaderContext {
                 }
 
                 // Use exponential backoff to try again
-                return Err(backoff::Error::transient(anyhow::anyhow!(
+                Err(backoff::Error::transient(anyhow::anyhow!(
                     "Failed to upload asset to Cloudflare"
-                )));
+                )))
             }
             .boxed()
         };
@@ -199,7 +199,6 @@ impl AssetUploaderContext {
             let self_clone = self_clone.clone();
             let asset_uri = url.to_string();
             tasks.push(tokio::spawn(async move {
-
                 match self_clone.upload_asset(url.clone()).await {
                     Ok(cdn_url) => {
                         info!(
