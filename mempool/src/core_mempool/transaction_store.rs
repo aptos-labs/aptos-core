@@ -571,6 +571,8 @@ impl TransactionStore {
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
+        // The priority of the receipient of the transactions
+        priority_of_receiver: BroadcastPeerPriority,
     ) -> (
         Vec<(SignedTransaction, SystemTime)>,
         MultiBucketTimelineIndexIds,
@@ -613,7 +615,7 @@ impl TransactionStore {
                             &txn.insertion_info,
                             bucket,
                             BROADCAST_BATCHED_LABEL,
-                            txn.priority_of_sender.to_string().as_str(),
+                            priority_of_receiver.to_string().as_str(),
                         );
                         counters::core_mempool_txn_ranking_score(
                             BROADCAST_BATCHED_LABEL,

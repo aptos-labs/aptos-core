@@ -452,6 +452,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                         &state.timeline_id,
                         self.mempool_config.shared_mempool_batch_size,
                         before,
+                        peer_priority,
                     );
                     (
                         MultiBatchId::from_timeline_ids(&state.timeline_id, &new_timeline_id),

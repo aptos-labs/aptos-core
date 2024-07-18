@@ -502,11 +502,13 @@ impl Mempool {
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
+        priority_of_receiver: BroadcastPeerPriority,
     ) -> (
         Vec<(SignedTransaction, SystemTime)>,
         MultiBucketTimelineIndexIds,
     ) {
-        self.transactions.read_timeline(timeline_id, count, before)
+        self.transactions
+            .read_timeline(timeline_id, count, before, priority_of_receiver)
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive),
