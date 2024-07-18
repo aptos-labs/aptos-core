@@ -6,7 +6,7 @@ use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_ff::Field;
 use ark_relations::r1cs::{ConstraintSynthesizer, SynthesisError};
-use rand::RngCore;
+use rand::{RngCore, Rng};
 use ark_std::{
     rand::SeedableRng,
     test_rng, UniformRand,
@@ -15,7 +15,7 @@ use ark_std::{marker::PhantomData, vec::Vec};
 use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP};
 use ark_groth16::data_structures::{VerifyingKey, Proof};
 use ark_serialize::*;
-use ark_std::rand::Rng;
+//use ark_std::rand::Rng;
 use ark_relations::r1cs::Result as R1CSResult;
 use ark_ec::{AffineRepr,CurveGroup};
 use ark_ff::PrimeField;
@@ -59,36 +59,51 @@ pub struct Trapdoor<E: Pairing> {
     pub g2: E::G2Affine,
 }
 
+
 impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
 {
+    fn generate_random_scalar<R: RngCore>(rng: &mut R) -> E::ScalarField {
+        let mut scalar = None;
+        while scalar.is_none() {
+            let mut bytes: [u8; 32] = [0; 32];
+            rng.fill_bytes(&mut bytes);
+            scalar = E::ScalarField::from_random_bytes(&bytes);
+        }
+        scalar.unwrap()
+    }
+
+    fn generate_random_g1_elem<R: RngCore>(rng: &mut R) -> E::G1Affine {
+        let mut elem = None;
+        while elem.is_none() {
+            let mut bytes: [u8; 32] = [0; 32];
+            rng.fill_bytes(&mut bytes);
+            elem = E::G1Affine::from_random_bytes(&bytes);
+        }
+        elem.unwrap()
+    }
+
+    fn generate_random_g2_elem<R: RngCore>(rng: &mut R) -> E::G2Affine {
+        let mut elem = None;
+        while elem.is_none() {
+            let mut bytes: [u8; 32] = [0; 32];
+            rng.fill_bytes(&mut bytes);
+            elem = E::G2Affine::from_random_bytes(&bytes);
+        }
+        elem.unwrap()
+    }
+
     fn circuit_agnostic_setup_with_trapdoor<R: RngCore>(
         rng: &mut R,
         num_public_inputs: u32,
     ) -> Result<(Trapdoor<E>, VerifyingKey<E>), SynthesisError> {
-        let mut alpha_bytes: [u8; 32];
-        rng.fill_bytes(&mut alpha_bytes);
-        let alpha = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
-        let beta_bytes: [u8; 32];
-        rng.fill_bytes(&mut beta_bytes);
-        let beta = E::ScalarField::from_random_bytes(&beta_bytes).unwrap();
-        let gamma_bytes: [u8; 32];
-        rng.fill_bytes(&mut gamma_bytes);
-        let gamma = E::ScalarField::from_random_bytes(&gamma_bytes).unwrap();
-        let delta_bytes: [u8; 32];
-        rng.fill_bytes(&mut delta_bytes);
-        let delta = E::ScalarField::from_random_bytes(&delta_bytes).unwrap();
-        let g1_gen_bytes: [u8; 32];
-        rng.fill_bytes(&mut g1_gen_bytes);
-        let g1_generator = E::G1Affine::from_random_bytes(&g1_gen_bytes).unwrap();
-        let g2_gen_bytes: [u8; 32];
-        rng.fill_bytes(&mut g2_gen_bytes);
-        let g2_generator = E::G2Affine::from_random_bytes(&g2_gen_bytes).unwrap();
-        /*let alpha = E::ScalarField::rand(rng);
-        let beta = E::ScalarField::rand(rng);
-        let gamma = E::ScalarField::rand(rng);
-        let delta = E::ScalarField::rand(rng);
-        let g1_generator = E::G1::rand(rng);
-        let g2_generator = E::G2::rand(rng);*/
+        let alpha = Self::generate_random_scalar(rng);
+        let beta = Self::generate_random_scalar(rng);
+        let gamma = Self::generate_random_scalar(rng);
+        let delta = Self::generate_random_scalar(rng);
+
+        let g1_generator = Self::generate_random_g1_elem(rng);
+        let g2_generator = Self::generate_random_g2_elem(rng);
+
         let alpha_g1 = g1_generator * alpha;
         let beta_g2 = g2_generator * beta;
         let gamma_g2 = g2_generator * gamma;
@@ -97,18 +112,9 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         let mut gamma_abc_g1 = Vec::new();
 
         for _i in 0..num_public_inputs+1 {
-            let mut a_bytes: [u8; 32];
-            rng.fill_bytes(&mut a_bytes);
-            let a = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
-            let mut b_bytes: [u8; 32];
-            rng.fill_bytes(&mut b_bytes);
-            let b = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
-            let mut c_bytes: [u8; 32];
-            rng.fill_bytes(&mut c_bytes);
-            let c = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
-            //let a = E::ScalarField::rand(rng);
-            //let b = E::ScalarField::rand(rng);
-            //let c = E::ScalarField::rand(rng);
+            let a = Self::generate_random_scalar(rng);
+            let b = Self::generate_random_scalar(rng);
+            let c = Self::generate_random_scalar(rng);
             let mut acc = beta * a + alpha * b + c;
             acc = acc * gamma.inverse().unwrap();
             let gamma_abc_g1_i = g1_generator * acc;
@@ -136,16 +142,16 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         Ok((pk, vk))
     }
 
-    fn circuit_specific_setup_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
+    /*fn circuit_specific_setup_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
         circuit: C,
         rng: &mut R,
     ) -> Result<(Trapdoor<E>, VerifyingKey<E>), SynthesisError> {
         let (pk, vk) = Self::generate_random_parameters_and_trapdoor_with_reduction(circuit, rng)?;
 
         Ok((pk, vk))
-    }
+    }*/
 
-    /// Generates a random common reference string for
+    /*/// Generates a random common reference string for
     /// a circuit using the provided R1CS-to-QAP reduction.
     #[inline]
     pub fn generate_random_parameters_and_trapdoor_with_reduction<C>(
@@ -155,13 +161,32 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     where
         C: ConstraintSynthesizer<E::ScalarField>,
     {
-        let alpha = E::ScalarField::rand(rng);
-        let beta = E::ScalarField::rand(rng);
-        let gamma = E::ScalarField::rand(rng);
-        let delta = E::ScalarField::rand(rng);
+        let mut alpha_bytes: [u8; 32];
+        rng.fill_bytes(&mut alpha_bytes);
+        let alpha = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
+        let mut beta_bytes: [u8; 32];
+        rng.fill_bytes(&mut beta_bytes);
+        let beta = E::ScalarField::from_random_bytes(&beta_bytes).unwrap();
+        let mut gamma_bytes: [u8; 32];
+        rng.fill_bytes(&mut gamma_bytes);
+        let gamma = E::ScalarField::from_random_bytes(&gamma_bytes).unwrap();
+        let mut delta_bytes: [u8; 32];
+        rng.fill_bytes(&mut delta_bytes);
+        let delta = E::ScalarField::from_random_bytes(&delta_bytes).unwrap();
+        let mut g1_gen_bytes: [u8; 32];
+        rng.fill_bytes(&mut g1_gen_bytes);
+        let g1_generator = E::G1Affine::from_random_bytes(&g1_gen_bytes).unwrap();
+        let mut g2_gen_bytes: [u8; 32];
+        rng.fill_bytes(&mut g2_gen_bytes);
+        let g2_generator = E::G2Affine::from_random_bytes(&g2_gen_bytes).unwrap();
 
-        let g1_generator = E::G1::rand(rng);
-        let g2_generator = E::G2::rand(rng);
+        //let alpha = E::ScalarField::rand(rng);
+        //let beta = E::ScalarField::rand(rng);
+        //let gamma = E::ScalarField::rand(rng);
+        //let delta = E::ScalarField::rand(rng);
+
+        //let g1_generator = E::G1::rand(rng);
+        //let g2_generator = E::G2::rand(rng);
 
         let pk = Groth16::<E,QAP>::generate_parameters_with_qap(
             circuit,
@@ -169,8 +194,8 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
             beta,
             gamma,
             delta,
-            g1_generator,
-            g2_generator,
+            g1_generator.into(),
+            g2_generator.into(),
             rng,
         ).unwrap();
 
@@ -181,11 +206,11 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
             beta,
             delta,
             gamma,
-            g1: g1_generator.into_affine(),
-            g2: g2_generator.into_affine(),
+            g1: g1_generator,
+            g2: g2_generator,
         },
         pk.vk.clone()))
-    }
+    }*/
 
     /// Create a Groth16 proof that is zero-knowledge using the provided
     /// R1CS-to-QAP reduction.
@@ -198,14 +223,19 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     ) -> R1CSResult<Proof<E>>
     where
     {
-        let a = E::ScalarField::rand(rng);
-        let b = E::ScalarField::rand(rng);
+        let mut a_bytes: [u8; 32] = [0; 32];
+        rng.fill_bytes(&mut a_bytes);
+        let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
+        let mut b_bytes: [u8; 32] = [0; 32];
+        rng.fill_bytes(&mut b_bytes);
+        let b = E::ScalarField::from_random_bytes(&b_bytes).unwrap();
+        //let a = E::ScalarField::rand(rng);
+        //let b = E::ScalarField::rand(rng);
 
         Self::create_proof_with_trapdoor(pk, a, b, public_inputs)
     }
 
     /// Creates proof using the trapdoor
-    #[cfg(test)]
     pub fn create_proof_with_trapdoor(
         pk: &Trapdoor<E>,
         a: E::ScalarField,
@@ -239,7 +269,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     }
 }
 
-/// Generates a trapdoor proving and verifiying key pair intended for proof simulation, in addition to a vector of public inputs, from
+/*/// Generates a trapdoor proving and verifiying key pair intended for proof simulation, in addition to a vector of public inputs, from
 /// circom-generated .r1cs and .wasm files, and a .json file containing the public inputs. To be
 /// used to update `test_prove_and_verify` after circuit changes occur
 /// WARNING: The files referenced in this function are not present in this repo and msut be added
@@ -270,7 +300,7 @@ fn generate_keys_and_inputs<E: Pairing>(wasm_file_path: String, r1cs_file_path: 
     println!("generated pk: {:?}", pk.clone());
     println!("generated vk: {:?}", vk.clone());
     println!("public inputs: {:?}", inputs);
-}
+}*/
 
 /// Generates and verifies a simulated proof using a hardcoded simulation prover and verifier key
 /// pair and a hardcoded public input. These values were generated with the Keyless circuit at commit
@@ -314,7 +344,8 @@ where
     let vk = VerifyingKey { alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1 };
     let pvk = prepare_verifying_key::<E>(&vk);
 
-    let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
+    let mut rng = rand::thread_rng();
+    //let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
     for _ in 0..n_iters {
         let proof = Groth16Simulator::<E>::create_random_proof_with_trapdoor(
             &[public_input],
@@ -324,7 +355,10 @@ where
         .unwrap();
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
-        let a = E::ScalarField::rand(&mut rng);
+        //let a = E::ScalarField::rand(&mut rng);
+        let mut a_bytes: [u8; 32] = [0; 32];
+        rng.fill_bytes(&mut a_bytes);
+        let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
@@ -340,6 +374,8 @@ where
     (prk, vk)
 }*/
 
+//use ark_std::rand::{Rng as ArkRng, RngCore as ArkRngCore};
+
 fn test_prove_and_verify_circuit_agnostic<E>(n_iters: usize)
 where
     E: Pairing<
@@ -351,7 +387,9 @@ where
     let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
     let public_input = ark_ff::BigInt::new(public_input_values);
     let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
-    let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
+    // TODO: Make this rng seedable
+    let mut rng = rand::thread_rng();
+    //let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     for _ in 0..n_iters {
         let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
@@ -365,7 +403,10 @@ where
         .unwrap();
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
-        let a = E::ScalarField::rand(&mut rng);
+        let mut a_bytes: [u8; 32] = [0; 32];
+        rng.fill_bytes(&mut a_bytes);
+        let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
+        //let a = E::ScalarField::rand(&mut rng);
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
