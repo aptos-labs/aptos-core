@@ -247,6 +247,11 @@ impl OnChainConsensusConfig {
         }
     }
 
+    // TODO: actually add to onchain config
+    pub fn window_size(&self) -> usize {
+        2
+    }
+
     pub fn is_dag_enabled(&self) -> bool {
         match self {
             OnChainConsensusConfig::V1(_) => false,

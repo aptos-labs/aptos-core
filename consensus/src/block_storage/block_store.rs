@@ -78,6 +78,7 @@ pub struct BlockStore {
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
+    window_size: usize,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
@@ -91,6 +92,7 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
         order_vote_enabled: bool,
+        window_size: usize,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
@@ -108,6 +110,7 @@ impl BlockStore {
             vote_back_pressure_limit,
             payload_manager,
             order_vote_enabled,
+            window_size,
             pending_blocks,
         ));
         block_on(block_store.try_send_for_execution());
@@ -146,6 +149,7 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
         order_vote_enabled: bool,
+        window_size: usize,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
@@ -208,6 +212,7 @@ impl BlockStore {
             back_pressure_for_test: AtomicBool::new(false),
             order_vote_enabled,
             pending_blocks,
+            window_size,
         };
 
         for block in blocks {
@@ -318,6 +323,7 @@ impl BlockStore {
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
             self.order_vote_enabled,
+            self.window_size,
             self.pending_blocks.clone(),
         )
         .await;
