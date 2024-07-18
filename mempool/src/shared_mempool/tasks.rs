@@ -555,19 +555,19 @@ pub(crate) fn process_committed_transactions(
     let mut pool = mempool.lock();
     let block_timestamp = Duration::from_micros(block_timestamp_usecs);
 
-    let tracking_usecases = use_case_history
-        .lock()
-        .update_usecases_and_get_tracking_set(&transactions);
+    let tracking_usecases = {
+        let mut history = use_case_history.lock();
+        history.update_usecases(&transactions);
+        history.compute_tracking_set()
+    };
 
     for transaction in transactions {
         pool.log_commit_transaction(
             &transaction.sender,
             transaction.sequence_number,
-            if tracking_usecases.contains(&transaction.use_case) {
-                Some(transaction.use_case.clone())
-            } else {
-                None
-            },
+            tracking_usecases
+                .get(&transaction.use_case)
+                .map(|name| (transaction.use_case.clone(), name)),
             block_timestamp,
         );
         pool.commit_transaction(&transaction.sender, transaction.sequence_number);

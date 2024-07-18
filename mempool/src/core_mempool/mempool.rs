@@ -57,7 +57,7 @@ impl Mempool {
         &self,
         sender: &AccountAddress,
         sequence_number: u64,
-        tracked_use_case: Option<UseCaseKey>,
+        tracked_use_case: Option<(UseCaseKey, &String)>,
         block_timestamp: Duration,
     ) {
         trace!(
@@ -197,7 +197,7 @@ impl Mempool {
         &self,
         account: AccountAddress,
         sequence_number: u64,
-        tracked_use_case: Option<UseCaseKey>,
+        tracked_use_case: Option<(UseCaseKey, &String)>,
         block_timestamp: Duration,
     ) {
         if let Some((insertion_info, bucket)) = self
@@ -217,16 +217,15 @@ impl Mempool {
                     insertion_to_block,
                 );
 
-                let use_case_label = match tracked_use_case {
-                    Some(UseCaseKey::Platform) => "platform".to_string(),
-                    Some(UseCaseKey::ContractAddress(addr)) => format!("contract_{:?}", addr),
-                    Some(UseCaseKey::Others) => "other".to_string(),
-                    None => "contract_other".to_string(),
-                };
+                let use_case_label = tracked_use_case
+                    .as_ref()
+                    .map_or("entry_user_other", |(_, use_case_name)| {
+                        use_case_name.as_str()
+                    });
 
                 counters::TXN_E2E_USE_CASE_COMMIT_LATENCY
                     .with_label_values(&[
-                        &use_case_label,
+                        use_case_label,
                         insertion_info.submitted_by_label(),
                         bucket,
                     ])

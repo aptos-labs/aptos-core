@@ -46,7 +46,6 @@ impl UseCaseAwareTransaction for SignedTransaction {
                 if module_id.address().is_special() {
                     Platform
                 } else {
-                    // n.b. Generics ignored.
                     ContractAddress(*module_id.address())
                 }
             },
