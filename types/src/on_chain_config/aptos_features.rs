@@ -287,10 +287,6 @@ impl Features {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
 
-    pub fn is_limit_type_size_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE)
-    }
-
     pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
