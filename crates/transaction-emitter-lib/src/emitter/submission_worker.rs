@@ -8,7 +8,7 @@ use crate::{
     },
     EmitModeParams,
 };
-use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -97,9 +97,9 @@ impl SubmissionWorker {
                 && loop_start_time.duration_since(wait_until) > Duration::from_secs(5)
             {
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(120)),
-                    warn!(
-                        "[{:?}] txn_emitter worker drifted out of sync too much: {}s",
+                    SampleRate::Duration(Duration::from_secs(5)),
+                    error!(
+                        "[{:?}] txn_emitter worker drifted out of sync too much: {}s. Is expiration too short, or 5s buffer on top of it?",
                         self.client().path_prefix_string(),
                         loop_start_time.duration_since(wait_until).as_secs()
                     )
@@ -163,7 +163,7 @@ impl SubmissionWorker {
                 let submitted_after = loop_start_time.elapsed();
                 if submitted_after.as_secs() > 5 {
                     sample!(
-                        SampleRate::Duration(Duration::from_secs(120)),
+                        SampleRate::Duration(Duration::from_secs(30)),
                         warn!(
                             "[{:?}] txn_emitter worker waited for more than 5s to submit transactions: {}s after loop start",
                             self.client().path_prefix_string(),
@@ -176,7 +176,7 @@ impl SubmissionWorker {
                     // we also don't want to be stuck waiting for txn_expiration_time_secs
                     // after stop is called, so we sleep until time or stop is set.
                     self.sleep_check_done(Duration::from_secs(
-                        self.params.txn_expiration_time_secs + 20,
+                        self.params.txn_expiration_time_secs + 3,
                     ))
                     .await
                 }
@@ -271,7 +271,7 @@ impl SubmissionWorker {
                 .expired
                 .fetch_add(num_expired as u64, Ordering::Relaxed);
             sample!(
-                SampleRate::Duration(Duration::from_secs(120)),
+                SampleRate::Duration(Duration::from_secs(60)),
                 warn!(
                     "[{:?}] Transactions were not committed before expiration: {:?}, for {:?}",
                     self.client().path_prefix_string(),
