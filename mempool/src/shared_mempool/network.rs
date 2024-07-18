@@ -58,6 +58,17 @@ pub enum MempoolSyncMsg {
         /// A backpressure signal from the recipient when it is overwhelmed (e.g., mempool is full).
         backoff: bool,
     },
+    /// Broadcast request issued by the sender.
+    BroadcastTransactionsRequestV2 {
+        /// Unique id of sync request. Can be used by sender for rebroadcast analysis
+        request_id: MultiBatchId,
+        /// For each transaction, we also include the time at which the transaction is inserted
+        /// in the current node. The upstream node can then calculate (SystemTime::now() - insertion_time)
+        /// to calculate the time it took for the transaction to reach the upstream node.
+        transactions: Vec<(SignedTransaction, SystemTime)>,
+        /// Priority of the upstream node for the sender.
+        priority: BroadcastPeerPriority,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -76,6 +87,7 @@ pub enum BroadcastError {
     TooManyPendingBroadcasts(PeerNetworkId),
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum BroadcastPeerPriority {
     Primary,
     Failover,
@@ -331,7 +343,14 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: PeerNetworkId,
         scheduled_backoff: bool,
         smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
-    ) -> Result<(MultiBatchId, Vec<SignedTransaction>, Option<&str>), BroadcastError> {
+    ) -> Result<
+        (
+            MultiBatchId,
+            Vec<(SignedTransaction, SystemTime)>,
+            Option<&str>,
+        ),
+        BroadcastError,
+    > {
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
@@ -444,11 +463,20 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         &self,
         peer: PeerNetworkId,
         batch_id: MultiBatchId,
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(SignedTransaction, SystemTime)>,
+        use_mempool_sync_message_v2: bool,
     ) -> Result<(), BroadcastError> {
-        let request = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: batch_id,
-            transactions,
+        let request = if use_mempool_sync_message_v2 {
+            MempoolSyncMsg::BroadcastTransactionsRequestV2 {
+                request_id: batch_id,
+                transactions,
+                priority: self.check_peer_prioritized(peer)?,
+            }
+        } else {
+            MempoolSyncMsg::BroadcastTransactionsRequest {
+                request_id: batch_id,
+                transactions: transactions.into_iter().map(|(txn, _)| txn).collect(),
+            }
         };
 
         if let Err(e) = self.network_client.send_to_peer(request, peer) {
@@ -508,8 +536,13 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
         let num_txns = transactions.len();
         let send_time = SystemTime::now();
-        self.send_batch_to_peer(peer, batch_id.clone(), transactions)
-            .await?;
+        self.send_batch_to_peer(
+            peer,
+            batch_id.clone(),
+            transactions,
+            smp.config.use_mempool_sync_message_v2,
+        )
+        .await?;
         let num_pending_broadcasts =
             self.update_broadcast_state(peer, batch_id.clone(), send_time)?;
         notify_subscribers(SharedMempoolNotification::Broadcast, &smp.subscribers);

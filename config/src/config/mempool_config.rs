@@ -60,6 +60,7 @@ pub struct MempoolConfig {
     pub broadcast_buckets: Vec<u64>,
     pub eager_expire_threshold_ms: Option<u64>,
     pub eager_expire_time_ms: u64,
+    pub use_mempool_sync_message_v2: bool,
 }
 
 impl Default for MempoolConfig {
@@ -87,6 +88,7 @@ impl Default for MempoolConfig {
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
             eager_expire_threshold_ms: Some(15_000),
             eager_expire_time_ms: 6_000,
+            use_mempool_sync_message_v2: true,
         }
     }
 }

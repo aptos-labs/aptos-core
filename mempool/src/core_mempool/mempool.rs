@@ -12,6 +12,7 @@ use crate::{
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
+    network::BroadcastPeerPriority,
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
@@ -231,6 +232,11 @@ impl Mempool {
         db_sequence_number: u64,
         timeline_state: TimelineState,
         client_submitted: bool,
+        // The time at which the transaction was inserted into the mempool of the
+        // downstream node (sender of the mempool transaction)
+        insertion_time_at_sender: Option<SystemTime>,
+        // The prority of this node for the peer that send the transaction
+        priority: BroadcastPeerPriority,
     ) -> MempoolStatus {
         trace!(
             LogSchema::new(LogEntry::AddTxn)
@@ -259,9 +265,24 @@ impl Mempool {
             db_sequence_number,
             now,
             client_submitted,
+            priority,
         );
 
+        let submitted_by_label = txn_info.insertion_info.submitted_by_label();
         let status = self.transactions.insert(txn_info);
+
+        if MempoolStatusCode::Accepted == status.code {
+            if let Some(insertion_time_at_sender) = insertion_time_at_sender {
+                if let Ok(time_delta) = now.duration_since(insertion_time_at_sender) {
+                    counters::core_mempool_txn_commit_latency(
+                        counters::TRANSACTION_INSERTED_LABEL,
+                        submitted_by_label,
+                        self.transactions.get_bucket(ranking_score),
+                        time_delta,
+                    );
+                }
+            }
+        }
         counters::core_mempool_txn_ranking_score(
             counters::INSERT_LABEL,
             status.code.to_string().as_str(),
@@ -460,12 +481,19 @@ impl Mempool {
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
-    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
+    ) -> (
+        Vec<(SignedTransaction, SystemTime)>,
+        MultiBucketTimelineIndexIds,
+    ) {
         self.transactions.read_timeline(timeline_id, count, before)
     }
 
-    /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
-    pub(crate) fn timeline_range(&self, start_end_pairs: &[(u64, u64)]) -> Vec<SignedTransaction> {
+    /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive),
+    /// along with their insertion times.
+    pub(crate) fn timeline_range(
+        &self,
+        start_end_pairs: &[(u64, u64)],
+    ) -> Vec<(SignedTransaction, SystemTime)> {
         self.transactions.timeline_range(start_end_pairs)
     }
 

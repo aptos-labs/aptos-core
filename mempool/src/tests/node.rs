@@ -4,7 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::MempoolSyncMsg,
+    network::{BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
     tests::common::TestTransaction,
 };
@@ -383,6 +383,8 @@ impl Node {
                 0,
                 TimelineState::NotReady,
                 false,
+                None,
+                BroadcastPeerPriority::Primary,
             );
         }
     }

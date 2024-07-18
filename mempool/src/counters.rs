@@ -23,6 +23,7 @@ pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
 pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 
 // Core mempool stages labels
+pub const TRANSACTION_INSERTED_LABEL: &str = "transaction_inserted";
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_ACCEPTED_BLOCK_LABEL: &str = "commit_accepted_block";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";

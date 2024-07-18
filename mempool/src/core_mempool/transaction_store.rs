@@ -555,13 +555,17 @@ impl TransactionStore {
 
     /// Read at most `count` transactions from timeline since `timeline_id`.
     /// This method takes into account the max number of bytes per transaction batch.
-    /// Returns block of transactions and new last_timeline_id.
+    /// Returns block of transactions along with their transaction insertion times
+    /// and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
-    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
+    ) -> (
+        Vec<(SignedTransaction, SystemTime)>,
+        MultiBucketTimelineIndexIds,
+    ) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
         let mut last_timeline_id = timeline_id.id_per_bucket.clone();
@@ -580,7 +584,7 @@ impl TransactionStore {
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
                         break; // The batch is full
                     } else {
-                        batch.push(txn.txn.clone());
+                        batch.push((txn.txn.clone(), txn.insertion_info.insertion_time));
                         batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
                         if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                             last_timeline_id[i] = timeline_id;
@@ -605,7 +609,10 @@ impl TransactionStore {
         (batch, last_timeline_id.into())
     }
 
-    pub(crate) fn timeline_range(&self, start_end_pairs: &[(u64, u64)]) -> Vec<SignedTransaction> {
+    pub(crate) fn timeline_range(
+        &self,
+        start_end_pairs: &[(u64, u64)],
+    ) -> Vec<(SignedTransaction, SystemTime)> {
         self.timeline_index
             .timeline_range(start_end_pairs)
             .iter()
@@ -613,7 +620,7 @@ impl TransactionStore {
                 self.transactions
                     .get(account)
                     .and_then(|txns| txns.get(sequence_number))
-                    .map(|txn| txn.txn.clone())
+                    .map(|txn| (txn.txn.clone(), txn.insertion_info.insertion_time))
             })
             .collect()
     }
