@@ -1,6 +1,8 @@
 name: "Ad-hoc Forge Run"
 on:
   pull_request:
+    paths:
+      - ".github/workflows/adhoc-forge.yaml"
   workflow_dispatch:
     inputs:
       GIT_SHA:
