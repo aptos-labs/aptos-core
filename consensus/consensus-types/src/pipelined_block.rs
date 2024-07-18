@@ -11,7 +11,7 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
-use anyhow::Error;
+use anyhow::{bail, Error};
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
 use aptos_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
@@ -35,7 +35,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{Debug, Display, Formatter},
-    sync::Arc,
+    sync::{Arc, Weak},
     time::{Duration, Instant},
 };
 use tokio::{
@@ -121,6 +121,58 @@ pub struct PipelineInputRx {
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
 }
 
+/// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
+#[derive(Clone)]
+pub struct OrderedBlockWindow {
+    blocks: Vec<Weak<PipelinedBlock>>,
+}
+
+impl OrderedBlockWindow {
+    pub fn new(blocks: Vec<Arc<PipelinedBlock>>) -> Self {
+        Self {
+            blocks: blocks
+                .iter()
+                .map(Arc::downgrade)
+                .collect::<Vec<Weak<PipelinedBlock>>>(),
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self { blocks: vec![] }
+    }
+
+    /// The blocks stored in `OrderedBlockWindow` use [`Weak`](Weak) pointers
+    ///
+    /// if the `PipelinedBlock` still exists
+    ///      `upgraded_block` will be `Some(PipelinedBlock)`, and included in `blocks`
+    /// else it will be `None`, and not included in `blocks`
+    pub fn blocks(&self) -> anyhow::Result<Vec<Block>> {
+        let mut blocks: Vec<Block> = vec![];
+        for (index, block) in self.blocks.iter().enumerate() {
+            let upgraded_block = block.upgrade();
+            if let Some(block) = upgraded_block {
+                blocks.push(block.block().clone())
+            } else {
+                bail!(
+                    "Block {} not found during upgrade in OrderedBlockWindow::blocks()",
+                    index
+                )
+            }
+        }
+        Ok(blocks)
+    }
+
+    pub fn pipelined_blocks(&self) -> Vec<Arc<PipelinedBlock>> {
+        let mut blocks: Vec<Arc<PipelinedBlock>> = Vec::new();
+        for block in &self.blocks {
+            if let Some(block) = block.upgrade() {
+                blocks.push(block);
+            }
+        }
+        blocks
+    }
+}
+
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered
 /// or in executed state. In the ordered state, the block is waiting to be executed. In the executed state,
 /// the block has been executed and the output is available.
@@ -129,6 +181,9 @@ pub struct PipelineInputRx {
 pub struct PipelinedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
+    /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
+    #[derivative(PartialEq = "ignore")]
+    block_window: OrderedBlockWindow,
     /// Input transactions in the order of execution
     input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
@@ -192,7 +247,6 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             input_transactions,
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
-
         let block = PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy());
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -326,6 +380,7 @@ impl PipelinedBlock {
     ) -> Self {
         Self {
             block,
+            block_window: OrderedBlockWindow::empty(),
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
@@ -339,12 +394,21 @@ impl PipelinedBlock {
         }
     }
 
-    pub fn new_ordered(block: Block) -> Self {
-        Self::new(block, vec![], StateComputeResult::new_dummy())
+    pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
+        let input_transactions = Vec::new();
+        let state_compute_result = StateComputeResult::new_dummy();
+        Self {
+            block_window: window,
+            ..Self::new(block, input_transactions, state_compute_result)
+        }
     }
 
     pub fn block(&self) -> &Block {
         &self.block
+    }
+
+    pub fn block_window(&self) -> &OrderedBlockWindow {
+        &self.block_window
     }
 
     pub fn id(&self) -> HashValue {
