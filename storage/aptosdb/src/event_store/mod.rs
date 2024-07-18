@@ -341,24 +341,6 @@ impl EventStore {
         }
         Ok(())
     }
-
-    pub(crate) fn delete_event_accumulator(
-        &self,
-        version: Version,
-        db_batch: &SchemaBatch,
-    ) -> anyhow::Result<()> {
-        let mut iter = self
-            .event_db
-            .iter::<EventAccumulatorSchema>()?;
-        iter.seek(&(version, Position::from_inorder_index(0)))?;
-        while let Some(((ver, position), _)) = iter.next().transpose()? {
-            if ver != version {
-                return Ok(());
-            }
-            db_batch.delete::<EventAccumulatorSchema>(&(version, position))?;
-        }
-        Ok(())
-    }
 }
 
 struct EventHashReader<'a> {

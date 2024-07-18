@@ -687,24 +687,6 @@ impl StateStore {
         )
     }
 
-    pub fn revert_value_sets(
-        &self,
-        _first_version: Version,
-        _last_version: Version,
-        _ledger_batch: &SchemaBatch,
-        _sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        _state_kv_metadata_batch: &SchemaBatch,
-        _put_state_value_indices: bool,
-    ) -> Result<()> {
-        // TODO: add tombstone entries to StaleStateValueIndexSchema
-        // TODO: revert usage statistics
-        // TODO: remove matching KV pairs from StateValueSchema
-        // TODO: remove matching state value indices from StateValueIndexSchema
-        // while the upstream uses them.
-
-        Ok(())
-    }
-
     pub fn put_state_values(
         &self,
         value_state_sets: Vec<&ShardedStateUpdates>,
