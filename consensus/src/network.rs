@@ -257,6 +257,7 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
+        // TODO @bchocho @hariria change in new release once new ConsensusMsg is available (ConsensusMsg::BlockRetrievalRequest)
         let msg =
             ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(retrieval_request.clone()));
         counters::CONSENSUS_SENT_MSGS
@@ -268,7 +269,10 @@ impl NetworkSender {
             _ => return Err(anyhow!("Invalid response to request")),
         };
         response
-            .verify(retrieval_request, &self.validators)
+            .verify(
+                BlockRetrievalRequest::V1(retrieval_request),
+                &self.validators,
+            )
             .map_err(|e| {
                 error!(
                     SecurityEvent::InvalidRetrievedBlock,
@@ -828,6 +832,7 @@ impl NetworkTask {
                         .with_label_values(&[msg.name()])
                         .inc();
                     let req = match msg {
+                        // TODO @bchocho @hariria revisit deprecation later once BlockRetrievalRequest enum is released
                         ConsensusMsg::DeprecatedBlockRetrievalRequest(request) => {
                             debug!(
                                 remote_peer = peer_id,
@@ -842,6 +847,19 @@ impl NetworkTask {
                                     response_sender: callback,
                                 },
                             )
+                        },
+                        ConsensusMsg::BlockRetrievalRequest(request) => {
+                            debug!(
+                                remote_peer = peer_id,
+                                event = LogEvent::ReceiveBlockRetrieval,
+                                "{:?}",
+                                request
+                            );
+                            IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
+                                req: *request,
+                                protocol,
+                                response_sender: callback,
+                            })
                         },
                         ConsensusMsg::BatchRequestMsg(request) => {
                             debug!(
