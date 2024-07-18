@@ -254,7 +254,7 @@ impl Mempool {
         // The time at which the transaction was inserted into the mempool of the
         // downstream node (sender of the mempool transaction)
         insertion_time_at_sender: Option<SystemTime>,
-        // The prority of this node for the peer that send the transaction
+        // The prority of this node for the peer that sent the transaction
         priority: BroadcastPeerPriority,
     ) -> MempoolStatus {
         trace!(

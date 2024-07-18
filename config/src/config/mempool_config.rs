@@ -60,6 +60,8 @@ pub struct MempoolConfig {
     pub broadcast_buckets: Vec<u64>,
     pub eager_expire_threshold_ms: Option<u64>,
     pub eager_expire_time_ms: u64,
+    /// Uses the MempoolSyncMessageV2 instead of MempoolSyncMessage when sending mempool transactions
+    /// to upstream nodes.
     pub use_mempool_sync_message_v2: bool,
 }
 
