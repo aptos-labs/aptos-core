@@ -470,9 +470,8 @@ impl BatchGenerator {
                         }
 
                         let pulled_in_last_sec = pulled_txns_window.iter().map(|(_, txns)| txns).sum();
-                        let dynamic_pull_max_txn = dynamic_pull_txn_per_s.saturating_sub(pulled_in_last_sec);
                         let pull_max_txn = std::cmp::min(
-                            dynamic_pull_max_txn,
+                            std::cmp::max(dynamic_pull_txn_per_s.saturating_sub(pulled_in_last_sec), 1),
                             self.config.sender_max_total_txns as u64,
                         );
                         let batches = self.handle_scheduled_pull(pull_max_txn).await;
