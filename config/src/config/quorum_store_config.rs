@@ -47,6 +47,7 @@ pub struct QuorumStoreConfig {
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
     pub batch_generation_poll_interval_ms: usize,
+    // No longer being used
     pub batch_generation_min_non_empty_interval_ms: usize,
     pub batch_generation_max_interval_ms: usize,
     /// The maximum number of transactions that the batch generator puts in a batch.
@@ -102,7 +103,7 @@ impl Default for QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_generation_poll_interval_ms: 25,
-            batch_generation_min_non_empty_interval_ms: 50,
+            batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
             sender_max_batch_txns: 250,
             // TODO: on next release, remove BATCH_PADDING_BYTES
