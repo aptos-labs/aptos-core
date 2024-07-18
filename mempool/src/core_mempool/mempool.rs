@@ -265,13 +265,14 @@ impl Mempool {
             db_sequence_number,
             now,
             client_submitted,
-            priority,
+            priority.clone(),
         );
 
         let submitted_by_label = txn_info.insertion_info.submitted_by_label();
         let status = self.transactions.insert(txn_info);
 
-        if MempoolStatusCode::Accepted == status.code {
+        if priority == BroadcastPeerPriority::Primary && status.code == MempoolStatusCode::Accepted
+        {
             if let Some(insertion_time_at_sender) = insertion_time_at_sender {
                 if let Ok(time_delta) = now.duration_since(insertion_time_at_sender) {
                     counters::core_mempool_txn_commit_latency(
