@@ -185,6 +185,8 @@ impl MetadataBackend for AptosDBBackend {
             }
         }
         let (events, version, hit_end) = {
+            // locked is somenthing
+            #[allow(clippy::unwrap_used)]
             let result = locked.as_ref().unwrap();
             (&result.0, result.1, result.2)
         };
