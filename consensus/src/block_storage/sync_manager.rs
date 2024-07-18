@@ -274,14 +274,8 @@ impl BlockStore {
             committed_round = root.0.round(),
             block_id = root.0.id(),
         );
-        self.rebuild(
-            root,
-            root_metadata,
-            blocks,
-            quorum_certs,
-            self.order_vote_enabled,
-        )
-        .await;
+        self.rebuild(root, root_metadata, blocks, quorum_certs)
+            .await;
 
         if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
             retriever
