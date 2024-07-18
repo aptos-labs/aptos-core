@@ -17,7 +17,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
 };
 use aptos_infallible::Mutex;
-use aptos_logger::{error, warn};
+use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
@@ -118,6 +118,48 @@ pub struct PipelineInputRx {
     pub commit_proof_rx: tokio::sync::broadcast::Receiver<LedgerInfoWithSignatures>,
 }
 
+/// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
+#[derive(Clone)]
+pub struct OrderedBlockWindow {
+    blocks: Arc<Mutex<Option<Vec<Arc<PipelinedBlock>>>>>,
+}
+
+impl OrderedBlockWindow {
+    pub fn new(blocks: Vec<Arc<PipelinedBlock>>) -> Self {
+        Self {
+            blocks: Arc::new(Mutex::new(Some(blocks))),
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            blocks: Arc::new(Mutex::new(Some(vec![]))),
+        }
+    }
+
+    pub fn clear(&self) {
+        *self.blocks.lock() = None;
+    }
+
+    pub fn blocks(&self) -> Vec<Block> {
+        self.blocks
+            .lock()
+            .as_ref()
+            .expect("window already cleared")
+            .iter()
+            .map(|b| b.block().clone())
+            .collect()
+    }
+
+    pub fn pipelined_blocks(&self) -> Vec<Arc<PipelinedBlock>> {
+        self.blocks
+            .lock()
+            .as_ref()
+            .expect("window already cleared")
+            .clone()
+    }
+}
+
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered
 /// or in executed state. In the ordered state, the block is waiting to be executed. In the executed state,
 /// the block has been executed and the output is available.
@@ -126,6 +168,9 @@ pub struct PipelineInputRx {
 pub struct PipelinedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
+    /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
+    #[derivative(PartialEq = "ignore")]
+    block_window: OrderedBlockWindow,
     /// Input transactions in the order of execution
     input_transactions: Vec<SignedTransaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
@@ -187,7 +232,12 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             input_transactions,
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
-
+        info!(
+            "Deserialized PipelinedBlock: ({}, {}) {}",
+            block.epoch(),
+            block.round(),
+            block.id()
+        );
         let block = PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy());
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -306,8 +356,18 @@ impl PipelinedBlock {
         input_transactions: Vec<SignedTransaction>,
         state_compute_result: StateComputeResult,
     ) -> Self {
+        info!(
+            "New PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block.payload().map_or(0, |p| p.len())
+        );
+
         Self {
             block,
+            block_window: OrderedBlockWindow::new(vec![]),
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
@@ -320,12 +380,37 @@ impl PipelinedBlock {
         }
     }
 
-    pub fn new_ordered(block: Block) -> Self {
-        Self::new(block, vec![], StateComputeResult::new_dummy())
+    pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
+        info!(
+            "New Ordered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block.payload().map_or(0, |p| p.len())
+        );
+        Self {
+            block,
+            block_window: window,
+            input_transactions: vec![],
+            state_compute_result: StateComputeResult::new_dummy(),
+            randomness: OnceCell::new(),
+            pipeline_insertion_time: OnceCell::new(),
+            execution_summary: Arc::new(OnceCell::new()),
+            pre_commit_fut: Arc::new(Mutex::new(None)),
+            pipeline_futs: Arc::new(Mutex::new(None)),
+            pipeline_tx: Arc::new(Mutex::new(None)),
+            pipeline_abort_handle: Arc::new(Mutex::new(None)),
+        }
     }
 
     pub fn block(&self) -> &Block {
         &self.block
+    }
+
+    // TODO: make this an Option?
+    pub fn block_window(&self) -> &OrderedBlockWindow {
+        &self.block_window
     }
 
     pub fn id(&self) -> HashValue {

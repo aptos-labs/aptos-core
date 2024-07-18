@@ -22,7 +22,7 @@ use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
-    pipelined_block::{ExecutionSummary, PipelinedBlock},
+    pipelined_block::{ExecutionSummary, OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
@@ -43,7 +43,10 @@ use std::collections::VecDeque;
 use std::sync::atomic::AtomicBool;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::Ordering;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -88,6 +91,8 @@ pub struct BlockStore {
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
+    /// Window Size for Execution Pool
+    window_size: usize,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     pipeline_builder: Option<PipelineBuilder>,
 }
@@ -102,6 +107,7 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
+        window_size: usize,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
     ) -> Self {
@@ -120,6 +126,7 @@ impl BlockStore {
             vote_back_pressure_limit,
             payload_manager,
             order_vote_enabled,
+            window_size,
             pending_blocks,
             pipeline_builder,
             None,
@@ -161,11 +168,18 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
+        window_size: usize,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
         tree_to_replace: Option<Arc<RwLock<BlockTree>>>,
     ) -> Self {
-        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
+        let (root_block, window_block, root_qc, root_ordered_cert, root_commit_cert) = (
+            root.commit_root_block,
+            root.window_root_block,
+            root.quorum_cert,
+            root.ordered_cert,
+            root.commit_cert,
+        );
 
         //verify root is correct
         assert!(
@@ -195,7 +209,7 @@ impl BlockStore {
         assert_eq!(result.root_hash(), root_metadata.accu_hash);
 
         let pipelined_root_block = PipelinedBlock::new(
-            *root_block,
+            *window_block,
             vec![],
             // Create a dummy state_compute_result with necessary fields filled in.
             result.clone(),
@@ -208,6 +222,7 @@ impl BlockStore {
         }
 
         let tree = BlockTree::new(
+            root_block.id(),
             pipelined_root_block,
             root_qc,
             root_ordered_cert,
@@ -234,6 +249,7 @@ impl BlockStore {
             order_vote_enabled,
             pending_blocks,
             pipeline_builder,
+            window_size,
         };
 
         for block in blocks {
@@ -263,6 +279,13 @@ impl BlockStore {
             .get_block(block_id_to_commit)
             .ok_or_else(|| format_err!("Committed block id not found"))?;
 
+        info!(
+            "send_for_execution for block {} with round {}, commit root round {}",
+            block_id_to_commit,
+            block_to_commit.round(),
+            self.commit_root().round()
+        );
+
         // First make sure that this commit is new.
         ensure!(
             block_to_commit.round() > self.ordered_root().round(),
@@ -281,6 +304,7 @@ impl BlockStore {
         self.pending_blocks
             .lock()
             .gc(finality_proof.commit_info().round());
+        let window_size = self.window_size;
         // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
             .finalize_order(
@@ -294,6 +318,7 @@ impl BlockStore {
                             committed_blocks,
                             finality_proof,
                             commit_decision,
+                            window_size,
                         );
                     },
                 ),
@@ -327,6 +352,7 @@ impl BlockStore {
                 .collect::<Vec<_>>()
         );
         let max_pruned_blocks_in_mem = self.inner.read().max_pruned_blocks_in_mem();
+
         // Rollover the previous highest TC from the old tree to the new one.
         let prev_2chain_htc = self
             .highest_2chain_timeout_cert()
@@ -344,6 +370,7 @@ impl BlockStore {
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
             self.order_vote_enabled,
+            self.window_size,
             self.pending_blocks.clone(),
             self.pipeline_builder.clone(),
             Some(self.inner.clone()),
@@ -366,7 +393,7 @@ impl BlockStore {
             return Ok(existing_block);
         }
         ensure!(
-            self.inner.read().ordered_root().round() < block.round(),
+            self.inner.read().window_root().round() < block.round(),
             "Block with old round"
         );
 
@@ -375,7 +402,39 @@ impl BlockStore {
                 .prefetch_payload_data(payload, block.timestamp_usecs());
         }
 
-        let pipelined_block = PipelinedBlock::new_ordered(block.clone());
+        let pipelined_block = if let Some(block_window) = self
+            .inner
+            .read()
+            .get_ordered_block_window(&block, self.window_size)
+        {
+            let now = Instant::now();
+            for block in block_window.blocks() {
+                if let Some(payload) = block.payload() {
+                    self.payload_manager
+                        .prefetch_payload_data(payload, block.timestamp_usecs());
+                }
+            }
+            info!(
+                "block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}, prefetch time: {} ms",
+                block.id(),
+                block.parent_id(),
+                block.round(),
+                block.epoch(),
+                block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
+                now.elapsed().as_millis()
+            );
+            PipelinedBlock::new_ordered(block.clone(), block_window)
+        } else {
+            info!(
+                "no block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}",
+                block.id(),
+                block.parent_id(),
+                block.round(),
+                block.epoch(),
+            );
+            // TODO: assert that this is an older block than commit root
+            PipelinedBlock::new_ordered(block.clone(), OrderedBlockWindow::empty())
+        };
 
         // build pipeline
         if let Some(pipeline_builder) = &self.pipeline_builder {
@@ -388,6 +447,7 @@ impl BlockStore {
             let storage = self.storage.clone();
             let id = block.id();
             let round = block.round();
+            let window_size = self.window_size;
             let callback = Box::new(move |commit_decision: LedgerInfoWithSignatures| {
                 if let Some(tree) = block_tree.upgrade() {
                     tree.write().commit_callback(
@@ -395,6 +455,7 @@ impl BlockStore {
                         id,
                         round,
                         WrappedLedgerInfo::new(VoteData::dummy(), commit_decision),
+                        window_size,
                     );
                 }
             });
@@ -408,20 +469,20 @@ impl BlockStore {
         }
 
         // ensure local time past the block time
-        let block_time = Duration::from_micros(pipelined_block.timestamp_usecs());
+        let block_time = Duration::from_micros(block.timestamp_usecs());
         let current_timestamp = self.time_service.get_current_timestamp();
         if let Some(t) = block_time.checked_sub(current_timestamp) {
             if t > Duration::from_secs(1) {
-                warn!(
-                    "Long wait time {}ms for block {}",
-                    t.as_millis(),
-                    pipelined_block.block()
-                );
+                warn!("Long wait time {}ms for block {}", t.as_millis(), block);
             }
             self.time_service.wait_until(block_time).await;
         }
+        if let Some(payload) = block.payload() {
+            self.payload_manager
+                .prefetch_payload_data(payload, block.timestamp_usecs());
+        }
         self.storage
-            .save_tree(vec![pipelined_block.block().clone()], vec![])
+            .save_tree(vec![block.clone()], vec![])
             .context("Insert block failed when saving block")?;
         self.inner.write().insert_block(pipelined_block)
     }
@@ -506,6 +567,7 @@ impl BlockStore {
         let mut wlock = self.inner.write();
         wlock.update_ordered_root(next_root_id);
         wlock.update_commit_root(next_root_id);
+        wlock.update_window_root(next_root_id);
         wlock.process_pruned_blocks(id_to_remove.clone());
         id_to_remove
     }

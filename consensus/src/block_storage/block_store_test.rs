@@ -154,6 +154,9 @@ proptest! {
 
 #[tokio::test]
 async fn test_block_store_prune() {
+    //       ╭--> A1--> A2--> A3
+    // Genesis--> B1--> B2
+    //             ╰--> C1
     let (blocks, block_store) = build_simple_tree().await;
     // Attempt to prune genesis block (should be no-op)
     assert_eq!(block_store.prune_tree(blocks[0].id()).len(), 0);

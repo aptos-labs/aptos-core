@@ -659,6 +659,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .max_blocks_per_sending_request(onchain_consensus_config.quorum_store_enabled()),
             self.payload_manager.clone(),
             onchain_consensus_config.order_vote_enabled(),
+            onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
         );
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
@@ -766,7 +767,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         info!(
             epoch = epoch_state.epoch,
             validators = epoch_state.verifier.to_string(),
-            root_block = %recovery_data.root_block(),
+            root_block = %recovery_data.commit_root_block(),
             "Starting new epoch",
         );
 
@@ -820,7 +821,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config.clone(),
                 rand_msg_rx,
-                recovery_data.root_block().round(),
+                recovery_data.commit_root_block().round(),
             )
             .await;
         let consensus_sk =
@@ -844,6 +845,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.vote_back_pressure_limit,
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
+            onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
             maybe_pipeline_builder,
         ));
@@ -1290,7 +1292,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
-        match self.storage.start(consensus_config.order_vote_enabled()) {
+        match self.storage.start(
+            consensus_config.order_vote_enabled(),
+            consensus_config.window_size(),
+        ) {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 self.recovery_mode = false;
                 self.start_round_manager(
