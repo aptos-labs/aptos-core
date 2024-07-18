@@ -1,5 +1,5 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(test)]
-mod fullnode_tests;
+pub mod managed_node;
+// pub mod move_executor;
