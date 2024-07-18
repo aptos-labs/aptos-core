@@ -51,6 +51,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue">0x1::schedule_transaction_queue</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="staking_config.md#0x1_staking_config">0x1::staking_config</a>;
@@ -365,6 +366,10 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
     <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
+    <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_initialize">schedule_transaction_queue::initialize</a>(&aptos_framework_account);
+
+    // test
+    <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">schedule_transaction_queue::insert</a>(&aptos_framework_account, <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">schedule_transaction_queue::new_transaction</a>(100, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], @0x1));
 }
 </code></pre>
 

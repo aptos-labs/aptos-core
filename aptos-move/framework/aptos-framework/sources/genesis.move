@@ -19,6 +19,7 @@ module aptos_framework::genesis {
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
+    use aptos_framework::schedule_transaction_queue;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
     use aptos_framework::staking_config;
@@ -131,6 +132,10 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
+        schedule_transaction_queue::initialize(&aptos_framework_account);
+
+        // test
+        schedule_transaction_queue::insert(&aptos_framework_account, schedule_transaction_queue::new_transaction(100, vector[], @0x1));
     }
 
     /// Genesis step 2: Initialize Aptos coin.

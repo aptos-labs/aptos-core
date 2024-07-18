@@ -4490,7 +4490,7 @@ module aptos_framework::avl_queue {
     /// # Testing
     ///
     /// * `test_search()`
-    fun search<V>(
+    public fun search<V>(
         avlq_ref: &AVLqueue<V>,
         seed_key: u64
     ): (

@@ -36,9 +36,16 @@ use aptos_types::{
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_value::StateValue, StateViewId},
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+};
+use serde::{Deserialize, Serialize};
 use std::{marker::PhantomData, sync::Arc};
 
 pub trait TransactionBlockExecutor: Send + Sync {
@@ -179,6 +186,13 @@ where
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct ScheduledTransaction {
+    scheduled_time: u64,
+    payload: Vec<u8>,
+    sender: AccountAddress,
+}
+
 impl<V> BlockExecutorInner<V>
 where
     V: TransactionBlockExecutor,
@@ -236,6 +250,36 @@ where
                         Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
                     )?
                 };
+
+                let timestamp_sec = match transactions.first() {
+                    SignatureVerifiedTransaction::Valid(Transaction::BlockMetadataExt(txn)) => {
+                        txn.timestamp_usecs() / 1_000_000
+                    },
+                    _ => panic!("no block metadata txn found"),
+                };
+                println!("block timestamp: {}", timestamp_sec);
+                let scheduled_transactions = bcs::from_bytes::<Vec<ScheduledTransaction>>(
+                    &AptosVM::execute_view_function(
+                        &state_view,
+                        ModuleId::new(
+                            CORE_CODE_ADDRESS,
+                            ident_str!("schedule_transaction_queue").to_owned(),
+                        ),
+                        ident_str!("get_ready_transactions").to_owned(),
+                        vec![], // ty_args,
+                        vec![
+                            bcs::to_bytes(&timestamp_sec).unwrap(),
+                            bcs::to_bytes(&100u64).unwrap(),
+                        ],
+                        u64::MAX,
+                    )
+                    .values
+                    .expect("view function execute failed")
+                    .pop()
+                    .expect("view function output is empty"),
+                )
+                .expect("failed to deserialize scheduled transactions");
+                println!("scheduled_transactions: {:?}", scheduled_transactions);
 
                 let chunk_output = {
                     let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();

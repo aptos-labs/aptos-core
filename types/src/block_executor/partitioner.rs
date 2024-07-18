@@ -571,6 +571,13 @@ impl ExecutableTransactions {
             },
         }
     }
+
+    pub fn first(&self) -> &SignatureVerifiedTransaction {
+        match self {
+            ExecutableTransactions::Unsharded(transactions) => transactions.first().unwrap(),
+            ExecutableTransactions::Sharded(_) => unimplemented!(),
+        }
+    }
 }
 
 impl From<Vec<SignatureVerifiedTransaction>> for ExecutableTransactions {

@@ -1,9 +1,9 @@
 module aptos_framework::schedule_transaction_queue {
     use std::bcs;
-    use std::option::{Self, Option};
+    use std::option;
     use std::signer;
     use std::vector;
-    use aptos_std::aptos_hash::sha3_512;
+    use std::hash::sha3_256;
     use aptos_std::iterable_table;
     use aptos_std::iterable_table::IterableTable;
     use aptos_std::table_with_length::{Self, TableWithLength};
@@ -31,22 +31,30 @@ module aptos_framework::schedule_transaction_queue {
         num: Aggregator<u64>,
     }
 
-    public fun initialize(framework: signer) {
-        system_addresses::assert_aptos_framework(&framework);
-        move_to(&framework, ScheduledQueue {
+    public fun new_transaction(scheduled_time: u64, payload: vector<u8>, sender: address): ScheduledTransaction {
+        ScheduledTransaction {
+            scheduled_time: scheduled_time,
+            payload: payload,
+            sender: sender,
+        }
+    }
+
+    public fun initialize(framework: &signer) {
+        system_addresses::assert_aptos_framework(framework);
+        move_to(framework, ScheduledQueue {
             queue: avl_queue::new(true, 0, 0),
             items: table_with_length::new(),
         });
-        move_to(&framework, ToRemove {
+        move_to(framework, ToRemove {
             num: aggregator_v2::create_unbounded_aggregator(),
         });
     }
 
-    fun insert(sender: &signer, txn: ScheduledTransaction) acquires ScheduledQueue {
+    public fun insert(sender: &signer, txn: ScheduledTransaction) acquires ScheduledQueue {
         assert!(signer::address_of(sender) == txn.sender, 1);
         let scheduled_queue = borrow_global_mut<ScheduledQueue>(@aptos_framework);
-        let id = TransactionId { hash: sha3_512(bcs::to_bytes(&txn)) };
-        if (!table_with_length::contains(&scheduled_queue.items, id)) {
+        let id = TransactionId { hash: sha3_256(bcs::to_bytes(&txn)) };
+        if (table_with_length::contains(&scheduled_queue.items, id)) {
             return
         };
         // assert timestamp range
@@ -54,12 +62,16 @@ module aptos_framework::schedule_transaction_queue {
         if (!avl_queue::has_key(&scheduled_queue.queue, time)) {
             avl_queue::insert(&mut scheduled_queue.queue, time, iterable_table::new());
         };
+        let (node_id, _) = avl_queue::search(&scheduled_queue.queue, time);
+        // Number of bits list node ID is shifted in an access key.
+        // const SHIFT_ACCESS_LIST_NODE_ID: u8 = 33;
+        let access_key = node_id << 33;
         iterable_table::add(
-            avl_queue::borrow_mut(&mut scheduled_queue.queue, time), id, false);
+            avl_queue::borrow_mut(&mut scheduled_queue.queue, access_key), id, false);
         table_with_length::add(&mut scheduled_queue.items, id, txn);
     }
 
-    fun cancel(sender: address, txn_id: vector<u8>) acquires ScheduledQueue {
+    public fun cancel(sender: address, txn_id: vector<u8>) acquires ScheduledQueue {
         let scheduled_queue = borrow_global_mut<ScheduledQueue>(@aptos_framework);
         let id = TransactionId { hash: txn_id };
         if (!table_with_length::contains(&scheduled_queue.items, id)) {
@@ -78,19 +90,19 @@ module aptos_framework::schedule_transaction_queue {
         }
     }
 
-    /// Execute view function before execution to prepare scheduled transaction (pop head is fine since the side effect is not persisted)
+    // Execute view function before execution to prepare scheduled transaction (pop head is fine since the side effect is not persisted)
     #[view]
-    fun get_ready_transactions(timestamp: u64, limit: u64): vector<ScheduledTransaction> acquires ScheduledQueue {
+    public fun get_ready_transactions(timestamp: u64, limit: u64): vector<ScheduledTransaction> acquires ScheduledQueue {
         let scheduled_queue = borrow_global_mut<ScheduledQueue>(@aptos_framework);
         let result = vector[];
         while (vector::length(&result) < limit) {
             let head_key = avl_queue::get_head_key(&scheduled_queue.queue);
             if (option::is_none(&head_key)) {
-                return result;
+                return result
             };
             let current_timestamp = option::extract(&mut head_key);
             if (current_timestamp > timestamp) {
-                return result;
+                return result
             };
             let table = avl_queue::pop_head(&mut scheduled_queue.queue);
             let key = iterable_table::head_key(&table);
@@ -136,5 +148,12 @@ module aptos_framework::schedule_transaction_queue {
                 return
             }
         }
+    }
+
+    #[test(fx = @0x1)]
+    fun test_insert(fx: &signer) acquires ScheduledQueue {
+        initialize(fx);
+        insert(fx, new_transaction(1, vector[], signer::address_of(fx)));
+        assert!(vector::length(&get_ready_transactions(100, 1)) == 1, 1);
     }
 }

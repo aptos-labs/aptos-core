@@ -6823,7 +6823,7 @@ key but match node has no right child.
 * <code>test_search()</code>
 
 
-<pre><code><b>fun</b> <a href="avl_tree.md#0x1_avl_queue_search">search</a>&lt;V&gt;(avlq_ref: &<a href="avl_tree.md#0x1_avl_queue_AVLqueue">avl_queue::AVLqueue</a>&lt;V&gt;, seed_key: u64): (u64, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;bool&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="avl_tree.md#0x1_avl_queue_search">search</a>&lt;V&gt;(avlq_ref: &<a href="avl_tree.md#0x1_avl_queue_AVLqueue">avl_queue::AVLqueue</a>&lt;V&gt;, seed_key: u64): (u64, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;bool&gt;)
 </code></pre>
 
 
@@ -6832,7 +6832,7 @@ key but match node has no right child.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="avl_tree.md#0x1_avl_queue_search">search</a>&lt;V&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="avl_tree.md#0x1_avl_queue_search">search</a>&lt;V&gt;(
     avlq_ref: &<a href="avl_tree.md#0x1_avl_queue_AVLqueue">AVLqueue</a>&lt;V&gt;,
     seed_key: u64
 ): (
