@@ -68,9 +68,9 @@ async fn raise_by_secret() {
     let arg0 = format!("hex:0x{}", hex::encode(my_epk_bytes));
     let txn_summary = cli
         .run_function(0, Some(gas_options), trigger_func_id.clone(), vec![arg0.as_str()], vec![])
-        .await
-        .unwrap();
+        .await;
     println!("txn_summary={:?}", txn_summary);
+    txn_summary.unwrap();
     let mpc_state = get_on_chain_resource::<MpcState>(&rest_cli).await;
     let chain_pk_bytes = <[u8; 48]>::try_from(mpc_state.tasks[0].result.clone().unwrap()).unwrap();
     let chain_pk = blstrs::G1Affine::from_compressed(&chain_pk_bytes).unwrap();
@@ -89,10 +89,9 @@ async fn raise_by_secret() {
         };
         let txn_summary = cli
             .run_function(0, Some(gas_options), vrfy_func_id.clone(), vec![arg0.as_str()], vec![])
-            .await
-            .unwrap();
+            .await;
         println!("txn_summary={:?}", txn_summary);
-
+        txn_summary.unwrap();
         sleep(Duration::from_secs(1)).await;
     }
 }
