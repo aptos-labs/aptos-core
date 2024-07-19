@@ -5,7 +5,7 @@ use crate::consensus_observer::error::Error;
 use aptos_consensus_types::{
     common::{BatchPayload, ProofWithData},
     pipelined_block::PipelinedBlock,
-    proof_of_store::{BatchInfo, ProofCache},
+    proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::{
@@ -342,6 +342,65 @@ impl BlockTransactionPayload {
             proof_with_data: ProofWithData::empty(),
             inline_batches: vec![],
         }
+    }
+
+    /// Verifies the payload batches against the expected batches
+    pub fn verify_batches(&self, expected_proofs: &[ProofOfStore]) -> Result<(), Error> {
+        // Get the batches in the block transaction payload
+        let payload_proofs = &self.proof_with_data.proofs;
+        let payload_batches: Vec<&BatchInfo> =
+            payload_proofs.iter().map(|proof| proof.info()).collect();
+
+        // Compare the expected batches against the payload batches
+        let expected_batches: Vec<&BatchInfo> =
+            expected_proofs.iter().map(|proof| proof.info()).collect();
+        if expected_batches != payload_batches {
+            return Err(Error::InvalidMessageError(format!(
+                "Transaction payload failed batch verification! Expected batches {:?}, but found {:?}!",
+                expected_batches, payload_batches
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Verifies the inline batches against the expected inline batches
+    pub fn verify_inline_batches(
+        &self,
+        expected_inline_batches: &[(BatchInfo, Vec<SignedTransaction>)],
+    ) -> Result<(), Error> {
+        // Get the expected inline batches
+        let expected_inline_batches: Vec<BatchInfo> = expected_inline_batches
+            .iter()
+            .map(|(batch_info, _)| batch_info.clone())
+            .collect();
+
+        // Compare the expected inline batches against the payload inline batches
+        if expected_inline_batches != self.inline_batches {
+            return Err(Error::InvalidMessageError(format!(
+                "Transaction payload failed inline batch verification! Expected inline batches {:?} but found {:?}",
+                expected_inline_batches, self.inline_batches
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Verifies the payload limit against the expected limit
+    pub fn verify_transaction_limit(
+        &self,
+        expected_transaction_limit: Option<u64>,
+        block_transaction_payload: &BlockTransactionPayload,
+    ) -> Result<(), Error> {
+        // Compare the expected limit against the payload limit
+        if expected_transaction_limit != self.limit {
+            return Err(Error::InvalidMessageError(format!(
+                "Transaction payload failed limit verification! Expected limit: {:?}, Found limit: {:?}",
+                expected_transaction_limit, block_transaction_payload.limit
+            )));
+        }
+
+        Ok(())
     }
 }
 
