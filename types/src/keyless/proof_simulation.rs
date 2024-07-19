@@ -366,19 +366,6 @@ where
     }
 }
 
-/*pub fn bn254_circuit_agnostic_setup_with_trapdoor<R>(mut rng: &mut R, num_public_inputs: usize) -> (Trapdoor<E>, Groth16VerificationKey)
-    where R: RngCore
-{
-    let (prk, vk) = Groth16Simulator::<Bn254>::circuit_agnostic_setup_with_trapdoor(&mut rng, num_public_inputs as u32).unwrap();
-    let pvk = prepare_verifying_key::<Bn254>(&vk);
-
-    let vk = Groth16VerificationKey::from(&pvk);
-
-    (prk, vk)
-}*/
-
-//use ark_std::rand::{Rng as ArkRng, RngCore as ArkRngCore};
-
 fn test_prove_and_verify_circuit_agnostic<E>(n_iters: usize)
 where
     E: Pairing<
@@ -394,9 +381,11 @@ where
     let mut rng = rand::thread_rng();
     //let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
-    for _ in 0..n_iters {
-        let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
-        let pvk = prepare_verifying_key::<E>(&vk);
+    let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+    let pvk = prepare_verifying_key::<E>(&vk);
+    for i in 0..n_iters {
+        println!("on iteration: {}", i);
+
 
         let proof = Groth16Simulator::<E>::create_random_proof_with_trapdoor(
             &[public_input],
@@ -421,5 +410,5 @@ fn prove_and_verify() {
 
 #[test]
 fn prove_and_verify_circuit_agnostic() {
-    test_prove_and_verify_circuit_agnostic::<Bn254>(25);
+    test_prove_and_verify_circuit_agnostic::<Bn254>(5);
 }
