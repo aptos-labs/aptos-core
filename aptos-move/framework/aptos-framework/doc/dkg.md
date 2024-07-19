@@ -26,7 +26,8 @@ DKG on-chain states and helper functions.
     -  [Function `incomplete_session`](#@Specification_1_incomplete_session)
 
 
-<pre><code><b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
+<b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="randomness_config.md#0x1_randomness_config">0x1::randomness_config</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
@@ -268,11 +269,16 @@ Abort if a DKG is already in progress.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_on_async_reconfig_start">on_async_reconfig_start</a>() <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&65);
     <b>if</b> (<a href="randomness_config.md#0x1_randomness_config_enabled">randomness_config::enabled</a>()) {
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&67);
         <b>let</b> dealer_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
         <b>let</b> <a href="randomness_config.md#0x1_randomness_config">randomness_config</a> = <a href="randomness_config.md#0x1_randomness_config_current">randomness_config::current</a>();
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&70);
         <b>let</b> dealer_validator_set = <a href="stake.md#0x1_stake_cur_validator_consensus_infos">stake::cur_validator_consensus_infos</a>();
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&72);
         <b>let</b> target_validator_set = <a href="stake.md#0x1_stake_next_validator_consensus_infos">stake::next_validator_consensus_infos</a>();
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&74);
         <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
         <b>let</b> new_session_metadata = <a href="dkg.md#0x1_dkg_DKGSessionMetadata">DKGSessionMetadata</a> {
             dealer_epoch,
@@ -291,7 +297,8 @@ Abort if a DKG is already in progress.
             start_time_us,
             session_metadata: new_session_metadata,
         });
-    }
+    };
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&94);
 }
 </code></pre>
 
