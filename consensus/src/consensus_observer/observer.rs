@@ -512,6 +512,17 @@ impl ConsensusObserver {
         self.sync_handle.is_some()
     }
 
+    /// Orders any ready pending blocks for the given epoch and round
+    async fn order_ready_pending_block(&mut self, block_epoch: u64, block_round: Round) {
+        if let Some(ordered_block) = self.pending_block_store.remove_ready_block(
+            block_epoch,
+            block_round,
+            &self.block_payload_store,
+        ) {
+            self.process_ordered_block(ordered_block).await;
+        }
+    }
+
     /// Processes the block payload message
     async fn process_block_payload_message(&mut self, block_payload: BlockPayload) {
         // Get the epoch and round for the block
@@ -563,14 +574,8 @@ impl ConsensusObserver {
         // now ready because of the new payload. Note: this should only
         // be done if the payload has been verified correctly.
         if verified_payload {
-            if let Some(ordered_block) = self.pending_block_store.remove_ready_block(
-                block_epoch,
-                block_round,
-                &self.block_payload_store,
-            ) {
-                // Process the ordered block
-                self.process_ordered_block(ordered_block).await;
-            }
+            self.order_ready_pending_block(block_epoch, block_round)
+                .await;
         }
     }
 
@@ -827,6 +832,21 @@ impl ConsensusObserver {
             return;
         };
 
+        // Verify the block payloads against the ordered block
+        if let Err(error) = self
+            .block_payload_store
+            .verify_payloads_against_ordered_block(&ordered_block)
+        {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify block payloads against ordered block! Ignoring: {:?}, Error: {:?}",
+                    ordered_block.proof_block_info(),
+                    error
+                ))
+            );
+            return;
+        }
+
         // The block was verified correctly. If the block is a child of our
         // last block, we can insert it into the ordered block store.
         if self.get_last_block().id() == ordered_block.first_block().parent_id() {
@@ -908,20 +928,15 @@ impl ConsensusObserver {
             self.wait_for_epoch_start().await;
 
             // Verify the block payloads for the new epoch
+            let new_epoch_state = self.get_epoch_state();
             let verified_payload_rounds = self
                 .block_payload_store
-                .verify_payload_signatures(&self.get_epoch_state());
+                .verify_payload_signatures(&new_epoch_state);
 
             // Order all the pending blocks that are now ready (these were buffered during state sync)
             for payload_round in verified_payload_rounds {
-                if let Some(ordered_block) = self.pending_block_store.remove_ready_block(
-                    self.get_epoch_state().epoch,
-                    payload_round,
-                    &self.block_payload_store,
-                ) {
-                    // Process the ordered block
-                    self.process_ordered_block(ordered_block).await;
-                }
+                self.order_ready_pending_block(new_epoch_state.epoch, payload_round)
+                    .await;
             }
         };
 

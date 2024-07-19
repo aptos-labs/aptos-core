@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
+    error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
-    network_message::BlockPayload,
+    network_message::{BlockPayload, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    common::{Payload, Round},
+    pipelined_block::PipelinedBlock,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_types::epoch_state::EpochState;
@@ -138,6 +142,104 @@ impl BlockPayloadStore {
             metrics::STORED_PAYLOADS_LABEL,
             highest_round,
         );
+    }
+
+    /// Verifies all block payloads against the given ordered block.
+    /// If verification fails, an error is returned.
+    pub fn verify_payloads_against_ordered_block(
+        &mut self,
+        ordered_block: &OrderedBlock,
+    ) -> Result<(), Error> {
+        // Verify each of the blocks in the ordered block
+        for ordered_block in ordered_block.blocks() {
+            // Get the block epoch and round
+            let block_epoch = ordered_block.epoch();
+            let block_round = ordered_block.round();
+
+            // Fetch the block payload
+            match self.block_payloads.lock().entry((block_epoch, block_round)) {
+                Entry::Occupied(entry) => {
+                    // Get the block transaction payload
+                    let transaction_payload = match entry.get() {
+                        BlockPayloadStatus::AvailableAndVerified(block_payload) => {
+                            &block_payload.transaction_payload
+                        },
+                        BlockPayloadStatus::AvailableAndUnverified(_) => {
+                            // The payload should have already been verified
+                            return Err(Error::InvalidMessageError(format!(
+                                "Payload verification failed! Block payload for epoch: {:?} and round: {:?} is unverified.",
+                                ordered_block.epoch(),
+                                ordered_block.round()
+                            )));
+                        },
+                    };
+
+                    // Get the ordered block payload
+                    let ordered_block_payload = match ordered_block.block().payload() {
+                        Some(payload) => payload,
+                        None => {
+                            return Err(Error::InvalidMessageError(format!(
+                                "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
+                                ordered_block.epoch(),
+                                ordered_block.round()
+                            )));
+                        },
+                    };
+
+                    // Verify the transaction payload against the ordered block payload
+                    match ordered_block_payload {
+                        Payload::DirectMempool(_) => {
+                            return Err(Error::InvalidMessageError(
+                                "Direct mempool payloads are not supported for consensus observer!"
+                                    .into(),
+                            ));
+                        },
+                        Payload::InQuorumStore(proof_with_data) => {
+                            // Verify the batches in the requested block
+                            transaction_payload.verify_batches(&proof_with_data.proofs)?;
+                        },
+                        Payload::InQuorumStoreWithLimit(proof_with_data) => {
+                            // Verify the batches in the requested block
+                            transaction_payload
+                                .verify_batches(&proof_with_data.proof_with_data.proofs)?;
+
+                            // Verify the transaction limit
+                            transaction_payload.verify_transaction_limit(
+                                proof_with_data.max_txns_to_execute,
+                                transaction_payload,
+                            )?;
+                        },
+                        Payload::QuorumStoreInlineHybrid(
+                            inline_batches,
+                            proof_with_data,
+                            max_txns_to_execute,
+                        ) => {
+                            // Verify the batches in the requested block
+                            transaction_payload.verify_batches(&proof_with_data.proofs)?;
+
+                            // Verify the inline batches
+                            transaction_payload.verify_inline_batches(inline_batches)?;
+
+                            // Verify the transaction limit
+                            transaction_payload.verify_transaction_limit(
+                                *max_txns_to_execute,
+                                transaction_payload,
+                            )?;
+                        },
+                    }
+                },
+                Entry::Vacant(_) => {
+                    // The payload is missing (this should never happen)
+                    return Err(Error::InvalidMessageError(format!(
+                        "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
+                        ordered_block.epoch(),
+                        ordered_block.round()
+                    )));
+                },
+            }
+        }
+
+        Ok(())
     }
 
     /// Verifies the block payload signatures against the given epoch state.

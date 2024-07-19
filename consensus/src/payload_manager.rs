@@ -13,7 +13,7 @@ use crate::{
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload, ProofWithData, Round},
-    proof_of_store::{BatchInfo, ProofOfStore},
+    proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -187,13 +187,7 @@ impl PayloadManager {
         };
 
         if let PayloadManager::ConsensusObserver(block_payloads, consensus_publisher) = self {
-            return get_transactions_for_observer(
-                block,
-                payload,
-                block_payloads,
-                consensus_publisher,
-            )
-            .await;
+            return get_transactions_for_observer(block, block_payloads, consensus_publisher).await;
         }
 
         async fn process_payload(
@@ -353,7 +347,6 @@ impl PayloadManager {
 /// Returns the transactions for the consensus observer payload manager
 async fn get_transactions_for_observer(
     block: &Block,
-    payload: &Payload,
     block_payloads: &Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
     consensus_publisher: &Option<Arc<ConsensusPublisher>>,
 ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
@@ -383,43 +376,8 @@ async fn get_transactions_for_observer(
         },
     };
 
-    // Verify the payload and inline batches before returning the data. The
-    // batch digests and transactions will have already been verified by the
-    // consensus observer on message receipt.
-    let transaction_payload = block_payload.transaction_payload;
-    match payload {
-        Payload::DirectMempool(_) => {
-            let error =
-                "DirectMempool payloads should not be sent to the consensus observer!".into();
-            return Err(InternalError { error });
-        },
-        Payload::InQuorumStore(proof_with_data) => {
-            // Verify the batches in the requested block
-            verify_batches_in_block(&proof_with_data.proofs, &transaction_payload)?;
-        },
-        Payload::InQuorumStoreWithLimit(proof_with_data) => {
-            // Verify the batches in the requested block
-            verify_batches_in_block(
-                &proof_with_data.proof_with_data.proofs,
-                &transaction_payload,
-            )?;
-
-            // Verify the transaction limit
-            verify_transaction_limit(proof_with_data.max_txns_to_execute, &transaction_payload)?;
-        },
-        Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, max_txns_to_execute) => {
-            // Verify the batches in the requested block
-            verify_batches_in_block(&proof_with_data.proofs, &transaction_payload)?;
-
-            // Verify the inline batches
-            verify_inline_batches_in_block(inline_batches, &transaction_payload)?;
-
-            // Verify the transaction limit
-            verify_transaction_limit(*max_txns_to_execute, &transaction_payload)?;
-        },
-    }
-
     // If the payload is valid, publish it to any downstream observers
+    let transaction_payload = block_payload.transaction_payload;
     if let Some(consensus_publisher) = consensus_publisher {
         let message = ConsensusObserverMessage::new_block_payload_message(
             block.gen_block_info(HashValue::zero(), 0, None),
@@ -430,73 +388,4 @@ async fn get_transactions_for_observer(
 
     // Return the transactions and the transaction limit
     Ok((transaction_payload.transactions, transaction_payload.limit))
-}
-
-/// Verifies that the batches in the block transaction payload
-/// match the batches that were already verified by the observer.
-fn verify_batches_in_block(
-    verified_proofs: &[ProofOfStore],
-    block_transaction_payload: &BlockTransactionPayload,
-) -> ExecutorResult<()> {
-    let verified_batches: Vec<&BatchInfo> =
-        verified_proofs.iter().map(|proof| proof.info()).collect();
-    let found_batches: Vec<&BatchInfo> = block_transaction_payload
-        .proof_with_data
-        .proofs
-        .iter()
-        .map(|proof| proof.info())
-        .collect();
-
-    if verified_batches != found_batches {
-        Err(ExecutorError::InternalError {
-            error: format!(
-                "Expected batches {:?} but found {:?}!",
-                verified_batches, found_batches
-            ),
-        })
-    } else {
-        Ok(())
-    }
-}
-
-/// Verifies that the inline batches in the block transaction payload
-/// match the inline batches that were already verified by the observer.
-fn verify_inline_batches_in_block(
-    verified_inline_batches: &[(BatchInfo, Vec<SignedTransaction>)],
-    block_transaction_payload: &BlockTransactionPayload,
-) -> ExecutorResult<()> {
-    let verified_batches: Vec<BatchInfo> = verified_inline_batches
-        .iter()
-        .map(|(batch_info, _)| batch_info.clone())
-        .collect();
-    let found_inline_batches = &block_transaction_payload.inline_batches;
-
-    if verified_batches != *found_inline_batches {
-        Err(ExecutorError::InternalError {
-            error: format!(
-                "Expected inline batches {:?} but found {:?}",
-                verified_batches, found_inline_batches
-            ),
-        })
-    } else {
-        Ok(())
-    }
-}
-
-/// Verifies that the transaction limit in the block transaction payload
-/// matches the transaction limit that was already verified by the observer.
-fn verify_transaction_limit(
-    max_txns_to_execute: Option<u64>,
-    block_transaction_payload: &BlockTransactionPayload,
-) -> ExecutorResult<()> {
-    if max_txns_to_execute != block_transaction_payload.limit {
-        Err(ExecutorError::InternalError {
-            error: format!(
-                "Expected transaction limit {:?} but found {:?}",
-                max_txns_to_execute, block_transaction_payload.limit
-            ),
-        })
-    } else {
-        Ok(())
-    }
 }
