@@ -26,11 +26,11 @@ module aptos_framework::reconfiguration_with_dkg {
         debug::print(&26);
         if (!reconfiguration_state::is_in_progress()) {
             debug::print(&28);
-            stake::finalize_next_validator_set();
-            debug::print(&30);
             reconfiguration_state::on_reconfig_start();
             dkg::on_async_reconfig_start();
             mpc::on_async_reconfig_start();
+            debug::print(&32);
+            stake::finalize_next_validator_set();
             debug::print(&34);
         };
         debug::print(&36);
