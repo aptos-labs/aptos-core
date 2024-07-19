@@ -64,7 +64,7 @@ impl CliCommand<()> for GenerateShellCompletions {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        generate_cli_completions::<Tool>("aptos", self.shell, self.output_file.as_path())
+        generate_cli_completions::<Tool>("movement", self.shell, self.output_file.as_path())
             .map_err(|err| CliError::IO(self.output_file.display().to_string(), err))
     }
 }
@@ -76,8 +76,8 @@ impl CliCommand<()> for GenerateShellCompletions {
 pub struct SetGlobalConfig {
     /// A configuration for where to place and use the config
     ///
-    /// `Workspace` will put the `.aptos/` folder in the current directory, where
-    /// `Global` will put the `.aptos/` folder in your home directory
+    /// `Workspace` will put the `.movement/` folder in the current directory, where
+    /// `Global` will put the `.movement/` folder in your home directory
     #[clap(long)]
     config_type: Option<ConfigType>,
     /// A configuration for how to expect the prompt response
@@ -273,9 +273,9 @@ const WORKSPACE: &str = "workspace";
 /// Global allows for one config for every part of the code
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, ValueEnum)]
 pub enum ConfigType {
-    /// Per system user configuration put in `<HOME>/.aptos`
+    /// Per system user configuration put in `<HOME>/.movement`
     Global,
-    /// Per directory configuration put in `<CURRENT_DIR>/.aptos`
+    /// Per directory configuration put in `<CURRENT_DIR>/.movement`
     Workspace,
 }
 

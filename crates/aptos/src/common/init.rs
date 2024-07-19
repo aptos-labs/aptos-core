@@ -33,7 +33,7 @@ const NUM_DEFAULT_OCTAS: u64 = 100000000;
 
 /// Tool to initialize current directory for the Movement tool
 ///
-/// Configuration will be pushed into .aptos/config.yaml
+/// Configuration will be pushed into .movement/config.yaml
 #[derive(Debug, Parser)]
 pub struct InitTool {
     /// Network to use for default settings
@@ -101,7 +101,7 @@ impl CliCommand<()> for InitTool {
 
         // Select profile we're using
         let mut profile_config = if let Some(profile_config) = config.remove_profile(profile_name) {
-            prompt_yes_with_override(&format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", profile_name), self.prompt_options)?;
+            prompt_yes_with_override(&format!("Movement already initialized for profile {}, do you want to overwrite the existing config?", profile_name), self.prompt_options)?;
             profile_config
         } else {
             ProfileConfig::default()

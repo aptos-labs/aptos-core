@@ -96,7 +96,7 @@ pub enum CliError {
     CommandArgumentError(String),
     #[error("Unable to load config: {0} {1}")]
     ConfigLoadError(String, String),
-    #[error("Unable to find config {0}, have you run `aptos init`?")]
+    #[error("Unable to find config {0}, have you run `movement init`?")]
     ConfigNotFoundError(String),
     #[error("Error accessing '{0}': {1}")]
     IO(String, #[source] std::io::Error),
@@ -227,7 +227,7 @@ pub struct CliConfig {
 
 const CONFIG_FILE: &str = "config.yaml";
 const LEGACY_CONFIG_FILE: &str = "config.yml";
-pub const CONFIG_FOLDER: &str = ".aptos";
+pub const CONFIG_FOLDER: &str = ".movement";
 
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
