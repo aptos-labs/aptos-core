@@ -2,7 +2,6 @@
 module aptos_framework::dkg {
     use std::option;
     use std::option::Option;
-    use aptos_std::debug;
     use aptos_framework::event::emit;
     use aptos_framework::randomness_config;
     use aptos_framework::randomness_config::RandomnessConfig;
@@ -62,16 +61,11 @@ module aptos_framework::dkg {
     /// Mark on-chain DKG state as in-progress. Notify validators to start DKG.
     /// Abort if a DKG is already in progress.
     public(friend) fun on_async_reconfig_start() acquires DKGState {
-        debug::print(&65);
         if (randomness_config::enabled()) {
-            debug::print(&67);
             let dealer_epoch = reconfiguration::current_epoch();
             let randomness_config = randomness_config::current();
-            debug::print(&70);
             let dealer_validator_set = stake::cur_validator_consensus_infos();
-            debug::print(&72);
             let target_validator_set = stake::next_validator_consensus_infos();
-            debug::print(&74);
             let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
             let new_session_metadata = DKGSessionMetadata {
                 dealer_epoch,
@@ -91,7 +85,6 @@ module aptos_framework::dkg {
                 session_metadata: new_session_metadata,
             });
         };
-        debug::print(&94);
     }
 
     public(friend) fun ready_for_next_epoch(): bool acquires DKGState {

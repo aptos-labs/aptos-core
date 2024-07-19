@@ -6,7 +6,6 @@ module aptos_framework::block {
     use std::option;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::Option;
-    use aptos_std::debug;
     use aptos_framework::randomness;
 
     use aptos_framework::account;
@@ -293,21 +292,14 @@ module aptos_framework::block {
             timestamp
         );
         randomness::on_new_block(&vm, epoch, round, randomness_seed);
-        debug::print(&296);
         if (!reconfiguration_state::is_in_progress()) {
-            debug::print(&298);
             if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
-                debug::print(&300);
                 reconfiguration_with_dkg::try_start();
-                debug::print(&302);
             };
         };
-        debug::print(&305);
         if (reconfiguration_state::is_in_progress()) {
-            debug::print(&307);
             reconfiguration_with_dkg::try_finish(&framework);
         };
-        debug::print(&310);
     }
 
     #[view]

@@ -33,13 +33,15 @@ fn native_print(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let val = safely_pop_arg!(args, Struct);
-    let bytes = val.unpack()?.next().unwrap();
+    if cfg!(feature = "testing") {
+        let val = safely_pop_arg!(args, Struct);
+        let bytes = val.unpack()?.next().unwrap();
 
-    println!(
-        "[debug] {}",
-        std::str::from_utf8(&bytes.value_as::<Vec<u8>>()?).unwrap()
-    );
+        println!(
+            "[debug] {}",
+            std::str::from_utf8(&bytes.value_as::<Vec<u8>>()?).unwrap()
+        );
+    }
 
     Ok(smallvec![])
 }

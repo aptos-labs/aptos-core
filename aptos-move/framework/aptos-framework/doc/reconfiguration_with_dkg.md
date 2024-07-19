@@ -16,7 +16,6 @@ Async reconfiguration state management.
 
 
 <pre><code><b>use</b> <a href="consensus_config.md#0x1_consensus_config">0x1::consensus_config</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="dkg.md#0x1_dkg">0x1::dkg</a>;
 <b>use</b> <a href="execution_config.md#0x1_execution_config">0x1::execution_config</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -55,16 +54,12 @@ Do nothing if one is already in progress.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">try_start</a>() {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&26);
     <b>if</b> (!<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_in_progress">reconfiguration_state::is_in_progress</a>()) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&28);
         <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_start">reconfiguration_state::on_reconfig_start</a>();
         <a href="stake.md#0x1_stake_finalize_next_validator_set">stake::finalize_next_validator_set</a>();
         <a href="dkg.md#0x1_dkg_on_async_reconfig_start">dkg::on_async_reconfig_start</a>();
         <a href="mpc.md#0x1_mpc_on_async_reconfig_start">mpc::on_async_reconfig_start</a>();
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&33);
     };
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&35);
 }
 </code></pre>
 
