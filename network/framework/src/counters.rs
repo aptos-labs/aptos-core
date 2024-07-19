@@ -26,7 +26,7 @@ pub const RECEIVED_LABEL: &str = "received";
 pub const SENT_LABEL: &str = "sent";
 pub const SUCCEEDED_LABEL: &str = "succeeded";
 pub const FAILED_LABEL: &str = "failed";
-pub const UNKNOWN_LABEL: &str = "unk";
+pub const UNKNOWN_LABEL: &str = "unknown";
 
 // Direction labels
 pub const INBOUND_LABEL: &str = "inbound";

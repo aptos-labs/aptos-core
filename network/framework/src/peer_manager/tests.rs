@@ -122,7 +122,6 @@ fn build_test_peer_manager(
         peer_manager,
         peer_manager_request_tx,
         connection_reqs_tx,
-        // hello_rx,
         conn_status_rx,
     )
 }
