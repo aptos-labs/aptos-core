@@ -172,7 +172,7 @@ module aptos_framework::reconfiguration {
         );
 
         reconfiguration_state::on_reconfig_finish();
-        next_validator_set::clear();
+        // next_validator_set::clear();
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {

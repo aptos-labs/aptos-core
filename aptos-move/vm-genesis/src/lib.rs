@@ -277,8 +277,8 @@ pub fn encode_genesis_change_set(
     initialize_randomness_config_seqnum(&mut session);
     initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
-    // initialize_mpc(&mut session);
-    // initialize_next_validator_set(&mut session);
+    initialize_mpc(&mut session);
+    initialize_next_validator_set(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
