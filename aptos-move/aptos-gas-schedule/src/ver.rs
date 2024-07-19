@@ -8,6 +8,15 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V21
+///   - Fix type to type tag conversion in MoveVM
+/// - V20
+///   - Limits for bounding MoveVM type sizes
+/// - V19
+///   - Gas for aggregator_v2::is_at_least native function
+/// - V18
+///   - Separate limits for governance scripts
+///   - Function info & dispatchable token gas params
 /// - V17
 ///   - Gas for keyless
 /// - V16
@@ -22,6 +31,7 @@
 /// - V12
 ///   - Added BN254 operations.
 ///   - IO gas change: 1. read bytes charged at 4KB intervals; 2. ignore free_write_bytes_quota
+///   - aggregator v2 gas charges
 /// - V11
 ///   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
 ///   - Hard limit on the number of write ops per transaction
@@ -56,11 +66,21 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 17;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_16;
 
-#[allow(dead_code)]
 pub mod gas_feature_versions {
+    pub const RELEASE_V1_8: u64 = 11;
+    pub const RELEASE_V1_9_SKIPPED: u64 = 12;
+    pub const RELEASE_V1_9: u64 = 13;
+    pub const RELEASE_V1_10: u64 = 15;
     pub const RELEASE_V1_11: u64 = 16;
     pub const RELEASE_V1_12: u64 = 17;
     pub const RELEASE_V1_13: u64 = 18;
+    pub const RELEASE_V1_14: u64 = 19;
+    pub const RELEASE_V1_15: u64 = 20;
+    pub const RELEASE_V1_16: u64 = 21;
+    pub const RELEASE_V1_17: u64 = 22;
+    pub const RELEASE_V1_18: u64 = 23;
+    pub const RELEASE_V1_19: u64 = 24;
+    pub const RELEASE_V1_20: u64 = 25;
 }

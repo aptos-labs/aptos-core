@@ -52,27 +52,27 @@
 ///     <ul>
 ///       <li>REST API: <a href="https://fullnode.devnet.aptoslabs.com/v1">https://fullnode.devnet.aptoslabs.com/v1</a></li>
 ///       <li>REST API Spec: <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">https://fullnode.devnet.aptoslabs.com/v1/spec#/</a></li>
-///       <li>Indexer API: <a href="https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
+///       <li>Indexer API: <a href="https://api.devnet.aptoslabs.com/v1/graphql">https://api.devnet.aptoslabs.com/v1/graphql</a></li>
 ///       <li>Faucet API: <a href="https://faucet.devnet.aptoslabs.com">https://faucet.devnet.aptoslabs.com</a></li>
-///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
+///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://api.devnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
 ///     </ul>
 ///   </TabItem>
 ///   <TabItem value="testnet" label="Testnet">
 ///     <ul>
 ///       <li>REST API: <a href="https://fullnode.testnet.aptoslabs.com/v1">https://fullnode.testnet.aptoslabs.com/v1</a></li>
 ///       <li>REST API Spec: <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">https://fullnode.testnet.aptoslabs.com/v1/spec#/</a></li>
-///       <li>Indexer API: <a href="https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
+///       <li>Indexer API: <a href="https://api.testnet.aptoslabs.com/v1/graphql">https://api.testnet.aptoslabs.com/v1/graphql</a></li>
 ///       <li>Faucet API: <a href="https://faucet.testnet.aptoslabs.com">https://faucet.testnet.aptoslabs.com</a></li>
-///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
+///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://api.testnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
 ///     </ul>
 ///   </TabItem>
 ///   <TabItem value="mainnet" label="Mainnet">
 ///     <ul>
 ///       <li>REST API: <a href="https://fullnode.mainnet.aptoslabs.com/v1">https://fullnode.mainnet.aptoslabs.com/v1</a></li>
 ///       <li>REST API Spec: <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">https://fullnode.mainnet.aptoslabs.com/v1/spec#/</a></li>
-///       <li>Indexer API: <a href="https://indexer.mainnet.aptoslabs.com/v1/graphql">https://indexer.mainnet.aptoslabs.com/v1/graphql</a></li>
+///       <li>Indexer API: <a href="https://api.mainnet.aptoslabs.com/v1/graphql">https://api.mainnet.aptoslabs.com/v1/graphql</a></li>
 ///       <li>Faucet: N/A</li>
-///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
+///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://api.mainnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
 ///     </ul>
 ///   </TabItem>
 /// </Tabs>

@@ -19,7 +19,7 @@ use aptos_sdk::{
 #[ignore]
 #[tokio::test]
 async fn test_external_transaction_signer() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     // generate key pair

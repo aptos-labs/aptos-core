@@ -15,8 +15,8 @@ anyhow = { workspace = true }
 bcs = { workspace = true }
 move-binary-format = { path = "../move-binary-format" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
+move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 move-command-line-common = { path = "../move-command-line-common" }
-#move-package = { path = "../tools/move-package" }
 move-compiler = { path = "../move-compiler" }
 move-core-types = { path = "../move-core/types" }
 move-disassembler = { path = "../tools/move-disassembler" }

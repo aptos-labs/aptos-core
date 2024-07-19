@@ -8,7 +8,7 @@ module 0x42::tuple {
     }
     private fun use_tuple(x: u64): u64 {
         {
-          let (x: u64, tuple::S{ f: y: u64 }): (u64, tuple::S) = tuple::tuple(x);
+          let (x: u64, tuple::S{ f: y }): (u64, tuple::S) = tuple::tuple(x);
           Add<u64>(x, y)
         }
     }

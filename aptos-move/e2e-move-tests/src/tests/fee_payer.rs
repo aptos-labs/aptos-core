@@ -271,8 +271,8 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
     let result = h.run_raw(transaction);
 
     assert_eq!(
-        result.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+        result.status().to_owned(),
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
             StatusCode::EXECUTION_LIMIT_REACHED
         ))),
     );

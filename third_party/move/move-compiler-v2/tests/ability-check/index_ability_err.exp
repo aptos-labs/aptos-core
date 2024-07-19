@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: value of type `test::Y<test::X<bool>>` does not have the `copy` ability
+   ┌─ tests/ability-check/index_ability_err.move:12:17
+   │
+12 │         let _ = Y<X<bool>>[addr];
+   │                 ^^^^^^^^^^^^^^^^ reference content copied here

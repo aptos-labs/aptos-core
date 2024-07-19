@@ -134,6 +134,12 @@ module aptos_framework::staking_config {
         });
     }
 
+    #[view]
+    /// Return the reward rate of this epoch as a tuple (numerator, denominator).
+    public fun reward_rate(): (u64, u64) acquires StakingRewardsConfig, StakingConfig {
+        get_reward_rate(borrow_global<StakingConfig>(@aptos_framework))
+    }
+
     /// Initialize rewards configurations.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun initialize_rewards(

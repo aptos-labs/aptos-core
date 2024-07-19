@@ -3181,11 +3181,14 @@ module aptos_framework::stake {
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
         let addr = signer::address_of(validator);
+        let (burn, mint) = aptos_coin::initialize_for_test(aptos_framework);
         configure_allowed_validators(aptos_framework, vector[addr]);
 
         account::create_account_for_test(addr);
         coin::register<AptosCoin>(validator);
         initialize_stake_owner(validator, 0, addr, addr);
+        coin::destroy_burn_cap(burn);
+        coin::destroy_mint_cap(mint);
     }
 
     #[test(aptos_framework = @0x1, validator = @0x123)]
@@ -3195,11 +3198,14 @@ module aptos_framework::stake {
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
         configure_allowed_validators(aptos_framework, vector[]);
+        let (burn, mint) = aptos_coin::initialize_for_test(aptos_framework);
 
         let addr = signer::address_of(validator);
         account::create_account_for_test(addr);
         coin::register<AptosCoin>(validator);
         initialize_stake_owner(validator, 0, addr, addr);
+        coin::destroy_burn_cap(burn);
+        coin::destroy_mint_cap(mint);
     }
 
     #[test_only]

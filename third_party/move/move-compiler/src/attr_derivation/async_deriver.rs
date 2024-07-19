@@ -10,7 +10,7 @@ use crate::{
     diag,
     parser::ast::{
         Definition, Exp, Exp_, Field, Function, FunctionName, LeadingNameAccess_, ModuleDefinition,
-        ModuleMember, NameAccessChain_, StructFields, StructName, Type, Type_, Visibility,
+        ModuleMember, NameAccessChain_, StructLayout, StructName, Type, Type_, Visibility,
     },
     shared::{CompilationEnv, NamedAddressMap},
 };
@@ -164,7 +164,7 @@ fn derive_module_for_async(
                 new_structs.push(new_struct(
                     loc,
                     StructName(sp(loc, Symbol::from(struct_name))),
-                    StructFields::Defined(fields),
+                    StructLayout::Singleton(fields),
                 ));
             }
         }

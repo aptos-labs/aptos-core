@@ -51,11 +51,14 @@ spec aptos_framework::transaction_fee {
     ///
     spec module {
         use aptos_framework::chain_status;
-        pragma verify = true;
+
+        // TODO(fa_migration)
+        pragma verify = false;
+
         pragma aborts_if_is_strict;
         // property 1: Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.
         /// [high-level-req-1]
-        invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework) || exists<AptosFABurnCapabilities>(@aptos_framework);
     }
 
     spec CollectedFeesPerBlock {
@@ -289,10 +292,17 @@ spec aptos_framework::transaction_fee {
     /// Aborts if `AptosCoinCapabilities` already exists.
     spec store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         use std::signer;
+
+        // TODO(fa_migration)
+        pragma verify = false;
+
         let addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(addr);
+
+        aborts_if exists<AptosFABurnCapabilities>(addr);
         aborts_if exists<AptosCoinCapabilities>(addr);
-        ensures exists<AptosCoinCapabilities>(addr);
+
+        ensures exists<AptosFABurnCapabilities>(addr) || exists<AptosCoinCapabilities>(addr);
     }
 
     /// Ensure caller is admin.

@@ -213,15 +213,15 @@ impl CounterState {
 pub trait RootAccountHandle: Send + Sync {
     async fn approve_funds(&self, amount: u64, reason: &str);
 
-    fn get_root_account(&self) -> &LocalAccount;
+    fn get_root_account(&self) -> Arc<LocalAccount>;
 }
 
-pub struct AlwaysApproveRootAccountHandle<'t> {
-    pub root_account: &'t LocalAccount,
+pub struct AlwaysApproveRootAccountHandle {
+    pub root_account: Arc<LocalAccount>,
 }
 
 #[async_trait::async_trait]
-impl<'t> RootAccountHandle for AlwaysApproveRootAccountHandle<'t> {
+impl RootAccountHandle for AlwaysApproveRootAccountHandle {
     async fn approve_funds(&self, amount: u64, reason: &str) {
         println!(
             "Consuming funds from root/source account: up to {} for {}",
@@ -229,8 +229,8 @@ impl<'t> RootAccountHandle for AlwaysApproveRootAccountHandle<'t> {
         );
     }
 
-    fn get_root_account(&self) -> &LocalAccount {
-        self.root_account
+    fn get_root_account(&self) -> Arc<LocalAccount> {
+        self.root_account.clone()
     }
 }
 

@@ -449,6 +449,31 @@ module aptos_framework::aptos_governance {
         proposal_id
     }
 
+    /// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
+    public entry fun batch_vote(
+        voter: &signer,
+        stake_pools: vector<address>,
+        proposal_id: u64,
+        should_pass: bool,
+    ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        vector::for_each(stake_pools, |stake_pool| {
+            vote_internal(voter, stake_pool, proposal_id, MAX_U64, should_pass);
+        });
+    }
+
+    /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
+    public entry fun batch_partial_vote(
+        voter: &signer,
+        stake_pools: vector<address>,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        vector::for_each(stake_pools, |stake_pool| {
+            vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass);
+        });
+    }
+
     /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
     public entry fun vote(
         voter: &signer,
@@ -1031,6 +1056,44 @@ module aptos_framework::aptos_governance {
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 10, 2);
 
         // No enough Yes. The proposal cannot be resolved.
+        test_resolving_proposal_generic(aptos_framework, true, execution_hash);
+    }
+
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
+    public entry fun test_batch_vote(
+        aptos_framework: signer,
+        proposer: signer,
+        voter_1: signer,
+        voter_2: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_coin_to_fungible_asset_migration_feature()], vector[]);
+        setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
+        let execution_hash = vector::empty<u8>();
+        vector::push_back(&mut execution_hash, 1);
+        let voter_1_addr = signer::address_of(&voter_1);
+        let voter_2_addr = signer::address_of(&voter_2);
+        stake::set_delegated_voter(&voter_2, voter_1_addr);
+        create_proposal_for_test(&proposer, true);
+        batch_vote(&voter_1, vector[voter_1_addr, voter_2_addr], 0, true);
+        test_resolving_proposal_generic(aptos_framework, true, execution_hash);
+    }
+
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
+    public entry fun test_batch_partial_vote(
+        aptos_framework: signer,
+        proposer: signer,
+        voter_1: signer,
+        voter_2: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_coin_to_fungible_asset_migration_feature()], vector[]);
+        setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
+        let execution_hash = vector::empty<u8>();
+        vector::push_back(&mut execution_hash, 1);
+        let voter_1_addr = signer::address_of(&voter_1);
+        let voter_2_addr = signer::address_of(&voter_2);
+        stake::set_delegated_voter(&voter_2, voter_1_addr);
+        create_proposal_for_test(&proposer, true);
+        batch_partial_vote(&voter_1, vector[voter_1_addr, voter_2_addr], 0, 9, true);
         test_resolving_proposal_generic(aptos_framework, true, execution_hash);
     }
 

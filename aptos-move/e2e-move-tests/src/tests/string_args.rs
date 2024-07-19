@@ -38,10 +38,10 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &
         address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
         module: Identifier::new("string").expect("valid identifier"),
         name: Identifier::new("String").expect("valid identifier"),
-        type_params: vec![],
+        type_args: vec![],
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
-    module_data.type_params.push(string_type);
+    module_data.type_args.push(string_type);
 
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data.clone()));
@@ -592,7 +592,7 @@ fn string_args_generic_call() {
         address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
         module: Identifier::new("string").expect("valid identifier"),
         name: Identifier::new("String").expect("valid identifier"),
-        type_params: vec![],
+        type_args: vec![],
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
@@ -651,7 +651,7 @@ fn string_args_generic_instantiation() {
         address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
         module: Identifier::new("string").expect("valid identifier"),
         name: Identifier::new("String").expect("valid identifier"),
-        type_params: vec![],
+        type_args: vec![],
     };
     let string_type = TypeTag::Struct(Box::new(string_struct));
 

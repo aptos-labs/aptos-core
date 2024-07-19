@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::driver::DriverConfiguration;
-use aptos_config::config::{RoleType, StateSyncDriverConfig};
+use aptos_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, Uniform,
@@ -84,11 +84,13 @@ pub fn create_event(event_key: Option<EventKey>) -> ContractEvent {
 /// Creates a test driver configuration for full nodes
 pub fn create_full_node_driver_configuration() -> DriverConfiguration {
     let config = StateSyncDriverConfig::default();
+    let consensus_observer_config = ConsensusObserverConfig::default();
     let role = RoleType::FullNode;
     let waypoint = Waypoint::default();
 
     DriverConfiguration {
         config,
+        consensus_observer_config,
         role,
         waypoint,
     }

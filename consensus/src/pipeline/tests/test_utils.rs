@@ -106,6 +106,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         vec![],
         vec![],
         vec![],
+        None, // block end info
     );
 
     let li = LedgerInfo::new(

@@ -378,7 +378,7 @@ impl DAGStorage for StorageAdapter {
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         let timer = counters::FETCH_COMMIT_HISTORY_DURATION.start_timer();
-        let version = self.aptos_db.get_latest_version()?;
+        let version = self.aptos_db.get_latest_ledger_info_version()?;
         let resource = self.get_commit_history_resource(version)?;
         let handle = resource.table_handle();
         let mut commit_events = vec![];

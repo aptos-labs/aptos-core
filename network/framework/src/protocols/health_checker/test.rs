@@ -53,7 +53,7 @@ impl TestHarness {
             PeerManagerRequestSender::new(peer_mgr_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        let hc_network_rx = HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, None);
+        let hc_network_rx = HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, None, true);
 
         let network_context = NetworkContext::mock();
         let peers_and_metadata = PeersAndMetadata::new(&[network_context.network_id()]);

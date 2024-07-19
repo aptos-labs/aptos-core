@@ -4,7 +4,7 @@
 use crate::{create_k8s_client, K8sApi, ReadWrite, Result};
 use again::RetryPolicy;
 use anyhow::{anyhow, bail};
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use k8s_openapi::api::core::v1::Secret;
 use once_cell::sync::Lazy;
 use prometheus_http_query::{
@@ -185,7 +185,14 @@ pub async fn query_range_with_metadata(
             new_query
         )
     })?;
-    if range.len() != 1 {
+    if range.is_empty() {
+        warn!(
+            "Missing data for start={}, end={}, query={}",
+            start_time, end_time, new_query
+        );
+        return Ok(Vec::new());
+    }
+    if range.len() > 1 {
         bail!(
             "Expected only one range vector from prometheus, recieved {} ({:?}). start={}, end={}, query={}",
             range.len(),

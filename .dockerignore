@@ -20,7 +20,7 @@
 !**/*.errmap
 !config/src/config/test_data
 !aptos-move/aptos-gas-profiling/templates/
-!aptos-move/aptos-release-builder/data/release.yaml
+!aptos-move/aptos-release-builder/data/*.yaml
 !aptos-move/aptos-release-builder/data/proposals/*
 !aptos-move/framework/
 !aptos-move/move-examples/hello_blockchain/
@@ -38,3 +38,6 @@
 !testsuite/forge/src/backend/k8s/
 !third_party/move/move-prover/boogie-backend/**/*.bpl
 !testsuite/testcases/src/data/
+!types/src/jwks/rsa/insecure_test_jwk.json
+!types/src/jwks/rsa/secure_test_jwk.json
+!types/src/jwks/rsa/insecure_test_jwk_private_key.pem

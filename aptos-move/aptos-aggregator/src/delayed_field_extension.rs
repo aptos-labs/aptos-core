@@ -42,6 +42,17 @@ impl DelayedFieldData {
         input: SignedU128,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<bool> {
+        self.try_add_or_check_delta(id, max_value, input, resolver, true)
+    }
+
+    pub fn try_add_or_check_delta(
+        &mut self,
+        id: DelayedFieldID,
+        max_value: u128,
+        input: SignedU128,
+        resolver: &dyn DelayedFieldResolver,
+        apply_delta: bool,
+    ) -> PartialVMResult<bool> {
         // No need to record or check or try, if input value exceeds the bound.
         if input.abs() > max_value {
             return Ok(false);
@@ -55,7 +66,7 @@ impl DelayedFieldData {
                     &input,
                     max_value,
                 )?;
-                if result {
+                if result && apply_delta {
                     entry.insert(DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
                         delta: DeltaWithMax::new(input, max_value),
                     }));
@@ -68,7 +79,9 @@ impl DelayedFieldData {
                     DelayedChange::Create(DelayedFieldValue::Aggregator(value)) => {
                         match math.unsigned_add_delta(*value, &input) {
                             Ok(new_value) => {
-                                *value = new_value;
+                                if apply_delta {
+                                    *value = new_value;
+                                }
                                 Ok(true)
                             },
                             Err(_) => Ok(false),
@@ -83,7 +96,7 @@ impl DelayedFieldData {
                             &input,
                             previous_delta.max_value,
                         )?;
-                        if result {
+                        if result && apply_delta {
                             *previous_delta = expect_ok(DeltaWithMax::create_merged_delta(
                                 previous_delta,
                                 &DeltaWithMax::new(input, max_value),
@@ -308,7 +321,7 @@ impl DelayedFieldData {
 mod test {
     use super::*;
     use crate::FakeAggregatorView;
-    use claims::{assert_err, assert_ok, assert_ok_eq};
+    use claims::{assert_err, assert_none, assert_ok_eq};
 
     #[test]
     fn test_aggregator_not_in_storage() {
@@ -342,28 +355,53 @@ mod test {
             get_agg(&data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(0))
         );
-        assert_ok!(data.try_add_delta(id, max_value, SignedU128::Positive(100), &resolver));
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Positive(100), &resolver, false),
+            true
+        );
+        assert_eq!(
+            get_agg(&data, &id),
+            &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(0))
+        );
+
+        assert_ok_eq!(
+            data.try_add_delta(id, max_value, SignedU128::Positive(100), &resolver),
+            true
+        );
         assert_eq!(
             get_agg(&data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(100))
         );
-        assert!(data
-            .try_add_delta(id, max_value, SignedU128::Negative(50), &resolver)
-            .unwrap());
+
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Positive(120), &resolver, false),
+            false
+        );
+        assert_eq!(
+            get_agg(&data, &id),
+            &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(100))
+        );
+
+        assert_ok_eq!(
+            data.try_add_delta(id, max_value, SignedU128::Negative(50), &resolver),
+            true
+        );
         assert_eq!(
             get_agg(&data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(50))
         );
-        assert!(!data
-            .try_add_delta(id, max_value, SignedU128::Negative(70), &resolver)
-            .unwrap());
+        assert_ok_eq!(
+            data.try_add_delta(id, max_value, SignedU128::Negative(70), &resolver),
+            false
+        );
         assert_eq!(
             get_agg(&data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(50))
         );
-        assert!(!data
-            .try_add_delta(id, max_value, SignedU128::Positive(170), &resolver)
-            .unwrap());
+        assert_ok_eq!(
+            data.try_add_delta(id, max_value, SignedU128::Positive(170), &resolver),
+            false
+        );
         assert_eq!(
             get_agg(&data, &id),
             &DelayedChange::Create(DelayedFieldValue::Aggregator(50))
@@ -394,6 +432,20 @@ mod test {
         resolver.set_from_aggregator_id(id, 100);
 
         assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Positive(400), &resolver, false),
+            true
+        );
+        // checks only add to captured reads, not to writes
+        assert_none!(data.delayed_fields.get(&id));
+
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Positive(550), &resolver, false),
+            false
+        );
+        // checks only add to captured reads, not to writes
+        assert_none!(data.delayed_fields.get(&id));
+
+        assert_ok_eq!(
             data.try_add_delta(id, max_value, SignedU128::Positive(400), &resolver),
             true
         );
@@ -401,6 +453,16 @@ mod test {
             get_agg(&data, &id),
             &aggregator_delta_change(400, max_value)
         );
+
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Negative(100), &resolver, false),
+            true
+        );
+        assert_eq!(
+            get_agg(&data, &id),
+            &aggregator_delta_change(400, max_value)
+        );
+
         assert_ok_eq!(
             data.try_add_delta(id, max_value, SignedU128::Negative(470), &resolver),
             true

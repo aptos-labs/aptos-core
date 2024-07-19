@@ -16,7 +16,7 @@ module 0x8675309::M {
         pack M::S(0);
         {
           let s: M::S = pack M::S(0);
-          M::R{ s: _, f: _, n1: _, n2: _ }: M::R = {
+          M::R{ s: _, f: _, n1: _, n2: _ } = {
             let $s: M::S = pack M::S(0);
             {
               let $n2: M::Nat<M::S> = pack M::Nat<M::S>(s);
@@ -32,7 +32,7 @@ module 0x8675309::M {
               let n1: M::Nat<u64> = pack M::Nat<u64>(0);
               {
                 let n2: M::Nat<M::S> = pack M::Nat<M::S>(Deref(Borrow(Immutable)(s)));
-                M::R{ s: _, f: _, n1: _, n2: _ }: M::R = {
+                M::R{ s: _, f: _, n1: _, n2: _ } = {
                   let $s: M::S = s;
                   {
                     let $n2: M::Nat<M::S> = n2;

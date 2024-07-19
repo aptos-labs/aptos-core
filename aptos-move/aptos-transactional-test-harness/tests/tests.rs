@@ -15,7 +15,7 @@ fn runner(path: &Path) -> anyhow::Result<(), Box<dyn std::error::Error>> {
         //    interested in debugging v2 bytecode.
         run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
             language_version: LanguageVersion::default(),
-            v2_experiments: vec![],
+            v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
         })
     } else {
         run_aptos_test_with_config(path, TestRunConfig::CompilerV1)

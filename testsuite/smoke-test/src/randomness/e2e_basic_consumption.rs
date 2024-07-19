@@ -16,7 +16,7 @@ use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
 async fn e2e_basic_consumption() {
     let epoch_duration_secs = 20;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {
@@ -78,7 +78,10 @@ struct DiceRollHistory {
     rolls: Vec<u64>,
 }
 
-async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_account_idx: usize) {
+pub async fn publish_on_chain_dice_module(
+    cli: &mut CliTestFramework,
+    publisher_account_idx: usize,
+) {
     cli.init_move_dir();
     let mut package_addresses = BTreeMap::new();
     package_addresses.insert("module_owner", "_");

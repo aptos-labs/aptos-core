@@ -22,7 +22,6 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    config::VMConfig,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
@@ -104,7 +103,7 @@ fn print_resources_and_extensions(
 ) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
-    let annotator = MoveValueAnnotator::new(storage);
+    let annotator = MoveValueAnnotator::new(storage.clone());
     for (account_addr, account_state) in cs.accounts() {
         writeln!(&mut buf, "0x{}:", account_addr.short_str_lossless())?;
 
@@ -267,10 +266,7 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
-        let mut config = VMConfig::default();
-        config.paranoid_type_checks = true;
-
-        let move_vm = MoveVM::new_with_config(self.native_function_table.clone(), config).unwrap();
+        let move_vm = MoveVM::new(self.native_function_table.clone());
         let extensions = extensions::new_extensions();
         let mut session =
             move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
@@ -351,8 +347,12 @@ impl SharedTestingConfig {
             };
             match exec_result {
                 Err(err) => {
-                    let actual_err =
-                        MoveError(err.major_status(), err.sub_status(), err.location().clone());
+                    let actual_err = MoveError(
+                        err.major_status(),
+                        err.sub_status(),
+                        err.location().clone(),
+                        err.message().cloned(),
+                    );
                     assert!(err.major_status() != StatusCode::EXECUTED);
                     match test_info.expected_failure.as_ref() {
                         Some(ExpectedFailure::Expected) => {

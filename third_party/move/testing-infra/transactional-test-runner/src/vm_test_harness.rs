@@ -6,16 +6,13 @@ use crate::{
     framework::{either_or_no_modules, run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility,
-    errors::{PartialVMError, VMResult},
-    file_format::CompiledScript,
-    file_format_common,
-    file_format_common::VERSION_MAX,
-    CompiledModule,
+    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript,
+    file_format_common, CompiledModule,
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
     address::ParsedAddress,
     env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env, read_bool_env_var},
@@ -24,14 +21,16 @@ use move_command_line_common::{
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
-    shared::{known_attributes::KnownAttribute, Flags, PackagePaths},
+    shared::{
+        known_attributes::KnownAttribute, string_packagepath_to_symbol_packagepath, Flags,
+        NumericalAddress, PackagePaths,
+    },
     FullyCompiledProgram,
 };
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     value::MoveValue,
 };
 use move_model::metadata::LanguageVersion;
@@ -44,7 +43,11 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
 };
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_test_utils::{
+    gas_schedule::{CostTable, Gas, GasStatus},
+    InMemoryStorage,
+};
+use move_vm_types::resolver::ResourceResolver;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -60,30 +63,6 @@ struct SimpleVMTestAdapter<'a> {
     default_syntax: SyntaxChoice,
     comparison_mode: bool,
     run_config: TestRunConfig,
-}
-
-pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolver<PartialVMError>,
-    address: AccountAddress,
-    module: &ModuleId,
-    resource: &IdentStr,
-    type_args: Vec<TypeTag>,
-) -> Result<String> {
-    let tag = StructTag {
-        address: *module.address(),
-        module: module.name().to_owned(),
-        name: resource.to_owned(),
-        type_params: type_args,
-    };
-    // TODO
-    match storage.get_resource(&address, &tag).unwrap() {
-        None => Ok("[No Resource Exists]".to_owned()),
-        Some(data) => {
-            let annotated = MoveValueAnnotator::new_with_max_bytecode_version(storage, VERSION_MAX)
-                .view_resource(&tag, &data)?;
-            Ok(format!("{}", annotated))
-        },
-    }
 }
 
 #[derive(Debug, Parser)]
@@ -104,8 +83,6 @@ pub struct AdapterPublishArgs {
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
-    #[clap(long, default_value = "true")]
-    pub check_runtime_types: bool,
     /// print more complete information for VMErrors on run
     #[clap(long)]
     pub verbose: bool,
@@ -143,7 +120,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         default_syntax: SyntaxChoice,
         comparison_mode: bool,
         run_config: TestRunConfig,
-        pre_compiled_deps_v1: Option<&'a FullyCompiledProgram>,
+        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
         pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
@@ -178,30 +155,26 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         };
 
         adapter
-            .perform_session_action(
-                None,
-                |session, gas_status| {
-                    for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-                        .into_iter()
-                        .map(|tmod| &tmod.named_module.module)
-                    {
-                        let mut module_bytes = vec![];
-                        module
-                            .serialize_for_version(
-                                Some(file_format_common::VERSION_MAX),
-                                &mut module_bytes,
-                            )
-                            .unwrap();
-                        let id = module.self_id();
-                        let sender = *id.address();
-                        session
-                            .publish_module(module_bytes, sender, gas_status)
-                            .unwrap();
-                    }
-                    Ok(())
-                },
-                production_vm_config_with_paranoid_type_checks(),
-            )
+            .perform_session_action(None, |session, gas_status| {
+                for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+                    .into_iter()
+                    .map(|tmod| &tmod.named_module.module)
+                {
+                    let mut module_bytes = vec![];
+                    module
+                        .serialize_for_version(
+                            Some(file_format_common::VERSION_MAX),
+                            &mut module_bytes,
+                        )
+                        .unwrap();
+                    let id = module.self_id();
+                    let sender = *id.address();
+                    session
+                        .publish_module(module_bytes, sender, gas_status)
+                        .unwrap();
+                }
+                Ok(())
+            })
             .unwrap();
         let mut addr_to_name_mapping = BTreeMap::new();
         for (name, addr) in move_stdlib_named_addresses() {
@@ -235,24 +208,21 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let id = module.self_id();
         let sender = *id.address();
         let verbose = extra_args.verbose;
-        match self.perform_session_action(
-            gas_budget,
-            |session, gas_status| {
-                let compat = Compatibility::new(
-                    !extra_args.skip_check_struct_and_pub_function_linking,
-                    !extra_args.skip_check_struct_layout,
-                    !extra_args.skip_check_friend_linking,
-                );
+        let result = self.perform_session_action(gas_budget, |session, gas_status| {
+            let compat = Compatibility::new(
+                !extra_args.skip_check_struct_and_pub_function_linking,
+                !extra_args.skip_check_struct_layout,
+                !extra_args.skip_check_friend_linking,
+            );
 
-                session.publish_module_bundle_with_compat_config(
-                    vec![module_bytes],
-                    sender,
-                    gas_status,
-                    compat,
-                )
-            },
-            production_vm_config_with_paranoid_type_checks(),
-        ) {
+            session.publish_module_bundle_with_compat_config(
+                vec![module_bytes],
+                sender,
+                gas_status,
+                compat,
+            )
+        });
+        match result {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
@@ -294,19 +264,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
-        self.perform_session_action(
-            gas_budget,
-            |session, gas_status| {
-                session.execute_script(
-                    script_bytes,
-                    type_args,
-                    args,
-                    gas_status,
-                    &mut TraversalContext::new(&traversal_storage),
-                )
-            },
-            VMConfig::from(extra_args),
-        )
+        self.perform_session_action(gas_budget, |session, gas_status| {
+            session.execute_script(
+                script_bytes,
+                type_args,
+                args,
+                gas_status,
+                &mut TraversalContext::new(&traversal_storage),
+            )
+        })
         .map_err(|vm_error| {
             anyhow!(
                 "Script execution failed with VMError: {}",
@@ -348,20 +314,16 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let traversal_storage = TraversalStorage::new();
 
         let serialized_return_values = self
-            .perform_session_action(
-                gas_budget,
-                |session, gas_status| {
-                    session.execute_function_bypass_visibility(
-                        module,
-                        function,
-                        type_args,
-                        args,
-                        gas_status,
-                        &mut TraversalContext::new(&traversal_storage),
-                    )
-                },
-                VMConfig::from(extra_args),
-            )
+            .perform_session_action(gas_budget, |session, gas_status| {
+                session.execute_function_bypass_visibility(
+                    module,
+                    function,
+                    type_args,
+                    args,
+                    gas_status,
+                    &mut TraversalContext::new(&traversal_storage),
+                )
+            })
             .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
@@ -381,7 +343,25 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         resource: &IdentStr,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        view_resource_in_move_storage(&self.storage, address, module, resource, type_args)
+        let tag = StructTag {
+            address: *module.address(),
+            module: module.name().to_owned(),
+            name: resource.to_owned(),
+            type_args,
+        };
+        match self
+            .storage
+            .get_resource_bytes_with_metadata_and_layout(&address, &tag, &[], None)
+            .unwrap()
+            .0
+        {
+            None => Ok("[No Resource Exists]".to_owned()),
+            Some(data) => {
+                let annotated =
+                    MoveValueAnnotator::new(self.storage.clone()).view_resource(&tag, &data)?;
+                Ok(format!("{}", annotated))
+            },
+        }
     }
 
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
@@ -394,9 +374,12 @@ impl<'a> SimpleVMTestAdapter<'a> {
         &mut self,
         gas_budget: Option<u64>,
         f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
-        vm_config: VMConfig,
     ) -> VMResult<Ret> {
-        // start session
+        let vm_config = VMConfig {
+            verifier_config: VerifierConfig::production(),
+            paranoid_type_checks: true,
+            ..VMConfig::default()
+        };
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 STD_ADDR,
@@ -404,10 +387,9 @@ impl<'a> SimpleVMTestAdapter<'a> {
                 move_stdlib::natives::GasParameters::zeros(),
             ),
             vm_config,
-        )
-        .unwrap();
+        );
         let (mut session, mut gas_status) = {
-            let gas_status = move_cli::sandbox::utils::get_gas_status(
+            let gas_status = get_gas_status(
                 &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
                 gas_budget,
             )
@@ -426,29 +408,48 @@ impl<'a> SimpleVMTestAdapter<'a> {
     }
 }
 
-static PRECOMPILED_MOVE_STDLIB: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|| {
-    if get_move_compiler_block_v1_from_env() {
-        return None;
-    }
-    let program_res = move_compiler::construct_pre_compiled_lib(
-        vec![PackagePaths {
+fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result<GasStatus> {
+    let gas_status = if let Some(gas_budget) = gas_budget {
+        // TODO(Gas): This should not be hardcoded.
+        let max_gas_budget = u64::MAX.checked_div(1000).unwrap();
+        if gas_budget >= max_gas_budget {
+            bail!("Gas budget set too high; maximum is {}", max_gas_budget)
+        }
+        GasStatus::new(cost_table, Gas::new(gas_budget))
+    } else {
+        // no budget specified. Disable gas metering
+        GasStatus::new_unmetered()
+    };
+    Ok(gas_status)
+}
+
+static PRECOMPILED_MOVE_STDLIB: Lazy<Option<(FullyCompiledProgram, Vec<PackagePaths>)>> =
+    Lazy::new(|| {
+        if get_move_compiler_block_v1_from_env() {
+            return None;
+        }
+        let lib_paths = PackagePaths {
             name: None,
             paths: move_stdlib::move_stdlib_files(),
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
-        }],
-        None,
-        Flags::empty().set_skip_attribute_checks(true), // no point in checking.
-        KnownAttribute::get_all_attribute_names(),
-    )
-    .unwrap();
-    match program_res {
-        Ok(stdlib) => Some(stdlib),
-        Err((files, errors)) => {
-            eprintln!("!!!Standard library failed to compile!!!");
-            move_compiler::diagnostics::report_diagnostics(&files, errors)
-        },
-    }
-});
+        };
+        let lib_paths_movesym =
+            string_packagepath_to_symbol_packagepath::<NumericalAddress>(&lib_paths);
+        let program_res = move_compiler::construct_pre_compiled_lib(
+            vec![lib_paths],
+            None,
+            Flags::empty().set_skip_attribute_checks(true), // no point in checking.
+            KnownAttribute::get_all_attribute_names(),
+        )
+        .unwrap();
+        match program_res {
+            Ok(stdlib) => Some((stdlib, vec![lib_paths_movesym])),
+            Err((files, errors)) => {
+                eprintln!("!!!Standard library failed to compile!!!");
+                move_compiler::diagnostics::report_diagnostics(&files, errors)
+            },
+        }
+    });
 
 pub struct PrecompiledFilesModules(Vec<String>, Vec<AnnotatedCompiledUnit>);
 
@@ -501,7 +502,7 @@ pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
 
 fn precompiled_v1_stdlib_if_needed(
     config: &TestRunConfig,
-) -> Option<&'static FullyCompiledProgram> {
+) -> Option<&'static (FullyCompiledProgram, Vec<PackagePaths>)> {
     match config {
         TestRunConfig::CompilerV1 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
         TestRunConfig::ComparisonV1V2 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
@@ -554,20 +555,4 @@ pub fn run_test_with_config_and_exp_suffix(
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
     run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, exp_suffix)
-}
-
-impl From<AdapterExecuteArgs> for VMConfig {
-    fn from(arg: AdapterExecuteArgs) -> VMConfig {
-        VMConfig {
-            paranoid_type_checks: arg.check_runtime_types,
-            ..Self::production()
-        }
-    }
-}
-
-fn production_vm_config_with_paranoid_type_checks() -> VMConfig {
-    VMConfig {
-        paranoid_type_checks: true,
-        ..VMConfig::production()
-    }
 }

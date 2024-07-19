@@ -13,6 +13,8 @@ mod client;
 #[cfg(test)]
 mod consensus;
 #[cfg(test)]
+mod consensus_observer;
+#[cfg(test)]
 mod execution;
 #[cfg(test)]
 mod full_nodes;
@@ -39,6 +41,8 @@ mod rosetta;
 #[cfg(test)]
 mod state_sync;
 #[cfg(test)]
+mod state_sync_utils;
+#[cfg(test)]
 mod storage;
 #[cfg(test)]
 mod test_smoke_tests;
@@ -55,13 +59,10 @@ mod upgrade;
 mod smoke_test_environment;
 
 #[cfg(test)]
-mod test_utils;
+mod utils;
 
 #[cfg(test)]
 mod validator_txns;
 
 #[cfg(test)]
 mod workspace_builder;
-
-#[cfg(test)]
-pub(crate) mod utils;

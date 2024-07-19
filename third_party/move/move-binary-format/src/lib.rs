@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
+#![deny(deprecated)]
 
 use std::fmt;
 
@@ -12,6 +13,7 @@ pub mod check_bounds;
 pub mod compatibility;
 #[macro_use]
 pub mod errors;
+pub mod check_complexity;
 pub mod constant;
 pub mod control_flow_graph;
 pub mod deserializer;

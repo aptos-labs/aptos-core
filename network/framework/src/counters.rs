@@ -415,10 +415,11 @@ pub static PENDING_PEER_MANAGER_DIAL_REQUESTS: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 /// Counter of messages pending in queue to be sent out on the wire.
-pub static PENDING_WIRE_MESSAGES: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static PENDING_WIRE_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "aptos_network_pending_wire_messages",
-        "Number of pending wire messages"
+        "Number of pending wire messages",
+        &["state"],
     )
     .unwrap()
 });
@@ -628,3 +629,12 @@ fn observe_ping_time(network_context: &NetworkContext, ping_latency_secs: f64, l
         .with_label_values(&[network_context.network_id().as_str(), label])
         .observe(ping_latency_secs);
 }
+
+pub static OP_MEASURE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_measure",
+        "Measures the time and count of an operation",
+        &["op"]
+    )
+    .unwrap()
+});

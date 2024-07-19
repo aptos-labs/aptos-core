@@ -390,8 +390,13 @@ fn test_peers_and_metadata_caching() {
     );
 
     // Update the peer metadata for peer 1
-    let peer_monitoring_metadata =
-        PeerMonitoringMetadata::new(Some(1010101.0), None, None, Some("Internal string".into()));
+    let peer_monitoring_metadata = PeerMonitoringMetadata::new(
+        Some(1010101.0),
+        None,
+        None,
+        None,
+        Some("Internal string".into()),
+    );
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata.clone())
         .unwrap();
@@ -683,7 +688,7 @@ async fn test_network_client_missing_network_sender() {
 
     // Verify that sending a message to all peers without a network simply logs the errors
     network_client
-        .send_to_peers(DummyMessage::new_empty(), &[bad_peer_network_id])
+        .send_to_peers(DummyMessage::new_empty(), vec![bad_peer_network_id])
         .unwrap();
 }
 
@@ -815,7 +820,7 @@ async fn test_network_client_network_senders_direct_send() {
     // Verify that broadcast messages are sent on matching networks and protocols
     let dummy_message = DummyMessage::new(2323);
     network_client
-        .send_to_peers(dummy_message.clone(), &[
+        .send_to_peers(dummy_message.clone(), vec![
             peer_network_id_1,
             peer_network_id_2,
         ])
@@ -1024,7 +1029,7 @@ fn create_network_sender_and_events(
             PeerManagerRequestSender::new(outbound_request_sender),
             ConnectionRequestSender::new(connection_outbound_sender),
         );
-        let network_events = NetworkEvents::new(inbound_request_receiver, None);
+        let network_events = NetworkEvents::new(inbound_request_receiver, None, true);
 
         // Save the sender, events and receivers
         network_senders.insert(*network_id, network_sender);

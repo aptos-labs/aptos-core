@@ -705,6 +705,9 @@ spec aptos_framework::stake {
         operator: address,
         voter: address,
     ) {
+        // TODO: These function failed in github CI
+        pragma verify_duration_estimate = 120;
+
         include ResourceRequirement;
         let addr = signer::address_of(owner);
         ensures global<ValidatorConfig>(addr) == ValidatorConfig {

@@ -4,7 +4,6 @@
 use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::VMChangeSet,
-    check_change_set::CheckChangeSet,
     output::VMOutput,
 };
 use aptos_aggregator::{
@@ -20,6 +19,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
     write_set::WriteOp,
 };
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
@@ -27,14 +27,6 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
-
-pub(crate) struct MockChangeSetChecker;
-
-impl CheckChangeSet for MockChangeSetChecker {
-    fn check_change_set(&self, _change_set: &VMChangeSet) -> PartialVMResult<()> {
-        Ok(())
-    }
-}
 
 macro_rules! as_state_key {
     ($k:ident) => {
@@ -55,8 +47,8 @@ macro_rules! as_bytes {
     };
 }
 
+use crate::module_write_set::ModuleWriteSet;
 pub(crate) use as_bytes;
-use move_binary_format::errors::PartialVMResult;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -128,7 +120,7 @@ pub(crate) fn mock_tag_0() -> StructTag {
         address: AccountAddress::ONE,
         module: Identifier::new("a").unwrap(),
         name: Identifier::new("a").unwrap(),
-        type_params: vec![TypeTag::U8],
+        type_args: vec![TypeTag::U8],
     }
 }
 
@@ -137,7 +129,7 @@ pub(crate) fn mock_tag_1() -> StructTag {
         address: AccountAddress::ONE,
         module: Identifier::new("abcde").unwrap(),
         name: Identifier::new("fgh").unwrap(),
-        type_params: vec![TypeTag::U64],
+        type_args: vec![TypeTag::U64],
     }
 }
 
@@ -146,13 +138,12 @@ pub(crate) fn mock_tag_2() -> StructTag {
         address: AccountAddress::ONE,
         module: Identifier::new("abcdex").unwrap(),
         name: Identifier::new("fghx").unwrap(),
-        type_params: vec![TypeTag::U128],
+        type_args: vec![TypeTag::U128],
     }
 }
 
 pub(crate) struct VMChangeSetBuilder {
     resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
@@ -163,7 +154,6 @@ impl VMChangeSetBuilder {
     pub(crate) fn new() -> Self {
         Self {
             resource_write_set: BTreeMap::new(),
-            module_write_set: BTreeMap::new(),
             events: vec![],
             delayed_field_change_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
@@ -177,15 +167,6 @@ impl VMChangeSetBuilder {
     ) -> Self {
         assert!(self.resource_write_set.is_empty());
         self.resource_write_set.extend(resource_write_set);
-        self
-    }
-
-    pub(crate) fn with_module_write_set(
-        mut self,
-        module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    ) -> Self {
-        assert!(self.module_write_set.is_empty());
-        self.module_write_set.extend(module_write_set);
         self
     }
 
@@ -232,14 +213,11 @@ impl VMChangeSetBuilder {
     pub(crate) fn build(self) -> VMChangeSet {
         VMChangeSet::new(
             self.resource_write_set,
-            self.module_write_set,
             self.events,
             self.delayed_field_change_set,
             self.aggregator_v1_write_set,
             self.aggregator_v1_delta_set,
-            &MockChangeSetChecker,
         )
-        .unwrap()
     }
 }
 
@@ -256,11 +234,11 @@ pub(crate) fn build_vm_output(
     VMOutput::new(
         VMChangeSetBuilder::new()
             .with_resource_write_set(resource_write_set)
-            .with_module_write_set(module_write_set)
             .with_delayed_field_change_set(delayed_field_change_set)
             .with_aggregator_v1_write_set(aggregator_v1_write_set)
             .with_aggregator_v1_delta_set(aggregator_v1_delta_set)
             .build(),
+        ModuleWriteSet::new(false, module_write_set.into_iter().collect()),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
         TransactionAuxiliaryData::default(),
@@ -270,7 +248,6 @@ pub(crate) fn build_vm_output(
 pub(crate) struct ExpandedVMChangeSetBuilder {
     resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
@@ -286,7 +263,6 @@ impl ExpandedVMChangeSetBuilder {
         Self {
             resource_write_set: BTreeMap::new(),
             resource_group_write_set: BTreeMap::new(),
-            module_write_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
             delayed_field_change_set: BTreeMap::new(),
@@ -312,15 +288,6 @@ impl ExpandedVMChangeSetBuilder {
         assert!(self.resource_group_write_set.is_empty());
         self.resource_group_write_set
             .extend(resource_group_write_set);
-        self
-    }
-
-    pub(crate) fn with_module_write_set(
-        mut self,
-        module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    ) -> Self {
-        assert!(self.module_write_set.is_empty());
-        self.module_write_set.extend(module_write_set);
         self
     }
 
@@ -391,14 +358,12 @@ impl ExpandedVMChangeSetBuilder {
         VMChangeSet::new_expanded(
             self.resource_write_set,
             self.resource_group_write_set,
-            self.module_write_set,
             self.aggregator_v1_write_set,
             self.aggregator_v1_delta_set,
             self.delayed_field_change_set,
             self.reads_needing_delayed_field_exchange,
             self.group_reads_needing_delayed_field_exchange,
             self.events,
-            &MockChangeSetChecker,
         )
     }
 

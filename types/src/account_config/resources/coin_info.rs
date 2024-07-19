@@ -62,7 +62,7 @@ impl MoveStructType for CoinInfoResource {
     const MODULE_NAME: &'static IdentStr = ident_str!("coin");
     const STRUCT_NAME: &'static IdentStr = ident_str!("CoinInfo");
 
-    fn type_params() -> Vec<TypeTag> {
+    fn type_args() -> Vec<TypeTag> {
         vec![APTOS_COIN_TYPE.clone()]
     }
 }

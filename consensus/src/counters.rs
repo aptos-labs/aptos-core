@@ -92,6 +92,34 @@ pub static COMMITTED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 //////////////////////
+// PROPOSAL VOTE COUNTERS
+//////////////////////
+
+pub static PROPOSAL_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proposal_vote_added",
+        "Count of the number of proposal votes added to pending votes"
+    )
+    .unwrap()
+});
+
+pub static QC_AGGREGATED_FROM_VOTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_qc_aggregated_from_votes",
+        "Count of the number of QC aggregated from votes"
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proposal_vote_broadcasted",
+        "Count of the number of proposal votes broadcasted"
+    )
+    .unwrap()
+});
+
+//////////////////////
 // PROPOSAL ELECTION
 //////////////////////
 
@@ -273,10 +301,13 @@ pub static CONSENSUS_PROPOSAL_PENDING_ROUNDS: Lazy<Histogram> = Lazy::new(|| {
 });
 
 /// duration pending when creating proposal
-pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<Histogram> = Lazy::new(|| {
-    register_avg_counter(
-        "aptos_consensus_proposal_pending_duration",
-        "duration pending when creating proposal",
+pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_proposal_pending_duration",
+            "duration pending when creating proposal",
+        )
+        .unwrap(),
     )
 });
 
@@ -285,6 +316,36 @@ pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
     register_gauge!(
         "aptos_proposer_delay_proposal",
         "Amount of time (in seconds) proposal is delayed due to backpressure/backoff",
+    )
+    .unwrap()
+});
+
+/// Histogram for max number of transactions (after filtering for dedup, expirations, etc) proposer uses when creating block.
+pub static PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_max_block_txns_after_filtering",
+        "Histogram for max number of transactions (after filtering) proposer uses when creating block.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for max number of transactions proposer uses when creating block.
+pub static PROPOSER_MAX_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_max_block_txns",
+        "Histogram for max number of transactions proposer uses when creating block.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for max number of transactions to execute proposer uses when creating block.
+pub static PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_max_block_txns_to_execute",
+        "Histogram for max number of transactions to execute proposer uses when creating block.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -525,6 +586,83 @@ pub static ROUND_TIMEOUT_MS: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 ////////////////////////
+/// ORDER VOTE COUNTERS
+////////////////////////
+
+pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_order_vote_qc",
+        "Count of the number of blocks successfully executed with order vote QC"
+    )
+    .unwrap()
+});
+
+pub static LATE_EXECUTION_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_late_execution_with_order_vote_qc",
+        "Count of the number of blocks that were executed with order vote QC after the block was already ordered"
+    )
+    .unwrap()
+});
+
+// Created order certificate from order votes. But the block isn't available in the block store.
+pub static ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_cert_created_without_block_in_block_store",
+        "Count of the number of order certificates created without the block being in the block store"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_regular_qc",
+        "Count of the number of blocks successfully executed with regular QC"
+    )
+    .unwrap()
+});
+
+pub static SYNC_TO_HIGHEST_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_sync_to_highest_qc",
+        "Count of the number of times we sync to highest QC"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_added",
+        "Count of the number of order votes added"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_VERY_OLD: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_very_old",
+        "Count of the number of order votes that are very old"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_OTHER_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_other_errors",
+        "Count of the number of order votes that have other errors"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_broadcasted",
+        "Count of the number of order votes broadcasted"
+    )
+    .unwrap()
+});
+
+////////////////////////
 // SYNC MANAGER COUNTERS
 ////////////////////////
 /// Counts the number of times the sync info message has been set since last restart.
@@ -535,6 +673,44 @@ pub static SYNC_INFO_MSGS_SENT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Received sync info with a newer cert
+pub static SYNC_INFO_RECEIVED_WITH_NEWER_CERT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_sync_info_received_with_newer_cert",
+        "Received sync info with a newer cert"
+    )
+    .unwrap()
+});
+
+/// Number of blocks being fetched from the network in block retriever
+pub static BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_blocks_fetched_from_network_in_block_retriever",
+        "Number of blocks being fetched from the network in block retriever"
+    )
+    .unwrap()
+});
+
+/// Number of blocks fetched from the network while inserting quorum cert
+pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT: Lazy<IntCounter> =
+    Lazy::new(|| {
+        register_int_counter!(
+            "aptos_consensus_blocks_fetched_network_while_inserting_quorum_cert",
+            "Number of blocks fetched from the network while inserting quorum cert"
+        )
+        .unwrap()
+    });
+
+/// Number of blocks fetched from the network while fast forward sync
+pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC: Lazy<IntCounter> =
+    Lazy::new(|| {
+        register_int_counter!(
+            "aptos_consensus_blocks_fetched_network_while_fast_forward_sync",
+            "Number of blocks fetched from the network while fast forward sync"
+        )
+        .unwrap()
+    });
 
 //////////////////////
 // RECONFIGURATION COUNTERS
@@ -598,6 +774,16 @@ pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
         "aptos_consensus_num_txns_per_block",
         "Histogram for the number of txns per (committed) blocks.",
         NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of bytes in the committed blocks.
+pub static NUM_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_num_bytes_per_block",
+        "Histogram for the number of bytes per (committed) blocks.",
+        exponential_buckets(/*start=*/ 500.0, /*factor=*/ 1.4, /*count=*/ 32).unwrap()
     )
     .unwrap()
 });
@@ -790,6 +976,14 @@ pub static BLOCK_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static BLOCK_RETRIEVAL_LOCAL_FULFILL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_block_retrieval_local_fulfill_count",
+        "Count of the number of local fulfillments of block retrieval requests"
+    )
+    .unwrap()
+});
+
 /// Count of the buffer manager retry requests since last restart.
 pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -895,6 +1089,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
         observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
         let txn_status = block.compute_result().compute_status_for_input_txns();
         NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
+        NUM_BYTES_PER_BLOCK
+            .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
         COMMITTED_BLOCKS_COUNT.inc();
         LAST_COMMITTED_ROUND.set(block.round() as i64);
         LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);

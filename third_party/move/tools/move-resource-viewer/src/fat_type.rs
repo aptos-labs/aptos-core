@@ -137,7 +137,7 @@ impl FatStructType {
             address: self.address,
             module: self.module.clone(),
             name: self.name.clone(),
-            type_params: ty_args,
+            type_args: ty_args,
         })
     }
 }
@@ -255,7 +255,7 @@ impl From<&StructTag> for FatStructType {
             name: struct_tag.name.clone(),
             abilities: WrappedAbilitySet(AbilitySet::EMPTY), // We can't get abilities from a struct tag
             ty_args: struct_tag
-                .type_params
+                .type_args
                 .iter()
                 .map(|inner| inner.into())
                 .collect(),

@@ -35,14 +35,18 @@ hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
+move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num-bigint = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
 passkey-types = { workspace = true }
+poem-openapi = { workspace = true }
+poem-openapi-derive = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 quick_cache = { workspace = true }
@@ -93,3 +97,6 @@ harness = false
 [[bench]]
 name = "state_key"
 harness = false
+
+[package.metadata.cargo-machete]
+ignored = ['poem-openapi']

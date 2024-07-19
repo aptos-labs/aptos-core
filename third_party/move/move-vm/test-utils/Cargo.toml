@@ -11,11 +11,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = { workspace = true }
 bytes = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 
 move-binary-format = { path = "../../move-binary-format" }
+move-bytecode-utils = { path = "../../tools/move-bytecode-utils" }
 move-core-types = { path = "../../move-core/types" }
 move-table-extension = { path = "../../extensions/move-table-extension", optional = true }
 move-vm-types = { path = "../types" }

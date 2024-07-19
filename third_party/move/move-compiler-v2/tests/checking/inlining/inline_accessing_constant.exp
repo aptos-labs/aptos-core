@@ -1,5 +1,8 @@
 // -- Model dump before bytecode pipeline
 module 0xc0ffee::dummy1 {
+    public inline fun expose(): u64 {
+        1
+    }
 } // end 0xc0ffee::dummy1
 module 0xc0ffee::dummy2 {
     public fun main(): u64 {

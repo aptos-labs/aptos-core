@@ -4,7 +4,7 @@
 
 use anyhow::anyhow;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_command_line_common::testing::EXP_EXT;
+use move_command_line_common::testing::get_compiler_exp_extension;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
 use move_compiler_v2::{self, env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
@@ -102,7 +102,7 @@ pub fn test_runner(
         }
         text
     };
-    let baseline_path = path.with_extension(EXP_EXT);
+    let baseline_path = path.with_extension(get_compiler_exp_extension());
     verify_or_update_baseline(baseline_path.as_path(), &out)?;
     Ok(())
 }

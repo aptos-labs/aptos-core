@@ -311,7 +311,7 @@ impl<I: Iterator<Item = Token>> Parser<I> {
                                     address: AccountAddress::from_hex_literal(&addr)?,
                                     module: Identifier::new(module)?,
                                     name: Identifier::new(name)?,
-                                    type_params: ty_args,
+                                    type_args: ty_args,
                                 }))
                             },
                             t => bail!("expected name, got {:?}", t),

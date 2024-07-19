@@ -10,6 +10,7 @@ use aptos_consensus_types::block::Block;
 use aptos_consensus_types::{
     block_data::{BlockData, BlockType},
     common::Payload,
+    order_vote_proposal::OrderVoteProposal,
     quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeout,
     vote_data::VoteData,
@@ -33,6 +34,7 @@ use aptos_types::{
 };
 use proptest::prelude::*;
 use rand::{rngs::StdRng, SeedableRng};
+use std::sync::Arc;
 
 const MAX_BLOCK_SIZE: usize = 10000;
 const MAX_NUM_ADDR_TO_VALIDATOR_INFO: usize = 10;
@@ -129,6 +131,32 @@ prop_compose! {
         next_epoch_state in arb_epoch_state(),
     ) -> VoteProposal {
         VoteProposal::new(accumulator_extension_proof, block, next_epoch_state, false)
+    }
+}
+
+// This generates an arbitrary OrderVoteProposal.
+prop_compose! {
+    pub fn arb_order_vote_proposal(
+    )(
+        block in arb_block(),
+        next_epoch_state in arb_epoch_state(),
+        parent_block_info_gen in any::<BlockInfoGen>(),
+        mut parent_account_info_universe in any_with::<AccountInfoUniverse>(NUM_UNIVERSE_ACCOUNTS),
+        parent_block_size in 1..MAX_BLOCK_SIZE,
+        signed_ledger_info in any::<LedgerInfoWithSignatures>(),
+    ) -> OrderVoteProposal {
+        let proposed_block_info = block.gen_block_info(
+            HashValue::zero(),
+            0,
+            next_epoch_state,
+        );
+        let parent_block_info = parent_block_info_gen.materialize(
+            &mut parent_account_info_universe,
+            parent_block_size
+        );
+        let vote_data = VoteData::new(proposed_block_info.clone(), parent_block_info);
+        let quorum_cert = QuorumCert::new(vote_data, signed_ledger_info);
+        OrderVoteProposal::new(block, proposed_block_info, Arc::new(quorum_cert))
     }
 }
 
@@ -229,6 +257,8 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
         arb_vote_proposal().prop_map(|input| {
             SafetyRulesInput::ConstructAndSignVoteTwoChain(Box::new(input), Box::new(None))
         }),
+        arb_order_vote_proposal()
+            .prop_map(|input| { SafetyRulesInput::ConstructAndSignOrderVote(Box::new(input)) }),
         arb_block_data().prop_map(|input| { SafetyRulesInput::SignProposal(Box::new(input)) }),
         arb_timeout().prop_map(|input| {
             SafetyRulesInput::SignTimeoutWithQC(Box::new(input), Box::new(None))
@@ -240,8 +270,8 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
 pub mod fuzzing {
     use crate::{error::Error, serializer::SafetyRulesInput, test_utils, TSafetyRules};
     use aptos_consensus_types::{
-        block_data::BlockData, timeout_2chain::TwoChainTimeout, vote::Vote,
-        vote_proposal::VoteProposal,
+        block_data::BlockData, order_vote::OrderVote, order_vote_proposal::OrderVoteProposal,
+        timeout_2chain::TwoChainTimeout, vote::Vote, vote_proposal::VoteProposal,
     };
     use aptos_crypto::bls12381;
     use aptos_types::epoch_change::EpochChangeProof;
@@ -256,6 +286,13 @@ pub mod fuzzing {
     ) -> Result<Vote, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
         safety_rules.construct_and_sign_vote_two_chain(&vote_proposal, None)
+    }
+
+    pub fn fuzz_construct_and_sign_order_vote(
+        order_vote_proposal: OrderVoteProposal,
+    ) -> Result<OrderVote, Error> {
+        let mut safety_rules = test_utils::test_safety_rules();
+        safety_rules.construct_and_sign_order_vote(&order_vote_proposal)
     }
 
     pub fn fuzz_handle_message(safety_rules_input: SafetyRulesInput) -> Result<Vec<u8>, Error> {
@@ -291,12 +328,12 @@ pub mod fuzzing {
 mod tests {
     use crate::{
         fuzzing::{
-            fuzz_construct_and_sign_vote_two_chain, fuzz_handle_message, fuzz_initialize,
-            fuzz_sign_proposal, fuzz_sign_timeout_with_qc,
+            fuzz_construct_and_sign_order_vote, fuzz_construct_and_sign_vote_two_chain,
+            fuzz_handle_message, fuzz_initialize, fuzz_sign_proposal, fuzz_sign_timeout_with_qc,
         },
         fuzzing_utils::{
-            arb_block_data, arb_epoch_change_proof, arb_safety_rules_input, arb_timeout,
-            arb_vote_proposal,
+            arb_block_data, arb_epoch_change_proof, arb_order_vote_proposal,
+            arb_safety_rules_input, arb_timeout, arb_vote_proposal,
         },
     };
     use proptest::prelude::*;
@@ -317,6 +354,11 @@ mod tests {
         #[test]
         fn construct_and_sign_vote_two_chain_proptest(input in arb_vote_proposal()) {
             let _ = fuzz_construct_and_sign_vote_two_chain(input);
+        }
+
+        #[test]
+        fn contruct_and_sign_order_vote(input in arb_order_vote_proposal()) {
+            let _ = fuzz_construct_and_sign_order_vote(input);
         }
 
         #[test]

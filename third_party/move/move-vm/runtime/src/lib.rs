@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
+#![deny(deprecated)]
 
 //! The core Move VM logic.
 //!
@@ -29,3 +30,5 @@ pub mod module_traversal;
 mod debug;
 
 mod access_control;
+
+pub use loader::LoadedFunction;

@@ -754,7 +754,7 @@ impl<'a> Instrumenter<'a> {
             let (rhs_temp, _) = self.builder.emit_let(self.builder.mk_call_with_inst(
                 &ghost_mem_ty,
                 ghost_mem.inst.clone(),
-                ast::Operation::Pack(ghost_mem.module_id, ghost_mem.id),
+                ast::Operation::Pack(ghost_mem.module_id, ghost_mem.id, None),
                 vec![new_rhs.clone()],
             ));
 

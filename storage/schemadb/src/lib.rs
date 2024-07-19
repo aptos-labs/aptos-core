@@ -32,9 +32,10 @@ use crate::{
 use anyhow::format_err;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_storage_interface::Result as DbResult;
+use aptos_storage_interface::{AptosDbError, Result as DbResult};
 use iterator::{ScanDirection, SchemaIterator};
 use rand::Rng;
+use rocksdb::ErrorKind;
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
@@ -235,6 +236,14 @@ impl DB {
         self.write_schemas(batch)
     }
 
+    /// Deletes a single record.
+    pub fn delete<S: Schema>(&self, key: &S::Key) -> DbResult<()> {
+        // Not necessary to use a batch, but we'd like a central place to bump counters.
+        let batch = SchemaBatch::new();
+        batch.delete::<S>(key)?;
+        self.write_schemas(batch)
+    }
+
     fn iter_with_direction<S: Schema>(
         &self,
         opts: ReadOptions,
@@ -248,12 +257,22 @@ impl DB {
     }
 
     /// Returns a forward [`SchemaIterator`] on a certain schema.
-    pub fn iter<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
+    pub fn iter<S: Schema>(&self) -> DbResult<SchemaIterator<S>> {
+        self.iter_with_opts(ReadOptions::default())
+    }
+
+    /// Returns a forward [`SchemaIterator`] on a certain schema, with non-default ReadOptions
+    pub fn iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Forward)
     }
 
     /// Returns a backward [`SchemaIterator`] on a certain schema.
-    pub fn rev_iter<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
+    pub fn rev_iter<S: Schema>(&self) -> DbResult<SchemaIterator<S>> {
+        self.rev_iter_with_opts(ReadOptions::default())
+    }
+
+    /// Returns a backward [`SchemaIterator`] on a certain schema, with non-default ReadOptions
+    pub fn rev_iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Backward)
     }
 
@@ -387,8 +406,25 @@ trait DeUnc: AsRef<Path> {
 
 impl<T> DeUnc for T where T: AsRef<Path> {}
 
-fn to_db_err(rocksdb_err: rocksdb::Error) -> aptos_storage_interface::AptosDbError {
-    aptos_storage_interface::AptosDbError::RocksDbError(rocksdb_err.to_string())
+fn to_db_err(rocksdb_err: rocksdb::Error) -> AptosDbError {
+    match rocksdb_err.kind() {
+        ErrorKind::Incomplete => AptosDbError::RocksDbIncompleteResult(rocksdb_err.to_string()),
+        ErrorKind::NotFound
+        | ErrorKind::Corruption
+        | ErrorKind::NotSupported
+        | ErrorKind::InvalidArgument
+        | ErrorKind::IOError
+        | ErrorKind::MergeInProgress
+        | ErrorKind::ShutdownInProgress
+        | ErrorKind::TimedOut
+        | ErrorKind::Aborted
+        | ErrorKind::Busy
+        | ErrorKind::Expired
+        | ErrorKind::TryAgain
+        | ErrorKind::CompactionTooLarge
+        | ErrorKind::ColumnFamilyDropped
+        | ErrorKind::Unknown => AptosDbError::OtherRocksDbError(rocksdb_err.to_string()),
+    }
 }
 
 trait IntoDbResult<T> {

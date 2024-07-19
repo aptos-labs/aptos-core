@@ -1413,6 +1413,16 @@ Transaction payload cannot be empty.
 
 
 
+<a id="0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH"></a>
+
+Provided target function does not match the payload stored in the on-chain transaction.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH">EPAYLOAD_DOES_NOT_MATCH</a>: u64 = 2010;
+</code></pre>
+
+
+
 <a id="0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH_HASH"></a>
 
 Provided target function does not match the hash stored in the on-chain transaction.
@@ -2938,7 +2948,7 @@ Remove the next transaction if it has sufficient owner rejections.
 
     <b>let</b> sequence_number = <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1;
     <b>let</b> owner_addr = address_of(owner);
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
         // Implicitly vote for rejection <b>if</b> the owner <b>has</b> not voted for rejection yet.
         <b>if</b> (!<a href="multisig_account.md#0x1_multisig_account_has_voted_for_rejection">has_voted_for_rejection</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number, owner_addr)) {
             <a href="multisig_account.md#0x1_multisig_account_reject_transaction">reject_transaction</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
@@ -3037,7 +3047,7 @@ Transaction payload is optional if it's already stored on chain for the transact
     <b>let</b> sequence_number = <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1;
     <a href="multisig_account.md#0x1_multisig_account_assert_transaction_exists">assert_transaction_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
 
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
         <b>assert</b>!(
             <a href="multisig_account.md#0x1_multisig_account_can_execute">can_execute</a>(address_of(owner), <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_APPROVALS">ENOT_ENOUGH_APPROVALS</a>),
@@ -3061,6 +3071,19 @@ Transaction payload is optional if it's already stored on chain for the transact
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH_HASH">EPAYLOAD_DOES_NOT_MATCH_HASH</a>),
         );
     };
+
+    // If the transaction payload is stored on chain and there is a provided payload,
+    // verify that the provided payload matches the stored payload.
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">features::abort_if_multisig_payload_mismatch_enabled</a>()
+        && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&transaction.payload)
+        && !<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&payload)
+    ) {
+        <b>let</b> stored_payload = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&transaction.payload);
+        <b>assert</b>!(
+            payload == *stored_payload,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH">EPAYLOAD_DOES_NOT_MATCH</a>),
+        );
+    }
 }
 </code></pre>
 
@@ -3195,7 +3218,17 @@ This function is private so no other code can call this beside the VM itself as 
     <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
 
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>() && implicit_approval) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>() && implicit_approval) {
+        <b>if</b> (std::features::module_event_migration_enabled()) {
+            emit(
+                <a href="multisig_account.md#0x1_multisig_account_Vote">Vote</a> {
+                    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+                    owner: executor,
+                    sequence_number,
+                    approved: <b>true</b>,
+                }
+            );
+        };
         num_approvals = num_approvals + 1;
         emit_event(
             &<b>mut</b> multisig_account_resource.vote_events,
@@ -3262,7 +3295,7 @@ This function is private so no other code can call this beside the VM itself as 
     <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>,
     transaction: <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>
 ) {
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
         <b>assert</b>!(
             <a href="multisig_account.md#0x1_multisig_account_available_transaction_queue_capacity">available_transaction_queue_capacity</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &gt; 0,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_EMAX_PENDING_TRANSACTIONS_EXCEEDED">EMAX_PENDING_TRANSACTIONS_EXCEEDED</a>)

@@ -44,6 +44,37 @@ async fn test_simple_view() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_view_gas_used_header() {
+    let mut context = new_test_context(current_function_name!());
+    let creator = &mut context.gen_account();
+    let owner = &mut context.gen_account();
+    let txn1 = context.mint_user_account(creator).await;
+    let txn2 = context.account_transfer(creator, owner, 100_000);
+
+    context.commit_block(&vec![txn1, txn2]).await;
+
+    let req = warp::test::request()
+        .method("POST")
+        .path("/v1/view")
+        .json(&build_coin_balance_request(&owner.address()));
+    let resp = context.reply(req).await;
+
+    // Confirm the gas used header is present.
+    assert!(
+        resp.headers()
+            .get("X-Aptos-Gas-Used")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            > 0
+    );
+
+    context.check_golden_output_no_prune(serde_json::from_slice(resp.body()).unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_view_allowlist() {
     let mut node_config = NodeConfig::default();
 

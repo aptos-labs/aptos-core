@@ -52,7 +52,7 @@ pub use self::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
         OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
-    gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
+    gas_schedule::{DiffItem, GasSchedule, GasScheduleV2, StorageGasSchedule},
     jwk_consensus_config::{
         ConfigV1 as JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig,
     },
@@ -217,7 +217,7 @@ pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
         address: CORE_CODE_ADDRESS,
         module: Identifier::new(config_id.1).expect("fail to make identifier"),
         name: Identifier::new(config_id.2).expect("fail to make identifier"),
-        type_params: vec![],
+        type_args: vec![],
     }
 }
 

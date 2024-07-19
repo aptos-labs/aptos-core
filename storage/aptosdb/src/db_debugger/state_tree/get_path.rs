@@ -6,7 +6,7 @@ use crate::{
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_merkle_db::StateMerkleDb,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     node_type::{Child, Node, NodeKey, NodeType},
     TreeReader,
@@ -45,9 +45,7 @@ impl Cmd {
         );
 
         let db = self.db_dir.open_state_merkle_db()?;
-        let mut iter = db
-            .metadata_db()
-            .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        let mut iter = db.metadata_db().rev_iter::<JellyfishMerkleNodeSchema>()?;
 
         iter.seek_for_prev(&NodeKey::new_empty_path(self.before_version - 1))?;
         let mut version = iter.next().transpose()?.unwrap().0.version();
@@ -171,7 +169,12 @@ impl Cmd {
                 }
             },
             Some(Node::Leaf(leaf_node)) => {
-                println!("           state key: {:?}\n", leaf_node.value_index().0);
+                let state_key = leaf_node.value_index().0.clone();
+                assert_eq!(state_key.hash(), leaf_node.account_key());
+
+                let serialized = hex::encode(bcs::to_bytes(&state_key).unwrap());
+                println!("           state key: {:?}\n", state_key);
+                println!("          serialized: {}\n", serialized);
                 println!("    full nibble path: {:x}", leaf_node.account_key());
                 println!("          value hash: {:x}", leaf_node.value_hash());
             },

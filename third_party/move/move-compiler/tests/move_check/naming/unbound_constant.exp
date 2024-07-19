@@ -32,7 +32,7 @@ error[E03002]: unbound module
    ┌─ tests/move_check/naming/unbound_constant.move:14:17
    │
 14 │         let y = Self::CONSTANT;
-   │                 ^^^^ Unbound module alias 'Self'
+   │                 ^^^^ Unbound module or type alias 'Self'
 
 error[E03005]: unbound unscoped name
    ┌─ tests/move_check/naming/unbound_constant.move:15:13
@@ -44,5 +44,5 @@ error[E03002]: unbound module
    ┌─ tests/move_check/naming/unbound_constant.move:15:24
    │
 15 │         0 + CONSTANT + Self::CONSTANT;
-   │                        ^^^^ Unbound module alias 'Self'
+   │                        ^^^^ Unbound module or type alias 'Self'
 

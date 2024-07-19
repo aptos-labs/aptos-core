@@ -3,7 +3,7 @@ name = "BCSStream"
 version = "0.0.0"
 
 [addresses]
-bcs_stream = "_"
+bcs_stream = "0xCAFE"
 
 [dependencies]
 AptosStdlib = { local = "../../framework/aptos-stdlib" }

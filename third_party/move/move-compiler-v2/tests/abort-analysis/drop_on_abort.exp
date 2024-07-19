@@ -42,7 +42,7 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
   0: $t4 := borrow_local($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t4
-     # graph: {@0=local($t0)[borrow(false) -> @1],@1=derived[]}
+     # graph: {@0=local($t0)[borrow_imm -> @1],@1=derived[]}
      # locals: {$t0=@0,$t4=@1}
      # globals: {}
      #

@@ -152,7 +152,6 @@ fn dump_consensus_db(consensus_db: &dyn PersistentLivenessStorage) -> anyhow::Re
     for qc in consensus_qcs {
         body.push_str(&format!("{qc:?}\n\n"));
     }
-
     Ok(body)
 }
 

@@ -18,6 +18,9 @@ pub use tool::UpdateTool;
 
 /// Things that implement this trait are able to update a binary.
 trait BinaryUpdater {
+    /// For checking the version but not updating
+    fn check(&self) -> bool;
+
     /// Only used for messages we print to the user.
     fn pretty_name(&self) -> &'static str;
 
@@ -88,4 +91,24 @@ impl UpdateRequiredInfo {
             None => Ok(true),
         }
     }
+}
+
+async fn update_binary<Updater: BinaryUpdater + Sync + Send + 'static>(
+    updater: Updater,
+) -> CliTypedResult<String> {
+    let name = updater.pretty_name();
+    if updater.check() {
+        let info = tokio::task::spawn_blocking(move || updater.get_update_info())
+            .await
+            .context(format!("Failed to check {} version", name))??;
+        if info.current_version.unwrap_or_default() != info.target_version {
+            return Ok(format!("Update is available ({})", info.target_version));
+        }
+
+        return Ok(format!("Already up to date ({})", info.target_version));
+    }
+
+    tokio::task::spawn_blocking(move || updater.update())
+        .await
+        .context(format!("Failed to install or update {}", name))?
 }

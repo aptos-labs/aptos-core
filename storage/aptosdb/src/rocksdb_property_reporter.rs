@@ -6,9 +6,10 @@ use crate::{
     common::NUM_STATE_SHARDS,
     db_options::{
         event_db_column_families, ledger_db_column_families, ledger_metadata_db_column_families,
-        skip_reporting_cf, state_kv_db_column_families, state_merkle_db_column_families,
-        transaction_accumulator_db_column_families, transaction_db_column_families,
-        transaction_info_db_column_families, write_set_db_column_families,
+        skip_reporting_cf, state_kv_db_column_families, state_kv_db_new_key_column_families,
+        state_merkle_db_column_families, transaction_accumulator_db_column_families,
+        transaction_db_column_families, transaction_info_db_column_families,
+        write_set_db_column_families,
     },
     ledger_db::LedgerDb,
     metrics::{
@@ -139,9 +140,13 @@ fn update_rocksdb_properties(
             set_property(cf, ledger_db.transaction_accumulator_db_raw())?;
         }
 
-        for cf in state_kv_db_column_families() {
-            set_property(cf, state_kv_db.metadata_db())?;
-            if state_kv_db.enabled_sharding() {
+        if !state_kv_db.enabled_sharding() {
+            for cf in state_kv_db_column_families() {
+                set_property(cf, state_kv_db.metadata_db())?;
+            }
+        } else {
+            for cf in state_kv_db_new_key_column_families() {
+                set_property(cf, state_kv_db.metadata_db())?;
                 for shard in 0..NUM_STATE_SHARDS {
                     set_shard_property(
                         cf,

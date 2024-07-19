@@ -18,7 +18,7 @@ use crate::{
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_jellyfish_merkle::node_type::NodeKey;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::Version;
 use claims::assert_le;
@@ -88,7 +88,7 @@ impl Cmd {
         let state_kv_db = Arc::new(state_kv_db);
         let overall_version = ledger_db
             .metadata_db()
-            .get_latest_version()
+            .get_synced_version()
             .expect("Overall commit progress must exist.");
         let ledger_db_version = ledger_db
             .metadata_db()
@@ -193,8 +193,7 @@ impl Cmd {
                 if Self::root_exists_at_version(state_merkle_db, closest_version)? {
                     return Ok(Some(closest_version));
                 }
-                let mut iter =
-                    ledger_metadata_db.iter::<EpochByVersionSchema>(ReadOptions::default())?;
+                let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>()?;
                 iter.seek_for_prev(&version)?;
                 match iter.next().transpose()? {
                     Some((closest_epoch_version, _)) => {
@@ -232,7 +231,9 @@ mod test {
             epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
             stale_node_index::StaleNodeIndexSchema,
             stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-            stale_state_value_index::StaleStateValueIndexSchema, state_value::StateValueSchema,
+            stale_state_value_index::StaleStateValueIndexSchema,
+            stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
+            state_value::StateValueSchema, state_value_by_key_hash::StateValueByKeyHashSchema,
             transaction::TransactionSchema, transaction_accumulator::TransactionAccumulatorSchema,
             transaction_info::TransactionInfoSchema, version_data::VersionDataSchema,
             write_set::WriteSetSchema,
@@ -273,7 +274,7 @@ mod test {
                 version += txns_to_commit.len() as u64;
             }
 
-            let db_version = db.get_latest_version().unwrap();
+            let db_version = db.get_synced_version().unwrap();
             prop_assert_eq!(db_version, version - 1);
 
             drop(db);
@@ -292,7 +293,7 @@ mod test {
             cmd.run().unwrap();
 
             let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
-            let db_version = db.get_latest_version().unwrap();
+            let db_version = db.get_synced_version().unwrap();
             prop_assert!(db_version <= target_version);
             target_version = db_version;
 
@@ -324,66 +325,86 @@ mod test {
             let ledger_metadata_db = ledger_db.metadata_db_arc();
 
             let num_frozen_nodes = num_frozen_nodes_in_accumulator(target_version + 1);
-            let mut iter = ledger_db.transaction_accumulator_db_raw().iter::<TransactionAccumulatorSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_accumulator_db_raw().iter::<TransactionAccumulatorSchema>().unwrap();
             iter.seek_to_last();
             let position = iter.next().transpose().unwrap().unwrap().0;
             prop_assert_eq!(position.to_postorder_index() + 1, num_frozen_nodes);
 
-            let mut iter = ledger_db.transaction_info_db_raw().iter::<TransactionInfoSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_info_db_raw().iter::<TransactionInfoSchema>().unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.transaction_db_raw().iter::<TransactionSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_db_raw().iter::<TransactionSchema>().unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_metadata_db.iter::<VersionDataSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_metadata_db.iter::<VersionDataSchema>().unwrap();
             iter.seek_to_last();
             prop_assert!(iter.next().transpose().unwrap().unwrap().0 <= target_version);
 
-            let mut iter = ledger_db.write_set_db_raw().iter::<WriteSetSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.write_set_db_raw().iter::<WriteSetSchema>().unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>().unwrap();
             iter.seek_to_last();
             let (version, epoch) = iter.next().transpose().unwrap().unwrap();
             prop_assert!(version <= target_version);
 
-            let mut iter = ledger_metadata_db.iter::<LedgerInfoSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_metadata_db.iter::<LedgerInfoSchema>().unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, epoch);
 
+            if sharding_config.enable_storage_sharding {
+                let mut iter = state_kv_db.metadata_db().iter::<StateValueByKeyHashSchema>().unwrap();
+                iter.seek_to_first();
+                for item in iter {
+                    let ((_, version), _) = item.unwrap();
+                    prop_assert!(version <= target_version);
+                }
 
-            let mut iter = state_kv_db.metadata_db().iter::<StateValueSchema>(ReadOptions::default()).unwrap();
+                let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexByKeyHashSchema>().unwrap();
+                iter.seek_to_first();
+                for item in iter {
+                    let version = item.unwrap().0.stale_since_version;
+                    prop_assert!(version <= target_version);
+                }
+
+            } else {
+                let mut iter = state_kv_db.metadata_db().iter::<StateValueSchema>().unwrap();
+                iter.seek_to_first();
+                for item in iter {
+                    let ((_, version), _) = item.unwrap();
+                    prop_assert!(version <= target_version);
+                }
+
+                let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>().unwrap();
             iter.seek_to_first();
             for item in iter {
-                let ((_, version), _) = item.unwrap();
+                let version = item.unwrap().0.stale_since_version;
                 prop_assert!(version <= target_version);
             }
+            }
 
-            let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>(ReadOptions::default()).unwrap();
+
+
+
+
+            let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexSchema>().unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.stale_since_version;
                 prop_assert!(version <= target_version);
             }
 
-            let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexSchema>(ReadOptions::default()).unwrap();
+            let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexCrossEpochSchema>().unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.stale_since_version;
                 prop_assert!(version <= target_version);
             }
 
-            let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexCrossEpochSchema>(ReadOptions::default()).unwrap();
-            iter.seek_to_first();
-            for item in iter {
-                let version = item.unwrap().0.stale_since_version;
-                prop_assert!(version <= target_version);
-            }
-
-            let mut iter = state_merkle_db.metadata_db().iter::<JellyfishMerkleNodeSchema>(ReadOptions::default()).unwrap();
+            let mut iter = state_merkle_db.metadata_db().iter::<JellyfishMerkleNodeSchema>().unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.version();
@@ -393,34 +414,34 @@ mod test {
             if sharding_config.enable_storage_sharding {
                 let state_merkle_db = Arc::new(state_merkle_db);
                 for i in 0..NUM_STATE_SHARDS as u8 {
-                    let mut kv_shard_iter = state_kv_db.db_shard(i).iter::<StateValueSchema>(ReadOptions::default()).unwrap();
+                    let mut kv_shard_iter = state_kv_db.db_shard(i).iter::<StateValueByKeyHashSchema>().unwrap();
                     kv_shard_iter.seek_to_first();
                     for item in kv_shard_iter {
                         let ((_, version), _) = item.unwrap();
                         prop_assert!(version <= target_version);
                     }
 
-                    let value_index_shard_iter = state_kv_db.db_shard(i).iter::<StaleStateValueIndexSchema>(ReadOptions::default()).unwrap();
+                    let value_index_shard_iter = state_kv_db.db_shard(i).iter::<StaleStateValueIndexByKeyHashSchema>().unwrap();
                     for item in value_index_shard_iter {
                         let version = item.unwrap().0.stale_since_version;
                         prop_assert!(version <= target_version);
                     }
 
-                    let mut stale_node_ind_iter = state_merkle_db.db_shard(i).iter::<StaleNodeIndexSchema>(ReadOptions::default()).unwrap();
+                    let mut stale_node_ind_iter = state_merkle_db.db_shard(i).iter::<StaleNodeIndexSchema>().unwrap();
                     stale_node_ind_iter.seek_to_first();
                     for item in stale_node_ind_iter {
                         let version = item.unwrap().0.stale_since_version;
                         prop_assert!(version <= target_version);
                     }
 
-                    let mut jelly_iter = state_merkle_db.db_shard(i).iter::<JellyfishMerkleNodeSchema>(ReadOptions::default()).unwrap();
+                    let mut jelly_iter = state_merkle_db.db_shard(i).iter::<JellyfishMerkleNodeSchema>().unwrap();
                     jelly_iter.seek_to_first();
                     for item in jelly_iter {
                         let version = item.unwrap().0.version();
                         prop_assert!(version <= target_version);
                     }
 
-                    let mut cross_iter = state_merkle_db.db_shard(i).iter::<StaleNodeIndexCrossEpochSchema>(ReadOptions::default()).unwrap();
+                    let mut cross_iter = state_merkle_db.db_shard(i).iter::<StaleNodeIndexCrossEpochSchema>().unwrap();
                     cross_iter.seek_to_first();
                     for item in cross_iter {
                         let version = item.unwrap().0.stale_since_version;

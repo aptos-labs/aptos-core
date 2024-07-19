@@ -4,20 +4,21 @@
 
 use crate::compiler::{as_module, as_script, compile_units};
 use bytes::Bytes;
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
-use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::{
+    gas::UnmeteredGasMeter,
+    resolver::{ModuleResolver, ResourceResolver},
+};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -89,8 +90,7 @@ fn test_malformed_resource() {
     let vm = MoveVM::new(move_stdlib::natives::all_natives(
         AccountAddress::from_hex_literal("0x1").unwrap(),
         move_stdlib::natives::GasParameters::zeros(),
-    ))
-    .unwrap();
+    ));
 
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
@@ -134,7 +134,7 @@ fn test_malformed_resource() {
             address: TEST_ADDR,
             module: Identifier::new("M").unwrap(),
             name: Identifier::new("Foo").unwrap(),
-            type_params: vec![],
+            type_args: vec![],
         },
         vec![0x3, 0x4, 0x5],
     );
@@ -182,7 +182,7 @@ fn test_malformed_module() {
     {
         let mut storage = InMemoryStorage::new();
         storage.publish_or_overwrite_module(m.self_id(), blob.clone());
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
         sess.execute_function_bypass_visibility(
             &module_id,
@@ -208,7 +208,7 @@ fn test_malformed_module() {
         blob[3] = 0xEF;
         let mut storage = InMemoryStorage::new();
         storage.publish_or_overwrite_module(m.self_id(), blob);
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
         let err = sess
             .execute_function_bypass_visibility(
@@ -249,7 +249,7 @@ fn test_unverifiable_module() {
         m.serialize(&mut blob).unwrap();
         storage.publish_or_overwrite_module(m.self_id(), blob);
 
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         sess.execute_function_bypass_visibility(
@@ -274,7 +274,7 @@ fn test_unverifiable_module() {
         m.serialize(&mut blob).unwrap();
         storage.publish_or_overwrite_module(m.self_id(), blob);
 
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         let err = sess
@@ -327,7 +327,7 @@ fn test_missing_module_dependency() {
         storage.publish_or_overwrite_module(m.self_id(), blob_m);
         storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         sess.execute_function_bypass_visibility(
@@ -347,7 +347,7 @@ fn test_missing_module_dependency() {
         let mut storage = InMemoryStorage::new();
         storage.publish_or_overwrite_module(n.self_id(), blob_n);
 
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         let err = sess
@@ -400,7 +400,7 @@ fn test_malformed_module_dependency() {
         storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
         storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         sess.execute_function_bypass_visibility(
@@ -426,7 +426,7 @@ fn test_malformed_module_dependency() {
         storage.publish_or_overwrite_module(m.self_id(), blob_m);
         storage.publish_or_overwrite_module(n.self_id(), blob_n);
 
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         let err = sess
@@ -480,7 +480,7 @@ fn test_unverifiable_module_dependency() {
         storage.publish_or_overwrite_module(m.self_id(), blob_m);
         storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         sess.execute_function_bypass_visibility(
@@ -506,7 +506,7 @@ fn test_unverifiable_module_dependency() {
         storage.publish_or_overwrite_module(m.self_id(), blob_m);
         storage.publish_or_overwrite_module(n.self_id(), blob_n);
 
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         let err = sess
@@ -524,32 +524,56 @@ fn test_unverifiable_module_dependency() {
     }
 }
 
-struct BogusStorage {
+struct BogusModuleStorage {
     bad_status_code: StatusCode,
 }
 
-impl ModuleResolver for BogusStorage {
-    type Error = PartialVMError;
-
+impl ModuleResolver for BogusModuleStorage {
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }
 
-impl ResourceResolver for BogusStorage {
-    type Error = PartialVMError;
-
+impl ResourceResolver for BogusModuleStorage {
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
+        unreachable!()
+    }
+}
+
+// Need another bogus storage implementation to allow querying modules but not resources.
+struct BogusResourceStorage {
+    module_storage: InMemoryStorage,
+    bad_status_code: StatusCode,
+}
+
+impl ModuleResolver for BogusResourceStorage {
+    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
+        self.module_storage.get_module_metadata(module_id)
+    }
+
+    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
+        self.module_storage.get_module(module_id)
+    }
+}
+
+impl ResourceResolver for BogusResourceStorage {
+    fn get_resource_bytes_with_metadata_and_layout(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+        _metadata: &[Metadata],
+        _maybe_layout: Option<&MoveTypeLayout>,
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }
@@ -571,10 +595,10 @@ fn test_storage_returns_bogus_error_when_loading_module() {
     let traversal_storage = TraversalStorage::new();
 
     for error_code in LIST_OF_ERROR_CODES {
-        let storage = BogusStorage {
+        let storage = BogusModuleStorage {
             bad_status_code: *error_code,
         };
-        let vm = MoveVM::new(vec![]).unwrap();
+        let vm = MoveVM::new(vec![]);
         let mut sess = vm.new_session(&storage);
 
         let err = sess
@@ -626,13 +650,6 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
     let mut s_blob = vec![];
     m.serialize(&mut m_blob).unwrap();
     s.serialize(&mut s_blob).unwrap();
-    let mut delta = ChangeSet::new();
-    delta
-        .add_module_op(m.self_id(), Op::New(m_blob.into()))
-        .unwrap();
-    delta
-        .add_module_op(s.self_id(), Op::New(s_blob.into()))
-        .unwrap();
 
     let m_id = m.self_id();
     let foo_name = Identifier::new("foo").unwrap();
@@ -640,16 +657,18 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
     let traversal_storage = TraversalStorage::new();
 
     for error_code in LIST_OF_ERROR_CODES {
-        let storage = BogusStorage {
+        let mut module_storage = InMemoryStorage::new();
+        module_storage.publish_or_overwrite_module(m.self_id(), m_blob.clone());
+        module_storage.publish_or_overwrite_module(s.self_id(), s_blob.clone());
+        let storage = BogusResourceStorage {
+            module_storage,
             bad_status_code: *error_code,
         };
-        let storage = DeltaStorage::new(&storage, &delta);
 
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
-        ))
-        .unwrap();
+        ));
         let mut sess = vm.new_session(&storage);
 
         sess.execute_function_bypass_visibility(

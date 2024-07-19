@@ -105,7 +105,7 @@ impl ModuleGenerator {
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let options = module_env.env.get_extension::<Options>().expect("options");
         let language_version = options.language_version.unwrap_or_default();
-        let gen_access_specifiers = language_version >= LanguageVersion::V2_0
+        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
         let compilation_metadata =
             CompilationMetadata::new(CompilerVersion::V2_0, language_version);
@@ -179,6 +179,10 @@ impl ModuleGenerator {
 
         let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
+            // Do not need to generate code for inline functions
+            if fun_env.is_inline() {
+                continue;
+            }
             assert!(compile_test_code || !fun_env.is_test_only());
             let acquires_list = &acquires_map[&fun_env.get_id()];
             FunctionGenerator::run(self, ctx, fun_env, acquires_list);
@@ -213,20 +217,24 @@ impl ModuleGenerator {
         }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let fields = struct_env.get_fields();
-        let field_information = FF::StructFieldInformation::Declared(
-            fields
-                .map(|f| {
-                    let field_loc = f.get_loc();
-                    self.source_map
-                        .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
-                        .expect(SOURCE_MAP_OK);
-                    let name = self.name_index(ctx, field_loc, f.get_name());
-                    let signature =
-                        FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
-                    FF::FieldDefinition { name, signature }
-                })
-                .collect(),
-        );
+        let field_information = if struct_env.is_native() {
+            FF::StructFieldInformation::Native
+        } else {
+            FF::StructFieldInformation::Declared(
+                fields
+                    .map(|f| {
+                        let field_loc = f.get_loc();
+                        self.source_map
+                            .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
+                            .expect(SOURCE_MAP_OK);
+                        let name = self.name_index(ctx, field_loc, f.get_name());
+                        let signature =
+                            FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
+                        FF::FieldDefinition { name, signature }
+                    })
+                    .collect(),
+            )
+        };
         let def = FF::StructDefinition {
             struct_handle,
             field_information,
@@ -864,6 +872,7 @@ impl<'env> ModuleContext<'env> {
         // Compute map with direct usage of resources
         let mut usage_map = module
             .get_functions()
+            .filter(|f| !f.is_inline())
             .map(|f| (f.get_id(), self.get_direct_function_acquires(&f)))
             .collect::<BTreeMap<_, _>>();
         // Now run a fixed-point loop: add resources used by called functions until there are no
@@ -871,6 +880,9 @@ impl<'env> ModuleContext<'env> {
         loop {
             let mut changes = false;
             for fun in module.get_functions() {
+                if fun.is_inline() {
+                    continue;
+                }
                 if let Some(callees) = fun.get_called_functions() {
                     let mut usage = usage_map[&fun.get_id()].clone();
                     let count = usage.len();

@@ -29,6 +29,9 @@ move-prover = { path = ".." }
 move-prover-test-utils = { path = "../test-utils" }
 tempfile = { workspace = true }
 
+# force more deterministic tests
+move-stdlib = { path = "../../move-stdlib" }
+
 [[test]]
 name = "testsuite"
 harness = false

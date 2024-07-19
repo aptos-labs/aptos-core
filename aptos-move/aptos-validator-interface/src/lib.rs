@@ -12,7 +12,7 @@ use aptos_types::{
     account_address::AccountAddress,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        Result as StateViewResult, TStateView,
+        Result as StateViewResult, StateViewId, TStateView,
     },
     transaction::{Transaction, TransactionInfo, Version},
 };
@@ -73,7 +73,7 @@ pub trait AptosValidatorInterface: Sync {
         )>,
     >;
 
-    async fn get_latest_version(&self) -> Result<Version>;
+    async fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
     async fn get_version_by_account_sequence(
         &self,
@@ -159,6 +159,10 @@ impl DebuggerStateView {
 
 impl TStateView for DebuggerStateView {
     type Key = StateKey;
+
+    fn id(&self) -> StateViewId {
+        StateViewId::Replay
+    }
 
     fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         self.get_state_value_internal(state_key, self.version)

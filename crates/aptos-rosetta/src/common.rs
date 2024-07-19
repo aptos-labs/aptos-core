@@ -154,7 +154,7 @@ pub fn native_coin_tag() -> TypeTag {
         address: AccountAddress::ONE,
         module: ident_str!(APTOS_COIN_MODULE).into(),
         name: ident_str!(APTOS_COIN_RESOURCE).into(),
-        type_params: vec![],
+        type_args: vec![],
     }))
 }
 

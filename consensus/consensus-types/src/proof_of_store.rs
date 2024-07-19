@@ -244,8 +244,8 @@ impl SignedBatchInfo {
         Ok(validator.verify(self.signer, &self.info, &self.signature)?)
     }
 
-    pub fn signature(self) -> bls12381::Signature {
-        self.signature
+    pub fn signature(&self) -> &bls12381::Signature {
+        &self.signature
     }
 
     pub fn batch_info(&self) -> &BatchInfo {

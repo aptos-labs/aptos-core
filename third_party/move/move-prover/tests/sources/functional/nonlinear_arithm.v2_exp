@@ -57,7 +57,7 @@ error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/nonlinear_arithm.move:72:5
    │
 70 │           a * b * c * d
-   │           --------- abort happened here with execution failure
+   │           ----- abort happened here with execution failure
 71 │       }
 72 │ ╭     spec overflow_u8_mul_4_incorrect {
 73 │ │         aborts_if false;
@@ -76,7 +76,7 @@ error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/nonlinear_arithm.move:90:5
    │
 88 │           a * b * c * d
-   │           --------- abort happened here with execution failure
+   │           ----- abort happened here with execution failure
 89 │       }
 90 │ ╭     spec overflow_u64_mul_4_incorrect {
 91 │ │         aborts_if false;

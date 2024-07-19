@@ -167,6 +167,7 @@ impl K8sSwarm {
         for group_netem in &swarm_netem.group_netems {
             let source_instance_labels = self.get_instance_labels(&group_netem.source_nodes);
             let target_instance_labels = self.get_instance_labels(&group_netem.target_nodes);
+            let service_targets = self.get_service_targets(&group_netem.target_nodes);
 
             network_chaos_specs.push(format!(
                 include_str!(NETEM_CHAOS_TEMPLATE!()),
@@ -180,6 +181,7 @@ impl K8sSwarm {
                 instance_labels = &source_instance_labels,
                 target_instance_labels = &target_instance_labels,
                 rate = group_netem.rate_in_mbps,
+                service_targets = &service_targets,
             ));
         }
 
@@ -284,5 +286,24 @@ impl K8sSwarm {
             // TODO: should we throw an error here instead of failing silently?
             INVALID_NODE_STRING
         }
+    }
+
+    fn get_service_name(&self, node: &AccountAddress) -> Option<String> {
+        if let Some(validator) = self.validator(*node) {
+            validator.service_name()
+        } else if let Some(fullnode) = self.full_node(*node) {
+            fullnode.service_name()
+        } else {
+            // TODO: should we throw an error here instead of failing silently?
+            None
+        }
+    }
+
+    pub(crate) fn get_service_targets(&self, target_nodes: &[AccountAddress]) -> String {
+        target_nodes
+            .iter()
+            .filter_map(|node| self.get_service_name(node))
+            .collect::<Vec<_>>()
+            .join(",")
     }
 }

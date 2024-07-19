@@ -31,16 +31,17 @@ use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
-use aptos_db_indexer::Indexer;
+use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, db_anyhow as anyhow, db_ensure as ensure,
-    db_other_bail as bail, state_delta::StateDelta, AptosDbError, DbReader, DbWriter,
-    ExecutedTrees, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, db_ensure as ensure, db_other_bail as bail,
+    state_delta::StateDelta, AptosDbError, DbReader, DbWriter, ExecutedTrees, Order, Result,
+    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -70,8 +71,6 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::data_cache::AsMoveResolver;
-use move_resource_viewer::MoveValueAnnotator;
 use rayon::prelude::*;
 use std::{
     cell::Cell,
@@ -124,6 +123,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -134,6 +134,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             false,
+            internal_indexer_db,
         )
     }
 
@@ -155,6 +156,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             true,
+            None,
         )
     }
 

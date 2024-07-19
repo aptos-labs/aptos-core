@@ -3,6 +3,26 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Upgraded indexer processors for localnet from 5244b84fa5ed872e5280dc8df032d744d62ad29d to d954cf4eef9ceabdd941b2e08923fff83984b591. Upgraded Hasura metadata accordingly.
+- Upgraded Hasura image from 2.36.1 to 2.40.2-ce. Note that we use the Community Edition, so the console won't ask users to upgrade to enterprise anymore / hint at any enterprise features.
+
+## [3.5.0] - 2024/07/06
+- Add balance command to easily get account balances for APT currently
+- Add network to config file
+- Add explorer links to initialized accounts, and transaction submissions
+- Alias some move commands as common misnomers (e.g. build -> compile, deploy -> publish)
+- Add "hello_blockchain" template to move init command
+
+## [3.4.1] - 2024/05/31
+- Upgraded indexer processors for localnet from ca60e51b53c3be6f9517de7c73d4711e9c1f7236 to 5244b84fa5ed872e5280dc8df032d744d62ad29d. Upgraded Hasura metadata accordingly.
+
+## [3.4.0] - 2024/05/30
+- Adds a check for safe usage of randomness features. Public functions are not allowed to call randomness features unless explicitly allowed via attribute `#[lint::allow_unsafe_randomness]`.
+- The Move syntax now supports structured attribute names, as in `#[attribute_area::attribute_name]`.
+- Upgraded indexer processors for localnet from a11f0b6532349aa6b9a80c9a1d77524f02d8a013 to ca60e51b53c3be6f9517de7c73d4711e9c1f7236. Upgraded Hasura metadata accordingly.
+
+## [3.3.1] - 2024/05/21
+- Fixed incompatibility bug that broken local simulation and gas profiling.
 
 ## [3.3.0] - 2024/05/03
 - **Breaking Change** Update View functions to use BCS for submission.  Allows for all arguments to be supported in view functions.  Note some input arguments that were previously inputted as strings may be handled differently.

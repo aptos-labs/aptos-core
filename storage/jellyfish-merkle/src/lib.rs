@@ -94,6 +94,7 @@ use aptos_types::{
     transaction::Version,
 };
 use arr_macro::arr;
+use itertools::{EitherOrBoth, Itertools};
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::arbitrary::Arbitrary;
@@ -425,10 +426,8 @@ where
             shard_root_nodes.len()
         );
 
-        let children: Children = shard_root_nodes
-            .iter()
-            .enumerate()
-            .filter_map(|(i, shard_root_node)| {
+        let children = Children::from_sorted(shard_root_nodes.iter().enumerate().filter_map(
+            |(i, shard_root_node)| {
                 let node_type = shard_root_node.node_type();
                 match node_type {
                     NodeType::Null => None,
@@ -437,8 +436,8 @@ where
                         Child::new(shard_root_node.hash(), version, node_type),
                     )),
                 }
-            })
-            .collect();
+            },
+        ));
         let root_node = if children.is_empty() {
             Node::Null
         } else {
@@ -509,7 +508,7 @@ where
                 // There is a small possibility that the old internal node is intact.
                 // Traverse all the path touched by `kvs` from this internal node.
                 let range_iter = NibbleRangeIterator::new(kvs, depth);
-                let new_children: Vec<_> = if depth <= MAX_PARALLELIZABLE_DEPTH {
+                let new_child_nodes_or_deletes: Vec<_> = if depth <= MAX_PARALLELIZABLE_DEPTH {
                     range_iter
                         .collect::<Vec<_>>()
                         .par_iter()
@@ -555,57 +554,67 @@ where
                         .collect::<Result<_>>()?
                 };
 
-                // Reuse the current `InternalNode` in memory to create a new internal node.
-                let mut old_children: Children = internal_node.into();
-                let mut new_created_children = HashMap::new();
-                for (child_nibble, child_option) in new_children {
-                    if let Some(child) = child_option {
-                        new_created_children.insert(child_nibble, child);
-                    } else {
-                        old_children.remove(&child_nibble);
-                    }
-                }
+                let children: Vec<_> = internal_node
+                    .children_sorted()
+                    .merge_join_by(new_child_nodes_or_deletes, |(n, _), (m, _)| (*n).cmp(m))
+                    .filter(|old_or_new| {
+                        !matches!(
+                            old_or_new,
+                            EitherOrBoth::Right((_, None)) | EitherOrBoth::Both((_, _), (_, None))
+                        )
+                    })
+                    .collect();
 
-                if old_children.is_empty() && new_created_children.is_empty() {
+                if children.is_empty() {
+                    // all children are deleted
                     return Ok(None);
-                } else if old_children.len() <= 1 && new_created_children.len() <= 1 {
-                    if let Some((new_nibble, new_child)) = new_created_children.iter().next() {
-                        if let Some((old_nibble, _old_child)) = old_children.iter().next() {
-                            if old_nibble == new_nibble && new_child.is_leaf() {
-                                return Ok(Some(new_child.clone()));
+                }
+
+                if children.len() == 1 {
+                    // only one child left, could be a leaf node that we need to push up one level.
+                    let only_child = children.first().unwrap();
+                    match only_child {
+                        EitherOrBoth::Left((nibble, old_child)) => {
+                            if old_child.is_leaf() {
+                                // it's an old leaf
+                                let child_key =
+                                    node_key.gen_child_node_key(old_child.version, **nibble);
+                                let node = self.reader.get_node_with_tag(&child_key, "commit")?;
+                                batch.put_stale_node(child_key, version);
+                                return Ok(Some(node));
                             }
-                        } else if new_child.is_leaf() {
-                            return Ok(Some(new_child.clone()));
-                        }
-                    } else {
-                        let (old_child_nibble, old_child) =
-                            old_children.iter().next().expect("must exist");
-                        if old_child.is_leaf() {
-                            let old_child_node_key =
-                                node_key.gen_child_node_key(old_child.version, *old_child_nibble);
-                            let old_child_node = self
-                                .reader
-                                .get_node_with_tag(&old_child_node_key, "commit")?;
-                            batch.put_stale_node(old_child_node_key, version);
-                            return Ok(Some(old_child_node));
-                        }
+                        },
+                        EitherOrBoth::Right((_nibble, new_node))
+                        | EitherOrBoth::Both((_, _), (_nibble, new_node)) => {
+                            let new_node =
+                                new_node.as_ref().expect("Deletion already filtered out.");
+                            if new_node.is_leaf() {
+                                // it's a new leaf
+                                return Ok(Some(new_node.clone()));
+                            }
+                        },
                     }
                 }
 
-                let mut new_children = old_children;
-                for (child_index, new_child_node) in new_created_children {
-                    let new_child_node_key = node_key.gen_child_node_key(version, child_index);
-                    new_children.insert(
-                        child_index,
-                        Child::new(
-                            get_hash(&new_child_node_key, &new_child_node, hash_cache),
-                            version,
-                            new_child_node.node_type(),
-                        ),
-                    );
-                    batch.put_node(new_child_node_key, new_child_node);
-                }
-                let new_internal_node = InternalNode::new(new_children);
+                let children = children.into_iter().map(|old_or_new| {
+                    match old_or_new {
+                        // an old child
+                        EitherOrBoth::Left((nibble, old_child)) => (*nibble, old_child.clone()),
+                        // a new or updated child
+                        EitherOrBoth::Right((nibble, new_node))
+                        | EitherOrBoth::Both((_, _), (nibble, new_node)) => {
+                            let new_node =
+                                new_node.as_ref().expect("Deletion already filtered out.");
+                            let child_key = node_key.gen_child_node_key(version, nibble);
+                            batch.put_node(child_key, new_node.clone());
+                            let child =
+                                Child::for_node(node_key, nibble, new_node, hash_cache, version);
+                            (nibble, child)
+                        },
+                    }
+                });
+
+                let new_internal_node = InternalNode::new(Children::from_sorted(children));
                 Ok(Some(new_internal_node.into()))
             },
             Some(Node::Leaf(leaf_node)) => batch_update_subtree_with_existing_leaf(
@@ -700,7 +709,7 @@ where
         key: HashValue,
         version: Version,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProof)> {
-        self.get_with_proof_ext(key, version)
+        self.get_with_proof_ext(key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
@@ -708,10 +717,11 @@ where
         &self,
         key: HashValue,
         version: Version,
+        target_root_depth: usize,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
-        let mut siblings = vec![];
+        let mut out_siblings = Vec::with_capacity(8); // reduces reallocation
         let nibble_path = NibblePath::new_even(key.to_vec());
         let mut nibble_iter = nibble_path.nibbles();
 
@@ -742,22 +752,24 @@ where
                     let queried_child_index = nibble_iter
                         .next()
                         .ok_or_else(|| AptosDbError::Other("ran out of nibbles".to_string()))?;
-                    let (child_node_key, mut siblings_in_internal) = internal_node
-                        .get_child_with_siblings(
-                            &next_node_key,
-                            queried_child_index,
-                            Some(self.reader),
-                        )?;
-                    siblings.append(&mut siblings_in_internal);
+                    let child_node_key = internal_node.get_child_with_siblings(
+                        &next_node_key,
+                        queried_child_index,
+                        Some(self.reader),
+                        &mut out_siblings,
+                        nibble_depth * 4,
+                        target_root_depth,
+                    )?;
                     next_node_key = match child_node_key {
                         Some(node_key) => node_key,
                         None => {
                             return Ok((
                                 None,
-                                SparseMerkleProofExt::new(None, {
-                                    siblings.reverse();
-                                    siblings
-                                }),
+                                SparseMerkleProofExt::new_partial(
+                                    None,
+                                    out_siblings,
+                                    target_root_depth,
+                                ),
                             ));
                         },
                     };
@@ -769,10 +781,11 @@ where
                         } else {
                             None
                         },
-                        SparseMerkleProofExt::new(Some(leaf_node.into()), {
-                            siblings.reverse();
-                            siblings
-                        }),
+                        SparseMerkleProofExt::new_partial(
+                            Some(leaf_node.into()),
+                            out_siblings,
+                            target_root_depth,
+                        ),
                     ));
                 },
                 Node::Null => {
@@ -795,7 +808,6 @@ where
         let siblings = proof
             .siblings()
             .iter()
-            .rev()
             .zip(rightmost_key_to_prove.iter_bits())
             .filter_map(|(sibling, bit)| {
                 // We only need to keep the siblings on the right.
@@ -930,24 +942,21 @@ where
         let (_, child) = children.pop().expect("Must exist");
         Ok(Some(child))
     } else {
-        let new_internal_node = InternalNode::new(
-            children
-                .into_iter()
-                .map(|(child_index, new_child_node)| {
-                    let new_child_node_key = node_key.gen_child_node_key(version, child_index);
-                    let result = (
-                        child_index,
-                        Child::new(
-                            get_hash(&new_child_node_key, &new_child_node, hash_cache),
-                            version,
-                            new_child_node.node_type(),
-                        ),
-                    );
-                    batch.put_node(new_child_node_key, new_child_node);
-                    result
-                })
-                .collect(),
-        );
+        let new_internal_node = InternalNode::new(Children::from_sorted(children.into_iter().map(
+            |(child_index, new_child_node)| {
+                let new_child_node_key = node_key.gen_child_node_key(version, child_index);
+                let result = (
+                    child_index,
+                    Child::new(
+                        get_hash(&new_child_node_key, &new_child_node, hash_cache),
+                        version,
+                        new_child_node.node_type(),
+                    ),
+                );
+                batch.put_node(new_child_node_key, new_child_node);
+                result
+            },
+        )));
         Ok(Some(new_internal_node.into()))
     }
 }
@@ -1007,6 +1016,7 @@ where
         }
         if isolated_existing_leaf {
             children.push((existing_leaf_bucket, existing_leaf_node.into()));
+            children.sort_by_key(|(n, _)| *n)
         }
 
         if children.is_empty() {
@@ -1015,24 +1025,21 @@ where
             let (_, child) = children.pop().expect("Must exist");
             Ok(Some(child))
         } else {
-            let new_internal_node = InternalNode::new(
-                children
-                    .into_iter()
-                    .map(|(child_index, new_child_node)| {
-                        let new_child_node_key = node_key.gen_child_node_key(version, child_index);
-                        let result = (
-                            child_index,
-                            Child::new(
-                                get_hash(&new_child_node_key, &new_child_node, hash_cache),
-                                version,
-                                new_child_node.node_type(),
-                            ),
-                        );
-                        batch.put_node(new_child_node_key, new_child_node);
-                        result
-                    })
-                    .collect(),
-            );
+            let children = children.into_iter().map(|(child_index, new_child_node)| {
+                let new_child_node_key = node_key.gen_child_node_key(version, child_index);
+                let result = (
+                    child_index,
+                    Child::new(
+                        get_hash(&new_child_node_key, &new_child_node, hash_cache),
+                        version,
+                        new_child_node.node_type(),
+                    ),
+                );
+                batch.put_node(new_child_node_key, new_child_node);
+                result
+            });
+            let new_internal_node = InternalNode::new(Children::from_sorted(children));
+
             Ok(Some(new_internal_node.into()))
         }
     }

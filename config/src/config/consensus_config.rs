@@ -6,13 +6,17 @@ use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
     QuorumStoreConfig, ReliableBroadcastConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
+use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
-pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 1900;
+const MAX_SENDING_BLOCK_UNIQUE_TXNS: u64 = 1900;
+const MAX_SENDING_BLOCK_TXNS: u64 = 4500;
+pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
+    Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
 // stop reducing size at this point, so 1MB transactions can still go through
 const MIN_BLOCK_BYTES_OVERRIDE: u64 = 1024 * 1024 + BATCH_PADDING_BYTES as u64;
 
@@ -22,6 +26,7 @@ pub struct ConsensusConfig {
     // length of inbound queue of messages
     pub max_network_channel_size: usize,
     pub max_sending_block_txns: u64,
+    pub max_sending_block_unique_txns: u64,
     pub max_sending_block_bytes: u64,
     pub max_sending_inline_txns: u64,
     pub max_sending_inline_bytes: u64,
@@ -131,7 +136,7 @@ pub struct PipelineBackpressureValues {
     // If we want to dynamically increase it beyond quorum_store_poll_time,
     // we need to adjust timeouts other nodes use for the backpressured round.
     pub backpressure_proposal_delay_ms: u64,
-    pub max_txns_from_block_to_execute: Option<usize>,
+    pub max_txns_from_block_to_execute: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -142,7 +147,7 @@ pub struct ChainHealthBackoffValues {
     pub max_sending_block_bytes_override: u64,
 
     pub backoff_proposal_delay_ms: u64,
-    pub max_txns_from_block_to_execute: Option<usize>,
+    pub max_txns_from_block_to_execute: Option<u64>,
 }
 
 impl Default for ConsensusConfig {
@@ -150,8 +155,9 @@ impl Default for ConsensusConfig {
         ConsensusConfig {
             max_network_channel_size: 1024,
             max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
+            max_sending_block_unique_txns: MAX_SENDING_BLOCK_UNIQUE_TXNS,
             max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
-            max_receiving_block_txns: 10000.max(2 * MAX_SENDING_BLOCK_TXNS),
+            max_receiving_block_txns: *MAX_RECEIVING_BLOCK_TXNS,
             max_sending_inline_txns: 100,
             max_sending_inline_bytes: 200 * 1024,       // 200 KB
             max_receiving_block_bytes: 6 * 1024 * 1024, // 6MB

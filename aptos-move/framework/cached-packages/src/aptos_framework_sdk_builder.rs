@@ -206,6 +206,21 @@ pub enum EntryFunctionCall {
         proposal_id: u64,
     },
 
+    /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
+    AptosGovernanceBatchPartialVote {
+        stake_pools: Vec<AccountAddress>,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    },
+
+    /// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
+    AptosGovernanceBatchVote {
+        stake_pools: Vec<AccountAddress>,
+        proposal_id: u64,
+        should_pass: bool,
+    },
+
     /// Create a single-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
@@ -893,6 +908,8 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
+    TransactionFeeConvertToAptosFaBurnRef {},
+
     /// Used in on-chain governances to update the major version for the next epoch.
     /// Example usage:
     /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
@@ -1095,6 +1112,22 @@ impl EntryFunctionCall {
             AptosGovernanceAddApprovedScriptHashScript { proposal_id } => {
                 aptos_governance_add_approved_script_hash_script(proposal_id)
             },
+            AptosGovernanceBatchPartialVote {
+                stake_pools,
+                proposal_id,
+                voting_power,
+                should_pass,
+            } => aptos_governance_batch_partial_vote(
+                stake_pools,
+                proposal_id,
+                voting_power,
+                should_pass,
+            ),
+            AptosGovernanceBatchVote {
+                stake_pools,
+                proposal_id,
+                should_pass,
+            } => aptos_governance_batch_vote(stake_pools, proposal_id, should_pass),
             AptosGovernanceCreateProposal {
                 stake_pool,
                 execution_hash,
@@ -1538,6 +1571,9 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
+            TransactionFeeConvertToAptosFaBurnRef {} => {
+                transaction_fee_convert_to_aptos_fa_burn_ref()
+            },
             VersionSetForNextEpoch { major } => version_set_for_next_epoch(major),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
@@ -2041,6 +2077,56 @@ pub fn aptos_governance_add_approved_script_hash_script(proposal_id: u64) -> Tra
         ident_str!("add_approved_script_hash_script").to_owned(),
         vec![],
         vec![bcs::to_bytes(&proposal_id).unwrap()],
+    ))
+}
+
+/// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
+pub fn aptos_governance_batch_partial_vote(
+    stake_pools: Vec<AccountAddress>,
+    proposal_id: u64,
+    voting_power: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("batch_partial_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pools).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&voting_power).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
+pub fn aptos_governance_batch_vote(
+    stake_pools: Vec<AccountAddress>,
+    proposal_id: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("batch_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pools).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
     ))
 }
 
@@ -4150,6 +4236,21 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
+pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("transaction_fee").to_owned(),
+        ),
+        ident_str!("convert_to_aptos_fa_burn_ref").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Used in on-chain governances to update the major version for the next epoch.
 /// Example usage:
 /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
@@ -4758,6 +4859,33 @@ mod decoder {
                     proposal_id: bcs::from_bytes(script.args().get(0)?).ok()?,
                 },
             )
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_governance_batch_partial_vote(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceBatchPartialVote {
+                stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_governance_batch_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceBatchVote {
+                stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
         } else {
             None
         }
@@ -5993,6 +6121,16 @@ mod decoder {
         }
     }
 
+    pub fn transaction_fee_convert_to_aptos_fa_burn_ref(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TransactionFeeConvertToAptosFaBurnRef {})
+        } else {
+            None
+        }
+    }
+
     pub fn version_set_for_next_epoch(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetForNextEpoch {
@@ -6302,6 +6440,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_add_approved_script_hash_script".to_string(),
             Box::new(decoder::aptos_governance_add_approved_script_hash_script),
+        );
+        map.insert(
+            "aptos_governance_batch_partial_vote".to_string(),
+            Box::new(decoder::aptos_governance_batch_partial_vote),
+        );
+        map.insert(
+            "aptos_governance_batch_vote".to_string(),
+            Box::new(decoder::aptos_governance_batch_vote),
         );
         map.insert(
             "aptos_governance_create_proposal".to_string(),
@@ -6691,6 +6837,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_proxy_set_voter".to_string(),
             Box::new(decoder::staking_proxy_set_voter),
+        );
+        map.insert(
+            "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),
+            Box::new(decoder::transaction_fee_convert_to_aptos_fa_burn_ref),
         );
         map.insert(
             "version_set_for_next_epoch".to_string(),

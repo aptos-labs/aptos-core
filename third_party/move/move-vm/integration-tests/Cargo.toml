@@ -14,7 +14,7 @@ edition = "2021"
 anyhow = { workspace = true }
 bytes = { workspace = true }
 memory-stats = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
+move-binary-format = { path = "../../move-binary-format", features = ["testing"] }
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 move-compiler = { path = "../../move-compiler" }
 smallvec = { workspace = true }

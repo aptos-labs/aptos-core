@@ -1186,7 +1186,8 @@ function as its payload.
 
 
 
-<pre><code><b>pragma</b> unroll = 32;
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>pragma</b> unroll = 32;
 <b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 </code></pre>
 

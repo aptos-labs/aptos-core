@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    test_utils::{create_and_fund_account, MAX_CATCH_UP_WAIT_SECS},
+    utils::{create_and_fund_account, MAX_CATCH_UP_WAIT_SECS},
 };
 use aptos::{
     account::create::DEFAULT_FUNDED_COINS,
@@ -42,7 +42,7 @@ use std::{
 
 #[tokio::test]
 async fn test_analyze_validators() {
-    let (mut swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
             *genesis_stake_amount = 100000;
@@ -388,7 +388,7 @@ async fn test_onchain_shuffling_change() {
 
     assert_eq!(
         current_execution_config.transaction_shuffler_type(),
-        TransactionShufflerType::SenderAwareV2(32),
+        TransactionShufflerType::default_for_genesis(),
     );
 
     assert_reordering(&mut swarm, true).await;
@@ -545,7 +545,7 @@ pub(crate) fn generate_blob(data: &[u8]) -> String {
 async fn test_large_total_stake() {
     // just barelly below u64::MAX
     const BASE: u64 = 10_000_000_000_000_000_000;
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_genesis_stake(Arc::new(|_, genesis_stake_amount| {
             // make sure we have quorum
             *genesis_stake_amount = BASE;
@@ -613,7 +613,7 @@ async fn test_nodes_rewards() {
     // with 10% APY, BASE amount gives 100 rewards per second
     const BASE: u64 = 3600u64 * 24 * 365 * 10 * 100;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(|_, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
@@ -946,7 +946,7 @@ async fn test_nodes_rewards() {
 
 #[tokio::test]
 async fn test_register_and_update_validator() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .build_with_cli(0)
         .await;
@@ -1042,7 +1042,7 @@ async fn test_register_and_update_validator() {
 
 #[tokio::test]
 async fn test_join_and_leave_validator() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
@@ -1207,7 +1207,7 @@ async fn test_join_and_leave_validator() {
 
 #[tokio::test]
 async fn test_owner_create_and_delegate_flow() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
@@ -1223,7 +1223,8 @@ async fn test_owner_create_and_delegate_flow() {
             genesis_config.epoch_duration_secs = 5;
             genesis_config.recurring_lockup_duration_secs = 10;
             genesis_config.voting_duration_secs = 5;
-            genesis_config.min_stake = 500000
+            genesis_config.min_stake = 500000;
+            genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
         }))
         .build_with_cli(0)
         .await;

@@ -98,7 +98,7 @@ impl SMRNode {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, None);
+        let network_events = NetworkEvents::new(consensus_rx, None, true);
         let network_service_events =
             NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
 
