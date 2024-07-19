@@ -1356,6 +1356,7 @@ module aptos_framework::stake {
 
     public fun next_validator_consensus_infos(): vector<ValidatorConsensusInfo> acquires ValidatorSet, ValidatorPerformance, StakePool, ValidatorFees, ValidatorConfig {
         // Init.
+        debug::print(&1359);
         let cur_validator_set = borrow_global<ValidatorSet>(@aptos_framework);
         let staking_config = staking_config::get();
         let validator_perf = borrow_global<ValidatorPerformance>(@aptos_framework);
@@ -1363,6 +1364,7 @@ module aptos_framework::stake {
         let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config);
 
         // Compute new validator set.
+        debug::print(&1367);
         let new_active_validators = vector[];
         let num_new_actives = 0;
         let candidate_idx = 0;
@@ -1373,6 +1375,7 @@ module aptos_framework::stake {
             assume num_cur_actives + num_cur_pending_actives <= MAX_U64;
         };
         let num_candidates = num_cur_actives + num_cur_pending_actives;
+        debug::print(&1378);
         while ({
             spec {
                 invariant candidate_idx <= num_candidates;
@@ -1450,6 +1453,7 @@ module aptos_framework::stake {
             candidate_idx = candidate_idx + 1;
         };
 
+        debug::print(&1456);
         let new_validator_set = ValidatorSet {
             consensus_scheme: cur_validator_set.consensus_scheme,
             active_validators: new_active_validators,
@@ -1459,7 +1463,9 @@ module aptos_framework::stake {
             total_joining_power: 0,
         };
 
-        validator_consensus_infos_from_validator_set(&new_validator_set)
+        let ret = validator_consensus_infos_from_validator_set(&new_validator_set);
+        debug::print(&1467);
+        ret
     }
 
     public(friend) fun finalize_next_validator_set() acquires ValidatorSet, ValidatorPerformance, StakePool, ValidatorFees, ValidatorConfig {
@@ -1780,6 +1786,7 @@ module aptos_framework::stake {
     #[test_only]
     use aptos_framework::aptos_coin;
     use aptos_std::bls12381::proof_of_possession_from_bytes;
+    use aptos_std::debug;
     use aptos_framework::next_validator_set;
     use aptos_framework::reconfiguration_state;
     use aptos_framework::validator_consensus_info;

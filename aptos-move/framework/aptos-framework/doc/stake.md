@@ -174,6 +174,7 @@ or if their stake drops below the min required, they would get removed at the en
 <b>use</b> <a href="../../aptos-stdlib/doc/bls12381.md#0x1_bls12381">0x1::bls12381</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -3829,6 +3830,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
 
 <pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_next_validator_consensus_infos">next_validator_consensus_infos</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt; <b>acquires</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a> {
     // Init.
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&1359);
     <b>let</b> cur_validator_set = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
     <b>let</b> <a href="staking_config.md#0x1_staking_config">staking_config</a> = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
     <b>let</b> validator_perf = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
@@ -3836,6 +3838,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
     <b>let</b> (rewards_rate, rewards_rate_denominator) = <a href="staking_config.md#0x1_staking_config_get_reward_rate">staking_config::get_reward_rate</a>(&<a href="staking_config.md#0x1_staking_config">staking_config</a>);
 
     // Compute new validator set.
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&1367);
     <b>let</b> new_active_validators = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> num_new_actives = 0;
     <b>let</b> candidate_idx = 0;
@@ -3846,6 +3849,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         <b>assume</b> num_cur_actives + num_cur_pending_actives &lt;= <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>;
     };
     <b>let</b> num_candidates = num_cur_actives + num_cur_pending_actives;
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&1378);
     <b>while</b> ({
         <b>spec</b> {
             <b>invariant</b> candidate_idx &lt;= num_candidates;
@@ -3923,6 +3927,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         candidate_idx = candidate_idx + 1;
     };
 
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&1456);
     <b>let</b> new_validator_set = <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
         consensus_scheme: cur_validator_set.consensus_scheme,
         active_validators: new_active_validators,
@@ -3932,7 +3937,9 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         total_joining_power: 0,
     };
 
-    <a href="stake.md#0x1_stake_validator_consensus_infos_from_validator_set">validator_consensus_infos_from_validator_set</a>(&new_validator_set)
+    <b>let</b> ret = <a href="stake.md#0x1_stake_validator_consensus_infos_from_validator_set">validator_consensus_infos_from_validator_set</a>(&new_validator_set);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&1467);
+    ret
 }
 </code></pre>
 
