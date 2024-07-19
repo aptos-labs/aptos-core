@@ -1888,7 +1888,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         ),
                         (
                             friend_vis_loc.clone(),
-                            "friend visibility used here".to_string(),
+                            "friend visibility declared here".to_string(),
                         ),
                     ],
                 );
