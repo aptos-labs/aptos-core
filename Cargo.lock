@@ -1545,13 +1545,18 @@ dependencies = [
 name = "aptos-experimental-layered-map"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "aptos-crypto",
  "aptos-drop-helper",
  "aptos-infallible",
  "aptos-metrics-core",
  "bitvec 1.0.1",
+ "criterion",
+ "itertools 0.12.1",
+ "jemallocator",
  "once_cell",
  "proptest",
+ "rand 0.7.3",
 ]
 
 [[package]]

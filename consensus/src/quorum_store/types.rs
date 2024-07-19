@@ -74,6 +74,10 @@ impl PersistedValue {
         }
         vec![]
     }
+
+    pub fn unpack(self) -> (BatchInfo, Option<Vec<SignedTransaction>>) {
+        (self.info, self.maybe_payload)
+    }
 }
 
 impl Deref for PersistedValue {

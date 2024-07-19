@@ -290,7 +290,6 @@ impl BlockStore {
         root_metadata: RootMetadata,
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
-        order_vote_enabled: bool,
     ) {
         info!(
             "Rebuilding block tree. root {:?}, blocks {:?}, qcs {:?}",
@@ -318,7 +317,7 @@ impl BlockStore {
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
-            order_vote_enabled,
+            self.order_vote_enabled,
             self.pending_blocks.clone(),
         )
         .await;

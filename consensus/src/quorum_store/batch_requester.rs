@@ -6,7 +6,7 @@ use crate::{
     network::QuorumStoreSender,
     quorum_store::{
         counters,
-        types::{BatchRequest, BatchResponse},
+        types::{BatchRequest, BatchResponse, PersistedValue},
     },
 };
 use aptos_consensus_types::proof_of_store::{BatchInfo, ProofOfStore};
@@ -132,6 +132,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         &self,
         proof: ProofOfStore,
         ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
+        mut subscriber_rx: oneshot::Receiver<PersistedValue>,
     ) -> Option<(BatchInfo, Vec<SignedTransaction>)> {
         let digest = *proof.digest();
         let expiration = proof.expiration();
@@ -190,6 +191,19 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 debug!("QS: batch request error, digest:{}, error:{:?}", digest, e);
                             }
                         }
+                    },
+                    result = &mut subscriber_rx => {
+                        match result {
+                            Ok(persisted_value) => {
+                                counters::RECEIVED_BATCH_FROM_SUBSCRIPTION_COUNT.inc();
+                                let (info, maybe_payload) = persisted_value.unpack();
+                                request_state.serve_request(*info.digest(), maybe_payload);
+                                return None;
+                            }
+                            Err(err) => {
+                                debug!("channel closed: {}", err);
+                            }
+                        };
                     },
                 }
             }
