@@ -18,7 +18,7 @@
 use crate::{
     counters::{
         self, network_application_inbound_traffic, network_application_outbound_traffic,
-        DECLINED_LABEL, FAILED_LABEL, RECEIVED_LABEL, SENT_LABEL,
+        DECLINED_LABEL, FAILED_LABEL, RECEIVED_LABEL, SENT_LABEL, UNKNOWN_LABEL,
     },
     logging::NetworkSchema,
     peer_manager::{PeerManagerError, TransportNotification},
@@ -451,9 +451,8 @@ where
                 );
                 match self.upstream_handlers.get(&direct.protocol_id) {
                     None => {
-                        // TODO: better label than "declined"? more like "garbage-in"
-                        counters::direct_send_messages(&self.network_context, DECLINED_LABEL).inc();
-                        counters::direct_send_bytes(&self.network_context, DECLINED_LABEL)
+                        counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
+                        counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
                             .inc_by(data_len as u64);
                     },
                     Some(handler) => {
@@ -499,7 +498,9 @@ where
             NetworkMessage::RpcRequest(request) => {
                 match self.upstream_handlers.get(&request.protocol_id) {
                     None => {
-                        // TODO: count error
+                        counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
+                        counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
+                            .inc_by(request.raw_request.len() as u64);
                     },
                     Some(handler) => {
                         let sender = self.connection_metadata.remote_peer_id;
