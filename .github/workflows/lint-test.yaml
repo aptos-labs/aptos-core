@@ -170,7 +170,6 @@ jobs:
         uses: ./.github/actions/rust-unit-tests
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_ANALYTICS_TOKEN }}
 
   # Run the cached packages build. This is a PR required job.
   rust-build-cached-packages:
