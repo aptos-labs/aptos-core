@@ -578,6 +578,13 @@ impl ExecutableTransactions {
             ExecutableTransactions::Sharded(_) => unimplemented!(),
         }
     }
+
+    pub fn append(&mut self, txns: impl Iterator<Item = SignatureVerifiedTransaction>) {
+        match self {
+            ExecutableTransactions::Unsharded(transactions) => transactions.extend(txns),
+            ExecutableTransactions::Sharded(_) => unimplemented!(),
+        }
+    }
 }
 
 impl From<Vec<SignatureVerifiedTransaction>> for ExecutableTransactions {

@@ -36,16 +36,17 @@ use aptos_types::{
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_value::StateValue, StateViewId},
-    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+    transaction::{
+        scheduled_transaction::ScheduledTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
+    },
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use move_core_types::{
-    account_address::AccountAddress,
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
 };
-use serde::{Deserialize, Serialize};
 use std::{marker::PhantomData, sync::Arc};
 
 pub trait TransactionBlockExecutor: Send + Sync {
@@ -186,13 +187,6 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ScheduledTransaction {
-    scheduled_time: u64,
-    payload: Vec<u8>,
-    sender: AccountAddress,
-}
-
 impl<V> BlockExecutorInner<V>
 where
     V: TransactionBlockExecutor,
@@ -210,7 +204,7 @@ where
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let ExecutableBlock {
             block_id,
-            transactions,
+            mut transactions,
         } = block;
         let mut block_vec = self
             .block_tree
@@ -280,6 +274,9 @@ where
                 )
                 .expect("failed to deserialize scheduled transactions");
                 println!("scheduled_transactions: {:?}", scheduled_transactions);
+                transactions.append(scheduled_transactions.into_iter().map(|txn| {
+                    SignatureVerifiedTransaction::Valid(Transaction::ScheduledTransaction(txn))
+                }));
 
                 let chunk_output = {
                     let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();

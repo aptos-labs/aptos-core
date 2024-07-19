@@ -47,6 +47,7 @@ mod block_output;
 mod change_set;
 mod module;
 mod multisig;
+pub mod scheduled_transaction;
 mod script;
 pub mod signature_verified_transaction;
 pub mod user_transaction_context;
@@ -58,7 +59,8 @@ use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
     block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
     fee_statement::FeeStatement, proof::accumulator::InMemoryEventAccumulator,
-    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
+    transaction::scheduled_transaction::ScheduledTransaction, validator_txn::ValidatorTransaction,
+    write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -1966,6 +1968,9 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     /// Replaces StateCheckpoint, with optionally having more data.
     BlockEpilogue(BlockEpiloguePayload),
+
+    /// Scheduled Transaction
+    ScheduledTransaction(ScheduledTransaction),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2015,6 +2020,7 @@ impl Transaction {
             Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(vt) => vt.type_name(),
             Transaction::BlockMetadataExt(_) => "block_metadata_ext",
+            Transaction::ScheduledTransaction(_) => "scheduled_transaction",
         }
     }
 
@@ -2030,7 +2036,8 @@ impl Transaction {
             | Transaction::GenesisTransaction(_)
             | Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
-            | Transaction::ValidatorTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_)
+            | Transaction::ScheduledTransaction(_) => false,
         }
     }
 
@@ -2041,7 +2048,8 @@ impl Transaction {
             | Transaction::BlockEpilogue(_)
             | Transaction::UserTransaction(_)
             | Transaction::GenesisTransaction(_)
-            | Transaction::ValidatorTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_)
+            | Transaction::ScheduledTransaction(_) => false,
         }
     }
 }
