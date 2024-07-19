@@ -109,9 +109,6 @@ where
         HashMap<ConnectionId, oneshot::Sender<Result<(), PeerManagerError>>>,
     /// Pin the transport type corresponding to this PeerManager instance
     phantom_transport: PhantomData<TTransport>,
-    /// Maximum concurrent network requests to any peer. // TODO: bring back usage?
-    #[allow(dead_code)]
-    max_concurrent_network_reqs: usize,
     /// Size of channels between different actors.
     channel_size: usize,
     /// Max network frame size
@@ -144,7 +141,6 @@ where
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
         channel_size: usize,
-        max_concurrent_network_reqs: usize,
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
@@ -185,7 +181,6 @@ where
             phantom_transport: PhantomData,
             upstream_handlers: Arc::new(upstream_handlers),
             connection_event_handlers,
-            max_concurrent_network_reqs,
             channel_size,
             max_frame_size,
             max_message_size,

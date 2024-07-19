@@ -73,7 +73,6 @@ struct PeerManagerContext {
         HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
-    max_concurrent_network_reqs: usize,
     channel_size: usize,
     max_frame_size: usize,
     max_message_size: usize,
@@ -96,7 +95,6 @@ impl PeerManagerContext {
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
-        max_concurrent_network_reqs: usize,
         channel_size: usize,
         max_frame_size: usize,
         max_message_size: usize,
@@ -113,7 +111,6 @@ impl PeerManagerContext {
             upstream_handlers,
             connection_event_handlers,
 
-            max_concurrent_network_reqs,
             channel_size,
             max_frame_size,
             max_message_size,
@@ -171,7 +168,6 @@ impl PeerManagerBuilder {
         peers_and_metadata: Arc<PeersAndMetadata>,
         authentication_mode: AuthenticationMode,
         channel_size: usize,
-        max_concurrent_network_reqs: usize,
         max_frame_size: usize,
         max_message_size: usize,
         enable_proxy_protocol: bool,
@@ -206,7 +202,6 @@ impl PeerManagerBuilder {
                 peers_and_metadata,
                 HashMap::new(),
                 Vec::new(),
-                max_concurrent_network_reqs,
                 channel_size,
                 max_frame_size,
                 max_message_size,
@@ -342,7 +337,6 @@ impl PeerManagerBuilder {
             pm_context.upstream_handlers,
             pm_context.connection_event_handlers,
             pm_context.channel_size,
-            pm_context.max_concurrent_network_reqs,
             pm_context.max_frame_size,
             pm_context.max_message_size,
             pm_context.inbound_connection_limit,

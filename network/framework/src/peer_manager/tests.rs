@@ -113,7 +113,6 @@ fn build_test_peer_manager(
             .collect(),
         vec![conn_status_tx],
         constants::NETWORK_CHANNEL_SIZE,
-        constants::MAX_CONCURRENT_NETWORK_REQS,
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
