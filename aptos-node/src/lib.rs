@@ -512,7 +512,6 @@ where
 
     // Configure the validator network
     let validator_network = node_config.validator_network.as_mut().unwrap();
-    validator_network.max_concurrent_network_reqs = 1;
     validator_network.connectivity_check_interval_ms = 10000;
     validator_network.max_connection_delay_ms = 10000;
     validator_network.ping_interval_ms = 10000;
@@ -520,7 +519,6 @@ where
 
     // Configure the fullnode network
     let fullnode_network = node_config.full_node_networks.get_mut(0).unwrap();
-    fullnode_network.max_concurrent_network_reqs = 1;
     fullnode_network.connectivity_check_interval_ms = 10000;
     fullnode_network.max_connection_delay_ms = 10000;
     fullnode_network.ping_interval_ms = 10000;
