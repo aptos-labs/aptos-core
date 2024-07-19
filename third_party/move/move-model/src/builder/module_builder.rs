@@ -441,8 +441,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for (name, fun_def) in module_def.functions.key_cloned_iter() {
             self.decl_ana_fun(&name, fun_def);
         }
-        // we have collected all package and friend visibilities in the current module
-        self.check_visibility_compatibility();
         for (name, const_def) in module_def.constants.key_cloned_iter() {
             self.decl_ana_const(&name, const_def);
         }
@@ -455,6 +453,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for (friend_mod_id, friend) in module_def.friends.key_cloned_iter() {
             self.decl_ana_friend_decl(&friend_mod_id, &friend.loc);
         }
+        // we have collected all package and friend visibilities in the current module
+        // and friend declarations in the current module, before we can check their compatibility
+        self.check_visibility_compatibility();
     }
 
     fn decl_ana_const(&mut self, name: &PA::ConstantName, def: &EA::Constant) {
@@ -1864,12 +1865,18 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         et
     }
 
-    /// Checks if both package and friend visibility are used in the same module
+    /// Checks if both package and friend visibility/declaration are used in the same module
     fn check_visibility_compatibility(&self) {
-        if let Some(friend_vis_loc) = &self.friend_fun_loc {
-            let friend_vis_loc = self.parent.to_loc(friend_vis_loc);
-            if let Some(package_vis_loc) = &self.package_fun_loc {
-                let package_vis_loc = self.parent.to_loc(package_vis_loc);
+        if let Some(package_vis_loc) = &self.package_fun_loc {
+            let package_vis_loc = self.parent.to_loc(package_vis_loc);
+            let friend_vis_loc = if let Some(friend_vis_loc) = &self.friend_fun_loc {
+                Some(self.parent.to_loc(friend_vis_loc))
+            } else {
+                self.friend_decls
+                    .first()
+                    .map(|friend_decl| friend_decl.loc.clone())
+            };
+            if let Some(friend_vis_loc) = friend_vis_loc {
                 self.parent.env.diag_with_labels(
                     Severity::Error,
                     &friend_vis_loc,
@@ -1881,7 +1888,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         ),
                         (
                             friend_vis_loc.clone(),
-                            "friend visibility declared here".to_string(),
+                            "friend visibility used here".to_string(),
                         ),
                     ],
                 );

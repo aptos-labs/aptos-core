@@ -21,3 +21,15 @@ address 0x43 {
 		}
 	}
 }
+
+address 0x44 {
+	module A {
+		friend 0x44::B;
+
+		public(package) fun bar() {
+
+		}
+	}
+
+	module B {}
+}
