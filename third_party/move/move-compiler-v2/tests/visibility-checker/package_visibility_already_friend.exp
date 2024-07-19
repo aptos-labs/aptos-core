@@ -1,29 +1,12 @@
-// -- Model dump before bytecode pipeline
-module 0x42::C {
-    friend fun bar() {
-        Tuple()
-    }
-    friend fun foo() {
-        C::bar()
-    }
-} // end 0x42::C
-module 0x42::A {
-    friend fun bar() {
-        Tuple()
-    }
-    private fun foo() {
-        Tuple()
-    }
-} // end 0x42::A
-module 0x42::B {
-    use 0x42::A; // resolved as: 0x42::A
-    public fun bar() {
-        A::bar()
-    }
-    friend fun foo() {
-        A::bar()
-    }
-    private fun baz() {
-        A::bar()
-    }
-} // end 0x42::B
+
+Diagnostics:
+error: Cannot use both package and friend visibility in the same module
+  ┌─ tests/visibility-checker/package_visibility_already_friend.move:4:5
+  │
+4 │     friend 0x42::B;
+  │     ^^^^^^^^^^^^^^^
+  │     │
+  │     friend visibility declared here
+5 │     fun foo() {}
+6 │     public(package) fun bar() {}
+  │     --------------- package visibility declared here
