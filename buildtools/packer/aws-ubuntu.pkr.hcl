@@ -58,7 +58,7 @@ build {
     inline = [
       "whoami",
       "chmod +x /tmp/scripts/dev_setup.sh",
-      "sudo -u runner /tmp/scripts/dev_setup.sh -b -k",
+      "sudo -u runner /tmp/scripts/dev_setup.sh -b -r -y -P -J -t -k",
     ]
   }
 }
