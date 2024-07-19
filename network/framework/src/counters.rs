@@ -26,6 +26,7 @@ pub const RECEIVED_LABEL: &str = "received";
 pub const SENT_LABEL: &str = "sent";
 pub const SUCCEEDED_LABEL: &str = "succeeded";
 pub const FAILED_LABEL: &str = "failed";
+pub const UNKNOWN_LABEL: &str = "unknown";
 
 // Direction labels
 pub const INBOUND_LABEL: &str = "inbound";
@@ -638,3 +639,19 @@ pub static OP_MEASURE: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static INBOUND_QUEUE_DELAY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_inbound_queue_time",
+        "Time a message sits in queue between peer socket and app code",
+        &["protocol_id"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub fn inbound_queue_delay_observe(protocol_id: ProtocolId, seconds: f64) {
+    INBOUND_QUEUE_DELAY
+        .with_label_values(&[protocol_id.as_str()])
+        .observe(seconds)
+}
