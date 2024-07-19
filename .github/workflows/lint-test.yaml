@@ -96,6 +96,23 @@ jobs:
       - run: echo "Skipping cargo deny! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
+  # Run the docs tests. This is a PR required job.
+  rust-doc-tests:
+    if: | # Only run when an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null
+      )
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run rust doc tests
+        uses: ./.github/actions/rust-doc-tests
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
   # Run all rust smoke tests. This is a PR required job.
   rust-smoke-tests:
     needs: file_change_determinator
