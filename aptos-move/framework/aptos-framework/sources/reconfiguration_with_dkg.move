@@ -27,13 +27,12 @@ module aptos_framework::reconfiguration_with_dkg {
         if (!reconfiguration_state::is_in_progress()) {
             debug::print(&28);
             reconfiguration_state::on_reconfig_start();
+            stake::finalize_next_validator_set();
             dkg::on_async_reconfig_start();
             mpc::on_async_reconfig_start();
-            debug::print(&32);
-            stake::finalize_next_validator_set();
-            debug::print(&34);
+            debug::print(&33);
         };
-        debug::print(&36);
+        debug::print(&35);
     }
 
     /// Clear incomplete DKG session, if it exists.

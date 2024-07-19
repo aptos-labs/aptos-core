@@ -38,7 +38,7 @@ async fn raise_by_secret() {
 
     let rest_cli = swarm.validators().next().unwrap().rest_client();
 
-    info!("Wait for epoch 2. Epoch 1 does not have randomness.");
+    info!("Wait for epoch 2.");
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2))
         .await
@@ -48,7 +48,7 @@ async fn raise_by_secret() {
     info!("Root account: {}", root_address);
     let _root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_address);
 
-    info!("Publishing OnChainDice module.");
+    info!("Publishing a testing module.");
     publish_module(&mut cli, 0).await;
 
     info!("Trigger raise.");

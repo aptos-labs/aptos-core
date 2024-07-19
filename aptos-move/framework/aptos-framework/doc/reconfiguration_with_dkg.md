@@ -59,13 +59,12 @@ Do nothing if one is already in progress.
     <b>if</b> (!<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_in_progress">reconfiguration_state::is_in_progress</a>()) {
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&28);
         <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_start">reconfiguration_state::on_reconfig_start</a>();
+        <a href="stake.md#0x1_stake_finalize_next_validator_set">stake::finalize_next_validator_set</a>();
         <a href="dkg.md#0x1_dkg_on_async_reconfig_start">dkg::on_async_reconfig_start</a>();
         <a href="mpc.md#0x1_mpc_on_async_reconfig_start">mpc::on_async_reconfig_start</a>();
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&32);
-        <a href="stake.md#0x1_stake_finalize_next_validator_set">stake::finalize_next_validator_set</a>();
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&34);
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&33);
     };
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&36);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&35);
 }
 </code></pre>
 

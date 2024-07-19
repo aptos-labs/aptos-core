@@ -1469,8 +1469,7 @@ module aptos_framework::stake {
     }
 
     public(friend) fun finalize_next_validator_set() acquires ValidatorSet, ValidatorPerformance, StakePool, ValidatorFees, ValidatorConfig {
-        let _x = next_validator_consensus_infos();
-        // next_validator_set::save(x);
+        next_validator_set::save(next_validator_consensus_infos());
     }
 
     fun validator_consensus_infos_from_validator_set(validator_set: &ValidatorSet): vector<ValidatorConsensusInfo> {
