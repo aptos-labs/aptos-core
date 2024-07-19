@@ -23,7 +23,7 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
         if (!reconfiguration_state::is_in_progress()) {
-            stake::finalize_next_validator_set();
+            // stake::finalize_next_validator_set();
             reconfiguration_state::on_reconfig_start();
             dkg::on_async_reconfig_start();
             mpc::on_async_reconfig_start();
