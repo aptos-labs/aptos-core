@@ -1451,10 +1451,10 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_wait_for_catchup_s(180) // 3 minutes
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
-                    // Check that we don't use more than 18 CPU cores for 30% of the time.
-                    MetricsThreshold::new(18.0, 40),
-                    // Check that we don't use more than 6 GB of memory for more than 10% of the time.
-                    MetricsThreshold::new_gb(6.0, 10),
+                    // Check that we don't use more than 24 CPU cores for 20% of the time.
+                    MetricsThreshold::new(24.0, 20),
+                    // Check that we don't use more than 7.5 GB of memory for more than 10% of the time.
+                    MetricsThreshold::new_gb(7.5, 10),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)

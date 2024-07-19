@@ -919,6 +919,7 @@ dependencies = [
  "once_cell",
  "ordered-float 3.9.2",
  "proptest",
+ "proptest-derive",
  "rand 0.7.3",
  "rayon",
  "scopeguard",
@@ -1544,13 +1545,18 @@ dependencies = [
 name = "aptos-experimental-layered-map"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "aptos-crypto",
  "aptos-drop-helper",
  "aptos-infallible",
  "aptos-metrics-core",
  "bitvec 1.0.1",
+ "criterion",
+ "itertools 0.12.1",
+ "jemallocator",
  "once_cell",
  "proptest",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -2954,12 +2960,14 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-metrics-core",
  "async-trait",
+ "axum 0.7.5",
  "backoff",
  "bytes",
  "chrono",
  "clap 4.4.14",
  "diesel",
  "diesel_migrations",
+ "enum_dispatch",
  "field_count",
  "futures",
  "google-cloud-storage",
@@ -2973,7 +2981,6 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "warp",
 ]
 
 [[package]]
@@ -5019,7 +5026,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b829e4e32b91e643de6eafe82b1d90675f5874230191a4ffbc1b336dec4d6bf"
 dependencies = [
  "async-trait",
- "axum-core",
+ "axum-core 0.3.4",
  "bitflags 1.3.2",
  "bytes",
  "futures-util",
@@ -5041,6 +5048,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a6c9af12842a67734c9a2e355436e5d03b22383ed60cf13cd0c18fbfe3dcbcf"
+dependencies = [
+ "async-trait",
+ "axum-core 0.4.3",
+ "bytes",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "hyper 1.4.1",
+ "hyper-util",
+ "itoa",
+ "matchit",
+ "memchr",
+ "mime",
+ "percent-encoding",
+ "pin-project-lite",
+ "rustversion",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "serde_urlencoded",
+ "sync_wrapper 1.0.1",
+ "tokio",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
 name = "axum-core"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5055,6 +5096,27 @@ dependencies = [
  "rustversion",
  "tower-layer",
  "tower-service",
+]
+
+[[package]]
+name = "axum-core"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a15c63fd72d41492dc4f497196f5da1fb04fb7529e631d73630d1b491e47a2e3"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "mime",
+ "pin-project-lite",
+ "rustversion",
+ "sync_wrapper 0.1.2",
+ "tower-layer",
+ "tower-service",
+ "tracing",
 ]
 
 [[package]]
@@ -14392,6 +14454,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_path_to_error"
+version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af99884400da37c88f5e9146b7f1fd0fbcae8f6eec4e9da38b67d05486f814a6"
+dependencies = [
+ "itoa",
+ "serde",
+]
+
+[[package]]
 name = "serde_regex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15908,7 +15980,7 @@ checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
 dependencies = [
  "async-stream",
  "async-trait",
- "axum",
+ "axum 0.6.20",
  "base64 0.21.6",
  "bytes",
  "flate2",
@@ -15940,7 +16012,7 @@ source = "git+https://github.com/aptos-labs/tonic.git?rev=0da1ba8b1751d6e19eb55b
 dependencies = [
  "async-stream",
  "async-trait",
- "axum",
+ "axum 0.6.20",
  "base64 0.22.1",
  "bytes",
  "flate2",

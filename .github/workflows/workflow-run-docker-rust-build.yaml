@@ -73,11 +73,26 @@ permissions:
 
 jobs:
   rust-all:
-    runs-on: experimental-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=1024,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     steps:
       - uses: actions/checkout@v3
         with:
           ref: ${{ env.GIT_SHA }}
+
+      - name: Setup Runs On Cache for Docker
+        uses: runs-on/cache@v4
+        with:
+          path: |
+            /home/runner/docker-cache.tzst
+          key: docker-buildkit-cache-${{ env.PROFILE }}-${{ env.FEATURES }}${{ hashFiles('Cargo.lock') }}
+
+      - name: Untar cache if present
+        run: |
+          if [ -f /home/runner/docker-cache.tzst ]; then
+            sudo systemctl stop docker
+            sudo tar --posix -xf /home/runner/docker-cache.tzst -P -C /var/lib/docker --use-compress-program zstdmt .
+            sudo systemctl start docker
+          fi          
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
@@ -96,3 +111,11 @@ jobs:
           BUILD_ADDL_TESTING_IMAGES: ${{ env.BUILD_ADDL_TESTING_IMAGES }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           TARGET_REGISTRY: ${{ env.TARGET_REGISTRY }}
+      
+      - name: Prepare Docker for Caching
+        run: |
+          if [ ! -f /home/runner/docker-cache.tzst ]; then
+            sudo systemctl stop docker
+            sudo tar --posix -cf /home/runner/docker-cache.tzst -P -C /var/lib/docker --use-compress-program zstdmt .
+          fi
+

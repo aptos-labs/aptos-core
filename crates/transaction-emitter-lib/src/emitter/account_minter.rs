@@ -230,7 +230,7 @@ impl<'t> AccountMinter<'t> {
     pub async fn create_and_fund_accounts(
         &mut self,
         txn_executor: &dyn ReliableTransactionSubmitter,
-        account_generator: Box<dyn LocalAccountGenerator>,
+        seed_accounts: Vec<Arc<LocalAccount>>,
         local_accounts: Vec<Arc<LocalAccount>>,
         coins_per_account: u64,
         max_submit_batch_size: usize,
@@ -244,10 +244,8 @@ impl<'t> AccountMinter<'t> {
             num_accounts, coins_per_account,
         );
 
-        let expected_num_seed_accounts =
-            (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
         let expected_children_per_seed_account =
-            (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
+            (num_accounts + seed_accounts.len() - 1) / seed_accounts.len();
 
         let coins_per_seed_account = Self::funds_needed_for_multi_transfer(
             "seed",
@@ -258,7 +256,7 @@ impl<'t> AccountMinter<'t> {
         );
         let coins_for_source = Self::funds_needed_for_multi_transfer(
             if mint_to_root { "root" } else { "source" },
-            expected_num_seed_accounts as u64,
+            seed_accounts.len() as u64,
             coins_per_seed_account,
             self.txn_factory.get_max_gas_amount(),
             self.txn_factory.get_gas_unit_price(),
@@ -295,18 +293,15 @@ impl<'t> AccountMinter<'t> {
 
         // Create seed accounts with which we can create actual accounts concurrently. Adding
         // additional fund for paying gas fees later.
-        let seed_accounts = self
-            .create_and_fund_seed_accounts(
-                new_source_account,
-                txn_executor,
-                account_generator,
-                expected_num_seed_accounts,
-                coins_per_seed_account,
-                max_submit_batch_size,
-                &request_counters,
-            )
-            .await?;
-        let actual_num_seed_accounts = seed_accounts.len();
+        self.create_and_fund_seed_accounts(
+            new_source_account,
+            txn_executor,
+            &seed_accounts,
+            coins_per_seed_account,
+            max_submit_batch_size,
+            &request_counters,
+        )
+        .await?;
 
         info!(
             "Completed creating {} seed accounts in {}s, each with {} coins, request stats: {}",
@@ -326,7 +321,7 @@ impl<'t> AccountMinter<'t> {
         let request_counters = txn_executor.create_counter_state();
 
         let approx_accounts_per_seed =
-            (num_accounts + actual_num_seed_accounts - 1) / actual_num_seed_accounts;
+            (num_accounts + seed_accounts.len() - 1) / seed_accounts.len();
 
         let local_accounts_by_seed: Vec<Vec<Arc<LocalAccount>>> = local_accounts
             .chunks(approx_accounts_per_seed)
@@ -377,12 +372,11 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         new_source_account: Option<LocalAccount>,
         txn_executor: &dyn ReliableTransactionSubmitter,
-        account_generator: Box<dyn LocalAccountGenerator>,
-        seed_account_num: usize,
+        seed_accounts: &[Arc<LocalAccount>],
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
         counters: &CounterState,
-    ) -> Result<Vec<LocalAccount>> {
+    ) -> Result<()> {
         info!(
             "Creating and funding seeds accounts (txn {} gas price)",
             self.txn_factory.get_gas_unit_price()
@@ -391,10 +385,6 @@ impl<'t> AccountMinter<'t> {
             None => self.source_account.get_root_account().clone(),
             Some(param_account) => Arc::new(param_account),
         };
-
-        let seed_accounts = account_generator
-            .gen_local_accounts(txn_executor, seed_account_num, self.account_rng())
-            .await?;
 
         for chunk in seed_accounts.chunks(max_submit_batch_size) {
             let txn_factory = &self.txn_factory;
@@ -414,7 +404,7 @@ impl<'t> AccountMinter<'t> {
                 .await?;
         }
 
-        Ok(seed_accounts)
+        Ok(())
     }
 
     pub async fn load_vasp_account(
@@ -496,7 +486,7 @@ impl<'t> AccountMinter<'t> {
 /// Create `num_new_accounts` by transferring coins from `source_account`. Return Vec of created
 /// accounts
 async fn create_and_fund_new_accounts(
-    source_account: LocalAccount,
+    source_account: Arc<LocalAccount>,
     accounts: Vec<Arc<LocalAccount>>,
     coins_per_new_account: u64,
     max_num_accounts_per_batch: usize,
@@ -509,7 +499,6 @@ async fn create_and_fund_new_accounts(
         .map(|chunk| chunk.to_vec())
         .collect::<Vec<_>>();
     let source_address = source_account.address();
-    let source_account = Arc::new(source_account);
     for batch in accounts_by_batch {
         let creation_requests: Vec<_> = batch
             .iter()
@@ -642,16 +631,33 @@ pub async fn bulk_create_accounts(
         seed
     );
 
-    let accounts = account_generator
-        .gen_local_accounts(txn_executor, num_accounts, &mut StdRng::from_seed(seed))
+    let mut rng = StdRng::from_seed(seed);
+
+    let num_seed_accounts = (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
+    let seed_accounts = account_generator
+        .gen_local_accounts(txn_executor, num_seed_accounts, &mut rng)
         .await?;
+
+    let accounts = account_generator
+        .gen_local_accounts(txn_executor, num_accounts, &mut rng)
+        .await?;
+
     info!(
         "Generated and fetched re-usable accounts for seed {:?}",
         seed
     );
 
     let all_accounts_already_exist = accounts.iter().all(|account| account.sequence_number() > 0);
-    let send_money_gas = if all_accounts_already_exist {
+    let all_seed_accounts_already_exist = seed_accounts
+        .iter()
+        .all(|account| account.sequence_number() > 0);
+
+    info!(
+        "Accounts exist: {}, seed accounts exist: {}",
+        all_accounts_already_exist, all_seed_accounts_already_exist
+    );
+
+    let send_money_gas = if all_accounts_already_exist && all_seed_accounts_already_exist {
         config.expected_gas_per_transfer
     } else {
         config.expected_gas_per_account_create
@@ -668,10 +674,12 @@ pub async fn bulk_create_accounts(
 
     if !config.skip_funding_accounts {
         let accounts: Vec<_> = accounts.into_iter().map(Arc::new).collect();
+        let seed_accounts: Vec<_> = seed_accounts.into_iter().map(Arc::new).collect();
+
         account_minter
             .create_and_fund_accounts(
                 txn_executor,
-                account_generator,
+                seed_accounts.clone(),
                 accounts.clone(),
                 coins_per_account,
                 config.max_submit_batch_size,

@@ -315,7 +315,6 @@ fn spawn_message_serializer_and_sender(
 mod test {
     use super::*;
     use aptos_config::network_id::NetworkId;
-    use aptos_consensus_types::pipeline::commit_decision::CommitDecision;
     use aptos_crypto::HashValue;
     use aptos_network::{
         application::{metadata::ConnectionState, storage::PeersAndMetadata},
@@ -516,12 +515,11 @@ mod test {
         process_unsubscription_for_peer(&consensus_publisher, &peer_network_id_1);
 
         // Publish another message to the active subscribers
-        let commit_decision_message = ConsensusObserverMessage::new_commit_decision_message(
-            CommitDecision::new(LedgerInfoWithSignatures::new(
+        let commit_decision_message =
+            ConsensusObserverMessage::new_commit_decision_message(LedgerInfoWithSignatures::new(
                 LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                 AggregateSignature::empty(),
-            )),
-        );
+            ));
         consensus_publisher
             .publish_message(commit_decision_message.clone())
             .await;
