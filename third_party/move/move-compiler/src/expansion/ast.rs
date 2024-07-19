@@ -413,6 +413,7 @@ pub type Type = Spanned<Type_>;
 pub enum LValue_ {
     Var(ModuleAccess, Option<Vec<Type>>),
     Unpack(ModuleAccess, Option<Vec<Type>>, Fields<LValue>),
+    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueList),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
@@ -1801,6 +1802,17 @@ impl AstDebug for LValue_ {
                     b.ast_debug(w);
                 });
                 w.write("}");
+            },
+            L::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(&args.value, |w, b| b.ast_debug(w));
+                w.write(")");
             },
         }
     }

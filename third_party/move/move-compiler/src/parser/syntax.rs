@@ -767,56 +767,39 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     // it is possible that the user intention was to use a variable name.
     let ty = parse_name_access_chain(context, false, || "a variable or struct or variant name")?;
     let ty_args = parse_optional_type_args(context)?;
-    let args = if !context.env.flags().lang_v2() || context.tokens.peek() == Tok::LBrace {
-        parse_comma_list(
+
+    let unpack = if !context.env.flags().lang_v2() || context.tokens.peek() == Tok::LBrace {
+        let args = parse_comma_list(
             context,
             Tok::LBrace,
             Tok::RBrace,
             parse_bind_field,
             "a field binding",
-        )?
+        )?;
+        Bind_::Unpack(Box::new(ty), ty_args, args)
     } else if context.tokens.peek() == Tok::LParen {
         let start_loc = context.tokens.start_loc();
-        let binds = parse_anonymous_field_binds(context)?;
+        let args = parse_comma_list(
+            context,
+            Tok::LParen,
+            Tok::RParen,
+            parse_bind,
+            "an anonymous field binding",
+        )?;
         let end_loc = context.tokens.previous_end_loc();
         let loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
         require_move_2(context, loc, "anonymous field");
-        binds
+        Bind_::PositionalUnpack(Box::new(ty), ty_args, args)
     } else {
-        vec![]
+        Bind_::Unpack(Box::new(ty), ty_args, vec![])
     };
     let end_loc = context.tokens.previous_end_loc();
-    let unpack = Bind_::Unpack(Box::new(ty), ty_args, args);
     Ok(spanned(
         context.tokens.file_hash(),
         start_loc,
         end_loc,
         unpack,
     ))
-}
-
-// Parse a comma separated list of anonymous field bindings:
-//      Comma<Bind>
-// Each field bind is accompanied by a field name, which is its index in the list.
-fn parse_anonymous_field_binds(
-    context: &mut Context,
-) -> Result<Vec<(Field, Bind)>, Box<Diagnostic>> {
-    let fields = parse_comma_list(
-        context,
-        Tok::LParen,
-        Tok::RParen,
-        parse_bind,
-        "an anonymous field binding",
-    )?;
-    Ok(fields
-        .into_iter()
-        .enumerate()
-        .map(|(idx, field_bind)| {
-            let field_name = Name::new(field_bind.loc, Symbol::from(format!("{}", idx)));
-            let field_name = Field(field_name);
-            (field_name, field_bind)
-        })
-        .collect())
 }
 
 // Parse a list of bindings, which can be zero, one, or more bindings:

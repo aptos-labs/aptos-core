@@ -34,8 +34,8 @@ use move_compiler::{
     expansion::ast as EA,
     hlir::ast as HA,
     naming::ast as NA,
-    parser::{ast as PA, ast::CallKind},
-    shared::{Identifier, Name},
+    parser::ast::{self as PA, CallKind, Field},
+    shared::{unique_map::UniqueMap, Identifier, Name},
 };
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use move_ir_types::location::{sp, Spanned};
@@ -2426,6 +2426,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.new_error_pat(loc)
                 }
             },
+            EA::LValue_::PositionalUnpack(maccess, generics, args) => {
+                let fields = UniqueMap::maybe_from_iter(args
+                    .value
+                    .iter()
+                    .enumerate()
+                    .map(|(field_offset, arg)| {
+                        let field_name = Name::new(arg.loc, move_symbol_pool::Symbol::from(format!("{}", field_offset)));
+                        let field_name = Field(field_name);
+                        (field_name, (field_offset, arg.clone()))
+                    }))
+                    .expect("unique field names");
+                let unpack_ = EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields);
+                let unpack = Spanned::new(lv.loc.clone(), unpack_);
+                self.translate_lvalue(&unpack, expected_type, expected_order, match_locals, context)
+            }
         }
     }
 

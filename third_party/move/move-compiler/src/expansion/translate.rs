@@ -2929,6 +2929,17 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             let fields = fields(context, loc, "deconstruction binding", "binding", vfields?);
             EL::Unpack(tn, tys_opt, fields)
         },
+        PB::PositionalUnpack(ptn, ptys_opt, pargs) => {
+            let tn = name_access_chain(
+                context,
+                Access::ApplyPositional,
+                *ptn,
+                Some(DeprecatedItem::Struct),
+            )?;
+            let tys_opt = optional_types(context, ptys_opt);
+            let fields: Option<Vec<E::LValue>> = pargs.into_iter().map(|pb| bind(context, pb)).collect();
+            EL::PositionalUnpack(tn, tys_opt, Spanned::new(loc, fields?))
+        }
     };
     Some(sp(loc, b_))
 }
@@ -3268,6 +3279,7 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
         EL::Unpack(_, _, efields) => efields
             .iter()
             .for_each(|(_, _, (_, l))| unbound_names_bind(unbound, l)),
+        EL::PositionalUnpack(_, _, ls) => unbound_names_binds(unbound, ls),
     }
 }
 
@@ -3289,6 +3301,7 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
         EL::Unpack(_, _, efields) => efields
             .iter()
             .for_each(|(_, _, (_, l))| unbound_names_assign(unbound, l)),
+        EL::PositionalUnpack(_, _, ls) => unbound_names_assigns(unbound, ls),
     }
 }
 

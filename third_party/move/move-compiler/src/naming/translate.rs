@@ -1181,6 +1181,7 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
                 nfields.expect("ICE fields were already unique"),
             )
         },
+        EL::PositionalUnpack(_, _, _) => panic!("positional fields only allowed in v2"),
         EL::Var(_, _) => panic!("unexpected specification construct"),
     };
     Some(sp(loc, nl_))

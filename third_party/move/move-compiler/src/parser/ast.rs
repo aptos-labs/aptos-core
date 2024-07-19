@@ -508,6 +508,9 @@ pub enum Bind_ {
     // T { f1: b1, ... fn: bn }
     // T<t1, ... , tn> { f1: b1, ... fn: bn }
     Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<(Field, Bind)>),
+    // T(e1, ..., en)
+    // T<t1, ... , tn>(e1, ..., en)
+    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<Bind>),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
@@ -2049,6 +2052,17 @@ impl AstDebug for Bind_ {
                     b.ast_debug(w);
                 });
                 w.write("}");
+            },
+            B::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(args, |w, b| b.ast_debug(w));
+                w.write(")");
             },
         }
     }
