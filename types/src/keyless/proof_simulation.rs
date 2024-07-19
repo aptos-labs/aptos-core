@@ -223,16 +223,8 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     ) -> R1CSResult<Proof<E>>
     where
     {
-        let mut a_bytes: [u8; 32] = [0; 32];
-        //rng.fill_bytes(&mut a_bytes);
-        //let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
         let a = Self::generate_random_scalar(rng);
         let b = Self::generate_random_scalar(rng);
-        //let mut b_bytes: [u8; 32] = [0; 32];
-        //rng.fill_bytes(&mut b_bytes);
-        //let b = E::ScalarField::from_random_bytes(&b_bytes).unwrap();
-        //let a = E::ScalarField::rand(rng);
-        //let b = E::ScalarField::rand(rng);
 
         Self::create_proof_with_trapdoor(pk, a, b, public_inputs)
     }
@@ -347,7 +339,6 @@ where
     let pvk = prepare_verifying_key::<E>(&vk);
 
     let mut rng = rand::thread_rng();
-    //let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
     for _ in 0..n_iters {
         let proof = Groth16Simulator::<E>::create_random_proof_with_trapdoor(
             &[public_input],
@@ -357,10 +348,6 @@ where
         .unwrap();
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
-        //let a = E::ScalarField::rand(&mut rng);
-        //let mut a_bytes: [u8; 32] = [0; 32];
-        //rng.fill_bytes(&mut a_bytes);
-        //let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
         let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
@@ -379,7 +366,6 @@ where
     let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
     // TODO: Make this rng seedable
     let mut rng = rand::thread_rng();
-    //let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
     let pvk = prepare_verifying_key::<E>(&vk);
@@ -398,7 +384,6 @@ where
         let mut a_bytes: [u8; 32] = [0; 32];
         rng.fill_bytes(&mut a_bytes);
         let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();
-        //let a = E::ScalarField::rand(&mut rng);
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
@@ -410,5 +395,5 @@ fn prove_and_verify() {
 
 #[test]
 fn prove_and_verify_circuit_agnostic() {
-    test_prove_and_verify_circuit_agnostic::<Bn254>(5);
+    test_prove_and_verify_circuit_agnostic::<Bn254>(25);
 }
