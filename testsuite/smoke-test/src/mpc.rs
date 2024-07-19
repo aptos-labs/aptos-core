@@ -96,11 +96,6 @@ async fn raise_by_secret() {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-struct DiceRollHistory {
-    rolls: Vec<u64>,
-}
-
 async fn publish_module(
     cli: &mut CliTestFramework,
     publisher_account_idx: usize,

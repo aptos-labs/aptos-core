@@ -38,6 +38,7 @@ to synchronize configuration changes for the validators.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="next_validator_set.md#0x1_next_validator_set">0x1::next_validator_set</a>;
 <b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
@@ -436,6 +437,7 @@ Signal validators to start using new configuration. Must be called from friend c
     );
 
     <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">reconfiguration_state::on_reconfig_finish</a>();
+    <a href="next_validator_set.md#0x1_next_validator_set_clear">next_validator_set::clear</a>();
 }
 </code></pre>
 

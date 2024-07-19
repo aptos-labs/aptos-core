@@ -44,6 +44,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::managed_coin`](managed_coin.md#0x1_managed_coin)
 -  [`0x1::mpc`](mpc.md#0x1_mpc)
 -  [`0x1::multisig_account`](multisig_account.md#0x1_multisig_account)
+-  [`0x1::next_validator_set`](next_validator_set.md#0x1_next_validator_set)
 -  [`0x1::object`](object.md#0x1_object)
 -  [`0x1::object_code_deployment`](object_code_deployment.md#0x1_object_code_deployment)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)

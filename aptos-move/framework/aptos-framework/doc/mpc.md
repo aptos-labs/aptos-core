@@ -7,12 +7,14 @@
 
 -  [Struct `SharedSecretState`](#0x1_mpc_SharedSecretState)
 -  [Struct `TaskSpec`](#0x1_mpc_TaskSpec)
--  [Struct `TaskState`](#0x1_mpc_TaskState)
 -  [Struct `TaskRaiseBySecret`](#0x1_mpc_TaskRaiseBySecret)
+-  [Struct `TaskState`](#0x1_mpc_TaskState)
 -  [Resource `State`](#0x1_mpc_State)
+-  [Struct `EpochSwitchStart`](#0x1_mpc_EpochSwitchStart)
 -  [Struct `NewTaskEvent`](#0x1_mpc_NewTaskEvent)
 -  [Struct `TaskCompletedEvent`](#0x1_mpc_TaskCompletedEvent)
 -  [Resource `FeatureEnabledFlag`](#0x1_mpc_FeatureEnabledFlag)
+-  [Function `initialize`](#0x1_mpc_initialize)
 -  [Function `on_async_reconfig_start`](#0x1_mpc_on_async_reconfig_start)
 -  [Function `ready_for_next_epoch`](#0x1_mpc_ready_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_mpc_on_new_epoch)
@@ -24,6 +26,7 @@
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
 
@@ -88,39 +91,6 @@
 
 </details>
 
-<a id="0x1_mpc_TaskState"></a>
-
-## Struct `TaskState`
-
-
-
-<pre><code><b>struct</b> <a href="mpc.md#0x1_mpc_TaskState">TaskState</a> <b>has</b> store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>task: <a href="mpc.md#0x1_mpc_TaskSpec">mpc::TaskSpec</a></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>result: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a id="0x1_mpc_TaskRaiseBySecret"></a>
 
 ## Struct `TaskRaiseBySecret`
@@ -145,6 +115,39 @@
 </dd>
 <dt>
 <code>secret_idx: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_mpc_TaskState"></a>
+
+## Struct `TaskState`
+
+
+
+<pre><code><b>struct</b> <a href="mpc.md#0x1_mpc_TaskState">TaskState</a> <b>has</b> store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>task: <a href="mpc.md#0x1_mpc_TaskSpec">mpc::TaskSpec</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>result: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -181,6 +184,34 @@
 </dt>
 <dd>
  tasks[0] should always be <code><a href="mpc.md#0x1_mpc_raise_by_secret">raise_by_secret</a>(GENERATOR)</code>
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_mpc_EpochSwitchStart"></a>
+
+## Struct `EpochSwitchStart`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="mpc.md#0x1_mpc_EpochSwitchStart">EpochSwitchStart</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -279,6 +310,37 @@ This resource exists under 0x1 iff MPC is enabled.
 
 </dd>
 </dl>
+
+
+</details>
+
+<a id="0x1_mpc_initialize"></a>
+
+## Function `initialize`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="mpc.md#0x1_mpc_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="mpc.md#0x1_mpc_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+    <b>if</b> (!<b>exists</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework)) {
+        <b>let</b> state = <a href="mpc.md#0x1_mpc_State">State</a> {
+            shared_secrets: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+            tasks: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+        };
+        <b>move_to</b>(framework, state);
+    }
+}
+</code></pre>
+
 
 
 </details>

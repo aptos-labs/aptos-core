@@ -1,6 +1,5 @@
 /// DKG on-chain states and helper functions.
 module aptos_framework::dkg {
-    use std::error;
     use std::option;
     use std::option::Option;
     use aptos_framework::event::emit;

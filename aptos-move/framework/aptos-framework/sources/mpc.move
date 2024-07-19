@@ -5,6 +5,7 @@ module aptos_framework::mpc {
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
     use aptos_framework::event::emit;
+    use aptos_framework::system_addresses;
 
     friend aptos_framework::reconfiguration_with_dkg;
 
@@ -17,20 +18,25 @@ module aptos_framework::mpc {
         variant: Any,
     }
 
-    struct TaskState has store {
-        task: TaskSpec,
-        result: Option<vector<u8>>,
-    }
-
     struct TaskRaiseBySecret has copy, drop, store {
         group_element: vector<u8>,
         secret_idx: u64,
+    }
+
+    struct TaskState has store {
+        task: TaskSpec,
+        result: Option<vector<u8>>,
     }
 
     struct State has key {
         shared_secrets: vector<SharedSecretState>,
         /// tasks[0] should always be `raise_by_secret(GENERATOR)`
         tasks: vector<TaskState>,
+    }
+
+    #[event]
+    struct EpochSwitchStart {
+
     }
 
     #[event]
@@ -47,6 +53,17 @@ module aptos_framework::mpc {
 
     /// This resource exists under 0x1 iff MPC is enabled.
     struct FeatureEnabledFlag has key {}
+
+    public fun initialize(framework: &signer) {
+        system_addresses::assert_aptos_framework(framework);
+        if (!exists<State>(@aptos_framework)) {
+            let state = State {
+                shared_secrets: vector[],
+                tasks: vector[],
+            };
+            move_to(framework, state);
+        }
+    }
 
     public fun on_async_reconfig_start() {
         if (exists<FeatureEnabledFlag>(@aptos_framework)) {
