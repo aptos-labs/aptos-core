@@ -306,7 +306,7 @@ module aptos_framework::block {
         if (reconfiguration_state::is_in_progress()) {
             debug::print(&307);
             reconfiguration_with_dkg::try_finish(&framework);
-        }
+        };
         debug::print(&310);
     }
 
