@@ -34,7 +34,7 @@ use tokio::time::sleep;
 
 pub struct SubmissionWorker {
     pub(crate) accounts: Vec<Arc<LocalAccount>>,
-    clients: Arc<Vec<RestClient>>,
+    clients: Vec<RestClient>,
     /// Main one is used to submit requests, all are used for querying/latency
     main_client_index: usize,
     stop: Arc<AtomicBool>,
@@ -49,7 +49,7 @@ pub struct SubmissionWorker {
 impl SubmissionWorker {
     pub fn new(
         accounts: Vec<LocalAccount>,
-        clients: Arc<Vec<RestClient>>,
+        clients: Vec<RestClient>,
         main_client_index: usize,
         stop: Arc<AtomicBool>,
         params: EmitModeParams,

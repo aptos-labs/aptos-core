@@ -792,9 +792,8 @@ impl TxnEmitter {
         // traffic pattern to be correct.
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
-        let all_clients = Arc::new(req.rest_clients.clone());
         for index in 0..num_accounts {
-            let main_client_index = index % all_clients.len();
+            let main_client_index = index % req.rest_clients.len();
 
             let accounts = all_accounts.split_off(all_accounts.len() - 1);
             let stop = stop.clone();
@@ -804,7 +803,7 @@ impl TxnEmitter {
 
             let worker = SubmissionWorker::new(
                 accounts,
-                all_clients.clone(),
+                req.rest_clients.clone(),
                 main_client_index,
                 stop,
                 mode_params.clone(),
