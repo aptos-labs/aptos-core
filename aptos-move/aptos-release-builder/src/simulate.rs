@@ -60,8 +60,8 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
+    resolver::ModuleResolver,
 };
-use move_core_types::resolver::ModuleResolver;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -596,6 +596,8 @@ pub async fn simulate_multistep_proposal(remote_url: Url, proposal_path: &Path) 
                 .sign(),
             &log_context,
         );
+
+        println!("        VM Status: {:?}", _vm_status);
         // TODO: ensure all scripts trigger reconfiguration.
 
         let txn_output = vm_output
@@ -610,6 +612,9 @@ pub async fn simulate_multistep_proposal(remote_url: Url, proposal_path: &Path) 
                 if *code == MAGIC_FAILED_NEXT_EXECUTION_HASH_CHECK =>
             {
                 bail!("the last script has a non-zero next execution hash")
+            },
+            TransactionStatus::Discard(status) => {
+                println!("        Discard: {:?}", status)
             },
             _ => {
                 println!(
