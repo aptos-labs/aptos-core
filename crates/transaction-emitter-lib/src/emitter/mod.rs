@@ -933,9 +933,11 @@ async fn wait_for_accounts_sequence(
     let mut latest_fetched_counts = HashMap::new();
 
     let mut sum_of_completion_timestamps_millis = 0u128;
+    let mut call_counts = HashMap::new();
     loop {
         let client = pick_client(clients);
-        match query_sequence_numbers(client, pending_addresses.iter()).await {
+        *call_counts.entry(client.path_prefix_string()).or_insert(0) += 1;
+        match query_sequence_numbers_no_retry(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();
                 for (address, sequence_number) in sequence_numbers {
@@ -964,11 +966,12 @@ async fn wait_for_accounts_sequence(
                     sample!(
                         SampleRate::Duration(Duration::from_secs(60)),
                         warn!(
-                            "[{}] Ledger timestamp {} exceeded txn expiration timestamp {} for {:?}",
+                            "[{}] Ledger timestamp {} exceeded txn expiration timestamp {} for {:?}, after calls: {:?}",
                             client.path_prefix_string(),
                             ledger_timestamp_secs,
                             txn_expiration_ts_secs,
                             pending_addresses,
+                            call_counts,
                         )
                     );
                     break;
@@ -1006,20 +1009,20 @@ async fn wait_for_accounts_sequence(
 }
 
 pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
-    Ok(query_sequence_numbers(client, [address].iter()).await?.0[0].1)
+    let ((_addr, seq_num), _timestamp) = FETCH_ACCOUNT_RETRY_POLICY.retry(move || get_account_address_and_seq_num(client, address)).await
+        .map_err(|e| format_err!("Get accounts failed: {:?}", e))?;
+    Ok(seq_num)
 }
 
 // Return a pair of (list of sequence numbers, ledger timestamp)
-pub async fn query_sequence_numbers<'a, I>(
+pub async fn query_sequence_numbers_no_retry<'a, I>(
     client: &RestClient,
     addresses: I,
 ) -> Result<(Vec<(AccountAddress, u64)>, u64)>
 where
     I: Iterator<Item = &'a AccountAddress>,
 {
-    let futures = addresses.map(|address| {
-        FETCH_ACCOUNT_RETRY_POLICY.retry(move || get_account_address_and_seq_num(client, *address))
-    });
+    let futures = addresses.map(|address| get_account_address_and_seq_num(client, *address));
 
     let (seq_nums, timestamps): (Vec<_>, Vec<_>) = try_join_all(futures)
         .await

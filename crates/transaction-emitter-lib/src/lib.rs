@@ -14,7 +14,7 @@ pub use args::{ClusterArgs, CoinSourceArgs, CreateAccountsArgs, EmitArgs};
 // We export these if you want finer grained control.
 pub use cluster::Cluster;
 pub use emitter::{
-    query_sequence_number, query_sequence_numbers,
+    query_sequence_number, query_sequence_numbers_no_retry,
     stats::{TxnStats, TxnStatsRate},
     EmitJob, EmitJobMode, EmitJobRequest, EmitModeParams, TxnEmitter,
 };
