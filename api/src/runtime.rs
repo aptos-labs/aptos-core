@@ -289,7 +289,7 @@ pub fn attach_poem_to_runtime(
 }
 
 #[handler]
-async fn root_handler() -> Html<&'static str> {
+pub async fn root_handler() -> Html<&'static str> {
     let response = "<html>
 <head>
     <title>Aptos Node API</title>
