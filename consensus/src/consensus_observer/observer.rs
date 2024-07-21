@@ -16,13 +16,14 @@ use crate::{
         payload_store::BlockPayloadStore,
         pending_blocks::PendingBlockStore,
         publisher::ConsensusPublisher,
-        subscription,
-        subscription::ConsensusObserverSubscription,
+        subscription::{self, ConsensusObserverSubscription},
     },
     dag::DagCommitSigner,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
     network_interface::CommitMessage,
-    payload_manager::PayloadManager,
+    payload_manager::{
+        ConsensusObserverPayloadManager, DirectMempoolPayloadManager, TPayloadManager,
+    },
     pipeline::execution_client::TExecutionClient,
     state_replication::StateComputerCommitCallBackType,
 };
@@ -1116,13 +1117,13 @@ impl ConsensusObserver {
         );
 
         // Create the payload manager
-        let payload_manager = if self.quorum_store_enabled {
-            PayloadManager::ConsensusObserver(
+        let payload_manager: Arc<dyn TPayloadManager> = if self.quorum_store_enabled {
+            Arc::new(ConsensusObserverPayloadManager::new(
                 self.block_payload_store.get_block_payloads(),
                 self.consensus_publisher.clone(),
-            )
+            ))
         } else {
-            PayloadManager::DirectMempool
+            Arc::new(DirectMempoolPayloadManager {})
         };
 
         // Start the new epoch
@@ -1137,7 +1138,7 @@ impl ConsensusObserver {
             .start_epoch(
                 epoch_state.clone(),
                 dummy_signer,
-                Arc::new(payload_manager),
+                payload_manager,
                 &consensus_config,
                 &execution_config,
                 &randomness_config,

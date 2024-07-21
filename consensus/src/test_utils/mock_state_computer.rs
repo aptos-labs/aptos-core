@@ -4,7 +4,7 @@
 
 use crate::{
     error::StateSyncError,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     pipeline::buffer_manager::OrderedBlocks,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -83,7 +83,7 @@ impl StateComputer for EmptyStateComputer {
     fn new_epoch(
         &self,
         _: &EpochState,
-        _: Arc<PayloadManager>,
+        _: Arc<dyn TPayloadManager>,
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
@@ -149,7 +149,7 @@ impl StateComputer for RandomComputeResultStateComputer {
     fn new_epoch(
         &self,
         _: &EpochState,
-        _: Arc<PayloadManager>,
+        _: Arc<dyn TPayloadManager>,
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,

@@ -37,7 +37,7 @@ use crate::{
     payload_client::{
         mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
     },
-    payload_manager::PayloadManager,
+    payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
     quorum_store::{
@@ -172,7 +172,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_rpc_tx: Option<aptos_channel::Sender<AccountAddress, IncomingDAGRequest>>,
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
@@ -237,7 +237,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             dag_shutdown_tx: None,
             aptos_time_service,
             dag_config,
-            payload_manager: Arc::new(PayloadManager::DirectMempool),
+            payload_manager: Arc::new(DirectMempoolPayloadManager::new()),
             rand_storage,
             proof_cache: Cache::builder()
                 .max_capacity(node_config.consensus.proof_cache_capacity)
@@ -672,7 +672,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: &EpochState,
         network_sender: NetworkSender,
         consensus_config: &OnChainConsensusConfig,
-    ) -> (Arc<PayloadManager>, QuorumStoreClient, QuorumStoreBuilder) {
+    ) -> (
+        Arc<dyn TPayloadManager>,
+        QuorumStoreClient,
+        QuorumStoreBuilder,
+    ) {
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
@@ -755,7 +759,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: Arc<NetworkSender>,
         payload_client: Arc<dyn PayloadClient>,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
@@ -1194,7 +1198,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         epoch_state: &EpochState,
         consensus_config: &OnChainConsensusConfig,
-    ) -> (NetworkSender, Arc<dyn PayloadClient>, Arc<PayloadManager>) {
+    ) -> (
+        NetworkSender,
+        Arc<dyn PayloadClient>,
+        Arc<dyn TPayloadManager>,
+    ) {
         self.set_epoch_start_metrics(epoch_state);
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
         let network_sender = self.create_network_sender(epoch_state);
@@ -1225,7 +1233,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
@@ -1271,7 +1279,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
@@ -1550,7 +1558,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         buffered_proposal_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
         peer_id: AccountAddress,
         event: VerifiedEvent,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) {
         if let VerifiedEvent::ProposalMsg(proposal) = &event {
