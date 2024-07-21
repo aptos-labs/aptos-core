@@ -225,17 +225,11 @@ mod tests {
     /// Contains the public key of the Passkey credential
     /// This is included in a passkey registration response and derived from a real
     /// [AuthenticatorAttestationResponse](passkey_types::webauthn::AuthenticatorAttestationResponse)
-    /// using `passkeys-ts`
-    ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
     static ATTESTATION_OBJECT: &str = "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViYSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NdAAAAAAAAAAAAAAAAAAAAAAAAAAAAFG_FKuGMNWGiFATwhbpPPcm-wkFLpQECAyYgASFYIMXShkyn1SgV8l9FKzTdChTDgnn9HB2TuXHLf1GA_VuGIlggRj8IW2yK6AcefsrfbM_6WIqK5CTVpkhtT8WFRvUAfcg";
 
     /// Contains the public key of a Secure Payment Confirmation (SPC) enabled Passkey credential
     /// This is included in a passkey registration response and derived from a real
     /// [AuthenticatorAttestationResponse](passkey_types::webauthn::AuthenticatorAttestationResponse)
-    /// using `passkeys-ts`
-    ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
     static SPC_ATTESTATION_OBJECT: &str = "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVikSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAK3OAAI1vMYKZIsLJfHwVQMAIIwkb4vzhrcbFEOzI6_J233DJiKugvfuflXjcIXQunjupQECAyYgASFYIB1yTmeAb93Xv2GaYO_SV3cDKqJeRX5jYqqgijy_9d0bIlggur6NDT5HhEu0VPlzpevZt2lOGh0qiNXfFytsqCLPZ8E";
 
     /// BCS encoded coin transfer raw transaction
@@ -253,9 +247,6 @@ mod tests {
 
     /// Passkey Authenticator Data
     /// This is generated from a real [AuthenticatorAssertionResponse](passkey_types::webauthn::AuthenticatorAssertionResponse)
-    /// using `passkeys-ts`
-    ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
     static AUTHENTICATOR_DATA: &[u8] = &[
         73, 150, 13, 229, 136, 14, 140, 104, 116, 52, 23, 15, 100, 118, 96, 91, 143, 228, 174, 185,
         162, 134, 50, 199, 153, 92, 243, 186, 131, 29, 151, 99, 29, 0, 0, 0, 0,
@@ -263,9 +254,6 @@ mod tests {
 
     /// Client Data JSON, using the `SHA3-256(signed_message(raw_transaction))` as the `challenge`
     /// This is generated from a real [AuthenticatorAssertionResponse](passkey_types::webauthn::AuthenticatorAssertionResponse)
-    /// using `passkeys-ts`
-    ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
     static CLIENT_DATA_JSON: &[u8] = &[
         123, 34, 116, 121, 112, 101, 34, 58, 34, 119, 101, 98, 97, 117, 116, 104, 110, 46, 103,
         101, 116, 34, 44, 34, 99, 104, 97, 108, 108, 101, 110, 103, 101, 34, 58, 34, 101, 85, 102,
@@ -280,9 +268,6 @@ mod tests {
     /// AUTHENTICATOR_DATA and SHA-256(CLIENT_DATA_JSON)
     ///
     /// This is generated from a real [AuthenticatorAssertionResponse](passkey_types::webauthn::AuthenticatorAssertionResponse)
-    /// using `passkeys-ts`
-    ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
     static SIGNATURE: &[u8] = &[
         113, 168, 216, 132, 231, 240, 12, 39, 184, 16, 246, 230, 166, 142, 70, 117, 131, 2, 3, 155,
         44, 87, 236, 192, 192, 28, 110, 2, 33, 143, 17, 200, 62, 221, 102, 227, 147, 24, 126, 96,
@@ -325,17 +310,17 @@ mod tests {
                     // Append the UTF-8 encoding of the code point
                     let utf8_bytes = code_point.to_string().into_bytes();
                     encoded.extend_from_slice(&utf8_bytes);
-                },
+                }
                 '\u{0022}' => {
                     // Append 0x5c22 (\")
                     encoded.push(0x5C);
                     encoded.push(0x22);
-                },
+                }
                 '\u{005C}' => {
                     // Append 0x5c5c (\\)
                     encoded.push(0x5C);
                     encoded.push(0x5C);
-                },
+                }
                 _ => {
                     // Append 0x5c75 (\u) followed by four lower-case hex digits
                     encoded.push(0x5C);
@@ -344,7 +329,7 @@ mod tests {
                     for hex_byte in hex_digits.bytes() {
                         encoded.push(hex_byte);
                     }
-                },
+                }
             }
         }
 
@@ -677,9 +662,6 @@ mod tests {
     }
 
     /// This test uses a real WebAuthn [AuthenticatorAssertionResponse](passkey_types::webauthn::AuthenticatorAssertionResponse)
-    /// from a passkey generated with the `passkeys-ts` test client.
-    ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
     #[tokio::test]
     async fn verify_real_partial_authenticator_assertion_response() {
         // Parse passkey credential registration response to get the public key
