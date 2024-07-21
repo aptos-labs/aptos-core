@@ -2758,7 +2758,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d954cf4eef9ceabdd941b2e08923fff83984b591#d954cf4eef9ceabdd941b2e08923fff83984b591"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=fa1ce4947f4c2be57529f1c9732529e05a06cb7f#fa1ce4947f4c2be57529f1c9732529e05a06cb7f"
 dependencies = [
  "chrono",
 ]
@@ -3263,8 +3263,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.3.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=d76b5bb423b78b2b9affc72d3853f0d973d3f11f#d76b5bb423b78b2b9affc72d3853f0d973d3f11f"
+version = "1.3.1"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3276,6 +3275,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.1"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb#5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -12977,14 +12977,14 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d954cf4eef9ceabdd941b2e08923fff83984b591#d954cf4eef9ceabdd941b2e08923fff83984b591"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=fa1ce4947f4c2be57529f1c9732529e05a06cb7f#fa1ce4947f4c2be57529f1c9732529e05a06cb7f"
 dependencies = [
  "ahash 0.8.11",
  "allocative",
  "allocative_derive",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d954cf4eef9ceabdd941b2e08923fff83984b591)",
- "aptos-protos 1.3.0",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=fa1ce4947f4c2be57529f1c9732529e05a06cb7f)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "async-trait",
  "bcs 0.1.4",
  "bigdecimal",
@@ -13031,7 +13031,6 @@ dependencies = [
  "tracing",
  "unescape",
  "url",
- "uuid",
 ]
 
 [[package]]
@@ -14582,7 +14581,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d954cf4eef9ceabdd941b2e08923fff83984b591#d954cf4eef9ceabdd941b2e08923fff83984b591"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=fa1ce4947f4c2be57529f1c9732529e05a06cb7f#fa1ce4947f4c2be57529f1c9732529e05a06cb7f"
 dependencies = [
  "anyhow",
  "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
