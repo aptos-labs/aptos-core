@@ -443,7 +443,6 @@ fn freeze_code_object_succeeds_when_all_dependencies_immutable() {
     assert_success!(status);
 }
 
-
 #[test]
 fn freeze_code_object_fail_when_package_registry_does_not_exist() {
     let mut context = TestContext::new(None, None);
