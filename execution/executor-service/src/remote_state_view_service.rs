@@ -16,6 +16,7 @@ use std::sync::{Condvar, Mutex};
 use cpq::ConcurrentPriorityQueue;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use tokio::runtime::Runtime;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
@@ -23,11 +24,15 @@ use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_rx: Receiver<Message>,
     kv_unprocessed_pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
-    kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
+    kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
     //thread_pool: Arc<Vec<rayon::ThreadPool>>,
     thread_pool: Arc<rayon::ThreadPool>,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
     recv_condition: Arc<(Mutex<bool>, Condvar)>,
+    outbound_rpc_runtime: Arc<Runtime>,
+    //rt_kv_proc_runtime: Arc<Runtime>,
+    num_shards: usize,
+
 }
 
 impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
@@ -64,7 +69,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 //controller.create_outbound_channel(*address, kv_response_type.to_string())
                 let mut command_tx = vec![];
                 for _ in 0..num_kv_req_threads {
-                    command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address, controller.get_outbound_rpc_runtime())));
+                    command_tx.push(tokio::sync::Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address, controller.get_outbound_rpc_runtime())));
                 }
                 command_tx
             })
@@ -76,6 +81,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             thread_pool: Arc::new(thread_pool),
             state_view: Arc::new(RwLock::new(None)),
             recv_condition: Arc::new((Mutex::new(false), Condvar::new())),
+            outbound_rpc_runtime: controller.get_outbound_rpc_runtime(),
+            //rt_kv_proc_runtime: Arc::new(rt_kv_proc),
+            num_shards,
         }
     }
 
@@ -99,11 +107,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let kv_tx_clone = self.kv_tx.clone();
             let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
             let recv_condition_clone = self.recv_condition.clone();
+            let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
             thread_pool_clone
                 .spawn(move || Self::priority_handler(state_view_clone.clone(),
                                                       kv_tx_clone.clone(),
                                                       kv_unprocessed_pq_clone.clone(),
-                                                      recv_condition_clone.clone()));
+                                                      recv_condition_clone.clone(),
+                                                      outbound_rpc_runtime_clone));
         }
 
         while let Ok(message) = self.kv_rx.recv() {
@@ -136,9 +146,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     }
 
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
-                            kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
+                            kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
                             pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
-                            recv_condition: Arc<(Mutex<bool>, Condvar)>) {
+                            recv_condition: Arc<(Mutex<bool>, Condvar)>,
+                            outbound_rpc_runtime: Arc<Runtime>,) {
         let mut rng = StdRng::from_entropy();
         loop {
             let (lock, cvar) = &*recv_condition;
@@ -146,12 +157,14 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             if pq.is_empty() {
                 lg = cvar.wait(lg).unwrap();
             }
+            let maybe_message = pq.pop();
             drop(lg);
-            if let Some(message) = pq.pop() {
+            if let Some(message) = maybe_message {
                 let state_view = state_view.clone();
                 let kv_txs = kv_tx.clone();
 
-                Self::handle_message(message, state_view, kv_txs, &mut rng);
+                let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
+                Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
             }
         }
     }
@@ -159,8 +172,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn handle_message(
         message: Message,
         state_view: Arc<RwLock<Option<Arc<S>>>>,
-        kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
-        rng: &mut StdRng,
+        kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
+        //rng: &mut StdRng,
+        rand_send_thread_idx: usize,
+        outbound_rpc_runtime: Arc<Runtime>,
     ) {
         let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
         {
@@ -238,16 +253,21 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .with_label_values(&["0", "kv_requests_4"])
             .start_timer();
 
-        let timer_5 = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&["0", "kv_requests_lock"])
-            .start_timer();
-        let rand_send_thread_idx = rng.gen_range(0, kv_tx[shard_id].len());
-        let mtx = kv_tx[shard_id][rand_send_thread_idx].lock();
-        drop(timer_5);
+        // let timer_5 = REMOTE_EXECUTOR_TIMER
+        //     .with_label_values(&["0", "kv_requests_lock"])
+        //     .start_timer();
+        // let rand_send_thread_idx = rng.gen_range(0, kv_tx[shard_id].len());
+        // let mtx = kv_tx[shard_id][rand_send_thread_idx].lock();
+        // drop(timer_5);
+
         let timer_6 = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests_send"])
             .start_timer();
-        mtx.unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
+        let kv_tx_clone = kv_tx.clone();
+        outbound_rpc_runtime.spawn(async move {
+            kv_tx_clone[shard_id][rand_send_thread_idx].lock().await.send_async(resp_message, &MessageType::new("remote_kv_response".to_string())).await;
+        });
+        //mtx.unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
         let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         info!("kv req batch {} sent to shard {} at time: {}", seq_num, shard_id, curr_time);
         drop(timer_6);
