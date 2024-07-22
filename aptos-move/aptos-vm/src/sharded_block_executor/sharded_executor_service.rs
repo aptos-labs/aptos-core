@@ -352,13 +352,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
 
             self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            info!("Dropped state view at time: {}", curr_time);
             stream_results_tx.send(TransactionIdxAndOutput {
                 txn_idx: u32::MAX,
                 txn_output: TransactionOutput::default(),
             }).unwrap();
-            self.coordinator_client.lock().unwrap().reset_state_view();
             stream_results_thread.join().unwrap();
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            info!("Sent results finished at time: {}", curr_time);
+            self.coordinator_client.lock().unwrap().reset_state_view();
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            info!("Dropped state view at time: {}", curr_time);
             if (i % 50 == 49) {
                 let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
                     .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
