@@ -12,6 +12,7 @@ module aptos_framework::block {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
     use aptos_framework::reconfiguration_with_dkg;
+    use aptos_framework::schedule_transaction_queue;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
@@ -215,6 +216,8 @@ module aptos_framework::block {
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
         state_storage::on_new_block(reconfiguration::current_epoch());
+
+        schedule_transaction_queue::reset();
 
         block_metadata_ref.epoch_interval
     }

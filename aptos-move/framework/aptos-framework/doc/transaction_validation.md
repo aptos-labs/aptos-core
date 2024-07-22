@@ -15,6 +15,8 @@
 -  [Function `fee_payer_script_prologue`](#0x1_transaction_validation_fee_payer_script_prologue)
 -  [Function `epilogue`](#0x1_transaction_validation_epilogue)
 -  [Function `epilogue_gas_payer`](#0x1_transaction_validation_epilogue_gas_payer)
+-  [Function `scheduled_txn_prologue`](#0x1_transaction_validation_scheduled_txn_prologue)
+-  [Function `scheduled_txn_epilogue`](#0x1_transaction_validation_scheduled_txn_epilogue)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -36,6 +38,7 @@
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue">0x1::schedule_transaction_queue</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -656,6 +659,107 @@ Called by the Adapter
     // Increment sequence number
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
     <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(addr);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_validation_scheduled_txn_prologue"></a>
+
+## Function `scheduled_txn_prologue`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_prologue">scheduled_txn_prologue</a>(gas_payer: <b>address</b>, txn_gas_price: u64, txn_max_gas_units: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_prologue">scheduled_txn_prologue</a>(
+    gas_payer: <b>address</b>,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+) {
+    <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
+        <b>assert</b>!(
+            <a href="aptos_account.md#0x1_aptos_account_is_fungible_balance_at_least">aptos_account::is_fungible_balance_at_least</a>(gas_payer, max_transaction_fee),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>)
+        );
+    } <b>else</b> {
+        <b>assert</b>!(
+            <a href="coin.md#0x1_coin_is_balance_at_least">coin::is_balance_at_least</a>&lt;AptosCoin&gt;(gas_payer, max_transaction_fee),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>)
+        );
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_validation_scheduled_txn_epilogue"></a>
+
+## Function `scheduled_txn_epilogue`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(gas_payer: <b>address</b>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(
+    gas_payer: <b>address</b>,
+    storage_fee_refunded: u64,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+    gas_units_remaining: u64
+) {
+    <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
+    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
+
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
+        <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">transaction_fee::collect_fee</a>(gas_payer, transaction_fee_amount);
+    } <b>else</b> {
+        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, transaction_fee_amount);
+    };
+
+    <b>let</b> amount_to_burn = <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
+        // TODO(gas): We might want <b>to</b> distinguish the refundable part of the charge and burn it or track
+        // it separately, so that we don't increase the total supply by refunding.
+
+        // If transaction fees are redistributed <b>to</b> validators, collect them here for
+        // later redistribution.
+        <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">transaction_fee::collect_fee</a>(gas_payer, transaction_fee_amount);
+        0
+    } <b>else</b> {
+        // Otherwise, just burn the fee.
+        // TODO: this branch should be removed completely when transaction fee collection
+        // is tested and is fully proven <b>to</b> work well.
+        transaction_fee_amount
+    };
+
+    <b>if</b> (amount_to_burn &gt; storage_fee_refunded) {
+        <b>let</b> burn_amount = amount_to_burn - storage_fee_refunded;
+        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
+    } <b>else</b> <b>if</b> (amount_to_burn &lt; storage_fee_refunded) {
+        <b>let</b> mint_amount = storage_fee_refunded - amount_to_burn;
+        <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount)
+    };
+
+    <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_finish_execution">schedule_transaction_queue::finish_execution</a>();
 }
 </code></pre>
 

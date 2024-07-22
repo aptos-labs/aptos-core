@@ -9,6 +9,7 @@
 -  [Struct `EntryFunctionPayload`](#0x1_transaction_context_EntryFunctionPayload)
 -  [Struct `MultisigPayload`](#0x1_transaction_context_MultisigPayload)
 -  [Constants](#@Constants_0)
+-  [Function `new_entry_function_payload`](#0x1_transaction_context_new_entry_function_payload)
 -  [Function `get_txn_hash`](#0x1_transaction_context_get_txn_hash)
 -  [Function `get_transaction_hash`](#0x1_transaction_context_get_transaction_hash)
 -  [Function `generate_unique_address`](#0x1_transaction_context_generate_unique_address)
@@ -102,7 +103,7 @@ for storing an address
 Represents the entry function payload.
 
 
-<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a> <b>has</b> <b>copy</b>, drop
+<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -205,6 +206,42 @@ Transaction context is only available in the user transaction prologue, executio
 </code></pre>
 
 
+
+<a id="0x1_transaction_context_new_entry_function_payload"></a>
+
+## Function `new_entry_function_payload`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_new_entry_function_payload">new_entry_function_payload</a>(account_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, ty_args_names: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, args: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;): <a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_new_entry_function_payload">new_entry_function_payload</a>(
+    account_address: <b>address</b>,
+    module_name: String,
+    function_name: String,
+    ty_args_names: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    args: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+): <a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a> {
+    <a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a> {
+        account_address,
+        module_name,
+        function_name,
+        ty_args_names,
+        args,
+    }
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_transaction_context_get_txn_hash"></a>
 

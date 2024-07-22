@@ -27,6 +27,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
+<b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 </code></pre>
 
 
@@ -54,13 +55,19 @@
 
 </dd>
 <dt>
-<code>payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>max_gas_unit: u64</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
 <code>sender: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>payload: <a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a></code>
 </dt>
 <dd>
 
@@ -163,7 +170,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">new_transaction</a>(scheduled_time: u64, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, sender: <b>address</b>): <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">schedule_transaction_queue::ScheduledTransaction</a>
+<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">new_transaction</a>(scheduled_time: u64, max_gas_unit: u64, payload: <a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>, sender: <b>address</b>): <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">schedule_transaction_queue::ScheduledTransaction</a>
 </code></pre>
 
 
@@ -172,11 +179,13 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">new_transaction</a>(scheduled_time: u64, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, sender: <b>address</b>): <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">ScheduledTransaction</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">new_transaction</a>(scheduled_time: u64, max_gas_unit: u64, payload: EntryFunctionPayload, sender: <b>address</b>): <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">ScheduledTransaction</a> {
+    // todo:: validate payload
     <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">ScheduledTransaction</a> {
         scheduled_time: scheduled_time,
-        payload: payload,
-        sender: sender,
+        max_gas_unit,
+        sender,
+        payload,
     }
 }
 </code></pre>
@@ -312,7 +321,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_get_ready_transactions">get_ready_transactions</a>(<a href="timestamp.md#0x1_timestamp">timestamp</a>: u64, limit: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">ScheduledTransaction</a>&gt; <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_get_ready_transactions">get_ready_transactions</a>(<a href="timestamp.md#0x1_timestamp">timestamp</a>: u64, limit: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">ScheduledTransaction</a>&gt; <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a>, <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ToRemove">ToRemove</a> {
+    <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_reset">reset</a>();
     <b>let</b> scheduled_queue = <b>borrow_global_mut</b>&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a>&gt;(@aptos_framework);
     <b>let</b> result = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&result) &lt; limit) {
@@ -351,7 +361,7 @@
 Increment at every scheduled transaction without affect parallelism
 
 
-<pre><code><b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_finish_execution">finish_execution</a>()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_finish_execution">finish_execution</a>()
 </code></pre>
 
 
@@ -360,7 +370,7 @@ Increment at every scheduled transaction without affect parallelism
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_finish_execution">finish_execution</a>() <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ToRemove">ToRemove</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_finish_execution">finish_execution</a>() <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ToRemove">ToRemove</a> {
     <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ToRemove">ToRemove</a>&gt;(@aptos_framework);
     <a href="aggregator_v2.md#0x1_aggregator_v2_add">aggregator_v2::add</a>(&<b>mut</b> to_remove.num, 1);
 }
@@ -377,7 +387,7 @@ Increment at every scheduled transaction without affect parallelism
 Reset at beginning of each block
 
 
-<pre><code><b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_reset">reset</a>()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_reset">reset</a>()
 </code></pre>
 
 
@@ -386,7 +396,7 @@ Reset at beginning of each block
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_reset">reset</a>() <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ToRemove">ToRemove</a>, <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_reset">reset</a>() <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ToRemove">ToRemove</a>, <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a> {
     <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ToRemove">ToRemove</a>&gt;(@aptos_framework);
     <b>let</b> num_to_remove = <a href="aggregator_v2.md#0x1_aggregator_v2_read">aggregator_v2::read</a>(&to_remove.num);
     <a href="aggregator_v2.md#0x1_aggregator_v2_sub">aggregator_v2::sub</a>(&<b>mut</b> to_remove.num, num_to_remove);

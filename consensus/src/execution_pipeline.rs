@@ -200,7 +200,6 @@ impl ExecutionPipeline {
                     });
                     let timestamp_sec = block_timestamp / 1_000_000;
                     let state_view = executor.state_view(parent_block_id)?;
-                    println!("block timestamp: {}", timestamp_sec);
                     let scheduled_transactions = bcs::from_bytes::<Vec<ScheduledTransaction>>(
                         &AptosVM::execute_view_function(
                             &state_view,
@@ -222,7 +221,10 @@ impl ExecutionPipeline {
                         .expect("view function output is empty"),
                     )
                     .expect("failed to deserialize scheduled transactions");
-                    println!("scheduled_transactions: {:?}", scheduled_transactions);
+                    println!(
+                        "block id: {}, timestamp: {}, scheduled_transactions: {:?}",
+                        block_id, timestamp_sec, scheduled_transactions
+                    );
 
                     let extra_txns: Vec<_> = scheduled_transactions
                         .iter()
@@ -245,7 +247,9 @@ impl ExecutionPipeline {
                 .await
             )
             .expect("Failed to spawn_blocking.");
-            output_txns.append(&mut rx.await.unwrap());
+            if let Ok(mut txns) = rx.await {
+                output_txns.append(&mut txns);
+            }
 
             ledger_apply_tx
                 .send(LedgerApplyCommand {

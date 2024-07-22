@@ -4,6 +4,7 @@ module aptos_framework::genesis {
     use std::vector;
 
     use aptos_std::simple_map;
+    use aptos_std::string;
 
     use aptos_framework::account;
     use aptos_framework::aggregator_factory;
@@ -30,6 +31,7 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_validation;
     use aptos_framework::version;
     use aptos_framework::vesting;
+    use aptos_framework::transaction_context;
 
     const EDUPLICATE_ACCOUNT: u64 = 1;
     const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
@@ -134,8 +136,6 @@ module aptos_framework::genesis {
         timestamp::set_time_has_started(&aptos_framework_account);
         schedule_transaction_queue::initialize(&aptos_framework_account);
 
-        // test
-        schedule_transaction_queue::insert(&aptos_framework_account, schedule_transaction_queue::new_transaction(100, vector[], @0x1));
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -174,6 +174,16 @@ module aptos_framework::genesis {
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
         aptos_account::register_apt(&core_resources); // registers APT store
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
+
+        // test
+        schedule_transaction_queue::insert(
+            &core_resources,
+            schedule_transaction_queue::new_transaction(
+                100,
+                1000,
+                transaction_context::new_entry_function_payload(@0x1, string::utf8(b"test_schedule_txn"), string::utf8(b"bar"), vector[], vector[]),
+                @core_resources,
+        ));
     }
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {

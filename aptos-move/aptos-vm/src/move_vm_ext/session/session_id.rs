@@ -50,6 +50,8 @@ pub enum SessionId {
     ValidatorTxn {
         script_hash: Vec<u8>,
     },
+    // TODO: unique id for each scheduled txn
+    ScheduledTxn,
 }
 
 impl SessionId {
@@ -141,7 +143,8 @@ impl SessionId {
             Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
             | Self::Void
-            | Self::BlockMetaExt { id: _ } => vec![],
+            | Self::BlockMetaExt { id: _ }
+            | Self::ScheduledTxn => vec![],
         }
     }
 }

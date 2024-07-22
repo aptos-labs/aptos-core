@@ -22,7 +22,9 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier,
+    transaction_validation,
+    transaction_validation::{run_scheduled_txn_epilogue, run_scheduled_txn_prologue},
+    verifier,
     verifier::randomness::get_randomness_annotation,
     VMExecutor, VMValidator,
 };
@@ -389,11 +391,11 @@ impl AptosVM {
     }
 
     fn fee_statement_from_gas_meter(
-        txn_data: &TransactionMetadata,
+        max_gas_unit: Gas,
         gas_meter: &impl AptosGasMeter,
         storage_fee_refund: u64,
     ) -> FeeStatement {
-        let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
+        let gas_used = Self::gas_used(max_gas_unit, gas_meter);
         FeeStatement::new(
             gas_used,
             u64::from(gas_meter.execution_gas_used()),
@@ -559,8 +561,11 @@ impl AptosVM {
                     );
                 };
 
-                let fee_statement =
-                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+                let fee_statement = AptosVM::fee_statement_from_gas_meter(
+                    txn_data.max_gas_amount(),
+                    gas_meter,
+                    ZERO_STORAGE_REFUND,
+                );
 
                 // Verify we charged sufficiently for creating an account slot
                 let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
@@ -589,8 +594,11 @@ impl AptosVM {
                 }
                 (abort_hook_session_change_set, fee_statement)
             } else {
-                let fee_statement =
-                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+                let fee_statement = AptosVM::fee_statement_from_gas_meter(
+                    txn_data.max_gas_amount(),
+                    gas_meter,
+                    ZERO_STORAGE_REFUND,
+                );
                 (prologue_session_change_set, fee_statement)
             };
 
@@ -652,7 +660,7 @@ impl AptosVM {
         }
 
         let fee_statement = AptosVM::fee_statement_from_gas_meter(
-            txn_data,
+            txn_data.max_gas_amount(),
             gas_meter,
             u64::from(epilogue_session.get_storage_fee_refund()),
         );
@@ -741,7 +749,6 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
-        _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
@@ -844,7 +851,6 @@ impl AptosVM {
                         traversal_context,
                         txn_data.senders(),
                         entry_fn,
-                        txn_data,
                     )
                 })?;
             },
@@ -957,7 +963,6 @@ impl AptosVM {
                                 payload.multisig_address,
                                 entry_function,
                                 new_published_modules_loaded,
-                                txn_data,
                                 change_set_configs,
                             )?;
                             let has_modules_published_to_special_address =
@@ -1095,7 +1100,6 @@ impl AptosVM {
                     txn_payload.multisig_address,
                     &entry_function,
                     new_published_modules_loaded,
-                    txn_data,
                     change_set_configs,
                 ),
         };
@@ -1221,7 +1225,6 @@ impl AptosVM {
         multisig_address: AccountAddress,
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
-        txn_data: &TransactionMetadata,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
@@ -1234,7 +1237,6 @@ impl AptosVM {
                 traversal_context,
                 vec![multisig_address],
                 payload,
-                txn_data,
             )
         })?;
 
@@ -2463,9 +2465,43 @@ impl AptosVM {
                     self.process_validator_transaction(resolver, txn.clone(), log_context)?;
                 (vm_status, output)
             },
-            Transaction::ScheduledTransaction(_txn) => {
-                let status = TransactionStatus::Keep(ExecutionStatus::Success);
-                let output = VMOutput::empty_with_status(status);
+            Transaction::ScheduledTransaction(txn) => {
+                let balance = txn.max_gas_unit.into();
+                let storage_gas = get_or_vm_startup_failure(&self.storage_gas_params, log_context)?;
+                let mut gas_meter = make_prod_gas_meter(
+                    self.gas_feature_version,
+                    get_or_vm_startup_failure(&self.gas_params, log_context)?
+                        .vm
+                        .clone(),
+                    storage_gas.clone(),
+                    false,
+                    balance,
+                );
+                let mut session = self.new_session(resolver, SessionId::ScheduledTxn, None);
+                let storage = TraversalStorage::new();
+                let mut context = TraversalContext::new(&storage);
+                run_scheduled_txn_prologue(&mut session, &txn, log_context, &mut context).unwrap();
+                self.validate_and_execute_entry_function(
+                    resolver,
+                    &mut session,
+                    &mut gas_meter,
+                    &mut context,
+                    vec![txn.sender],
+                    &txn.payload,
+                )
+                .unwrap();
+                run_scheduled_txn_epilogue(
+                    &mut session,
+                    &txn,
+                    gas_meter.balance(),
+                    Self::fee_statement_from_gas_meter(txn.max_gas_unit.into(), &gas_meter, 0),
+                    &mut context,
+                )
+                .unwrap();
+                let output =
+                    get_system_transaction_output(session, &storage_gas.change_set_configs)
+                        .unwrap();
+                println!("Scheduled transaction output: {:?}", output);
                 (VMStatus::Executed, output)
             },
         })

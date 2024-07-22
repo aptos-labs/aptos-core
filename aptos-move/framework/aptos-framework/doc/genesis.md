@@ -58,7 +58,9 @@
 <b>use</b> <a href="staking_contract.md#0x1_staking_contract">0x1::staking_contract</a>;
 <b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
 <b>use</b> <a href="storage_gas.md#0x1_storage_gas">0x1::storage_gas</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
+<b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
 <b>use</b> <a href="transaction_validation.md#0x1_transaction_validation">0x1::transaction_validation</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
@@ -368,8 +370,6 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
     <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_initialize">schedule_transaction_queue::initialize</a>(&aptos_framework_account);
 
-    // test
-    <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">schedule_transaction_queue::insert</a>(&aptos_framework_account, <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">schedule_transaction_queue::new_transaction</a>(100, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], @0x1));
 }
 </code></pre>
 
@@ -448,6 +448,16 @@ Only called for testnets and e2e tests.
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
     <a href="aptos_account.md#0x1_aptos_account_register_apt">aptos_account::register_apt</a>(&core_resources); // registers APT store
     <a href="aptos_coin.md#0x1_aptos_coin_configure_accounts_for_test">aptos_coin::configure_accounts_for_test</a>(aptos_framework, &core_resources, mint_cap);
+
+    // test
+    <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">schedule_transaction_queue::insert</a>(
+        &core_resources,
+        <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">schedule_transaction_queue::new_transaction</a>(
+            100,
+            1000,
+            <a href="transaction_context.md#0x1_transaction_context_new_entry_function_payload">transaction_context::new_entry_function_payload</a>(@0x1, <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="test_schedule_txn.md#0x1_test_schedule_txn">test_schedule_txn</a>"), <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"bar"), <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]),
+            @core_resources,
+    ));
 }
 </code></pre>
 

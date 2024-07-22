@@ -17,12 +17,28 @@ module aptos_framework::transaction_context {
     }
 
     /// Represents the entry function payload.
-    struct EntryFunctionPayload has copy, drop {
+    struct EntryFunctionPayload has store, copy, drop {
         account_address: address,
         module_name: String,
         function_name: String,
         ty_args_names: vector<String>,
         args: vector<vector<u8>>,
+    }
+
+    public fun new_entry_function_payload(
+        account_address: address,
+        module_name: String,
+        function_name: String,
+        ty_args_names: vector<String>,
+        args: vector<vector<u8>>,
+    ): EntryFunctionPayload {
+        EntryFunctionPayload {
+            account_address,
+            module_name,
+            function_name,
+            ty_args_names,
+            args,
+        }
     }
 
     /// Represents the multisig payload.

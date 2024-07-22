@@ -11,6 +11,8 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     transaction_argument::TransactionArgument,
 };
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -107,6 +109,7 @@ impl fmt::Debug for Script {
 
 /// Call a Move entry function.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct EntryFunction {
     module: ModuleId,
     function: Identifier,

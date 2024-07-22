@@ -908,6 +908,21 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
+    TestScheduleTxnBar {},
+
+    TestScheduleTxnFoo {},
+
+    TestScheduleTxnFooWithArg {
+        a: u64,
+        b: u64,
+    },
+
+    TestScheduleTxnFooWithSignerAndArg {
+        value: u64,
+    },
+
+    TestScheduleTxnInitialize {},
+
     TransactionFeeConvertToAptosFaBurnRef {},
 
     /// Used in on-chain governances to update the major version for the next epoch.
@@ -1571,6 +1586,13 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
+            TestScheduleTxnBar {} => test_schedule_txn_bar(),
+            TestScheduleTxnFoo {} => test_schedule_txn_foo(),
+            TestScheduleTxnFooWithArg { a, b } => test_schedule_txn_foo_with_arg(a, b),
+            TestScheduleTxnFooWithSignerAndArg { value } => {
+                test_schedule_txn_foo_with_signer_and_arg(value)
+            },
+            TestScheduleTxnInitialize {} => test_schedule_txn_initialize(),
             TransactionFeeConvertToAptosFaBurnRef {} => {
                 transaction_fee_convert_to_aptos_fa_burn_ref()
             },
@@ -4236,6 +4258,81 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
+pub fn test_schedule_txn_bar() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("test_schedule_txn").to_owned(),
+        ),
+        ident_str!("bar").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn test_schedule_txn_foo() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("test_schedule_txn").to_owned(),
+        ),
+        ident_str!("foo").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn test_schedule_txn_foo_with_arg(a: u64, b: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("test_schedule_txn").to_owned(),
+        ),
+        ident_str!("foo_with_arg").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&a).unwrap(), bcs::to_bytes(&b).unwrap()],
+    ))
+}
+
+pub fn test_schedule_txn_foo_with_signer_and_arg(value: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("test_schedule_txn").to_owned(),
+        ),
+        ident_str!("foo_with_signer_and_arg").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&value).unwrap()],
+    ))
+}
+
+pub fn test_schedule_txn_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("test_schedule_txn").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -6121,6 +6218,55 @@ mod decoder {
         }
     }
 
+    pub fn test_schedule_txn_bar(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TestScheduleTxnBar {})
+        } else {
+            None
+        }
+    }
+
+    pub fn test_schedule_txn_foo(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TestScheduleTxnFoo {})
+        } else {
+            None
+        }
+    }
+
+    pub fn test_schedule_txn_foo_with_arg(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TestScheduleTxnFooWithArg {
+                a: bcs::from_bytes(script.args().get(0)?).ok()?,
+                b: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn test_schedule_txn_foo_with_signer_and_arg(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TestScheduleTxnFooWithSignerAndArg {
+                value: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn test_schedule_txn_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TestScheduleTxnInitialize {})
+        } else {
+            None
+        }
+    }
+
     pub fn transaction_fee_convert_to_aptos_fa_burn_ref(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6837,6 +6983,26 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_proxy_set_voter".to_string(),
             Box::new(decoder::staking_proxy_set_voter),
+        );
+        map.insert(
+            "test_schedule_txn_bar".to_string(),
+            Box::new(decoder::test_schedule_txn_bar),
+        );
+        map.insert(
+            "test_schedule_txn_foo".to_string(),
+            Box::new(decoder::test_schedule_txn_foo),
+        );
+        map.insert(
+            "test_schedule_txn_foo_with_arg".to_string(),
+            Box::new(decoder::test_schedule_txn_foo_with_arg),
+        );
+        map.insert(
+            "test_schedule_txn_foo_with_signer_and_arg".to_string(),
+            Box::new(decoder::test_schedule_txn_foo_with_signer_and_arg),
+        );
+        map.insert(
+            "test_schedule_txn_initialize".to_string(),
+            Box::new(decoder::test_schedule_txn_initialize),
         );
         map.insert(
             "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),

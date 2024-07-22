@@ -13,8 +13,10 @@ use crate::{
 };
 use aptos_gas_algebra::Gas;
 use aptos_types::{
-    account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
-    on_chain_config::Features, transaction::Multisig,
+    account_config::constants::CORE_CODE_ADDRESS,
+    fee_statement::FeeStatement,
+    on_chain_config::Features,
+    transaction::{scheduled_transaction::ScheduledTransaction, Multisig},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -40,6 +42,8 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
+        scheduled_txn_prologue_name: Identifier::new("scheduled_txn_prologue").unwrap(),
+        scheduled_txn_epilogue_name: Identifier::new("scheduled_txn_epilogue").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -52,6 +56,8 @@ pub struct TransactionValidation {
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
+    pub scheduled_txn_prologue_name: Identifier,
+    pub scheduled_txn_epilogue_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -333,4 +339,58 @@ pub(crate) fn run_failure_epilogue(
             log_context,
         )
     })
+}
+
+pub(crate) fn run_scheduled_txn_prologue(
+    session: &mut SessionExt,
+    txn: &ScheduledTransaction,
+    log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
+) -> Result<(), VMStatus> {
+    let args = vec![
+        MoveValue::Address(txn.sender),
+        MoveValue::U64(txn.max_gas_unit),
+        MoveValue::U64(100), // gas price
+    ];
+    session
+        .execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            &APTOS_TRANSACTION_VALIDATION.scheduled_txn_prologue_name,
+            vec![],
+            serialize_values(&args),
+            &mut UnmeteredGasMeter,
+            traversal_context,
+        )
+        .map(|_return_vals| ())
+        .map_err(expect_no_verification_errors)
+        .or_else(|err| convert_prologue_error(err, log_context))
+}
+
+pub(crate) fn run_scheduled_txn_epilogue(
+    session: &mut SessionExt,
+    txn: &ScheduledTransaction,
+    gas_remaining: Gas,
+    fee_statement: FeeStatement,
+    traversal_context: &mut TraversalContext,
+) -> VMResult<()> {
+    let args = vec![
+        MoveValue::Address(txn.sender),
+        MoveValue::U64(fee_statement.storage_fee_refund()),
+        MoveValue::U64(100),
+        MoveValue::U64(txn.max_gas_unit),
+        MoveValue::U64(gas_remaining.into()),
+    ];
+    session
+        .execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            &APTOS_TRANSACTION_VALIDATION.scheduled_txn_epilogue_name,
+            vec![],
+            serialize_values(&args),
+            &mut UnmeteredGasMeter,
+            traversal_context,
+        )
+        .map(|_return_vals| ())
+        .map_err(expect_no_verification_errors)?;
+    emit_fee_statement(session, fee_statement, traversal_context)?;
+    Ok(())
 }
