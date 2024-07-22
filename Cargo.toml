@@ -339,6 +339,7 @@ aptos-faucet-service = { path = "crates/aptos-faucet/service" }
 aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
+aptos-forge-pilot = { path = "testsuite/forge-pilot" }
 aptos-framework = { path = "aptos-move/framework" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
