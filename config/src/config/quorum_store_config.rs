@@ -133,7 +133,7 @@ impl Default for QuorumStoreConfig {
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
             allow_batches_without_pos_in_proposal: true,
-            minimum_batch_size: 5,
+            minimum_batch_size: 20,
         }
     }
 }
