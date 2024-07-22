@@ -237,7 +237,7 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         for (protocol_id, peers) in peers_per_protocol {
             for (network_id, peers) in &peers
                 .iter()
-                .group_by(|peer_network_id| peer_network_id.network_id())
+                .chunk_by(|peer_network_id| peer_network_id.network_id())
             {
                 let network_sender = self.get_sender_for_network_id(&network_id)?;
                 let peer_ids = peers.map(|peer_network_id| peer_network_id.peer_id());
