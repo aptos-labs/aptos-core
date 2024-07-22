@@ -461,8 +461,8 @@ impl BatchGenerator {
                     if (!self.back_pressure.proof_count && !self.back_pressure.txn_count)
                         || since_last_non_empty_pull_ms >= self.config.batch_generation_max_interval_ms {
 
-                        while let Some(&(tick_start, _)) = pulled_txns_window.front() {
-                            if tick_start.elapsed() >= Duration::from_secs(1) {
+                        while let Some(&(timestamp, _)) = pulled_txns_window.front() {
+                            if timestamp.elapsed() >= Duration::from_secs(1) {
                                 pulled_txns_window.pop_front();
                             } else {
                                 break;
