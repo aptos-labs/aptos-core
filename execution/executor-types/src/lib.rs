@@ -10,6 +10,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_config::NEW_EPOCH_EVENT_MOVE_TYPE_TAG,
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
@@ -131,6 +132,8 @@ pub struct StateSnapshotDelta {
 }
 
 pub trait BlockExecutorTrait: Send + Sync {
+    /// Get a state view after the given block id.
+    fn state_view(&self, _block_id: HashValue) -> ExecutorResult<CachedStateView>;
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
 

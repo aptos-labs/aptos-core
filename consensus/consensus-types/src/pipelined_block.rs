@@ -12,8 +12,11 @@ use crate::{
 use aptos_crypto::hash::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_types::{
-    block_info::BlockInfo, contract_event::ContractEvent, randomness::Randomness,
-    transaction::SignedTransaction, validator_txn::ValidatorTransaction,
+    block_info::BlockInfo,
+    contract_event::ContractEvent,
+    randomness::Randomness,
+    transaction::{SignedTransaction, Transaction},
+    validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -32,6 +35,7 @@ pub struct PipelinedBlock {
     block: Block,
     /// Input transactions in the order of execution
     input_transactions: Vec<SignedTransaction>,
+    output_transactions: Vec<Transaction>,
     /// The state_compute_result is calculated for all the pending blocks prior to insertion to
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
@@ -50,6 +54,7 @@ impl Serialize for PipelinedBlock {
         struct SerializedBlock<'a> {
             block: &'a Block,
             input_transactions: &'a Vec<SignedTransaction>,
+            output_transactions: &'a Vec<Transaction>,
             state_compute_result: &'a StateComputeResult,
             randomness: Option<&'a Randomness>,
         }
@@ -57,6 +62,7 @@ impl Serialize for PipelinedBlock {
         let serialized = SerializedBlock {
             block: &self.block,
             input_transactions: &self.input_transactions,
+            output_transactions: &self.output_transactions,
             state_compute_result: &self.state_compute_result,
             randomness: self.randomness.get(),
         };
@@ -74,6 +80,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
         struct SerializedBlock {
             block: Block,
             input_transactions: Vec<SignedTransaction>,
+            output_transactions: Vec<Transaction>,
             state_compute_result: StateComputeResult,
             randomness: Option<Randomness>,
         }
@@ -81,6 +88,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
         let SerializedBlock {
             block,
             input_transactions,
+            output_transactions,
             state_compute_result,
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
@@ -88,6 +96,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
         let block = PipelinedBlock {
             block,
             input_transactions,
+            output_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
@@ -103,10 +112,12 @@ impl PipelinedBlock {
     pub fn set_execution_result(
         mut self,
         input_transactions: Vec<SignedTransaction>,
+        output_transactions: Vec<Transaction>,
         result: StateComputeResult,
     ) -> Self {
         self.state_compute_result = result;
         self.input_transactions = input_transactions;
+        self.output_transactions = output_transactions;
         self
     }
 
@@ -140,6 +151,7 @@ impl PipelinedBlock {
         Self {
             block,
             input_transactions,
+            output_transactions: vec![],
             state_compute_result,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
@@ -150,6 +162,7 @@ impl PipelinedBlock {
         Self {
             block,
             input_transactions: vec![],
+            output_transactions: vec![],
             state_compute_result: StateComputeResult::new_dummy(),
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
@@ -166,6 +179,10 @@ impl PipelinedBlock {
 
     pub fn input_transactions(&self) -> &Vec<SignedTransaction> {
         &self.input_transactions
+    }
+
+    pub fn output_transactions(&self) -> &Vec<Transaction> {
+        &self.output_transactions
     }
 
     pub fn epoch(&self) -> u64 {

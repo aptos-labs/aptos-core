@@ -103,6 +103,11 @@ impl<V> BlockExecutorTrait for BlockExecutor<V>
 where
     V: TransactionBlockExecutor,
 {
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        self.maybe_initialize().expect("Failed to initialize.");
+        self.inner.read().as_ref().unwrap().state_view(block_id)
+    }
+
     fn committed_block_id(&self) -> HashValue {
         self.maybe_initialize().expect("Failed to initialize.");
         self.inner
@@ -191,6 +196,30 @@ impl<V> BlockExecutorInner<V>
 where
     V: TransactionBlockExecutor,
 {
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        let block = self
+            .block_tree
+            .get_blocks_opt(&[block_id])?
+            .pop()
+            .expect("Must exist.")
+            .ok_or(ExecutorError::BlockNotFound(block_id))?;
+        let block_output = &block.output;
+        let state_view = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["verified_state_view"])
+                .start_timer();
+            info!("next_version: {}", block_output.next_version());
+            CachedStateView::new(
+                StateViewId::BlockExecution { block_id },
+                Arc::clone(&self.db.reader),
+                block_output.next_version(),
+                block_output.state().current.clone(),
+                Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+            )?
+        };
+        Ok(state_view)
+    }
+
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
     }
@@ -204,7 +233,7 @@ where
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let ExecutableBlock {
             block_id,
-            mut transactions,
+            transactions,
         } = block;
         let mut block_vec = self
             .block_tree
@@ -244,39 +273,6 @@ where
                         Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
                     )?
                 };
-
-                let timestamp_sec = match transactions.first() {
-                    SignatureVerifiedTransaction::Valid(Transaction::BlockMetadataExt(txn)) => {
-                        txn.timestamp_usecs() / 1_000_000
-                    },
-                    _ => panic!("no block metadata txn found"),
-                };
-                println!("block timestamp: {}", timestamp_sec);
-                let scheduled_transactions = bcs::from_bytes::<Vec<ScheduledTransaction>>(
-                    &AptosVM::execute_view_function(
-                        &state_view,
-                        ModuleId::new(
-                            CORE_CODE_ADDRESS,
-                            ident_str!("schedule_transaction_queue").to_owned(),
-                        ),
-                        ident_str!("get_ready_transactions").to_owned(),
-                        vec![], // ty_args,
-                        vec![
-                            bcs::to_bytes(&timestamp_sec).unwrap(),
-                            bcs::to_bytes(&100u64).unwrap(),
-                        ],
-                        u64::MAX,
-                    )
-                    .values
-                    .expect("view function execute failed")
-                    .pop()
-                    .expect("view function output is empty"),
-                )
-                .expect("failed to deserialize scheduled transactions");
-                println!("scheduled_transactions: {:?}", scheduled_transactions);
-                transactions.append(scheduled_transactions.into_iter().map(|txn| {
-                    SignatureVerifiedTransaction::Valid(Transaction::ScheduledTransaction(txn))
-                }));
 
                 let chunk_output = {
                     let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();

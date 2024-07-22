@@ -20,10 +20,17 @@ use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata_ext::BlockMetadataExt,
     transaction::{
+        scheduled_transaction::ScheduledTransaction,
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        Transaction,
     },
 };
+use aptos_vm::AptosVM;
 use fail::fail_point;
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+};
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
@@ -129,6 +136,7 @@ impl ExecutionPipeline {
                 SIG_VERIFY_POOL.install(|| {
                     let num_txns = txns_to_execute.len();
                     txns_to_execute
+                        .clone()
                         .into_par_iter()
                         .with_min_len(optimal_min_len(num_txns, 32))
                         .map(|t| t.into())
@@ -137,10 +145,12 @@ impl ExecutionPipeline {
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
+                    output_txns: txns_to_execute,
                     block: (block.id(), sig_verified_txns).into(),
                     parent_block_id,
                     block_executor_onchain_config,
                     result_tx,
+                    block_timestamp: block.timestamp_usecs(),
                 })
                 .expect("Failed to send block to execution pipeline.");
         })
@@ -168,15 +178,18 @@ impl ExecutionPipeline {
     ) {
         while let Some(ExecuteBlockCommand {
             input_txns,
-            block,
+            mut output_txns,
+            mut block,
             parent_block_id,
             block_executor_onchain_config,
             result_tx,
+            block_timestamp,
         }) = block_rx.recv().await
         {
             let block_id = block.block_id;
             debug!("execute_stage received block {}.", block_id);
             let executor = executor.clone();
+            let (tx, rx) = oneshot::channel();
             let state_checkpoint_output = monitor!(
                 "execute_block",
                 tokio::task::spawn_blocking(move || {
@@ -185,6 +198,44 @@ impl ExecutionPipeline {
                             error: "Injected error in compute".into(),
                         })
                     });
+                    let timestamp_sec = block_timestamp / 1_000_000;
+                    let state_view = executor.state_view(parent_block_id)?;
+                    println!("block timestamp: {}", timestamp_sec);
+                    let scheduled_transactions = bcs::from_bytes::<Vec<ScheduledTransaction>>(
+                        &AptosVM::execute_view_function(
+                            &state_view,
+                            ModuleId::new(
+                                CORE_CODE_ADDRESS,
+                                ident_str!("schedule_transaction_queue").to_owned(),
+                            ),
+                            ident_str!("get_ready_transactions").to_owned(),
+                            vec![], // ty_args,
+                            vec![
+                                bcs::to_bytes(&timestamp_sec).unwrap(),
+                                bcs::to_bytes(&100u64).unwrap(),
+                            ],
+                            u64::MAX,
+                        )
+                        .values
+                        .expect("view function execute failed")
+                        .pop()
+                        .expect("view function output is empty"),
+                    )
+                    .expect("failed to deserialize scheduled transactions");
+                    println!("scheduled_transactions: {:?}", scheduled_transactions);
+
+                    let extra_txns: Vec<_> = scheduled_transactions
+                        .iter()
+                        .map(|txn| Transaction::ScheduledTransaction(txn.clone()))
+                        .collect();
+                    tx.send(extra_txns).ok();
+                    block
+                        .transactions
+                        .append(scheduled_transactions.iter().map(|txn| {
+                            SignatureVerifiedTransaction::Valid(Transaction::ScheduledTransaction(
+                                txn.clone(),
+                            ))
+                        }));
                     executor.execute_and_state_checkpoint(
                         block,
                         parent_block_id,
@@ -194,10 +245,12 @@ impl ExecutionPipeline {
                 .await
             )
             .expect("Failed to spawn_blocking.");
+            output_txns.append(&mut rx.await.unwrap());
 
             ledger_apply_tx
                 .send(LedgerApplyCommand {
                     input_txns,
+                    output_txns,
                     block_id,
                     parent_block_id,
                     state_checkpoint_output,
@@ -214,6 +267,7 @@ impl ExecutionPipeline {
     ) {
         while let Some(LedgerApplyCommand {
             input_txns,
+            output_txns,
             block_id,
             parent_block_id,
             state_checkpoint_output,
@@ -233,7 +287,8 @@ impl ExecutionPipeline {
                 .expect("Failed to spawn_blocking().")
             }
             .await;
-            let pipe_line_res = res.map(|output| PipelineExecutionResult::new(input_txns, output));
+            let pipe_line_res =
+                res.map(|output| PipelineExecutionResult::new(input_txns, output_txns, output));
             result_tx.send(pipe_line_res).unwrap_or_else(|err| {
                 error!(
                     block_id = block_id,
@@ -257,14 +312,17 @@ struct PrepareBlockCommand {
 
 struct ExecuteBlockCommand {
     input_txns: Vec<SignedTransaction>,
+    output_txns: Vec<Transaction>,
     block: ExecutableBlock,
     parent_block_id: HashValue,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+    block_timestamp: u64,
 }
 
 struct LedgerApplyCommand {
     input_txns: Vec<SignedTransaction>,
+    output_txns: Vec<Transaction>,
     block_id: HashValue,
     parent_block_id: HashValue,
     state_checkpoint_output: ExecutorResult<StateCheckpointOutput>,

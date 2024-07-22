@@ -572,13 +572,6 @@ impl ExecutableTransactions {
         }
     }
 
-    pub fn first(&self) -> &SignatureVerifiedTransaction {
-        match self {
-            ExecutableTransactions::Unsharded(transactions) => transactions.first().unwrap(),
-            ExecutableTransactions::Sharded(_) => unimplemented!(),
-        }
-    }
-
     pub fn append(&mut self, txns: impl Iterator<Item = SignatureVerifiedTransaction>) {
         match self {
             ExecutableTransactions::Unsharded(transactions) => transactions.extend(txns),

@@ -895,6 +895,7 @@ impl Transaction {
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
             ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
             BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, txn.info, vec![]),
+            ScheduledTransaction(_) => unimplemented!(),
         };
 
         // Operations must be sequential and operation index must always be in the same order

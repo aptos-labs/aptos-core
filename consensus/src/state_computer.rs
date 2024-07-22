@@ -42,12 +42,21 @@ pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecu
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PipelineExecutionResult {
     pub input_txns: Vec<SignedTransaction>,
+    pub output_txns: Vec<Transaction>,
     pub result: StateComputeResult,
 }
 
 impl PipelineExecutionResult {
-    pub fn new(input_txns: Vec<SignedTransaction>, result: StateComputeResult) -> Self {
-        Self { input_txns, result }
+    pub fn new(
+        input_txns: Vec<SignedTransaction>,
+        output_txns: Vec<Transaction>,
+        result: StateComputeResult,
+    ) -> Self {
+        Self {
+            input_txns,
+            output_txns,
+            result,
+        }
     }
 }
 
@@ -128,33 +137,29 @@ impl ExecutionProxy {
         }
     }
 
-    fn transactions_to_commit(
-        &self,
-        executed_block: &PipelinedBlock,
-        validators: &[AccountAddress],
-        randomness_enabled: bool,
-    ) -> Vec<Transaction> {
+    fn transactions_to_commit(&self, executed_block: &PipelinedBlock) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
         if executed_block.is_reconfiguration_suffix() {
             return vec![];
         }
 
-        let user_txns = executed_block.input_transactions().clone();
-        let validator_txns = executed_block.validator_txns().cloned().unwrap_or_default();
-        let metadata = if randomness_enabled {
-            executed_block
-                .block()
-                .new_metadata_with_randomness(validators, executed_block.randomness().cloned())
-        } else {
-            executed_block.block().new_block_metadata(validators).into()
-        };
-
-        let input_txns = Block::combine_to_input_transactions(validator_txns, user_txns, metadata);
+        let output_txns = executed_block.output_transactions().clone();
+        // let user_txns = executed_block.input_transactions().clone();
+        // let validator_txns = executed_block.validator_txns().cloned().unwrap_or_default();
+        // let metadata = if randomness_enabled {
+        //     executed_block
+        //         .block()
+        //         .new_metadata_with_randomness(validators, executed_block.randomness().cloned())
+        // } else {
+        //     executed_block.block().new_block_metadata(validators).into()
+        // };
+        //
+        // let input_txns = Block::combine_to_input_transactions(validator_txns, user_txns, metadata);
 
         // Adds StateCheckpoint/BlockEpilogue transaction if needed.
         executed_block
             .compute_result()
-            .transactions_to_commit(input_txns, executed_block.id())
+            .transactions_to_commit(output_txns, executed_block.id())
     }
 }
 
@@ -277,10 +282,7 @@ impl StateComputer for ExecutionProxy {
         let block_timestamp = finality_proof.commit_info().timestamp_usecs();
 
         let MutableState {
-            payload_manager,
-            validators,
-            is_randomness_enabled,
-            ..
+            payload_manager, ..
         } = self
             .state
             .read()
@@ -294,7 +296,7 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled));
+            txns.extend(self.transactions_to_commit(block));
             subscribable_txn_events.extend(block.subscribable_events());
         }
 
