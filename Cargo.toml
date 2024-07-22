@@ -105,6 +105,7 @@ members = [
     "crates/proxy",
     "crates/reliable-broadcast",
     "crates/short-hex-str",
+    "crates/supra",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
     "crates/transaction-generator-lib",
@@ -274,6 +275,7 @@ rust-version = "1.75.0"
 [workspace.dependencies]
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
+supra-aptos = { path = "crates/supra" }
 aptos = { path = "crates/aptos" }
 aptos-accumulator = { path = "storage/accumulator" }
 aptos-admin-service = { path = "crates/aptos-admin-service" }

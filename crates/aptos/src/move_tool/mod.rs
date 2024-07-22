@@ -67,6 +67,7 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
+use supra_aptos::{SupraCommand, SupraCommandArguments};
 
 /// Tool for Move related operations
 ///
@@ -163,10 +164,10 @@ impl FrameworkPackageArgs {
         addresses: BTreeMap<String, ManifestNamedAddress>,
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
-        const APTOS_FRAMEWORK: &str = "AptosFramework";
-        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
-        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
-        const DEFAULT_BRANCH: &str = "mainnet";
+        const SUPRA_FRAMEWORK: &str = "SupraFramework";
+        const SUPRA_FRAMEWORK_GIT_PATH: &str = "https://github.com/Entropy-Foundation/aptos-core.git";
+        const SUBDIR_PATH: &str = "aptos-move/framework/supra-framework";
+        const DEFAULT_BRANCH: &str = "integrate_consensus_key";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), prompt_options)?;
@@ -189,7 +190,7 @@ impl FrameworkPackageArgs {
         // Add the framework dependency if it's provided
         let mut dependencies = BTreeMap::new();
         if let Some(ref path) = self.framework_local_dir {
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
+            dependencies.insert(SUPRA_FRAMEWORK.to_string(), Dependency {
                 local: Some(path.display().to_string()),
                 git: None,
                 rev: None,
@@ -199,9 +200,9 @@ impl FrameworkPackageArgs {
             });
         } else {
             let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
+            dependencies.insert(SUPRA_FRAMEWORK.to_string(), Dependency {
                 local: None,
-                git: Some(APTOS_GIT_PATH.to_string()),
+                git: Some(SUPRA_FRAMEWORK_GIT_PATH.to_string()),
                 rev: Some(git_rev.to_string()),
                 subdir: Some(SUBDIR_PATH.to_string()),
                 aptos: None,
@@ -801,6 +802,17 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let package_publication_data: PackagePublicationData = (&self).try_into()?;
         profile_or_submit(package_publication_data.payload, &self.txn_options).await
+    }
+}
+
+impl SupraCommand for PublishPackage {
+    fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        let package_publication_data: PackagePublicationData = (&self).try_into()?;
+        Ok(SupraCommandArguments {
+            payload: package_publication_data.payload,
+            profile: self.txn_options.profile_options.profile,
+            rpc: self.txn_options.rest_options.url ,
+        })
     }
 }
 
@@ -1407,6 +1419,16 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 }
 
+impl SupraCommand for RunFunction {
+    fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        Ok(SupraCommandArguments {
+            payload: TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
+            profile: self.txn_options.profile_options.profile,
+            rpc: self.txn_options.rest_options.url,
+        })
+    }
+}
+
 /// Run a view function
 #[derive(Parser)]
 pub struct ViewFunction {
@@ -1456,6 +1478,19 @@ impl CliCommand<TransactionSummary> for RunScript {
             &self.txn_options,
         )
         .await
+    }
+}
+
+impl SupraCommand for RunScript {
+    fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile("RunScript", self.txn_options.prompt_options)?;
+        Ok(SupraCommandArguments {
+            payload: self.script_function_args.create_script_payload(bytecode)?,
+            profile: self.txn_options.profile_options.profile,
+            rpc: self.txn_options.rest_options.url,
+        })
     }
 }
 
