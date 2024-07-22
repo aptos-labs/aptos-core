@@ -8,10 +8,7 @@ use crate::consensus_observer::{
     network_message::{BlockPayload, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::{
-    common::{Payload, Round},
-    pipelined_block::PipelinedBlock,
-};
+use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_types::epoch_state::EpochState;
@@ -187,46 +184,7 @@ impl BlockPayloadStore {
                     };
 
                     // Verify the transaction payload against the ordered block payload
-                    match ordered_block_payload {
-                        Payload::DirectMempool(_) => {
-                            return Err(Error::InvalidMessageError(
-                                "Direct mempool payloads are not supported for consensus observer!"
-                                    .into(),
-                            ));
-                        },
-                        Payload::InQuorumStore(proof_with_data) => {
-                            // Verify the batches in the requested block
-                            transaction_payload.verify_batches(&proof_with_data.proofs)?;
-                        },
-                        Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                            // Verify the batches in the requested block
-                            transaction_payload
-                                .verify_batches(&proof_with_data.proof_with_data.proofs)?;
-
-                            // Verify the transaction limit
-                            transaction_payload.verify_transaction_limit(
-                                proof_with_data.max_txns_to_execute,
-                                transaction_payload,
-                            )?;
-                        },
-                        Payload::QuorumStoreInlineHybrid(
-                            inline_batches,
-                            proof_with_data,
-                            max_txns_to_execute,
-                        ) => {
-                            // Verify the batches in the requested block
-                            transaction_payload.verify_batches(&proof_with_data.proofs)?;
-
-                            // Verify the inline batches
-                            transaction_payload.verify_inline_batches(inline_batches)?;
-
-                            // Verify the transaction limit
-                            transaction_payload.verify_transaction_limit(
-                                *max_txns_to_execute,
-                                transaction_payload,
-                            )?;
-                        },
-                    }
+                    transaction_payload.verify_against_ordered_payload(ordered_block_payload)?;
                 },
                 Entry::Vacant(_) => {
                     // The payload is missing (this should never happen)
@@ -312,7 +270,6 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        common::ProofWithData,
         proof_of_store::{BatchId, BatchInfo, ProofOfStore},
         quorum_cert::QuorumCert,
     };
@@ -485,8 +442,7 @@ mod test {
         check_num_verified_payloads(&block_payload_store, num_blocks_in_store - 1);
 
         // Insert the same block payload into the block payload store (as verified)
-        let transaction_payload =
-            BlockTransactionPayload::new(vec![], Some(0), ProofWithData::empty(), vec![]);
+        let transaction_payload = BlockTransactionPayload::empty();
         let block_payload = BlockPayload::new(verified_blocks[0].block_info(), transaction_payload);
         block_payload_store.insert_block_payload(block_payload, true);
 
@@ -998,10 +954,10 @@ mod test {
                 );
                 proofs_of_store.push(ProofOfStore::new(batch_info, AggregateSignature::empty()));
             }
-            let block_transaction_payload = BlockTransactionPayload::new(
+            let block_transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
                 vec![],
+                proofs_of_store,
                 None,
-                ProofWithData::new(proofs_of_store),
                 vec![],
             );
 

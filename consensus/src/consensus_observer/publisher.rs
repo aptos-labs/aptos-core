@@ -316,7 +316,6 @@ mod test {
     use super::*;
     use crate::consensus_observer::network_message::BlockTransactionPayload;
     use aptos_config::network_id::NetworkId;
-    use aptos_consensus_types::common::ProofWithData;
     use aptos_crypto::HashValue;
     use aptos_network::{
         application::{metadata::ConnectionState, storage::PeersAndMetadata},
@@ -493,8 +492,12 @@ mod test {
         }
 
         // Publish a message to the active subscribers
-        let transaction_payload =
-            BlockTransactionPayload::new(vec![], Some(10), ProofWithData::empty(), vec![]);
+        let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
+            vec![],
+            vec![],
+            Some(10),
+            vec![],
+        );
         let block_payload_message = ConsensusObserverMessage::new_block_payload_message(
             BlockInfo::empty(),
             transaction_payload,
