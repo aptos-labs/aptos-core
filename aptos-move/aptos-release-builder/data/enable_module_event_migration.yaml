@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: "enable_module_event_migration"
+proposals:
+  - name: enable_module_event_migration
+    metadata:
+      title: "Enable module event migration in aptos_framework"
+      description: "This enables all the module events emitting for all v1 events in aptos framework"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - module_event_migration
