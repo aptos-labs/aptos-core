@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 mod deprecated_fairness;
 mod sender_aware;
+mod use_case_aware;
 
 /// Interface to shuffle transactions
 pub trait TransactionShuffler: Send + Sync {
@@ -60,6 +61,22 @@ pub fn create_transaction_shuffler(
                 module_conflict_window_size: module_conflict_window_size as usize,
                 entry_fun_conflict_window_size: entry_fun_conflict_window_size as usize,
             })
+        },
+        UseCaseAware {
+            sender_spread_factor,
+            platform_use_case_spread_factor,
+            user_use_case_spread_factor,
+        } => {
+            let config = use_case_aware::Config {
+                sender_spread_factor,
+                platform_use_case_spread_factor,
+                user_use_case_spread_factor,
+            };
+            info!(
+                config = ?config,
+                "Using use case aware transaction shuffling."
+            );
+            Arc::new(use_case_aware::UseCaseAwareShuffler { config })
         },
     }
 }

@@ -6,7 +6,7 @@ variable "region" {
 variable "kubernetes_version" {
   description = "Version of Kubernetes to use for EKS cluster"
   type        = string
-  default     = "1.27"
+  default     = "1.28"
 }
 
 variable "eks_cluster_name" {

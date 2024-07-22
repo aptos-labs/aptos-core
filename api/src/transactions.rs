@@ -1435,8 +1435,7 @@ impl TransactionsApi {
                 let mut user_transactions = Vec::new();
                 for transaction in transactions.into_iter() {
                     match transaction {
-                        Transaction::UserTransaction(user_txn) => {
-                            let mut txn = *user_txn;
+                        Transaction::UserTransaction(mut user_txn) => {
                             match &vm_status {
                                 VMStatus::Error {
                                     message: Some(msg), ..
@@ -1444,13 +1443,13 @@ impl TransactionsApi {
                                 | VMStatus::ExecutionFailure {
                                     message: Some(msg), ..
                                 } => {
-                                    txn.info.vm_status +=
+                                    user_txn.info.vm_status +=
                                         format!("\nExecution failed with message: {}", msg)
                                             .as_str();
                                 },
                                 _ => (),
                             }
-                            user_transactions.push(txn);
+                            user_transactions.push(user_txn);
                         },
                         _ => {
                             return Err(SubmitTransactionError::internal_with_code(

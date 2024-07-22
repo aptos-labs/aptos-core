@@ -59,8 +59,8 @@ NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
 NOISE_LOWER_LIMIT_WARN = None if IS_MAINNET else 0.9
 # If you want to calibrate the upper limit for perf improvement, you can
 # increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
-NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.2  # TODO reduce to 1.15
-NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.1  # TODO reduce to 1.05
+NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.15
+NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
@@ -136,54 +136,53 @@ class RunGroupConfig:
 
 # 0-indexed
 CALIBRATED_TPS_INDEX = -1
-CALIBRATION_SEPARATOR = " "
+CALIBRATION_SEPARATOR = "	"
 
-# transaction_type                                 module_working_set  executor      block_size    expected t/s    t/s
+# transaction_type	module_working_set_size	executor_type	min_ratio	max_ratio	median
 CALIBRATION = """
-warmup                                                            1  VM                 10000               0  20409
-no-op                                                             1  VM                 10000           39672  38887
-no-op                                                          1000  VM                 10000           21087  21951
-coin-transfer                                                     1  VM                 10000           25665  27000
-coin-transfer                                                     1  native             10000           33570  40000
-account-generation                                                1  VM                 10000           19242  22135
-account-generation                                                1  native             10000           29020  33290
-account-resource32-b                                              1  VM                 10000           32416  38017
-modify-global-resource                                            1  VM                  2959            2959   3107
-modify-global-resource                                           10  VM                 10000           16789  17390
-publish-package                                                   1  VM                   139             139    143
-mix_publish_transfer                                              1  VM                  2216            2216   2200
-batch100-transfer                                                 1  VM                   614             614    653
-batch100-transfer                                                 1  native              1425            1425   1900
-vector-picture30k                                                 1  VM                   135             135    139
-vector-picture30k                                                20  VM                  1159            1159   1326
-smart-table-picture30-k-with200-change                            1  VM                    21              21     21
-smart-table-picture30-k-with200-change                           20  VM                   180             180    180
-modify-global-resource-agg-v2                                     1  VM                 10000           32962  37474
-modify-global-flag-agg-v2                                         1  VM                  6020            6020   6128
-modify-global-bounded-agg-v2                                      1  VM                 10000           10439  10604
-modify-global-milestone-agg-v2                                    1  VM                 10000           27341  28477
-resource-groups-global-write-tag1-kb                              1  VM                  9138            9138   9182
-resource-groups-global-write-and-read-tag1-kb                     1  VM                  6057            6057   6430
-resource-groups-sender-write-tag1-kb                              1  VM                 10000           19986  20000
-resource-groups-sender-multi-change1-kb                           1  VM                 10000           15374  17000
-token-v1ft-mint-and-transfer                                      1  VM                  1252            1252   1327
-token-v1ft-mint-and-transfer                                     20  VM                 10000           11270  11947
-token-v1nft-mint-and-transfer-sequential                          1  VM                   783             783    816
-token-v1nft-mint-and-transfer-sequential                         20  VM                  7359            7359   7726
-coin-init-and-mint                                                1  VM                 10000           29354  29709
-coin-init-and-mint                                               20  VM                 10000           22691  24694
-fungible-asset-mint                                               1  VM                 10000           22920  25291
-fungible-asset-mint                                              20  VM                 10000           21716  22463
-no-op5-signers                                                    1  VM                 10000           37885  42482
-token-v2-ambassador-mint                                          1  VM                 10000           16363  17119
-token-v2-ambassador-mint                                         20  VM                 10000           16231  17204
-liquidity-pool-swap                                               1  VM                   953             953    979
-liquidity-pool-swap                                              20  VM                  8028            8028   8339
-liquidity-pool-swap-stable                                        1  VM                   926             926    954
-liquidity-pool-swap-stable                                       20  VM                  7755            7755   8005
-deserialize-u256                                                  1  VM                 10000           35448  38913
-no-op-fee-payer                                                   1  VM                  2305            2305   2356
-no-op-fee-payer                                                  50  VM                 10000           26756  28196
+no-op	1	VM	0.896	1.057	41218.8
+no-op	1000	VM	0.902	1.030	22359.4
+coin-transfer	1	VM	0.891	1.056	28721.7
+coin-transfer	1	native	0.848	1.157	40469.1
+account-generation	1	VM	0.888	1.030	22359.4
+account-generation	1	native	0.717	1.153	33440.0
+account-resource32-b	1	VM	0.934	1.074	36855.5
+modify-global-resource	1	VM	0.940	1.033	3082.9
+modify-global-resource	10	VM	0.918	1.017	17905.3
+publish-package	1	VM	0.950	1.040	143.9
+mix_publish_transfer	1	VM	0.967	1.163	2173.8
+batch100-transfer	1	VM	0.859	1.021	667.8
+batch100-transfer	1	native	0.784	1.222	1862.1
+vector-picture30k	1	VM	0.935	1.023	138.5
+vector-picture30k	20	VM	0.819	1.038	1347.9
+smart-table-picture30-k-with200-change	1	VM	0.959	1.054	21.4
+smart-table-picture30-k-with200-change	20	VM	0.923	1.057	182.6
+modify-global-resource-agg-v2	1	VM	0.893	1.030	39728.8
+modify-global-flag-agg-v2	1	VM	0.972	1.022	6111.4
+modify-global-bounded-agg-v2	1	VM	0.926	1.103	10494.1
+modify-global-milestone-agg-v2	1	VM	0.912	1.030	29251.9
+resource-groups-global-write-tag1-kb	1	VM	0.886	1.061	9389.9
+resource-groups-global-write-and-read-tag1-kb	1	VM	0.882	1.018	6446.3
+resource-groups-sender-write-tag1-kb	1	VM	0.841	1.163	22359.4
+resource-groups-sender-multi-change1-kb	1	VM	0.826	1.107	17562.1
+token-v1ft-mint-and-transfer	1	VM	0.892	1.027	1347.9
+token-v1ft-mint-and-transfer	20	VM	0.889	1.021	12114.8
+token-v1nft-mint-and-transfer-sequential	1	VM	0.899	1.027	812.9
+token-v1nft-mint-and-transfer-sequential	20	VM	0.888	1.015	7881.5
+coin-init-and-mint	1	VM	0.870	1.024	30932.7
+coin-init-and-mint	20	VM	0.866	1.055	25786.3
+fungible-asset-mint	1	VM	0.873	1.033	25331.5
+fungible-asset-mint	20	VM	0.887	1.055	22763.8
+no-op5-signers	1	VM	0.904	1.038	41978.3
+token-v2-ambassador-mint	1	VM	0.869	1.025	17905.3
+token-v2-ambassador-mint	20	VM	0.878	1.024	17562.1
+liquidity-pool-swap	1	VM	0.931	1.032	975.7
+liquidity-pool-swap	20	VM	0.918	1.009	8359.6
+liquidity-pool-swap-stable	1	VM	0.901	1.016	957.5
+liquidity-pool-swap-stable	20	VM	0.925	1.022	8035.3
+deserialize-u256	1	VM	0.899	1.036	39728.8
+no-op-fee-payer	1	VM	0.922	1.022	2392.0
+no-op-fee-payer	50	VM	0.898	1.028	27699.5
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.

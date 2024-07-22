@@ -6,7 +6,11 @@ metadata:
     {{- include "pfn-addons.labels" . | nindent 4 }}
   annotations:
     {{- if eq .Values.ingress.class "alb" }}
+    {{- if .Values.ingress.health_check_duration_secs }}
+    alb.ingress.kubernetes.io/healthcheck-path: /v1/-/healthy?duration_secs={{ .Values.ingress.health_check_duration_secs }}
+    {{- else }}
     alb.ingress.kubernetes.io/healthcheck-path: /v1/-/healthy
+    {{- end }}
     {{- end }}
     {{- if eq .Values.ingress.class "gce" }}
     {{- if .Values.ingress.backend_http2 }}
@@ -35,13 +39,19 @@ spec:
   securityPolicy:
     name: {{ .Values.ingress.gce_security_policy }}
   {{- end }}
+  connectionDraining:
+    drainingTimeoutSec: 30
   healthCheck:
-    checkIntervalSec: 30
+    checkIntervalSec: 15
     timeoutSec: 5
     healthyThreshold: 1
     unhealthyThreshold: 2
     type: HTTP
+    {{- if .Values.ingress.health_check_duration_secs }}
+    requestPath: /v1/-/healthy?duration_secs={{ .Values.ingress.health_check_duration_secs }}
+    {{- else }}
     requestPath: /v1/-/healthy
+    {{- end }}
     # container targetPort
     port: 8080
   {{- if .Values.ingress.enableStickyness }}

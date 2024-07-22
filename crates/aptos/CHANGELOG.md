@@ -4,6 +4,11 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [3.5.1] - 2024/07/21
+- Upgraded indexer processors for localnet from 5244b84fa5ed872e5280dc8df032d744d62ad29d to fa1ce4947f4c2be57529f1c9732529e05a06cb7f. Upgraded Hasura metadata accordingly.
+- Upgraded Hasura image from 2.36.1 to 2.40.2-ce. Note that we use the Community Edition, so the console won't ask users to upgrade to enterprise anymore / hint at any enterprise features.
+- Fixes a bug in the Move compiler (both v1 and v2) which disallowed `match` as a name for a function or for a variable.
+
 ## [3.5.0] - 2024/07/06
 - Add balance command to easily get account balances for APT currently
 - Add network to config file

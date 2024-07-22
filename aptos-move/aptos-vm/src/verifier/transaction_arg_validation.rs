@@ -135,12 +135,7 @@ pub fn validate_combine_signer_and_txn_args(
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
-        let ty = if ty_builder.is_legacy() {
-            subst_res.unwrap()
-        } else {
-            subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        };
-
+        let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let valid = is_valid_txn_arg(session, &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
@@ -235,12 +230,7 @@ pub(crate) fn construct_args(
     let ty_builder = session.get_ty_builder();
     for (ty, arg) in types.iter().zip(args) {
         let subst_res = ty_builder.create_ty_with_subst(ty, ty_args);
-        let ty = if ty_builder.is_legacy() {
-            subst_res.unwrap()
-        } else {
-            subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        };
-
+        let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let arg = construct_arg(session, &ty, allowed_structs, arg, &mut gas_meter, is_view)?;
         res_args.push(arg);
     }

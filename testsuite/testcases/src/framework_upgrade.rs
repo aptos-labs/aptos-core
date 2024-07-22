@@ -9,12 +9,13 @@ use aptos_forge::{
 };
 use aptos_keygen::KeyGen;
 use aptos_logger::info;
+use aptos_release_builder::ReleaseConfig;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
-use std::ops::DerefMut;
-use tokio::time::Duration;
+use std::{ops::DerefMut, path::Path};
+use tokio::{fs, time::Duration};
 
 pub struct FrameworkUpgrade;
 
@@ -26,6 +27,16 @@ impl Test for FrameworkUpgrade {
     fn name(&self) -> &'static str {
         "framework_upgrade::framework-upgrade"
     }
+}
+
+const RELEASE_YAML_PATH: &str = "aptos-move/aptos-release-builder/data";
+const IGNORED_YAMLS: [&str; 2] = ["release.yaml", "example.yaml"];
+
+fn is_release_yaml(path: &Path) -> bool {
+    let basename = path.file_name().unwrap().to_str().unwrap();
+    path.is_file()
+        && path.extension().unwrap_or_default() == "yaml"
+        && !IGNORED_YAMLS.contains(&basename)
 }
 
 #[async_trait]
@@ -126,8 +137,26 @@ impl NetworkTest for FrameworkUpgrade {
 
         let release_config = aptos_release_builder::current_release_config();
 
-        aptos_release_builder::validate::validate_config(release_config.clone(), network_info)
-            .await?;
+        aptos_release_builder::validate::validate_config(
+            release_config.clone(),
+            network_info.clone(),
+        )
+        .await?;
+
+        // Execute all the release yaml files
+        let mut entries = fs::read_dir(RELEASE_YAML_PATH).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if is_release_yaml(&path) {
+                let release_config = ReleaseConfig::parse(&fs::read_to_string(&path).await?)?;
+                info!("Executing release yaml: {}", path.to_string_lossy());
+                aptos_release_builder::validate::validate_config(
+                    release_config.clone(),
+                    network_info.clone(),
+                )
+                .await?;
+            }
+        }
 
         // Update the sequence number for the root account
         let root_account = { ctx.swarm.read().await.chain_info().root_account().address() };

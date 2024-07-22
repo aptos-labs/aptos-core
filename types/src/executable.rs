@@ -1,12 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    access_path::AccessPath,
-    state_store::state_key::{inner::StateKeyInner, StateKey},
-};
+use crate::state_store::state_key::{inner::StateKeyInner, StateKey};
 use aptos_crypto::HashValue;
-use std::sync::Arc;
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum ExecutableDescriptor {
@@ -18,17 +15,22 @@ pub enum ExecutableDescriptor {
 }
 
 pub trait ModulePath {
-    fn module_path(&self) -> Option<AccessPath>;
+    // TODO(George):
+    //   Improve this in the future, right now all writes use state keys
+    //   and we need to use this trait to check if a generic state key is
+    //   for code or not.
+    fn is_module_path(&self) -> bool;
+
+    fn from_address_and_module_name(address: &AccountAddress, module_name: &IdentStr) -> Self;
 }
 
 impl ModulePath for StateKey {
-    fn module_path(&self) -> Option<AccessPath> {
-        if let StateKeyInner::AccessPath(ap) = self.inner() {
-            if ap.is_code() {
-                return Some(ap.clone());
-            }
-        }
-        None
+    fn is_module_path(&self) -> bool {
+        matches!(self.inner(), StateKeyInner::AccessPath(ap) if ap.is_code())
+    }
+
+    fn from_address_and_module_name(address: &AccountAddress, module_name: &IdentStr) -> Self {
+        Self::module(address, module_name)
     }
 }
 
@@ -48,44 +50,4 @@ impl Executable for ExecutableTestType {
     fn size_bytes(&self) -> usize {
         0
     }
-}
-
-// TODO: variant for a compiled module when available to avoid deserialization.
-pub enum FetchedModule<X: Executable> {
-    Blob(Option<Vec<u8>>),
-    // Note: We could use Weak / & for parallel and sequential modes, respectively
-    // but rely on Arc for a simple and unified treatment for the time being.
-    // TODO: change Arc<X> to custom reference when we have memory manager / arena.
-    Executable(Arc<X>),
-}
-
-/// View for the VM for interacting with the multi-versioned executable cache.
-pub trait ExecutableView {
-    type Key;
-    type Executable: Executable;
-
-    /// This is an optimization to bypass transactional semantics and share the
-    /// executable (and all the useful work for producing it) as early as possible
-    /// other txns / VM sessions. It is safe as storage-version module can't change,
-    /// and o.w. the key is the (cryptographic) hash of the module blob.
-    ///
-    /// W.o. this, we would have to include executables in TransactionOutputExt.
-    /// This may occur much later leading to work duplication (producing the same
-    /// executable by other sessions) in the common case when the executable isn't
-    /// based on the module published by the transaction itself.
-    fn store_executable(
-        &self,
-        key: &Self::Key,
-        descriptor: ExecutableDescriptor,
-        executable: Self::Executable,
-    );
-
-    /// Returns either the blob of the module, that will need to be deserialized into
-    /// CompiledModule and then made into an executable, or executable directly, if
-    /// the executable corresponding to the latest published module was already stored.
-    /// TODO: Return CompiledModule directly to avoid deserialization.
-    fn fetch_module(
-        &self,
-        key: &Self::Key,
-    ) -> anyhow::Result<(ExecutableDescriptor, FetchedModule<Self::Executable>)>;
 }

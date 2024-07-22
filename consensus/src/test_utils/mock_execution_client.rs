@@ -103,7 +103,7 @@ impl TExecutionClient for MockExecutionClient {
         _rand_config: Option<RandConfig>,
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        _highest_ordered_round: Round,
+        _highest_committed_round: Round,
     ) {
     }
 
@@ -168,6 +168,10 @@ impl TExecutionClient for MockExecutionClient {
         );
         self.consensus_db
             .commit_to_storage(commit.ledger_info().clone());
+        Ok(())
+    }
+
+    async fn reset(&self, _target: &LedgerInfoWithSignatures) -> Result<()> {
         Ok(())
     }
 

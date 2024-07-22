@@ -176,7 +176,7 @@ impl
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
-    UserTransaction(Box<UserTransaction>),
+    UserTransaction(UserTransaction),
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
     StateCheckpointTransaction(StateCheckpointTransaction),
@@ -292,12 +292,12 @@ impl
             u64,
         ),
     ) -> Self {
-        Transaction::UserTransaction(Box::new(UserTransaction {
+        Transaction::UserTransaction(UserTransaction {
             info,
             request: (txn, payload).into(),
             events,
             timestamp: timestamp.into(),
-        }))
+        })
     }
 }
 
