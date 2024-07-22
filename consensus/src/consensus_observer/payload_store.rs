@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
+    error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
-    network_message::BlockPayload,
+    network_message::{BlockPayload, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
@@ -140,6 +141,65 @@ impl BlockPayloadStore {
         );
     }
 
+    /// Verifies all block payloads against the given ordered block.
+    /// If verification fails, an error is returned.
+    pub fn verify_payloads_against_ordered_block(
+        &mut self,
+        ordered_block: &OrderedBlock,
+    ) -> Result<(), Error> {
+        // Verify each of the blocks in the ordered block
+        for ordered_block in ordered_block.blocks() {
+            // Get the block epoch and round
+            let block_epoch = ordered_block.epoch();
+            let block_round = ordered_block.round();
+
+            // Fetch the block payload
+            match self.block_payloads.lock().entry((block_epoch, block_round)) {
+                Entry::Occupied(entry) => {
+                    // Get the block transaction payload
+                    let transaction_payload = match entry.get() {
+                        BlockPayloadStatus::AvailableAndVerified(block_payload) => {
+                            &block_payload.transaction_payload
+                        },
+                        BlockPayloadStatus::AvailableAndUnverified(_) => {
+                            // The payload should have already been verified
+                            return Err(Error::InvalidMessageError(format!(
+                                "Payload verification failed! Block payload for epoch: {:?} and round: {:?} is unverified.",
+                                ordered_block.epoch(),
+                                ordered_block.round()
+                            )));
+                        },
+                    };
+
+                    // Get the ordered block payload
+                    let ordered_block_payload = match ordered_block.block().payload() {
+                        Some(payload) => payload,
+                        None => {
+                            return Err(Error::InvalidMessageError(format!(
+                                "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
+                                ordered_block.epoch(),
+                                ordered_block.round()
+                            )));
+                        },
+                    };
+
+                    // Verify the transaction payload against the ordered block payload
+                    transaction_payload.verify_against_ordered_payload(ordered_block_payload)?;
+                },
+                Entry::Vacant(_) => {
+                    // The payload is missing (this should never happen)
+                    return Err(Error::InvalidMessageError(format!(
+                        "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
+                        ordered_block.epoch(),
+                        ordered_block.round()
+                    )));
+                },
+            }
+        }
+
+        Ok(())
+    }
+
     /// Verifies the block payload signatures against the given epoch state.
     /// If verification is successful, blocks are marked as verified. Each
     /// new verified block is
@@ -210,7 +270,6 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        common::ProofWithData,
         proof_of_store::{BatchId, BatchInfo, ProofOfStore},
         quorum_cert::QuorumCert,
     };
@@ -383,8 +442,7 @@ mod test {
         check_num_verified_payloads(&block_payload_store, num_blocks_in_store - 1);
 
         // Insert the same block payload into the block payload store (as verified)
-        let transaction_payload =
-            BlockTransactionPayload::new(vec![], Some(0), ProofWithData::empty(), vec![]);
+        let transaction_payload = BlockTransactionPayload::empty();
         let block_payload = BlockPayload::new(verified_blocks[0].block_info(), transaction_payload);
         block_payload_store.insert_block_payload(block_payload, true);
 
@@ -896,10 +954,10 @@ mod test {
                 );
                 proofs_of_store.push(ProofOfStore::new(batch_info, AggregateSignature::empty()));
             }
-            let block_transaction_payload = BlockTransactionPayload::new(
+            let block_transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
                 vec![],
+                proofs_of_store,
                 None,
-                ProofWithData::new(proofs_of_store),
                 vec![],
             );
 
