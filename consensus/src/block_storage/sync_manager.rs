@@ -310,12 +310,12 @@ impl BlockStore {
 
         // For execution, we need the window starting from the highest_commit_cert + 1.
         // TODO: what happens cross-epoch?
-        let target_round = highest_commit_cert
-            .ledger_info()
-            .ledger_info()
-            .round()
-            .saturating_add(1)
-            .saturating_sub(window_size as u64);
+        let highest_commit_cert_round = highest_commit_cert.ledger_info().ledger_info().round();
+        let target_round = min(
+            highest_commit_cert_round,
+            // commit_cert + 1 - (window_size - 1)
+            highest_commit_cert_round.saturating_sub(window_size as u64),
+        );
 
         let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
         info!(
@@ -484,9 +484,6 @@ impl BlockStore {
     ///
     /// The current version of the function is not really async, but keeping it this way for
     /// future possible changes.
-    ///
-    /// TODO: Instead of target block id, ask for target epoch and round. The round can be
-    ///   committed_block.round().saturating_sub(window)
     pub async fn process_block_retrieval(
         &self,
         request: IncomingBlockRetrievalRequest,

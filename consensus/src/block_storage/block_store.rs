@@ -198,6 +198,7 @@ impl BlockStore {
             root_ordered_cert,
             root_commit_cert,
             max_pruned_blocks_in_mem,
+            window_size,
             highest_2chain_timeout_cert.map(Arc::new),
         );
 

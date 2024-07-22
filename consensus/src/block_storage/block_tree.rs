@@ -18,7 +18,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use mirai_annotations::{checked_verify_eq, precondition};
 use std::{
-    collections::{vec_deque::VecDeque, HashMap, HashSet},
+    collections::{vec_deque::VecDeque, BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -89,6 +89,7 @@ pub struct BlockTree {
     pruned_block_ids: VecDeque<HashValue>,
     /// Num pruned blocks to keep in memory.
     max_pruned_blocks_in_mem: usize,
+    window_size: usize,
 }
 
 impl BlockTree {
@@ -98,6 +99,7 @@ impl BlockTree {
         root_ordered_cert: WrappedLedgerInfo,
         root_commit_cert: WrappedLedgerInfo,
         max_pruned_blocks_in_mem: usize,
+        window_size: usize,
         highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     ) -> Self {
         assert_eq!(
@@ -131,6 +133,7 @@ impl BlockTree {
             id_to_quorum_cert,
             pruned_block_ids,
             max_pruned_blocks_in_mem,
+            window_size,
             highest_2chain_timeout_cert,
         }
     }
@@ -309,13 +312,17 @@ impl BlockTree {
     /// B3--> B4, root = B3
     ///
     /// Note this function is read-only, use with process_pruned_blocks to do the actual prune.
-    pub(super) fn find_blocks_to_prune(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
+    pub(super) fn find_blocks_to_prune(
+        &self,
+        next_root_id: HashValue,
+        window_start_round: u64,
+    ) -> VecDeque<HashValue> {
         // Nothing to do if this is the commit root
         if next_root_id == self.commit_root_id {
             return VecDeque::new();
         }
 
-        let mut blocks_pruned = VecDeque::new();
+        let mut blocks_pruned = BTreeMap::new();
         let mut blocks_to_be_pruned = vec![self.linkable_root()];
         while let Some(block_to_remove) = blocks_to_be_pruned.pop() {
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
@@ -330,9 +337,22 @@ impl BlockTree {
                 );
             }
             // Track all the block ids removed
-            blocks_pruned.push_back(block_to_remove.id());
+            blocks_pruned.insert(block_to_remove.executed_block.round(), block_to_remove.id());
         }
-        blocks_pruned
+
+        // Add back all blocks that are in the path from
+        // commit root to exec root (first block that is <= window_start_round)
+        let mut curr_block_id = self.commit_root_id;
+        while let Some(block_to_add_back) = self.get_block(&curr_block_id) {
+            blocks_pruned.remove(&block_to_add_back.round());
+            // Stop after adding the first block that is <= window_start_round
+            if block_to_add_back.round() <= window_start_round {
+                break;
+            }
+            curr_block_id = block_to_add_back.parent_id();
+        }
+
+        blocks_pruned.values().cloned().collect()
     }
 
     pub(super) fn update_ordered_root(&mut self, root_id: HashValue) {
@@ -442,7 +462,13 @@ impl BlockTree {
             block_id = block_to_commit.id(),
         );
 
-        let ids_to_remove = self.find_blocks_to_prune(block_to_commit.id());
+        let ids_to_remove = self.find_blocks_to_prune(
+            block_to_commit.id(),
+            block_to_commit
+                .round()
+                .saturating_add(1)
+                .saturating_sub(self.window_size as u64),
+        );
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with
