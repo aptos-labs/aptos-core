@@ -40,9 +40,11 @@ use std::{
     time::{Instant, SystemTime},
 };
 use tokio::runtime::Handle;
+use super::latency_tracking::MempoolLatencyStatsTracking;
 
 pub type MempoolSenderBucket = u8;
 pub type TimelineIndexIdentifier = u8;
+
 
 /// Struct that owns all dependencies required by shared mempool routines.
 #[derive(Clone)]
@@ -55,6 +57,7 @@ pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     pub broadcast_within_validator_network: Arc<RwLock<bool>>,
     pub use_case_history: Arc<Mutex<UseCaseHistory>>,
+    pub latency_stats_tracking: Arc<Mutex<MempoolLatencyStatsTracking>>,
 }
 
 impl<
@@ -77,6 +80,7 @@ impl<
             config.usecase_stats_num_blocks_to_track,
             config.usecase_stats_num_top_to_track,
         );
+        let latency_stats_tracking = MempoolLatencyStatsTracking {};
         SharedMempool {
             mempool,
             config,
@@ -86,6 +90,7 @@ impl<
             subscribers,
             broadcast_within_validator_network: Arc::new(RwLock::new(true)),
             use_case_history: Arc::new(Mutex::new(use_case_history)),
+            latency_stats_tracking: Arc::new(Mutex::new(latency_stats_tracking)),
         }
     }
 
@@ -237,10 +242,15 @@ pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
 pub enum MempoolClientRequest {
     SubmitTransaction(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>),
     GetTransactionByHash(HashValue, oneshot::Sender<Option<SignedTransaction>>),
+    GetLatencySummary(MempoolLatencySummary),
 }
 
 pub type MempoolClientSender = mpsc::Sender<MempoolClientRequest>;
 pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
+
+pub struct MempoolLatencySummary {
+
+}
 
 /// State of last sync with peer:
 /// `timeline_id` is position in log of ready transactions
