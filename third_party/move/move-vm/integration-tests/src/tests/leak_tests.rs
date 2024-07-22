@@ -4,7 +4,7 @@
 use move_binary_format::file_format::{
     Bytecode::*, CodeUnit, CompiledScript, Signature, SignatureIndex, SignatureToken::*,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -61,6 +61,8 @@ fn leak_with_abort() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
+            &DummyCodeStorage,
         );
     }
 

@@ -26,6 +26,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
+    DummyCodeStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{zero_cost_schedule, CostTable, Gas, GasCost, GasStatus},
@@ -282,6 +283,7 @@ impl SharedTestingConfig {
             serialize_values(test_info.arguments.iter()),
             &mut gas_meter,
             &mut TraversalContext::new(&storage),
+            &DummyCodeStorage,
         );
         let mut return_result = serialized_return_values_result.map(|res| {
             res.return_values
