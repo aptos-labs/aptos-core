@@ -24,7 +24,7 @@ royalty.
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
+<b>use</b> <a href="">0x1::object</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 </code></pre>
 
@@ -40,7 +40,7 @@ Royalties are optional for a collection.  Royalty percentage is calculated
 by (numerator / denominator) * 100%
 
 
-<pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="_ObjectGroup">0x1::object::ObjectGroup</a>])]
 <b>struct</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> <b>has</b> <b>copy</b>, drop, key
 </code></pre>
 
@@ -93,7 +93,7 @@ This enables creating or overwriting a <code><a href="royalty.md#0x4_royalty_Mut
 
 <dl>
 <dt>
-<code>inner: <a href="../../aptos-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a></code>
+<code>inner: <a href="_ExtendRef">object::ExtendRef</a></code>
 </dt>
 <dd>
 
@@ -145,7 +145,7 @@ The royalty cannot be greater than 100%
 Add a royalty, given a ConstructorRef.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_init">init</a>(ref: &<a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_init">init</a>(ref: &<a href="_ConstructorRef">object::ConstructorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>)
 </code></pre>
 
 
@@ -155,7 +155,7 @@ Add a royalty, given a ConstructorRef.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_init">init</a>(ref: &ConstructorRef, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">Royalty</a>) {
-    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(ref);
+    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="_generate_signer">object::generate_signer</a>(ref);
     <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="royalty.md#0x4_royalty">royalty</a>);
 }
 </code></pre>
@@ -181,12 +181,12 @@ Set the royalty if it does not exist, replace it otherwise.
 
 
 <pre><code><b>public</b> <b>fun</b> <b>update</b>(mutator_ref: &<a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">Royalty</a>) <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
-    <b>let</b> addr = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_extend_ref">object::address_from_extend_ref</a>(&mutator_ref.inner);
+    <b>let</b> addr = <a href="_address_from_extend_ref">object::address_from_extend_ref</a>(&mutator_ref.inner);
     <b>if</b> (<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr)) {
         <b>move_from</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr);
     };
 
-    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(&mutator_ref.inner);
+    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="_generate_signer_for_extending">object::generate_signer_for_extending</a>(&mutator_ref.inner);
     <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="royalty.md#0x4_royalty">royalty</a>);
 }
 </code></pre>
@@ -229,7 +229,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_generate_mutator_ref">generate_mutator_ref</a>(ref: <a href="../../aptos-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="royalty.md#0x4_royalty_MutatorRef">royalty::MutatorRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_generate_mutator_ref">generate_mutator_ref</a>(ref: <a href="_ExtendRef">object::ExtendRef</a>): <a href="royalty.md#0x4_royalty_MutatorRef">royalty::MutatorRef</a>
 </code></pre>
 
 
@@ -302,7 +302,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_get">get</a>&lt;T: key&gt;(maybe_royalty: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_get">get</a>&lt;T: key&gt;(maybe_royalty: <a href="_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;
 </code></pre>
 
 
@@ -312,7 +312,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_get">get</a>&lt;T: key&gt;(maybe_royalty: Object&lt;T&gt;): Option&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt; <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
-    <b>let</b> obj_addr = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&maybe_royalty);
+    <b>let</b> obj_addr = <a href="_object_address">object::object_address</a>(&maybe_royalty);
     <b>if</b> (<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(obj_addr)) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<b>borrow_global</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(obj_addr))
     } <b>else</b> {

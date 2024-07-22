@@ -26,7 +26,7 @@ Deprecated module
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="">0x1::event</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
@@ -93,13 +93,13 @@ The listing of all tokens for swapping stored at token owner's account
 
 </dd>
 <dt>
-<code>listing_events: <a href="../../aptos-framework/doc/event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="token_coin_swap.md#0x3_token_coin_swap_TokenListingEvent">token_coin_swap::TokenListingEvent</a>&gt;</code>
+<code>listing_events: <a href="_EventHandle">event::EventHandle</a>&lt;<a href="token_coin_swap.md#0x3_token_coin_swap_TokenListingEvent">token_coin_swap::TokenListingEvent</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>swap_events: <a href="../../aptos-framework/doc/event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="token_coin_swap.md#0x3_token_coin_swap_TokenSwapEvent">token_coin_swap::TokenSwapEvent</a>&gt;</code>
+<code>swap_events: <a href="_EventHandle">event::EventHandle</a>&lt;<a href="token_coin_swap.md#0x3_token_coin_swap_TokenSwapEvent">token_coin_swap::TokenSwapEvent</a>&gt;</code>
 </dt>
 <dd>
 
