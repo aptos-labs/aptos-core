@@ -305,8 +305,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             let (stream_results_tx, stream_results_rx) = unbounded();
             let coordinator_client_clone = self.coordinator_client.clone();
             let stream_results_thread = thread::spawn(move || {
-                let batch_size = 5000;
+                let batch_size = 200;
                 let mut curr_batch = vec![];
+                let mut seq_num: u64 = 0;
                 loop {
                     let txn_idx_output: TransactionIdxAndOutput = stream_results_rx.recv().unwrap();
                     if txn_idx_output.txn_idx == u32::MAX {
@@ -319,6 +320,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     if curr_batch.len() == batch_size {
                         coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
                         curr_batch = vec![];
+                        seq_num += 1;
                     }
                 }
             });
