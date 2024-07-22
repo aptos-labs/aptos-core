@@ -318,4 +318,8 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["6_exe_complete_on_shard"]).observe(delta as f64);
     }
+
+    fn reset_state_view(&self) {
+        self.state_view_client.init_for_block();
+    }
 }

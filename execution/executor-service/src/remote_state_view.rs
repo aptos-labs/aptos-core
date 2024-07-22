@@ -48,10 +48,15 @@ impl RemoteStateView {
     }
 
     pub fn set_state_value(&self, state_key: &StateKey, state_value: Option<StateValue>) {
-        self.state_values
-            .get(state_key)
-            .unwrap()
-            .set_value(state_value);
+        // value can be none as the state values DashMap can be cleared before all
+        // the responses are received.
+        if let Some(value) = self.state_values.get(state_key) {
+            value.set_value(state_value);
+        }
+        // self.state_values
+        //     .get(state_key)
+        //     .unwrap()
+        //     .set_value(state_value);
     }
 
     pub fn insert_state_key(&self, state_key: StateKey) {
@@ -232,7 +237,7 @@ impl TStateView for RemoteStateViewClient {
         self.pre_fetch_state_values(vec![state_key.clone()], true);
         state_view_reader.get_state_value(state_key)
     }
-
+    
     fn get_usage(&self) -> Result<StateStorageUsage> {
         unimplemented!("get_usage is not implemented for RemoteStateView")
     }

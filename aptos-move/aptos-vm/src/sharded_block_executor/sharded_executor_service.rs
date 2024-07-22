@@ -342,7 +342,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 shard_txns_start_index as TxnIndex,
                 stream_results_tx.clone(),
             );
-            //drop(state_view);
+            drop(state_view);
             drop(exe_timer);
 
             self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
@@ -351,7 +351,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 txn_idx: u32::MAX,
                 txn_output: TransactionOutput::default(),
             }).unwrap();
-            drop(state_view);
+            self.coordinator_client.lock().unwrap().reset_state_view();
             stream_results_thread.join().unwrap();
             if (i % 50 == 49) {
                 let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
