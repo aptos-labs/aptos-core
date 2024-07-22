@@ -481,7 +481,7 @@ impl BatchGenerator {
                         // Ignore the batch if batch is smaller than minimum batch size and pull again in 25ms
                         // If a batch hasn't been created for a while, send it out even if it's smaller than minimum batch size
                         if num_txns_in_batches as u64 >= self.config.minimum_batch_size
-                            || (!batches.is_empty() && since_last_non_empty_pull_ms >= self.config.batch_generation_max_interval_ms) {
+                            || (!batches.is_empty() && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms) {
                             last_non_empty_pull = tick_start;
                             pulled_txns_window.push_back((tick_start, num_txns_in_batches as u64));
                             let persist_start = Instant::now();
