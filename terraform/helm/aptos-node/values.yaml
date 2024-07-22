@@ -40,10 +40,10 @@ haproxy:
   resources:
     limits:
       cpu: 7
-      memory: 26Gi
+      memory: 16Gi
     requests:
       cpu: 7
-      memory: 26Gi
+      memory: 16Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -51,6 +51,8 @@ haproxy:
   config:
     # -- Whether to send Proxy Protocol v2
     send_proxy_protocol: &send_proxy_protocol false
+    # -- System user to run HA
+    user: nobody
   # -- Name of the Kubernetes TLS secret to use for HAProxy
   tls_secret:
 

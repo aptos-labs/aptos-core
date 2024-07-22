@@ -100,9 +100,18 @@ transforms:
     inputs:
       - filter_forge_logs
     # temporarily filter out noisy logs in vector until https://github.com/aptos-labs/aptos-core/pull/13965 lands in mainnet release
+    # temporarily filter out noisy logs from https://aptos-org.slack.com/archives/C06TH3DH7SB/p1721328005384169?thread_ts=1720695143.603089&cid=C06TH3DH7SB until lands in mainnet release
     condition: |
-      should_be_excluded = .level == "debug" && ( .message == "ReceiveProactiveRandShare" || .message == "ReceiveRandShareFastPath" )
-      !should_be_excluded
+      if is_string(.message) {
+        message = to_string!(.message)
+        if .level == "debug" && ( .message == "ReceiveProactiveRandShare" || .message == "ReceiveRandShareFastPath" ) {
+          return false
+        }
+        if starts_with(message, "ReceiveVote") || starts_with(message, "OrderVote:") || starts_with(message, "Receive commit vote BlockInfo") {
+          return false
+        }
+      }
+      true
 
   uptrace_logs:
     type: remap
@@ -111,6 +120,7 @@ transforms:
     source: |
       . = flatten(., ".") # in order for fields to become individual, filterable top-level fields in uptrace we need to flatten nested objects into top-level keys.
       .service_name = .k8s.labels.app
+      .repo = "gcp"
 
   datadog_logs:
     type: remap
@@ -122,3 +132,15 @@ transforms:
         .service = .k8s.labels.app
       }
       .ddtags, _ = "kube_cluster_name:" + .k8s.cluster + ",kube_namespace:" + .k8s.namespace + ",pod_name:" + .k8s.pod_name
+
+  signoz_logs:
+    type: remap
+    inputs:
+      - final_logs
+    source: |
+      .severity_text = del(.level)
+      .source_type = "k8s"
+      tmp = { "k8s": del(.k8s)}
+      resources_tmp = flatten(tmp, ".")
+      . = flatten(., ".")
+      .resources = resources_tmp
