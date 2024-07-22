@@ -330,6 +330,8 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             .with_label_values(&[&self.shard_id.to_string(), "result_tx_send"])
             .start_timer();
         self.result_tx.send(Message::new(output_message), &MessageType::new(execute_result_type));
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        info!("Sent cmd results batch at time: {}", curr_time);
     }
 
     fn record_execution_complete_time_on_shard(&self) {
