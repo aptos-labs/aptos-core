@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    ArgumentOperation, BatchArgument, BatchArgumentType, BatchedFunctionCall, PreviousResult,
-};
+use crate::{ArgumentOperation, BatchArgumentType, BatchedFunctionCall, PreviousResult};
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{PartialVMError, PartialVMResult},
@@ -13,12 +11,11 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    resolver::ModuleResolver,
     transaction_argument::TransactionArgument,
     vm_status::StatusCode,
 };
 use serde::Serialize;
-use std::{collections::BTreeMap, str::FromStr};
+use std::collections::BTreeMap;
 
 #[derive(Default)]
 struct Context {
@@ -240,7 +237,8 @@ impl Context {
 
     fn add_signers(&mut self, signer_counts: u16) -> PartialVMResult<()> {
         for _ in 0..signer_counts {
-            self.parameters.push(SignatureToken::Reference(Box::new(SignatureToken::Signer)));
+            self.parameters
+                .push(SignatureToken::Reference(Box::new(SignatureToken::Signer)));
         }
         self.signer_counts = signer_counts;
         Ok(())
@@ -319,18 +317,23 @@ impl Context {
         let func_handle = self.script.function_handle_at(func_id).clone();
         let mut subst_mapping = BTreeMap::new();
         for (idx, ty_param) in call.ty_args.iter().enumerate() {
-            subst_mapping.insert(idx as u16, if let Some(stored_idx) = self.ty_args_to_idx.get(ty_param) {
-                *stored_idx
-            } else {
-                let new_call_idx = self.ty_args.len() as u16;
-                if new_call_idx >= TableIndex::MAX {
-                    return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
-                }
-                self.script.type_parameters.push(*func_handle.type_parameters.get(idx).unwrap());
-                self.ty_args_to_idx.insert(ty_param.clone(), new_call_idx);
-                self.ty_args.push(ty_param.clone());
-                new_call_idx
-            });
+            subst_mapping.insert(
+                idx as u16,
+                if let Some(stored_idx) = self.ty_args_to_idx.get(ty_param) {
+                    *stored_idx
+                } else {
+                    let new_call_idx = self.ty_args.len() as u16;
+                    if new_call_idx >= TableIndex::MAX {
+                        return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
+                    }
+                    self.script
+                        .type_parameters
+                        .push(*func_handle.type_parameters.get(idx).unwrap());
+                    self.ty_args_to_idx.insert(ty_param.clone(), new_call_idx);
+                    self.ty_args.push(ty_param.clone());
+                    new_call_idx
+                },
+            );
         }
 
         // Instructions for loading parameters
@@ -341,6 +344,8 @@ impl Context {
                         call_idx,
                         return_idx,
                         operation_type,
+                        ty: _,
+                        ability: _,
                     }) = &arg.previous_result
                     {
                         if let Some(idx) = self.returned_val_to_local.get(*call_idx as usize) {
@@ -405,8 +410,7 @@ impl Context {
             self.script.code.code.push(Bytecode::CallGeneric(fi_idx));
         }
 
-        self.returned_val_to_local
-            .push(self.locals.len() as u16);
+        self.returned_val_to_local.push(self.locals.len() as u16);
         self.return_counts
             .push(self.script.signature_at(func_handle.return_).0.len() as u16);
 
@@ -426,14 +430,11 @@ impl Context {
             .collect::<Vec<_>>();
 
         for ret_ty in ret_locals {
-            let local_idx = self.locals.len()
-                + self.args.len()
-                + self.signer_counts as usize;
+            let local_idx = self.locals.len() + self.args.len() + self.signer_counts as usize;
             if local_idx >= u8::MAX as usize {
                 return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
             }
-            self.locals
-                .push(ret_ty);
+            self.locals.push(ret_ty);
             self.script.code.code.push(Bytecode::StLoc(local_idx as u8));
         }
 
@@ -466,7 +467,10 @@ pub fn generate_script_from_batched_calls(
     context.script.code.code.push(Bytecode::Ret);
     context.script.parameters = context.add_signature(Signature(context.parameters.clone()))?;
     context.script.code.locals = context.add_signature(Signature(context.locals.clone()))?;
-    move_bytecode_verifier::verify_script(&context.script).map_err(|err| err.to_partial().with_message(format!("{:?}", context.script)))?;
+    move_bytecode_verifier::verify_script(&context.script).map_err(|err| {
+        err.to_partial()
+            .with_message(format!("{:?}", context.script))
+    })?;
     let mut bytes = vec![];
     context
         .script

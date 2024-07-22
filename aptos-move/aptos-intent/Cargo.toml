@@ -31,3 +31,7 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4.42"
 reqwest-wasm = { version = "*", features = ["blocking"] }
 reqwest = { version = "*", features = ["blocking"] }
+
+[dev-dependencies]
+e2e-move-tests = { path = "../e2e-move-tests" }
+aptos-types = { workspace = true }

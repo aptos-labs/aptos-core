@@ -2296,8 +2296,10 @@ name = "aptos-intent"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-types",
  "bcs 0.1.4",
  "bytes",
+ "e2e-move-tests",
  "getrandom 0.2.11",
  "hex",
  "move-binary-format",
