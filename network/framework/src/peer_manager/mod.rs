@@ -15,7 +15,7 @@ use crate::{
     constants,
     counters::{self},
     logging::*,
-    peer::{Peer, PeerNotification, PeerRequest},
+    peer::{Peer, PeerRequest},
     transport::{
         Connection, ConnectionId, ConnectionMetadata, TSocket as TransportTSocket,
         TRANSPORT_TIMEOUT,
@@ -56,7 +56,7 @@ pub use self::error::PeerManagerError;
 use crate::{
     application::{error::Error, storage::PeersAndMetadata},
     peer_manager::transport::{TransportHandler, TransportRequest},
-    protocols::network::SerializedRequest,
+    protocols::network::{ReceivedMessage, SerializedRequest},
 };
 use aptos_config::config::PeerRole;
 use aptos_types::account_address::AccountAddress;
@@ -93,7 +93,7 @@ where
     /// Upstream handlers for RPC and DirectSend protocols. The handlers are promised fair delivery
     /// of messages across (PeerId, ProtocolId).
     upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
     /// Channels to send NewPeer/LostPeer notifications to.
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
     /// Channel used to send Dial requests to the ConnectionHandler actor
@@ -109,8 +109,6 @@ where
         HashMap<ConnectionId, oneshot::Sender<Result<(), PeerManagerError>>>,
     /// Pin the transport type corresponding to this PeerManager instance
     phantom_transport: PhantomData<TTransport>,
-    /// Maximum concurrent network requests to any peer.
-    max_concurrent_network_reqs: usize,
     /// Size of channels between different actors.
     channel_size: usize,
     /// Max network frame size
@@ -139,11 +137,10 @@ where
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
         upstream_handlers: HashMap<
             ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+            aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
         channel_size: usize,
-        max_concurrent_network_reqs: usize,
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
@@ -182,9 +179,8 @@ where
             transport_notifs_rx,
             outstanding_disconnect_requests: HashMap::new(),
             phantom_transport: PhantomData,
-            upstream_handlers,
+            upstream_handlers: Arc::new(upstream_handlers),
             connection_event_handlers,
-            max_concurrent_network_reqs,
             channel_size,
             max_frame_size,
             max_message_size,
@@ -650,12 +646,6 @@ where
             self.channel_size,
             Some(&counters::PENDING_NETWORK_REQUESTS),
         );
-        // TODO: Add label for peer.
-        let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(
-            QueueStyle::FIFO,
-            self.channel_size,
-            Some(&counters::PENDING_NETWORK_NOTIFICATIONS),
-        );
 
         // Initialize a new Peer actor for this connection.
         let peer = Peer::new(
@@ -665,7 +655,7 @@ where
             connection,
             self.transport_notifs_tx.clone(),
             peer_reqs_rx,
-            peer_notifs_tx,
+            self.upstream_handlers.clone(),
             Duration::from_millis(constants::INBOUND_RPC_TIMEOUT_MS),
             constants::MAX_CONCURRENT_INBOUND_RPCS,
             constants::MAX_CONCURRENT_OUTBOUND_RPCS,
@@ -674,9 +664,6 @@ where
         );
         self.executor.spawn(peer.start());
 
-        // Start background task to handle events (RPCs and DirectSend messages) received from
-        // peer.
-        self.spawn_peer_network_events_handler(peer_id, peer_notifs_rx);
         // Save PeerRequest sender to `active_peers`.
         self.active_peers
             .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
@@ -711,70 +698,5 @@ where
                 );
             }
         }
-    }
-
-    fn spawn_peer_network_events_handler(
-        &self,
-        peer_id: PeerId,
-        network_events: aptos_channel::Receiver<ProtocolId, PeerNotification>,
-    ) {
-        let mut upstream_handlers = self.upstream_handlers.clone();
-        let network_context = self.network_context;
-        self.executor.spawn(network_events.for_each_concurrent(
-            self.max_concurrent_network_reqs,
-            move |inbound_event| {
-                handle_inbound_request(
-                    network_context,
-                    inbound_event,
-                    peer_id,
-                    &mut upstream_handlers,
-                );
-                futures::future::ready(())
-            },
-        ));
-    }
-}
-
-/// A task for consuming inbound network messages
-fn handle_inbound_request(
-    network_context: NetworkContext,
-    inbound_event: PeerNotification,
-    peer_id: PeerId,
-    upstream_handlers: &mut HashMap<
-        ProtocolId,
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-    >,
-) {
-    let (protocol_id, notification) = match inbound_event {
-        PeerNotification::RecvMessage(msg) => (
-            msg.protocol_id(),
-            PeerManagerNotification::RecvMessage(peer_id, msg),
-        ),
-        PeerNotification::RecvRpc(req) => (
-            req.protocol_id(),
-            PeerManagerNotification::RecvRpc(peer_id, req),
-        ),
-    };
-
-    if let Some(handler) = upstream_handlers.get_mut(&protocol_id) {
-        // Send over aptos channel for fairness.
-        if let Err(err) = handler.push((peer_id, protocol_id), notification) {
-            warn!(
-                NetworkSchema::new(&network_context),
-                error = ?err,
-                protocol_id = protocol_id,
-                "{} Upstream handler unable to handle message for protocol: {}. Error: {:?}",
-                network_context, protocol_id, err
-            );
-        }
-    } else {
-        debug!(
-            NetworkSchema::new(&network_context),
-            protocol_id = protocol_id,
-            message = format!("{:?}", notification),
-            "{} Received network message for unregistered protocol: {:?}",
-            network_context,
-            notification,
-        );
     }
 }
