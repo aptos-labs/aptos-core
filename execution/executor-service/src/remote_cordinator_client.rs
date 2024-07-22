@@ -145,7 +145,7 @@ impl RemoteCoordinatorClient {
             match command_rx.recv() {
                 Ok(message) => {
                     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-                    info!("Received cmd batch {} at time: {}", message.seq_num.unwrap(), curr_time);
+                    info!("Received cmd batch {} at time: {}", message.shard_id.unwrap(), curr_time);
                     let state_view_client_clone = state_view_client.clone();
                     let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
                     let cmd_rx_msg_duration_since_epoch_clone = cmd_rx_msg_duration_since_epoch.clone();
