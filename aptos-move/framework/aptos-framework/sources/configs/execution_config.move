@@ -30,7 +30,8 @@ module aptos_framework::execution_config {
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
 
         if (exists<ExecutionConfig>(@aptos_framework)) {
-            let config_ref = &mut borrow_global_mut<ExecutionConfig>(@aptos_framework).config;
+            let config_ref =
+                &mut borrow_global_mut<ExecutionConfig>(@aptos_framework).config;
             *config_ref = config;
         } else {
             move_to(account, ExecutionConfig { config });

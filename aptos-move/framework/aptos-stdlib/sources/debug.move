@@ -22,10 +22,18 @@ module aptos_std::debug {
 
     #[test_only]
     struct Foo has drop {}
+
     #[test_only]
-    struct Bar has drop { x: u128, y: Foo, z: bool }
+    struct Bar has drop {
+        x: u128,
+        y: Foo,
+        z: bool
+    }
+
     #[test_only]
-    struct Box<T> has drop { x: T }
+    struct Box<T> has drop {
+        x: T
+    }
 
     #[test_only]
     struct GenericStruct<phantom T> has drop {
@@ -63,7 +71,7 @@ module aptos_std::debug {
     }
 
     #[test]
-    public fun test()  {
+    public fun test() {
         let x = 42;
         assert_equal(&x, b"42");
 
@@ -77,17 +85,25 @@ module aptos_std::debug {
         assert_equal(&foo, b"0x1::debug::Foo {\n  dummy_field: false\n}");
 
         let bar = Bar { x: 404, y: Foo {}, z: true };
-        assert_equal(&bar, b"0x1::debug::Bar {\n  x: 404,\n  y: 0x1::debug::Foo {\n    dummy_field: false\n  },\n  z: true\n}");
+        assert_equal(
+            &bar,
+            b"0x1::debug::Bar {\n  x: 404,\n  y: 0x1::debug::Foo {\n    dummy_field: false\n  },\n  z: true\n}",
+        );
 
         let box = Box { x: Foo {} };
-        assert_equal(&box, b"0x1::debug::Box<0x1::debug::Foo> {\n  x: 0x1::debug::Foo {\n    dummy_field: false\n  }\n}");
+        assert_equal(
+            &box,
+            b"0x1::debug::Box<0x1::debug::Foo> {\n  x: 0x1::debug::Foo {\n    dummy_field: false\n  }\n}",
+        );
     }
 
     #[test]
     fun test_print_string() {
         let str_bytes = b"Hello, sane Move debugging!";
 
-        assert_equal(&str_bytes, b"0x48656c6c6f2c2073616e65204d6f766520646562756767696e6721");
+        assert_equal(
+            &str_bytes, b"0x48656c6c6f2c2073616e65204d6f766520646562756767696e6721"
+        );
 
         let str = std::string::utf8(str_bytes);
         assert_equal(&str, b"\"Hello, sane Move debugging!\"");
@@ -100,7 +116,6 @@ module aptos_std::debug {
         let str = std::string::utf8(str_bytes);
         assert_equal(&str, b"\"Can you say \\\"Hel\\\\lo\\\"?\"");
     }
-
 
     #[test_only]
     use std::features;
@@ -121,8 +136,13 @@ module aptos_std::debug {
         let u128 = 340282366920938463463374607431768211455u128;
         assert_equal(&u128, b"340282366920938463463374607431768211455");
 
-        let u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935u256;
-        assert_equal(&u256, b"115792089237316195423570985008687907853269984665640564039457584007913129639935");
+        let u256 =
+
+                115792089237316195423570985008687907853269984665640564039457584007913129639935u256;
+        assert_equal(
+            &u256,
+            b"115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        );
 
         let bool = false;
         assert_equal(&bool, b"false");
@@ -139,8 +159,8 @@ module aptos_std::debug {
         }
     }
 
-    const MSG_1 : vector<u8> = b"abcdef";
-    const MSG_2 : vector<u8> = b"123456";
+    const MSG_1: vector<u8> = b"abcdef";
+    const MSG_2: vector<u8> = b"123456";
 
     #[test]
     fun test_print_struct() {
@@ -150,13 +170,12 @@ module aptos_std::debug {
             msgs: vector[MSG_1, MSG_2],
         };
 
-        assert_equal(&obj, b"0x1::debug::TestInner {\n  val: 100,\n  vec: [ 200, 400 ],\n  msgs: [\n    0x616263646566,\n    0x313233343536\n  ]\n}");
+        assert_equal(
+            &obj,
+            b"0x1::debug::TestInner {\n  val: 100,\n  vec: [ 200, 400 ],\n  msgs: [\n    0x616263646566,\n    0x313233343536\n  ]\n}",
+        );
 
-        let obj = TestInner {
-            val: 10,
-            vec: vector[],
-            msgs: vector[],
-        };
+        let obj = TestInner { val: 10, vec: vector[], msgs: vector[], };
 
         assert_equal(&obj, b"0x1::debug::TestInner {\n  val: 10,\n  vec: [],\n  msgs: []\n}");
     }
@@ -199,12 +218,14 @@ module aptos_std::debug {
                 msgs: vector[x"00ff", x"abcd"],
             },
             TestInner {
-                val: 8u128 ,
+                val: 8u128,
                 vec: vector[128u128, 129u128],
                 msgs: vector[x"0000"],
-            }
-        ];
-        assert_equal(&v, b"[\n  0x1::debug::TestInner {\n    val: 4,\n    vec: [ 127, 128 ],\n    msgs: [\n      0x00ff,\n      0xabcd\n    ]\n  },\n  0x1::debug::TestInner {\n    val: 8,\n    vec: [ 128, 129 ],\n    msgs: [\n      0x0000\n    ]\n  }\n]");
+            }];
+        assert_equal(
+            &v,
+            b"[\n  0x1::debug::TestInner {\n    val: 4,\n    vec: [ 127, 128 ],\n    msgs: [\n      0x00ff,\n      0xabcd\n    ]\n  },\n  0x1::debug::TestInner {\n    val: 8,\n    vec: [ 128, 129 ],\n    msgs: [\n      0x0000\n    ]\n  }\n]",
+        );
     }
 
     #[test(s1 = @0x123, s2 = @0x456)]
@@ -241,14 +262,14 @@ module aptos_std::debug {
         let v = vector[
             vector[
                 TestInner { val: 4u128, vec: vector[127u128, 128u128], msgs: vector[] },
-                TestInner { val: 8u128 , vec: vector[128u128, 129u128], msgs: vector[] }
-            ],
+                TestInner { val: 8u128, vec: vector[128u128, 129u128], msgs: vector[] }],
             vector[
                 TestInner { val: 4u128, vec: vector[127u128, 128u128], msgs: vector[] },
-                TestInner { val: 8u128 , vec: vector[128u128, 129u128], msgs: vector[] }
-            ]
-        ];
-        assert_equal(&v, b"[\n  [\n    0x1::debug::TestInner {\n      val: 4,\n      vec: [ 127, 128 ],\n      msgs: []\n    },\n    0x1::debug::TestInner {\n      val: 8,\n      vec: [ 128, 129 ],\n      msgs: []\n    }\n  ],\n  [\n    0x1::debug::TestInner {\n      val: 4,\n      vec: [ 127, 128 ],\n      msgs: []\n    },\n    0x1::debug::TestInner {\n      val: 8,\n      vec: [ 128, 129 ],\n      msgs: []\n    }\n  ]\n]");
+                TestInner { val: 8u128, vec: vector[128u128, 129u128], msgs: vector[] }]];
+        assert_equal(
+            &v,
+            b"[\n  [\n    0x1::debug::TestInner {\n      val: 4,\n      vec: [ 127, 128 ],\n      msgs: []\n    },\n    0x1::debug::TestInner {\n      val: 8,\n      vec: [ 128, 129 ],\n      msgs: []\n    }\n  ],\n  [\n    0x1::debug::TestInner {\n      val: 4,\n      vec: [ 127, 128 ],\n      msgs: []\n    },\n    0x1::debug::TestInner {\n      val: 8,\n      vec: [ 128, 129 ],\n      msgs: []\n    }\n  ]\n]",
+        );
     }
 
     #[test]
@@ -260,18 +281,18 @@ module aptos_std::debug {
             name: std::string::utf8(b"He\"llo"),
             vec: vector[
                 TestInner { val: 1, vec: vector[130u128, 131u128], msgs: vector[] },
-                TestInner { val: 2, vec: vector[132u128, 133u128], msgs: vector[] }
-            ],
+                TestInner { val: 2, vec: vector[132u128, 133u128], msgs: vector[] }],
         };
 
-        assert_equal(&obj, b"0x1::debug::TestStruct {\n  addr: @0x1,\n  number: 255,\n  bytes: 0xc0ffee,\n  name: \"He\\\"llo\",\n  vec: [\n    0x1::debug::TestInner {\n      val: 1,\n      vec: [ 130, 131 ],\n      msgs: []\n    },\n    0x1::debug::TestInner {\n      val: 2,\n      vec: [ 132, 133 ],\n      msgs: []\n    }\n  ]\n}");
+        assert_equal(
+            &obj,
+            b"0x1::debug::TestStruct {\n  addr: @0x1,\n  number: 255,\n  bytes: 0xc0ffee,\n  name: \"He\\\"llo\",\n  vec: [\n    0x1::debug::TestInner {\n      val: 1,\n      vec: [ 130, 131 ],\n      msgs: []\n    },\n    0x1::debug::TestInner {\n      val: 2,\n      vec: [ 132, 133 ],\n      msgs: []\n    }\n  ]\n}",
+        );
     }
 
     #[test]
     fun test_print_generic_struct() {
-        let obj = GenericStruct<Foo> {
-            val: 60u64,
-        };
+        let obj = GenericStruct<Foo> { val: 60u64, };
 
         assert_equal(&obj, b"0x1::debug::GenericStruct<0x1::debug::Foo> {\n  val: 60\n}");
     }

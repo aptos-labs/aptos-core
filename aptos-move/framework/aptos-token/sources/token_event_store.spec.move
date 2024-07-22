@@ -7,7 +7,7 @@ spec aptos_token::token_event_store {
     spec initialize_token_event_store(acct: &signer) {
         pragma verify = true;
         let addr = signer::address_of(acct);
-        include InitializeTokenEventStoreAbortsIf {creator : acct};
+        include InitializeTokenEventStoreAbortsIf { creator: acct };
     }
 
     /// Adjust the overflow value according to the
@@ -18,8 +18,10 @@ spec aptos_token::token_event_store {
         let addr = signer::address_of(creator);
         let account = global<Account>(addr);
         aborts_if !exists<TokenEventStoreV1>(addr) && !exists<Account>(addr);
-        aborts_if !exists<TokenEventStoreV1>(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<TokenEventStoreV1>(addr) && account.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<TokenEventStoreV1>(addr)
+            && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<TokenEventStoreV1>(addr) && account.guid_creation_num + 9
+            > MAX_U64;
     }
 
     spec schema TokenEventStoreAbortsIf {
@@ -32,20 +34,29 @@ spec aptos_token::token_event_store {
         aborts_if account.guid_creation_num + 9 > MAX_U64;
     }
 
-    spec emit_collection_uri_mutate_event(creator: &signer, collection: String, old_uri: String, new_uri: String) {
+    spec emit_collection_uri_mutate_event(
+        creator: &signer, collection: String, old_uri: String, new_uri: String
+    ) {
         include InitializeTokenEventStoreAbortsIf;
     }
 
-    spec emit_collection_description_mutate_event(creator: &signer, collection: String, old_description: String, new_description: String) {
+    spec emit_collection_description_mutate_event(
+        creator: &signer,
+        collection: String,
+        old_description: String,
+        new_description: String
+    ) {
         include InitializeTokenEventStoreAbortsIf;
     }
 
-    spec emit_collection_maximum_mutate_event(creator: &signer, collection: String, old_maximum: u64, new_maximum: u64) {
+    spec emit_collection_maximum_mutate_event(
+        creator: &signer, collection: String, old_maximum: u64, new_maximum: u64
+    ) {
         include InitializeTokenEventStoreAbortsIf;
     }
 
     spec emit_token_opt_in_event(account: &signer, opt_in: bool) {
-        include InitializeTokenEventStoreAbortsIf {creator : account};
+        include InitializeTokenEventStoreAbortsIf { creator: account };
     }
 
     spec emit_token_uri_mutate_event(

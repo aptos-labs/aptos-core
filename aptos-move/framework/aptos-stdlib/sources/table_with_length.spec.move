@@ -70,8 +70,12 @@ spec aptos_std::table_with_length {
 
     // Specification functions for tables
     spec native fun spec_len<K, V>(t: TableWithLength<K, V>): num;
+
     spec native fun spec_contains<K, V>(t: TableWithLength<K, V>, k: K): bool;
+
     spec native fun spec_set<K, V>(t: TableWithLength<K, V>, k: K, v: V): TableWithLength<K, V>;
+
     spec native fun spec_remove<K, V>(t: TableWithLength<K, V>, k: K): TableWithLength<K, V>;
+
     spec native fun spec_get<K, V>(t: TableWithLength<K, V>, k: K): V;
 }

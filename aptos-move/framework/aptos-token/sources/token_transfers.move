@@ -76,17 +76,16 @@ module aptos_token::token_transfers {
             PendingClaims {
                 pending_claims: table::new<TokenOfferId, Token>(),
                 offer_events: account::new_event_handle<TokenOfferEvent>(account),
-                cancel_offer_events: account::new_event_handle<TokenCancelOfferEvent>(account),
+                cancel_offer_events: account::new_event_handle<TokenCancelOfferEvent>(
+                    account
+                ),
                 claim_events: account::new_event_handle<TokenClaimEvent>(account),
-            }
+            },
         )
     }
 
     fun create_token_offer_id(to_addr: address, token_id: TokenId): TokenOfferId {
-        TokenOfferId {
-            to_addr,
-            token_id
-        }
+        TokenOfferId { to_addr, token_id }
     }
 
     public entry fun offer_script(
@@ -98,7 +97,8 @@ module aptos_token::token_transfers {
         property_version: u64,
         amount: u64,
     ) acquires PendingClaims {
-        let token_id = token::create_token_id_raw(creator, collection, name, property_version);
+        let token_id =
+            token::create_token_id_raw(creator, collection, name, property_version);
         offer(&sender, receiver, token_id, amount);
     }
 
@@ -126,20 +126,12 @@ module aptos_token::token_transfers {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                TokenOffer {
-                    to_address: receiver,
-                    token_id,
-                    amount,
-                }
+                TokenOffer { to_address: receiver, token_id, amount, },
             )
         };
         event::emit_event<TokenOfferEvent>(
             &mut borrow_global_mut<PendingClaims>(sender_addr).offer_events,
-            TokenOfferEvent {
-                to_address: receiver,
-                token_id,
-                amount,
-            },
+            TokenOfferEvent { to_address: receiver, token_id, amount, },
         );
     }
 
@@ -151,7 +143,8 @@ module aptos_token::token_transfers {
         name: String,
         property_version: u64,
     ) acquires PendingClaims {
-        let token_id = token::create_token_id_raw(creator, collection, name, property_version);
+        let token_id =
+            token::create_token_id_raw(creator, collection, name, property_version);
         claim(&receiver, sender, token_id);
     }
 
@@ -161,30 +154,24 @@ module aptos_token::token_transfers {
         token_id: TokenId,
     ) acquires PendingClaims {
         assert!(exists<PendingClaims>(sender), ETOKEN_OFFER_NOT_EXIST);
-        let pending_claims =
-            &mut borrow_global_mut<PendingClaims>(sender).pending_claims;
+        let pending_claims = &mut borrow_global_mut<PendingClaims>(sender).pending_claims;
         let token_offer_id = create_token_offer_id(signer::address_of(receiver), token_id);
-        assert!(table::contains(pending_claims, token_offer_id), error::not_found(ETOKEN_OFFER_NOT_EXIST));
+        assert!(
+            table::contains(pending_claims, token_offer_id),
+            error::not_found(ETOKEN_OFFER_NOT_EXIST),
+        );
         let tokens = table::remove(pending_claims, token_offer_id);
         let amount = token::get_token_amount(&tokens);
         token::deposit_token(receiver, tokens);
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                TokenClaim {
-                    to_address: signer::address_of(receiver),
-                    token_id,
-                    amount,
-                }
+                TokenClaim { to_address: signer::address_of(receiver), token_id, amount, },
             )
         };
         event::emit_event<TokenClaimEvent>(
             &mut borrow_global_mut<PendingClaims>(sender).claim_events,
-            TokenClaimEvent {
-                to_address: signer::address_of(receiver),
-                token_id,
-                amount,
-            },
+            TokenClaimEvent { to_address: signer::address_of(receiver), token_id, amount, },
         );
     }
 
@@ -196,7 +183,8 @@ module aptos_token::token_transfers {
         name: String,
         property_version: u64,
     ) acquires PendingClaims {
-        let token_id = token::create_token_id_raw(creator, collection, name, property_version);
+        let token_id =
+            token::create_token_id_raw(creator, collection, name, property_version);
         cancel_offer(&sender, receiver, token_id);
     }
 
@@ -217,20 +205,12 @@ module aptos_token::token_transfers {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                TokenCancelOffer {
-                    to_address: receiver,
-                    token_id,
-                    amount,
-                },
+                TokenCancelOffer { to_address: receiver, token_id, amount, },
             )
         };
         event::emit_event<TokenCancelOfferEvent>(
             &mut borrow_global_mut<PendingClaims>(sender_addr).cancel_offer_events,
-            TokenCancelOfferEvent {
-                to_address: receiver,
-                token_id,
-                amount,
-            },
+            TokenCancelOfferEvent { to_address: receiver, token_id, amount, },
         );
     }
 
@@ -243,7 +223,6 @@ module aptos_token::token_transfers {
         aptos_framework::account::create_account_for_test(owner_addr);
         offer(&creator, owner_addr, token_id, 1);
         claim(&owner, creator_addr, token_id);
-
 
         offer(&owner, creator_addr, token_id, 1);
         cancel_offer(&owner, creator_addr, token_id);
@@ -298,9 +277,13 @@ module aptos_token::token_transfers {
         );
 
         let token_mutation_setting = vector<bool>[false, false, false, false, true];
-        let default_keys = vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")];
+        let default_keys = vector<String>[string::utf8(b"attack"), string::utf8(
+                b"num_of_use"
+            )];
         let default_vals = vector<vector<u8>>[b"10", b"5"];
-        let default_types = vector<String>[string::utf8(b"integer"), string::utf8(b"integer")];
+        let default_types = vector<String>[string::utf8(b"integer"), string::utf8(
+                b"integer"
+            )];
         token::create_token_script(
             creator,
             collection_name,
@@ -321,7 +304,7 @@ module aptos_token::token_transfers {
             signer::address_of(creator),
             collection_name,
             string::utf8(b"Token: Hello, Token"),
-            0
+            0,
         )
     }
 }

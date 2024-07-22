@@ -20,7 +20,9 @@ module aptos_framework::consensus_config {
     const EINVALID_CONFIG: u64 = 1;
 
     /// Publishes the ConsensusConfig config.
-    public(friend) fun initialize(aptos_framework: &signer, config: vector<u8>) {
+    public(friend) fun initialize(
+        aptos_framework: &signer, config: vector<u8>
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
         move_to(aptos_framework, ConsensusConfig { config });
@@ -52,7 +54,7 @@ module aptos_framework::consensus_config {
     public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(account);
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
-        std::config_buffer::upsert<ConsensusConfig>(ConsensusConfig {config});
+        std::config_buffer::upsert<ConsensusConfig>(ConsensusConfig { config });
     }
 
     /// Only used in reconfigurations to apply the pending `ConsensusConfig`, if there is any.

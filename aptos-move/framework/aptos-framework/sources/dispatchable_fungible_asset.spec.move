@@ -11,11 +11,11 @@ spec aptos_framework::dispatchable_fungible_asset {
         pragma opaque;
     }
 
-    spec dispatchable_derived_balance{
+    spec dispatchable_derived_balance {
         pragma opaque;
     }
 
-    spec dispatchable_derived_supply{
+    spec dispatchable_derived_supply {
         pragma opaque;
     }
 }

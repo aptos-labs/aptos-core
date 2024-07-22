@@ -13,9 +13,7 @@ spec aptos_framework::config_buffer {
         if (exists<PendingConfigs>(@aptos_framework)) {
             let config = global<PendingConfigs>(@aptos_framework);
             simple_map::spec_contains_key(config.configs, type_name)
-        } else {
-            false
-        }
+        } else { false }
     }
 
     spec upsert<T: drop + store>(config: T) {
@@ -31,9 +29,7 @@ spec aptos_framework::config_buffer {
         let configs = global<PendingConfigs>(@aptos_framework);
         let key = type_info::type_name<T>();
         aborts_if !simple_map::spec_contains_key(configs.configs, key);
-        include any::UnpackAbortsIf<T> {
-            x: simple_map::spec_get(configs.configs, key)
-        };
+        include any::UnpackAbortsIf<T> { x: simple_map::spec_get(configs.configs, key) };
     }
 
     spec schema SetForNextEpochAbortsIf {
@@ -50,9 +46,8 @@ spec aptos_framework::config_buffer {
         let type_name = type_info::type_name<T>();
         let configs = global<PendingConfigs>(@aptos_framework);
         // TODO(#12015)
-        include spec_fun_does_exist<T>(type_name) ==> any::UnpackAbortsIf<T> {
-            x: simple_map::spec_get(configs.configs, type_name)
-        };
+        include spec_fun_does_exist<T>(type_name) ==>
+            any::UnpackAbortsIf<T> { x: simple_map::spec_get(configs.configs, type_name) };
     }
 
     spec schema OnNewEpochRequirement<T> {
@@ -60,9 +55,9 @@ spec aptos_framework::config_buffer {
         let type_name = type_info::type_name<T>();
         let configs = global<PendingConfigs>(@aptos_framework);
         // TODO(#12015)
-        include spec_fun_does_exist<T>(type_name) ==> any::UnpackRequirement<T> {
-            x: simple_map::spec_get(configs.configs, type_name)
-        };
+        include spec_fun_does_exist<T>(type_name) ==>
+            any::UnpackRequirement<T> {
+                x: simple_map::spec_get(configs.configs, type_name)
+            };
     }
-
 }

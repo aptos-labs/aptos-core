@@ -21,7 +21,7 @@ spec aptos_std::crypto_algebra {
         pragma opaque;
     }
 
-    spec downcast_internal<L,S>(handle: u64): (bool, u64) {
+    spec downcast_internal<L, S>(handle: u64): (bool, u64) {
         pragma opaque;
     }
 
@@ -45,11 +45,13 @@ spec aptos_std::crypto_algebra {
         pragma opaque;
     }
 
-    spec multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64 {
+    spec multi_pairing_internal<G1, G2, Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64 {
         pragma opaque;
     }
 
-    spec multi_scalar_mul_internal<G, S>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64 {
+    spec multi_scalar_mul_internal<G, S>(
+        element_handles: vector<u64>, scalar_handles: vector<u64>
+    ): u64 {
         pragma opaque;
     }
 
@@ -65,7 +67,7 @@ spec aptos_std::crypto_algebra {
         pragma opaque;
     }
 
-    spec pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64 {
+    spec pairing_internal<G1, G2, Gt>(g1_handle: u64, g2_handle: u64): u64 {
         pragma opaque;
     }
 
@@ -85,12 +87,11 @@ spec aptos_std::crypto_algebra {
         pragma opaque;
     }
 
-    spec upcast_internal<S,L>(handle: u64): u64 {
+    spec upcast_internal<S, L>(handle: u64): u64 {
         pragma opaque;
     }
 
     spec zero_internal<S>(): u64 {
         pragma opaque;
     }
-
 }
