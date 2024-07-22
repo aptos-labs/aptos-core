@@ -145,19 +145,22 @@ impl RemoteStateViewClient {
         kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
         shard_id: ShardId,
         state_keys: Vec<StateKey>,
+        priority: u64,
     ) {
         state_keys.clone().into_iter().for_each(|state_key| {
             state_view_clone.read().unwrap().insert_state_key(state_key);
         });
         let mut seq_num = 0;
-
         state_keys
             .chunks(1600) //REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
                 if state_keys.len() > 1 {
-                    seq_num += 1;
+                    seq_num = priority;
+                }
+                else {
+                    seq_num = 0;
                 }
                 thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();
@@ -167,7 +170,7 @@ impl RemoteStateViewClient {
             });
     }
 
-    pub fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_insert_keys: bool) {
+    pub fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_insert_keys: bool, priority: u64) {
         let state_view_clone = self.state_view.clone();
         let thread_pool_clone = self.thread_pool.clone();
         let kv_tx_clone = self.kv_tx.clone();
@@ -180,6 +183,7 @@ impl RemoteStateViewClient {
                 kv_tx_clone,
                 shard_id,
                 state_keys,
+                priority,
             );
         };
         if sync_insert_keys {
@@ -234,10 +238,10 @@ impl TStateView for RemoteStateViewClient {
         REMOTE_EXECUTOR_REMOTE_KV_COUNT
             .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_kv"])
             .inc();
-        self.pre_fetch_state_values(vec![state_key.clone()], true);
+        self.pre_fetch_state_values(vec![state_key.clone()], true, 0);
         state_view_reader.get_state_value(state_key)
     }
-    
+
     fn get_usage(&self) -> Result<StateStorageUsage> {
         unimplemented!("get_usage is not implemented for RemoteStateView")
     }
