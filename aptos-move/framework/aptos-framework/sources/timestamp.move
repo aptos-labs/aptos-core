@@ -30,9 +30,7 @@ module aptos_framework::timestamp {
 
     /// Updates the wall clock time by consensus. Requires VM privilege and will be invoked during block prologue.
     public fun update_global_time(
-        account: &signer,
-        proposer: address,
-        timestamp: u64
+        account: &signer, proposer: address, timestamp: u64
     ) acquires CurrentTimeMicroseconds {
         // Can only be invoked by AptosVM signer.
         system_addresses::assert_vm(account);

@@ -17,13 +17,13 @@ module std::string {
     /// Creates a new string from a sequence of bytes. Aborts if the bytes do not represent valid utf8.
     public fun utf8(bytes: vector<u8>): String {
         assert!(internal_check_utf8(&bytes), EINVALID_UTF8);
-        String{bytes}
+        String { bytes }
     }
 
     /// Tries to create a new string from a sequence of bytes.
     public fun try_utf8(bytes: vector<u8>): Option<String> {
         if (internal_check_utf8(&bytes)) {
-            option::some(String{bytes})
+            option::some(String { bytes })
         } else {
             option::none()
         }
@@ -58,7 +58,10 @@ module std::string {
     /// boundary.
     public fun insert(s: &mut String, at: u64, o: String) {
         let bytes = &s.bytes;
-        assert!(at <= vector::length(bytes) && internal_is_char_boundary(bytes, at), EINVALID_INDEX);
+        assert!(
+            at <= vector::length(bytes) && internal_is_char_boundary(bytes, at),
+            EINVALID_INDEX,
+        );
         let l = length(s);
         let front = sub_string(s, 0, at);
         let end = sub_string(s, at, l);
@@ -74,8 +77,11 @@ module std::string {
         let bytes = &s.bytes;
         let l = vector::length(bytes);
         assert!(
-            j <= l && i <= j && internal_is_char_boundary(bytes, i) && internal_is_char_boundary(bytes, j),
-            EINVALID_INDEX
+            j <= l
+            && i <= j
+            && internal_is_char_boundary(bytes, i)
+            && internal_is_char_boundary(bytes, j),
+            EINVALID_INDEX,
         );
         String { bytes: internal_sub_string(bytes, i, j) }
     }

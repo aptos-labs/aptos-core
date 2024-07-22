@@ -71,14 +71,17 @@ module aptos_framework::reconfiguration {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(account::get_guid_next_creation_num(signer::address_of(aptos_framework)) == 2, error::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(
+            account::get_guid_next_creation_num(signer::address_of(aptos_framework)) == 2,
+            error::invalid_state(EINVALID_GUID_FOR_EVENT),
+        );
         move_to<Configuration>(
             aptos_framework,
             Configuration {
                 epoch: 0,
                 last_reconfiguration_time: 0,
                 events: account::new_event_handle<NewEpochEvent>(aptos_framework),
-            }
+            },
         );
     }
 
@@ -96,7 +99,9 @@ module aptos_framework::reconfiguration {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         assert!(!reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
-        DisableReconfiguration {} = move_from<DisableReconfiguration>(signer::address_of(aptos_framework));
+        DisableReconfiguration {} = move_from<DisableReconfiguration>(
+            signer::address_of(aptos_framework)
+        );
     }
 
     fun reconfiguration_enabled(): bool {
@@ -106,9 +111,9 @@ module aptos_framework::reconfiguration {
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
         // Do not do anything if genesis has not finished.
-        if (chain_status::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled()) {
-            return
-        };
+        if (chain_status::is_genesis()
+            || timestamp::now_microseconds() == 0
+            || !reconfiguration_enabled()) { return };
 
         let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
         let current_time = timestamp::now_microseconds();
@@ -125,9 +130,7 @@ module aptos_framework::reconfiguration {
         // Thus, this check ensures that a transaction that does multiple "reconfiguration required" actions emits only
         // one reconfiguration event.
         //
-        if (current_time == config_ref.last_reconfiguration_time) {
-            return
-        };
+        if (current_time == config_ref.last_reconfiguration_time) { return };
 
         reconfiguration_state::on_reconfig_start();
 
@@ -149,7 +152,10 @@ module aptos_framework::reconfiguration {
         stake::on_new_epoch();
         storage_gas::on_reconfig();
 
-        assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
+        assert!(
+            current_time > config_ref.last_reconfiguration_time,
+            error::invalid_state(EINVALID_BLOCK_TIME),
+        );
         config_ref.last_reconfiguration_time = current_time;
         spec {
             assume config_ref.epoch + 1 <= MAX_U64;
@@ -158,16 +164,12 @@ module aptos_framework::reconfiguration {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                NewEpoch {
-                    epoch: config_ref.epoch,
-                },
+                NewEpoch { epoch: config_ref.epoch, },
             );
         };
         event::emit_event<NewEpochEvent>(
             &mut config_ref.events,
-            NewEpochEvent {
-                epoch: config_ref.epoch,
-            },
+            NewEpochEvent { epoch: config_ref.epoch, },
         );
 
         reconfiguration_state::on_reconfig_finish();
@@ -185,21 +187,20 @@ module aptos_framework::reconfiguration {
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
         let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
-        assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, error::invalid_state(ECONFIGURATION));
+        assert!(
+            config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0,
+            error::invalid_state(ECONFIGURATION),
+        );
         config_ref.epoch = 1;
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                NewEpoch {
-                    epoch: config_ref.epoch,
-                },
+                NewEpoch { epoch: config_ref.epoch, },
             );
         };
         event::emit_event<NewEpochEvent>(
             &mut config_ref.events,
-            NewEpochEvent {
-                epoch: config_ref.epoch,
-            },
+            NewEpochEvent { epoch: config_ref.epoch, },
         );
     }
 
@@ -213,7 +214,7 @@ module aptos_framework::reconfiguration {
                 epoch: 0,
                 last_reconfiguration_time: 0,
                 events: account::new_event_handle<NewEpochEvent>(account),
-            }
+            },
         );
     }
 
@@ -228,9 +229,7 @@ module aptos_framework::reconfiguration {
     public fun reconfigure_for_test_custom() acquires Configuration {
         let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
         let current_time = timestamp::now_microseconds();
-        if (current_time == config_ref.last_reconfiguration_time) {
-            return
-        };
+        if (current_time == config_ref.last_reconfiguration_time) { return };
         config_ref.last_reconfiguration_time = current_time;
         config_ref.epoch = config_ref.epoch + 1;
     }

@@ -29,15 +29,12 @@ module aptos_std::simple_map {
 
     /// Create an empty SimpleMap.
     public fun new<Key: store, Value: store>(): SimpleMap<Key, Value> {
-        SimpleMap {
-            data: vector::empty(),
-        }
+        SimpleMap { data: vector::empty(), }
     }
 
     /// Create a SimpleMap from a vector of keys and values. The keys must be unique.
     public fun new_from<Key: store, Value: store>(
-        keys: vector<Key>,
-        values: vector<Value>,
+        keys: vector<Key>, values: vector<Value>,
     ): SimpleMap<Key, Value> {
         let map = new();
         add_all(&mut map, keys, values);
@@ -79,7 +76,9 @@ module aptos_std::simple_map {
         option::is_some(&maybe_idx)
     }
 
-    public fun destroy_empty<Key: store, Value: store>(map: SimpleMap<Key, Value>) {
+    public fun destroy_empty<Key: store, Value: store>(
+        map: SimpleMap<Key, Value>
+    ) {
         let SimpleMap { data } = map;
         vector::destroy_empty(data);
     }
@@ -102,9 +101,12 @@ module aptos_std::simple_map {
         keys: vector<Key>,
         values: vector<Value>,
     ) {
-        vector::zip(keys, values, |key, value| {
-            add(map, key, value);
-        });
+        vector::zip(
+            keys, values,
+            |key, value| {
+                add(map, key, value);
+            }
+        );
     }
 
     /// Insert key/value pair or update an existing key to a new value
@@ -132,32 +134,42 @@ module aptos_std::simple_map {
 
     /// Return all keys in the map. This requires keys to be copyable.
     public fun keys<Key: copy, Value>(map: &SimpleMap<Key, Value>): vector<Key> {
-        vector::map_ref(&map.data, |e| {
-            let e: &Element<Key, Value> = e;
-            e.key
-        })
+        vector::map_ref(
+            &map.data,
+            |e| {
+                let e: &Element<Key, Value> = e;
+                e.key
+            },
+        )
     }
 
     /// Return all values in the map. This requires values to be copyable.
     public fun values<Key, Value: copy>(map: &SimpleMap<Key, Value>): vector<Value> {
-        vector::map_ref(&map.data, |e| {
-            let e: &Element<Key, Value> = e;
-            e.value
-        })
+        vector::map_ref(
+            &map.data,
+            |e| {
+                let e: &Element<Key, Value> = e;
+                e.value
+            },
+        )
     }
 
     /// Transform the map into two vectors with the keys and values respectively
     /// Primarily used to destroy a map
     public fun to_vec_pair<Key: store, Value: store>(
-        map: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
+        map: SimpleMap<Key, Value>
+    ): (vector<Key>, vector<Value>) {
         let keys: vector<Key> = vector::empty();
         let values: vector<Value> = vector::empty();
         let SimpleMap { data } = map;
-        vector::for_each(data, |e| {
-            let Element { key, value } = e;
-            vector::push_back(&mut keys, key);
-            vector::push_back(&mut values, value);
-        });
+        vector::for_each(
+            data,
+            |e| {
+                let Element { key, value } = e;
+                vector::push_back(&mut keys, key);
+                vector::push_back(&mut values, value);
+            },
+        );
         (keys, values)
     }
 

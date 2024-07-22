@@ -33,8 +33,7 @@ module aptos_framework::managed_coin {
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     public entry fun burn<CoinType>(
-        account: &signer,
-        amount: u64,
+        account: &signer, amount: u64,
     ) acquires Capabilities {
         let account_addr = signer::address_of(account);
 
@@ -58,19 +57,19 @@ module aptos_framework::managed_coin {
         decimals: u8,
         monitor_supply: bool,
     ) {
-        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<CoinType>(
-            account,
-            string::utf8(name),
-            string::utf8(symbol),
-            decimals,
-            monitor_supply,
-        );
+        let (burn_cap, freeze_cap, mint_cap) =
+            coin::initialize<CoinType>(
+                account,
+                string::utf8(name),
+                string::utf8(symbol),
+                decimals,
+                monitor_supply,
+            );
 
-        move_to(account, Capabilities<CoinType> {
-            burn_cap,
-            freeze_cap,
-            mint_cap,
-        });
+        move_to(
+            account,
+            Capabilities<CoinType> { burn_cap, freeze_cap, mint_cap, },
+        );
     }
 
     /// Create new coins `CoinType` and deposit them into dst_addr's account.
@@ -112,15 +111,15 @@ module aptos_framework::managed_coin {
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
     public entry fun test_end_to_end(
-        source: signer,
-        destination: signer,
-        mod_account: signer
+        source: signer, destination: signer, mod_account: signer
     ) acquires Capabilities {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
         aptos_framework::account::create_account_for_test(source_addr);
         aptos_framework::account::create_account_for_test(destination_addr);
-        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aptos_framework::account::create_account_for_test(
+            signer::address_of(&mod_account)
+        );
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(
@@ -128,7 +127,7 @@ module aptos_framework::managed_coin {
             b"Fake Money",
             b"FMD",
             10,
-            true
+            true,
         );
         assert!(coin::is_coin_initialized<FakeMoney>(), 0);
 
@@ -168,8 +167,12 @@ module aptos_framework::managed_coin {
         let source_addr = signer::address_of(&source);
 
         aptos_framework::account::create_account_for_test(source_addr);
-        aptos_framework::account::create_account_for_test(signer::address_of(&destination));
-        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aptos_framework::account::create_account_for_test(
+            signer::address_of(&destination)
+        );
+        aptos_framework::account::create_account_for_test(
+            signer::address_of(&mod_account)
+        );
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
@@ -190,8 +193,12 @@ module aptos_framework::managed_coin {
         let source_addr = signer::address_of(&source);
 
         aptos_framework::account::create_account_for_test(source_addr);
-        aptos_framework::account::create_account_for_test(signer::address_of(&destination));
-        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aptos_framework::account::create_account_for_test(
+            signer::address_of(&destination)
+        );
+        aptos_framework::account::create_account_for_test(
+            signer::address_of(&mod_account)
+        );
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);

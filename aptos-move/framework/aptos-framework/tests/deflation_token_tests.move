@@ -13,8 +13,7 @@ module 0xcafe::deflation_token_tests {
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_deflation_e2e_basic_flow(
-        creator: &signer,
-        aaron: &signer,
+        creator: &signer, aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
@@ -52,7 +51,9 @@ module 0xcafe::deflation_token_tests {
         assert!(fungible_asset::balance(creator_store) == 73, 42);
         assert!(fungible_asset::balance(aaron_store) == 25, 42);
 
-        dispatchable_fungible_asset::transfer_assert_minimum_deposit(creator, creator_store, aaron_store, 10, 10);
+        dispatchable_fungible_asset::transfer_assert_minimum_deposit(
+            creator, creator_store, aaron_store, 10, 10
+        );
         assert!(fungible_asset::balance(creator_store) == 62, 42);
         assert!(fungible_asset::balance(aaron_store) == 35, 42);
     }
@@ -60,8 +61,7 @@ module 0xcafe::deflation_token_tests {
     #[test(creator = @0xcafe, aaron = @0xface)]
     #[expected_failure(abort_code = 0x70002, location = aptos_framework::dispatchable_fungible_asset)]
     fun test_deflation_assert_min_deposit(
-        creator: &signer,
-        aaron: &signer,
+        creator: &signer, aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
@@ -78,14 +78,14 @@ module 0xcafe::deflation_token_tests {
         assert!(fungible_asset::supply(metadata) == option::some(100), 2);
         dispatchable_fungible_asset::deposit(creator_store, fa);
 
-        dispatchable_fungible_asset::transfer_assert_minimum_deposit(creator, creator_store, aaron_store, 10, 11);
+        dispatchable_fungible_asset::transfer_assert_minimum_deposit(
+            creator, creator_store, aaron_store, 10, 11
+        );
     }
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x1001C, location = aptos_framework::fungible_asset)]
-    fun test_deflation_fa_deposit(
-        creator: &signer,
-    ) {
+    fun test_deflation_fa_deposit(creator: &signer,) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
@@ -108,8 +108,7 @@ module 0xcafe::deflation_token_tests {
     #[test(creator = @0xcafe, aaron = @0xface)]
     #[expected_failure(abort_code = 0x1001C, location = aptos_framework::fungible_asset)]
     fun test_deflation_fa_withdraw(
-        creator: &signer,
-        aaron: &signer,
+        creator: &signer, aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
@@ -134,143 +133,136 @@ module 0xcafe::deflation_token_tests {
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     #[expected_failure(abort_code = 0x8001D, location = aptos_framework::fungible_asset)]
-    fun test_double_init(
-        creator: &signer,
-    ) {
+    fun test_double_init(creator: &signer,) {
         let (creator_ref, _) = fungible_asset::create_test_token(creator);
         let (_, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         deflation_token::initialize(creator, &creator_ref);
 
-        let withdraw = function_info::new_function_info(
-            creator,
-            string::utf8(b"deflation_token"),
-            string::utf8(b"withdraw"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                creator,
+                string::utf8(b"deflation_token"),
+                string::utf8(b"withdraw"),
+            );
 
         // Re-registering the overload function should yield an error
         dispatchable_fungible_asset::register_dispatch_functions(
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none()
+            option::none(),
         );
     }
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10019, location = aptos_framework::fungible_asset)]
-    fun test_register_bad_withdraw(
-        creator: &signer,
-    ) {
+    fun test_register_bad_withdraw(creator: &signer,) {
         let (creator_ref, _) = fungible_asset::create_test_token(creator);
 
-        let withdraw = function_info::new_function_info(
-            creator,
-            string::utf8(b"deflation_token"),
-            string::utf8(b"initialize"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                creator,
+                string::utf8(b"deflation_token"),
+                string::utf8(b"initialize"),
+            );
 
         // Change the deposit and withdraw function. Should give a type mismatch error.
         dispatchable_fungible_asset::register_dispatch_functions(
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none()
+            option::none(),
         );
     }
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x1001A, location = aptos_framework::fungible_asset)]
-    fun test_register_bad_deposit(
-        creator: &signer,
-    ) {
+    fun test_register_bad_deposit(creator: &signer,) {
         let (creator_ref, _) = fungible_asset::create_test_token(creator);
 
-        let withdraw = function_info::new_function_info(
-            creator,
-            string::utf8(b"deflation_token"),
-            string::utf8(b"withdraw"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                creator,
+                string::utf8(b"deflation_token"),
+                string::utf8(b"withdraw"),
+            );
 
         // Change the deposit and withdraw function. Should give a type mismatch error.
         dispatchable_fungible_asset::register_dispatch_functions(
             &creator_ref,
             option::some(withdraw),
             option::some(withdraw),
-            option::none()
+            option::none(),
         );
     }
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x1001B, location = aptos_framework::fungible_asset)]
-    fun test_register_bad_value(
-        creator: &signer,
-    ) {
+    fun test_register_bad_value(creator: &signer,) {
         let (creator_ref, _) = fungible_asset::create_test_token(creator);
 
-        let withdraw = function_info::new_function_info(
-            creator,
-            string::utf8(b"deflation_token"),
-            string::utf8(b"withdraw"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                creator,
+                string::utf8(b"deflation_token"),
+                string::utf8(b"withdraw"),
+            );
 
         // Change the deposit and withdraw function. Should give a type mismatch error.
         dispatchable_fungible_asset::register_dispatch_functions(
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::some(withdraw)
+            option::some(withdraw),
         );
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(major_status=1081, location = aptos_framework::function_info)]
+    #[expected_failure(major_status = 1081, location = aptos_framework::function_info)]
     fun test_register_bad_withdraw_non_exist(
-        creator: &signer,
-        aaron: &signer,
+        creator: &signer, aaron: &signer,
     ) {
         let (creator_ref, _) = fungible_asset::create_test_token(creator);
 
-        let withdraw = function_info::new_function_info(
-            aaron,
-            string::utf8(b"deflation_token"),
-            string::utf8(b"withdraw"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                aaron,
+                string::utf8(b"deflation_token"),
+                string::utf8(b"withdraw"),
+            );
 
         // Change the deposit and withdraw function. Should give a type mismatch error.
         dispatchable_fungible_asset::register_dispatch_functions(
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none()
+            option::none(),
         );
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code=2, location = aptos_framework::function_info)]
-    fun test_register_bad_withdraw_non_exist_2(
-        creator: &signer,
-    ) {
+    #[expected_failure(abort_code = 2, location = aptos_framework::function_info)]
+    fun test_register_bad_withdraw_non_exist_2(creator: &signer,) {
         let (creator_ref, _) = fungible_asset::create_test_token(creator);
 
-        let withdraw = function_info::new_function_info(
-            creator,
-            string::utf8(b"deflation_token"),
-            string::utf8(b"withdraw2"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                creator,
+                string::utf8(b"deflation_token"),
+                string::utf8(b"withdraw2"),
+            );
 
         // Change the deposit and withdraw function. Should give a type mismatch error.
         dispatchable_fungible_asset::register_dispatch_functions(
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none()
+            option::none(),
         );
     }
 
     #[test(creator = @0xcafe)]
-    fun test_calling_overloadable_api_on_regular_fa(
-        creator: &signer,
-    ) {
+    fun test_calling_overloadable_api_on_regular_fa(creator: &signer,) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
@@ -286,34 +278,35 @@ module 0xcafe::deflation_token_tests {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code=0x6001E, location = aptos_framework::fungible_asset)]
-    fun test_register_on_non_metadata_object(
-        creator: &signer,
-    ) {
+    #[expected_failure(abort_code = 0x6001E, location = aptos_framework::fungible_asset)]
+    fun test_register_on_non_metadata_object(creator: &signer,) {
         account::create_account_for_test(signer::address_of(creator));
         let creator_ref = object::create_named_object(creator, b"TEST");
-         let withdraw = function_info::new_function_info(
-            creator,
-            string::utf8(b"deflation_token"),
-            string::utf8(b"withdraw"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                creator,
+                string::utf8(b"deflation_token"),
+                string::utf8(b"withdraw"),
+            );
 
         // Change the deposit and withdraw function. Should give a type mismatch error.
         dispatchable_fungible_asset::register_dispatch_functions(
             &creator_ref,
             option::some(withdraw),
             option::none(),
-            option::none()
+            option::none(),
         );
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_basic_flow_primary_fa(
-        creator: &signer,
-        aaron: &signer,
+        creator: &signer, aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
-        let (mint_ref, transfer_ref, burn_ref) = primary_fungible_store::init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let (mint_ref, transfer_ref, burn_ref) =
+            primary_fungible_store::init_test_metadata_with_primary_store_enabled(
+                &creator_ref
+            );
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         deflation_token::initialize(creator, &creator_ref);
@@ -334,7 +327,8 @@ module 0xcafe::deflation_token_tests {
 
         primary_fungible_store::set_frozen_flag(&transfer_ref, aaron_address, true);
         assert!(primary_fungible_store::is_frozen(aaron_address, metadata), 5);
-        let fa = primary_fungible_store::withdraw_with_ref(&transfer_ref, aaron_address, 30);
+        let fa =
+            primary_fungible_store::withdraw_with_ref(&transfer_ref, aaron_address, 30);
 
         assert!(primary_fungible_store::balance(creator_address, metadata) == 22, 3);
         assert!(primary_fungible_store::balance(aaron_address, metadata) == 39, 4);
@@ -342,7 +336,9 @@ module 0xcafe::deflation_token_tests {
         primary_fungible_store::deposit_with_ref(&transfer_ref, aaron_address, fa);
 
         assert!(primary_fungible_store::balance(aaron_address, metadata) == 69, 4);
-        primary_fungible_store::transfer_with_ref(&transfer_ref, aaron_address, creator_address, 20);
+        primary_fungible_store::transfer_with_ref(
+            &transfer_ref, aaron_address, creator_address, 20
+        );
 
         assert!(primary_fungible_store::balance(creator_address, metadata) == 42, 3);
         assert!(primary_fungible_store::balance(aaron_address, metadata) == 49, 4);
@@ -356,8 +352,7 @@ module 0xcafe::deflation_token_tests {
     #[test(creator = @0xcafe, aaron = @0xface)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::fungible_asset)]
     fun test_deflation_set_frozen(
-        creator: &signer,
-        aaron: &signer,
+        creator: &signer, aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, transfer_ref, _, _) = fungible_asset::init_test_metadata(&creator_ref);
@@ -391,8 +386,7 @@ module 0xcafe::deflation_token_tests {
     #[test(creator = @0xcafe, aaron = @0xface)]
     #[expected_failure(abort_code = 0x50008, location = aptos_framework::fungible_asset)]
     fun test_deflation_wrong_withdraw(
-        creator: &signer,
-        aaron: &signer,
+        creator: &signer, aaron: &signer,
     ) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         fungible_asset::init_test_metadata(&creator_ref);
