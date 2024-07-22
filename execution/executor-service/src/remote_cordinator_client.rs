@@ -320,8 +320,15 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
 
     fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
         //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
+        let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&self.shard_id.to_string(), "result_tx_bcs_ser"])
+            .start_timer();
         let execute_result_type = format!("execute_result_{}", self.shard_id);
         let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
+        drop(bcs_ser_timer);
+        let tx_send_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&self.shard_id.to_string(), "result_tx_send"])
+            .start_timer();
         self.result_tx.send(Message::new(output_message), &MessageType::new(execute_result_type));
     }
 
