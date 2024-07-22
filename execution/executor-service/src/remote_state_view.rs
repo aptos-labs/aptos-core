@@ -52,10 +52,13 @@ impl RemoteStateView {
     }
 
     pub fn set_state_value(&self, state_key: &StateKey, state_value: Option<StateValue>) {
-        self.state_values
-            .get(state_key)
-            .unwrap()
-            .set_value(state_value);
+        if let Some(value) = self.state_values.get(state_key) {
+            value.set_value(state_value);
+        }
+        // self.state_values
+        //     .get(state_key)
+        //     .unwrap()
+        //     .set_value(state_value);
     }
 
     pub fn insert_state_key(&self, state_key: StateKey) {
