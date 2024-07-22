@@ -1772,6 +1772,7 @@ dependencies = [
 name = "aptos-forge-pilot"
 version = "0.1.0"
 dependencies = [
+ "clap 4.4.14",
  "serde",
  "serde_json",
 ]
