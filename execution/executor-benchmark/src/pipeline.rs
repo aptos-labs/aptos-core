@@ -68,7 +68,7 @@ where
             if config.delay_execution_start {
                 (num_blocks.unwrap() + 1).max(50)
             } else {
-                200 //10
+                10
             }, /* bound */
         );
 
@@ -80,7 +80,7 @@ where
                 if config.split_stages || config.skip_commit {
                     (num_blocks.unwrap() + 1).max(3)
                 } else {
-                    200 //3
+                    3
                 }, /* bound */
             );
 
@@ -88,7 +88,7 @@ where
             if config.split_stages || config.skip_commit {
                 (num_blocks.unwrap() + 1).max(3)
             } else {
-                200 //3
+                3
             }, /* bound */
         );
 
