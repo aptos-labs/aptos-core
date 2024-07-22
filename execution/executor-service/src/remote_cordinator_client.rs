@@ -16,6 +16,7 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 use std::sync::Mutex;
+use std::time::SystemTime;
 use aptos_logger::info;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
@@ -132,6 +133,8 @@ impl RemoteCoordinatorClient {
             }
             match command_rx.recv() {
                 Ok(message) => {
+                    let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                    info!("Received cmd batch {} at time: {}", message.seq_num.unwrap(), curr_time);
                     let state_view_client_clone = state_view_client.clone();
                     let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
                     let cmd_rx_msg_duration_since_epoch_clone = cmd_rx_msg_duration_since_epoch.clone();
@@ -225,6 +228,9 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn receive_execute_command_stream(&self) -> StreamedExecutorShardCommand<RemoteStateViewClient> {
         match self.command_rx.recv() {
             Ok(message) => {
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Received cmd batch {} at time: {}", 200, curr_time);
+
                 let delta = get_delta_time(message.start_ms_since_epoch.unwrap());
                 REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                     .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
@@ -237,21 +243,28 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                     .start_timer();
                 let txns: CmdsAndMetaData = bcs::from_bytes(&message.data).unwrap();
                 drop(bcs_deser_timer);
-
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint 1.1 at time: {}", curr_time);
 
                 let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
                     .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
                     .start_timer();
 
                 self.state_view_client.init_for_block();
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint 1.2 at time: {}", curr_time);
                 let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
                 self.state_view_client.pre_fetch_state_values(state_keys, false, 1);
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint 1.3 at time: {}", curr_time);
                 let num_txns = txns.num_txns;
                 let num_txns_in_the_batch = txns.cmds.len();
                 let shard_txns_start_index = txns.shard_txns_start_index;
                 let batch_start_index = txns.batch_start_index;
                 self.is_block_init_done.store(true, std::sync::atomic::Ordering::Relaxed);
                 let blocking_transactions_provider = Arc::new(BlockingTransactionsProvider::new(num_txns));
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Checkpoint 1.4 at time: {}", curr_time);
 
                 let command_rx = self.command_rx.clone();
                 let blocking_transactions_provider_clone = blocking_transactions_provider.clone();

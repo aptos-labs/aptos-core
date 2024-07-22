@@ -15,7 +15,7 @@ use std::time::SystemTime;
 
 extern crate itertools;
 use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_COUNT, REMOTE_EXECUTOR_TIMER};
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::partitioner::ShardId,
     state_store::{
@@ -217,8 +217,12 @@ impl RemoteStateViewClient {
         }
         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
             .with_label_values(&["0_kv_req_grpc_shard_send_1_lock_acquired"]).observe(delta);
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        info!("Sent (a) kv req batch {} at time: {}", seq_num, curr_time);
         sender_lk.send(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
                        &MessageType::new(REMOTE_KV_REQUEST_MSG_TYPE.to_string()));
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        info!("Sent (b) kv req batch {} at time: {}", seq_num, curr_time);
     }
 }
 
@@ -323,7 +327,8 @@ impl RemoteStateValueReceiver {
             .for_each(|(state_key, state_value)| {
                 state_view_lock.set_state_value(&state_key, state_value);
             });
-
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        info!("Received back kv req batch {} at time: {}", message.seq_num.unwrap(), curr_time);
         {
             let curr_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)

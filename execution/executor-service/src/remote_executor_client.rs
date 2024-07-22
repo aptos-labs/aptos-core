@@ -245,6 +245,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                     let delta = get_delta_time(duration_since_epoch);
                     REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                         .with_label_values(&["9_1_results_tx_msg_remote_exe_recv"]).observe(delta as f64);
+                    let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                    info!("Received last cmd batch from shard {} at time {}", shard_id, current_time);
                     break;
                 }
             }
@@ -287,6 +289,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         duration_since_epoch: u64
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("RemoteExecutorClient Sending block to shards");
+        let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        info!("Executing block started at time {}", current_time);
         self.state_view_service.set_state_view(state_view);
         let (sub_blocks, global_txns) = transactions.get_ref();
         if !global_txns.is_empty() {
@@ -331,7 +335,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
                             .with_label_values(&["0", "cmd_tx_bcs_ser"])
                             .start_timer();
-                        let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, 0, 0);
+                        let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, chunk_idx as u64, 0);
                         drop(bcs_ser_timer);
                         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                             .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
@@ -345,6 +349,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                             .lock()
                             .unwrap()
                             .send(msg, &MessageType::new(execute_command_type));
+                        let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                        info!("Sent cmd batch {} to shard {} at time {}", chunk_idx, shard_id, current_time);
                         drop(timer_1)
                     });
                 

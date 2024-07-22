@@ -108,6 +108,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
         while let Ok(message) = self.kv_rx.recv() {
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            info!("kv req batch {} received from shard {} at time: {}", message.seq_num.unwrap(), message.shard_id.unwrap(), curr_time);
             let mut delta = 0.0;
             if curr_time > message.start_ms_since_epoch.unwrap() {
                 delta = (curr_time - message.start_ms_since_epoch.unwrap()) as f64;
@@ -247,6 +248,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .with_label_values(&["0", "kv_requests_send"])
             .start_timer();
         mtx.unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        info!("kv req batch {} sent to shard {} at time: {}", seq_num, shard_id, curr_time);
         drop(timer_6);
 
         {
