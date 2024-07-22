@@ -12,11 +12,10 @@ use once_cell::sync::Lazy;
 pub const BLOCK_PAYLOAD_LABEL: &str = "block_payload";
 pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
-pub const ORDERED_MESSAGE_LABEL: &str = "ordered_message";
+pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
+pub const ORDERED_BLOCKS_LABEL: &str = "ordered_blocks";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
-pub const PENDING_ORDERED_BLOCKS_LABEL: &str = "pending_ordered_blocks";
-pub const PENDING_ORDERED_ENTRIES_LABEL: &str = "pending_ordered_entries";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
 
 /// Counter for tracking created subscriptions for the consensus observer

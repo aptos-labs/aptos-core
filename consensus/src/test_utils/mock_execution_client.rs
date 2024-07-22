@@ -171,5 +171,9 @@ impl TExecutionClient for MockExecutionClient {
         Ok(())
     }
 
+    async fn reset(&self, _target: &LedgerInfoWithSignatures) -> Result<()> {
+        Ok(())
+    }
+
     async fn end_epoch(&self) {}
 }

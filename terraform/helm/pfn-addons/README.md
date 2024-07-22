@@ -16,6 +16,7 @@ Additional components for a public fullnode fleet deployment
 | ingress.gce_managed_certificate | string | `nil` |  |
 | ingress.gce_managed_certificate_domains | string | `nil` |  |
 | ingress.gce_security_policy | string | `nil` | Security policy to apply to the backend services behind the ingress |
+| ingress.health_check_duration_secs | string | `nil` | The maximum number of seconds that a PFN is allowed to be behind to be considered healthy and be allowed to serve traffic |
 | ingress.loadBalancerSourceRanges | string | `nil` |  |
 | ingress.wafAclArn | string | `nil` |  |
 | load_test.affinity | object | `{}` |  |

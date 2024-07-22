@@ -57,10 +57,8 @@ mod test;
 
 /// The interface from Network to HealthChecker layer.
 ///
-/// `HealthCheckerNetworkEvents` is a `Stream` of `PeerManagerNotification` where the
-/// raw `Bytes` rpc messages are deserialized into
-/// `HealthCheckerMsg` types. `HealthCheckerNetworkEvents` is a thin wrapper
-/// around an `channel::Receiver<PeerManagerNotification>`.
+/// `HealthCheckerNetworkEvents` is a `Stream` of `HealthCheckerMsg`.
+/// (Behind the scenes, network messages are being deserialized)
 pub type HealthCheckerNetworkEvents = NetworkEvents<HealthCheckerMsg>;
 
 /// Returns a network application config for the health check client and service
