@@ -227,10 +227,10 @@ impl TransactionWorkload {
             },
             match self.load {
                 EmitJobMode::MaxLoad { mempool_backlog } =>
-                    format!("{:.1}kM", mempool_backlog as f32 / 1000.0),
-                EmitJobMode::ConstTps { tps } => format!("{:.1}kT", tps as f32 / 1000.0),
+                    format!("B:{:.1}k", mempool_backlog as f32 / 1000.0),
+                EmitJobMode::ConstTps { tps } => format!("T:{:.1}k", tps as f32 / 1000.0),
                 EmitJobMode::WaveTps { average_tps, .. } =>
-                    format!("~{:.1}kT", average_tps as f32 / 1000.0),
+                    format!("T:~{:.1}k", average_tps as f32 / 1000.0),
             },
             // ,
         )
@@ -460,9 +460,18 @@ fn extract_background_stats(stats_by_phase: Vec<TxnStats>) -> Vec<(String, TxnSt
 }
 
 fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
+    let name_width = (results
+        .iter()
+        .flatten()
+        .map(|result| result.name.len())
+        .max()
+        .unwrap_or(28)
+        + 2)
+    .max(30);
+
     let mut table = Vec::new();
     table.push(format!(
-        "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
         type_name,
         "submitted/s",
         "committed/s",
@@ -484,7 +493,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         for result in run_results {
             let rate = result.stats.rate();
             table.push(format!(
-                "{: <40} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12}",
+                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12}",
                 result.name,
                 rate.submitted,
                 rate.committed,
@@ -508,9 +517,17 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
 }
 
 fn to_table_background(type_name: String, results: &[(String, TxnStats)]) -> Vec<String> {
+    let name_width = (results
+        .iter()
+        .map(|(name, _)| name.len())
+        .max()
+        .unwrap_or(28)
+        + 2)
+    .max(30);
+
     let mut table = Vec::new();
     table.push(format!(
-        "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
         type_name,
         "submitted/s",
         "committed/s",
@@ -525,7 +542,7 @@ fn to_table_background(type_name: String, results: &[(String, TxnStats)]) -> Vec
     for (name, stats) in results {
         let rate = stats.rate();
         table.push(format!(
-            "{: <40} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3}",
+            "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3}",
             name,
             rate.submitted,
             rate.committed,

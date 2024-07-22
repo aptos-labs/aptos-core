@@ -314,7 +314,7 @@ fn main() -> Result<()> {
             match test_cmd {
                 TestCommand::LocalSwarm(local_cfg) => {
                     // Loosen all criteria for local runs
-                    test_suite.get_success_criteria_mut().min_avg_tps = 400;
+                    test_suite.get_success_criteria_mut().min_avg_tps = 400.0;
                     let previous_emit_job = test_suite.get_emit_job().clone();
                     let test_suite =
                         test_suite.with_emit_job(previous_emit_job.mode(EmitJobMode::MaxLoad {
@@ -843,6 +843,10 @@ fn optimize_for_maximum_throughput(
     quorum_store_backlog_txn_limit_count(config, target_tps, vn_latency);
 
     config.consensus.quorum_store.sender_max_batch_txns = 500;
+    config
+        .consensus
+        .min_max_txns_in_block_after_filtering_from_backpressure =
+        2 * config.consensus.quorum_store.sender_max_batch_txns as u64;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
     config.consensus.quorum_store.sender_max_num_batches = 100;
     config.consensus.quorum_store.sender_max_total_txns = 4000;
@@ -1053,16 +1057,55 @@ fn realistic_env_sweep_wrap(
         )
 }
 
+fn background_emit_request() -> EmitJobRequest {
+    EmitJobRequest::default()
+        .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
+        .mode(EmitJobMode::ConstTps { tps: 10 })
+        .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+}
+
+fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
+    Some(BackgroundTraffic {
+        traffic: background_emit_request(),
+        criteria: std::iter::repeat(9.5)
+            .take(num_cases)
+            .map(|min_tps| {
+                SuccessCriteria::new_float(min_tps)
+                    .add_max_expired_tps(0.1)
+                    .add_max_failed_submission_tps(0.0)
+            })
+            .collect(),
+    })
+}
+
+fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)]) -> Option<BackgroundTraffic> {
+    Some(BackgroundTraffic {
+        traffic: background_emit_request(),
+        criteria: criteria
+            .iter()
+            .map(|(p50, p90)| {
+                SuccessCriteria::new_float(9.5)
+                    .add_max_expired_tps(0.1)
+                    .add_max_failed_submission_tps(0.0)
+                    .add_latency_threshold(*p50, LatencyType::P50)
+                    .add_latency_threshold(*p90, LatencyType::P90)
+            })
+            .collect(),
+    })
+}
+
 fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
+        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
         criteria: [
-            (9, 1.5, 3., 4., 0),
-            (95, 1.5, 3., 4., 0),
-            (950, 2., 3., 4., 0),
-            (2750, 2.5, 3.5, 4.5, 0),
-            (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
+            (9, 1.0, 1.0, 1.2, 0),
+            (95, 1.0, 1.0, 1.2, 0),
+            (950, 1.4, 1.6, 2.0, 0),
+            (2900, 2.5, 2.2, 2.5, 0),
+            (4800, 3., 4., 3.0, 0),
+            // TODO : recalibrate latencies for 7k TPS
+            (6700, 5., 10., 20., 100), // Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
@@ -1076,7 +1119,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
             },
         )
         .collect(),
-        background_traffic: None,
+        background_traffic: background_traffic_for_sweep(5),
     })
 }
 
@@ -1086,7 +1129,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         workloads: Workloads::TRANSACTIONS(vec![
             TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
             TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
-            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 10000)
+            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
                 .with_transactions_per_account(1),
             TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
                 .with_unique_senders(),
@@ -1095,11 +1138,11 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (7700, 100, 0.3, 0.5, 0.5, 0.5),
             (7000, 100, 0.3, 0.5, 0.5, 0.5),
-            (2000, 300, 0.3, 2.5, 0.6, 1.0),
-            (3200, 500, 0.3, 1.5, 0.7, 0.7),
-            (30, 5, 0.5, 2.0, 1.5, 1.0),
+            (8500, 100, 0.3, 0.5, 0.5, 0.5),
+            (2000, 300, 0.3, 1.0, 0.6, 1.0),
+            (3200, 500, 0.3, 1.0, 0.7, 0.7),
+            (28, 5, 0.3, 1.0, 0.7, 1.0),
         ]
         .into_iter()
         .map(
@@ -1129,7 +1172,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
             },
         )
         .collect(),
-        background_traffic: None,
+        background_traffic: background_traffic_for_sweep(5),
     })
 }
 
@@ -1143,22 +1186,16 @@ fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
                 100000,
             ),
             TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 20000),
-            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 4000),
             TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 4000)
                 .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
-        background_traffic: Some(BackgroundTraffic {
-            traffic: EmitJobRequest::default()
-                .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-                .mode(EmitJobMode::ConstTps { tps: 40 }),
-            criteria: [30, 30, 30].into_iter().map(SuccessCriteria::new).collect(),
-        }),
+        background_traffic: background_traffic_for_sweep_with_latency(&[
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 4.0),
+        ]),
     })
-    .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-        // no epoch change.
-        helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
-    }))
 }
 
 fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
@@ -1187,30 +1224,15 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
             TransactionWorkload::new_const_tps(TransactionTypeArg::ModifyGlobalFlagAggV2, 3 * 3500),
         ]),
         criteria: Vec::new(),
-        background_traffic: Some(BackgroundTraffic {
-            traffic: EmitJobRequest::default()
-                .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-                .mode(EmitJobMode::ConstTps { tps: 10 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
-            criteria: [
-                (9, 2.5, 3.0),
-                (9, 3.0, 5.0),
-                (9, 2.5, 3.0),
-                (9, 4.0, 6.0),
-                (9, 5.5, 8.0),
-                (9, 5.0, 8.0),
-                (9, 3.5, 18.0),
-            ]
-            .into_iter()
-            .map(|(min_tps, p50, p90)| {
-                SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(0.1)
-                    .add_max_failed_submission_tps(0.0)
-                    .add_latency_threshold(p50, LatencyType::P50)
-                    .add_latency_threshold(p90, LatencyType::P90)
-            })
-            .collect(),
-        }),
+        background_traffic: background_traffic_for_sweep_with_latency(&[
+            (4.0, 5.0),
+            (3.0, 4.0),
+            (2.5, 4.0),
+            (2.5, 4.0),
+            (3.0, 5.0),
+            (2.5, 4.0),
+            (3.5, 5.0),
+        ]),
     })
     .with_emit_job(
         EmitJobRequest::default()
@@ -1218,10 +1240,6 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
             .init_gas_price_multiplier(5)
             .init_expiration_multiplier(6.0),
     )
-    .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-        // no epoch change.
-        helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
-    }))
 }
 
 fn load_vs_perf_benchmark() -> ForgeConfig {

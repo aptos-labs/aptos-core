@@ -159,7 +159,7 @@ impl LatencyBreakdownThreshold {
 
 #[derive(Default, Clone, Debug)]
 pub struct SuccessCriteria {
-    pub min_avg_tps: usize,
+    pub min_avg_tps: f64,
     latency_thresholds: Vec<(Duration, LatencyType)>,
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
@@ -174,6 +174,10 @@ pub struct SuccessCriteria {
 
 impl SuccessCriteria {
     pub fn new(min_avg_tps: usize) -> Self {
+        Self::new_float(min_avg_tps as f64)
+    }
+
+    pub fn new_float(min_avg_tps: f64) -> Self {
         Self {
             min_avg_tps,
             latency_thresholds: Vec::new(),
@@ -458,12 +462,12 @@ impl SuccessCriteriaChecker {
     }
 
     pub fn check_tps(
-        min_avg_tps: usize,
+        min_avg_tps: f64,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         let avg_tps = stats_rate.committed;
-        if avg_tps < min_avg_tps as f64 {
+        if avg_tps < min_avg_tps {
             bail!(
                 "TPS requirement{} failed. Average TPS {}, minimum TPS requirement {}. Full stats: {}",
                 traffic_name_addition,
@@ -511,7 +515,7 @@ impl SuccessCriteriaChecker {
     }
 
     pub fn check_throughput(
-        min_avg_tps: usize,
+        min_avg_tps: f64,
         max_expired_config: Option<f64>,
         max_failed_submission_config: Option<f64>,
         stats_rate: &TxnStatsRate,
