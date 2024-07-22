@@ -74,7 +74,16 @@ impl TestContext {
         options
             .named_addresses
             .insert(MODULE_ADDRESS_NAME.to_string(), self.object_address);
+        self.execute_object_code_action_with_options(account, path, action, options)
+    }
 
+    fn execute_object_code_action_with_options(
+        &mut self,
+        account: &Account,
+        path: &str,
+        action: ObjectCodeAction,
+        options: BuildOptions,
+    ) -> TransactionStatus {
         match action {
             ObjectCodeAction::Deploy => self.harness.object_code_deployment_package(
                 account,
@@ -118,10 +127,13 @@ impl TestContext {
 }
 
 const MODULE_ADDRESS_NAME: &str = "object";
+const MUT_DEPS_MODULE_ADDRESS_NAME: &str = "object_mutable_deps";
+const IMMUT_DEPS_MODULE_ADDRESS_NAME: &str = "object_immutable_deps";
 const PACKAGE_REGISTRY_ACCESS_PATH: &str = "0x1::code::PackageRegistry";
 const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: &str = "EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED";
 const ENOT_CODE_OBJECT_OWNER: &str = "ENOT_CODE_OBJECT_OWNER";
 const ENOT_PACKAGE_OWNER: &str = "ENOT_PACKAGE_OWNER";
+const EDEP_WEAKER_POLICY: &str = "EDEP_WEAKER_POLICY";
 
 /// Tests the `publish` object code deployment function with feature flags enabled/disabled.
 /// Deployment should only happen when feature is enabled.
@@ -360,6 +372,75 @@ fn freeze_code_object_fail_when_not_owner() {
         context.execute_object_code_action(&different_account, "", ObjectCodeAction::Freeze);
 
     context.assert_feature_flag_error(status, ENOT_PACKAGE_OWNER);
+}
+
+#[test]
+fn freeze_code_object_fail_when_having_mutable_dependency() {
+    let mut context = TestContext::new(None, None);
+    let acc = context.account.clone();
+
+    assert_success!(context.execute_object_code_action(
+        &acc,
+        "object_code_deployment.data/pack_upgrade_compat",
+        ObjectCodeAction::Deploy,
+    ));
+    let mut options = BuildOptions::default();
+    options
+        .named_addresses
+        .insert(MODULE_ADDRESS_NAME.to_string(), context.object_address);
+    let sequence_number = context.harness.sequence_number(acc.address());
+    context.object_address =
+        create_object_code_deployment_address(*acc.address(), sequence_number + 1);
+    options.named_addresses.insert(
+        MUT_DEPS_MODULE_ADDRESS_NAME.to_string(),
+        context.object_address,
+    );
+    assert_success!(context.execute_object_code_action_with_options(
+        &acc,
+        "object_code_deployment.data/pack_mutable_deps",
+        ObjectCodeAction::Deploy,
+        options
+    ));
+
+    // Freezing a package with upgradeable dependencies is not allowed.
+    let status = context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
+    context.assert_feature_flag_error(status, EDEP_WEAKER_POLICY);
+}
+
+#[test]
+fn freeze_code_object_succeeds_when_all_dependencies_immutable() {
+    let mut context = TestContext::new(None, None);
+    let acc = context.account.clone();
+
+    // Deploy immutable dependency package
+    assert_success!(context.execute_object_code_action(
+        &acc,
+        "object_code_deployment.data/pack_initial_immutable",
+        ObjectCodeAction::Deploy,
+    ));
+    let mut options = BuildOptions::default();
+    options
+        .named_addresses
+        .insert(MODULE_ADDRESS_NAME.to_string(), context.object_address);
+    let sequence_number = context.harness.sequence_number(acc.address());
+    context.object_address =
+        create_object_code_deployment_address(*acc.address(), sequence_number + 1);
+    options.named_addresses.insert(
+        IMMUT_DEPS_MODULE_ADDRESS_NAME.to_string(),
+        context.object_address,
+    );
+
+    // Deploy mutable package with immutable dependency
+    assert_success!(context.execute_object_code_action_with_options(
+        &acc,
+        "object_code_deployment.data/pack_immutable_deps",
+        ObjectCodeAction::Deploy,
+        options
+    ));
+
+    // Attempt to freeze the initial package
+    let status = context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
+    assert_success!(status);
 }
 
 #[test]

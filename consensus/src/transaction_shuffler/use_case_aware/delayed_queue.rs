@@ -209,9 +209,10 @@ impl UseCase {
 /// associated or not.
 ///     2. all txns that are examined and delayed previously.
 ///
-///     * A delayed txn is attached to an account and the account is attached to a priority queue in a use
+/// Note:
+///     A delayed txn is attached to an account and the account is attached to a priority queue in a use
 /// case, which has an entry in the main priority queue.
-///     * Empty accounts and use cases are still tracked for the delay so that a next txn in the
+///     Empty accounts and use cases are still tracked for the delay so that a next txn in the
 /// input stream is properly delayed if associated with such an account or use case.
 #[derive(Debug, Default)]
 pub(crate) struct DelayedQueue<Txn> {
