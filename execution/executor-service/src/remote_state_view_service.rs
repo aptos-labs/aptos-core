@@ -256,7 +256,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let timer_5 = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests_lock"])
             .start_timer();
-        let rand_send_thread_idx = rng.gen_range(0, kv_tx[shard_id].len());
+        //let rand_send_thread_idx = rng.gen_range(0, kv_tx[shard_id].len());
         let mtx = kv_tx[shard_id][rand_send_thread_idx].lock();
         drop(timer_5);
 
