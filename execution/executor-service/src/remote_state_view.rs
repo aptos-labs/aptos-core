@@ -152,7 +152,7 @@ impl RemoteStateViewClient {
         });
         let mut seq_num = 0;
         state_keys
-            .chunks(1600) //REMOTE_STATE_KEY_BATCH_SIZE)
+            .chunks(40000) //REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
