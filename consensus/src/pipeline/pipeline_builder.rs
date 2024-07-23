@@ -18,9 +18,10 @@ use aptos_consensus_types::{
     common::Round,
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
-        CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult, PipelineFutures,
-        PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult,
-        PostPreCommitResult, PreCommitResult, PrepareResult, TaskError, TaskFuture, TaskResult,
+        CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult,
+        OrderedBlockWindow, PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock,
+        PostCommitResult, PostLedgerUpdateResult, PostPreCommitResult, PreCommitResult,
+        PrepareResult, TaskError, TaskFuture, TaskResult,
     },
 };
 use aptos_crypto::HashValue;
@@ -229,6 +230,7 @@ impl PipelineBuilder {
         let (futs, tx, abort_handles) = self.build_internal(
             parent_futs,
             Arc::new(pipelined_block.block().clone()),
+            Arc::new(pipelined_block.block_window().clone()),
             block_store_callback,
         );
         pipelined_block.set_pipeline_futs(futs);
@@ -240,6 +242,7 @@ impl PipelineBuilder {
         &self,
         parent: PipelineFutures,
         block: Arc<Block>,
+        block_window: Arc<OrderedBlockWindow>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let (tx, rx) = Self::channel();
@@ -253,7 +256,11 @@ impl PipelineBuilder {
         let mut abort_handles = vec![];
 
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(self.block_preparer.clone(), block.clone()),
+            Self::prepare(
+                self.block_preparer.clone(),
+                block.clone(),
+                block_window.clone(),
+            ),
             &mut abort_handles,
         );
         let execute_fut = spawn_shared_fut(
@@ -327,6 +334,7 @@ impl PipelineBuilder {
                 self.state_sync_notifier.clone(),
                 self.payload_manager.clone(),
                 block.clone(),
+                block_window.clone(),
             ),
             &mut abort_handles,
         );
@@ -362,11 +370,15 @@ impl PipelineBuilder {
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Wait for all data becomes available and verify transaction signatures
-    async fn prepare(preparer: Arc<BlockPreparer>, block: Arc<Block>) -> TaskResult<PrepareResult> {
+    async fn prepare(
+        preparer: Arc<BlockPreparer>,
+        block: Arc<Block>,
+        block_window: Arc<OrderedBlockWindow>,
+    ) -> TaskResult<PrepareResult> {
         let _tracker = Tracker::new("prepare", &block);
         // the loop can only be abort by the caller
         let input_txns = loop {
-            match preparer.prepare_block(&block).await {
+            match preparer.prepare_block(&block, &block_window).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
                     warn!(
@@ -620,12 +632,13 @@ impl PipelineBuilder {
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         payload_manager: Arc<dyn TPayloadManager>,
         block: Arc<Block>,
+        block_window: Arc<OrderedBlockWindow>,
     ) -> TaskResult<PostPreCommitResult> {
         let compute_result = pre_commit.await?;
         parent_post_pre_commit.await?;
 
         let _tracker = Tracker::new("post_pre_commit", &block);
-        let payload = block.payload().cloned();
+        let blocks = block_window.pipelined_blocks().clone();
         let timestamp = block.timestamp_usecs();
         let _timer = counters::OP_COUNTERS.timer("pre_commit_notify");
 
@@ -640,8 +653,7 @@ impl PipelineBuilder {
             error!(error = ?e, "Failed to notify state synchronizer");
         }
 
-        let payload_vec = payload.into_iter().collect();
-        payload_manager.notify_commit(timestamp, payload_vec);
+        payload_manager.notify_commit(timestamp, &blocks);
         Ok(())
     }
 

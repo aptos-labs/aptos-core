@@ -13,8 +13,9 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_consensus_types::{
-    block::Block, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::PipelinedBlock,
+    block::Block,
+    pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -123,6 +124,7 @@ impl StateComputer for RandomComputeResultStateComputer {
     async fn schedule_compute(
         &self,
         _block: &Block,
+        _block_window: &OrderedBlockWindow,
         parent_block_id: HashValue,
         _randomness: Option<Randomness>,
         _lifetime_guard: CountedRequest<()>,

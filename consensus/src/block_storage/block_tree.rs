@@ -30,6 +30,8 @@ use std::{
 
 /// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::pipelined_block::PipelinedBlock)
 /// that adds `children` field to know the parent-child relationship between blocks.
+// TODO: remove debug
+#[derive(Debug)]
 struct LinkableBlock {
     /// Executed block that has raw block data and execution output.
     executed_block: Arc<PipelinedBlock>,
@@ -487,6 +489,7 @@ impl BlockTree {
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
             for child_id in block_to_remove.children() {
+                info!(" child_id: {}", child_id);
                 if next_window_root_id == *child_id {
                     continue;
                 }
@@ -494,9 +497,11 @@ impl BlockTree {
                     self.get_linkable_block(child_id)
                         .expect("Child must exist in the tree"),
                 );
+                info!("blocks_to_be_pruned: {:?}", blocks_to_be_pruned);
             }
             // Track all the block ids removed
             blocks_pruned.push_back(block_to_remove.id());
+            info!("blocks_pruned: {:?}", blocks_pruned);
         }
         blocks_pruned
     }
