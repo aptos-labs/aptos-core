@@ -48,7 +48,7 @@ pub trait ModuleStorage {
     fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
-pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Module>>);
+pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Arc<Module>>>);
 
 impl ModuleCache {
     pub fn new() -> Self {
@@ -68,7 +68,10 @@ impl Clone for ModuleCache {
 
 impl ModuleStorage for ModuleCache {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module> {
-        self.0.write().insert(module_id.clone(), binary).clone()
+        self.0
+            .write()
+            .insert(module_id.clone(), Arc::new(binary))
+            .clone()
     }
 
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {

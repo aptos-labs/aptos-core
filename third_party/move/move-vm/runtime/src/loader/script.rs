@@ -203,12 +203,20 @@ impl Script {
     }
 }
 
-// A script cache is a map from the hash value of a script and the `Script` itself.
-// Script are added in the cache once verified and so getting a script out the cache
-// does not require further verification (except for parameters and type parameters)
+/// An entry for the script cache (associated to its hash). An entry is either:
+///   1. Fully-verified script, which can be used directly and does not require further
+///      verification (except for parameters and type parameters).
+///   2. A deserialized script, which is verified first time it is loaded for execution and
+///      then will no longer need re-verification.
+#[derive(Clone)]
+pub(crate) enum ScriptCacheEntry {
+    Verified(Arc<Script>),
+    Deserialized(Arc<CompiledScript>),
+}
+
 #[derive(Clone)]
 pub(crate) struct ScriptCache {
-    pub(crate) scripts: BinaryCache<ScriptHash, Script>,
+    scripts: BinaryCache<ScriptHash, ScriptCacheEntry>,
 }
 
 impl ScriptCache {
@@ -218,17 +226,31 @@ impl ScriptCache {
         }
     }
 
-    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<Arc<Function>> {
-        self.scripts.get(hash).map(|script| script.entry_point())
+    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<&ScriptCacheEntry> {
+        self.scripts.get(hash)
     }
 
-    pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Function> {
-        match self.get(&hash) {
-            Some(cached) => cached,
-            None => {
-                let script = self.scripts.insert(hash, script);
-                script.entry_point()
-            },
-        }
+    pub(crate) fn insert_compiled_script(
+        &mut self,
+        hash: ScriptHash,
+        compiled_script: CompiledScript,
+    ) -> Arc<CompiledScript> {
+        let compiled_script_to_return = Arc::new(compiled_script);
+        self.scripts.insert(
+            hash,
+            ScriptCacheEntry::Deserialized(compiled_script_to_return.clone()),
+        );
+        compiled_script_to_return
+    }
+
+    pub(crate) fn insert_verified_script(
+        &mut self,
+        hash: ScriptHash,
+        verified_script: Script,
+    ) -> Arc<Function> {
+        let entry_point = verified_script.entry_point();
+        self.scripts
+            .insert(hash, ScriptCacheEntry::Verified(Arc::new(verified_script)));
+        entry_point
     }
 }
