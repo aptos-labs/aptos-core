@@ -354,7 +354,7 @@ fn test_reset_sequence_number_on_failure() {
     assert!(add_txn(&mut pool, TestTransaction::new(1, 0, 1)).is_ok());
 }
 
-fn view(txns: Vec<(SignedTransaction, SystemTime)>) -> Vec<u64> {
+fn view(txns: Vec<(SignedTransaction, u64)>) -> Vec<u64> {
     txns.iter()
         .map(|(txn, _)| txn.sequence_number())
         .sorted()

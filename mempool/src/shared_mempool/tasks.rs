@@ -37,7 +37,7 @@ use rayon::prelude::*;
 use std::{
     cmp,
     sync::Arc,
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 use tokio::runtime::Handle;
 
@@ -176,7 +176,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
     smp: SharedMempool<NetworkClient, TransactionValidator>,
     // The sender of the transactions can send the time at which the transactions were inserted
     // in the sender's mempool.
-    transactions: Vec<(SignedTransaction, Option<SystemTime>)>,
+    transactions: Vec<(SignedTransaction, Option<u64>)>,
     request_id: MultiBatchId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
@@ -266,7 +266,7 @@ pub(crate) fn update_ack_counter(
 /// and returns a vector containing [SubmissionStatusBundle].
 pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>(
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
-    transactions: Vec<(SignedTransaction, Option<SystemTime>)>,
+    transactions: Vec<(SignedTransaction, Option<u64>)>,
     timeline_state: TimelineState,
     client_submitted: bool,
     // The priority of this node for the sender of the transactions
@@ -349,7 +349,7 @@ where
 /// validation into the mempool.
 #[cfg(not(feature = "consensus-only-perf-test"))]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, u64, Option<SystemTime>)>,
+    transactions: Vec<(SignedTransaction, u64, Option<u64>)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
@@ -420,7 +420,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
 /// outstanding sequence numbers.
 #[cfg(feature = "consensus-only-perf-test")]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, u64, Option<SystemTime>)>,
+    transactions: Vec<(SignedTransaction, u64, Option<u64>)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,

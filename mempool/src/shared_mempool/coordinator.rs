@@ -265,7 +265,7 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     network_id: NetworkId,
     request_id: MultiBatchId,
-    transactions: Vec<(SignedTransaction, Option<SystemTime>)>,
+    transactions: Vec<(SignedTransaction, Option<u64>)>,
     peer_id: PeerId,
     priority: BroadcastPeerPriority,
 ) where

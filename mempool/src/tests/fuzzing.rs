@@ -21,12 +21,12 @@ use proptest::{
     prelude::*,
     strategy::{Just, Strategy},
 };
-use std::{collections::HashMap, sync::Arc, time::SystemTime};
+use std::{collections::HashMap, sync::Arc};
 
 pub fn mempool_incoming_transactions_strategy(
-) -> impl Strategy<Value = (Vec<SignedTransaction>, TimelineState)> {
+) -> impl Strategy<Value = (Vec<(SignedTransaction, Option<u64>)>, TimelineState)> {
     (
-        proptest::collection::vec(any::<SignedTransaction>(), 0..100),
+        proptest::collection::vec(any::<(SignedTransaction, Option<u64>)>(), 0..100),
         prop_oneof![
             Just(TimelineState::NotReady),
             Just(TimelineState::NonQualified)
@@ -35,7 +35,7 @@ pub fn mempool_incoming_transactions_strategy(
 }
 
 pub fn test_mempool_process_incoming_transactions_impl(
-    txns: Vec<(SignedTransaction, Option<SystemTime>)>,
+    txns: Vec<(SignedTransaction, Option<u64>)>,
     timeline_state: TimelineState,
 ) {
     let config = NodeConfig::default();
@@ -71,6 +71,6 @@ proptest! {
 
     #[test]
     fn test_mempool_process_incoming_transactions((txns, timeline_state) in mempool_incoming_transactions_strategy()) {
-        test_mempool_process_incoming_transactions_impl(txns.into_iter().map(|txn| (txn, None)).collect(), timeline_state);
+        test_mempool_process_incoming_transactions_impl(txns, timeline_state);
     }
 }
