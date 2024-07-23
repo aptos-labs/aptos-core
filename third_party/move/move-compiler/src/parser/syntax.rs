@@ -2778,8 +2778,7 @@ fn parse_struct_decl(
 }
 
 fn parse_abilities(context: &mut Context) -> Result<Vec<Ability>, Box<Diagnostic>> {
-    if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "has"
-    {
+    if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "has" {
         context.tokens.advance()?;
         parse_list(
             context,

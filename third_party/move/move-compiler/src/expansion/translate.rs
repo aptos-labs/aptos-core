@@ -2937,9 +2937,10 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                 Some(DeprecatedItem::Struct),
             )?;
             let tys_opt = optional_types(context, ptys_opt);
-            let fields: Option<Vec<E::LValue>> = pargs.into_iter().map(|pb| bind(context, pb)).collect();
+            let fields: Option<Vec<E::LValue>> =
+                pargs.into_iter().map(|pb| bind(context, pb)).collect();
             EL::PositionalUnpack(tn, tys_opt, Spanned::new(loc, fields?))
-        }
+        },
     };
     Some(sp(loc, b_))
 }
