@@ -20,8 +20,11 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    block::Block, common::Round, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
+    block::Block,
+    common::Round,
+    pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -175,10 +178,13 @@ impl ExecutionProxy {
         let blocks = blocks.to_vec();
         Box::pin(async move {
             for block in blocks.iter() {
-                let payload = block.payload().cloned();
-                let payload_vec = payload.into_iter().collect();
                 let timestamp = block.timestamp_usecs();
-                payload_manager.notify_commit(timestamp, payload_vec);
+                // TODO: change notify_commit
+                payload_manager.notify_commit(
+                    timestamp,
+                    Some(block.block()),
+                    Some(block.block_window()),
+                );
             }
             callback(&blocks, finality_proof);
         })
@@ -225,6 +231,7 @@ impl StateComputer for ExecutionProxy {
         &self,
         // The block to be executed.
         block: &Block,
+        block_window: &OrderedBlockWindow,
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
@@ -273,6 +280,7 @@ impl StateComputer for ExecutionProxy {
             .execution_pipeline
             .queue(
                 block.clone(),
+                block_window.clone(),
                 metadata.clone(),
                 parent_block_id,
                 block_qc,
@@ -444,7 +452,7 @@ impl StateComputer for ExecutionProxy {
             let block_timestamp = target.commit_info().timestamp_usecs();
             inner
                 .payload_manager
-                .notify_commit(block_timestamp, Vec::new());
+                .notify_commit(block_timestamp, None, None);
         }
 
         // Inject an error for fail point testing
