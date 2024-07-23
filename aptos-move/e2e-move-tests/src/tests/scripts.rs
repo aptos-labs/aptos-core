@@ -88,10 +88,10 @@ fn test_script_with_object_parameter() {
 
     let code = package.extract_script_code().into_iter().next().unwrap();
     let script = Script::new(code, vec![], vec![
-        TransactionArgument::Raw(bcs::to_bytes(&metadata).unwrap()),
-        TransactionArgument::Raw(bcs::to_bytes(&vec![alice.address()]).unwrap()),
-        TransactionArgument::Raw(bcs::to_bytes(&vec![bob.address()]).unwrap()),
-        TransactionArgument::Raw(bcs::to_bytes(&vec![30u64]).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&metadata).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&vec![alice.address()]).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&vec![bob.address()]).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&vec![30u64]).unwrap()),
     ]);
 
     let txn = TransactionBuilder::new(alice.clone())
@@ -104,7 +104,7 @@ fn test_script_with_object_parameter() {
     let status = h.run(txn);
     assert_success!(status);
 
-    h.enable_features(vec![], vec![FeatureFlag::RAW_SCRIPT_ARGS]);
+    h.enable_features(vec![], vec![FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS]);
 
     let txn = TransactionBuilder::new(alice.clone())
         .script(script.clone())

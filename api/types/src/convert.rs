@@ -273,7 +273,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     ) -> Result<TransactionPayload> {
         use aptos_types::transaction::TransactionPayload::*;
         let ret = match payload {
-            // TODO: Annotate the raw transaction argument using value annotator.
             Script(s) => {
                 let (code, ty_args, args) = s.into_inner();
                 let func_args = self.inner.view_script_arguments(&code, &args, &ty_args);

@@ -15,5 +15,5 @@ proposals:
           git_hash: ~
       - FeatureFlag:
           enabled:
-            - raw_script_args
+            - allow_serialized_script_args
 

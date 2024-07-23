@@ -723,9 +723,9 @@ impl AptosVM {
             )?;
         }
 
-        if !self.features().is_enabled(FeatureFlag::RAW_SCRIPT_ARGS) {
+        if !self.features().is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS) {
             for arg in script.args() {
-                if let TransactionArgument::Raw(_) = arg {
+                if let TransactionArgument::Serialized(_) = arg {
                     return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
                         .finish(Location::Script)
                         .into_vm_status());
