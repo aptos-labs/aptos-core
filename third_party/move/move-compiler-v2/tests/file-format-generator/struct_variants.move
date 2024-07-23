@@ -110,4 +110,5 @@ module 0xc0ffee::m {
     fun select_common_fields(s: CommonFields): u64 {
         s.x + (match (s) { Foo{x: _, y} => y, Bar{z, x: _} => z })
     }
+
 }

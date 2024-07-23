@@ -1,6 +1,7 @@
-module 0xc0ffee::m {
+//# publish
+module 0x42::m {
 
-    enum Inner {
+    enum Inner has drop {
         Inner1{ x: u64 }
         Inner2{ x: u64, y: u64 }
     }
@@ -9,7 +10,7 @@ module 0xc0ffee::m {
         x: u64
     }
 
-    enum Outer {
+    enum Outer has drop {
         None,
         One{i: Inner},
         Two{i: Inner, b: Box},
@@ -110,4 +111,91 @@ module 0xc0ffee::m {
     fun select_common_fields(s: CommonFields): u64 {
         s.x + (match (s) { Foo{x: _, y} => y, Bar{z, x: _} => z })
     }
+
+    // -------------------
+    // Test entry points
+
+    fun t1_is_inner1(): bool {
+        is_inner1(&Inner::Inner1{x: 2})
+    }
+
+    fun t2_is_inner1(): bool {
+        is_inner1(&Inner::Inner2{x: 2, y: 3})
+    }
+
+    fun t1_inner_value(): u64 {
+        inner_value(Inner::Inner2{x: 2, y: 5})
+    }
+
+    fun t1_outer_value(): u64 {
+        outer_value(Outer::None{})
+    }
+
+    fun t2_outer_value(): u64 {
+        outer_value(Outer::One{i: Inner::Inner2{x: 1, y: 2}})
+    }
+
+    fun t3_outer_value(): u64 {
+        outer_value(Outer::Two{i: Inner::Inner1{x: 1}, b: Box{x: 7}})
+    }
+
+    fun t1_outer_value_nested(): u64 {
+        outer_value_nested(Outer::One{i: Inner::Inner1{x: 27}})
+    }
+
+    fun t2_outer_value_nested(): u64 {
+        outer_value_nested(Outer::Two{i: Inner::Inner1{x: 5}, b: Box{x: 7}})
+    }
+
+    fun t1_outer_value_with_cond(): u64 {
+        outer_value_with_cond(Outer::One{i: Inner::Inner1{x: 43}})
+    }
+
+    fun t1_outer_value_with_cond_ref(): bool {
+        outer_value_with_cond_ref(&Outer::One{i: Inner::Inner1{x: 43}})
+    }
+
+    fun t1_is_some(): bool {
+        is_some(&Option::None<u64>{})
+    }
+
+    fun t2_is_some(): bool {
+        is_some(&Option::Some{value: 3})
+    }
+
+    fun t1_is_some_specialized(): bool {
+        is_some_specialized(&Option::Some{value: Option::None{}})
+    }
+
+    fun t2_is_some_specialized(): bool {
+        is_some_specialized(&Option::Some{value: Option::Some{value: 1}})
+    }
 }
+
+//# run 0x42::m::t1_is_inner1
+
+//# run 0x42::m::t2_is_inner1
+
+//# run 0x42::m::t1_inner_value
+
+//# run 0x42::m::t1_outer_value
+
+//# run 0x42::m::t2_outer_value
+
+//# run 0x42::m::t3_outer_value
+
+//# run 0x42::m::t1_outer_value_nested
+
+//# run 0x42::m::t2_outer_value_nested
+
+//# run 0x42::m::t1_outer_value_with_cond
+
+//# run 0x42::m::t1_outer_value_with_cond_ref
+
+//# run 0x42::m::t1_is_some
+
+//# run 0x42::m::t2_is_some
+
+//# run 0x42::m::t1_is_some_specialized
+
+//# run 0x42::m::t2_is_some_specialized

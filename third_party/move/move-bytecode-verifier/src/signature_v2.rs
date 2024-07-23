@@ -6,11 +6,12 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Ability, AbilitySet, Bytecode, CodeUnit, CompiledModule, CompiledScript,
+        Ability, AbilitySet, Bytecode, CodeUnit, CompiledModule, CompiledScript, FieldDefinition,
         FieldInstantiationIndex, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
         FunctionInstantiationIndex, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
-        StructDefinition, StructFieldInformation, StructHandle, StructTypeParameter,
-        TypeParameterIndex,
+        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandle,
+        StructTypeParameter, StructVariantInstantiationIndex, TypeParameterIndex,
+        VariantFieldInstantiationIndex,
     },
     IndexKind,
 };
@@ -318,6 +319,14 @@ struct SignatureChecker<'a, const N: usize> {
     >,
     field_inst_results:
         RefCell<BTreeMap<FieldInstantiationIndex, &'a BitsetTypeParameterConstraints<N>>>,
+    variant_field_inst_results:
+        RefCell<BTreeMap<VariantFieldInstantiationIndex, &'a BitsetTypeParameterConstraints<N>>>,
+    struct_variant_inst_results: RefCell<
+        BTreeMap<
+            (StructVariantInstantiationIndex, AbilitySet),
+            &'a BitsetTypeParameterConstraints<N>,
+        >,
+    >,
 }
 
 impl<'a, const N: usize> SignatureChecker<'a, N> {
@@ -334,6 +343,8 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             func_inst_results: RefCell::new(BTreeMap::new()),
             struct_inst_results: RefCell::new(BTreeMap::new()),
             field_inst_results: RefCell::new(BTreeMap::new()),
+            variant_field_inst_results: RefCell::new(BTreeMap::new()),
+            struct_variant_inst_results: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -507,16 +518,8 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         Ok(())
     }
 
-    /// Checks if a struct instantiation is well-formed, in a context-less fashion.
-    ///
-    /// A struct instantiation is well-formed if
-    /// - There are no references in the type arguments
-    /// - All type arguments are well-formed and have declared abilities
-    ///
-    /// Returns the minimal set of constraints the type parameters need to satisfy, with the result
-    /// being cached.
-    ///
-    /// Time complexity: `O(total_size_of_all_type_args)` if not cached.
+    /// Checks if a struct instantiation is well-formed, in a context-less fashion,
+    /// with the result being cached.
     fn verify_struct_instantiation_contextless(
         &self,
         struct_inst_idx: StructDefInstantiationIndex,
@@ -530,61 +533,123 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             btree_map::Entry::Occupied(entry) => *entry.into_mut(),
             btree_map::Entry::Vacant(entry) => {
                 let struct_inst = self.resolver.struct_instantiation_at(struct_inst_idx)?;
-                let struct_def = self.resolver.struct_def_at(struct_inst.def)?;
-                let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
-                let ty_args_idx = struct_inst.type_parameters;
-                let ty_args = &self.resolver.signature_at(ty_args_idx).0;
-
-                // TODO: is this needed?
-                if struct_handle.type_parameters.len() != ty_args.len() {
-                    return Err(
-                        PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
-                            .with_message(format!(
-                                "expected {} type argument(s), got {}",
-                                struct_handle.type_parameters.len(),
-                                ty_args.len()
-                            ))
-                            .at_index(IndexKind::StructDefInstantiation, struct_inst_idx.0),
-                    );
-                }
-
-                if !required_abilities.is_subset(struct_handle.abilities) {
-                    return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-                        .with_message(format!(
-                            "expected struct with abilities {:?} got {:?}",
-                            required_abilities, struct_handle.abilities
-                        ))
-                        .at_index(IndexKind::StructDefInstantiation, struct_inst_idx.0));
-                }
-
-                let mut constraints = BitsetTypeParameterConstraints::new();
-                for (ty_idx, ty) in ty_args.iter().enumerate() {
-                    if ty.is_reference() {
-                        return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
-                            .with_message("reference not allowed".to_string())
-                            .at_index(IndexKind::StructDefInstantiation, struct_inst_idx.0));
-                    }
-
-                    let arg_abilities = if struct_handle.type_parameters[ty_idx].is_phantom {
-                        struct_handle.type_parameters[ty_idx].constraints
-                    } else {
-                        struct_handle.type_parameters[ty_idx]
-                            .constraints
-                            .union(required_abilities.requires())
-                    };
-
-                    constraints.merge(self.verify_type_in_signature_contextless(
-                        ty_args_idx,
-                        ty_idx,
-                        arg_abilities,
-                    )?);
-                }
-
+                let constraints = self
+                    .verify_struct_type_params(
+                        required_abilities,
+                        struct_inst.def,
+                        struct_inst.type_parameters,
+                    )
+                    .map_err(|err| {
+                        err.at_index(IndexKind::StructDefInstantiation, struct_inst_idx.0)
+                    })?;
                 *entry.insert(self.constraints.alloc(constraints))
             },
         };
 
         Ok(r)
+    }
+
+    /// Checks if a struct variant instantiation is well-formed, in a context-less fashion,
+    /// with the result being cached.
+    fn verify_struct_variant_instantiation_contextless(
+        &self,
+        struct_variant_inst_idx: StructVariantInstantiationIndex,
+        required_abilities: AbilitySet,
+    ) -> PartialVMResult<&'a BitsetTypeParameterConstraints<N>> {
+        let r = match self
+            .struct_variant_inst_results
+            .borrow_mut()
+            .entry((struct_variant_inst_idx, required_abilities))
+        {
+            btree_map::Entry::Occupied(entry) => *entry.into_mut(),
+            btree_map::Entry::Vacant(entry) => {
+                let struct_variant_inst = self
+                    .resolver
+                    .struct_variant_instantiation_at(struct_variant_inst_idx)?;
+                let struct_variant_handle = self
+                    .resolver
+                    .struct_variant_handle_at(struct_variant_inst.handle)?;
+                let constraints = self
+                    .verify_struct_type_params(
+                        required_abilities,
+                        struct_variant_handle.struct_index,
+                        struct_variant_inst.type_parameters,
+                    )
+                    .map_err(|err| {
+                        err.at_index(
+                            IndexKind::StructVariantInstantiation,
+                            struct_variant_inst_idx.0,
+                        )
+                    })?;
+                *entry.insert(self.constraints.alloc(constraints))
+            },
+        };
+
+        Ok(r)
+    }
+
+    /// Checks if a struct instantiation is well-formed, in a context-less fashion.
+    ///
+    /// A struct instantiation is well-formed if
+    /// - There are no references in the type arguments
+    /// - All type arguments are well-formed and have declared abilities
+    ///
+    /// Returns the minimal set of constraints the type parameters need to satisfy.
+    ///
+    /// Time complexity: `O(total_size_of_all_type_args)` if not cached.
+    fn verify_struct_type_params(
+        &self,
+        required_abilities: AbilitySet,
+        struct_def_idx: StructDefinitionIndex,
+        ty_args_idx: SignatureIndex,
+    ) -> PartialVMResult<BitsetTypeParameterConstraints<N>> {
+        let struct_def = self.resolver.struct_def_at(struct_def_idx)?;
+        let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
+        let ty_args = &self.resolver.signature_at(ty_args_idx).0;
+
+        if struct_handle.type_parameters.len() != ty_args.len() {
+            return Err(
+                PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH).with_message(
+                    format!(
+                        "expected {} type argument(s), got {}",
+                        struct_handle.type_parameters.len(),
+                        ty_args.len()
+                    ),
+                ),
+            );
+        }
+
+        if !required_abilities.is_subset(struct_handle.abilities) {
+            return Err(
+                PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED).with_message(format!(
+                    "expected struct with abilities {:?} got {:?}",
+                    required_abilities, struct_handle.abilities
+                )),
+            );
+        }
+
+        let mut constraints = BitsetTypeParameterConstraints::new();
+        for (ty_idx, ty) in ty_args.iter().enumerate() {
+            if ty.is_reference() {
+                return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
+                    .with_message("reference not allowed".to_string()));
+            }
+
+            let arg_abilities = if struct_handle.type_parameters[ty_idx].is_phantom {
+                struct_handle.type_parameters[ty_idx].constraints
+            } else {
+                struct_handle.type_parameters[ty_idx]
+                    .constraints
+                    .union(required_abilities.requires())
+            };
+
+            constraints.merge(self.verify_type_in_signature_contextless(
+                ty_args_idx,
+                ty_idx,
+                arg_abilities,
+            )?);
+        }
+        Ok(constraints)
     }
 
     /// Checks if all struct instantiations are well-formed, in a context-less fashion.
@@ -600,16 +665,21 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         Ok(())
     }
 
-    /// Checks if a field instantiation is well-formed, in a context-less fashion.
+    /// Checks if all struct variant instantiations are well-formed, in a context-less fashion.
     ///
-    /// A field instantiation is well-formed if
-    /// - There are no references in the type arguments
-    /// - All type arguments are well-formed and have declared abilities
-    ///
-    /// Returns the minimal set of constraints the type parameters need to satisfy, with the result
-    /// being cached.
-    ///
-    /// Time complexity: `O(total_size_of_all_type_args)` if not cached.
+    /// Time complexity: `O(total_size_of_all_type_args_in_all_instantiations)`
+    fn verify_struct_variant_instantiations_contextless(&self) -> PartialVMResult<()> {
+        for struct_inst_idx in 0..self.resolver.struct_variant_instantiations().unwrap().len() {
+            self.verify_struct_variant_instantiation_contextless(
+                StructVariantInstantiationIndex(struct_inst_idx as u16),
+                AbilitySet::EMPTY,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Checks if a field instantiation is well-formed, in a context-less fashion,
+    /// with the result being cached.
     fn verify_field_instantiation_contextless(
         &self,
         field_inst_idx: FieldInstantiationIndex,
@@ -619,39 +689,46 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             btree_map::Entry::Vacant(entry) => {
                 let field_inst = self.resolver.field_instantiation_at(field_inst_idx)?;
                 let field_handle = self.resolver.field_handle_at(field_inst.handle)?;
-                let struct_def = self.resolver.struct_def_at(field_handle.owner)?;
-                let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
-                let ty_args_idx = field_inst.type_parameters;
-                let ty_args = &self.resolver.signature_at(ty_args_idx).0;
+                let constraints = self
+                    .verify_struct_type_params(
+                        AbilitySet::EMPTY,
+                        field_handle.owner,
+                        field_inst.type_parameters,
+                    )
+                    .map_err(|err| err.at_index(IndexKind::FieldInstantiation, field_inst_idx.0))?;
+                *entry.insert(self.constraints.alloc(constraints))
+            },
+        };
+        Ok(r)
+    }
 
-                // TODO: is this needed?
-                if struct_handle.type_parameters.len() != ty_args.len() {
-                    return Err(
-                        PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
-                            .with_message(format!(
-                                "expected {} type argument(s), got {}",
-                                struct_handle.type_parameters.len(),
-                                ty_args.len()
-                            ))
-                            .at_index(IndexKind::FieldInstantiation, field_inst_idx.0),
-                    );
-                }
-
-                let mut constraints = BitsetTypeParameterConstraints::new();
-                for (ty_idx, ty) in ty_args.iter().enumerate() {
-                    if ty.is_reference() {
-                        return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
-                            .with_message("reference not allowed".to_string())
-                            .at_index(IndexKind::FieldInstantiation, field_inst_idx.0));
-                    }
-
-                    constraints.merge(self.verify_type_in_signature_contextless(
-                        ty_args_idx,
-                        ty_idx,
-                        struct_handle.type_parameters[ty_idx].constraints,
-                    )?);
-                }
-
+    /// Same like `verify_field_instantiation_contextless` but for variant fields.
+    fn verify_variant_field_instantiation_contextless(
+        &self,
+        field_inst_idx: VariantFieldInstantiationIndex,
+    ) -> PartialVMResult<&'a BitsetTypeParameterConstraints<N>> {
+        let r = match self
+            .variant_field_inst_results
+            .borrow_mut()
+            .entry(field_inst_idx)
+        {
+            btree_map::Entry::Occupied(entry) => *entry.into_mut(),
+            btree_map::Entry::Vacant(entry) => {
+                let variant_field_inst = self
+                    .resolver
+                    .variant_field_instantiation_at(field_inst_idx)?;
+                let field_handle = self
+                    .resolver
+                    .variant_field_handle_at(variant_field_inst.handle)?;
+                let constraints = self
+                    .verify_struct_type_params(
+                        AbilitySet::EMPTY,
+                        field_handle.struct_index,
+                        variant_field_inst.type_parameters,
+                    )
+                    .map_err(|err| {
+                        err.at_index(IndexKind::VariantFieldInstantiation, field_inst_idx.0)
+                    })?;
                 *entry.insert(self.constraints.alloc(constraints))
             },
         };
@@ -664,6 +741,18 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     fn verify_field_instantiations_contextless(&self) -> PartialVMResult<()> {
         for field_inst_idx in 0..self.resolver.field_instantiations().unwrap().len() {
             self.verify_field_instantiation_contextless(FieldInstantiationIndex(
+                field_inst_idx as u16,
+            ))?;
+        }
+        Ok(())
+    }
+
+    /// Checks if all variant field instantiations are well-formed, in a context-less fashion.
+    ///
+    /// Time complexity: `O(total_size_of_all_type_args_in_all_instantiations)`
+    fn verify_variant_field_instantiations_contextless(&self) -> PartialVMResult<()> {
+        for field_inst_idx in 0..self.resolver.variant_field_instantiations().unwrap().len() {
+            self.verify_variant_field_instantiation_contextless(VariantFieldInstantiationIndex(
                 field_inst_idx as u16,
             ))?;
         }
@@ -716,6 +805,9 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             BTreeMap::<StructDefInstantiationIndex, ()>::new();
         let mut checked_vec_insts = BTreeMap::<SignatureIndex, ()>::new();
         let mut checked_field_insts = BTreeMap::<FieldInstantiationIndex, ()>::new();
+        let mut checked_variant_field_insts = BTreeMap::<VariantFieldInstantiationIndex, ()>::new();
+        let mut checked_struct_variant_insts =
+            BTreeMap::<StructVariantInstantiationIndex, ()>::new();
 
         for (offset, instr) in code.code.iter().enumerate() {
             let map_err = |res: PartialVMResult<()>| {
@@ -739,6 +831,18 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                         entry.insert(());
                     }
                 },
+                PackVariantGeneric(idx) | UnpackVariantGeneric(idx) | TestVariantGeneric(idx) => {
+                    if let btree_map::Entry::Vacant(entry) =
+                        checked_struct_variant_insts.entry(*idx)
+                    {
+                        let constraints = self.verify_struct_variant_instantiation_contextless(
+                            *idx,
+                            AbilitySet::EMPTY,
+                        )?;
+                        map_err(constraints.check_in_context(&ability_context))?;
+                        entry.insert(());
+                    }
+                },
                 ExistsGeneric(idx)
                 | MoveFromGeneric(idx)
                 | MoveToGeneric(idx)
@@ -758,6 +862,15 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 ImmBorrowFieldGeneric(idx) | MutBorrowFieldGeneric(idx) => {
                     if let btree_map::Entry::Vacant(entry) = checked_field_insts.entry(*idx) {
                         let constraints = self.verify_field_instantiation_contextless(*idx)?;
+                        map_err(constraints.check_in_context(&ability_context))?;
+                        entry.insert(());
+                    }
+                },
+                ImmBorrowVariantFieldGeneric(idx) | MutBorrowVariantFieldGeneric(idx) => {
+                    if let btree_map::Entry::Vacant(entry) = checked_variant_field_insts.entry(*idx)
+                    {
+                        let constraints =
+                            self.verify_variant_field_instantiation_contextless(*idx)?;
                         map_err(constraints.check_in_context(&ability_context))?;
                         entry.insert(());
                     }
@@ -796,14 +909,70 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.
-                Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_) | LdU8(_) | LdU16(_) | LdU32(_)
-                | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_) | CastU8 | CastU16 | CastU32
-                | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | Call(_) | Pack(_)
-                | Unpack(_) | ReadRef | WriteRef | FreezeRef | Add | Sub | Mul | Mod | Div
-                | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le
-                | Ge | CopyLoc(_) | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_)
-                | MutBorrowField(_) | ImmBorrowField(_) | MutBorrowGlobal(_)
-                | ImmBorrowGlobal(_) | Exists(_) | MoveTo(_) | MoveFrom(_) | Abort | Nop => (),
+                Pop
+                | Ret
+                | Branch(_)
+                | BrTrue(_)
+                | BrFalse(_)
+                | LdU8(_)
+                | LdU16(_)
+                | LdU32(_)
+                | LdU64(_)
+                | LdU128(_)
+                | LdU256(_)
+                | LdConst(_)
+                | CastU8
+                | CastU16
+                | CastU32
+                | CastU64
+                | CastU128
+                | CastU256
+                | LdTrue
+                | LdFalse
+                | Call(_)
+                | Pack(_)
+                | Unpack(_)
+                | TestVariant(_)
+                | PackVariant(_)
+                | UnpackVariant(_)
+                | ReadRef
+                | WriteRef
+                | FreezeRef
+                | Add
+                | Sub
+                | Mul
+                | Mod
+                | Div
+                | BitOr
+                | BitAnd
+                | Xor
+                | Shl
+                | Shr
+                | Or
+                | And
+                | Not
+                | Eq
+                | Neq
+                | Lt
+                | Gt
+                | Le
+                | Ge
+                | CopyLoc(_)
+                | MoveLoc(_)
+                | StLoc(_)
+                | MutBorrowLoc(_)
+                | ImmBorrowLoc(_)
+                | MutBorrowField(_)
+                | ImmBorrowField(_)
+                | MutBorrowVariantField(_)
+                | ImmBorrowVariantField(_)
+                | MutBorrowGlobal(_)
+                | ImmBorrowGlobal(_)
+                | Exists(_)
+                | MoveTo(_)
+                | MoveFrom(_)
+                | Abort
+                | Nop => (),
             }
         }
 
@@ -839,10 +1008,6 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     ///
     /// Time complexity: `O(total_size_of_field_types)`
     fn verify_struct_def(&self, struct_def: &StructDefinition) -> PartialVMResult<()> {
-        let fields = match &struct_def.field_information {
-            StructFieldInformation::Native => return Ok(()),
-            StructFieldInformation::Declared(fields) => fields,
-        };
         let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
         let context = struct_handle
             .type_param_constraints()
@@ -855,13 +1020,40 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             .map(|idx| (idx as TypeParameterIndex, AbilitySet::ALL))
             .collect::<BitsetTypeParameterConstraints<N>>();
 
-        for field_def in fields.iter() {
+        match &struct_def.field_information {
+            StructFieldInformation::Native => Ok(()),
+            StructFieldInformation::Declared(fields) => self.verify_fields_of_struct(
+                &struct_handle,
+                &context,
+                required_abilities_conditional,
+                &context_all_abilities,
+                fields.iter(),
+            ),
+            StructFieldInformation::DeclaredVariants(variants) => self.verify_fields_of_struct(
+                &struct_handle,
+                &context,
+                required_abilities_conditional,
+                &context_all_abilities,
+                variants.iter().flat_map(|v| v.fields.iter()),
+            ),
+        }
+    }
+
+    fn verify_fields_of_struct<'l>(
+        &self,
+        struct_handle: &&StructHandle,
+        context: &BitsetTypeParameterConstraints<{ N }>,
+        required_abilities_conditional: AbilitySet,
+        context_all_abilities: &BitsetTypeParameterConstraints<{ N }>,
+        fields: impl Iterator<Item = &'l FieldDefinition>,
+    ) -> Result<(), PartialVMError> {
+        for field_def in fields {
             let field_ty = &field_def.signature.0;
 
             // Check if the field type itself is well-formed.
             check_ty_in_context(
                 self.resolver.struct_handles(),
-                &context,
+                context,
                 field_ty,
                 false,
                 AbilitySet::EMPTY,
@@ -870,7 +1062,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             // Check if the field type satisfies the conditional ability requirements.
             check_ty_in_context(
                 self.resolver.struct_handles(),
-                &context_all_abilities,
+                context_all_abilities,
                 field_ty,
                 false,
                 required_abilities_conditional,
@@ -884,7 +1076,6 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 field_ty,
             )?;
         }
-
         Ok(())
     }
 
@@ -908,6 +1099,8 @@ fn verify_module_impl<const N: usize>(module: &CompiledModule) -> PartialVMResul
     checker.verify_function_instantiations_contextless()?;
     checker.verify_struct_instantiations_contextless()?;
     checker.verify_field_instantiations_contextless()?;
+    checker.verify_struct_variant_instantiations_contextless()?;
+    checker.verify_variant_field_instantiations_contextless()?;
 
     checker.verify_function_handles()?;
     checker.verify_function_defs()?;
