@@ -31,14 +31,17 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, Ability, AbilitySet};
 use move_compiler::{
-    expansion::ast as EA,
+    expansion::ast::{self as EA, wild_card},
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
-use move_ir_types::location::{sp, Spanned};
+use move_ir_types::{
+    location::{sp, Spanned},
+    sp,
+};
 use num::{BigInt, FromPrimitive, Zero};
 use std::{
     cell::RefCell,
@@ -2392,6 +2395,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             maccess,
                             generics,
                             None,
+                            &None,
                         ) {
                             pat
                         } else {
@@ -2400,7 +2404,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     },
                 }
             },
-            EA::LValue_::Unpack(maccess, generics, args) => {
+            EA::LValue_::Unpack(maccess, generics, args, dotdot) => {
                 if let Some(pat) = self.translate_lvalue_unpack(
                     expected_type,
                     expected_order,
@@ -2410,6 +2414,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     maccess,
                     generics,
                     Some(args),
+                    dotdot,
                 ) {
                     pat
                 } else {
@@ -2417,26 +2422,136 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             },
             EA::LValue_::PositionalUnpack(maccess, generics, args) => {
-                let fields = UniqueMap::maybe_from_iter(args.value.iter().enumerate().map(
-                    |(field_offset, arg)| {
-                        let field_name = Name::new(
-                            arg.loc,
-                            move_symbol_pool::Symbol::from(format!("{}", field_offset)),
-                        );
-                        let field_name = Field(field_name);
-                        (field_name, (field_offset, arg.clone()))
-                    },
-                ))
-                .expect("unique field names");
-                let unpack_ = EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields);
-                let unpack = Spanned::new(lv.loc, unpack_);
-                self.translate_lvalue(
-                    &unpack,
-                    expected_type,
-                    expected_order,
-                    match_locals,
-                    context,
-                )
+                let struct_info = self.resolve_struct(expected_type, maccess);
+                let (struct_name, variant, struct_entry) =
+                    if let Some((struct_name, variant, struct_entry)) = struct_info {
+                        (struct_name, variant, struct_entry)
+                    } else {
+                        return self.new_error_pat(loc);
+                    };
+                let struct_name_loc = self.to_loc(&maccess.loc);
+
+                // If this is a struct variant, check whether it exists.
+                if let Some(v) = variant {
+                    if !self.check_variant_declared(
+                        &struct_name,
+                        &struct_entry,
+                        &struct_name_loc,
+                        v,
+                    ) {
+                        return self.new_error_pat(loc);
+                    }
+                }
+
+                let arity = self.get_struct_arity(&struct_entry, &struct_name, loc, variant);
+                if let Some(arity) = arity {
+                    let dotdot_loc = args
+                        .value
+                        .iter()
+                        .filter_map(|arg| {
+                            if let sp!(loc, EA::LValueOrDotdot_::Dotdot) = arg {
+                                Some(loc.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .next();
+                    if dotdot_loc.is_none() && args.value.len() != arity
+                        || dotdot_loc.is_some()
+                            && args.value.len() > arity
+                            && !(args.value.len() == 1 && arity == 0)
+                    {
+                        self.error(loc, &context.arity_mismatch(true, arity, args.value.len()));
+                        return self.new_error_pat(loc);
+                    }
+                    let mut fields = UniqueMap::new();
+                    let mut arg_idx = 0;
+                    let mut field_offset = 0;
+                    let mut remainning_fields = arity;
+                    while remainning_fields > 0 {
+                        let sp!(arg_loc, arg) = args.value.get(arg_idx).expect("invalid index");
+                        match arg {
+                            EA::LValueOrDotdot_::LValue(lval) => {
+                                let field_name = Name::new(
+                                    *arg_loc,
+                                    move_symbol_pool::Symbol::from(format!("{}", field_offset)),
+                                );
+                                let field_name = Field(field_name);
+                                fields
+                                    .add(field_name, (field_offset, lval.clone()))
+                                    .expect("duplicate keys");
+                                remainning_fields -= 1;
+                                field_offset += 1;
+                            },
+                            EA::LValueOrDotdot_::Dotdot => {
+                                let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
+                                    arity - args.value.len() + 1
+                                } else {
+                                    0
+                                };
+                                for _ in 0..fields_to_expand {
+                                    let field_name = Name::new(
+                                        *arg_loc,
+                                        move_symbol_pool::Symbol::from(format!("{}", field_offset)),
+                                    );
+                                    let field_name = Field(field_name);
+                                    fields
+                                        .add(field_name, (field_offset, wild_card(*arg_loc)))
+                                        .expect("duplicate keys");
+                                    remainning_fields -= 1;
+                                    field_offset += 1;
+                                }
+                            },
+                        }
+                        // if let sp!(loc, EA::LValueOrDotdot_::Dotdot) = args.value.get(arg_idx).expect("invalid index") {
+                        //     let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
+                        //         arity - args.value.len() + 1
+                        //     } else {
+                        //         0
+                        //     };
+                        //     for i in 0..fields_to_expand {
+                        //         let field_name = Name::new(*loc, move_symbol_pool::Symbol::from(format!("{}", field_offset)));
+                        //         let field_name = Field(field_name);
+                        //         fields.add(field_name, (field_offset, wild_card(*loc))).expect("duplicate keys");
+                        //         remainning_fields -= 1;
+                        //         field_offset += 1;
+                        //     }
+                        // } else {
+                        //     let arg = args.value.get(arg_idx).expect("invalid index");
+                        //     let field_name = Name::new(arg.loc, move_symbol_pool::Symbol::from(format!("{}", field_offset)));
+                        //     let field_name = Field(field_name);
+                        //     fields.add(field_name, (field_offset, arg.clone())).expect("duplicate keys");
+                        //     remainning_fields -= 1;
+                        //     field_offset += 1;
+                        // }
+                        arg_idx += 1;
+                    }
+                    // let fields = UniqueMap::maybe_from_iter(args
+                    //     .value
+                    //     .iter()
+                    //     .enumerate()
+                    //     .map(|(field_offset, arg)| {
+                    //         if let sp!(loc, EA::LValueOrDotdot_::Dotdot) = arg.value {
+                    //             dotdot_idx = Some(field_offset);
+                    //         }
+                    //         let field_name = Name::new(arg.loc, move_symbol_pool::Symbol::from(format!("{}", field_offset)));
+                    //         let field_name = Field(field_name);
+                    //         (field_name, (field_offset, arg.clone()))
+                    //     }))
+                    //     .expect("unique field names");
+                    let unpack_ =
+                        EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields, None);
+                    let unpack = Spanned::new(lv.loc.clone(), unpack_);
+                    self.translate_lvalue(
+                        &unpack,
+                        expected_type,
+                        expected_order,
+                        match_locals,
+                        context,
+                    )
+                } else {
+                    return self.new_error_pat(loc);
+                }
             },
         }
     }
@@ -2486,14 +2601,33 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let (field_decls, _is_positional) =
             self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
         let field_decls = field_decls.clone();
+
         if let Some(fields) = fields {
             // Check whether all fields are covered.
-            self.check_missing_or_undeclared_fields(
-                loc,
-                struct_name.clone(),
-                &field_decls,
-                fields,
-            )?;
+            let uncovered_fields = self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
+            if let Some(dotdot) = dotdot {
+                for uncoverd_field in uncovered_fields {
+                    if let Some(field_data) = field_decls.get(&uncoverd_field) {
+                        let field_ty = field_data.ty.instantiate(&instantiation);
+                        let expected_field_ty = if let Some(kind) = ref_expected {
+                            Type::Reference(kind, Box::new(field_ty.clone()))
+                        } else {
+                            field_ty.clone()
+                        };
+                        let lvalue = wild_card(dotdot.loc);
+                        let translated = self.translate_lvalue(
+                            &lvalue,
+                            &expected_field_ty,
+                            expected_order,
+                            match_locals,
+                            context,
+                        );
+                        args.insert(field_data.offset, translated);
+                    }
+                }
+            } else {
+                self.report_missing_fields(&uncovered_fields, loc)
+            }
             // Translate fields
             for (_, name, (_, value)) in fields.iter() {
                 let field_name = self.symbol_pool().make(name);
@@ -4648,13 +4782,46 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    fn get_struct_arity<'a>(
+        &'a mut self,
+        s: &'a StructEntry,
+        struct_name: &QualifiedSymbol,
+        struct_name_loc: &Loc,
+        variant: Option<Symbol>,
+    ) -> Option<usize> {
+        match (&s.layout, variant) {
+            (StructLayout::Singleton(fields), None) => {
+                Some(if s.is_empty_struct { 0 } else { fields.len() })
+            },
+            (StructLayout::Variants(variants), Some(name)) => {
+                if let Some(variant) = variants.iter().find(|v| v.name == name) {
+                    Some(variant.fields.len())
+                } else {
+                    self.error(
+                        struct_name_loc,
+                        &format!(
+                            "struct `{}` has no variant named `{}`",
+                            struct_name.display(self.env()),
+                            name.display(self.symbol_pool())
+                        ),
+                    );
+                    None
+                }
+            },
+            _ => {
+                self.bug(struct_name_loc, "inconsistent struct definition");
+                None
+            },
+        }
+    }
+
     fn check_missing_or_undeclared_fields<T>(
         &mut self,
         loc: &Loc,
         struct_name: QualifiedSymbol,
         field_decls: &BTreeMap<Symbol, FieldData>,
         fields: &EA::Fields<T>,
-    ) -> Option<()> {
+    ) -> Option<BTreeSet<Symbol>> {
         let mut succeed = true;
         let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
         // Exclude from the covered fields the dummy_field added by legacy compiler
@@ -4681,6 +4848,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 succeed = false;
             }
         }
+        if succeed {
+            Some(fields_not_covered)
+        } else {
+            None
+        }
+    }
+
+    fn report_missing_fields(&mut self, fields_not_covered: &BTreeSet<Symbol>, loc: &Loc) {
         if !fields_not_covered.is_empty() {
             self.error(
                 loc,
@@ -4697,12 +4872,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         .join(", ")
                 ),
             );
-            succeed = false;
-        }
-        if succeed {
-            Some(())
-        } else {
-            None
         }
     }
 

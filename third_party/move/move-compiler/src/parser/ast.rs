@@ -509,7 +509,11 @@ pub enum Bind_ {
     Var(Var),
     // T { f1: b1, ... fn: bn }
     // T<t1, ... , tn> { f1: b1, ... fn: bn }
-    Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindFieldOrDotdot>),
+    Unpack(
+        Box<NameAccessChain>,
+        Option<Vec<Type>>,
+        Vec<BindFieldOrDotdot>,
+    ),
     // T(e1, ..., en)
     // T<t1, ... , tn>(e1, ..., en)
     PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotdot>),
@@ -2074,7 +2078,6 @@ impl AstDebug for BindFieldOrDotdot_ {
             B::Dotdot => w.write(".."),
         }
     }
-
 }
 
 impl AstDebug for Vec<Vec<Exp>> {
