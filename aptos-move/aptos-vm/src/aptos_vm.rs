@@ -90,6 +90,7 @@ use move_binary_format::{
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    file_format::CompiledScript,
     CompiledModule,
 };
 use move_core_types::{
@@ -737,6 +738,27 @@ impl AptosVM {
         }
 
         let func = session.load_script(script.code(), script.ty_args())?;
+
+        // Check that unstable bytecode cannot be executed on mainnet
+        if self
+            .features()
+            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT)
+        {
+            let script = match CompiledScript::deserialize_with_config(
+                script.code(),
+                self.deserializer_config(),
+            ) {
+                Ok(script) => script,
+                Err(err) => {
+                    let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                    return Err(VMStatus::error(
+                        StatusCode::CODE_DESERIALIZATION_ERROR,
+                        Some(msg),
+                    ));
+                },
+            };
+            self.reject_unstable_bytecode_for_script(&script)?;
+        }
 
         // TODO(Gerardo): consolidate the extended validation to verifier.
         verifier::event_validation::verify_no_event_emission_in_script(
@@ -1616,6 +1638,22 @@ impl AptosVM {
                             )
                             .finish(Location::Undefined));
                     }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
+    pub fn reject_unstable_bytecode_for_script(&self, module: &CompiledScript) -> VMResult<()> {
+        if self.chain_id().is_mainnet() {
+            if let Some(metadata) =
+                aptos_framework::get_compilation_metadata_from_compiled_script(module)
+            {
+                if metadata.unstable {
+                    return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
+                        .with_message("script marked unstable cannot be run on mainnet".to_string())
+                        .finish(Location::Undefined));
                 }
             }
         }
