@@ -5,6 +5,7 @@ use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
     account_address::AccountAddress,
+    on_chain_config::FeatureFlag,
     transaction::{Script, TransactionArgument},
 };
 use move_core_types::language_storage::TypeTag;
@@ -86,27 +87,35 @@ fn test_script_with_object_parameter() {
     .expect("building package must succeed");
 
     let code = package.extract_script_code().into_iter().next().unwrap();
+    let script = Script::new(code, vec![], vec![
+        TransactionArgument::Raw(bcs::to_bytes(&metadata).unwrap()),
+        TransactionArgument::Raw(bcs::to_bytes(&vec![alice.address()]).unwrap()),
+        TransactionArgument::Raw(bcs::to_bytes(&vec![bob.address()]).unwrap()),
+        TransactionArgument::Raw(bcs::to_bytes(&vec![30u64]).unwrap()),
+    ]);
 
-    // let txn = TransactionBuilder::new(alice.clone())
-    //     .script(Script::new(
-    //         code,
-    //         vec![],
-    //         vec![
-    //             TransactionArgument::Raw(bcs::to_bytes(&metadata).unwrap()),
-    //             TransactionArgument::Raw(bcs::to_bytes(&vec![alice.address()]).unwrap()),
-    //             TransactionArgument::Raw(bcs::to_bytes(&vec![bob.address()]).unwrap()),
-    //             TransactionArgument::Raw(bcs::to_bytes(&vec![30u64]).unwrap())
-    //         ],
-    //     ))
-    //     .sequence_number(10)
-    //     .max_gas_amount(1_000_000)
-    //     .gas_unit_price(1)
-    //     .sign();
+    let txn = TransactionBuilder::new(alice.clone())
+        .script(script.clone())
+        .sequence_number(13)
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign();
 
-    // let status = h.run(txn);
-    // assert_success!(status);
+    let status = h.run(txn);
+    assert_success!(status);
+
+    h.enable_features(vec![], vec![FeatureFlag::RAW_SCRIPT_ARGS]);
+
+    let txn = TransactionBuilder::new(alice.clone())
+        .script(script.clone())
+        .sequence_number(14)
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign();
+
+    let status = h.run(txn);
+    assert!(status.is_discarded());
 }
-
 
 #[test]
 fn test_script_with_type_parameter() {
