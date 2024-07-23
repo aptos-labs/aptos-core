@@ -99,7 +99,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
 
-        let kv_proc_rt = runtime::Builder::new_multi_thread().worker_threads(300).enable_all().thread_name("kv_proc").build().unwrap();
+        let kv_proc_rt = runtime::Builder::new_multi_thread().worker_threads(100).enable_all().thread_name("kv_proc").build().unwrap();
         let kv_request_type = "remote_kv_request";
         let kv_response_type = "remote_kv_response";
         let result_rx = controller.create_inbound_channel(kv_request_type.to_string());
@@ -143,7 +143,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             messages: Mutex::new(ConcurrentPriorityQueue::new()),
             notify_on_sent: Notify::new(),
         });
-        let num_workers = 300;
+        let num_workers = 100;
         let kv_proc_runtime_clone = self.kv_proc_runtime.clone();
 
         //info!("Num handlers created is {}", thread_pool_clone.current_num_threads());
