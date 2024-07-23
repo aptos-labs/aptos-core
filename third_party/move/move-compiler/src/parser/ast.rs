@@ -509,14 +509,28 @@ pub enum Bind_ {
     Var(Var),
     // T { f1: b1, ... fn: bn }
     // T<t1, ... , tn> { f1: b1, ... fn: bn }
-    Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<(Field, Bind)>),
+    Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindFieldOrDotdot>),
     // T(e1, ..., en)
     // T<t1, ... , tn>(e1, ..., en)
-    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<Bind>),
+    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotdot>),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
 pub type BindList = Spanned<Vec<Bind>>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindFieldOrDotdot_ {
+    FieldBind(Field, Bind),
+    Dotdot,
+}
+pub type BindFieldOrDotdot = Spanned<BindFieldOrDotdot_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindOrDotdot_ {
+    Bind(Bind),
+    Dotdot,
+}
+pub type BindOrDotdot = Spanned<BindOrDotdot_>;
 
 pub type BindWithRange = Spanned<(Bind, Exp)>;
 pub type BindWithRangeList = Spanned<Vec<BindWithRange>>;
@@ -2039,6 +2053,30 @@ impl AstDebug for Vec<Bind> {
     }
 }
 
+impl AstDebug for BindOrDotdot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindOrDotdot_ as B;
+        match self {
+            B::Bind(b) => b.ast_debug(w),
+            B::Dotdot => w.write(".."),
+        }
+    }
+}
+
+impl AstDebug for BindFieldOrDotdot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindFieldOrDotdot_ as B;
+        match self {
+            B::FieldBind(f, b) => {
+                w.write(&format!("{}: ", f));
+                b.ast_debug(w);
+            },
+            B::Dotdot => w.write(".."),
+        }
+    }
+
+}
+
 impl AstDebug for Vec<Vec<Exp>> {
     fn ast_debug(&self, w: &mut AstWriter) {
         for trigger in self {
@@ -2062,9 +2100,8 @@ impl AstDebug for Bind_ {
                     w.write(">");
                 }
                 w.write("{");
-                w.comma(fields, |w, (f, b)| {
-                    w.write(&format!("{}: ", f));
-                    b.ast_debug(w);
+                w.comma(fields, |w, field| {
+                    field.ast_debug(w);
                 });
                 w.write("}");
             },

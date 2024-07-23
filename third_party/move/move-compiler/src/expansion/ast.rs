@@ -414,12 +414,26 @@ pub type Type = Spanned<Type_>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum LValue_ {
     Var(ModuleAccess, Option<Vec<Type>>),
-    Unpack(ModuleAccess, Option<Vec<Type>>, Fields<LValue>),
-    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueList),
+    // the last bool is true if the unpack has a trailing ".."
+    Unpack(ModuleAccess, Option<Vec<Type>>, Fields<LValue>, Option<Dotdot>),
+    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueOrDotdotList),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
 pub type LValueList = Spanned<LValueList_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Dotdot_;
+pub type Dotdot = Spanned<Dotdot_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum LValueOrDotdot_ {
+    LValue(LValue),
+    Dotdot,
+}
+pub type LValueOrDotdot = Spanned<LValueOrDotdot_>;
+pub type LValueOrDotdotList_ = Vec<LValueOrDotdot>;
+pub type LValueOrDotdotList = Spanned<LValueOrDotdotList_>;
 
 pub type LValueWithRange_ = (LValue, Exp);
 pub type LValueWithRange = Spanned<LValueWithRange_>;
@@ -1801,7 +1815,7 @@ impl AstDebug for LValue_ {
                     w.write(">");
                 }
             },
-            L::Unpack(ma, tys_opt, fields) => {
+            L::Unpack(ma, tys_opt, fields, dotdot) => {
                 ma.ast_debug(w);
                 if let Some(ss) = tys_opt {
                     w.write("<");
@@ -1814,6 +1828,12 @@ impl AstDebug for LValue_ {
                     w.write(&format!("{}#{}: ", idx, f));
                     b.ast_debug(w);
                 });
+                if !fields.is_empty() {
+                    w.write(", ");
+                }
+                if dotdot.is_some() {
+                    w.write("..");
+                }
                 w.write("}");
             },
             L::PositionalUnpack(ma, tys_opt, args) => {
@@ -1827,6 +1847,16 @@ impl AstDebug for LValue_ {
                 w.comma(&args.value, |w, b| b.ast_debug(w));
                 w.write(")");
             },
+        }
+    }
+}
+
+impl AstDebug for LValueOrDotdot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use LValueOrDotdot_::*;
+        match self {
+            LValue(l) => l.ast_debug(w),
+            Dotdot => w.write(".."),
         }
     }
 }

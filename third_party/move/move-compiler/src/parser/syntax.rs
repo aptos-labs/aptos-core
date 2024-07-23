@@ -787,7 +787,7 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
             context,
             Tok::LBrace,
             Tok::RBrace,
-            parse_bind_field,
+            parse_bind_field_or_dotdot,
             "a field binding",
         )?;
         Bind_::Unpack(Box::new(ty), ty_args, args)
@@ -838,6 +838,30 @@ fn parse_bind_list(context: &mut Context) -> Result<BindList, Box<Diagnostic>> {
     };
     let end_loc = context.tokens.previous_end_loc();
     Ok(spanned(context.tokens.file_hash(), start_loc, end_loc, b))
+}
+
+/// Parse a <BindField> or a ".."
+fn parse_bind_field_or_dotdot(context: &mut Context) -> Result<BindFieldOrDotdot, Box<Diagnostic>> {
+    if context.tokens.peek() == Tok::PeriodPeriod {
+        let loc = current_token_loc(context.tokens);
+        context.tokens.advance()?;
+        Ok(sp(loc, BindFieldOrDotdot_::Dotdot))
+    } else {
+        let (f, b) = parse_bind_field(context)?;
+        Ok(sp(f.loc(), BindFieldOrDotdot_::FieldBind(f, b)))
+    }
+}
+
+/// Parse a <Bind> or a ".."
+fn parse_bind_or_dotdot(context: &mut Context) -> Result<BindOrDotdot, Box<Diagnostic>> {
+    if context.tokens.peek() == Tok::PeriodPeriod {
+        let loc = current_token_loc(context.tokens);
+        context.tokens.advance()?;
+        Ok(sp(loc, BindOrDotdot_::Dotdot))
+    } else {
+        let b = parse_bind(context)?;
+        Ok(sp(b.loc, BindOrDotdot_::Bind(b)))
+    }
 }
 
 // Parse a list of bindings for lambda.
