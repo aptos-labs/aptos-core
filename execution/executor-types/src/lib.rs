@@ -437,9 +437,10 @@ impl StateComputeResult {
         assert_eq!(
             input_txns.len(),
             self.compute_status_for_input_txns().len(),
-            "{:?} != {:?}",
+            "{:?} != {:?}, for block_id: {}",
             input_txns.iter().map(|t| t.type_name()).collect::<Vec<_>>(),
-            self.compute_status_for_input_txns()
+            self.compute_status_for_input_txns(),
+            block_id
         );
         let output = itertools::zip_eq(input_txns, self.compute_status_for_input_txns())
             .filter_map(|(txn, status)| {
