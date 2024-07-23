@@ -4,6 +4,7 @@
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
 use super::types::MempoolMessageId;
+use super::types::MempoolLatencySummary;
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     counters,
@@ -168,6 +169,28 @@ pub(crate) async fn process_client_get_transaction<NetworkClient, TransactionVal
     if callback.send(txn).is_err() {
         warn!(LogSchema::event_log(
             LogEntry::GetTransaction,
+            LogEvent::CallbackFail
+        ));
+        counters::CLIENT_CALLBACK_FAIL.inc();
+    }
+}
+
+/// Processes get latency summary request by client.
+pub(crate) async fn process_client_get_latency_summary<NetworkClient, TransactionValidator>(
+    smp: SharedMempool<NetworkClient, TransactionValidator>,
+    callback: oneshot::Sender<MempoolLatencySummary>,
+    timer: HistogramTimer,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
+{
+    timer.stop_and_record();
+    let _timer = counters::process_get_txn_latency_timer_client();
+    let mempool_latency_summary = smp.latency_stats_tracking.lock().get_latency_summary();
+
+    if callback.send(mempool_latency_summary).is_err() {
+        warn!(LogSchema::event_log(
+            LogEntry::GetLatencySummary,
             LogEvent::CallbackFail
         ));
         counters::CLIENT_CALLBACK_FAIL.inc();

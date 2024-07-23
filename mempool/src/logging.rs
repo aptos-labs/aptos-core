@@ -157,6 +157,7 @@ pub enum LogEntry {
     JsonRpc,
     GetTransaction,
     GetBlock,
+    GetLatencySummary,
     QuorumStore,
     StateSyncCommit,
     BroadcastTransaction,

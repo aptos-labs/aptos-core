@@ -217,6 +217,26 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
                 ))
                 .await;
         },
+        MempoolClientRequest::GetLatencySummary(callback) => {
+            // This timer measures how long it took for the bounded executor to *schedule* the
+            // task.
+            let _timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_GET_LATENCY_SUMMARY_LABEL,
+                counters::SPAWN_LABEL,
+            );
+            // This timer measures how long it took for the task to go from scheduled to started.
+            let task_start_timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_GET_LATENCY_SUMMARY_LABEL,
+                counters::START_LABEL,
+            );
+            bounded_executor
+                .spawn(tasks::process_client_get_latency_summary(
+                    smp.clone(),
+                    callback,
+                    task_start_timer,
+                ))
+                .await;
+        },
     }
 }
 

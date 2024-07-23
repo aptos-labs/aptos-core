@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Objects used by/related to shared mempool
+use super::latency_tracking::MempoolLatencyStatsTracking;
 use crate::{
     core_mempool::CoreMempool,
     network::{MempoolNetworkInterface, MempoolSyncMsg},
@@ -44,7 +45,6 @@ use super::latency_tracking::MempoolLatencyStatsTracking;
 
 pub type MempoolSenderBucket = u8;
 pub type TimelineIndexIdentifier = u8;
-
 
 /// Struct that owns all dependencies required by shared mempool routines.
 #[derive(Clone)]
@@ -242,15 +242,13 @@ pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
 pub enum MempoolClientRequest {
     SubmitTransaction(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>),
     GetTransactionByHash(HashValue, oneshot::Sender<Option<SignedTransaction>>),
-    GetLatencySummary(MempoolLatencySummary),
+    GetLatencySummary(oneshot::Sender<MempoolLatencySummary>),
 }
 
 pub type MempoolClientSender = mpsc::Sender<MempoolClientRequest>;
 pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
 
-pub struct MempoolLatencySummary {
-
-}
+pub struct MempoolLatencySummary {}
 
 /// State of last sync with peer:
 /// `timeline_id` is position in log of ready transactions
