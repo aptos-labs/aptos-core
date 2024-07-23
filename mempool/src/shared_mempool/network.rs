@@ -63,9 +63,9 @@ pub enum MempoolSyncMsg {
     BroadcastTransactionsRequestV2 {
         /// Unique id of sync request. Can be used by sender for rebroadcast analysis
         request_id: MultiBatchId,
-        /// For each transaction, we also include the time at which the transaction is inserted
+        /// For each transaction, we also include the time at which the transaction is ready
         /// in the current node in millis since epoch. The upstream node can then calculate
-        /// (SystemTime::now() - insertion_time) to calculate the time it took for the transaction
+        /// (SystemTime::now() - ready_time) to calculate the time it took for the transaction
         /// to reach the upstream node.
         transactions: Vec<(SignedTransaction, u64)>,
         /// Priority of the upstream node for the sender.
@@ -357,7 +357,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> Result<
         (
             MultiBatchId,
-            // For each transaction, include the insertion time in millis since epoch
+            // For each transaction, include the ready time in millis since epoch
             Vec<(SignedTransaction, u64)>,
             Option<&str>,
         ),
@@ -476,7 +476,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         &self,
         peer: PeerNetworkId,
         batch_id: MultiBatchId,
-        // For each transaction, we include the insertion time in millis since epoch
+        // For each transaction, we include the ready time in millis since epoch
         transactions: Vec<(SignedTransaction, u64)>,
         use_mempool_sync_message_v2: bool,
     ) -> Result<(), BroadcastError> {

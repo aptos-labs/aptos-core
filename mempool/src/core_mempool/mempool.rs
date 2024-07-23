@@ -269,7 +269,7 @@ impl Mempool {
         client_submitted: bool,
         // The time at which the transaction was inserted into the mempool of the
         // downstream node (sender of the mempool transaction) in millis since epoch
-        insertion_time_at_sender: Option<u64>,
+        ready_time_at_sender: Option<u64>,
         // The prority of this node for the peer that sent the transaction
         priority: BroadcastPeerPriority,
     ) -> MempoolStatus {
@@ -309,14 +309,16 @@ impl Mempool {
             .duration_since(UNIX_EPOCH)
             .expect("Failed to get current time")
             .as_millis() as u64;
-        info!("txn added to mempool: {} {} status {}, priority {:?}, client_submitted {}, now: {:?}, inserted_at_sender {:?}, time_since: {:?}", txn.sender(), txn.sequence_number(), status, priority.clone(), client_submitted, now, insertion_time_at_sender, Duration::from_millis(now.saturating_sub(insertion_time_at_sender.unwrap_or(0))));
+
+        // TODO: Remove this before landing
+        info!("txn added to mempool: {} {} status {}, priority {:?}, client_submitted {}, now: {:?}, inserted_at_sender {:?}, time_since: {:?}", txn.sender(), txn.sequence_number(), status, priority.clone(), client_submitted, now, ready_time_at_sender, Duration::from_millis(now.saturating_sub(ready_time_at_sender.unwrap_or(0))));
         if status.code == MempoolStatusCode::Accepted {
-            if let Some(insertion_time_at_sender) = insertion_time_at_sender {
+            if let Some(ready_time_at_sender) = ready_time_at_sender {
                 counters::core_mempool_txn_commit_latency(
                     counters::BROADCAST_RECEIVED_LABEL,
                     submitted_by_label,
                     self.transactions.get_bucket(ranking_score),
-                    Duration::from_millis(now.saturating_sub(insertion_time_at_sender)),
+                    Duration::from_millis(now.saturating_sub(ready_time_at_sender)),
                     priority.to_string().as_str(),
                 );
             }
@@ -514,7 +516,7 @@ impl Mempool {
     }
 
     /// Returns block of transactions and new last_timeline_id. For each transaction, the output includes
-    /// the transaction insertion time in millis since epoch
+    /// the transaction ready time in millis since epoch
     pub(crate) fn read_timeline(
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
@@ -527,7 +529,7 @@ impl Mempool {
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive),
-    /// along with their insertion times in millis since poch
+    /// along with their ready times in millis since poch
     pub(crate) fn timeline_range(
         &self,
         start_end_pairs: &[(u64, u64)],

@@ -592,13 +592,14 @@ impl TransactionStore {
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
                         break; // The batch is full
                     } else {
-                        batch.push((txn.txn.clone(), txn.insertion_info.insertion_time.duration_since(UNIX_EPOCH).expect("Failed to determine absolute unix time based on given duration")
+                        batch.push((txn.txn.clone(), txn.insertion_info.ready_time.duration_since(UNIX_EPOCH).expect("Failed to determine absolute unix time based on given duration")
                         .as_millis() as u64));
                         batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
                         if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                             last_timeline_id[i] = timeline_id;
                         }
                         let bucket = self.timeline_index.get_bucket(txn.ranking_score);
+                        // TODO: Remove this before landing.
                         info!(
                             "read_timeline: {} {}, time taken: {:?}, before: {:?}, high_time_taken: {}, priority: {}, submitted_by: {}",
                             address,
@@ -640,7 +641,7 @@ impl TransactionStore {
                 self.transactions
                     .get(account)
                     .and_then(|txns| txns.get(sequence_number))
-                    .map(|txn| (txn.txn.clone(), txn.insertion_info.insertion_time.duration_since(UNIX_EPOCH).expect("Failed to determine absolute unix time based on given duration")
+                    .map(|txn| (txn.txn.clone(), txn.insertion_info.ready_time.duration_since(UNIX_EPOCH).expect("Failed to determine absolute unix time based on given duration")
                     .as_millis() as u64))
             })
             .collect()
