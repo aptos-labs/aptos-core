@@ -66,7 +66,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 // We need two extra threads for the cross-shard commit receiver and the thread
                 // that is blocked on waiting for execute block to finish.
                 .thread_name(move |i| format!("sharded-executor-shard-{}-{}", shard_id, i))
-                .num_threads(num_threads + 2)
+                .num_threads(num_threads + 2 + 1)
                 .build()
                 .unwrap(),
         );
@@ -306,7 +306,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
 
             let (stream_results_tx, stream_results_rx) = unbounded();
             let coordinator_client_clone = self.coordinator_client.clone();
-            let stream_results_thread = thread::spawn(move || {
+            let stream_results_thread = self.executor_thread_pool.spawn(move || {
                 let batch_size = 200;
                 let mut curr_batch = vec![];
                 let mut seq_num: u64 = 0;
@@ -365,7 +365,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 txn_idx: u32::MAX,
                 txn_output: TransactionOutput::default(),
             }).unwrap();
-            stream_results_thread.join().unwrap();
+            stream_results_thread.join(); //.unwrap();
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             info!("Sent results finished at time: {}", curr_time);
             self.coordinator_client.lock().unwrap().reset_state_view();
