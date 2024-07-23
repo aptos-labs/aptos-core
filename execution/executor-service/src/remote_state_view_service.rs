@@ -233,6 +233,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         rand_send_thread_idx: usize,
         outbound_rpc_scheduler: Arc<OutboundRpcScheduler>,
     ) {
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        info!("Entered processing kv req batch {} sent to shard {} at time: {}", message.seq_num.unwrap(), message.shard_id.unwrap(), curr_time);
         let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
         {
             let curr_time = SystemTime::now()
@@ -329,8 +331,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         //     kv_tx_clone[shard_id][rand_send_thread_idx].lock().await.send_async(resp_message, &MessageType::new("remote_kv_response".to_string())).await;
         // });
         //mtx.unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
-        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-        info!("kv req batch {} sent to shard {} at time: {}", seq_num, shard_id, curr_time);
+
         drop(timer_6);
 
         {

@@ -13,6 +13,7 @@ use std::{
 };
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::time::SystemTime;
 use tokio::{runtime, runtime::Runtime, sync::oneshot};
 use tokio::sync::Notify;
 use crate::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
@@ -194,7 +195,11 @@ impl OutboundRpcScheduler {
             self.outbound_rpc_runtime.spawn(async move {
                 loop {
                     let msg = outbound_rpc_scheduler_clone.recv().await;
+                    let seq_num = msg.msg.seq_num.unwrap();
+                    let shard_id = msg.msg.shard_id.unwrap();
                     msg.outbound_helper.lock().await.send_async(msg.msg, &msg.msg_type).await;
+                    let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                    info!("Sent kv req batch {} sent to shard {} at time: {}", seq_num, shard_id, curr_time);
                 }
             });
         }
