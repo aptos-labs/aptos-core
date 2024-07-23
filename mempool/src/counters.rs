@@ -190,9 +190,10 @@ pub fn core_mempool_txn_commit_latency(
     submitted_by: &'static str,
     bucket: &str,
     latency: Duration,
+    priority: String,
 ) {
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
-        .with_label_values(&[stage, submitted_by, bucket])
+        .with_label_values(&[stage, submitted_by, bucket, priority.as_str()])
         .observe(latency.as_secs_f64());
 }
 
@@ -202,7 +203,7 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
-        &["stage", "submitted_by", "bucket"],
+        &["stage", "submitted_by", "bucket", "priority"],
         MEMPOOL_LATENCY_BUCKETS.to_vec()
     )
     .unwrap()

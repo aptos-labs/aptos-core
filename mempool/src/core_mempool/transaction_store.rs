@@ -11,9 +11,9 @@ use crate::{
         mempool::Mempool,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
     },
-    counters,
-    counters::{BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
+    counters::{self, BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
+    network::BroadcastPeerPriority,
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
@@ -111,7 +111,7 @@ impl TransactionStore {
     }
 
     #[inline]
-    fn get_mempool_txn(
+    pub(crate) fn get_mempool_txn(
         &self,
         address: &AccountAddress,
         sequence_number: u64,
@@ -156,9 +156,13 @@ impl TransactionStore {
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<(&InsertionInfo, &str)> {
+    ) -> Option<(&InsertionInfo, &str, BroadcastPeerPriority)> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
-            return Some((&txn.insertion_info, self.get_bucket(txn.ranking_score)));
+            return Some((
+                &txn.insertion_info,
+                self.get_bucket(txn.ranking_score),
+                txn.priority.clone(),
+            ));
         }
         None
     }
@@ -362,6 +366,7 @@ impl TransactionStore {
         bucket: &str,
         insertion_info: &mut InsertionInfo,
         broadcast_ready: bool,
+        priority: BroadcastPeerPriority,
     ) {
         insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
@@ -372,12 +377,14 @@ impl TransactionStore {
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority.to_string(),
                 );
                 counters::core_mempool_txn_commit_latency(
                     BROADCAST_READY_LABEL,
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority.to_string(),
                 );
             } else {
                 counters::core_mempool_txn_commit_latency(
@@ -385,6 +392,7 @@ impl TransactionStore {
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority.to_string(),
                 );
             }
         }
@@ -429,6 +437,7 @@ impl TransactionStore {
                         self.timeline_index.get_bucket(txn.ranking_score),
                         &mut txn.insertion_info,
                         process_broadcast_ready,
+                        txn.priority.clone(),
                     );
                 }
 
@@ -590,6 +599,7 @@ impl TransactionStore {
                             &txn.insertion_info,
                             bucket,
                             BROADCAST_BATCHED_LABEL,
+                            txn.priority.clone(),
                         );
                         counters::core_mempool_txn_ranking_score(
                             BROADCAST_BATCHED_LABEL,

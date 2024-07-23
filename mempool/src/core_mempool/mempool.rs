@@ -12,6 +12,7 @@ use crate::{
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
+    network::BroadcastPeerPriority,
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
@@ -123,6 +124,7 @@ impl Mempool {
         insertion_info: &InsertionInfo,
         bucket: &str,
         stage: &'static str,
+        priority: BroadcastPeerPriority,
     ) {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             counters::core_mempool_txn_commit_latency(
@@ -130,19 +132,25 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 time_delta,
+                priority.to_string(),
             );
         }
     }
 
     fn log_consensus_pulled_latency(&self, account: AccountAddress, sequence_number: u64) {
-        if let Some((insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket, priority)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
             let prev_count = insertion_info
                 .consensus_pulled_counter
                 .fetch_add(1, Ordering::Relaxed);
-            Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
+            Self::log_txn_latency(
+                insertion_info,
+                bucket,
+                counters::CONSENSUS_PULLED_LABEL,
+                priority,
+            );
             counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
         }
     }
@@ -153,15 +161,19 @@ impl Mempool {
         sequence_number: u64,
         stage: &'static str,
     ) {
-        if let Some((insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket, priority)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_latency(insertion_info, bucket, stage);
+            Self::log_txn_latency(insertion_info, bucket, stage, priority);
         }
     }
 
-    fn log_commit_and_parked_latency(insertion_info: &InsertionInfo, bucket: &str) {
+    fn log_commit_and_parked_latency(
+        insertion_info: &InsertionInfo,
+        bucket: &str,
+        priority: BroadcastPeerPriority,
+    ) {
         let parked_duration = if let Some(park_time) = insertion_info.park_time {
             let parked_duration = insertion_info
                 .ready_time
@@ -172,6 +184,7 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 parked_duration,
+                priority.to_string(),
             );
             parked_duration
         } else {
@@ -188,6 +201,7 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 commit_minus_parked,
+                priority.to_string(),
             );
         }
     }
@@ -198,12 +212,17 @@ impl Mempool {
         sequence_number: u64,
         block_timestamp: Duration,
     ) {
-        if let Some((insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket, priority)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_latency(insertion_info, bucket, counters::COMMIT_ACCEPTED_LABEL);
-            Self::log_commit_and_parked_latency(insertion_info, bucket);
+            Self::log_txn_latency(
+                insertion_info,
+                bucket,
+                counters::COMMIT_ACCEPTED_LABEL,
+                priority.clone(),
+            );
+            Self::log_commit_and_parked_latency(insertion_info, bucket, priority.clone());
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
@@ -213,6 +232,7 @@ impl Mempool {
                     insertion_info.submitted_by_label(),
                     bucket,
                     insertion_to_block,
+                    priority.to_string(),
                 );
             }
         }
@@ -231,6 +251,7 @@ impl Mempool {
         db_sequence_number: u64,
         timeline_state: TimelineState,
         client_submitted: bool,
+        priority: BroadcastPeerPriority,
     ) -> MempoolStatus {
         trace!(
             LogSchema::new(LogEntry::AddTxn)
@@ -259,6 +280,7 @@ impl Mempool {
             db_sequence_number,
             now,
             client_submitted,
+            priority,
         );
 
         let status = self.transactions.insert(txn_info);

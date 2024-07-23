@@ -4,7 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::MempoolSyncMsg,
+    network::{BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{tasks, types::SharedMempool},
 };
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
@@ -57,7 +57,13 @@ pub fn test_mempool_process_incoming_transactions_impl(
         config.base.role,
     );
 
-    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);
+    let _ = tasks::process_incoming_transactions(
+        &smp,
+        txns,
+        timeline_state,
+        false,
+        BroadcastPeerPriority::Primary,
+    );
 }
 
 proptest! {

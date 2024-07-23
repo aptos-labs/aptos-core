@@ -34,6 +34,7 @@ use fail::fail_point;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
+    fmt::{Display, Formatter},
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -48,6 +49,7 @@ pub enum MempoolSyncMsg {
         /// Unique id of sync request. Can be used by sender for rebroadcast analysis
         request_id: MultiBatchId,
         transactions: Vec<SignedTransaction>,
+        priority: BroadcastPeerPriority,
     },
     /// Broadcast ack issued by the receiver.
     BroadcastTransactionsResponse {
@@ -76,9 +78,16 @@ pub enum BroadcastError {
     TooManyPendingBroadcasts(PeerNetworkId),
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum BroadcastPeerPriority {
     Primary,
     Failover,
+}
+
+impl Display for BroadcastPeerPriority {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -449,6 +458,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         let request = MempoolSyncMsg::BroadcastTransactionsRequest {
             request_id: batch_id,
             transactions,
+            priority: self.check_peer_prioritized(peer)?,
         };
 
         if let Err(e) = self.network_client.send_to_peer(request, peer) {

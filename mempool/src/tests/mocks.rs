@@ -4,6 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
+    network::BroadcastPeerPriority,
     shared_mempool::start_shared_mempool,
     MempoolClientSender, QuorumStoreRequest,
 };
@@ -184,6 +185,7 @@ impl MockSharedMempool {
                         0,
                         TimelineState::NotReady,
                         false,
+                        BroadcastPeerPriority::Primary,
                     )
                     .code
                     != MempoolStatusCode::Accepted
