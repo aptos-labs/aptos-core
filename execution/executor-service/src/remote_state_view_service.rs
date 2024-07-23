@@ -50,9 +50,11 @@ impl<T> MpmcCpq<T> {
     }
 
     pub async fn recv(&self) -> T {
+        info!("WOOOOOOOOOOOOOOOW1");
         let future = self.notify_on_sent.notified();
+        info!("WOOOOOOOOOOOOOOOW2");
         tokio::pin!(future);
-        info!("WOOOOOOOOOOOOOOOW");
+        info!("WOOOOOOOOOOOOOOOW3");
         loop {
             // Make sure that no wakeup is lost if we get
             // `None` from `try_recv`.
@@ -144,7 +146,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             messages: Mutex::new(ConcurrentPriorityQueue::new()),
             notify_on_sent: Notify::new(),
         });
-        let num_workers = 100;
+        let num_workers = 2;
         let kv_proc_runtime_clone = self.kv_proc_runtime.clone();
 
         //info!("Num handlers created is {}", thread_pool_clone.current_num_threads());
@@ -184,7 +186,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             // let recv_condition_clone = self.recv_condition.clone();
             // let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
             kv_unprocessed.send(message, priority);
-
+            info!("{}", kv_unprocessed.len());
             REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_req_pq_size"])
                 .observe(kv_unprocessed.len() as f64);
