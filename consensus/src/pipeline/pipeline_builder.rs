@@ -18,9 +18,10 @@ use aptos_consensus_types::{
     common::Round,
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
-        CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult, PipelineFutures,
-        PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult,
-        PostPreCommitResult, PreCommitResult, PrepareResult, TaskError, TaskFuture, TaskResult,
+        CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult,
+        OrderedBlockWindow, PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock,
+        PostCommitResult, PostLedgerUpdateResult, PostPreCommitResult, PreCommitResult,
+        PrepareResult, TaskError, TaskFuture, TaskResult,
     },
     quorum_cert::QuorumCert,
 };
@@ -276,6 +277,7 @@ impl PipelineBuilder {
         let (futs, tx, abort_handles) = self.build_internal(
             parent_futs,
             Arc::new(pipelined_block.block().clone()),
+            Arc::new(pipelined_block.block_window().clone()),
             block_store_callback,
         );
         pipelined_block.set_pipeline_futs(futs);
@@ -287,6 +289,7 @@ impl PipelineBuilder {
         &self,
         parent: PipelineFutures,
         block: Arc<Block>,
+        block_window: Arc<OrderedBlockWindow>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
@@ -300,7 +303,12 @@ impl PipelineBuilder {
         } = rx;
 
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(self.block_preparer.clone(), block.clone(), qc_rx),
+            Self::prepare(
+                self.block_preparer.clone(),
+                block.clone(),
+                block_window.clone(),
+                qc_rx,
+            ),
             &mut abort_handles,
         );
         let execute_fut = spawn_shared_fut(
@@ -385,6 +393,7 @@ impl PipelineBuilder {
                 self.payload_manager.clone(),
                 block_store_callback,
                 block.clone(),
+                block_window.clone(),
             ),
             &mut abort_handles,
         );
@@ -413,6 +422,7 @@ impl PipelineBuilder {
     async fn prepare(
         preparer: Arc<BlockPreparer>,
         block: Arc<Block>,
+        block_window: Arc<OrderedBlockWindow>,
         qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     ) -> TaskResult<PrepareResult> {
         let mut tracker = Tracker::start_waiting("prepare", &block);
@@ -430,7 +440,10 @@ impl PipelineBuilder {
         .shared();
         // the loop can only be abort by the caller
         let input_txns = loop {
-            match preparer.prepare_block(&block, qc_rx.clone()).await {
+            match preparer
+                .prepare_block(&block, &block_window, qc_rx.clone())
+                .await
+            {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
                     warn!(
@@ -744,6 +757,7 @@ impl PipelineBuilder {
         payload_manager: Arc<dyn TPayloadManager>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
         block: Arc<Block>,
+        block_window: Arc<OrderedBlockWindow>,
     ) -> TaskResult<PostCommitResult> {
         let mut tracker = Tracker::start_waiting("post_commit_ledger", &block);
         parent_post_commit.await?;
@@ -755,10 +769,9 @@ impl PipelineBuilder {
         update_counters_for_block(&block);
         update_counters_for_compute_result(&compute_result);
 
-        let payload = block.payload().cloned();
         let timestamp = block.timestamp_usecs();
-        let payload_vec = payload.into_iter().collect();
-        payload_manager.notify_commit(timestamp, payload_vec);
+        // TODO: change notify_commit
+        payload_manager.notify_commit(timestamp, Some(&block), Some(&block_window));
 
         if let Some(ledger_info_with_sigs) = maybe_ledger_info_with_sigs {
             block_store_callback(ledger_info_with_sigs);
