@@ -185,7 +185,7 @@ impl RemoteCoordinatorClient {
                         let batch_start_index = txns.batch_start_index;
                         let state_keys = Self::extract_state_keys_from_txns(&transactions);
 
-                        state_view_client_clone.pre_fetch_state_values(state_keys, false, message.shard_id.unwrap());
+                        state_view_client_clone.pre_fetch_state_values(state_keys, true, message.shard_id.unwrap());
 
                         let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
                             blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
@@ -268,7 +268,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
                 info!("Checkpoint 1.2 at time: {}", curr_time);
                 let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
-                self.state_view_client.pre_fetch_state_values(state_keys, false, 1);
+                self.state_view_client.pre_fetch_state_values(state_keys, true, 1);
                 let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
                 info!("Checkpoint 1.3 at time: {}", curr_time);
                 let num_txns = txns.num_txns;
