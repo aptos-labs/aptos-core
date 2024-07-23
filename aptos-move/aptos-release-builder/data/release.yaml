@@ -13,3 +13,7 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
+      - FeatureFlag:
+          enabled:
+            - raw_script_args
+
