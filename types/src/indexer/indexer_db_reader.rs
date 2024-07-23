@@ -57,5 +57,5 @@ pub trait IndexerReader: Send + Sync {
         version: Version,
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
 
-    fn get_latest_internal_indexer_ledger_version(&self) -> Result<Version>;
+    fn get_latest_internal_indexer_ledger_version(&self) -> Result<Option<Version>>;
 }

@@ -35,6 +35,9 @@ pub enum MetadataKey {
     EventPrunerProgress,
     TransactionPrunerProgress,
     StateSnapshotRestoreProgress(Version),
+    EventVersion,
+    StateVersion,
+    TransactionVersion,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

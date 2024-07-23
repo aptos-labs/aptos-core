@@ -186,7 +186,7 @@ impl StateValueWriter<StateKey, StateValue> for MockStore {
         Ok(())
     }
 
-    fn write_usage(&self, _version: Version, _usage: StateStorageUsage) -> Result<()> {
+    fn kv_finish(&self, _version: Version, _usage: StateStorageUsage) -> Result<()> {
         Ok(())
     }
 

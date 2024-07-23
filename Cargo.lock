@@ -3683,7 +3683,6 @@ dependencies = [
  "aptos-data-client",
  "aptos-data-streaming-service",
  "aptos-db",
- "aptos-db-indexer",
  "aptos-event-notifications",
  "aptos-executor",
  "aptos-executor-test-helpers",

@@ -98,11 +98,20 @@ impl InternalIndexerDB {
         Ok(())
     }
 
-    pub fn get_persisted_version(&self) -> Result<Version> {
-        // read the latest key from the db
-        self.db
-            .get::<InternalIndexerMetadataSchema>(&MetadataKey::LatestVersion)?
-            .map_or(Ok(0), |metavalue| Ok(metavalue.expect_version()))
+    pub fn get_persisted_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::LatestVersion)
+    }
+
+    pub fn get_event_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::EventVersion)
+    }
+
+    pub fn get_state_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::StateVersion)
+    }
+
+    pub fn get_transaction_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::TransactionVersion)
     }
 
     pub fn event_enabled(&self) -> bool {
@@ -136,11 +145,13 @@ impl InternalIndexerDB {
 
     pub fn ensure_cover_ledger_version(&self, ledger_version: Version) -> Result<()> {
         let indexer_latest_version = self.get_persisted_version()?;
-        ensure!(
-            indexer_latest_version >= ledger_version,
-            "ledger version too new"
-        );
-        Ok(())
+        if let Some(indexer_latest_version) = indexer_latest_version {
+            if indexer_latest_version >= ledger_version {
+                return Ok(());
+            }
+        }
+
+        bail!("ledger version too new")
     }
 
     pub fn get_account_transaction_version_iter(
@@ -255,6 +266,13 @@ impl InternalIndexerDB {
             (event_key, txn_version, seq_num, idx)
         })))
     }
+
+    fn get_version(&self, key: &MetadataKey) -> Result<Option<Version>> {
+        Ok(self
+            .db
+            .get::<InternalIndexerMetadataSchema>(key)?
+            .map(|v| v.expect_version()))
+    }
 }
 
 pub struct DBIndexer {
@@ -302,15 +320,6 @@ impl DBIndexer {
             .expect("main db lowest viable version doesn't exist")
     }
 
-    pub fn ensure_cover_ledger_version(&self, ledger_version: Version) -> Result<()> {
-        let indexer_latest_version = self.indexer_db.get_persisted_version()?;
-        ensure!(
-            indexer_latest_version >= ledger_version,
-            "ledger version too new"
-        );
-        Ok(())
-    }
-
     fn get_main_db_iter(
         &self,
         start_version: Version,
@@ -345,15 +354,14 @@ impl DBIndexer {
         }
         // we want to include the last transaction since the iterator interface will is right exclusive.
         let num_of_transaction = min(
-            (self.indexer_db.config.batch_size + 1) as u64,
+            self.indexer_db.config.batch_size as u64,
             highest_version + 1 - version,
         );
         Ok(num_of_transaction)
     }
 
-    pub fn process_a_batch(&self, start_version: Option<Version>) -> Result<Version> {
-        let mut version = start_version.unwrap_or(0);
-
+    pub fn process_a_batch(&self, start_version: Version) -> Result<Version> {
+        let mut version = start_version;
         let num_transactions = self.get_num_of_transactions(version)?;
         let mut db_iter = self.get_main_db_iter(version, num_transactions)?;
         let batch = SchemaBatch::new();
@@ -399,7 +407,25 @@ impl DBIndexer {
             version += 1;
             Ok::<(), AptosDbError>(())
         })?;
-        assert_eq!(num_transactions, version - start_version.unwrap_or(0));
+        assert_eq!(num_transactions, version - start_version);
+        if self.indexer_db.transaction_enabled() {
+            batch.put::<InternalIndexerMetadataSchema>(
+                &MetadataKey::TransactionVersion,
+                &MetadataValue::Version(version),
+            )?;
+        }
+        if self.indexer_db.event_enabled() {
+            batch.put::<InternalIndexerMetadataSchema>(
+                &MetadataKey::EventVersion,
+                &MetadataValue::Version(version),
+            )?;
+        }
+        if self.indexer_db.statekeys_enabled() {
+            batch.put::<InternalIndexerMetadataSchema>(
+                &MetadataKey::StateVersion,
+                &MetadataValue::Version(version),
+            )?;
+        }
         batch.put::<InternalIndexerMetadataSchema>(
             &MetadataKey::LatestVersion,
             &MetadataValue::Version(version - 1),

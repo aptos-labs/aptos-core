@@ -309,20 +309,20 @@ impl Context {
     pub fn get_latest_internal_indexer_ledger_version_and_main_db_info<E: StdApiError>(
         &self,
     ) -> Result<(LedgerInfo, Version), E> {
-        if self.indexer_reader.is_none() {
-            return Err(E::internal_with_code_no_info(
-                "Indexer reader doesn't exist",
-                AptosErrorCode::InternalError,
-            ));
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            if let Some(latest_version) = indexer_reader
+                .get_latest_internal_indexer_ledger_version()
+                .map_err(|err| E::internal_with_code_no_info(err, AptosErrorCode::InternalError))?
+            {
+                let latest_ledger_info = self.get_latest_ledger_info()?;
+                return Ok((latest_ledger_info, latest_version));
+            }
         }
-        let latest_version = self
-            .indexer_reader
-            .as_ref()
-            .unwrap()
-            .get_latest_internal_indexer_ledger_version()
-            .map_err(|err| E::internal_with_code_no_info(err, AptosErrorCode::InternalError))?;
-        let latest_ledger_info = self.get_latest_ledger_info()?;
-        Ok((latest_ledger_info, latest_version))
+
+        Err(E::internal_with_code_no_info(
+            "Indexer reader doesn't exist, or doesn't have data.",
+            AptosErrorCode::InternalError,
+        ))
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {

@@ -36,7 +36,10 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
-use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
+use aptos_db_indexer_schemas::{
+    metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
+    schema::indexer_metadata::InternalIndexerMetadataSchema,
+};
 use aptos_executor::components::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
@@ -1189,8 +1192,40 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             .commit(version, batch, sharded_schema_batch)
     }
 
-    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
-        self.ledger_db.metadata_db().put_usage(version, usage)
+    fn kv_finish(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
+        self.ledger_db.metadata_db().put_usage(version, usage)?;
+        if let Some(internal_indexer_db) = self.internal_indexer_db.as_ref() {
+            if version > 0 {
+                let batch = SchemaBatch::new();
+                batch.put::<InternalIndexerMetadataSchema>(
+                    &MetadataKey::LatestVersion,
+                    &MetadataValue::Version(version - 1),
+                )?;
+                if internal_indexer_db.statekeys_enabled() {
+                    batch.put::<InternalIndexerMetadataSchema>(
+                        &MetadataKey::StateVersion,
+                        &MetadataValue::Version(version - 1),
+                    )?;
+                }
+                if internal_indexer_db.transaction_enabled() {
+                    batch.put::<InternalIndexerMetadataSchema>(
+                        &MetadataKey::TransactionVersion,
+                        &MetadataValue::Version(version - 1),
+                    )?;
+                }
+                if internal_indexer_db.event_enabled() {
+                    batch.put::<InternalIndexerMetadataSchema>(
+                        &MetadataKey::EventVersion,
+                        &MetadataValue::Version(version - 1),
+                    )?;
+                }
+                internal_indexer_db
+                    .get_inner_db_ref()
+                    .write_schemas(batch)?;
+            }
+        }
+
+        Ok(())
     }
 
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {

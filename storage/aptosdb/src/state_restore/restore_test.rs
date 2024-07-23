@@ -88,7 +88,7 @@ where
         Ok(())
     }
 
-    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
+    fn kv_finish(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
         self.usage_store.write().insert(version, usage);
         Ok(())
     }

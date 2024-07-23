@@ -77,13 +77,11 @@ impl InternalIndexerDBService {
     }
 
     pub async fn get_start_version(&self, node_config: &NodeConfig) -> Result<Version> {
-        let indexer_version = self.db_indexer.indexer_db.get_persisted_version()?;
         let fast_sync_enabled = node_config
             .state_sync
             .state_sync_driver
             .bootstrapping_mode
             .is_fast_sync();
-        let mut db_min_version = self.db_indexer.get_main_db_lowest_viable_version()?;
         let mut main_db_synced_version = self.db_indexer.main_db_reader.get_synced_version()?;
 
         // Wait till fast sync is done
@@ -91,24 +89,47 @@ impl InternalIndexerDBService {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             main_db_synced_version = self.db_indexer.main_db_reader.get_synced_version()?;
         }
-        
-        let fast_sync_version_opt = self
+
+        let start_version = self
             .db_indexer
             .indexer_db
-            .get_restore_progress(db_min_version)?;
+            .get_persisted_version()?
+            .map_or(0, |v| v + 1);
 
-        if node_config.indexer_db_config.enable_statekeys()
-            && fast_sync_enabled
-            && fast_sync_version_opt.is_none()
-        {
-            panic!("Internal indexer db don't have state keys restored. Please run state sync with state keys enabled.");
+        if node_config.indexer_db_config.enable_statekeys() {
+            let state_start_version = self
+                .db_indexer
+                .indexer_db
+                .get_state_version()?
+                .map_or(0, |v| v + 1);
+            if start_version != state_start_version {
+                panic!("Cannot start state indexer because the progress doesn't match.");
+            }
         }
 
-        if indexer_version >= db_min_version {
-            Ok(indexer_version)
-        } else {
-            Ok(db_min_version)
+        if node_config.indexer_db_config.enable_transaction() {
+            let transaction_start_version = self
+                .db_indexer
+                .indexer_db
+                .get_transaction_version()?
+                .map_or(0, |v| v + 1);
+            if start_version != transaction_start_version {
+                panic!("Cannot start transaction indexer because the progress doesn't match.");
+            }
         }
+
+        if node_config.indexer_db_config.enable_event() {
+            let event_start_version = self
+                .db_indexer
+                .indexer_db
+                .get_event_version()?
+                .map_or(0, |v| v + 1);
+            if start_version != event_start_version {
+                panic!("Cannot start event indexer because the progress doesn't match.");
+            }
+        }
+
+        Ok(start_version)
     }
 
     pub async fn run(&mut self, node_config: &NodeConfig) -> Result<()> {
@@ -116,10 +137,10 @@ impl InternalIndexerDBService {
 
         loop {
             let start_time: std::time::Instant = std::time::Instant::now();
-            let next_version = self.db_indexer.process_a_batch(Some(start_version))?;
+            let next_version = self.db_indexer.process_a_batch(start_version)?;
 
             if next_version == start_version {
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 continue;
             }
             log_grpc_step(

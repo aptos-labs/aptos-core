@@ -21,7 +21,6 @@ aptos-config = { workspace = true }
 aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
-aptos-db-indexer = { workspace = true, features = ["fuzzing"]}
 aptos-db-indexer-schemas = { workspace = true }
 aptos-debugger = { workspace = true }
 aptos-dkg = { workspace = true }
@@ -66,6 +65,7 @@ walkdir = { workspace = true }
 
 [dev-dependencies]
 aptos-backup-cli = { workspace = true }
+aptos-db-indexer = { workspace = true, features = ["fuzzing"] }
 aptos-genesis = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }

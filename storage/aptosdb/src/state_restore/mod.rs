@@ -40,7 +40,7 @@ pub trait StateValueWriter<K, V>: Send + Sync {
         progress: StateSnapshotProgress,
     ) -> Result<()>;
 
-    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()>;
+    fn kv_finish(&self, version: Version, usage: StateStorageUsage) -> Result<()>;
 
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>>;
 }
@@ -127,7 +127,7 @@ impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
 
     pub fn finish(self) -> Result<()> {
         let progress = self.db.get_progress(self.version)?;
-        self.db.write_usage(
+        self.db.kv_finish(
             self.version,
             progress.map_or(StateStorageUsage::zero(), |p| p.usage),
         )
@@ -277,17 +277,6 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
     }
 
     fn finish_box(self: Box<Self>) -> Result<()> {
-        match self.restore_mode {
-            StateSnapshotRestoreMode::KvOnly => self.kv_restore.lock().take().unwrap().finish()?,
-            StateSnapshotRestoreMode::TreeOnly => {
-                self.tree_restore.lock().take().unwrap().finish_impl()?
-            },
-            StateSnapshotRestoreMode::Default => {
-                // for tree only mode, we also need to write the usage to DB
-                self.kv_restore.lock().take().unwrap().finish()?;
-                self.tree_restore.lock().take().unwrap().finish_impl()?
-            },
-        }
-        Ok(())
+        self.finish()
     }
 }
