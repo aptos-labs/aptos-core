@@ -489,6 +489,7 @@ impl BlockTransactionPayload {
                 // Verify the transaction limit
                 self.verify_transaction_limit(*max_txns_to_execute)?;
             },
+            Payload::OptQuorumStore(_) => todo!(),
         }
 
         Ok(())

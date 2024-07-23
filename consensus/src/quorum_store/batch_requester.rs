@@ -130,13 +130,12 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
 
     pub(crate) async fn request_batch(
         &self,
-        proof: ProofOfStore,
+        digest: HashValue,
+        expiration: u64,
+        signers: Vec<PeerId>,
         ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
         mut subscriber_rx: oneshot::Receiver<PersistedValue>,
     ) -> Option<(BatchInfo, Vec<SignedTransaction>)> {
-        let digest = *proof.digest();
-        let expiration = proof.expiration();
-        let signers = proof.shuffled_signers(&self.validator_verifier);
         let validator_verifier = self.validator_verifier.clone();
         let mut request_state = BatchRequesterState::new(signers, ret_tx, self.retry_limit);
         let network_sender = self.network_sender.clone();
