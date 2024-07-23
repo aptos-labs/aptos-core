@@ -28,6 +28,7 @@ use async_trait::async_trait;
 use futures::channel::mpsc::Sender;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
+    ops::Deref,
     sync::Arc,
 };
 use tokio::sync::oneshot;
@@ -341,6 +342,34 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     proof_with_data.proofs.clone(),
                     *max_txns_to_execute,
                     inline_batches,
+                )
+            },
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                let opt_batch_txns = process_payload_helper(
+                    opt_qs_payload.opt_batches(),
+                    self.batch_reader.clone(),
+                    block,
+                    &self.ordered_authors,
+                )
+                .await?;
+                let proof_batch_txns = process_payload_helper(
+                    opt_qs_payload.proof_with_data(),
+                    self.batch_reader.clone(),
+                    block,
+                    &self.ordered_authors,
+                )
+                .await?;
+                let inline_batch_txns = opt_qs_payload.inline_batches().transactions();
+                let all_txns = [opt_batch_txns, proof_batch_txns, inline_batch_txns].concat();
+                BlockTransactionPayload::new_opt_quorum_store(
+                    all_txns,
+                    opt_qs_payload.proof_with_data().deref().clone(),
+                    opt_qs_payload.max_txns_to_execute(),
+                    [
+                        opt_qs_payload.opt_batches().deref().clone(),
+                        opt_qs_payload.inline_batches().batch_infos(),
+                    ]
+                    .concat(),
                 )
             },
             _ => unreachable!(
