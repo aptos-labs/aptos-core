@@ -307,7 +307,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             let (stream_results_tx, stream_results_rx) = unbounded();
             let coordinator_client_clone = self.coordinator_client.clone();
             let stream_results_thread = thread::spawn(move || {
-                let batch_size = 5000;
+                let batch_size = 200;
                 let mut curr_batch = vec![];
                 let mut seq_num: u64 = 0;
                 let mut rng = StdRng::from_entropy();
@@ -350,7 +350,11 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 shard_txns_start_index as TxnIndex,
                 stream_results_tx.clone(),
             );
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            info!("Checkpoint 1: {}", curr_time);
             drop(state_view);
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            info!("Checkpoint 2: {}", curr_time);
             drop(exe_timer);
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             info!("Finished executing block at time: {}", curr_time);
