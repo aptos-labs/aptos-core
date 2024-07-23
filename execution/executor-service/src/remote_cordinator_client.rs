@@ -287,7 +287,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let state_view_client_clone = self.state_view_client.clone();
                 let is_block_init_done_clone = self.is_block_init_done.clone();
                 let cmd_rx_thread_pool_clone = self.cmd_rx_thread_pool.clone();
-                self.cmd_rx_thread_pool.spawn(move || {
+                self.cmd_rx_thread_pool.spawn_fifo(move || {
                     Self::receive_execute_command_stream_follow_up(
                         state_view_client_clone,
                         command_rx,
