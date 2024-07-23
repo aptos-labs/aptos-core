@@ -35,6 +35,8 @@ use move_core_types::vm_status::VMStatus;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::SystemTime;
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
 use rayon::prelude::IntoParallelIterator;
 use serde::{Deserialize, Serialize};
 use aptos_block_executor::transaction_provider::TxnProvider;
@@ -308,17 +310,18 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 let batch_size = 200;
                 let mut curr_batch = vec![];
                 let mut seq_num: u64 = 0;
+                let mut rng = StdRng::from_entropy();
                 loop {
                     let txn_idx_output: TransactionIdxAndOutput = stream_results_rx.recv().unwrap();
                     if txn_idx_output.txn_idx == u32::MAX {
                         if !curr_batch.is_empty() {
-                            coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+                            coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch, rng.gen_range(0, 8));
                         }
                         break;
                     }
                     curr_batch.push(txn_idx_output);
                     if curr_batch.len() == batch_size {
-                        coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+                        coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch, rng.gen_range(0, 8));
                         curr_batch = vec![];
                         seq_num += 1;
                     }

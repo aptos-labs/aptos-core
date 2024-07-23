@@ -29,7 +29,7 @@ pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
     command_rx: Arc<Receiver<Message>>,
     //result_tx: Sender<Message>,
-    result_tx: Arc<Mutex<OutboundRpcHelper>>,
+    result_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
     shard_id: ShardId,
     cmd_rx_msg_duration_since_epoch: Arc<AtomicU64>,
     is_block_init_done: Arc<AtomicBool>,//Mutex<bool>,
@@ -46,7 +46,10 @@ impl RemoteCoordinatorClient {
         let execute_command_type = format!("execute_command_{}", shard_id);
         let execute_result_type = format!("execute_result_{}", shard_id);
         let command_rx = controller.create_inbound_channel(execute_command_type);
-        let result_tx = Arc::new(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
+        let mut result_tx = vec![];
+        for _ in 0..8 {
+            result_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
+        }
             //controller.create_outbound_channel(coordinator_address, execute_result_type);
         let cmd_rx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -70,7 +73,7 @@ impl RemoteCoordinatorClient {
         Self {
             state_view_client: Arc::new(state_view_client),
             command_rx: Arc::new(command_rx),
-            result_tx,
+            result_tx: Arc::new(result_tx),
             shard_id,
             cmd_rx_msg_duration_since_epoch: Arc::new(AtomicU64::new(0)),
             is_block_init_done: Arc::new(AtomicBool::new(false)),
@@ -326,10 +329,10 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         let delta = get_delta_time(duration_since_epoch);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["6_results_tx_msg_shard_send"]).observe(delta as f64);
-        self.result_tx.lock().unwrap().send(Message::create_with_metadata(output_message, duration_since_epoch, 0, 0), &MessageType::new(execute_result_type));
+        self.result_tx[0].lock().unwrap().send(Message::create_with_metadata(output_message, duration_since_epoch, 0, 0), &MessageType::new(execute_result_type));
     }
 
-    fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
+    fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>, rand_result_rx_thread: usize) {
         //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
         let result_tx_clone = self.result_tx.clone();
         let shard_id_clone = self.shard_id.clone();
@@ -343,7 +346,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             let tx_send_timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&[&shard_id_clone.to_string(), "result_tx_send"])
                 .start_timer();
-            result_tx_clone.lock().unwrap().send(Message::new(output_message), &MessageType::new(execute_result_type));
+            result_tx_clone[rand_result_rx_thread].lock().unwrap().send(Message::new(output_message), &MessageType::new(execute_result_type));
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             info!("Sent cmd results batch at time: {}", curr_time);
         });
