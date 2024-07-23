@@ -158,13 +158,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let kv_unprocessed_clone = kv_unprocessed.clone();
             let recv_condition_clone = self.recv_condition.clone();
             let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
-            kv_proc_runtime_clone
-                .spawn(async move {Self::priority_handler(state_view_clone.clone(),
+            self.kv_proc_runtime.spawn(async move {Self::priority_handler(state_view_clone.clone(),
                                                       kv_tx_clone.clone(),
                                                       kv_unprocessed_clone.clone(),
                                                       recv_condition_clone.clone(),
-                                                      outbound_rpc_runtime_clone)
-                });
+                                                      outbound_rpc_runtime_clone)});
         }
 
         while let Ok(message) = self.kv_rx.recv() {
@@ -211,6 +209,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                             outbound_rpc_runtime: Arc<Runtime>,) {
         let mut rng = StdRng::from_entropy();
         loop {
+            info!("I'm here");
             let message = pq.recv().await;
             let state_view = state_view.clone();
             let kv_txs = kv_tx.clone();
