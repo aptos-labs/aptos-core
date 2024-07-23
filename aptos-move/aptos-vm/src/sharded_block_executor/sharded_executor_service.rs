@@ -307,7 +307,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             let (stream_results_tx, stream_results_rx) = unbounded();
             let coordinator_client_clone = self.coordinator_client.clone();
             let stream_results_thread = thread::spawn(move || {
-                let batch_size = 200;
+                let batch_size = 5000;
                 let mut curr_batch = vec![];
                 let mut seq_num: u64 = 0;
                 let mut rng = StdRng::from_entropy();
