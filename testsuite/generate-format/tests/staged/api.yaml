@@ -606,6 +606,10 @@ TransactionArgument:
           TUPLEARRAY:
             CONTENT: U8
             SIZE: 32
+    9:
+      Raw:
+        NEWTYPE:
+          SEQ: U8
 TransactionAuthenticator:
   ENUM:
     0:
