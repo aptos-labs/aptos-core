@@ -102,7 +102,7 @@ async fn test_batch_request_exists() {
 
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
-        .request_batch(
+        .request_batch_for_proof(
             ProofOfStore::new(
                 batch.batch_info().clone(),
                 AggregateSignature::new(vec![u8::MAX].into(), None),
@@ -199,7 +199,7 @@ async fn test_batch_request_not_exists_not_expired() {
     let request_start = Instant::now();
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
-        .request_batch(
+        .request_batch_for_proof(
             ProofOfStore::new(
                 batch.batch_info().clone(),
                 AggregateSignature::new(vec![u8::MAX].into(), None),
@@ -248,7 +248,7 @@ async fn test_batch_request_not_exists_expired() {
     let request_start = Instant::now();
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
-        .request_batch(
+        .request_batch_for_proof(
             ProofOfStore::new(
                 batch.batch_info().clone(),
                 AggregateSignature::new(vec![u8::MAX].into(), None),
