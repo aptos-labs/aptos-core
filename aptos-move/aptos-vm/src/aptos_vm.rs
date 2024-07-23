@@ -739,32 +739,30 @@ impl AptosVM {
 
         let func = session.load_script(script.code(), script.ty_args())?;
 
+        let compiled_script = match CompiledScript::deserialize_with_config(
+            script.code(),
+            self.deserializer_config(),
+        ) {
+            Ok(script) => script,
+            Err(err) => {
+                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                let partial_err = PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Script);
+                return Err(partial_err.into_vm_status());
+            },
+        };
+
         // Check that unstable bytecode cannot be executed on mainnet
         if self
             .features()
             .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT)
         {
-            let script = match CompiledScript::deserialize_with_config(
-                script.code(),
-                self.deserializer_config(),
-            ) {
-                Ok(script) => script,
-                Err(err) => {
-                    let msg = format!("[VM] deserializer for script returned error: {:?}", err);
-                    return Err(VMStatus::error(
-                        StatusCode::CODE_DESERIALIZATION_ERROR,
-                        Some(msg),
-                    ));
-                },
-            };
-            self.reject_unstable_bytecode_for_script(&script)?;
+            self.reject_unstable_bytecode_for_script(&compiled_script)?;
         }
 
         // TODO(Gerardo): consolidate the extended validation to verifier.
-        verifier::event_validation::verify_no_event_emission_in_script(
-            script.code(),
-            self.deserializer_config(),
-        )?;
+        verifier::event_validation::verify_no_event_emission_in_compiled_script(&compiled_script)?;
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
@@ -1653,7 +1651,7 @@ impl AptosVM {
                 if metadata.unstable {
                     return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                         .with_message("script marked unstable cannot be run on mainnet".to_string())
-                        .finish(Location::Undefined));
+                        .finish(Location::Script));
                 }
             }
         }
