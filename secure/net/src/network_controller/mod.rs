@@ -190,10 +190,10 @@ impl OutboundRpcScheduler {
     pub fn start(&self) {
         let num_workers = self.outbound_rpc_runtime.handle().metrics().num_workers();
         for _ in 0..num_workers {
-            let outbound_rpc_scheduler = self.outbound_rpc_scheduler.clone();
+            let outbound_rpc_scheduler_clone = self.outbound_rpc_scheduler.clone();
             self.outbound_rpc_runtime.spawn(async move {
                 loop {
-                    let msg = outbound_rpc_scheduler.recv().await;
+                    let msg = outbound_rpc_scheduler_clone.recv().await;
                     msg.outbound_helper.lock().await.send_async(msg.msg, &msg.msg_type).await;
                 }
             });
@@ -293,6 +293,7 @@ impl NetworkController {
             "Starting network controller started for at {}",
             self.listen_addr
         );
+        self.outbound_rpc_scheduler.start();
         self.inbound_server_shutdown_tx = self
             .inbound_handler
             .lock()
