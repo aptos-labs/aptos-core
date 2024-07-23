@@ -415,12 +415,23 @@ pub type Type = Spanned<Type_>;
 pub enum LValue_ {
     Var(ModuleAccess, Option<Vec<Type>>),
     // the last bool is true if the unpack has a trailing ".."
-    Unpack(ModuleAccess, Option<Vec<Type>>, Fields<LValue>, Option<Dotdot>),
+    Unpack(
+        ModuleAccess,
+        Option<Vec<Type>>,
+        Fields<LValue>,
+        Option<Dotdot>,
+    ),
     PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueOrDotdotList),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
 pub type LValueList = Spanned<LValueList_>;
+
+pub fn wild_card(loc: Loc) -> LValue {
+    let wildcard = sp(loc, Symbol::from("_"));
+    let lvalue_ = LValue_::Var(sp(loc, ModuleAccess_::Name(wildcard)), None);
+    sp(loc, lvalue_)
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Dotdot_;

@@ -9,7 +9,10 @@ use crate::{
     diagnostics::{codes::DeprecatedItem, Diagnostic},
     expansion::{
         aliases::{AliasMap, AliasSet},
-        ast::{self as E, Address, Fields, LValueOrDotdot_, ModuleAccess_, ModuleIdent, ModuleIdent_, SpecId},
+        ast::{
+            self as E, Address, Fields, LValueOrDotdot_, ModuleAccess_, ModuleIdent, ModuleIdent_,
+            SpecId,
+        },
         byte_string, hex_string,
     },
     parser::ast::{
@@ -2908,7 +2911,12 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                 && is_valid_struct_constant_or_schema_name(v.value().as_str())
             {
                 // Interpret as an unqualified module access
-                EL::Unpack(sp(v.loc(), ModuleAccess_::Name(v.0)), None, Fields::new(), None)
+                EL::Unpack(
+                    sp(v.loc(), ModuleAccess_::Name(v.0)),
+                    None,
+                    Fields::new(),
+                    None,
+                )
             } else {
                 check_valid_local_name(context, &v);
                 EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
@@ -2931,14 +2939,16 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                         let lval = bind(context, pbind.clone())?;
                         vfields.push((field.clone(), lval));
                     },
-                    P::BindFieldOrDotdot_::Dotdot => if i != pfields.len() - 1 {
-                        context.env.add_diag(diag!(
-                            Syntax::UnexpectedToken,
-                            (pfield.loc, "`..` must be at the end")
-                        ));
-                    } else {
-                        dotdot = Some(sp(pfield.loc, E::Dotdot_));
-                    }
+                    P::BindFieldOrDotdot_::Dotdot => {
+                        if i != pfields.len() - 1 {
+                            context.env.add_diag(diag!(
+                                Syntax::UnexpectedToken,
+                                (pfield.loc, "`..` must be at the end")
+                            ));
+                        } else {
+                            dotdot = Some(sp(pfield.loc, E::Dotdot_));
+                        }
+                    },
                 }
             }
             let fields = fields(context, loc, "deconstruction binding", "binding", vfields);
@@ -2953,25 +2963,29 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             )?;
             let tys_opt = optional_types(context, ptys_opt);
             let mut dot_seen = false;
-            let fields: Option<Vec<E::LValueOrDotdot>> = pargs.into_iter().map(|pb_or_dotdot| {
-                let sp!(loc, pb_or_dotdot_) = pb_or_dotdot;
-                match pb_or_dotdot_ {
-                    P::BindOrDotdot_::Bind(pb) => bind(context, pb).map(|b| sp(b.loc, LValueOrDotdot_::LValue(b))),
-                    P::BindOrDotdot_::Dotdot => {
-                        if dot_seen {
-                            context.env.add_diag(diag!(
-                                Syntax::UnexpectedToken,
-                                (loc, "Ambiguous `..`")
-                            ));
-                            None
-                        } else {
-                            dot_seen = true;
-                            Some(sp(loc, LValueOrDotdot_::Dotdot))
-                        }
+            let fields: Option<Vec<E::LValueOrDotdot>> = pargs
+                .into_iter()
+                .map(|pb_or_dotdot| {
+                    let sp!(loc, pb_or_dotdot_) = pb_or_dotdot;
+                    match pb_or_dotdot_ {
+                        P::BindOrDotdot_::Bind(pb) => {
+                            bind(context, pb).map(|b| sp(b.loc, LValueOrDotdot_::LValue(b)))
+                        },
+                        P::BindOrDotdot_::Dotdot => {
+                            if dot_seen {
+                                context.env.add_diag(diag!(
+                                    Syntax::UnexpectedToken,
+                                    (loc, "Ambiguous `..`")
+                                ));
+                                None
+                            } else {
+                                dot_seen = true;
+                                Some(sp(loc, LValueOrDotdot_::Dotdot))
+                            }
+                        },
                     }
-                }
-            }
-            ).collect();
+                })
+                .collect();
             EL::PositionalUnpack(tn, tys_opt, Spanned::new(loc, fields?))
         },
     };
@@ -3315,13 +3329,17 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
             .for_each(|(_, _, (_, l))| unbound_names_bind(unbound, l)),
         EL::PositionalUnpack(_, _, ls) => {
             let loc = ls.loc;
-            let ls = ls.value.iter().filter_map(|l| {
-                if let sp!(_, LValueOrDotdot_::LValue(l)) = l {
-                    Some(l.clone())
-                } else {
-                    None
-                }
-            }).collect();
+            let ls = ls
+                .value
+                .iter()
+                .filter_map(|l| {
+                    if let sp!(_, LValueOrDotdot_::LValue(l)) = l {
+                        Some(l.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             unbound_names_binds(unbound, &sp(loc, ls))
         },
     }
@@ -3347,13 +3365,17 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
             .for_each(|(_, _, (_, l))| unbound_names_assign(unbound, l)),
         EL::PositionalUnpack(_, _, ls) => {
             let loc = ls.loc;
-            let ls = ls.value.iter().filter_map(|l| {
-                if let sp!(_, LValueOrDotdot_::LValue(l)) = l {
-                    Some(l.clone())
-                } else {
-                    None
-                }
-            }).collect();
+            let ls = ls
+                .value
+                .iter()
+                .filter_map(|l| {
+                    if let sp!(_, LValueOrDotdot_::LValue(l)) = l {
+                        Some(l.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             unbound_names_assigns(unbound, &sp(loc, ls))
         },
     }
