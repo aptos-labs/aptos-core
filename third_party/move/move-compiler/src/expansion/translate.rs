@@ -2956,11 +2956,23 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                 Some(DeprecatedItem::Struct),
             )?;
             let tys_opt = optional_types(context, ptys_opt);
+            let mut dot_seen = false;
             let fields: Option<Vec<E::LValueOrDotdot>> = pargs.into_iter().map(|pb_or_dotdot| {
                 let sp!(loc, pb_or_dotdot_) = pb_or_dotdot;
                 match pb_or_dotdot_ {
                     P::BindOrDotdot_::Bind(pb) => bind(context, pb).map(|b| sp(b.loc, LValueOrDotdot_::LValue(b))),
-                    P::BindOrDotdot_::Dotdot => Some(sp(loc, LValueOrDotdot_::Dotdot))
+                    P::BindOrDotdot_::Dotdot => {
+                        if dot_seen {
+                            context.env.add_diag(diag!(
+                                Syntax::UnexpectedToken,
+                                (loc, "Ambiguous `..`")
+                            ));
+                            None
+                        } else {
+                            dot_seen = true;
+                            Some(sp(loc, LValueOrDotdot_::Dotdot))
+                        }
+                    }
                 }
             }
             ).collect();
