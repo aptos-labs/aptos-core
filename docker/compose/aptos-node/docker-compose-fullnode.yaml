@@ -4,7 +4,7 @@
 version: "3.8"
 services:
   haproxy:
-    image: haproxytech/haproxy-debian:2.2.29
+    image: haproxy:3.0.2
     volumes:
       - type: bind
         source: ./haproxy-fullnode.cfg
