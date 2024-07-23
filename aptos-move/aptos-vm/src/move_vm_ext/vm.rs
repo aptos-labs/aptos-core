@@ -8,8 +8,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_16, AptosGasParameters, MiscGasParameters,
-    NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
@@ -40,13 +39,8 @@ impl GenesisMoveVM {
         let features = Features::default();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
-        let pseudo_meter_vector_ty_to_ty_tag_construction = true;
-        let vm_config = aptos_prod_vm_config(
-            &features,
-            &timed_features,
-            pseudo_meter_vector_ty_to_ty_tag_construction,
-            aptos_default_ty_builder(),
-        );
+        let vm_config =
+            aptos_prod_vm_config(&features, &timed_features, aptos_default_ty_builder());
 
         // All genesis sessions run with unmetered gas meter, and here we set
         // the gas parameters for natives as zeros (because they do not matter).
@@ -141,8 +135,6 @@ impl MoveVmExt {
 
         // TODO(George): Move gas configs to environment to avoid this clone!
         let mut vm_config = env.vm_config().clone();
-        vm_config.pseudo_meter_vector_ty_to_ty_tag_construction =
-            gas_feature_version >= RELEASE_V1_16;
         vm_config.ty_builder = ty_builder;
         vm_config.disallow_dispatch_for_native = env
             .features()
