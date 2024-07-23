@@ -4065,6 +4065,7 @@ dependencies = [
  "async-trait",
  "clap 4.4.14",
  "futures",
+ "hex",
  "itertools 0.12.1",
  "once_cell",
  "rand 0.7.3",
