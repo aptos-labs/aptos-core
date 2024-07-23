@@ -56,7 +56,9 @@ pub fn get_blocks_from_block_store_and_window(
     block: &Block,
     window_size: Option<u64>,
 ) -> Vec<Block> {
-    let windowed_blocks = block_store.get_ordered_block_window(block, window_size);
+    let windowed_blocks = block_store
+        .get_ordered_block_window(block, window_size)
+        .expect("Expected OrderedBlockWindow");
     let ordered_block_window = windowed_blocks.expect("Expected valid OrderedBlockWindow");
     ordered_block_window.blocks().to_owned()
 }

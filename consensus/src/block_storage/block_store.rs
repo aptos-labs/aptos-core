@@ -406,9 +406,7 @@ impl BlockStore {
             "Recovered block already exists"
         );
 
-        // We don't know if the blocks in the window for a committed block will
-        // be available in memory so we set the OrderedBlockWindow to empty
-        let pipelined_block = PipelinedBlock::new_ordered(block, OrderedBlockWindow::empty());
+        let pipelined_block = PipelinedBlock::new_ordered(block, None);
         self.insert_block_inner(pipelined_block).await
     }
 
@@ -425,14 +423,16 @@ impl BlockStore {
             .inner
             .read()
             .get_ordered_block_window(&block, self.window_size)?;
-        let blocks = block_window.blocks();
-        for block in blocks {
-            if let Some(payload) = block.payload() {
-                self.payload_manager.prefetch_payload_data(
-                    payload,
-                    block.author().expect("Payload block must have author"),
-                    block.timestamp_usecs(),
-                );
+        if let Some(block_window) = &block_window {
+            let blocks = block_window.blocks();
+            for block in blocks {
+                if let Some(payload) = block.payload() {
+                    self.payload_manager.prefetch_payload_data(
+                        payload,
+                        block.author().expect("Payload block must have author"),
+                        block.timestamp_usecs(),
+                    );
+                }
             }
         }
 
@@ -849,7 +849,7 @@ impl BlockStore {
         &self,
         block: &Block,
         window_size: Option<u64>,
-    ) -> anyhow::Result<OrderedBlockWindow> {
+    ) -> anyhow::Result<Option<OrderedBlockWindow>> {
         self.inner
             .read()
             .get_ordered_block_window(block, window_size.or(self.window_size))

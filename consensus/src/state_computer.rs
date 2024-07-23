@@ -20,8 +20,11 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    block::Block, common::Round, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
+    block::Block,
+    common::Round,
+    pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -68,6 +71,7 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
+    is_execution_pool_enabled: bool,
 }
 
 /// Basic communication with the Execution module;
@@ -175,10 +179,7 @@ impl ExecutionProxy {
         let blocks = blocks.to_vec();
         Box::pin(async move {
             for block in blocks.iter() {
-                let payload = block.payload().cloned();
-                let payload_vec = payload.into_iter().collect();
-                let timestamp = block.timestamp_usecs();
-                payload_manager.notify_commit(timestamp, payload_vec);
+                payload_manager.notify_commit(block.block(), block.block_window());
             }
             callback(&blocks, finality_proof);
         })
@@ -192,6 +193,7 @@ impl ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            is_execution_pool_enabled,
         } = self
             .state
             .read()
@@ -204,6 +206,7 @@ impl ExecutionProxy {
             self.transaction_filter.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
+            is_execution_pool_enabled,
         ));
         PipelineBuilder::new(
             block_preparer,
@@ -225,6 +228,7 @@ impl StateComputer for ExecutionProxy {
         &self,
         // The block to be executed.
         block: &Block,
+        block_window: Option<&OrderedBlockWindow>,
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
@@ -244,6 +248,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            is_execution_pool_enabled,
         } = self
             .state
             .read()
@@ -257,6 +262,7 @@ impl StateComputer for ExecutionProxy {
             self.transaction_filter.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
+            is_execution_pool_enabled,
         );
 
         let block_executor_onchain_config = block_executor_onchain_config.clone();
@@ -273,6 +279,7 @@ impl StateComputer for ExecutionProxy {
             .execution_pipeline
             .queue(
                 block.clone(),
+                block_window.cloned(),
                 metadata.clone(),
                 parent_block_id,
                 block_qc,
@@ -437,16 +444,6 @@ impl StateComputer for ExecutionProxy {
             return Ok(());
         }
 
-        // This is to update QuorumStore with the latest known commit in the system,
-        // so it can set batches expiration accordingly.
-        // Might be none if called in the recovery path, or between epoch stop and start.
-        if let Some(inner) = self.state.read().as_ref() {
-            let block_timestamp = target.commit_info().timestamp_usecs();
-            inner
-                .payload_manager
-                .notify_commit(block_timestamp, Vec::new());
-        }
-
         // Inject an error for fail point testing
         fail_point!("consensus::sync_to_target", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to_target").into())
@@ -484,6 +481,7 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        execution_pool_enabled: bool,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -496,6 +494,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
+            is_execution_pool_enabled: execution_pool_enabled,
         });
     }
 
@@ -657,6 +656,7 @@ async fn test_commit_sync_race() {
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),
+        false,
         false,
     );
     executor
