@@ -197,10 +197,10 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
                 }
                 // For arguments, we also need to check the case that a src, even if not used after this program
                 // point, is again used in the argument list. Also, in difference to assign inference, we only need
-                // to copy the argument if its not primitive.
+                // to copy the argument if its not primitive or it is being borrowed.
                 for (i, src) in srcs.iter().enumerate() {
                     if (temp_needs_copy(src, instr) || srcs[i + 1..].contains(src))
-                        && type_needs_copy(src)
+                        && (lifetime.before.is_borrowed(*src) || type_needs_copy(src))
                     {
                         state.needs_copy.insert(*src);
                     } else {
@@ -294,15 +294,9 @@ impl<'a> Transformer<'a> {
                     self.builder.emit(Assign(id, dst, src, AssignKind::Move))
                 },
             },
-            Call(id, dests, op, srcs, ai) => {
-                use Operation::*;
-                match &op {
-                    Function(..) => {
-                        let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
-                        self.check_and_emit_bytecode(code_offset, Call(id, dests, op, new_srcs, ai))
-                    },
-                    _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
-                }
+            Call(..) => {
+                let bc = self.translate_bytecode_call(&bc, code_offset);
+                self.check_and_emit_bytecode(code_offset, bc)
             },
             _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
         }
@@ -364,28 +358,37 @@ impl<'a> Transformer<'a> {
         self.check_copy(id, src, || ("explicitly copied here".to_string(), vec![]));
     }
 
-    /// Walks over the argument list and inserts copies if needed.
-    fn copy_args_if_needed(
+    /// During translation of `Call`, walks over the argument list and inserts copies if needed.
+    fn translate_bytecode_call(&mut self, bc: &Bytecode, code_offset: CodeOffset) -> Bytecode {
+        if let Bytecode::Call(id, dests, op, srcs, ai) = bc {
+            if op.function_call_or_primitive_operations() {
+                let mut new_srcs = vec![];
+                for src in srcs.iter() {
+                    new_srcs.push(self.copy_arg_if_needed(code_offset, *id, *src));
+                }
+                return Bytecode::Call(*id, dests.clone(), op.clone(), new_srcs, ai.clone());
+            }
+        }
+        bc.clone()
+    }
+
+    fn copy_arg_if_needed(
         &mut self,
         code_offset: CodeOffset,
         id: AttrId,
-        srcs: Vec<TempIndex>,
-    ) -> Vec<TempIndex> {
+        src: TempIndex,
+    ) -> TempIndex {
         use Bytecode::*;
         let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy drop");
-        let mut new_srcs = vec![];
-        for src in srcs.iter() {
-            if copy_drop_at.needs_copy.contains(src) {
-                self.check_implicit_copy(code_offset, id, *src);
-                let ty = self.builder.get_local_type(*src);
-                let temp = self.builder.new_temp(ty);
-                self.builder.emit(Assign(id, temp, *src, AssignKind::Copy));
-                new_srcs.push(temp)
-            } else {
-                new_srcs.push(*src)
-            }
+        if copy_drop_at.needs_copy.contains(&src) {
+            self.check_implicit_copy(code_offset, id, src);
+            let ty = self.builder.get_local_type(src);
+            let temp = self.builder.new_temp(ty);
+            self.builder.emit(Assign(id, temp, src, AssignKind::Copy));
+            temp
+        } else {
+            src
         }
-        new_srcs
     }
 
     /// Checks whether the given temp has copy ability, add diagnostics if not

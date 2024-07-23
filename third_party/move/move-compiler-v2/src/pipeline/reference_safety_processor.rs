@@ -986,6 +986,43 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.ty(local).is_reference()
     }
 
+    fn make_hints_from_usage(&self, temp: TempIndex) -> Vec<(Loc, String)> {
+        if let Some(info) = self.alive.after.get(&temp) {
+            info.usage_locations()
+                .into_iter()
+                .map(|loc| (loc, "used here".to_owned()))
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+
+    /// Returns true if the local is a ref or it is not being borrowed.
+    fn check_ambiguous_usage(&self, local: TempIndex) -> bool {
+        if self.is_ref(local) {
+            // Always valid
+            return true;
+        }
+        let loc = self.cur_loc();
+        if self.state.label_for_temp_with_children(local).is_some() {
+            self.error_with_hints(
+                loc,
+                format!(
+                    "ambiguous usage of {} since it is still being borrowed",
+                    self.display(local)
+                ),
+                format!(
+                    "ambiguous usage here, try an explicit annotation, e.g. 'move {}' or 'copy {}'",
+                    self.display_name_or_empty("", local),
+                    self.display_name_or_empty("", local)
+                ),
+                self.make_hints_from_usage(local).into_iter(),
+            );
+            return false;
+        }
+        true
+    }
+
     /// Check validness of reading a local.
     fn check_read_local(&self, local: TempIndex, read_mode: ReadMode) -> bool {
         if self.is_ref(local) {
@@ -1917,6 +1954,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a WriteRef instruction.
     fn write_ref(&mut self, dest: TempIndex, src: TempIndex) {
         self.check_read_local(src, ReadMode::Argument);
+        self.check_ambiguous_usage(src);
         if let Some(label) = self.state.label_for_temp_with_children(dest) {
             self.error_with_hints(
                 self.cur_loc(),
@@ -2012,6 +2050,13 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                     MoveFrom(mid, sid, inst) => {
                         step.move_from(dests[0], &mid.qualified_inst(*sid, inst.clone()), srcs[0])
                     },
+                    Vector => {
+                        for src in srcs {
+                            step.check_ambiguous_usage(*src);
+                        }
+                        step.call_operation(oper.clone(), dests, srcs)
+                    },
+
                     _ => step.call_operation(oper.clone(), dests, srcs),
                 }
             },
