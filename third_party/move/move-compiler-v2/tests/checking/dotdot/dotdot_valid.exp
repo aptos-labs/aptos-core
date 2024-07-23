@@ -1,0 +1,81 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    struct S0 {
+        dummy_field: bool,
+    }
+    struct S1 {
+        0: u8,
+    }
+    struct S2 {
+        0: bool,
+        1: test::S0,
+    }
+    struct S3 {
+        x: bool,
+        y: u8,
+    }
+    struct S4 {
+        x: #0,
+        y: test::S3,
+    }
+    private fun nested(x: test::S4<bool>) {
+        {
+          let test::S4<bool>{ x: _x, y: _ } = x;
+          {
+            let test::S4<bool>{ x: _, y: _y } = x;
+            {
+              let test::S4<bool>{ x: _, y: test::S3{ x: _, y: _ } } = x;
+              {
+                let test::S4<bool>{ x: _, y: test::S3{ x: _x, y: _ } } = x;
+                {
+                  let test::S4<bool>{ x: _x2, y: test::S3{ x: _x1, y: _ } } = x;
+                  {
+                    let test::S4<bool>{ x: _, y: test::S3{ x: _, y: _y } } = x;
+                    {
+                      let test::S4<bool>{ x: _x2, y: test::S3{ x: _x1, y: _ } } = x;
+                      Tuple()
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun simple_0(x: test::S0) {
+        {
+          let test::S0{ dummy_field: _ } = x;
+          Tuple()
+        }
+    }
+    private fun simple_1(x: test::S1) {
+        {
+          let test::S1{ 0: _ } = x;
+          Tuple()
+        }
+    }
+    private fun simple_2(x: test::S2) {
+        {
+          let test::S2{ 0: _, 1: _ } = x;
+          {
+            let test::S2{ 0: _x, 1: _ } = x;
+            {
+              let test::S2{ 0: _, 1: _x } = x;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun simple_3(x: test::S3) {
+        {
+          let test::S3{ x: _, y: _ } = x;
+          {
+            let test::S3{ x: _x, y: _ } = x;
+            {
+              let test::S3{ x: _, y: _y } = x;
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::test
