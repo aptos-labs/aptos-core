@@ -108,8 +108,8 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             Some(ms_since_epoch) => Message::create_with_metadata(
                 network_message.message,
                 ms_since_epoch,
-                network_message.seq_no.unwrap(),
-                network_message.shard_id.unwrap(),
+                network_message.seq_no.unwrap_or_default(),
+                network_message.shard_id.unwrap_or_default(),
             ),
             None => Message::new(network_message.message),
         };
