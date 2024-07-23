@@ -47,7 +47,7 @@ impl RemoteCoordinatorClient {
         let execute_result_type = format!("execute_result_{}", shard_id);
         let command_rx = controller.create_inbound_channel(execute_command_type);
         let mut result_tx = vec![];
-        for _ in 0..8 {
+        for _ in 0..16 {
             result_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
         }
             //controller.create_outbound_channel(coordinator_address, execute_result_type);
@@ -161,7 +161,7 @@ impl RemoteCoordinatorClient {
                         is_block_init_done_clone.store(false, std::sync::atomic::Ordering::Relaxed);
                         break_out = true;
                     }
-                    cmd_rx_thread_pool_clone.spawn(move || {
+                    cmd_rx_thread_pool_clone.spawn_fifo(move || {
                         let delta = get_delta_time(message.start_ms_since_epoch.unwrap());
                         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                             .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
