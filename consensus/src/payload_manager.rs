@@ -15,6 +15,7 @@ use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload, ProofWithData, Round},
     payload::{BatchPointer, DataFetchFut, TDataInfo},
+    pipelined_block::PipelinedBlock,
     proof_of_store::BatchInfo,
 };
 use aptos_crypto::HashValue;
@@ -29,7 +30,7 @@ use async_trait::async_trait;
 use futures::{channel::mpsc::Sender, FutureExt};
 use itertools::Itertools;
 use std::{
-    collections::{btree_map::Entry, BTreeMap, HashMap},
+    collections::{btree_map::Entry, BTreeMap, HashMap, HashSet},
     ops::Deref,
     sync::Arc,
 };
@@ -41,7 +42,7 @@ use tokio::sync::oneshot;
 pub trait TPayloadManager: Send + Sync {
     /// Notify the payload manager that a block has been committed. This indicates that the
     /// transactions in the block's payload are no longer required for consensus.
-    fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>);
+    fn notify_commit(&self, block_timestamp: u64, blocks: &[Arc<PipelinedBlock>]);
 
     /// Prefetch the data for a payload. This is used to ensure that the data for a payload is
     /// available when block is executed.
@@ -70,7 +71,7 @@ impl DirectMempoolPayloadManager {
 
 #[async_trait]
 impl TPayloadManager for DirectMempoolPayloadManager {
-    fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
+    fn notify_commit(&self, _block_timestamp: u64, _blocks: &[Arc<PipelinedBlock>]) {}
 
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
 
@@ -155,54 +156,90 @@ impl QuorumStorePayloadManager {
         }
         receivers
     }
+
+    fn batches_in_block(block: &Block) -> Vec<BatchInfo> {
+        let mut batches = vec![];
+        for payload in block.payload().iter() {
+            match payload {
+                Payload::DirectMempool(_) => {
+                    unreachable!("InQuorumStore should be used");
+                },
+                Payload::InQuorumStore(proof_with_status) => {
+                    for proof in proof_with_status.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+                Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                    for proof in proof_with_status.proof_with_data.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                    for (batch_info, _) in inline_batches.iter() {
+                        batches.push(batch_info.clone());
+                    }
+                    for proof in proof_with_data.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+                Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                    // TODO: how to avoid the clone?
+                    batches = opt_quorum_store_payload
+                        .clone()
+                        .into_inner()
+                        .get_all_batch_infos();
+                },
+            }
+        }
+        batches
+    }
+
+    fn batches_removed_from_window(block: &PipelinedBlock) -> Vec<BatchInfo> {
+        let mut batches_removed = HashSet::new();
+        if let Some(block_removed) = block
+            .block_window()
+            .blocks()
+            .iter()
+            .chain(std::iter::once(block.block()))
+            .next()
+        {
+            for batch in Self::batches_in_block(block_removed) {
+                batches_removed.insert(batch);
+            }
+        }
+        block
+            .block_window()
+            .blocks()
+            .iter()
+            .chain(std::iter::once(block.block()))
+            .skip(1)
+            .for_each(|block| {
+                for batch in Self::batches_in_block(block) {
+                    batches_removed.remove(&batch);
+                }
+            });
+        batches_removed.into_iter().collect()
+    }
 }
 
 #[async_trait]
 impl TPayloadManager for QuorumStorePayloadManager {
-    fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
+    fn notify_commit(&self, block_timestamp: u64, blocks: &[Arc<PipelinedBlock>]) {
         self.batch_reader
             .update_certified_timestamp(block_timestamp);
 
-        let batches: Vec<_> = payloads
-            .into_iter()
-            .flat_map(|payload| match payload {
-                Payload::DirectMempool(_) => {
-                    unreachable!("InQuorumStore should be used");
-                },
-                Payload::InQuorumStore(proof_with_status) => proof_with_status
-                    .proofs
-                    .iter()
-                    .map(|proof| proof.info().clone())
-                    .collect::<Vec<_>>(),
-                Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
-                    .proof_with_data
-                    .proofs
-                    .iter()
-                    .map(|proof| proof.info().clone())
-                    .collect::<Vec<_>>(),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
-                    inline_batches
-                        .iter()
-                        .map(|(batch_info, _)| batch_info.clone())
-                        .chain(
-                            proof_with_data
-                                .proofs
-                                .iter()
-                                .map(|proof| proof.info().clone()),
-                        )
-                        .collect::<Vec<_>>()
-                },
-                Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.into_inner().get_all_batch_infos()
-                },
-            })
-            .collect();
+        let mut batches_removed = HashSet::new();
+        for block in blocks {
+            for batch in Self::batches_removed_from_window(block) {
+                batches_removed.insert(batch);
+            }
+        }
 
         let mut tx = self.coordinator_tx.clone();
 
         if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
             block_timestamp,
-            batches,
+            batches_removed.into_iter().collect(),
         )) {
             warn!(
                 "CommitNotification failed. Is the epoch shutting down? error: {}",
@@ -738,7 +775,7 @@ impl ConsensusObserverPayloadManager {
 
 #[async_trait]
 impl TPayloadManager for ConsensusObserverPayloadManager {
-    fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {
+    fn notify_commit(&self, _block_timestamp: u64, _blocks: &[Arc<PipelinedBlock>]) {
         // noop
     }
 

@@ -92,7 +92,7 @@ impl BlockGasLimitType {
             conflict_penalty_window: 9,
             use_granular_resource_group_conflicts: false,
             use_module_publishing_block_conflict: true,
-            block_output_limit: Some(5 * 1024 * 1024),
+            block_output_limit: Some(4 * 5 * 1024 * 1024),
             include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: true,
         }
