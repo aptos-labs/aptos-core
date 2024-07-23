@@ -6,7 +6,7 @@ use crate::{
     file_format::{
         AbilitySet, FieldDefinition, IdentifierIndex, ModuleHandleIndex, SignatureToken,
         StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex,
-        StructTypeParameter, TableIndex, TypeSignature,
+        StructTypeParameter, TableIndex, TypeSignature, VariantDefinition,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -148,6 +148,8 @@ pub struct StructDefinitionGen {
     type_parameters: Vec<(AbilitySetGen, bool)>,
     #[allow(dead_code)]
     is_public: bool,
+    // Variants to generate, with prop index the name of the variant.
+    variants: Vec<PropIndex>,
     field_defs: Option<Vec<FieldDefinitionGen>>,
 }
 
@@ -164,23 +166,22 @@ impl StructDefinitionGen {
                 type_parameter_count,
             ),
             any::<bool>(),
+            vec(any::<PropIndex>(), 0..4), // Generate up to 4 variants (0 is pure struct)
             option::of(vec(FieldDefinitionGen::strategy(), field_count)),
         )
             .prop_map(
-                |(name_idx, abilities, type_parameters, is_public, field_defs)| Self {
+                |(name_idx, abilities, type_parameters, is_public, variants, field_defs)| Self {
                     name_idx,
                     abilities,
                     type_parameters,
                     is_public,
+                    variants,
                     field_defs,
                 },
             )
     }
 
-    pub fn materialize(
-        self,
-        state: &mut StDefnMaterializeState,
-    ) -> (Option<StructDefinition>, usize) {
+    pub fn materialize(self, state: &mut StDefnMaterializeState) -> Option<StructDefinition> {
         let mut field_names = HashSet::new();
         let mut fields = vec![];
         match self.field_defs {
@@ -216,27 +217,38 @@ impl StructDefinitionGen {
         };
         match state.add_struct_handle(handle) {
             Some(struct_handle) => {
-                if fields.is_empty() {
-                    (
-                        Some(StructDefinition {
-                            struct_handle,
-                            field_information: StructFieldInformation::Native,
-                        }),
-                        0,
-                    )
+                let field_information = if self.variants.is_empty() {
+                    if fields.is_empty() {
+                        StructFieldInformation::Native
+                    } else {
+                        StructFieldInformation::Declared(fields)
+                    }
                 } else {
-                    let field_count = fields.len();
-                    let field_information = StructFieldInformation::Declared(fields);
-                    (
-                        Some(StructDefinition {
-                            struct_handle,
-                            field_information,
-                        }),
-                        field_count,
+                    // partition fields among variants
+                    let mut variant_fields: Vec<Vec<FieldDefinition>> =
+                        (0..self.variants.len()).map(|_| vec![]).collect();
+                    for (i, fd) in fields.into_iter().enumerate() {
+                        variant_fields[i % self.variants.len()].push(fd)
+                    }
+                    StructFieldInformation::DeclaredVariants(
+                        variant_fields
+                            .into_iter()
+                            .zip(self.variants.iter())
+                            .map(|(fields, name)| VariantDefinition {
+                                name: IdentifierIndex(
+                                    name.index(state.identifiers_len) as TableIndex
+                                ),
+                                fields,
+                            })
+                            .collect(),
                     )
-                }
+                };
+                Some(StructDefinition {
+                    struct_handle,
+                    field_information,
+                })
             },
-            None => (None, 0),
+            None => None,
         }
     }
 }

@@ -15,6 +15,7 @@ use crate::{
             notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
             SharedMempoolNotification,
         },
+        use_case_history::UseCaseHistory,
     },
     MempoolEventsReceiver, QuorumStoreRequest,
 };
@@ -140,10 +141,16 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
 {
     let mempool = smp.mempool.clone();
     let mempool_validator = smp.validator.clone();
+    let use_case_history = smp.use_case_history.clone();
 
     tokio::spawn(async move {
         while let Some(commit_notification) = mempool_listener.next().await {
-            handle_commit_notification(&mempool, &mempool_validator, commit_notification);
+            handle_commit_notification(
+                &mempool,
+                &mempool_validator,
+                &use_case_history,
+                commit_notification,
+            );
         }
     });
 }
@@ -208,6 +215,7 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
 fn handle_commit_notification<TransactionValidator>(
     mempool: &Arc<Mutex<CoreMempool>>,
     mempool_validator: &Arc<RwLock<TransactionValidator>>,
+    use_case_history: &Arc<Mutex<UseCaseHistory>>,
     msg: MempoolCommitNotification,
 ) where
     TransactionValidator: TransactionValidation,
@@ -224,7 +232,12 @@ fn handle_commit_notification<TransactionValidator>(
         counters::COMMIT_STATE_SYNC_LABEL,
         msg.transactions.len(),
     );
-    process_committed_transactions(mempool, msg.transactions, msg.block_timestamp_usecs);
+    process_committed_transactions(
+        mempool,
+        use_case_history,
+        msg.transactions,
+        msg.block_timestamp_usecs,
+    );
     mempool_validator.write().notify_commit();
     let latency = start_time.elapsed();
     counters::mempool_service_latency(

@@ -533,6 +533,9 @@ impl StructLayoutBuilder {
                     },
                 })
             },
+            StructFieldInformation::DeclaredVariants(..) => {
+                bail!("struct variants not yet supported by layouts")
+            },
         }
     }
 

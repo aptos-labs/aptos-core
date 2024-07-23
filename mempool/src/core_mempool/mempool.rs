@@ -22,7 +22,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
-    transaction::SignedTransaction,
+    transaction::{use_case::UseCaseKey, SignedTransaction},
     vm_status::DiscardedVMStatus,
 };
 use std::{
@@ -58,13 +58,14 @@ impl Mempool {
         &self,
         sender: &AccountAddress,
         sequence_number: u64,
+        tracked_use_case: Option<(UseCaseKey, &String)>,
         block_timestamp: Duration,
     ) {
         trace!(
             LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
             is_rejected = false
         );
-        self.log_commit_latency(*sender, sequence_number, block_timestamp);
+        self.log_commit_latency(*sender, sequence_number, tracked_use_case, block_timestamp);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
@@ -206,6 +207,7 @@ impl Mempool {
         &self,
         account: AccountAddress,
         sequence_number: u64,
+        tracked_use_case: Option<(UseCaseKey, &String)>,
         block_timestamp: Duration,
     ) {
         if let Some((insertion_info, bucket, priority)) = self
@@ -234,6 +236,20 @@ impl Mempool {
                     insertion_to_block,
                     priority.to_string().as_str(),
                 );
+
+                let use_case_label = tracked_use_case
+                    .as_ref()
+                    .map_or("entry_user_other", |(_, use_case_name)| {
+                        use_case_name.as_str()
+                    });
+
+                counters::TXN_E2E_USE_CASE_COMMIT_LATENCY
+                    .with_label_values(&[
+                        use_case_label,
+                        insertion_info.submitted_by_label(),
+                        bucket,
+                    ])
+                    .observe(insertion_to_block.as_secs_f64());
             }
         }
     }

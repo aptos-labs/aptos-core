@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction_shuffler::{use_case_aware::types::UseCaseKey, TransactionShuffler};
-use aptos_types::transaction::SignedTransaction;
+use crate::transaction_shuffler::TransactionShuffler;
+use aptos_types::transaction::{use_case::UseCaseKey, SignedTransaction};
 use iterator::ShuffledTransactionIterator;
 
 pub(crate) mod iterator;

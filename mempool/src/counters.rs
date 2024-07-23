@@ -227,6 +227,18 @@ static CORE_MEMPOOL_TXN_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+
+      
+pub static TXN_E2E_USE_CASE_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_txn_e2e_use_case_commit_latency",
+        "Latency of txn commit_accept, by use_case",
+        &["use_case", "submitted_by", "bucket"],
+        MEMPOOL_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 pub fn core_mempool_txn_ranking_score(
     stage: &'static str,
     status: &str,
