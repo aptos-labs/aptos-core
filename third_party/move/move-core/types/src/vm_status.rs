@@ -728,6 +728,7 @@ pub enum StatusCode {
     RESERVED_VERIFICATION_ERROR_2 = 1129,
     RESERVED_VERIFICATION_ERROR_3 = 1130,
     RESERVED_VERIFICATION_ERROR_4 = 1131,
+    RESERVED_VERIFICATION_ERROR_5 = 1132,
 
 
     // These are errors that the VM might raise if a violation of internal
