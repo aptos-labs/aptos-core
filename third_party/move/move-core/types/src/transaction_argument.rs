@@ -19,7 +19,7 @@ pub enum TransactionArgument {
     U16(u16),
     U32(u32),
     U256(u256::U256),
-    Raw(Vec<u8>),
+    Raw(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
 impl fmt::Debug for TransactionArgument {

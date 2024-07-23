@@ -608,8 +608,7 @@ TransactionArgument:
             SIZE: 32
     9:
       Raw:
-        NEWTYPE:
-          SEQ: U8
+        NEWTYPE: BYTES
 TransactionAuthenticator:
   ENUM:
     0:
