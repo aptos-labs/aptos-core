@@ -305,6 +305,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             });*/
 
             let (stream_results_tx, stream_results_rx) = unbounded();
+            let (stream_results_finished_tx, stream_results_finished_rx) = unbounded();
             let coordinator_client_clone = self.coordinator_client.clone();
             let stream_results_thread = self.executor_thread_pool.spawn(move || {
                 let batch_size = 200;
@@ -317,6 +318,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         if !curr_batch.is_empty() {
                             coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch, rng.gen_range(0, 8));
                         }
+                        stream_results_finished_tx.send(()).unwrap();
                         break;
                     }
                     curr_batch.push(txn_idx_output);
@@ -365,7 +367,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 txn_idx: u32::MAX,
                 txn_output: TransactionOutput::default(),
             }).unwrap();
-            stream_results_thread.join(); //.unwrap();
+            stream_results_finished_rx.recv().unwrap();
+            //stream_results_thread.join().unwrap();
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             info!("Sent results finished at time: {}", curr_time);
             self.coordinator_client.lock().unwrap().reset_state_view();
