@@ -20,8 +20,10 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    block::Block, common::Round, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::PipelinedBlock,
+    block::Block,
+    common::Round,
+    pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -134,11 +136,12 @@ impl ExecutionProxy {
     fn pre_commit_hook(
         &self,
         block: &Block,
+        block_window: &OrderedBlockWindow,
         payload_manager: Arc<dyn TPayloadManager>,
     ) -> PreCommitHook {
         let mut pre_commit_notifier = self.pre_commit_notifier.clone();
         let state_sync_notifier = self.state_sync_notifier.clone();
-        let payload = block.payload().cloned();
+        let blocks = block_window.pipelined_blocks().clone();
         let timestamp = block.timestamp_usecs();
         Box::new(move |state_compute_result: &StateComputeResult| {
             let state_compute_result = state_compute_result.clone();
@@ -159,8 +162,7 @@ impl ExecutionProxy {
                             error!(error = ?e, "Failed to notify state synchronizer");
                         }
 
-                        let payload_vec = payload.into_iter().collect();
-                        payload_manager.notify_commit(timestamp, payload_vec);
+                        payload_manager.notify_commit(timestamp, &blocks);
                     }))
                     .await
                     .expect("Failed to send pre-commit notification");
@@ -209,6 +211,7 @@ impl StateComputer for ExecutionProxy {
         &self,
         // The block to be executed.
         block: &Block,
+        block_window: &OrderedBlockWindow,
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
@@ -256,11 +259,12 @@ impl StateComputer for ExecutionProxy {
             .execution_pipeline
             .queue(
                 block.clone(),
+                block_window.clone(),
                 metadata.clone(),
                 parent_block_id,
                 transaction_generator,
                 block_executor_onchain_config,
-                self.pre_commit_hook(block, payload_manager),
+                self.pre_commit_hook(block, block_window, payload_manager),
                 lifetime_guard,
             )
             .await;
@@ -343,9 +347,9 @@ impl StateComputer for ExecutionProxy {
         )
         .expect("spawn_blocking failed");
 
-        let blocks = blocks.to_vec();
+        let blocks_cloned = blocks.to_vec();
         let callback_fut = Box::pin(async move {
-            callback(&blocks, finality_proof);
+            callback(&blocks_cloned, finality_proof);
         });
 
         self.commit_notifier
@@ -428,9 +432,7 @@ impl StateComputer for ExecutionProxy {
         // Might be none if called in the recovery path, or between epoch stop and start.
         if let Some(inner) = self.state.read().as_ref() {
             let block_timestamp = target.commit_info().timestamp_usecs();
-            inner
-                .payload_manager
-                .notify_commit(block_timestamp, Vec::new());
+            inner.payload_manager.notify_commit(block_timestamp, &[]);
         }
 
         // Inject an error for fail point testing

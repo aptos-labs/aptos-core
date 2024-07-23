@@ -12,10 +12,12 @@ use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
+    pipelined_block::PipelinedBlock,
 };
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{aggregate_signature::AggregateSignature, transaction::SignedTransaction};
 use async_trait::async_trait;
+use std::sync::Arc;
 
 pub(super) const TEST_DAG_WINDOW: u64 = 5;
 
@@ -25,7 +27,7 @@ pub(super) struct MockPayloadManager {}
 impl TPayloadManager for MockPayloadManager {
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
 
-    fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
+    fn notify_commit(&self, _block_timestamp: u64, _blocks: &[Arc<PipelinedBlock>]) {}
 
     fn check_payload_availability(&self, _block: &Block) -> Result<(), BitVec> {
         unimplemented!()
