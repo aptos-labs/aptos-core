@@ -120,38 +120,40 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let mut delta = 0;
             if curr_time > msg.start_ms_since_epoch.unwrap() {
-                delta = (curr_time - msg.start_ms_since_epoch.unwrap());
+                delta = curr_time - msg.start_ms_since_epoch.unwrap();
             }
-            if message_type.get_type() == "remote_kv_request" {
-                REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["2_kv_req_coord_grpc_recv"]).observe(delta as f64);
-            } else if message_type.get_type() == "remote_kv_response" {
-                REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["6_kv_resp_shard_grpc_recv"]).observe(delta as f64);
-            }
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER.with_label_values(&["network_message_latency"]).observe(delta as f64);
+
+            // if message_type.get_type() == "remote_kv_request" {
+            //     REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+            //         .with_label_values(&["2_kv_req_coord_grpc_recv"]).observe(delta as f64);
+            // } else if message_type.get_type() == "remote_kv_response" {
+            //     REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+            //         .with_label_values(&["6_kv_resp_shard_grpc_recv"]).observe(delta as f64);
+            // }
         }
 
         if let Some(handler) = self.inbound_handlers.read().unwrap().get(&message_type) {
-            if msg.start_ms_since_epoch.is_some() {
-                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-                let mut delta = 0;
-                if curr_time > msg.start_ms_since_epoch.unwrap() {
-                    delta = (curr_time - msg.start_ms_since_epoch.unwrap());
-                }
-                if message_type.get_type() == "remote_kv_request" {
-                    REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["2_kv_req_coord_grpc_recv_got_inbound_lock"]).observe(delta as f64);
-                } else if message_type.get_type() == "remote_kv_response" {
-                    REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["6_kv_resp_shard_grpc_recv_got_inbound_lock"]).observe(delta as f64);
-                } else if message_type.get_type().starts_with("execute_command_") {
-                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["4_cmd_tx_msg_grpc_recv"]).observe(delta as f64);
-                } else if message_type.get_type().starts_with("execute_result_") {
-                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["9_results_tx_msg_grpc_recv"]).observe(delta as f64);
-                }
-            }
+            // if msg.start_ms_since_epoch.is_some() {
+            //     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            //     let mut delta = 0;
+            //     if curr_time > msg.start_ms_since_epoch.unwrap() {
+            //         delta = (curr_time - msg.start_ms_since_epoch.unwrap());
+            //     }
+            //     if message_type.get_type() == "remote_kv_request" {
+            //         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+            //             .with_label_values(&["2_kv_req_coord_grpc_recv_got_inbound_lock"]).observe(delta as f64);
+            //     } else if message_type.get_type() == "remote_kv_response" {
+            //         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+            //             .with_label_values(&["6_kv_resp_shard_grpc_recv_got_inbound_lock"]).observe(delta as f64);
+            //     } else if message_type.get_type().starts_with("execute_command_") {
+            //         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+            //             .with_label_values(&["4_cmd_tx_msg_grpc_recv"]).observe(delta as f64);
+            //     } else if message_type.get_type().starts_with("execute_result_") {
+            //         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+            //             .with_label_values(&["9_results_tx_msg_grpc_recv"]).observe(delta as f64);
+            //     }
+            // }
             // Send the message to the registered handler
             handler.send(msg).unwrap();
         } else {
@@ -192,34 +194,35 @@ impl GRPCNetworkMessageServiceClientWrapper {
         message: Message,
         mt: &MessageType,
     ) {
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         let request = tonic::Request::new(NetworkMessage {
             message: message.data,
             message_type: mt.get_type(),
-            ms_since_epoch: message.start_ms_since_epoch,
+            ms_since_epoch: Some(curr_time), //message.start_ms_since_epoch,
             seq_no: message.seq_num,
             shard_id: message.shard_id,
         });
 
-        if message.start_ms_since_epoch.is_some() {
-            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            let mut delta = 0.0;
-            if curr_time > message.start_ms_since_epoch.unwrap() {
-                delta = (curr_time - message.start_ms_since_epoch.unwrap()) as f64;
-            }
-            if mt.get_type() == "remote_kv_request" {
-                REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["1_kv_req_grpc_shard_send"]).observe(delta);
-            } else if mt.get_type() == "remote_kv_response" {
-                REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["5_kv_resp_coord_grpc_send"]).observe(delta);
-            } else if mt.get_type().starts_with("execute_command_") {
-                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["3_cmd_tx_msg_grpc_send"]).observe(delta);
-            } else if mt.get_type().starts_with("execute_result_") {
-                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["8_results_tx_msg_grpc_send"]).observe(delta as f64);
-            }
-        }
+        // if message.start_ms_since_epoch.is_some() {
+        //     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        //     let mut delta = 0.0;
+        //     if curr_time > message.start_ms_since_epoch.unwrap() {
+        //         delta = (curr_time - message.start_ms_since_epoch.unwrap()) as f64;
+        //     }
+        //     if mt.get_type() == "remote_kv_request" {
+        //         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+        //             .with_label_values(&["1_kv_req_grpc_shard_send"]).observe(delta);
+        //     } else if mt.get_type() == "remote_kv_response" {
+        //         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+        //             .with_label_values(&["5_kv_resp_coord_grpc_send"]).observe(delta);
+        //     } else if mt.get_type().starts_with("execute_command_") {
+        //         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+        //             .with_label_values(&["3_cmd_tx_msg_grpc_send"]).observe(delta);
+        //     } else if mt.get_type().starts_with("execute_result_") {
+        //         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+        //             .with_label_values(&["8_results_tx_msg_grpc_send"]).observe(delta as f64);
+        //     }
+        // }
 
         // TODO: Retry with exponential backoff on failures
         match self.remote_channel.simple_msg_exchange(request).await {
