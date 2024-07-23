@@ -128,7 +128,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
                 let mut command_tx = vec![];
-                for _ in 0..50{//num_threads/(2 * num_shards) {
+                for _ in 0..1{//num_threads/(2 * num_shards) {
                     command_tx.push(Arc::new(tokio::sync::Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone()))));
                 }
                 let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
@@ -241,7 +241,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let result: Vec<TransactionIdxAndOutput> = bcs::from_bytes(&received_msg.to_bytes()).unwrap();
                 drop(bcs_deser_timer);
                 num_outputs_received += result.len() as u64;
-                //info!("Streamed output from shard {}; txn_id {}", shard_id, result.txn_idx);
+                let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                info!("Streamed output from shard {}; at time {}", shard_id, current_time);
                 outputs.extend(result);
                 if num_outputs_received == expected_outputs[shard_id] {
                     let delta = get_delta_time(duration_since_epoch);
