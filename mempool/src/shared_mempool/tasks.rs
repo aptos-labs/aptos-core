@@ -8,9 +8,11 @@ use crate::{
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
     network::{BroadcastError, BroadcastPeerPriority, MempoolSyncMsg},
-    shared_mempool::types::{
-        notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
-        SharedMempoolNotification, SubmissionStatusBundle,
+    shared_mempool::{
+        types::{
+            notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
+            SharedMempoolNotification, SubmissionStatusBundle,
+        },
         use_case_history::UseCaseHistory,
     },
     thread_pool::IO_POOL,

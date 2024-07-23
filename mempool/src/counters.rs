@@ -227,8 +227,6 @@ static CORE_MEMPOOL_TXN_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-
-      
 pub static TXN_E2E_USE_CASE_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_txn_e2e_use_case_commit_latency",
