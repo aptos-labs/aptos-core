@@ -65,17 +65,13 @@ impl Display for ConsensusObserverMessage {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ConsensusObserverMessage::Request(request) => {
-                write!(f, "ConsensusObserverRequest: {}", request.get_content())
+                write!(f, "ConsensusObserverRequest: {}", request)
             },
             ConsensusObserverMessage::Response(response) => {
-                write!(f, "ConsensusObserverResponse: {}", response.get_content())
+                write!(f, "ConsensusObserverResponse: {}", response)
             },
             ConsensusObserverMessage::DirectSend(direct_send) => {
-                write!(
-                    f,
-                    "ConsensusObserverDirectSend: {}",
-                    direct_send.get_content()
-                )
+                write!(f, "ConsensusObserverDirectSend: {}", direct_send)
             },
         }
     }
@@ -96,10 +92,11 @@ impl ConsensusObserverRequest {
             ConsensusObserverRequest::Unsubscribe => "unsubscribe",
         }
     }
+}
 
-    /// Returns the message content for the request. This is useful for debugging.
-    pub fn get_content(&self) -> String {
-        self.get_label().into()
+impl Display for ConsensusObserverRequest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get_label())
     }
 }
 
@@ -118,10 +115,11 @@ impl ConsensusObserverResponse {
             ConsensusObserverResponse::UnsubscribeAck => "unsubscribe_ack",
         }
     }
+}
 
-    /// Returns the message content for the response. This is useful for debugging.
-    pub fn get_content(&self) -> String {
-        self.get_label().into()
+impl Display for ConsensusObserverResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get_label())
     }
 }
 
@@ -142,18 +140,20 @@ impl ConsensusObserverDirectSend {
             ConsensusObserverDirectSend::BlockPayload(_) => "block_payload",
         }
     }
+}
 
-    /// Returns the message content for the direct send. This is useful for debugging.
-    pub fn get_content(&self) -> String {
+impl Display for ConsensusObserverDirectSend {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
-                format!("OrderedBlock: {}", ordered_block.proof_block_info())
+                write!(f, "OrderedBlock: {}", ordered_block.proof_block_info())
             },
             ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
-                format!("CommitDecision: {}", commit_decision.proof_block_info())
+                write!(f, "CommitDecision: {}", commit_decision.proof_block_info())
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
-                format!(
+                write!(
+                    f,
                     "BlockPayload: {}. Number of transactions: {}, limit: {:?}, proofs: {:?}",
                     block_payload.block,
                     block_payload.transaction_payload.transactions().len(),
