@@ -348,6 +348,7 @@ impl TExecutionClient for ExecutionProxyClient {
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled();
+        let execution_pool_enabled = onchain_execution_config.execution_pool_enabled();
         self.execution_proxy.new_epoch(
             &epoch_state,
             payload_manager,
@@ -355,6 +356,7 @@ impl TExecutionClient for ExecutionProxyClient {
             block_executor_onchain_config,
             transaction_deduper,
             randomness_enabled,
+            execution_pool_enabled,
         );
 
         maybe_rand_msg_tx

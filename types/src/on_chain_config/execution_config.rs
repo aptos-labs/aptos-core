@@ -18,6 +18,7 @@ pub enum OnChainExecutionConfig {
     Missing,
     // Reminder: Add V4 and future versions here, after Missing (order matters for enums).
     V4(ExecutionConfigV4),
+    V5(ExecutionConfigV5),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -30,6 +31,7 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V5(config) => config.transaction_shuffler_type.clone(),
         }
     }
 
@@ -45,6 +47,7 @@ impl OnChainExecutionConfig {
                 .block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
             OnChainExecutionConfig::V4(config) => config.block_gas_limit_type.clone(),
+            OnChainExecutionConfig::V5(config) => config.block_gas_limit_type.clone(),
         }
     }
 
@@ -63,16 +66,29 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
             OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
             OnChainExecutionConfig::V4(config) => config.transaction_deduper_type.clone(),
+            OnChainExecutionConfig::V5(config) => config.transaction_deduper_type.clone(),
+        }
+    }
+
+    pub fn execution_pool_enabled(&self) -> bool {
+        match &self {
+            OnChainExecutionConfig::Missing
+            | OnChainExecutionConfig::V1(_)
+            | OnChainExecutionConfig::V2(_)
+            | OnChainExecutionConfig::V3(_)
+            | OnChainExecutionConfig::V4(_) => false,
+            OnChainExecutionConfig::V5(config) => config.execution_pool_enabled,
         }
     }
 
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V4(ExecutionConfigV4 {
+        OnChainExecutionConfig::V5(ExecutionConfigV5 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
+            execution_pool_enabled: false,
         })
     }
 
@@ -92,7 +108,7 @@ impl BlockGasLimitType {
             conflict_penalty_window: 9,
             use_granular_resource_group_conflicts: false,
             use_module_publishing_block_conflict: true,
-            block_output_limit: Some(5 * 1024 * 1024),
+            block_output_limit: Some(4 * 5 * 1024 * 1024),
             include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: true,
         }
@@ -140,6 +156,14 @@ pub struct ExecutionConfigV4 {
     pub transaction_shuffler_type: TransactionShufflerType,
     pub block_gas_limit_type: BlockGasLimitType,
     pub transaction_deduper_type: TransactionDeduperType,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV5 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit_type: BlockGasLimitType,
+    pub transaction_deduper_type: TransactionDeduperType,
+    pub execution_pool_enabled: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
