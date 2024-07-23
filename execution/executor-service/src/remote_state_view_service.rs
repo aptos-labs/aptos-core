@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{RemoteKVRequest, RemoteKVResponse};
-use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
+use aptos_secure_net::network_controller::{Message, MessageType, NetworkController, OutboundRpcScheduler};
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use std::{net::SocketAddr, sync::{Arc, RwLock}, thread};
 use std::ops::DerefMut;
@@ -77,12 +77,12 @@ impl<T> MpmcCpq<T> {
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_rx: Receiver<Message>,
     kv_unprocessed_pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
-    kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
+    kv_tx: Arc<Vec<Vec<Arc<tokio::sync::Mutex<OutboundRpcHelper>>>>>,
     //thread_pool: Arc<Vec<rayon::ThreadPool>>,
     //thread_pool: Arc<rayon::ThreadPool>,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
     recv_condition: Arc<(tokio::sync::Mutex<bool>, Condvar)>,
-    outbound_rpc_runtime: Arc<Runtime>,
+    outbound_rpc_scheduler: Arc<OutboundRpcScheduler>,
     kv_proc_runtime: Arc<Runtime>,
     num_shards: usize,
 
@@ -109,7 +109,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 //controller.create_outbound_channel(*address, kv_response_type.to_string())
                 let mut command_tx = vec![];
                 for _ in 0..num_kv_req_threads {
-                    command_tx.push(tokio::sync::Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address, controller.get_outbound_rpc_runtime())));
+                    command_tx.push(Arc::new(tokio::sync::Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address, controller.get_outbound_rpc_runtime()))));
                 }
                 command_tx
             })
@@ -121,7 +121,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             //thread_pool: Arc::new(thread_pool),
             state_view: Arc::new(RwLock::new(None)),
             recv_condition: Arc::new((tokio::sync::Mutex::new(false), Condvar::new())),
-            outbound_rpc_runtime: controller.get_outbound_rpc_runtime(),
+            outbound_rpc_scheduler: controller.get_outbound_rpc_scheduler(),
             kv_proc_runtime: Arc::new(kv_proc_rt),
             num_shards,
         }
@@ -154,12 +154,12 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let kv_tx_clone = self.kv_tx.clone();
             let kv_unprocessed_clone = kv_unprocessed.clone();
             let recv_condition_clone = self.recv_condition.clone();
-            let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
+            let outbound_rpc_scheduler_clone = self.outbound_rpc_scheduler.clone();
             self.kv_proc_runtime.spawn(async move {Self::priority_handler(state_view_clone.clone(),
                                                       kv_tx_clone.clone(),
                                                       kv_unprocessed_clone.clone(),
                                                       recv_condition_clone.clone(),
-                                                      outbound_rpc_runtime_clone).await;
+                                                      outbound_rpc_scheduler_clone).await;
             });
         }
 
@@ -201,10 +201,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     }
 
     pub async fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
-                            kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
+                            kv_tx: Arc<Vec<Vec<Arc<tokio::sync::Mutex<OutboundRpcHelper>>>>>,
                             pq: Arc<MpmcCpq<Message>>,
                             recv_condition: Arc<(tokio::sync::Mutex<bool>, Condvar)>,
-                            outbound_rpc_runtime: Arc<Runtime>,) {
+                            outbound_rpc_scheduler: Arc<OutboundRpcScheduler>,) {
         let mut rng = StdRng::from_entropy();
         loop {
             //info!("I'm here");
@@ -212,8 +212,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let state_view = state_view.clone();
             let kv_txs = kv_tx.clone();
 
-            let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
-            Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone).await;
+            let outbound_rpc_scheduler_clone = outbound_rpc_scheduler.clone();
+            Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_scheduler_clone).await;
 
             // if let Some(message) = maybe_message {
             //     let state_view = state_view.clone();
@@ -228,10 +228,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub async fn handle_message(
         message: Message,
         state_view: Arc<RwLock<Option<Arc<S>>>>,
-        kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
+        kv_tx: Arc<Vec<Vec<Arc<tokio::sync::Mutex<OutboundRpcHelper>>>>>,
         //rng: &mut StdRng,
         rand_send_thread_idx: usize,
-        outbound_rpc_runtime: Arc<Runtime>,
+        outbound_rpc_scheduler: Arc<OutboundRpcScheduler>,
     ) {
         let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
         {
@@ -321,9 +321,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .with_label_values(&["0", "kv_requests_send"])
             .start_timer();
         let kv_tx_clone = kv_tx.clone();
-        outbound_rpc_runtime.spawn(async move {
-            kv_tx_clone[shard_id][rand_send_thread_idx].lock().await.send_async(resp_message, &MessageType::new("remote_kv_response".to_string())).await;
-        });
+        outbound_rpc_scheduler.send(resp_message,
+                                    MessageType::new("remote_kv_response".to_string()),
+                                    kv_tx_clone[shard_id][rand_send_thread_idx].clone(),
+                                    100 + seq_num); // first 100 numbers is reserved for cmd messages
+        // outbound_rpc_runtime.spawn(async move {
+        //     kv_tx_clone[shard_id][rand_send_thread_idx].lock().await.send_async(resp_message, &MessageType::new("remote_kv_response".to_string())).await;
+        // });
         //mtx.unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
         let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         info!("kv req batch {} sent to shard {} at time: {}", seq_num, shard_id, curr_time);

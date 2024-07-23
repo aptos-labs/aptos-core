@@ -12,7 +12,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use tokio::{runtime, runtime::Runtime, sync::oneshot};
+use tokio::sync::Notify;
+use crate::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 
 mod error;
 mod inbound_handler;
@@ -81,6 +84,131 @@ impl Message {
     }
 }
 
+struct MessageWithOutboundRpcHelper {
+    msg: Message,
+    msg_type: MessageType,
+    outbound_helper: Arc<tokio::sync::Mutex<OutboundRpcHelper>>,
+    priority: u64,
+}
+impl PartialEq for MessageWithOutboundRpcHelper {
+    fn eq(&self, other: &Self) -> bool {
+        self.priority == other.priority
+    }
+}
+
+impl Eq for MessageWithOutboundRpcHelper {}
+// The priority queue depends on `Ord`.
+// Explicitly implement the trait so the queue becomes a min-heap
+// instead of a max-heap.
+impl Ord for MessageWithOutboundRpcHelper {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Notice that we flip the ordering on costs.
+        // In case of a tie we compare positions - this step is necessary
+        // to make implementations of `PartialEq` and `Ord` consistent.
+        other.priority.cmp(&self.priority)
+            .then_with(|| self.priority.cmp(&other.priority))
+    }
+}
+
+// `PartialOrd` needs to be implemented as well.
+impl PartialOrd for MessageWithOutboundRpcHelper {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+
+
+struct MpmcCpq<T>
+where T: Eq + Ord + PartialEq
+{
+    jobs_pq: Mutex<BinaryHeap<T>>,
+    notify_on_sent: Notify,
+}
+
+impl<T: Eq + Ord + PartialEq> MpmcCpq<T> {
+    pub fn send(&self, msg: T) {
+        let mut locked_queue = self.jobs_pq.lock().unwrap();
+        locked_queue.push(msg);
+        drop(locked_queue);
+
+        // Send a notification to one of the calls currently
+        // waiting in a call to `recv`.
+        self.notify_on_sent.notify_one();
+    }
+
+    pub fn len(&self) -> usize {
+        let mut locked_queue = self.jobs_pq.lock().unwrap();
+        return locked_queue.len();
+    }
+    pub fn try_recv(&self) -> Option<T> {
+        let mut locked_queue = self.jobs_pq.lock().unwrap();
+        locked_queue.pop()
+    }
+
+    pub async fn recv(&self) -> T {
+        let future = self.notify_on_sent.notified();
+        tokio::pin!(future);
+        loop {
+            // Make sure that no wakeup is lost if we get
+            // `None` from `try_recv`.
+            future.as_mut().enable();
+
+            if let Some(msg) = self.try_recv() {
+                return msg;
+            }
+
+            // Wait for a call to `notify_one`.
+            //
+            // This uses `.as_mut()` to avoid consuming the future,
+            // which lets us call `Pin::set` below.
+            future.as_mut().await;
+
+            // Reset the future in case another call to
+            // `try_recv` got the message before us.
+            future.set(self.notify_on_sent.notified());
+        }
+    }
+}
+
+pub struct OutboundRpcScheduler {
+    outbound_rpc_runtime: Arc<Runtime>,
+    outbound_rpc_scheduler: Arc<MpmcCpq<MessageWithOutboundRpcHelper>>,
+}
+
+impl OutboundRpcScheduler {
+    pub fn new(outbound_rpc_runtime: Arc<Runtime>) -> Self {
+        let outbound_rpc_scheduler = Arc::new(MpmcCpq {
+            jobs_pq: Mutex::new(BinaryHeap::new()),
+            notify_on_sent: Notify::new(),
+        });
+        Self {
+            outbound_rpc_runtime,
+            outbound_rpc_scheduler,
+        }
+    }
+    pub fn start(&self) {
+        let num_workers = self.outbound_rpc_runtime.handle().metrics().num_workers();
+        for _ in 0..num_workers {
+            let outbound_rpc_scheduler = self.outbound_rpc_scheduler.clone();
+            self.outbound_rpc_runtime.spawn(async move {
+                loop {
+                    let msg = outbound_rpc_scheduler.recv().await;
+                    msg.outbound_helper.lock().await.send_async(msg.msg, &msg.msg_type).await;
+                }
+            });
+        }
+    }
+    pub fn send(&self, msg: Message, msg_type: MessageType, outbound_helper: Arc<tokio::sync::Mutex<OutboundRpcHelper>>, priority: u64) {
+        self.outbound_rpc_scheduler.send(MessageWithOutboundRpcHelper {
+            msg,
+            msg_type,
+            outbound_helper,
+            priority,
+        });
+    }
+}
+
 /// NetworkController is the main entry point for sending and receiving messages over the network.
 /// 1. If a node acts as both client and server, albeit in different contexts, GRPC needs separate
 ///    runtimes for client context and server context. Otherwise we a hang in GRPC. This seems to be
@@ -101,6 +229,7 @@ pub struct NetworkController {
     inbound_server_shutdown_tx: Option<oneshot::Sender<()>>,
     outbound_task_shutdown_tx: Option<Sender<Message>>,
     listen_addr: SocketAddr,
+    outbound_rpc_scheduler: Arc<OutboundRpcScheduler>,
 }
 
 impl NetworkController {
@@ -121,12 +250,15 @@ impl NetworkController {
             inbound_server_shutdown_tx: None,
             outbound_task_shutdown_tx: None,
             listen_addr,
+            outbound_rpc_scheduler: Arc::new(OutboundRpcScheduler::new(Arc::new(runtime::Builder::new_multi_thread().enable_all().thread_name("outbound_rpc_scheduler").build().unwrap()))),
         }
     }
 
     pub fn get_outbound_rpc_runtime(&self) -> Arc<Runtime> {
         self.outbound_rpc_runtime.clone()
     }
+
+    pub fn get_outbound_rpc_scheduler(&self) -> Arc<OutboundRpcScheduler> { self.outbound_rpc_scheduler.clone() }
 
     pub fn get_self_addr(&self) -> SocketAddr {
         self.listen_addr

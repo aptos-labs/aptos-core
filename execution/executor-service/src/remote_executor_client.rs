@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult, RemoteExecutionRequestRef, ExecuteBlockCommandRef};
 use aptos_logger::{info, trace};
-use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
+use aptos_secure_net::network_controller::{Message, MessageType, NetworkController, OutboundRpcScheduler};
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
@@ -91,7 +91,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
     network_controller: NetworkController,
     state_view_service: Arc<RemoteStateViewService<S>>,
     // Channels to send execute block commands to the executor shards.
-    command_txs: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
+    command_txs: Arc<Vec<Vec<Arc<tokio::sync::Mutex<OutboundRpcHelper>>>>>,
     // Channels to receive execution results from the executor shards.
     result_rxs: Vec<Receiver<Message>>,
     // Thread pool used to pre-fetch the state values for the block in parallel and create an in-memory state view.
@@ -100,6 +100,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
 
     phantom: std::marker::PhantomData<S>,
     _join_handle: Option<thread::JoinHandle<()>>,
+    outbound_rpc_scheduler: Arc<OutboundRpcScheduler>
 }
 
 #[allow(dead_code)]
@@ -128,7 +129,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let execute_result_type = format!("execute_result_{}", shard_id);
                 let mut command_tx = vec![];
                 for _ in 0..num_threads/(2 * num_shards) {
-                    command_tx.push(Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone())));
+                    command_tx.push(Arc::new(tokio::sync::Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone()))));
                 }
                 let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
                 (command_tx, result_rx)
@@ -157,7 +158,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 .build()
                 .unwrap(),
         );
-
+        let scheduler = controller.get_outbound_rpc_scheduler();
         Self {
             network_controller: controller,
             state_view_service,
@@ -167,6 +168,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             thread_pool,
             cmd_tx_thread_pool,
             phantom: std::marker::PhantomData,
+            outbound_rpc_scheduler: scheduler,
         }
     }
 
@@ -313,6 +315,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             let onchain_config_clone = onchain_config.clone();
             let transactions_clone = transactions.clone();
             let senders = self.command_txs.clone();
+            let outbound_rpc_scheduler_clone = self.outbound_rpc_scheduler.clone();
             self.cmd_tx_thread_pool.spawn(move || {
                 let shard_txns = &transactions_clone.get_ref().0[shard_id].sub_blocks[0].transactions;
                 let index_offset = transactions_clone.get_ref().0[shard_id].sub_blocks[0].start_index as usize;
@@ -345,10 +348,14 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         let timer_1 = REMOTE_EXECUTOR_TIMER
                             .with_label_values(&["0", "cmd_tx_lock_send"])
                             .start_timer();
-                        senders[shard_id][rand_send_thread_idx]
-                            .lock()
-                            .unwrap()
-                            .send(msg, &MessageType::new(execute_command_type));
+                        // senders[shard_id][rand_send_thread_idx]
+                        //     .lock()
+                        //     .unwrap()
+                        //     .send(msg, &MessageType::new(execute_command_type));
+                        outbound_rpc_scheduler_clone.send(msg,
+                                                         MessageType::new(execute_command_type),
+                                                         senders[shard_id][rand_send_thread_idx].clone(),
+                                                         chunk_idx as u64);
                         let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
                         info!("Sent cmd batch {} to shard {} at time {}", chunk_idx, shard_id, current_time);
                         drop(timer_1)
