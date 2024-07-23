@@ -87,6 +87,7 @@ pub enum FeatureFlag {
     LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
     DISALLOW_USER_NATIVES = 71,
+    RAW_SCRIPT_ARGS = 72,
 }
 
 impl FeatureFlag {
@@ -154,6 +155,7 @@ impl FeatureFlag {
             FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
             FeatureFlag::DISALLOW_USER_NATIVES,
+            FeatureFlag::RAW_SCRIPT_ARGS,
         ]
     }
 }

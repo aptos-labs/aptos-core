@@ -61,7 +61,7 @@ use aptos_types::{
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignedTransaction, Transaction,
+        MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
@@ -721,6 +721,16 @@ impl AptosVM {
                 traversal_context,
                 script.code(),
             )?;
+        }
+
+        if !self.features().is_enabled(FeatureFlag::RAW_SCRIPT_ARGS) {
+            for arg in script.args() {
+                if let TransactionArgument::Raw(_) = arg {
+                    return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
+                        .finish(Location::Script)
+                        .into_vm_status());
+                }
+            }
         }
 
         let func = session.load_script(script.code(), script.ty_args())?;
