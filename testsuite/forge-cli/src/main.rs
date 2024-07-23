@@ -665,7 +665,7 @@ fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
     let test = match test_name {
         "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
         "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, true),
         "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
         "pfn_performance_with_network_chaos" => {
             pfn_performance(duration, false, true, false, 7, 1, false)
@@ -2461,7 +2461,7 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
