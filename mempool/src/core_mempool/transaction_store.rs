@@ -564,7 +564,7 @@ impl TransactionStore {
 
     /// Read at most `count` transactions from timeline since `timeline_id`.
     /// This method takes into account the max number of bytes per transaction batch.
-    /// Returns block of transactions along with their transaction insertion times
+    /// Returns block of transactions along with their transaction ready times
     /// and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
