@@ -31,6 +31,8 @@ use std::{
 
 /// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::pipelined_block::PipelinedBlock)
 /// that adds `children` field to know the parent-child relationship between blocks.
+// TODO: remove debug
+#[derive(Debug)]
 struct LinkableBlock {
     /// Executed block that has raw block data and execution output.
     executed_block: Arc<PipelinedBlock>,
@@ -268,7 +270,7 @@ impl BlockTree {
         &self,
         block: &Block,
         window_size: Option<u64>,
-    ) -> anyhow::Result<OrderedBlockWindow> {
+    ) -> anyhow::Result<Option<OrderedBlockWindow>> {
         // Block round should never be less than the commit root round
         ensure!(
             block.round() >= self.commit_root().round(),
@@ -279,7 +281,7 @@ impl BlockTree {
 
         // window_size is None only if execution pool is turned off
         let Some(window_size) = window_size else {
-            return Ok(OrderedBlockWindow::empty());
+            return Ok(None);
         };
         let round = block.round();
         let window_start_round = calculate_window_start_round(round, window_size);
@@ -304,7 +306,7 @@ impl BlockTree {
         // The window order is lower round -> higher round
         window.reverse();
         ensure!(window.len() < window_size as usize);
-        Ok(OrderedBlockWindow::new(window))
+        Ok(Some(OrderedBlockWindow::new(window, window_start_round)))
     }
 
     pub(super) fn insert_block(
@@ -483,6 +485,11 @@ impl BlockTree {
         let ordered_block_window = self
             .get_ordered_block_window(block.block(), window_size)
             .expect("Ordered block window not found");
+
+        let Some(ordered_block_window) = ordered_block_window else {
+            return block.id();
+        };
+
         let pipelined_blocks = ordered_block_window.pipelined_blocks();
 
         // If the first block is None, it falls back on the current block as the window root
