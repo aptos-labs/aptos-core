@@ -345,7 +345,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                             .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
                         let execute_command_type = format!("execute_command_{}", shard_id);
                         let mut rng = StdRng::from_entropy();
-                        let rand_send_thread_idx = chunk_idx;//rng.gen_range(0, senders[shard_id].len());
+                        let rand_send_thread_idx = rng.gen_range(0, senders[shard_id].len());
                         let timer_1 = REMOTE_EXECUTOR_TIMER
                             .with_label_values(&["0", "cmd_tx_lock_send"])
                             .start_timer();
