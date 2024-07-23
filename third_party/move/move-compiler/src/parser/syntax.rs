@@ -2717,32 +2717,7 @@ fn parse_struct_decl(
     let name = StructName(parse_identifier(context)?);
     let type_parameters = parse_struct_type_parameters(context)?;
 
-    let abilities = if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "has"
-    {
-        context.tokens.advance()?;
-        parse_list(
-            context,
-            |context| match context.tokens.peek() {
-                Tok::Comma => {
-                    context.tokens.advance()?;
-                    Ok(true)
-                },
-                Tok::LBrace | Tok::Semicolon => Ok(false),
-                _ => Err(unexpected_token_error(
-                    context.tokens,
-                    &format!(
-                        "one of: '{}', '{}', or '{}'",
-                        Tok::Comma,
-                        Tok::LBrace,
-                        Tok::Semicolon
-                    ),
-                )),
-            },
-            parse_ability,
-        )?
-    } else {
-        vec![]
-    };
+    let mut abilities = parse_abilities(context)?;
 
     let layout = match native {
         Some(loc) => {
@@ -2770,6 +2745,7 @@ fn parse_struct_decl(
                     let loc = current_token_loc(context.tokens);
                     require_move_2(context, loc, "anonymous fields");
                     let list = parse_anonymous_fields(context)?;
+                    abilities = parse_abilities(context)?;
                     consume_token(context.tokens, Tok::Semicolon)?;
                     list
                 } else {
@@ -2799,6 +2775,35 @@ fn parse_struct_decl(
         type_parameters,
         layout,
     })
+}
+
+fn parse_abilities(context: &mut Context) -> Result<Vec<Ability>, Box<Diagnostic>> {
+    if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "has"
+    {
+        context.tokens.advance()?;
+        parse_list(
+            context,
+            |context| match context.tokens.peek() {
+                Tok::Comma => {
+                    context.tokens.advance()?;
+                    Ok(true)
+                },
+                Tok::LBrace | Tok::Semicolon => Ok(false),
+                _ => Err(unexpected_token_error(
+                    context.tokens,
+                    &format!(
+                        "one of: '{}', '{}', or '{}'",
+                        Tok::Comma,
+                        Tok::LBrace,
+                        Tok::Semicolon
+                    ),
+                )),
+            },
+            parse_ability,
+        )
+    } else {
+        Ok(vec![])
+    }
 }
 
 // Parse a struct variant. The returned boolean indicates whether the variant has a braced (`{..}`)
