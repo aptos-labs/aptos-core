@@ -433,7 +433,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     use super::priority;
 
     let mut mempool = smp.mempool.lock();
-    for (transaction, sequence_info, insertion_time_at_sender) in transactions.into_iter() {
+    for (transaction, sequence_info, _insertion_time_at_sender) in transactions.into_iter() {
         let mempool_status = mempool.add_txn(
             transaction.clone(),
             0,

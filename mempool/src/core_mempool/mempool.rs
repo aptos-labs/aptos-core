@@ -295,7 +295,7 @@ impl Mempool {
             if let Some(insertion_time_at_sender) = insertion_time_at_sender {
                 if let Ok(time_delta) = now.duration_since(insertion_time_at_sender) {
                     counters::core_mempool_txn_commit_latency(
-                        counters::TRANSACTION_INSERTED_LABEL,
+                        counters::BROADCAST_RECEIVED_LABEL,
                         submitted_by_label,
                         self.transactions.get_bucket(ranking_score),
                         time_delta,
