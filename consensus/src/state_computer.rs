@@ -18,7 +18,11 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::{block::Block, common::Round, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    block::Block,
+    common::Round,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
@@ -173,6 +177,7 @@ impl StateComputer for ExecutionProxy {
         &self,
         // The block to be executed.
         block: &Block,
+        block_window: &OrderedBlockWindow,
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
@@ -218,6 +223,7 @@ impl StateComputer for ExecutionProxy {
             .execution_pipeline
             .queue(
                 block.clone(),
+                block_window.clone(),
                 metadata,
                 parent_block_id,
                 transaction_generator,
@@ -278,7 +284,6 @@ impl StateComputer for ExecutionProxy {
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut subscribable_txn_events = Vec::new();
-        let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
             finality_proof.ledger_info().round(),
@@ -299,10 +304,6 @@ impl StateComputer for ExecutionProxy {
         for block in blocks {
             block_ids.push(block.id());
 
-            if let Some(payload) = block.block().payload() {
-                payloads.push(payload.clone());
-            }
-
             txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled));
             subscribable_txn_events.extend(block.subscribable_events());
         }
@@ -320,9 +321,9 @@ impl StateComputer for ExecutionProxy {
         )
         .expect("spawn_blocking failed");
 
-        let blocks = blocks.to_vec();
+        let blocks_vec = blocks.to_vec();
         let wrapped_callback = move || {
-            callback(&blocks, finality_proof);
+            callback(&blocks_vec, finality_proof);
         };
         self.async_state_sync_notifier
             .clone()
@@ -331,7 +332,7 @@ impl StateComputer for ExecutionProxy {
             .expect("Failed to send async state sync notification");
 
         *latest_logical_time = logical_time;
-        payload_manager.notify_commit(block_timestamp, payloads);
+        payload_manager.notify_commit(block_timestamp, blocks);
         Ok(())
     }
 
@@ -359,9 +360,7 @@ impl StateComputer for ExecutionProxy {
         // so it can set batches expiration accordingly.
         // Might be none if called in the recovery path, or between epoch stop and start.
         if let Some(inner) = self.state.read().as_ref() {
-            inner
-                .payload_manager
-                .notify_commit(block_timestamp, Vec::new());
+            inner.payload_manager.notify_commit(block_timestamp, &[]);
         }
 
         fail_point!("consensus::sync_to", |_| {
