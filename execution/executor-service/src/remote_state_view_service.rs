@@ -52,7 +52,7 @@ impl<T> MpmcCpq<T> {
     pub async fn recv(&self) -> T {
         let future = self.notify_on_sent.notified();
         tokio::pin!(future);
-
+        info!("WOOOOOOOOOOOOOOOW");
         loop {
             // Make sure that no wakeup is lost if we get
             // `None` from `try_recv`.
@@ -181,8 +181,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
             let priority = message.seq_num.unwrap();
 
-            let recv_condition_clone = self.recv_condition.clone();
-            let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
+            // let recv_condition_clone = self.recv_condition.clone();
+            // let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
             kv_unprocessed.send(message, priority);
 
             REMOTE_EXECUTOR_TIMER
