@@ -4,10 +4,10 @@
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
-    register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
-    IntGauge, IntGaugeVec,
+    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_avg_counter,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec,
+    IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
@@ -124,6 +124,13 @@ static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     .unwrap()
 });
 
+static BYTE_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    exponential_buckets(
+        /*start=*/ 500.0, /*factor=*/ 1.5, /*count=*/ 25,
+    )
+    .unwrap()
+});
+
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -181,6 +188,23 @@ pub static CORE_MEMPOOL_GAS_UPGRADED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_core_mempool_gas_upgraded_txns_count",
         "Number of txns received that are gas upgraded for the same sequence number"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_READ_TIMELINE_FREQUENCY: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_read_timeline",
+        "Number of times core mempool read_timeline is invoked"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_READ_TIMELINE_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_max_txns",
+        "Number of max txns being pulled in read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -296,6 +320,40 @@ pub static PENDING_MEMPOOL_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
         &["state"]
     )
     .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_SKIPPED_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_get_batch_skipped_txns",
+        "Number of transactions skipped in mempool get batch",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_get_batch_max_txns",
+        "Max number of transactions requested from mempool in get batch",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_MAX_BYTES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_get_batch_max_bytes",
+        "Max number of bytes requested from mempool in get batch",
+        BYTE_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_SPACE_REMAINING: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_mempool_get_batch_space_remaining", 
+        "Represents whether the the transactions are skipped in mempool while there is still space remaining"   
+    )
 });
 
 /// Counter of number of txns processed in each consensus/state sync message
