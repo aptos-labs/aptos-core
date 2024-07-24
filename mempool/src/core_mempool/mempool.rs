@@ -222,9 +222,9 @@ impl Mempool {
             );
             Self::log_commit_and_parked_latency(
                 insertion_info,
-                bucket,
+                bucket.as_str(),
                 priority.to_string().as_str(),
-            .as_str());
+            );
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
@@ -247,7 +247,7 @@ impl Mempool {
                     .with_label_values(&[
                         use_case_label,
                         insertion_info.submitted_by_label(),
-                        bucket,
+                        bucket.as_str(),
                     ])
                     .observe(insertion_to_block.as_secs_f64());
             }
@@ -310,10 +310,11 @@ impl Mempool {
 
         if status.code == MempoolStatusCode::Accepted {
             if let Some(ready_time_at_sender) = ready_time_at_sender {
+                let bucket = self.transactions.get_bucket(ranking_score, &sender);
                 counters::core_mempool_txn_commit_latency(
                     counters::BROADCAST_RECEIVED_LABEL,
                     submitted_by_label,
-                    self.transactions.get_bucket(ranking_score),
+                    bucket.as_str(),
                     Duration::from_millis(now.saturating_sub(ready_time_at_sender)),
                     priority.to_string().as_str(),
                 );
@@ -515,28 +516,28 @@ impl Mempool {
     /// the transaction ready time in millis since epoch
     pub(crate) fn read_timeline(
         &self,
-        sender_hash: MempoolSenderBucket,
+        sender_bucket: MempoolSenderBucket,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
         priority_of_receiver: BroadcastPeerPriority,
     ) -> (Vec<(SignedTransaction, u64)>, MultiBucketTimelineIndexIds) {
         self.transactions
-            .read_timeline(sender_hash, timeline_id, count, before, priority_of_receiver)
+            .read_timeline(sender_bucket, timeline_id, count, before, priority_of_receiver)
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive),
     /// along with their ready times in millis since poch
     pub(crate) fn timeline_range(
         &self,
-        sender_hash: MempoolSenderBucket, start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>) -> Vec<SignedTransaction> {
-        self.transactions.timeline_range(sender_hash, start_end_pairs)
+        sender_bucket: MempoolSenderBucket, start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>) -> Vec<(SignedTransaction, u64)> {
+        self.transactions.timeline_range(sender_bucket, start_end_pairs)
     }
 
     pub(crate) fn timeline_range_of_message(&self, sender_start_end_pairs: HashMap<MempoolSenderBucket, HashMap<TimelineIndexIdentifier, (u64, u64)>>,
     ) -> Vec<(SignedTransaction, u64)> {
-        sender_start_end_pairs.iter().flat_map(|(sender_hash, start_end_pairs)| {
-            self.transactions.timeline_range(*sender_hash, start_end_pairs.clone())
+        sender_start_end_pairs.iter().flat_map(|(sender_bucket, start_end_pairs)| {
+            self.transactions.timeline_range(*sender_bucket, start_end_pairs.clone())
         }).collect()
     }
 

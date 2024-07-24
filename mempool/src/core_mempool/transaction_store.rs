@@ -38,6 +38,10 @@ pub const TXN_INDEX_ESTIMATED_BYTES: usize = size_of::<crate::core_mempool::inde
     + (size_of::<u64>() * 3 + size_of::<AccountAddress>()) // timeline_index
     + (size_of::<HashValue>() + size_of::<u64>() + size_of::<AccountAddress>()); // hash_index
 
+fn sender_bucket(address: &AccountAddress, num_sender_buckets: MempoolSenderBucket) -> MempoolSenderBucket {
+    address.as_ref()[address.as_ref().len()-1] as MempoolSenderBucket % num_sender_buckets
+}
+
 /// TransactionStore is in-memory storage for all transactions in mempool.
 pub struct TransactionStore {
     // main DS
@@ -186,18 +190,14 @@ impl TransactionStore {
         None
     }
 
-    fn sender_bucket(&mut self, address: &AccountAddress) -> MempoolSenderBucket {
-        address.as_ref()[address.as_ref().len()-1] as MempoolSenderBucket % self.num_sender_buckets
-    }
-
     #[inline]
     pub(crate) fn get_bucket(&self, ranking_score: u64, sender: &AccountAddress) -> String {
-        let sender_bucket = self.sender_bucket(sender).to_string();
+        let sender_bucket = sender_bucket(sender, self.num_sender_buckets);
         let bucket = self.timeline_index
-            .get(&self.sender_bucket(sender))
+            .get(&sender_bucket)
             .unwrap()
             .get_bucket(ranking_score).to_string();
-        format!("{}_{}", sender_bucket, bucket)
+        format!("{}_{}", sender_bucket.to_string(), bucket)
     }
 
     pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
@@ -443,11 +443,11 @@ impl TransactionStore {
     ///   TimelineIndex (txns for SharedMempool).
     /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
     fn process_ready_transactions(&mut self, address: &AccountAddress, sequence_num: u64) {
-        let sender_bucket = self.sender_bucket(address);
+        let sender_bucket = sender_bucket(address, self.num_sender_buckets);
         if let Some(txns) = self.transactions.get_mut(address) {
             let mut min_seq = sequence_num;
 
-            while let Some(txn) = txns.get(&min_seq) {
+            while let Some(txn) = txns.get_mut(&min_seq) {
                 let process_ready = !self.priority_index.contains(txn);
 
                 self.priority_index.insert(txn);
@@ -457,11 +457,16 @@ impl TransactionStore {
                     self.timeline_index
                         .get_mut(&sender_bucket)
                         .unwrap()
-                        .insert(txns.get_mut(&min_seq).unwrap());
+                        .insert(txn);
                 }
 
                 if process_ready {
-                    let bucket = self.get_bucket(txn.ranking_score, address);
+                    let bucket = self.timeline_index
+                        .get(&sender_bucket)
+                        .unwrap()
+                        .get_bucket(ranking_score).to_string();
+                    let bucket = format!("{}_{}", sender_bucket.to_string(), bucket);
+
                     Self::log_ready_transaction(
                         txn.ranking_score,
                         bucket.as_str(),
@@ -575,9 +580,9 @@ impl TransactionStore {
         self.system_ttl_index.remove(txn);
         self.expiration_time_index.remove(txn);
         self.priority_index.remove(txn);
-        let sender_bucket = self.sender_bucket(&txn.get_sender());
+        let sender_bucket = sender_bucket(&txn.get_sender(), self.num_sender_buckets);
         self.timeline_index
-            .get_mut(&self.sender_bucket(&txn.get_sender()))
+            .get_mut(&sender_bucket)
             .expect(format!("Unable to get the timeline index for the sender hash {}", sender_bucket).as_str())
             .remove(txn);
         self.parking_lot_index.remove(txn);
@@ -768,7 +773,7 @@ impl TransactionStore {
                 for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
                     self.priority_index.remove(t);
-                    let sender_bucket = self.sender_bucket(&t.get_sender());
+                    let sender_bucket = sender_bucket(&t.get_sender(), self.num_sender_buckets);
                     self.timeline_index
                         .get_mut(&sender_bucket)
                         .expect(format!("Unable to get the timeline index for the sender bucket {}", sender_bucket).as_str())

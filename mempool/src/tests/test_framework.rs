@@ -4,7 +4,7 @@
 
 use crate::{
     core_mempool::CoreMempool,
-    shared_mempool::{start_shared_mempool, types::{MempoolMessageId, MempoolSenderBucket, MultiBatchId}},
+    shared_mempool::{start_shared_mempool, types::{MempoolMessageId, MempoolSenderBucket}},
     tests::common::{self, TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
@@ -254,9 +254,9 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
         let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
-        let message_id = MempoolMessageId::from_timeline_ids(vec![(0 as MempoolSenderBucket, (&vec![1].into(), &vec![10].into()))]);
+        let message_id_in_request = MempoolMessageId::from_timeline_ids(vec![(0 as MempoolSenderBucket, (&vec![1].into(), &vec![10].into()))]);
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
-            message_id,
+            message_id: message_id_in_request,
             transactions: sign_transactions(txns),
         };
         let data = protocol_id.to_bytes(&msg).unwrap();
@@ -310,12 +310,12 @@ impl MempoolNode {
             }
         };
         if let MempoolSyncMsg::BroadcastTransactionsResponse {
-            message_id,
+            message_id: message_id_in_response,
             retry,
             backoff,
         } = response
         {
-            assert_eq!(batch_id, request_id);
+            assert_eq!(message_id_in_response, message_id_in_request);
             assert!(!retry);
             assert!(!backoff);
         } else {
@@ -374,7 +374,7 @@ impl MempoolNode {
         };
         assert_eq!(peer_id, expected_peer_id);
         let mempool_message = common::decompress_and_deserialize(&data.to_vec());
-        let request_id = match mempool_message {
+        let message_id = match mempool_message {
             MempoolSyncMsg::BroadcastTransactionsRequest {
                 message_id,
                 transactions,
@@ -402,7 +402,7 @@ impl MempoolNode {
                 message_id
             },
             MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
-                request_id,
+                message_id,
                 transactions,
                 priority: _,
             } => {
@@ -428,7 +428,7 @@ impl MempoolNode {
                         txns, expected_txns
                     );
                 }
-                request_id
+                message_id
             },
             MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                 panic!("We aren't supposed to be getting as response here");

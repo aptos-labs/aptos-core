@@ -62,13 +62,13 @@ pub enum MempoolSyncMsg {
     /// Broadcast request issued by the sender.
     BroadcastTransactionsRequestWithReadyTime {
         /// Unique id of sync request. Can be used by sender for rebroadcast analysis
-        request_id: MultiBatchId,
+        message_id: MempoolMessageId,
         /// For each transaction, we also include the time at which the transaction is ready
         /// in the current node in millis since epoch. The upstream node can then calculate
         /// (SystemTime::now() - ready_time) to calculate the time it took for the transaction
         /// to reach the upstream node.
         transactions: Vec<(SignedTransaction, u64)>,
-        /// Priority of the upstream node for the sender.
+        /// Priority of the receiver (upstream node) for these transactions.
         priority: BroadcastPeerPriority,
     },
 }
@@ -90,7 +90,6 @@ pub enum BroadcastError {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BroadcastPeerPriority {
     Primary,
     Failover,
@@ -335,7 +334,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: PeerNetworkId,
         scheduled_backoff: bool,
         smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
-    ) -> Result<(MempoolMessageId, Vec<(SignedTransaction, u64)>, Option<&str>), BroadcastError> {
+    ) -> Result<(MempoolMessageId, Vec<(SignedTransaction, u64, BroadcastPeerPriority)>, Option<&str>), BroadcastError> {
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
@@ -420,7 +419,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                     // Fresh broadcast
                     // Sort sender_buckets based on priority. Primary peer should be first.
                     sender_buckets.sort_by(|(_, priority_a), (_, priority_b)| if priority_a == priority_b {
-                        std::cmp::Equal } else if priority_a == BroadcastPeerPriority::Primary { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater });
+                        std::cmp::Ordering::Equal } else if *priority_a == BroadcastPeerPriority::Primary { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater });
 
                     let max_txns = self.mempool_config.shared_mempool_batch_size;
                     let mut output_txns = vec![];
@@ -480,7 +479,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             }
         } else {
             MempoolSyncMsg::BroadcastTransactionsRequest {
-                request_id: batch_id,
+                message_id,
                 transactions: transactions.into_iter().map(|(txn, _)| txn).collect(),
             }
         };

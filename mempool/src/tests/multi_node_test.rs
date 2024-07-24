@@ -418,8 +418,8 @@ impl TestHarness {
                         msg,
                     ),
                     MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
+                        message_id: _message_id,
                         transactions,
-                        request_id: _request_id,
                         priority: _priority,
                     } => self.handle_txns(
                         transactions.into_iter().map(|(txn, _)| txn).collect(),
