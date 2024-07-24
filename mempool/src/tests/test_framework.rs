@@ -401,7 +401,7 @@ impl MempoolNode {
                 }
                 request_id
             },
-            MempoolSyncMsg::BroadcastTransactionsRequestV2 {
+            MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
                 request_id,
                 transactions,
                 priority: _,

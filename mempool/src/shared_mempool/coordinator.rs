@@ -351,7 +351,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                     )
                     .await;
                 },
-                MempoolSyncMsg::BroadcastTransactionsRequestV2 {
+                MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
                     request_id,
                     transactions,
                     priority,

@@ -417,7 +417,7 @@ impl TestHarness {
                         remote_peer_id,
                         msg,
                     ),
-                    MempoolSyncMsg::BroadcastTransactionsRequestV2 {
+                    MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
                         transactions,
                         request_id: _request_id,
                         priority: _priority,

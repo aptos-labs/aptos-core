@@ -60,7 +60,7 @@ pub enum MempoolSyncMsg {
         backoff: bool,
     },
     /// Broadcast request issued by the sender.
-    BroadcastTransactionsRequestV2 {
+    BroadcastTransactionsRequestWithReadyTime {
         /// Unique id of sync request. Can be used by sender for rebroadcast analysis
         request_id: MultiBatchId,
         /// For each transaction, we also include the time at which the transaction is ready
@@ -478,10 +478,9 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         batch_id: MultiBatchId,
         // For each transaction, we include the ready time in millis since epoch
         transactions: Vec<(SignedTransaction, u64)>,
-        use_mempool_sync_message_v2: bool,
     ) -> Result<(), BroadcastError> {
-        let request = if use_mempool_sync_message_v2 {
-            MempoolSyncMsg::BroadcastTransactionsRequestV2 {
+        let request = if self.mempool_config.include_ready_time_in_broadcast {
+            MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
                 request_id: batch_id,
                 transactions,
                 priority: self.check_peer_prioritized(peer)?,
@@ -550,13 +549,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
         let num_txns = transactions.len();
         let send_time = SystemTime::now();
-        self.send_batch_to_peer(
-            peer,
-            batch_id.clone(),
-            transactions,
-            smp.config.use_mempool_sync_message_v2,
-        )
-        .await?;
+        self.send_batch_to_peer(peer, batch_id.clone(), transactions)
+            .await?;
         let num_pending_broadcasts =
             self.update_broadcast_state(peer, batch_id.clone(), send_time)?;
         notify_subscribers(SharedMempoolNotification::Broadcast, &smp.subscribers);

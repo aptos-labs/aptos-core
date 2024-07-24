@@ -60,9 +60,9 @@ pub struct MempoolConfig {
     pub broadcast_buckets: Vec<u64>,
     pub eager_expire_threshold_ms: Option<u64>,
     pub eager_expire_time_ms: u64,
-    /// Uses the MempoolSyncMessageV2 instead of MempoolSyncMessage when sending mempool transactions
+    /// Uses the BroadcastTransactionsRequestWithReadyTime instead of MempoolSyncMessage when sending mempool transactions
     /// to upstream nodes.
-    pub use_mempool_sync_message_v2: bool,
+    pub include_ready_time_in_broadcast: bool,
     pub usecase_stats_num_blocks_to_track: usize,
     pub usecase_stats_num_top_to_track: usize,
 }
@@ -92,7 +92,7 @@ impl Default for MempoolConfig {
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
             eager_expire_threshold_ms: Some(15_000),
             eager_expire_time_ms: 6_000,
-            use_mempool_sync_message_v2: true,
+            include_ready_time_in_broadcast: true,
             usecase_stats_num_blocks_to_track: 40,
             usecase_stats_num_top_to_track: 5,
         }

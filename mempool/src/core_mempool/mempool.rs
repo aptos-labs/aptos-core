@@ -28,7 +28,7 @@ use aptos_types::{
 use std::{
     collections::{BTreeMap, HashSet},
     sync::atomic::Ordering,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime},
 };
 
 pub struct Mempool {
@@ -305,13 +305,8 @@ impl Mempool {
 
         let submitted_by_label = txn_info.insertion_info.submitted_by_label();
         let status = self.transactions.insert(txn_info);
-        let now = now
-            .duration_since(UNIX_EPOCH)
-            .expect("Failed to get current time")
-            .as_millis() as u64;
+        let now = aptos_infallible::duration_since_epoch().as_millis() as u64;
 
-        // TODO: Remove this before landing
-        info!("txn added to mempool: {} {} status {}, priority {:?}, client_submitted {}, now: {:?}, inserted_at_sender {:?}, time_since: {:?}", txn.sender(), txn.sequence_number(), status, priority.clone(), client_submitted, now, ready_time_at_sender, Duration::from_millis(now.saturating_sub(ready_time_at_sender.unwrap_or(0))));
         if status.code == MempoolStatusCode::Accepted {
             if let Some(ready_time_at_sender) = ready_time_at_sender {
                 counters::core_mempool_txn_commit_latency(

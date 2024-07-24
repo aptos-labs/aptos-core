@@ -29,7 +29,7 @@ use std::{
     collections::HashMap,
     mem::size_of,
     ops::Bound,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime},
 };
 
 /// Estimated per-txn overhead of indexes. Needs to be updated if additional indexes are added.
@@ -592,24 +592,18 @@ impl TransactionStore {
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
                         break; // The batch is full
                     } else {
-                        batch.push((txn.txn.clone(), txn.insertion_info.ready_time.duration_since(UNIX_EPOCH).expect("Failed to determine absolute unix time based on given duration")
-                        .as_millis() as u64));
+                        batch.push((
+                            txn.txn.clone(),
+                            aptos_infallible::duration_since_epoch_at(
+                                &txn.insertion_info.ready_time,
+                            )
+                            .as_millis() as u64,
+                        ));
                         batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
                         if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                             last_timeline_id[i] = timeline_id;
                         }
                         let bucket = self.timeline_index.get_bucket(txn.ranking_score);
-                        // TODO: Remove this before landing.
-                        info!(
-                            "read_timeline: {} {}, time taken: {:?}, before: {:?}, high_time_taken: {}, priority: {}, submitted_by: {}",
-                            address,
-                            sequence_number,
-                            SystemTime::now().duration_since(txn.insertion_info.insertion_time),
-                            Instant::now().duration_since(before.unwrap_or(Instant::now())),
-                            SystemTime::now().duration_since(txn.insertion_info.insertion_time).unwrap() > Duration::from_millis(15),
-                            txn.priority_of_sender.to_string().as_str(),
-                            txn.insertion_info.submitted_by_label(),
-                        );
                         Mempool::log_txn_latency(
                             &txn.insertion_info,
                             bucket,
@@ -641,8 +635,15 @@ impl TransactionStore {
                 self.transactions
                     .get(account)
                     .and_then(|txns| txns.get(sequence_number))
-                    .map(|txn| (txn.txn.clone(), txn.insertion_info.ready_time.duration_since(UNIX_EPOCH).expect("Failed to determine absolute unix time based on given duration")
-                    .as_millis() as u64))
+                    .map(|txn| {
+                        (
+                            txn.txn.clone(),
+                            aptos_infallible::duration_since_epoch_at(
+                                &txn.insertion_info.ready_time,
+                            )
+                            .as_millis() as u64,
+                        )
+                    })
             })
             .collect()
     }
