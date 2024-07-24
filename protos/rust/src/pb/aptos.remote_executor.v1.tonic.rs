@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::SystemTime;
+
 // @generated
 /// Generated client implementations.
 pub mod network_message_service_client {
