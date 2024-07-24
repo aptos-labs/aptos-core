@@ -89,6 +89,7 @@ impl Cmd {
         let overall_version = ledger_db
             .metadata_db()
             .get_synced_version()
+            .expect("DB read failed.")
             .expect("Overall commit progress must exist.");
         let ledger_db_version = ledger_db
             .metadata_db()
@@ -274,7 +275,7 @@ mod test {
                 version += txns_to_commit.len() as u64;
             }
 
-            let db_version = db.get_synced_version().unwrap();
+            let db_version = db.expect_synced_version();
             prop_assert_eq!(db_version, version - 1);
 
             drop(db);
@@ -293,7 +294,7 @@ mod test {
             cmd.run().unwrap();
 
             let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
-            let db_version = db.get_synced_version().unwrap();
+            let db_version = db.expect_synced_version();
             prop_assert!(db_version <= target_version);
             target_version = db_version;
 

@@ -256,7 +256,7 @@ impl AptosDB {
             latest_in_memory_state.current_version.expect("Must exist"),
         );
 
-        let num_transactions_in_db = self.get_synced_version().map_or(0, |v| v + 1);
+        let num_transactions_in_db = self.get_synced_version()?.map_or(0, |v| v + 1);
         {
             let buffered_state = self.state_store.buffered_state().lock();
             ensure!(
@@ -564,7 +564,7 @@ impl AptosDB {
         version_to_commit: Version,
         txns_to_commit: Option<&[TransactionToCommit]>
     ) -> Result<Option<Version>> {
-        let old_committed_ver = self.ledger_db.metadata_db().get_synced_version_opt()?;
+        let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
         let pre_committed_ver = self.ledger_db.metadata_db().get_pre_committed_version();
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),

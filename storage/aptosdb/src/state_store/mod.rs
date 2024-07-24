@@ -342,7 +342,10 @@ impl StateStore {
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
-        if let Ok(overall_commit_progress) = ledger_metadata_db.get_synced_version() {
+        if let Some(overall_commit_progress) = ledger_metadata_db
+            .get_synced_version()
+            .expect("DB read failed.")
+        {
             info!(
                 overall_commit_progress = overall_commit_progress,
                 "Start syncing databases..."
@@ -440,7 +443,7 @@ impl StateStore {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
-            .get_synced_version()
+            .get_synced_version()?
             .map_or(0, |v| v + 1);
 
         let latest_snapshot_version = state_db
