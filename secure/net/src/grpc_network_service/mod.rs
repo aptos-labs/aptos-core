@@ -195,13 +195,6 @@ impl GRPCNetworkMessageServiceClientWrapper {
         mt: &MessageType,
     ) {
         let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-        let request = tonic::Request::new(NetworkMessage {
-            message: message.data,
-            message_type: mt.get_type(),
-            ms_since_epoch: Some(curr_time), //message.start_ms_since_epoch,
-            seq_no: message.seq_num,
-            shard_id: message.shard_id,
-        });
 
         // if message.start_ms_since_epoch.is_some() {
         //     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
@@ -225,15 +218,29 @@ impl GRPCNetworkMessageServiceClientWrapper {
         // }
 
         // TODO: Retry with exponential backoff on failures
-        match self.remote_channel.simple_msg_exchange(request).await {
-            Ok(_) => {},
-            Err(e) => {
-                panic!(
-                    "Error '{}' sending message to {} on node {:?}",
-                    e, self.remote_addr, sender_addr
-                );
-            },
+        let mut success = false;
+        let mut cnt = 0;
+        while !success {
+            let request = tonic::Request::new(NetworkMessage {
+                message: message.data.clone(),
+                message_type: mt.get_type(),
+                ms_since_epoch: Some(curr_time), //message.start_ms_since_epoch,
+                seq_no: message.seq_num,
+                shard_id: message.shard_id,
+            });
+            match self.remote_channel.simple_msg_exchange(request).await {
+                Ok(_) => {success = true},
+                Err(e) => {
+                    cnt += 1;
+                    // panic!(
+                    //     "Error '{}' sending message to {} on node {:?}",
+                    //     e, self.remote_addr, sender_addr
+                    // );
+                },
+            }
         }
+        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+            .with_label_values(&["num_retries"]).observe(cnt as f64);
     }
 }
 
