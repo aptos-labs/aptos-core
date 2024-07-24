@@ -8,10 +8,10 @@ use super::{
 use crate::{
     block_storage::BlockReader,
     counters::{
-        CHAIN_HEALTH_BACKOFF_TRIGGERED, PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
-        PROPOSER_DELAY_PROPOSAL, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
-        PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
-        PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
+        CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
+        PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
+        PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING, PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE,
+        PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     payload_client::PayloadClient,
     util::time_service::TimeService,
@@ -21,7 +21,11 @@ use aptos_config::config::{
     ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
 };
 use aptos_consensus_types::{
-    block::Block, block_data::BlockData, common::{Author, Payload, PayloadFilter, Round}, pipelined_block::ExecutionSummary, quorum_cert::QuorumCert
+    block::Block,
+    block_data::BlockData,
+    common::{Author, Payload, PayloadFilter, Round},
+    pipelined_block::ExecutionSummary,
+    quorum_cert::QuorumCert,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
@@ -161,11 +165,27 @@ impl PipelineBackpressureConfig {
             let sizes = block_execution_times
                 .iter()
                 .flat_map(|summary| {
+                    // for each block, compute target (re-calibrated) block size
+
                     let execution_time_ms = summary.execution_time.as_millis();
+                    // Only block above the time threshold are considered giving enough signal to support calibration
+                    // so we filter out shorter locks
                     if execution_time_ms > config.min_block_time_ms_to_activate as u128 {
+                        // TODO: After cost of "retries" is reduced with execution pool, we
+                        // should be computing block gas limit here, simply as:
+                        // `config.target_block_time_ms / execution_time_ms * gas_consumed_by_block``
+                        //
+                        // Until then, we need to compute wanted block size to create.
+                        // Unfortunatelly, there is multiple layers where transactions are filtered.
+                        // After deduping/reordering logic is applied, max_txns_to_execute limits the transactions
+                        // passed to executor (`summary.payload_len` here), and then some are discarded for various
+                        // reasons, which we approximate are cheaply ignored.
+                        // For the rest, only `summary.to_commit` fraction of `summary.to_commit + summary.to_retry`
+                        // was executed. And so assuming same discard rate, we scale `summary.payload_len` with it.
                         Some(
                             ((config.target_block_time_ms as f64 / execution_time_ms as f64
-                                * (summary.to_commit as f64 / (summary.to_commit + summary.to_retry) as f64)
+                                * (summary.to_commit as f64
+                                    / (summary.to_commit + summary.to_retry) as f64)
                                 * summary.payload_len as f64)
                                 .floor() as u64)
                                 .max(1),
@@ -179,9 +199,11 @@ impl PipelineBackpressureConfig {
                 .collect::<Vec<_>>();
             info!("Estimated block back-offs block sizes: {:?}", sizes);
             if sizes.len() >= config.min_blocks_to_activate {
-                Some(*sizes
-                    .get((config.percentile * sizes.len() as f64) as usize)
-                    .unwrap())
+                Some(
+                    *sizes
+                        .get((config.percentile * sizes.len() as f64) as usize)
+                        .unwrap(),
+                )
             } else {
                 None
             }
@@ -375,11 +397,11 @@ impl ProposalGenerator {
                 .await;
 
             PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING.observe(max_block_txns_after_filtering as f64);
-            PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE.observe(
-                max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering) as f64,
-            );
+            if let Some(max_to_execute) = max_txns_from_block_to_execute {
+                PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE.observe(max_to_execute as f64);
+            }
 
-            PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
+            PROPOSER_DELAY_PROPOSAL.observe(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
                 tokio::time::sleep(proposal_delay).await;
             }
@@ -476,7 +498,7 @@ impl ProposalGenerator {
         timestamp: Duration,
         round: Round,
     ) -> (u64, u64, Option<u64>, Duration) {
-        let mut values_max_block_txns = vec![self.max_block_txns_after_filtering];
+        let mut values_max_block_txns_after_filtering = vec![self.max_block_txns_after_filtering];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
         let mut values_max_txns_from_block_to_execute = vec![];
@@ -485,7 +507,8 @@ impl ProposalGenerator {
             .chain_health_backoff_config
             .get_backoff(voting_power_ratio);
         if let Some(value) = chain_health_backoff {
-            values_max_block_txns.push(value.max_sending_block_txns_override);
+            values_max_block_txns_after_filtering
+                .push(value.max_sending_block_txns_after_filtering_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
             if let Some(val) = value.max_txns_from_block_to_execute {
                 values_max_txns_from_block_to_execute.push(val);
@@ -501,7 +524,8 @@ impl ProposalGenerator {
             .pipeline_backpressure_config
             .get_backoff(pipeline_pending_latency);
         if let Some(value) = pipeline_backpressure {
-            values_max_block_txns.push(value.max_sending_block_txns_override);
+            values_max_block_txns_after_filtering
+                .push(value.max_sending_block_txns_after_filtering_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
             if let Some(val) = value.max_txns_from_block_to_execute {
                 values_max_txns_from_block_to_execute.push(val);
@@ -525,7 +549,7 @@ impl ProposalGenerator {
                             .get_recent_block_execution_times(config.num_blocks_to_look_at),
                     );
                 if let Some(execution_backpressure_block_size) = execution_backpressure {
-                    values_max_block_txns.push(
+                    values_max_block_txns_after_filtering.push(
                         (execution_backpressure_block_size as f64
                             * config.reordering_ovarpacking_factor.max(1.0))
                             as u64,
@@ -543,11 +567,16 @@ impl ProposalGenerator {
             },
         );
 
-        let max_block_txns = values_max_block_txns.into_iter().min().unwrap();
+        let max_block_txns = values_max_block_txns_after_filtering
+            .into_iter()
+            .min()
+            .unwrap();
         let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
         let proposal_delay = values_proposal_delay.into_iter().max().unwrap();
-        let max_txns_from_block_to_execute =
-            values_max_txns_from_block_to_execute.into_iter().min().filter(|v| *v < max_block_txns);
+        let max_txns_from_block_to_execute = values_max_txns_from_block_to_execute
+            .into_iter()
+            .min()
+            .filter(|v| *v < max_block_txns);
 
         warn!(
             pipeline_pending_latency = pipeline_pending_latency.as_millis(),

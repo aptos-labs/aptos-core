@@ -12,8 +12,11 @@ use crate::{
 use aptos_crypto::hash::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_types::{
-    block_info::BlockInfo, contract_event::ContractEvent, randomness::Randomness,
-    transaction::{SignedTransaction, TransactionStatus}, validator_txn::ValidatorTransaction,
+    block_info::BlockInfo,
+    contract_event::ContractEvent,
+    randomness::Randomness,
+    transaction::{SignedTransaction, TransactionStatus},
+    validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -117,16 +120,22 @@ impl PipelinedBlock {
             match txn {
                 TransactionStatus::Keep(_) => to_commit += 1,
                 TransactionStatus::Retry => to_retry += 1,
-                _ => {}
+                _ => {},
             }
         }
 
-        assert!(self.execution_summary.set(ExecutionSummary {
-            payload_len: self.block.payload().map_or(0, |payload| payload.len_for_execution()),
-            to_commit,
-            to_retry,
-            execution_time,
-        }).is_ok());
+        assert!(self
+            .execution_summary
+            .set(ExecutionSummary {
+                payload_len: self
+                    .block
+                    .payload()
+                    .map_or(0, |payload| payload.len_for_execution()),
+                to_commit,
+                to_retry,
+                execution_time,
+            })
+            .is_ok());
 
         self
     }

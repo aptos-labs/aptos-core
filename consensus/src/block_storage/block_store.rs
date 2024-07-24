@@ -19,8 +19,12 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
-    block::Block, common::Round, pipelined_block::{ExecutionSummary, PipelinedBlock}, quorum_cert::QuorumCert,
-    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    block::Block,
+    common::Round,
+    pipelined_block::{ExecutionSummary, PipelinedBlock},
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutCertificate,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};

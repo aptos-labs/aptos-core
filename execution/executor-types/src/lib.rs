@@ -429,7 +429,7 @@ impl StateComputeResult {
     pub fn transactions_to_commit_len(&self) -> usize {
         self.compute_status_for_input_txns()
             .iter()
-            .filter(|status| if let TransactionStatus::Keep(_) = status { true } else { false })
+            .filter(|status| matches!(status, TransactionStatus::Keep(_)))
             .count()
             // StateCheckpoint/BlockEpilogue is added if there is no reconfiguration
             + (if self.has_reconfiguration() { 0 } else { 1 })

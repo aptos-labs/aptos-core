@@ -320,12 +320,11 @@ pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<DurationHistogram> = Lazy::
 });
 
 /// Amount of time (in seconds) proposal is delayed due to backpressure/backoff
-pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
-    register_gauge!(
+pub static PROPOSER_DELAY_PROPOSAL: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "aptos_proposer_delay_proposal",
         "Amount of time (in seconds) proposal is delayed due to backpressure/backoff",
     )
-    .unwrap()
 });
 
 /// Histogram for max number of transactions (after filtering for dedup, expirations, etc) proposer uses when creating block.
