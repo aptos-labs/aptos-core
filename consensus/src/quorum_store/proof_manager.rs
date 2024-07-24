@@ -298,6 +298,18 @@ impl ProofManager {
 
     /// return true when quorum store is back pressured
     pub(crate) fn qs_back_pressure(&self) -> BackPressure {
+        if self.remaining_total_txn_num > self.back_pressure_total_txn_limit
+            || self.remaining_total_proof_num > self.back_pressure_total_proof_limit
+        {
+            info!(
+                "Quorum store is back pressured with {} txns, limit: {}, proofs: {}, limit: {}",
+                self.remaining_total_txn_num,
+                self.back_pressure_total_txn_limit,
+                self.remaining_total_proof_num,
+                self.back_pressure_total_proof_limit
+            );
+        }
+
         BackPressure {
             txn_count: self.remaining_total_txn_num > self.back_pressure_total_txn_limit,
             proof_count: self.remaining_total_proof_num > self.back_pressure_total_proof_limit,
