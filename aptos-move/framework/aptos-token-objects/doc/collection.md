@@ -980,9 +980,6 @@ TODO: Hide this until we bring back meaningful way to enforce burns
         <a href="royalty.md#0x4_royalty_init">royalty::init</a>(&constructor_ref, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> <a href="royalty.md#0x4_royalty">royalty</a>))
     };
 
-    <b>let</b> transfer_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(&constructor_ref);
-    <a href="../../aptos-framework/doc/object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(&transfer_ref);
-
     constructor_ref
 }
 </code></pre>
