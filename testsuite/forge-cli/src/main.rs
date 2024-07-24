@@ -730,6 +730,16 @@ fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwor
     )
 }
 
+fn wrap_with_realistic_env_high_cpu_variance<T: NetworkTest + 'static>(
+    test: T,
+) -> CompositeNetworkTest {
+    CompositeNetworkTest::new_with_two_wrappers(
+        MultiRegionNetworkEmulationTest::default(),
+        CpuChaosTest::new_with_load(80),
+        test,
+    )
+}
+
 fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
     mempool_config.capacity = 3_000_000;
     mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
@@ -1023,6 +1033,7 @@ fn consensus_stress_test() -> ForgeConfig {
 fn realistic_env_sweep_wrap(
     num_validators: usize,
     num_fullnodes: usize,
+    high_cpu_variance: bool,
     test: LoadVsPerfBenchmark,
 ) -> ForgeConfig {
     ForgeConfig::default()
@@ -1031,7 +1042,13 @@ fn realistic_env_sweep_wrap(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
-        .add_network_test(wrap_with_realistic_env(test))
+        .add_network_test(
+            if high_cpu_variance {
+                wrap_with_realistic_env_high_cpu_variance(test)
+            } else {
+                wrap_with_realistic_env(test)
+            },
+        )
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
             EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
@@ -1052,7 +1069,7 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(20, 10, false, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
@@ -1079,7 +1096,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
 }
 
 fn realistic_env_workload_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(7, 3, false, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
@@ -1133,7 +1150,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
 }
 
 fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(7, 3, false, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // Very high gas
@@ -1161,7 +1178,7 @@ fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
 }
 
 fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(7, 3, true, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // do account generation first, to fill up a storage a bit.
