@@ -34,6 +34,7 @@ pub struct RemoteCoordinatorClient {
     cmd_rx_msg_duration_since_epoch: Arc<AtomicU64>,
     is_block_init_done: Arc<AtomicBool>,//Mutex<bool>,
     cmd_rx_thread_pool: Arc<rayon::ThreadPool>,
+    command_finished_rx: Receiver<Message>,
 }
 
 impl RemoteCoordinatorClient {
@@ -59,6 +60,7 @@ impl RemoteCoordinatorClient {
             RemoteStateViewClient::new(shard_id, controller, coordinator_address);
 
         OUTBOUND_RUNTIME.set(controller.get_outbound_rpc_runtime().clone()).ok();
+        let command_finished_rx = controller.create_inbound_channel("command_completed".to_string());
 
         Self {
             state_view_client: Arc::new(state_view_client),
@@ -68,6 +70,7 @@ impl RemoteCoordinatorClient {
             cmd_rx_msg_duration_since_epoch: Arc::new(AtomicU64::new(0)),
             is_block_init_done: Arc::new(AtomicBool::new(false)),
             cmd_rx_thread_pool,
+            command_finished_rx,
         }
     }
 
@@ -191,6 +194,7 @@ impl RemoteCoordinatorClient {
                 Err(_) => { break; }
             }
         }
+
     }
 }
 
@@ -236,6 +240,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     }
 
     fn receive_execute_command_stream(&self) -> StreamedExecutorShardCommand<RemoteStateViewClient> {
+        self.command_finished_rx.recv().unwrap();
         match self.command_rx.recv() {
             Ok(message) => {
                 let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
@@ -353,6 +358,10 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
 
     fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
         //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
+        if txn_idx_output.len() == 0 {
+            self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
+            return;
+        }
         let execute_result_type = format!("execute_result_{}", self.shard_id);
         let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
         self.result_tx.send(Message::new(output_message), &MessageType::new(execute_result_type));
