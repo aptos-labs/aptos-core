@@ -117,12 +117,12 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
         let message_type = MessageType::new(network_message.message_type);
 
         if msg.start_ms_since_epoch.is_some() {
-            // let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            // let mut delta = 0;
-            // if curr_time > msg.start_ms_since_epoch.unwrap() {
-            //     delta = curr_time - msg.start_ms_since_epoch.unwrap();
-            // }
-            // REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER.with_label_values(&["network_message_latency"]).observe(delta as f64);
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            let mut delta = 0;
+            if curr_time > msg.start_ms_since_epoch.unwrap() {
+                delta = curr_time - msg.start_ms_since_epoch.unwrap();
+            }
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER.with_label_values(&["network_message_latency"]).observe(delta as f64);
 
             // if message_type.get_type() == "remote_kv_request" {
             //     REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
