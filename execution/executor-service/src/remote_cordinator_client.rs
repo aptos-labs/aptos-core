@@ -47,7 +47,7 @@ impl RemoteCoordinatorClient {
         let execute_result_type = format!("execute_result_{}", shard_id);
         let command_rx = controller.create_inbound_channel(execute_command_type);
         let mut result_tx = vec![];
-        for _ in 0..1 {
+        for _ in 0..8 {
             result_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
         }
             //controller.create_outbound_channel(coordinator_address, execute_result_type);
@@ -62,7 +62,7 @@ impl RemoteCoordinatorClient {
         let result_tx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("remote-state-view-shard-send-request-{}-{}", shard_id, index))
-                .num_threads(4)
+                .num_threads(8)
                 .build()
                 .unwrap(),
         );
