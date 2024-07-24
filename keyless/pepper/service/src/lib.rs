@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_db::{init_account_db, AUD_DB},
+    account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
     account_managers::ACCOUNT_MANAGERS,
     vuf_keys::VUF_SK,
     ProcessingFailure::{BadRequest, InternalError},
@@ -12,7 +12,7 @@ use aptos_crypto::asymmetric_encryption::{
 };
 use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{
-    aud_db::AudDbEntry,
+    aud_db::AccountRecoveryDbEntry,
     jwt::Claims,
     vuf::{
         self,
@@ -22,7 +22,7 @@ use aptos_keyless_pepper_common::{
     },
     PepperInput, PepperRequest, PepperResponse, SignatureResponse,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_types::{
     account_address::AccountAddress,
     keyless::{Configuration, IdCommitment, KeylessPublicKey, OpenIdSig},
@@ -217,7 +217,7 @@ async fn process_common(
     ) // Signature verification happens here.
     .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
 
-    // If the pepper request is at V1, is from an account manager, and has a target aud specified, compute the pepper for the target aud.
+    // If the pepper request is is from an account manager, and has a target aud specified, compute the pepper for the target aud.
     let mut aud_overridden = false;
     let mut final_aud = claims.claims.aud.clone();
     if ACCOUNT_MANAGERS.contains(&(claims.claims.iss.clone(), claims.claims.aud.clone())) {
@@ -243,29 +243,8 @@ async fn process_common(
             uid_key = input.uid_key.clone(),
             "PepperInput is available."
         );
-        let db = AUD_DB.get_or_init(init_account_db).await;
-        info!("db obtained");
-        let entry = AudDbEntry {
-            iss: input.iss.clone(),
-            aud: input.aud.clone(),
-            uid_key: input.uid_key.clone(),
-            uid_val: input.uid_val.clone(),
-            last_request_unix_ms: duration_since_epoch().as_millis() as u64,
-        };
-        let doc_id = entry.document_id();
-        info!("doc_id={}", doc_id);
-        db.fluent()
-            .update()
-            .fields(paths!(AudDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms}))
-            .in_col("accounts")
-            .document_id(&doc_id)
-            .object(&entry)
-            .execute::<AudDbEntry>()
-            .await
-            .map_err(|e| InternalError(e.to_string()))?;
+        update_account_recovery_db(&input).await?;
     }
-
-    info!("eval.");
 
     let input_bytes = bcs::to_bytes(&input).unwrap();
     let (pepper_base, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)
@@ -317,5 +296,42 @@ async fn process_common(
         Ok((pepper_base_encrypted, pepper_encrypted, address))
     } else {
         Ok((pepper_base, derived_pepper.to_bytes().to_vec(), address))
+    }
+}
+
+/// Save a pepper request into the account recovery DB.
+///
+/// TODO: once the account recovery DB flow is verified working e2e, DB error should not be ignored.
+async fn update_account_recovery_db(input: &PepperInput) -> Result<(), ProcessingFailure> {
+    match ACCOUNT_RECOVERY_DB.get_or_init(init_account_db).await {
+        Ok(db) => {
+            let entry = AccountRecoveryDbEntry {
+                iss: input.iss.clone(),
+                aud: input.aud.clone(),
+                uid_key: input.uid_key.clone(),
+                uid_val: input.uid_val.clone(),
+                last_request_unix_ms: duration_since_epoch().as_millis() as u64,
+            };
+            let doc_id = entry.document_id();
+
+            // Actual DB operation using fluent API.
+            let op_result = db.fluent()
+                .update()
+                .fields(paths!(AccountRecoveryDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms}))
+                .in_col("accounts")
+                .document_id(&doc_id)
+                .object(&entry)
+                .execute::<AccountRecoveryDbEntry>()
+                .await;
+
+            if let Err(e) = op_result {
+                warn!("ACCOUNT_RECOVERY_DB operation failed: {e}");
+            }
+            Ok(())
+        },
+        Err(e) => {
+            warn!("ACCOUNT_RECOVERY_DB client failed to init: {e}");
+            Ok(())
+        },
     }
 }

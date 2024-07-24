@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{
-    aud_db::AudDbEntry,
+    aud_db::AccountRecoveryDbEntry,
     jwt,
     vuf::{self, VUF},
     PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, SignatureResponse,
@@ -104,7 +105,7 @@ async fn main() {
 
     println!();
     println!("Action 4: decide an expiry unix time.");
-    let epk_expiry_time_secs = 1721397501;
+    let epk_expiry_time_secs = duration_since_epoch().as_secs() + 3600;
     println!("expiry_time_sec={}", epk_expiry_time_secs);
 
     let esk_bytes =
@@ -200,7 +201,7 @@ async fn main() {
     println!("Pepper verification succeeded!");
 
     println!("Checking firestore records.");
-    let google_project_id = std::env::var("KEYLESS_PROJECT_ID").unwrap();
+    let google_project_id = std::env::var("PROJECT_ID").unwrap();
     let database_id = std::env::var("DATABASE_ID").unwrap();
     let options = FirestoreDbOptions {
         google_project_id,
@@ -209,18 +210,20 @@ async fn main() {
         firebase_api_url: None,
     };
     let db = FirestoreDb::with_options(options).await.unwrap();
-    let docs: Vec<AudDbEntry> = db
+    let docs: Vec<AccountRecoveryDbEntry> = db
         .fluent()
         .select()
-        .fields(paths!(AudDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms}))
+        .fields(paths!(AccountRecoveryDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms}))
         .from("accounts")
         .filter(|q| {
             q.for_all([
-                q.field(path!(AudDbEntry::iss)).eq(pepper_input.iss.clone()),
-                q.field(path!(AudDbEntry::aud)).eq(pepper_input.aud.clone()),
-                q.field(path!(AudDbEntry::uid_key))
+                q.field(path!(AccountRecoveryDbEntry::iss))
+                    .eq(pepper_input.iss.clone()),
+                q.field(path!(AccountRecoveryDbEntry::aud))
+                    .eq(pepper_input.aud.clone()),
+                q.field(path!(AccountRecoveryDbEntry::uid_key))
                     .eq(pepper_input.uid_key.clone()),
-                q.field(path!(AudDbEntry::uid_val))
+                q.field(path!(AccountRecoveryDbEntry::uid_val))
                     .eq(pepper_input.uid_val.clone()),
             ])
         })

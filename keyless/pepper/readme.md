@@ -2,43 +2,54 @@
 
 ### Prepare dependency: a firestore instance.
 
-Pepper service now depends on firestore on GCP.
-You must have a GCP project in order to run firestore emulator locally
-You also need to create a service account, and grant firestore access to it, and download its credential file.
-Below we assume the credential file has been saved as `credential.json`.
+Pepper service now depends on an account recovery DB, which is deployed as a firestore on GCP.
+You must have a GCP project in order to run firestore emulator locally.
+You also need to create a service account, grant firestore access to it, and download its credential file.
 
 In terminal 0, start a local firestore emulator.
 ```bash
 gcloud emulators firestore start --host-port=localhost:8081
 ```
 
-In terminal 1, start the pepper service.
+In terminal 1, set up the environment variables and start the pepper service.
 ```bash
-FIRESTORE_EMULATOR_HOST=localhost:8081 \
-  GOOGLE_APPLICATION_CREDENTIALS=credential.json \
-  KEYLESS_PROJECT_ID=$(gcloud config get-value project) \
-  DATABASE_ID=account-db-devnet \
-  ACCOUNT_MANAGER_0_ISSUER=https://accounts.google.com \
-  ACCOUNT_MANAGER_0_AUD=407408718192.apps.googleusercontent.com \
-  VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff \
-  cargo run -p aptos-keyless-pepper-service
-```
+# If specified, firestore library connects to the local emulator instead of the real GCP API.
+export FIRESTORE_EMULATOR_HOST=localhost:8081
 
-Remarks.
-- `ACCOUNT_MANAGER_0_ISSUER` and `ACCOUNT_MANAGER_0_AUD` together determines an account manager app which allows [account recovery/discovery](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-61.md#recovery-service).
-  - To specify more account managers, give each a short ID `X` and specify envvars `ACCOUNT_MANAGER_X_ISSUER` and `ACCOUNT_MANAGER_X_AUD`.
-- `VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00` is a dummy VUF private key seed.
-- `GOOGLE_APPLICATION_CREDENTIALS` and `KEYLESS_PROJECT_ID` are required to connect to firestore.
-- If `FIRESTORE_EMULATOR_HOST` is specified, pepper service will connect to to specified emulator;
-  otherwise (probably the case in production), it connects to the default firestore instance in the GCP project as specified by `KEYLESS_PROJECT_ID`.
+export GOOGLE_APPLICATION_CREDENTIALS="<path-to-your-service-account-credential>"
+
+# Specify the account recovery DB location.
+export PROJECT_ID=$(gcloud config get-value project)
+export DATABASE_ID='(default)' # the default name of a local firestore emulator
+
+# Specify an account manager.
+export ACCOUNT_MANAGER_0_ISSUER=https://accounts.google.com
+export ACCOUNT_MANAGER_0_AUD=407408718192.apps.googleusercontent.com
+# To specify more, do the following:
+#   export ACCOUNT_MANAGER_1_ISSUER=https://www.facebook.com
+#   export ACCOUNT_MANAGER_1_AUD=999999999.apps.fbusercontent.com
+#   export ACCOUNT_MANAGER_2_ISSUER=https://appleid.apple.com
+#   export ACCOUNT_MANAGER_2_AUD=88888888.apps.appleusercontent.com
+
+# Specify the VUF private key.
+export VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+# Start the pepper service.
+cargo run -p aptos-keyless-pepper-service
+```
 
 Run the example client in terminal 2.
 ```bash
-FIRESTORE_EMULATOR_HOST=localhost:8081 \
-  GOOGLE_APPLICATION_CREDENTIALS=credential.json \
-  KEYLESS_PROJECT_ID=$(gcloud config get-value project) \
-  DATABASE_ID=account-db-devnet \
-  cargo run -p aptos-keyless-pepper-example-client-rust
+# In addition to sending a pepper request and verify the response,
+# the example client also connects to the account recovery DB and verifies that it was correctly updated by the pepper service.
+# So here it relies on the same firestore-related parameters as `aptos-keyless-pepper-service` does.
+export FIRESTORE_EMULATOR_HOST=localhost:8081
+export GOOGLE_APPLICATION_CREDENTIALS="<path-to-your-service-account-credential>"
+export PROJECT_ID=$(gcloud config get-value project)
+export DATABASE_ID='(default)' # the default name of a local firestore emulator
+
+# Start the example client.
+cargo run -p aptos-keyless-pepper-example-client-rust
 ```
 This is an interactive console program.
 Follow the instruction to manually complete a session with the pepper service.

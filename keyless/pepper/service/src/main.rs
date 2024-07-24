@@ -4,6 +4,7 @@
 use aptos_keyless_pepper_common::BadPepperRequestError;
 use aptos_keyless_pepper_service::{
     about::ABOUT_JSON,
+    account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
     account_managers::ACCOUNT_MANAGERS,
     jwk::{self, parse_jwks, DECODING_KEY_CACHE},
     metrics::start_metric_server,
@@ -12,7 +13,7 @@ use aptos_keyless_pepper_service::{
     ProcessingFailure::{BadRequest, InternalError},
     V0FetchHandler, V0SignatureHandler,
 };
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_types::keyless::test_utils::get_sample_iss;
 use hyper::{
     header::{
@@ -24,7 +25,6 @@ use hyper::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::{convert::Infallible, fmt::Debug, net::SocketAddr, ops::Deref, time::Duration};
-use aptos_keyless_pepper_service::account_db::{AUD_DB, init_account_db};
 
 async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
     let origin = req
@@ -69,7 +69,7 @@ async fn main() {
     let _ = VUF_SK.deref();
     let _ = ACCOUNT_MANAGERS.deref();
     {
-        let _db = AUD_DB.get_or_init(init_account_db).await;
+        let _db = ACCOUNT_RECOVERY_DB.get_or_init(init_account_db).await;
     }
     aptos_logger::Logger::new().init();
     start_metric_server();
@@ -118,33 +118,43 @@ where
     let body = req.into_body();
     let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
     let pepper_request = serde_json::from_slice::<PREQ>(&body_bytes);
-    info!("pepper_request={:?}", pepper_request);
     let (status_code, body_json) = match pepper_request {
         Ok(request) => {
             let pepper_response = handler.handle(request).await;
-            info!("pepper_response={:?}", pepper_response);
             match pepper_response {
-                Ok(pepper_response) => (
-                    StatusCode::OK,
-                    serde_json::to_string_pretty(&pepper_response).unwrap(),
-                ),
-                Err(BadRequest(err)) => (
-                    StatusCode::BAD_REQUEST,
-                    serde_json::to_string_pretty(&BadPepperRequestError {
-                        message: err.to_string(),
-                    })
-                    .unwrap(),
-                ),
-                Err(InternalError(_)) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
+                Ok(pepper_response) => {
+                    info!("Request processed normally.");
+                    (
+                        StatusCode::OK,
+                        serde_json::to_string_pretty(&pepper_response).unwrap(),
+                    )
+                },
+                Err(BadRequest(err)) => {
+                    info!("Processing failed with bad request: {err}");
+                    (
+                        StatusCode::BAD_REQUEST,
+                        serde_json::to_string_pretty(&BadPepperRequestError {
+                            message: err.to_string(),
+                        })
+                        .unwrap(),
+                    )
+                },
+                Err(InternalError(e)) => {
+                    error!("Processing failed with internal error: {e}");
+                    (StatusCode::INTERNAL_SERVER_ERROR, String::new())
+                },
             }
         },
-        Err(err) => (
-            StatusCode::BAD_REQUEST,
-            serde_json::to_string_pretty(&BadPepperRequestError {
-                message: err.to_string(),
-            })
-            .unwrap(),
-        ),
+        Err(err) => {
+            error!("Processing did not start due to bad request: {err}");
+            (
+                StatusCode::BAD_REQUEST,
+                serde_json::to_string_pretty(&BadPepperRequestError {
+                    message: err.to_string(),
+                })
+                .unwrap(),
+            )
+        },
     };
 
     build_response(origin, status_code, body_json)

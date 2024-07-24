@@ -1,22 +1,22 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::env::VarError;
-use firestore::{FirestoreDb, FirestoreDbOptions};
-use google_cloud_auth::project::Config;
+use aptos_logger::warn;
+use firestore::{FirestoreDb, FirestoreDbOptions, FirestoreResult};
 use once_cell::sync::Lazy;
 use tokio::sync::OnceCell;
-use aptos_logger::{info, warn};
 
-pub static AUD_DB: Lazy<OnceCell<FirestoreDb>> = Lazy::new(OnceCell::new);
+/// A GCP firestore that holds all account address pre-images
+pub static ACCOUNT_RECOVERY_DB: Lazy<OnceCell<FirestoreResult<FirestoreDb>>> =
+    Lazy::new(OnceCell::new);
 
-pub async fn init_account_db() -> FirestoreDb {
-    let google_project_id = match std::env::var("KEYLESS_PROJECT_ID") {
+pub async fn init_account_db() -> FirestoreResult<FirestoreDb> {
+    let google_project_id = match std::env::var("PROJECT_ID") {
         Ok(id) => id,
         Err(e) => {
-            warn!("Could not load envvar `KEYLESS_PROJECT_ID`: {e}");
+            warn!("Could not load envvar `PROJECT_ID`: {e}");
             "unknown_project".to_string()
-        }
+        },
     };
 
     let database_id = match std::env::var("DATABASE_ID") {
@@ -24,7 +24,7 @@ pub async fn init_account_db() -> FirestoreDb {
         Err(e) => {
             warn!("Could not load envvar `DATABASE_ID`: {e}");
             "unknown_database".to_string()
-        }
+        },
     };
 
     let option = FirestoreDbOptions {
@@ -33,5 +33,5 @@ pub async fn init_account_db() -> FirestoreDb {
         max_retries: 1,
         firebase_api_url: None,
     };
-    FirestoreDb::with_options(option).await.unwrap()
+    FirestoreDb::with_options(option).await
 }

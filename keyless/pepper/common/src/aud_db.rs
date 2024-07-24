@@ -5,8 +5,9 @@ use crate::{Deserialize, Serialize};
 use aptos_crypto::compat::Sha3_256;
 use ed25519_dalek::Digest;
 
+/// The schema used in the account recovery DB.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AudDbEntry {
+pub struct AccountRecoveryDbEntry {
     pub iss: String,
     pub aud: String,
     pub uid_key: String,
@@ -14,7 +15,7 @@ pub struct AudDbEntry {
     pub last_request_unix_ms: u64,
 }
 
-impl AudDbEntry {
+impl AccountRecoveryDbEntry {
     pub fn document_id(&self) -> String {
         let mut hasher = Sha3_256::new();
         hasher.update((self.iss.len() as u64).to_be_bytes());
