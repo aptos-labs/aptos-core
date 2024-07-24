@@ -303,16 +303,6 @@ impl MultiBucketTimelineIndexIds {
         }
     }
 
-    // pub(crate) fn update(&mut self, batch_id: &MultiBatchId) {
-    //     if self.id_per_bucket.len() != batch_id.0.len() {
-    //         return;
-    //     }
-
-    //     for (cur, &(_start, end)) in self.id_per_bucket.iter_mut().zip(batch_id.0.iter()) {
-    //         *cur = std::cmp::max(*cur, end)
-    //     }
-    // }
-
     pub(crate) fn update(&mut self, start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>) {
         if self.id_per_bucket.len() != start_end_pairs.len() {
             return;

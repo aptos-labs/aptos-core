@@ -23,11 +23,12 @@ async fn test_consensus_events_rejected_txns() {
     // Txn 2: not committed with different address
     // Txn 3: not committed with same address
     let rejected_txn = TestTransaction::new(0, 0, 1).make_signed_transaction();
-    let kept_txn = TestTransaction::new(1, 0, 1).make_signed_transaction();
+    let kept_txn_1 = TestTransaction::new(1, 0, 1).make_signed_transaction();
+    let kept_txn_2 = TestTransaction::new(0, 1, 1).make_signed_transaction();
     let txns = vec![
         rejected_txn.clone(),
-        kept_txn.clone(),
-        TestTransaction::new(0, 1, 1).make_signed_transaction(),
+        kept_txn_1.clone(),
+        kept_txn_2.clone(),
     ];
     // Add txns to mempool
     {
@@ -50,13 +51,24 @@ async fn test_consensus_events_rejected_txns() {
     let pool = smp.mempool.lock();
     // TODO: make less brittle to broadcast buckets changes
     let (timeline, _) = pool.read_timeline(
+        1,
         &vec![0; 10].into(),
         10,
         None,
         BroadcastPeerPriority::Primary,
     );
-    assert_eq!(timeline.len(), 2);
-    assert_eq!(timeline.first().unwrap().0, kept_txn);
+    assert_eq!(timeline.len(), 1);
+    assert_eq!(timeline.first().unwrap().0, kept_txn_1);
+
+    let (timeline, _) = pool.read_timeline(
+        0,
+        &vec![0; 10].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
+    assert_eq!(timeline.len(), 1);
+    assert_eq!(timeline.first().unwrap().0, kept_txn_2);
 }
 
 #[allow(clippy::await_holding_lock)] // This appears to be a false positive!
@@ -71,11 +83,12 @@ async fn test_mempool_notify_committed_txns() {
     // Txn 3: not committed and newer than block timestamp
     let committed_txn =
         TestTransaction::new(0, 0, 1).make_signed_transaction_with_expiration_time(0);
-    let kept_txn = TestTransaction::new(1, 0, 1).make_signed_transaction(); // not committed or cleaned out by block timestamp gc
+    let kept_txn_1 = TestTransaction::new(1, 0, 1).make_signed_transaction(); // not committed or cleaned out by block timestamp gc
+    let kept_txn_2 = TestTransaction::new(0, 1, 1).make_signed_transaction_with_expiration_time(0);
     let txns = vec![
         committed_txn.clone(),
-        TestTransaction::new(0, 1, 1).make_signed_transaction_with_expiration_time(0),
-        kept_txn.clone(),
+        kept_txn_1.clone(),
+        kept_txn_2.clone(),
     ];
     // Add txns to mempool
     {
@@ -96,14 +109,25 @@ async fn test_mempool_notify_committed_txns() {
         let pool = smp.mempool.lock();
         // TODO: make less brittle to broadcast buckets changes
         let (timeline, _) = pool.read_timeline(
+            1,
             &vec![0; 10].into(),
             10,
             None,
             BroadcastPeerPriority::Primary,
         );
-        if timeline.len() == 10 && timeline.first().unwrap().0 == kept_txn {
-            return; // Mempool handled the commit notification
-        }
+        assert_eq!(timeline.len(), 1);
+        assert_eq!(timeline.first().unwrap().0, kept_txn_1);
+
+        let (timeline, _) = pool.read_timeline(
+            0,
+            &vec![0; 10].into(),
+            10,
+            None,
+            BroadcastPeerPriority::Primary,
+        );
+
+        assert_eq!(timeline.len(), 1);
+        assert_eq!(timeline.first().unwrap().0, kept_txn_2);
         drop(pool);
 
         // Sleep for a while

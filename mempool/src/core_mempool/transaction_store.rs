@@ -464,7 +464,7 @@ impl TransactionStore {
                     let bucket = self.timeline_index
                         .get(&sender_bucket)
                         .unwrap()
-                        .get_bucket(ranking_score).to_string();
+                        .get_bucket(txn.ranking_score).to_string();
                     let bucket = format!("{}_{}", sender_bucket.to_string(), bucket);
 
                     Self::log_ready_transaction(

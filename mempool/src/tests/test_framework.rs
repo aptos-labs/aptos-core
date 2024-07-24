@@ -254,9 +254,9 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
         let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
-        let message_id_in_request = MempoolMessageId::from_timeline_ids(vec![(0 as MempoolSenderBucket, (&vec![1].into(), &vec![10].into()))]);
+        let message_id_in_request = MempoolMessageId::from_timeline_ids(vec![(0 as MempoolSenderBucket, (vec![1].into(), vec![10].into()))]);
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
-            message_id: message_id_in_request,
+            message_id: message_id_in_request.clone(),
             transactions: sign_transactions(txns),
         };
         let data = protocol_id.to_bytes(&msg).unwrap();

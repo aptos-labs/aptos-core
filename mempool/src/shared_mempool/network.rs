@@ -334,7 +334,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: PeerNetworkId,
         scheduled_backoff: bool,
         smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
-    ) -> Result<(MempoolMessageId, Vec<(SignedTransaction, u64, BroadcastPeerPriority)>, Option<&str>), BroadcastError> {
+    ) -> Result<(MempoolMessageId, Vec<(SignedTransaction, u64)>, Option<&str>), BroadcastError> {
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
