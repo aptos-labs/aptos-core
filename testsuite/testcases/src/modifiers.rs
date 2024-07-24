@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{multi_region_network_test::chunk_peers, LoadDestination, NetworkLoadTest};
+use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     GroupCpuStress, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos,
     SwarmCpuStress, SwarmExt, Test,
@@ -201,16 +201,24 @@ impl Test for NetworkUnreliabilityTest {
 
 #[derive(Clone)]
 pub struct CpuChaosConfig {
-    pub num_groups: usize,
-    pub load_per_worker: u64,
+    pub num_cores: usize,
+    pub max_load_per_worker: usize,
+}
+
+impl CpuChaosConfig {
+    pub fn new_with_load(max_load_per_worker: usize) -> Self {
+        Self {
+            // default machine spec on forge has 32 cores.
+            // cannot use num_cpus::get(), as we are on coordinator machine.
+            num_cores: 32,
+            max_load_per_worker,
+        }
+    }
 }
 
 impl Default for CpuChaosConfig {
     fn default() -> Self {
-        Self {
-            num_groups: 4,
-            load_per_worker: 100,
-        }
+        Self::new_with_load(40)
     }
 }
 
@@ -220,6 +228,12 @@ pub struct CpuChaosTest {
 }
 
 impl CpuChaosTest {
+    pub fn new_with_load(max_load_per_worker: usize) -> Self {
+        Self {
+            cpu_chaos_config: CpuChaosConfig::new_with_load(max_load_per_worker),
+        }
+    }
+
     pub fn new_with_config(cpu_chaos_config: CpuChaosConfig) -> Self {
         Self { cpu_chaos_config }
     }
@@ -258,29 +272,24 @@ pub fn create_swarm_cpu_stress(
     let cpu_chaos_config = cpu_chaos_config.unwrap_or_default();
 
     // Chunk the peers into groups and create a GroupCpuStress for each group
-    let all_peers = all_peers.iter().map(|id| vec![*id]).collect();
-    let peer_chunks = chunk_peers(all_peers, cpu_chaos_config.num_groups);
-    let group_cpu_stresses = peer_chunks
-        .into_iter()
+    let group_cpu_stresses = all_peers
+        .iter()
         .enumerate()
-        .map(|(idx, chunk)| {
-            // Lower bound the number of workers
-            let num_workers = if cpu_chaos_config.num_groups > idx {
-                (cpu_chaos_config.num_groups - idx) as u64
-            } else {
-                1
-            };
+        .filter(|(idx, _)| *idx > 0) // skip cpu stress on first, as load would be 0
+        .map(|(idx, peer)| {
+            let load_per_worker =
+                idx * cpu_chaos_config.max_load_per_worker / (all_peers.len() - 1);
 
             // Create the cpu stress for the group
             info!(
-                "Creating CPU stress for group {} with {} workers",
-                idx, num_workers
+                "Creating CPU stress for group {}: {}% load on {} cores, for peer: {:?}",
+                idx, load_per_worker, cpu_chaos_config.num_cores, peer
             );
             GroupCpuStress {
                 name: format!("group-{}-cpu-stress", idx),
-                target_nodes: chunk,
-                num_workers,
-                load_per_worker: cpu_chaos_config.load_per_worker,
+                target_nodes: vec![*peer],
+                num_workers: cpu_chaos_config.num_cores,
+                load_per_worker,
             }
         })
         .collect();

@@ -53,7 +53,6 @@ use aptos_testcases::{
         StateSyncFullnodeFastSyncPerformance, StateSyncFullnodePerformance,
         StateSyncValidatorPerformance,
     },
-    three_region_simulation_test::ThreeRegionSameCloudSimulationTest,
     twin_validator_test::TwinValidatorTest,
     two_traffics_test::TwoTrafficsTest,
     validator_join_leave_test::ValidatorJoinLeaveTest,
@@ -691,6 +690,9 @@ fn get_realistic_env_test(
         "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
+        "realistic_env_simulation_with_different_node_speed" => {
+            realistic_env_simulation_with_different_node_speed()
+        },
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         _ => return None, // The test name does not match a realistic-env test
     };
@@ -715,10 +717,6 @@ fn get_state_sync_test(test_name: &str) -> Option<ForgeConfig> {
 fn get_multi_region_test(test_name: &str) -> Option<ForgeConfig> {
     let test = match test_name {
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
-        "three_region_simulation" => three_region_simulation(),
-        "three_region_simulation_with_different_node_speed" => {
-            three_region_simulation_with_different_node_speed()
-        },
         _ => return None, // The test name does not match a multi-region test
     };
     Some(test)
@@ -728,6 +726,16 @@ fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwor
     CompositeNetworkTest::new_with_two_wrappers(
         MultiRegionNetworkEmulationTest::default(),
         CpuChaosTest::default(),
+        test,
+    )
+}
+
+fn wrap_with_realistic_env_high_cpu_variance<T: NetworkTest + 'static>(
+    test: T,
+) -> CompositeNetworkTest {
+    CompositeNetworkTest::new_with_two_wrappers(
+        MultiRegionNetworkEmulationTest::default(),
+        CpuChaosTest::new_with_load(80),
         test,
     )
 }
@@ -1025,6 +1033,7 @@ fn consensus_stress_test() -> ForgeConfig {
 fn realistic_env_sweep_wrap(
     num_validators: usize,
     num_fullnodes: usize,
+    high_cpu_variance: bool,
     test: LoadVsPerfBenchmark,
 ) -> ForgeConfig {
     ForgeConfig::default()
@@ -1033,7 +1042,13 @@ fn realistic_env_sweep_wrap(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
-        .add_network_test(wrap_with_realistic_env(test))
+        .add_network_test(
+            if high_cpu_variance {
+                wrap_with_realistic_env_high_cpu_variance(test)
+            } else {
+                wrap_with_realistic_env(test)
+            },
+        )
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
             EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
@@ -1054,7 +1069,7 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(20, 10, false, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
@@ -1081,7 +1096,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
 }
 
 fn realistic_env_workload_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(7, 3, false, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
@@ -1135,7 +1150,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
 }
 
 fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(7, 3, false, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // Very high gas
@@ -1163,7 +1178,7 @@ fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
 }
 
 fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(7, 3, true, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // do account generation first, to fill up a storage a bit.
@@ -1618,21 +1633,18 @@ fn net_bench_two_region_inner(netbench_config: NetbenchConfig) -> ForgeConfig {
         }))
 }
 
-fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
+fn realistic_env_simulation_with_different_node_speed() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_initial_fullnode_count(30)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .add_network_test(CompositeNetworkTest::new(
-            ExecutionDelayTest {
-                add_execution_delay: ExecutionDelayConfig {
-                    inject_delay_node_fraction: 0.5,
-                    inject_delay_max_transaction_percentage: 40,
-                    inject_delay_per_transaction_ms: 2,
-                },
+        .add_network_test(wrap_with_realistic_env(ExecutionDelayTest {
+            add_execution_delay: ExecutionDelayConfig {
+                inject_delay_node_fraction: 0.5,
+                inject_delay_max_transaction_percentage: 40,
+                inject_delay_per_transaction_ms: 2,
             },
-            ThreeRegionSameCloudSimulationTest,
-        ))
+        }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.api.failpoints_enabled = true;
         }))
@@ -1641,24 +1653,6 @@ fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
         }))
         .with_success_criteria(
             SuccessCriteria::new(1000)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(240)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
-        )
-}
-
-fn three_region_simulation() -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
-        .with_initial_fullnode_count(12)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .add_network_test(ThreeRegionSameCloudSimulationTest)
-        // TODO(rustielin): tune these success criteria after we have a better idea of the test behavior
-        .with_success_criteria(
-            SuccessCriteria::new(3000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {
@@ -2062,7 +2056,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .add_network_test(NetworkBandwidthTest)
-        .add_network_test(ThreeRegionSameCloudSimulationTest)
+        .add_network_test(MultiRegionNetworkEmulationTest::default())
         .add_network_test(NetworkLossTest)
         .with_success_criteria(
             SuccessCriteria::new(
