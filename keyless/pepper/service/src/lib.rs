@@ -12,7 +12,7 @@ use aptos_crypto::asymmetric_encryption::{
 };
 use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{
-    aud_db::AccountRecoveryDbEntry,
+    account_recovery_db::AccountRecoveryDbEntry,
     jwt::Claims,
     vuf::{
         self,

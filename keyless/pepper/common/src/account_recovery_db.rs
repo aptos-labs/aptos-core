@@ -16,6 +16,7 @@ pub struct AccountRecoveryDbEntry {
 }
 
 impl AccountRecoveryDbEntry {
+    /// Derive a unique ID for a document/data entry.
     pub fn document_id(&self) -> String {
         let mut hasher = Sha3_256::new();
         hasher.update((self.iss.len() as u64).to_be_bytes());

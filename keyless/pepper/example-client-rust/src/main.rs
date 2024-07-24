@@ -4,7 +4,7 @@
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{
-    aud_db::AccountRecoveryDbEntry,
+    account_recovery_db::AccountRecoveryDbEntry,
     jwt,
     vuf::{self, VUF},
     PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, SignatureResponse,
