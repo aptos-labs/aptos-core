@@ -249,25 +249,6 @@ fn sum_max_txns_to_execute(m1: Option<u64>, m2: Option<u64>) -> Option<u64> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub enum PayloadExecutionLimit {
-    None,
-    MaxTransactionToExecute(u64),
-}
-
-impl PayloadExecutionLimit {
-    pub(crate) fn extend(&mut self, other: PayloadExecutionLimit) {
-        *self = match (&self, &other) {
-            (PayloadExecutionLimit::None, _) => other,
-            (_, PayloadExecutionLimit::None) => return,
-            (
-                PayloadExecutionLimit::MaxTransactionToExecute(limit1),
-                PayloadExecutionLimit::MaxTransactionToExecute(limit2),
-            ) => PayloadExecutionLimit::MaxTransactionToExecute(*limit1 + *limit2),
-        };
-    }
-}
-
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
