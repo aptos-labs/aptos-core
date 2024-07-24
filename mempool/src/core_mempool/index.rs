@@ -4,6 +4,7 @@
 
 /// This module provides various indexes used by Mempool.
 use crate::core_mempool::transaction::{MempoolTransaction, SequenceInfo, TimelineState};
+use crate::shared_mempool::types::TimelineIndexIdentifier;
 use crate::{
     counters,
     logging::{LogEntry, LogSchema},
@@ -14,6 +15,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
 use rand::seq::SliceRandom;
+use std::hash::Hash;
 use std::{
     cmp::Ordering,
     collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap},
@@ -348,13 +350,13 @@ impl MultiBucketTimelineIndex {
     /// Read transactions from the timeline from `start_id` (exclusive) to `end_id` (inclusive).
     pub(crate) fn timeline_range(
         &self,
-        start_end_pairs: &[(u64, u64)],
+        start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>
     ) -> Vec<(AccountAddress, u64)> {
         assert_eq!(start_end_pairs.len(), self.timelines.len());
 
         let mut all_txns = vec![];
-        for (timeline, &(start_id, end_id)) in self.timelines.iter().zip(start_end_pairs.iter()) {
-            let mut txns = timeline.timeline_range(start_id, end_id);
+        for (timeline_index_identifier, (start_id, end_id)) in start_end_pairs {
+            let mut txns = self.timelines.get(timeline_index_identifier as usize).map_or_else(|| vec![], |timeline| timeline.timeline_range(start_id, end_id));
             all_txns.append(&mut txns);
         }
         all_txns

@@ -10,7 +10,7 @@ use crate::{
     network::{BroadcastError, BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{
         types::{
-            notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
+            notify_subscribers, ScheduledBroadcast, SharedMempool,
             SharedMempoolNotification, SubmissionStatusBundle,
         },
         use_case_history::UseCaseHistory,
@@ -43,6 +43,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::runtime::Handle;
+
+use super::types::MempoolMessageId;
 
 // ============================== //
 //  broadcast_coordinator tasks  //
@@ -180,7 +182,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
     // The sender of the transactions can send the time at which the transactions were inserted
     // in the sender's mempool.
     transactions: Vec<(SignedTransaction, Option<u64>)>,
-    request_id: MultiBatchId,
+    message_id: MempoolMessageId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
     timer: HistogramTimer,
@@ -196,7 +198,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
         process_incoming_transactions(&smp, transactions, timeline_state, false, priority);
     log_txn_process_results(&results, Some(peer));
 
-    let ack_response = gen_ack_response(request_id, results, &peer);
+    let ack_response = gen_ack_response(message_id, results, &peer);
 
     // Respond to the peer with an ack. Note: ack response messages should be
     // small enough that they always fit within the maximum network message
@@ -218,7 +220,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
 
 /// If `MempoolIsFull` on any of the transactions, provide backpressure to the downstream peer.
 fn gen_ack_response(
-    request_id: MultiBatchId,
+    message_id: MempoolMessageId,
     results: Vec<SubmissionStatusBundle>,
     peer: &PeerNetworkId,
 ) -> MempoolSyncMsg {
@@ -237,7 +239,7 @@ fn gen_ack_response(
         backoff_and_retry,
     );
     MempoolSyncMsg::BroadcastTransactionsResponse {
-        request_id,
+        message_id,
         retry: backoff_and_retry,
         backoff: backoff_and_retry,
     }

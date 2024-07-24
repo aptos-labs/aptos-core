@@ -13,7 +13,7 @@ use crate::{
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
     network::BroadcastPeerPriority,
-    shared_mempool::types::MultiBucketTimelineIndexIds,
+    shared_mempool::types::{MempoolSenderBucket, TimelineIndexIdentifier, MultiBucketTimelineIndexIds},
 };
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
@@ -26,7 +26,7 @@ use aptos_types::{
     vm_status::DiscardedVMStatus,
 };
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashSet, HashMap},
     sync::atomic::Ordering,
     time::{Duration, Instant, SystemTime},
 };
@@ -70,7 +70,7 @@ impl Mempool {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
                 counters::COMMIT_ACCEPTED_LABEL,
-                self.transactions.get_bucket(ranking_score),
+                self.transactions.get_bucket(ranking_score, sender).as_str(),
                 ranking_score,
             );
         }
@@ -92,7 +92,7 @@ impl Mempool {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
                 reason_label,
-                self.transactions.get_bucket(ranking_score),
+                self.transactions.get_bucket(ranking_score, sender).as_str(),
                 ranking_score,
             );
         }
@@ -148,7 +148,7 @@ impl Mempool {
                 .fetch_add(1, Ordering::Relaxed);
             Self::log_txn_latency(
                 insertion_info,
-                bucket,
+                bucket.as_str(),
                 counters::CONSENSUS_PULLED_LABEL,
                 priority.to_string().as_str(),
             );
@@ -166,7 +166,7 @@ impl Mempool {
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_latency(insertion_info, bucket, stage, priority.to_string().as_str());
+            Self::log_txn_latency(insertion_info, bucket.as_str(), stage, priority.to_string().as_str());
         }
     }
 
@@ -216,7 +216,7 @@ impl Mempool {
         {
             Self::log_txn_latency(
                 insertion_info,
-                bucket,
+                bucket.as_str(),
                 counters::COMMIT_ACCEPTED_LABEL,
                 priority.to_string().as_str(),
             );
@@ -224,7 +224,7 @@ impl Mempool {
                 insertion_info,
                 bucket,
                 priority.to_string().as_str(),
-            );
+            .as_str());
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
@@ -232,7 +232,7 @@ impl Mempool {
                 counters::core_mempool_txn_commit_latency(
                     counters::COMMIT_ACCEPTED_BLOCK_LABEL,
                     insertion_info.submitted_by_label(),
-                    bucket,
+                    bucket.as_str(),
                     insertion_to_block,
                     priority.to_string().as_str(),
                 );
@@ -292,6 +292,7 @@ impl Mempool {
         let expiration_time =
             aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
+        let sender = txn.sender();
         let txn_info = MempoolTransaction::new(
             txn.clone(),
             expiration_time,
@@ -321,7 +322,7 @@ impl Mempool {
         counters::core_mempool_txn_ranking_score(
             counters::INSERT_LABEL,
             status.code.to_string().as_str(),
-            self.transactions.get_bucket(ranking_score),
+            self.transactions.get_bucket(ranking_score, &sender).as_str(),
             ranking_score,
         );
         status
@@ -444,7 +445,7 @@ impl Mempool {
                 counters::core_mempool_txn_ranking_score(
                     counters::CONSENSUS_PULLED_LABEL,
                     counters::CONSENSUS_PULLED_LABEL,
-                    self.transactions.get_bucket(ranking_score),
+                    self.transactions.get_bucket(ranking_score, &sender).as_str(),
                     ranking_score,
                 );
             }
@@ -514,22 +515,29 @@ impl Mempool {
     /// the transaction ready time in millis since epoch
     pub(crate) fn read_timeline(
         &self,
+        sender_hash: MempoolSenderBucket,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
         priority_of_receiver: BroadcastPeerPriority,
     ) -> (Vec<(SignedTransaction, u64)>, MultiBucketTimelineIndexIds) {
         self.transactions
-            .read_timeline(timeline_id, count, before, priority_of_receiver)
+            .read_timeline(sender_hash, timeline_id, count, before, priority_of_receiver)
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive),
     /// along with their ready times in millis since poch
     pub(crate) fn timeline_range(
         &self,
-        start_end_pairs: &[(u64, u64)],
+        sender_hash: MempoolSenderBucket, start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>) -> Vec<SignedTransaction> {
+        self.transactions.timeline_range(sender_hash, start_end_pairs)
+    }
+
+    pub(crate) fn timeline_range_of_message(&self, sender_start_end_pairs: HashMap<MempoolSenderBucket, HashMap<TimelineIndexIdentifier, (u64, u64)>>,
     ) -> Vec<(SignedTransaction, u64)> {
-        self.transactions.timeline_range(start_end_pairs)
+        sender_start_end_pairs.iter().flat_map(|(sender_hash, start_end_pairs)| {
+            self.transactions.timeline_range(*sender_hash, start_end_pairs.clone())
+        }).collect()
     }
 
     pub fn gen_snapshot(&self) -> TxnsLog {

@@ -65,6 +65,9 @@ pub struct MempoolConfig {
     pub include_ready_time_in_broadcast: bool,
     pub usecase_stats_num_blocks_to_track: usize,
     pub usecase_stats_num_top_to_track: usize,
+    /// We divide the transactions into buckets based on hash of the sender address.
+    /// This is the number of sender buckets we use.
+    pub num_sender_buckets: u8,
 }
 
 impl Default for MempoolConfig {
@@ -95,6 +98,7 @@ impl Default for MempoolConfig {
             include_ready_time_in_broadcast: false,
             usecase_stats_num_blocks_to_track: 40,
             usecase_stats_num_top_to_track: 5,
+            num_sender_buckets: 4,
         }
     }
 }

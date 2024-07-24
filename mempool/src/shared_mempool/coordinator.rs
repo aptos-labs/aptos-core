@@ -12,7 +12,7 @@ use crate::{
     shared_mempool::{
         tasks::{self, process_committed_transactions},
         types::{
-            notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
+            notify_subscribers, MempoolMessageId, ScheduledBroadcast, SharedMempool,
             SharedMempoolNotification,
         },
         use_case_history::UseCaseHistory,
@@ -277,7 +277,7 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
     bounded_executor: &BoundedExecutor,
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     network_id: NetworkId,
-    request_id: MultiBatchId,
+    message_id: MempoolMessageId,
     transactions: Vec<(SignedTransaction, Option<u64>)>,
     peer_id: PeerId,
     priority: BroadcastPeerPriority,
@@ -311,7 +311,7 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
         .spawn(tasks::process_transaction_broadcast(
             smp_clone,
             transactions,
-            request_id,
+            message_id,
             timeline_state,
             peer,
             task_start_timer,
@@ -337,14 +337,14 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
             counters::shared_mempool_event_inc("message");
             match msg {
                 MempoolSyncMsg::BroadcastTransactionsRequest {
-                    request_id,
+                    message_id,
                     transactions,
                 } => {
                     process_received_txns(
                         bounded_executor,
                         smp,
                         network_id,
-                        request_id,
+                        message_id,
                         transactions.into_iter().map(|t| (t, None)).collect(),
                         peer_id,
                         BroadcastPeerPriority::Primary,
@@ -352,7 +352,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                     .await;
                 },
                 MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
-                    request_id,
+                    message_id,
                     transactions,
                     priority,
                 } => {
@@ -360,7 +360,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                         bounded_executor,
                         smp,
                         network_id,
-                        request_id,
+                        message_id,
                         transactions.into_iter().map(|t| (t.0, Some(t.1))).collect(),
                         peer_id,
                         priority,
@@ -368,14 +368,14 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                     .await;
                 },
                 MempoolSyncMsg::BroadcastTransactionsResponse {
-                    request_id,
+                    message_id,
                     retry,
                     backoff,
                 } => {
                     let ack_timestamp = SystemTime::now();
                     smp.network_interface.process_broadcast_ack(
                         PeerNetworkId::new(network_id, peer_id),
-                        request_id,
+                        message_id,
                         retry,
                         backoff,
                         ack_timestamp,

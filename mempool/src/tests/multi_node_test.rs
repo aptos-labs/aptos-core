@@ -404,7 +404,7 @@ impl TestHarness {
                 match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsRequest {
                         transactions,
-                        request_id: _request_id,
+                        message_id: _message_id,
                     } => self.handle_txns(
                         transactions,
                         sender_id,

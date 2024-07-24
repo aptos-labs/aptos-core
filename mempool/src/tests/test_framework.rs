@@ -4,8 +4,8 @@
 
 use crate::{
     core_mempool::CoreMempool,
-    shared_mempool::{start_shared_mempool, types::MultiBatchId},
-    tests::{common, common::TestTransaction},
+    shared_mempool::{start_shared_mempool, types::{MempoolMessageId, MempoolSenderBucket, MultiBatchId}},
+    tests::common::{self, TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -254,9 +254,9 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
         let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
-        let batch_id = MultiBatchId::from_timeline_ids(&vec![1].into(), &vec![10].into());
+        let message_id = MempoolMessageId::from_timeline_ids(vec![(0 as MempoolSenderBucket, (&vec![1].into(), &vec![10].into()))]);
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: batch_id.clone(),
+            message_id,
             transactions: sign_transactions(txns),
         };
         let data = protocol_id.to_bytes(&msg).unwrap();
@@ -310,7 +310,7 @@ impl MempoolNode {
             }
         };
         if let MempoolSyncMsg::BroadcastTransactionsResponse {
-            request_id,
+            message_id,
             retry,
             backoff,
         } = response
@@ -376,7 +376,7 @@ impl MempoolNode {
         let mempool_message = common::decompress_and_deserialize(&data.to_vec());
         let request_id = match mempool_message {
             MempoolSyncMsg::BroadcastTransactionsRequest {
-                request_id,
+                message_id,
                 transactions,
             } => {
                 if !block_only_contains_transactions(&transactions, expected_txns) {
@@ -399,7 +399,7 @@ impl MempoolNode {
                         txns, expected_txns
                     );
                 }
-                request_id
+                message_id
             },
             MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
                 request_id,
@@ -435,7 +435,7 @@ impl MempoolNode {
             },
         };
         let response = MempoolSyncMsg::BroadcastTransactionsResponse {
-            request_id,
+            message_id,
             retry,
             backoff,
         };

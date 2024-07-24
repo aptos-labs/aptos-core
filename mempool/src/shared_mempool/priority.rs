@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters;
+use crate::{counters, network::BroadcastPeerPriority};
 use aptos_config::{
     config::MempoolConfig,
     network_id::{NetworkId, PeerNetworkId},
@@ -13,11 +13,13 @@ use aptos_time_service::{TimeService, TimeServiceTrait};
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
-    collections::hash_map::RandomState,
+    collections::{HashMap, hash_map::RandomState},
     hash::{BuildHasher, Hasher},
     sync::Arc,
     time::Instant,
 };
+
+use super::types::MempoolSenderBucket;
 
 /// A simple struct that offers comparisons and ordering for peer prioritization
 #[derive(Clone, Debug)]
@@ -123,6 +125,12 @@ pub struct PrioritizedPeersState {
     // The current list of prioritized peers
     prioritized_peers: Arc<RwLock<Vec<PeerNetworkId>>>,
 
+    // We divide mempool transactions into buckets based on hash of the sender.
+    // For load balancing, we send transactions from a subset of buckets to a peer.
+    // This map stores the buckets that are sent to a peer and the priority of the peer
+    // for that bucket.
+    peer_to_sender_buckets: HashMap<PeerNetworkId, HashMap<MempoolSenderBucket, BroadcastPeerPriority>>,
+
     // The comparator used to prioritize peers
     peer_comparator: PrioritizedPeersComparator,
 
@@ -145,6 +153,7 @@ impl PrioritizedPeersState {
             observed_all_ping_latencies: false,
             last_peer_priority_update: None,
             time_service,
+            peer_to_sender_buckets: HashMap::new(),
         }
     }
 
@@ -187,6 +196,13 @@ impl PrioritizedPeersState {
         }
     }
 
+    pub(crate) fn get_sender_buckets_for_peer(
+        &self,
+        peer: &PeerNetworkId,
+    ) -> Option<&HashMap<MempoolSenderBucket, BroadcastPeerPriority>> {
+        self.peer_to_sender_buckets.get(peer)
+    }
+
     /// Sorts the given peers by priority using the prioritized peer comparator.
     /// The peers are sorted in descending order (i.e., higher values are prioritized).
     fn sort_peers_by_priority(
@@ -213,6 +229,9 @@ impl PrioritizedPeersState {
         &mut self,
         peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
     ) {
+        let peer_monitoring_data: HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>> =
+            peers_and_metadata.clone().into_iter().collect();
+
         // Calculate the new set of prioritized peers
         let new_prioritized_peers = self.sort_peers_by_priority(&peers_and_metadata);
 
@@ -227,6 +246,54 @@ impl PrioritizedPeersState {
             self.observed_all_ping_latencies = peers_and_metadata
                 .iter()
                 .all(|(_, metadata)| get_peer_ping_latency(metadata).is_some());
+        }
+
+        // Divide the sender buckets amongst the top peers
+        self.peer_to_sender_buckets = HashMap::new();
+        if !self.prioritized_peers.read().is_empty() {
+            let mut peer_index = 0;
+            let base_ping_latency = self.prioritized_peers.read().get(0).and_then(|peer| {
+                peer_monitoring_data
+                    .get(peer)
+                    .and_then(|metadata| get_peer_ping_latency(metadata)
+                )
+            });
+            for bucket_index in 0..self.mempool_config.num_sender_buckets {
+                self.peer_to_sender_buckets
+                    .entry(*self.prioritized_peers.read().get(peer_index).unwrap())
+                    .or_insert_with(HashMap::new)
+                    .insert(bucket_index, BroadcastPeerPriority::Primary);
+
+                // Get the next peer_id with ping latency less than base_ping_latency + 30 ms
+                loop {
+                    peer_index = (peer_index + 1) % self.prioritized_peers.read().len();
+
+                    let ping_latency = self.prioritized_peers.read().get(peer_index).and_then(|peer| {
+                        peer_monitoring_data
+                            .get(peer)
+                            .and_then(|metadata| get_peer_ping_latency(metadata))
+                    });
+
+                    if base_ping_latency.is_none() || ping_latency.is_none() || ping_latency.unwrap() < base_ping_latency.unwrap() + 0.030 {
+                        break;
+                    }
+                }
+            }
+
+            for _ in 0..self.mempool_config.default_failovers {
+                for bucket_index in 0..self.mempool_config.num_sender_buckets {
+                    // Find the first peer that already doesn't have the sender bucket, and add the bucket
+                    for peer in self.prioritized_peers.read().iter() {
+                        let sender_bucket_list = self.peer_to_sender_buckets
+                                .entry(*peer)
+                                .or_insert_with(HashMap::new);
+                        if !sender_bucket_list.contains_key(&bucket_index) {
+                            sender_bucket_list.insert(bucket_index, BroadcastPeerPriority::Failover);
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         // Set the last peer priority update time
