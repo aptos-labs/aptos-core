@@ -829,7 +829,7 @@ fn optimize_for_maximum_throughput(
 ) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_unique_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_txns_after_filtering = max_txns_per_block as u64;
     config.consensus.max_sending_block_txns = config
         .consensus
         .max_sending_block_txns
@@ -2253,9 +2253,10 @@ pub fn changing_working_quorum_test_helper(
             } else {
                 for (i, item) in chain_health_backoff.iter_mut().enumerate() {
                     // as we have lower TPS, make limits smaller
-                    item.max_sending_block_txns_override =
+                    item.max_sending_block_txns_after_filtering_override =
                         (block_size / 2_u64.pow(i as u32 + 1)).max(2);
-                    min_block_txns = min_block_txns.min(item.max_sending_block_txns_override);
+                    min_block_txns =
+                        min_block_txns.min(item.max_sending_block_txns_after_filtering_override);
                     // as we have fewer nodes, make backoff triggered earlier:
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
