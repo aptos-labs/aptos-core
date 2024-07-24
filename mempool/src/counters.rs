@@ -193,7 +193,6 @@ pub fn core_mempool_txn_commit_latency(
     latency: Duration,
     priority: &str,
 ) {
-    // Will be deprecated soon
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
         .with_label_values(&[stage, submitted_by, bucket])
         .observe(latency.as_secs_f64());
