@@ -34,6 +34,7 @@ use fail::fail_point;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
+    fmt::Display,
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -58,6 +59,18 @@ pub enum MempoolSyncMsg {
         /// A backpressure signal from the recipient when it is overwhelmed (e.g., mempool is full).
         backoff: bool,
     },
+    /// Broadcast request issued by the sender.
+    BroadcastTransactionsRequestWithReadyTime {
+        /// Unique id of sync request. Can be used by sender for rebroadcast analysis
+        request_id: MultiBatchId,
+        /// For each transaction, we also include the time at which the transaction is ready
+        /// in the current node in millis since epoch. The upstream node can then calculate
+        /// (SystemTime::now() - ready_time) to calculate the time it took for the transaction
+        /// to reach the upstream node.
+        transactions: Vec<(SignedTransaction, u64)>,
+        /// Priority of the upstream node for the sender.
+        priority: BroadcastPeerPriority,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -76,9 +89,19 @@ pub enum BroadcastError {
     TooManyPendingBroadcasts(PeerNetworkId),
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum BroadcastPeerPriority {
     Primary,
     Failover,
+}
+
+impl Display for BroadcastPeerPriority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BroadcastPeerPriority::Primary => write!(f, "Primary"),
+            BroadcastPeerPriority::Failover => write!(f, "Failover"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -331,7 +354,15 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: PeerNetworkId,
         scheduled_backoff: bool,
         smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
-    ) -> Result<(MultiBatchId, Vec<SignedTransaction>, Option<&str>), BroadcastError> {
+    ) -> Result<
+        (
+            MultiBatchId,
+            // For each transaction, include the ready time in millis since epoch
+            Vec<(SignedTransaction, u64)>,
+            Option<&str>,
+        ),
+        BroadcastError,
+    > {
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
@@ -423,6 +454,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                         &state.timeline_id,
                         self.mempool_config.shared_mempool_batch_size,
                         before,
+                        peer_priority,
                     );
                     (
                         MultiBatchId::from_timeline_ids(&state.timeline_id, &new_timeline_id),
@@ -444,11 +476,20 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         &self,
         peer: PeerNetworkId,
         batch_id: MultiBatchId,
-        transactions: Vec<SignedTransaction>,
+        // For each transaction, we include the ready time in millis since epoch
+        transactions: Vec<(SignedTransaction, u64)>,
     ) -> Result<(), BroadcastError> {
-        let request = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: batch_id,
-            transactions,
+        let request = if self.mempool_config.include_ready_time_in_broadcast {
+            MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
+                request_id: batch_id,
+                transactions,
+                priority: self.check_peer_prioritized(peer)?,
+            }
+        } else {
+            MempoolSyncMsg::BroadcastTransactionsRequest {
+                request_id: batch_id,
+                transactions: transactions.into_iter().map(|(txn, _)| txn).collect(),
+            }
         };
 
         if let Err(e) = self.network_client.send_to_peer(request, peer) {
