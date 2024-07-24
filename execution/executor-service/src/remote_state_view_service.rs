@@ -326,7 +326,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         outbound_rpc_scheduler.send(resp_message,
                                     MessageType::new("remote_kv_response".to_string()),
                                     kv_tx_clone[shard_id][rand_send_thread_idx].clone(),
-                                    100 + seq_num); // first 100 numbers is reserved for cmd messages
+                                    seq_num); // first 100 numbers is reserved for cmd messages
         // outbound_rpc_runtime.spawn(async move {
         //     kv_tx_clone[shard_id][rand_send_thread_idx].lock().await.send_async(resp_message, &MessageType::new("remote_kv_response".to_string())).await;
         // });
