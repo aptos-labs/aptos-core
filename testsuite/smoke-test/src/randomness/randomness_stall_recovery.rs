@@ -83,6 +83,23 @@ async fn randomness_stall_recovery() {
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
+    info!("Hot-fixing the VFNs.");
+    for (idx, vfn) in swarm.fullnodes_mut().enumerate() {
+        info!("Stopping VFN {}.", idx);
+        vfn.stop();
+        let config_path = vfn.config_path();
+        let mut vfn_override_config = OverrideNodeConfig::load_config(config_path.clone()).unwrap();
+        vfn_override_config
+            .override_config_mut()
+            .randomness_override_seq_num = 1;
+        info!("Updating VFN {} config.", idx);
+        vfn_override_config.save_config(config_path).unwrap();
+        info!("Restarting VFN {}.", idx);
+        vfn.start().unwrap();
+        info!("Let VFN {} bake for 5 secs.", idx);
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    }
+
     let liveness_check_result = swarm
         .liveness_check(Instant::now().add(Duration::from_secs(30)))
         .await;

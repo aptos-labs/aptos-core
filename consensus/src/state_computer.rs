@@ -9,7 +9,7 @@ use crate::{
     error::StateSyncError,
     execution_pipeline::ExecutionPipeline,
     monitor,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
@@ -72,7 +72,7 @@ impl LogicalTime {
 #[derive(Clone)]
 struct MutableState {
     validators: Arc<[AccountAddress]>,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     transaction_shuffler: Arc<dyn TransactionShuffler>,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
@@ -382,7 +382,7 @@ impl StateComputer for ExecutionProxy {
     fn new_epoch(
         &self,
         epoch_state: &EpochState,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
@@ -412,7 +412,8 @@ impl StateComputer for ExecutionProxy {
 #[tokio::test]
 async fn test_commit_sync_race() {
     use crate::{
-        error::MempoolError, transaction_deduper::create_transaction_deduper,
+        error::MempoolError, payload_manager::DirectMempoolPayloadManager,
+        transaction_deduper::create_transaction_deduper,
         transaction_shuffler::create_transaction_shuffler,
     };
     use aptos_config::config::transaction_filter_type::Filter;
@@ -544,7 +545,7 @@ async fn test_commit_sync_race() {
 
     executor.new_epoch(
         &EpochState::empty(),
-        Arc::new(PayloadManager::DirectMempool),
+        Arc::new(DirectMempoolPayloadManager {}),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),

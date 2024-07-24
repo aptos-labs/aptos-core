@@ -10,7 +10,7 @@ use crate::{
         BlockReader,
     },
     counters,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
@@ -74,7 +74,7 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     vote_back_pressure_limit: Round,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
@@ -89,7 +89,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
@@ -144,7 +144,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
@@ -290,7 +290,6 @@ impl BlockStore {
         root_metadata: RootMetadata,
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
-        order_vote_enabled: bool,
     ) {
         info!(
             "Rebuilding block tree. root {:?}, blocks {:?}, qcs {:?}",
@@ -318,7 +317,7 @@ impl BlockStore {
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
-            order_vote_enabled,
+            self.order_vote_enabled,
             self.pending_blocks.clone(),
         )
         .await;

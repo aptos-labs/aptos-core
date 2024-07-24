@@ -165,6 +165,10 @@ impl ProofWithData {
         }
     }
 
+    pub fn empty() -> Self {
+        Self::new(vec![])
+    }
+
     #[allow(clippy::unwrap_used)]
     pub fn extend(&mut self, other: ProofWithData) {
         let other_data_status = other.status.lock().as_mut().unwrap().take();

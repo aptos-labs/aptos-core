@@ -51,9 +51,8 @@ use crate::{
         RECEIVED_LABEL, REQUEST_LABEL, RESPONSE_LABEL, SENT_LABEL,
     },
     logging::NetworkSchema,
-    peer::PeerNotification,
     protocols::{
-        network::SerializedRequest,
+        network::{ReceivedMessage, SerializedRequest},
         wire::messaging::v1::{NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse},
     },
     ProtocolId,
@@ -74,7 +73,7 @@ use futures::{
     stream::{FuturesUnordered, StreamExt},
 };
 use serde::Serialize;
-use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, time::Duration};
+use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 pub mod error;
 
@@ -206,8 +205,8 @@ impl InboundRpcs {
     /// Handle a new inbound `RpcRequest` message off the wire.
     pub fn handle_inbound_request(
         &mut self,
-        peer_notifs_tx: &mut aptos_channel::Sender<ProtocolId, PeerNotification>,
-        request: RpcRequest,
+        peer_notifs_tx: &aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+        mut request: ReceivedMessage,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
 
@@ -224,9 +223,13 @@ impl InboundRpcs {
             return Err(RpcError::TooManyPending(self.max_concurrent_inbound_rpcs));
         }
 
-        let protocol_id = request.protocol_id;
-        let request_id = request.request_id;
-        let priority = request.priority;
+        let peer_id = request.sender.peer_id();
+        let NetworkMessage::RpcRequest(rpc_request) = &request.message else {
+            return Err(RpcError::InvalidRpcResponse);
+        };
+        let protocol_id = rpc_request.protocol_id;
+        let request_id = rpc_request.request_id;
+        let priority = rpc_request.priority;
 
         trace!(
             NetworkSchema::new(network_context).remote_peer(&self.remote_peer_id),
@@ -236,19 +239,15 @@ impl InboundRpcs {
             request_id,
             protocol_id,
         );
-        self.update_inbound_rpc_request_metrics(protocol_id, request.raw_request.len() as u64);
+        self.update_inbound_rpc_request_metrics(protocol_id, rpc_request.raw_request.len() as u64);
 
         let timer =
             counters::inbound_rpc_handler_latency(network_context, protocol_id).start_timer();
 
         // Forward request to PeerManager for handling.
         let (response_tx, response_rx) = oneshot::channel();
-        let notif = PeerNotification::RecvRpc(InboundRpcRequest {
-            protocol_id,
-            data: Bytes::from(request.raw_request),
-            res_tx: response_tx,
-        });
-        if let Err(err) = peer_notifs_tx.push(protocol_id, notif) {
+        request.rpc_replier = Some(Arc::new(response_tx));
+        if let Err(err) = peer_notifs_tx.push((peer_id, protocol_id), request) {
             counters::rpc_messages(network_context, REQUEST_LABEL, INBOUND_LABEL, FAILED_LABEL)
                 .inc();
             return Err(err.into());

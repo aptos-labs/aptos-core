@@ -31,9 +31,10 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionPayload, TransactionStatus, Version,
+        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, Script,
+        SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionPayload, TransactionStatus, Version,
     },
     validator_verifier::ValidatorVerifier,
     waypoint::Waypoint,
@@ -278,9 +279,13 @@ pub async fn verify_commit_notification(
     let mempool_notification = mempool_notification_listener.select_next_some().await;
     let committed_transactions: Vec<CommittedTransaction> = expected_transactions
         .into_iter()
-        .map(|txn| CommittedTransaction {
-            sender: txn.try_as_signed_user_txn().unwrap().sender(),
-            sequence_number: 0,
+        .map(|txn| {
+            let signed = txn.try_as_signed_user_txn().unwrap();
+            CommittedTransaction {
+                sender: signed.sender(),
+                sequence_number: 0,
+                use_case: signed.parse_use_case(),
+            }
         })
         .collect();
     assert_eq!(mempool_notification.transactions, committed_transactions);

@@ -747,6 +747,14 @@ pub static RECEIVED_BATCH_RESPONSE_ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static RECEIVED_BATCH_FROM_SUBSCRIPTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_from_subscription_count",
+        "Count of the number of batches received via batch store subscription."
+    )
+    .unwrap()
+});
+
 pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_backpressure_txn_count",

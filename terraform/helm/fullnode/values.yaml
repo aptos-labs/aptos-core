@@ -9,6 +9,8 @@ chain:
   era: 1
   # -- Name of the testnet to connect to. There must be a corresponding entry in .Values.aptos_chains
   name: devnet
+  # -- The value of the `chain_name` label. If empty, defaults to `.Values.chain.name`
+  label:
   # -- Kubernetes Configmap from which to load the genesis.blob and waypoint.txt
   genesisConfigmap:
   # -- Kubernetes Secret from which to load the genesis.blob and waypoint.txt
@@ -20,7 +22,7 @@ aptos_chains:
     waypoint_txt_url: https://devnet.aptoslabs.com/waypoint.txt
     genesis_blob_url: https://devnet.aptoslabs.com/genesis.blob
   testnet:
-    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/waypoint.txt
+    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis_waypoint.txt
     genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob
   mainnet:
     waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
@@ -137,7 +139,7 @@ backup:
       container:
       sas:
     # -- State snapshot interval epochs
-    state_snapshot_interval_epochs: 1
+    state_snapshot_interval_epochs: 2
     # -- Transaction batch size
     transaction_batch_size: 1000000
 

@@ -116,6 +116,7 @@ pub struct BatchStore {
     db_quota: usize,
     batch_quota: usize,
     validator_signer: ValidatorSigner,
+    persist_subscribers: DashMap<HashValue, Vec<oneshot::Sender<PersistedValue>>>,
 }
 
 impl BatchStore {
@@ -140,6 +141,7 @@ impl BatchStore {
             db_quota,
             batch_quota,
             validator_signer,
+            persist_subscribers: DashMap::new(),
         };
         let db_content = db_clone
             .get_all_batches()
@@ -290,6 +292,7 @@ impl BatchStore {
                     // digest with a higher expiration would update the persisted value and
                     // effectively extend the expiration.
                     if entry.get().expiration() <= certified_time {
+                        self.persist_subscribers.remove(entry.get().digest());
                         Some(entry.remove())
                     } else {
                         None
@@ -378,13 +381,39 @@ impl BatchStore {
             Err(ExecutorError::CouldNotGetData)
         }
     }
+
+    /// This calls lets the caller subscribe to a batch being added to the batch store.
+    /// This can be useful in cases where there are multiple flows to add a batch (like
+    /// direct from author batch / batch requester fetch) to the batch store and either
+    /// flow needs to subscribe to the other.
+    fn subscribe(&self, digest: HashValue) -> oneshot::Receiver<PersistedValue> {
+        let (tx, rx) = oneshot::channel();
+        self.persist_subscribers.entry(digest).or_default().push(tx);
+
+        // This is to account for the race where this subscribe call happens after the
+        // persist call.
+        if let Ok(value) = self.get_batch_from_local(&digest) {
+            self.notify_subscribers(value)
+        }
+
+        rx
+    }
+
+    fn notify_subscribers(&self, value: PersistedValue) {
+        if let Some((_, subscribers)) = self.persist_subscribers.remove(value.digest()) {
+            for subscriber in subscribers {
+                subscriber.send(value.clone()).ok();
+            }
+        }
+    }
 }
 
 impl BatchWriter for BatchStore {
     fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo> {
         let mut signed_infos = vec![];
         for persist_request in persist_requests.into_iter() {
-            if let Some(signed_info) = self.persist_inner(persist_request) {
+            if let Some(signed_info) = self.persist_inner(persist_request.clone()) {
+                self.notify_subscribers(persist_request);
                 signed_infos.push(signed_info);
             }
         }
@@ -447,7 +476,10 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
             } else {
                 // Quorum store metrics
                 counters::MISSED_BATCHES_COUNT.inc();
-                if let Some((batch_info, payload)) = batch_requester.request_batch(proof, tx).await
+                let subscriber_rx = batch_store.subscribe(*proof.digest());
+                if let Some((batch_info, payload)) = batch_requester
+                    .request_batch(proof, tx, subscriber_rx)
+                    .await
                 {
                     batch_store.persist(vec![PersistedValue::new(batch_info, Some(payload))]);
                 }

@@ -978,9 +978,14 @@ impl RoundManager {
             fail_point!("consensus::process_order_vote_msg", |_| {
                 Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
             });
-            info!(
-                self.new_log(LogEvent::ReceiveOrderVote),
-                "{}", order_vote_msg
+
+            let order_vote = order_vote_msg.order_vote();
+            debug!(
+                self.new_log(LogEvent::ReceiveOrderVote)
+                    .remote_peer(order_vote.author()),
+                epoch = order_vote.ledger_info().epoch(),
+                round = order_vote.ledger_info().round(),
+                id = order_vote.ledger_info().consensus_block_id(),
             );
 
             if self
@@ -1077,16 +1082,26 @@ impl RoundManager {
     async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
 
-        info!(
-            self.new_log(LogEvent::ReceiveVote)
-                .remote_peer(vote.author()),
-            vote = %vote,
-            vote_epoch = vote.vote_data().proposed().epoch(),
-            vote_round = vote.vote_data().proposed().round(),
-            vote_id = vote.vote_data().proposed().id(),
-            vote_state = vote.vote_data().proposed().executed_state_id(),
-            is_timeout = vote.is_timeout(),
-        );
+        if vote.is_timeout() {
+            info!(
+                self.new_log(LogEvent::ReceiveVote)
+                    .remote_peer(vote.author()),
+                vote = %vote,
+                epoch = vote.vote_data().proposed().epoch(),
+                round = vote.vote_data().proposed().round(),
+                id = vote.vote_data().proposed().id(),
+                state = vote.vote_data().proposed().executed_state_id(),
+                is_timeout = vote.is_timeout(),
+            );
+        } else {
+            debug!(
+                self.new_log(LogEvent::ReceiveVote)
+                    .remote_peer(vote.author()),
+                epoch = vote.vote_data().proposed().epoch(),
+                round = vote.vote_data().proposed().round(),
+                id = vote.vote_data().proposed().id(),
+            );
+        }
 
         if !self.local_config.broadcast_vote && !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.

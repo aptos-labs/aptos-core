@@ -97,6 +97,11 @@ fn instantiation_err() {
                 ],
             }),
         }],
+        // TODO(#13806): followup on whether we need specific tests for variants here
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
 
     move_bytecode_verifier::verify_module(&cm).expect("verify failed");
