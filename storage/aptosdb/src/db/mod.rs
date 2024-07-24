@@ -96,7 +96,8 @@ pub struct AptosDB {
     pub(crate) transaction_store: Arc<TransactionStore>,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
-    ledger_commit_lock: std::sync::Mutex<()>,
+    pre_commit_lock: std::sync::Mutex<()>,
+    commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,
 }
