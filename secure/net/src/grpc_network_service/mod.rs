@@ -194,7 +194,6 @@ impl GRPCNetworkMessageServiceClientWrapper {
         message: Message,
         mt: &MessageType,
     ) {
-        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
 
         // if message.start_ms_since_epoch.is_some() {
         //     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
@@ -221,6 +220,7 @@ impl GRPCNetworkMessageServiceClientWrapper {
         let mut success = false;
         let mut cnt = 0;
         while !success {
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let request = tonic::Request::new(NetworkMessage {
                 message: message.data.clone(),
                 message_type: mt.get_type(),
@@ -231,6 +231,7 @@ impl GRPCNetworkMessageServiceClientWrapper {
             match self.remote_channel.simple_msg_exchange(request).await {
                 Ok(_) => {success = true},
                 Err(e) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(2u64.pow(cnt))).await;
                     cnt += 1;
                     // panic!(
                     //     "Error '{}' sending message to {} on node {:?}",
