@@ -11,31 +11,31 @@ transforms:
 
       del(.k8s.namespace_labels)
 
-      del(.k8s.node_labels."beta.kubernetes.io/instance-type")
-      del(.k8s.node_labels."beta.kubernetes.io/arch")
-      del(.k8s.node_labels."beta.kubernetes.io/os")
-      del(.k8s.node_labels."eks.amazonaws.com/capacityType")
-      del(.k8s.node_labels."eks.amazonaws.com/nodegroup-image")
-      del(.k8s.node_labels."eks.amazonaws.com/sourceLaunchTemplateId")
-      del(.k8s.node_labels."eks.amazonaws.com/sourceLaunchTemplateVersion")
-      del(.k8s.node_labels."failure-domain.beta.kubernetes.io/region")
-      del(.k8s.node_labels."failure-domain.beta.kubernetes.io/zone")
-      del(.k8s.node_labels."topology.ebs.csi.aws.com/zone")
-      del(.k8s.node_labels."kubernetes.io/arch")
-      del(.k8s.node_labels."kubernetes.io/os")
-      del(.k8s.node_labels."kubernetes.io/hostname")
-      del(.k8s.node_labels."topology.kubernetes.io/region")
-      del(.k8s.node_labels."topology.kubernetes.io/zone")
-      del(.k8s.node_labels."k8s.io/cloud-provider-aws")
-      del(.k8s.node_labels."eks.amazonaws.com/nodegroup")
+      node_labels = del(.k8s.node_labels)
+      .k8s.node_labels."node.kubernetes.io/instance-type" = node_labels."node.kubernetes.io/instance-type"
+      .k8s.node_labels."topology.gke.io/zone" = node_labels."topology.gke.io/zone"
+
       del(.k8s.labels."statefulset.kubernetes.io/pod-name")
+      del(.k8s.labels."pod-template-generation")
+      del(.k8s.labels."addonmanager.kubernetes.io/mode")
+      del(.k8s.container_image_id)
       del(.k8s.pod_owner)
       del(.k8s.labels."forge-image-tag")
       del(.k8s.labels."controller-uid")
 
-      del(.k8s.annotations."kubectl.kubernetes.io/last-applied-configuration")
-      del(.k8s.annotations."seccomp.security.alpha.kubernetes.io/pod")
-      del(.k8s.annotations."checksum/validator.yaml")
+      # del(.k8s.annotations."kubectl.kubernetes.io/last-applied-configuration")
+      # del(.k8s.annotations."seccomp.security.alpha.kubernetes.io/pod")
+      # del(.k8s.annotations."checksum/validator.yaml")
+      # del(.k8s.annotations."config-hash")
+      # del(.k8s.annotations."tls-secret-hash")
+      # del(.k8s.annotations."prometheus.io/port")
+      # del(.k8s.annotations."prometheus.io/scrape")
+
+      # if is_object(.k8s.annotations) && is_empty(object!(.k8s.annotations)) {
+      #   del(.k8s.annotations)
+      # }
+
+      del(.k8s.annotations)
 
       del(.k8s.labels."app.kubernetes.io/managed-by")
       del(.k8s.labels."app.kubernetes.io/part-of")
@@ -51,7 +51,7 @@ transforms:
       del(.hostname)
       del(.file)
 
-  final_logs:
+  normalized_logs:
     type: remap
     inputs:
       - k8s_logs
@@ -68,6 +68,10 @@ transforms:
           }
         }
       }
+      if exists(.fields) {
+        . = merge!(., .fields)
+        del(.fields)
+      }
       if exists(.level) && is_string(.level) {
         .level = downcase!(.level);
       }
@@ -78,3 +82,65 @@ transforms:
       if err == null {
         .timestamp = parsed_timestamp
       }
+
+  # this last stage drops all forge node logs from aptos-nodes 5 (0-indexed) and above unless they are of level error
+  filter_forge_logs:
+    type: filter
+    inputs:
+      - normalized_logs
+    condition: |
+      aptos_node_index = to_int(parse_regex(.k8s.pod_name, r'^aptos-node-(?P<node_index>\d+)-.*').node_index ?? 0) ?? 0
+
+      should_be_excluded = contains(to_string!(.k8s.cluster), "forge") && exists(.k8s.labels."forge-namespace") && aptos_node_index >= 5 && includes(["warn","info","debug","trace"], .level)
+
+      !should_be_excluded
+
+  final_logs:
+    type: filter
+    inputs:
+      - filter_forge_logs
+    # temporarily filter out noisy logs in vector until https://github.com/aptos-labs/aptos-core/pull/13965 lands in mainnet release
+    # temporarily filter out noisy logs from https://aptos-org.slack.com/archives/C06TH3DH7SB/p1721328005384169?thread_ts=1720695143.603089&cid=C06TH3DH7SB until lands in mainnet release
+    condition: |
+      if is_string(.message) {
+        message = to_string!(.message)
+        if .level == "debug" && ( .message == "ReceiveProactiveRandShare" || .message == "ReceiveRandShareFastPath" ) {
+          return false
+        }
+        if starts_with(message, "ReceiveVote") || starts_with(message, "OrderVote:") || starts_with(message, "Receive commit vote BlockInfo") {
+          return false
+        }
+      }
+      true
+
+  uptrace_logs:
+    type: remap
+    inputs:
+      - final_logs
+    source: |
+      . = flatten(., ".") # in order for fields to become individual, filterable top-level fields in uptrace we need to flatten nested objects into top-level keys.
+      .service_name = .k8s.labels.app
+      .repo = "gcp"
+
+  datadog_logs:
+    type: remap
+    inputs:
+      - final_logs
+    source: |
+      .ddsource = "k8s"
+      if is_string(.k8s.labels.app) {
+        .service = .k8s.labels.app
+      }
+      .ddtags, _ = "kube_cluster_name:" + .k8s.cluster + ",kube_namespace:" + .k8s.namespace + ",pod_name:" + .k8s.pod_name
+
+  signoz_logs:
+    type: remap
+    inputs:
+      - final_logs
+    source: |
+      .severity_text = del(.level)
+      .source_type = "k8s"
+      tmp = { "k8s": del(.k8s)}
+      resources_tmp = flatten(tmp, ".")
+      . = flatten(., ".")
+      .resources = resources_tmp

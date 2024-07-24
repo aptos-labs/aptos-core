@@ -312,7 +312,7 @@ dependencies = [
  "dirs",
  "futures",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "jemallocator",
  "maplit",
  "move-binary-format",
@@ -442,7 +442,7 @@ dependencies = [
  "fail",
  "futures",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "mime",
  "mini-moka",
  "move-core-types",
@@ -581,7 +581,7 @@ dependencies = [
  "clap 4.4.14",
  "csv",
  "futures",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-binary-format",
  "move-bytecode-verifier",
  "num_cpus",
@@ -670,7 +670,7 @@ dependencies = [
  "dashmap",
  "derivative",
  "fail",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-binary-format",
  "move-core-types",
  "move-vm-types",
@@ -697,7 +697,7 @@ dependencies = [
  "clap 4.4.14",
  "criterion",
  "dashmap",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "jemallocator",
  "move-core-types",
  "once_cell",
@@ -793,7 +793,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.4.14",
  "futures",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-compiler",
  "move-core-types",
  "move-model",
@@ -907,7 +907,7 @@ dependencies = [
  "futures",
  "futures-channel",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "lru 0.7.8",
  "maplit",
  "mini-moka",
@@ -968,7 +968,7 @@ dependencies = [
  "bcs 0.1.4",
  "fail",
  "futures",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "mini-moka",
  "mirai-annotations",
  "once_cell",
@@ -1089,7 +1089,7 @@ dependencies = [
  "claims",
  "dashmap",
  "futures",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "maplit",
  "mockall",
  "ordered-float 3.9.2",
@@ -1163,7 +1163,7 @@ dependencies = [
  "either",
  "hex",
  "indicatif 0.15.0",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "lru 0.7.8",
  "move-core-types",
  "num-derive",
@@ -1235,7 +1235,7 @@ dependencies = [
  "aptos-vm",
  "bcs 0.1.4",
  "clap 4.4.14",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "tokio",
 ]
 
@@ -1416,7 +1416,7 @@ dependencies = [
  "bytes",
  "dashmap",
  "fail",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-core-types",
  "once_cell",
  "proptest",
@@ -1459,7 +1459,7 @@ dependencies = [
  "clap 4.4.14",
  "derivative",
  "indicatif 0.15.0",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "jemallocator",
  "move-core-types",
  "num_cpus",
@@ -1493,7 +1493,7 @@ dependencies = [
  "crossbeam-channel",
  "ctrlc",
  "dashmap",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "num_cpus",
  "once_cell",
  "rayon",
@@ -1535,7 +1535,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "criterion",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "once_cell",
  "serde",
  "thiserror",
@@ -1552,7 +1552,7 @@ dependencies = [
  "aptos-metrics-core",
  "bitvec 1.0.1",
  "criterion",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "jemallocator",
  "once_cell",
  "proptest",
@@ -1718,7 +1718,7 @@ dependencies = [
  "futures",
  "hex",
  "hyper 0.14.28",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "json-patch",
  "k8s-openapi",
  "kube",
@@ -1799,7 +1799,7 @@ dependencies = [
  "either",
  "flate2",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "libsecp256k1",
  "log",
  "lru 0.7.8",
@@ -2119,7 +2119,7 @@ dependencies = [
  "goldenfile",
  "hex",
  "hyper 0.14.28",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-binary-format",
  "move-core-types",
  "move-package",
@@ -2240,7 +2240,7 @@ dependencies = [
  "cloud-storage",
  "dashmap",
  "futures",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "lz4",
  "once_cell",
  "prometheus",
@@ -2305,7 +2305,7 @@ dependencies = [
  "arr_macro",
  "bcs 0.1.4",
  "byteorder",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "num-derive",
  "num-traits",
  "once_cell",
@@ -2387,7 +2387,7 @@ dependencies = [
  "ark-ff",
  "base64 0.13.1",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "num-bigint 0.3.3",
  "num-modular",
  "num-traits",
@@ -2627,7 +2627,7 @@ dependencies = [
  "enum_dispatch",
  "fail",
  "futures",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "maplit",
  "num_cpus",
  "once_cell",
@@ -2691,7 +2691,7 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "clap 4.4.14",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "regex",
  "reqwest",
  "tokio",
@@ -2758,7 +2758,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d954cf4eef9ceabdd941b2e08923fff83984b591#d954cf4eef9ceabdd941b2e08923fff83984b591"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=fa1ce4947f4c2be57529f1c9732529e05a06cb7f#fa1ce4947f4c2be57529f1c9732529e05a06cb7f"
 dependencies = [
  "chrono",
 ]
@@ -2848,7 +2848,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "maplit",
  "once_cell",
  "ordered-float 3.9.2",
@@ -3149,7 +3149,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-framework",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-command-line-common",
  "move-package",
  "tempfile",
@@ -3263,8 +3263,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.3.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=d76b5bb423b78b2b9affc72d3853f0d973d3f11f#d76b5bb423b78b2b9affc72d3853f0d973d3f11f"
+version = "1.3.1"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3276,6 +3275,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.1"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb#5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3329,18 +3329,26 @@ dependencies = [
  "aptos-genesis",
  "aptos-infallible",
  "aptos-keygen",
+ "aptos-language-e2e-tests",
+ "aptos-move-debugger",
  "aptos-rest-client",
  "aptos-temppath",
  "aptos-types",
+ "aptos-vm",
+ "aptos-vm-logging",
  "bcs 0.1.4",
  "clap 4.4.14",
  "futures",
  "git2 0.16.1",
  "handlebars",
  "hex",
+ "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-model",
+ "move-vm-types",
  "once_cell",
+ "parking_lot 0.12.1",
  "reqwest",
  "serde",
  "serde_json",
@@ -3350,6 +3358,7 @@ dependencies = [
  "strum_macros 0.24.3",
  "tokio",
  "url",
+ "walkdir",
 ]
 
 [[package]]
@@ -3445,7 +3454,7 @@ dependencies = [
  "clap 4.4.14",
  "futures",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-core-types",
  "once_cell",
  "reqwest",
@@ -3540,7 +3549,7 @@ dependencies = [
  "aptos-types",
  "bitvec 1.0.1",
  "criterion",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "jemallocator",
  "once_cell",
  "proptest",
@@ -3980,7 +3989,7 @@ dependencies = [
  "csv",
  "futures",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "rand 0.7.3",
  "reqwest",
  "tokio",
@@ -4056,7 +4065,7 @@ dependencies = [
  "async-trait",
  "clap 4.4.14",
  "futures",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -4166,7 +4175,7 @@ dependencies = [
  "fxhash",
  "hashbrown 0.14.3",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "jsonwebtoken 8.3.0",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -9573,6 +9582,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10461,7 +10479,7 @@ dependencies = [
  "better_any",
  "bytes",
  "datatest-stable",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-binary-format",
  "move-command-line-common",
  "move-compiler",
@@ -10655,7 +10673,7 @@ dependencies = [
  "ethnum",
  "flexi_logger",
  "im",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -10681,7 +10699,7 @@ name = "move-compiler-v2-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-command-line-common",
  "move-compiler-v2",
  "move-model",
@@ -10759,7 +10777,7 @@ dependencies = [
  "codespan",
  "codespan-reporting",
  "datatest-stable",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "move-compiler",
  "move-core-types",
@@ -10886,7 +10904,7 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "internment",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -10914,7 +10932,7 @@ dependencies = [
  "datatest-stable",
  "evm-exec-utils",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-abigen",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -10951,7 +10969,7 @@ dependencies = [
  "clap 4.4.14",
  "codespan-reporting",
  "datatest-stable",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "move-abigen",
  "move-command-line-common",
@@ -10982,7 +11000,7 @@ dependencies = [
  "codespan",
  "codespan-reporting",
  "futures",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "move-binary-format",
  "move-command-line-common",
@@ -11009,7 +11027,7 @@ dependencies = [
  "anyhow",
  "codespan-reporting",
  "datatest-stable",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "move-binary-format",
  "move-core-types",
@@ -11054,7 +11072,7 @@ dependencies = [
  "datatest-stable",
  "ethnum",
  "im",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "move-binary-format",
  "move-core-types",
@@ -11149,7 +11167,7 @@ dependencies = [
  "ethnum",
  "evm",
  "evm-exec-utils",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "maplit",
  "move-command-line-common",
  "move-compiler",
@@ -11212,7 +11230,7 @@ dependencies = [
  "difference",
  "evm",
  "evm-exec-utils",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-binary-format",
  "move-bytecode-utils",
  "move-command-line-common",
@@ -11319,7 +11337,7 @@ dependencies = [
  "bytes",
  "claims",
  "derivative",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "move-binary-format",
  "move-core-types",
  "proptest",
@@ -12977,14 +12995,14 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d954cf4eef9ceabdd941b2e08923fff83984b591#d954cf4eef9ceabdd941b2e08923fff83984b591"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=fa1ce4947f4c2be57529f1c9732529e05a06cb7f#fa1ce4947f4c2be57529f1c9732529e05a06cb7f"
 dependencies = [
  "ahash 0.8.11",
  "allocative",
  "allocative_derive",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d954cf4eef9ceabdd941b2e08923fff83984b591)",
- "aptos-protos 1.3.0",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=fa1ce4947f4c2be57529f1c9732529e05a06cb7f)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "async-trait",
  "bcs 0.1.4",
  "bigdecimal",
@@ -13031,7 +13049,6 @@ dependencies = [
  "tracing",
  "unescape",
  "url",
- "uuid",
 ]
 
 [[package]]
@@ -13222,7 +13239,7 @@ dependencies = [
  "chrono",
  "clap 4.4.14",
  "codespan-reporting",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "move-compiler",
  "move-model",
@@ -14582,7 +14599,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d954cf4eef9ceabdd941b2e08923fff83984b591#d954cf4eef9ceabdd941b2e08923fff83984b591"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=fa1ce4947f4c2be57529f1c9732529e05a06cb7f#fa1ce4947f4c2be57529f1c9732529e05a06cb7f"
 dependencies = [
  "anyhow",
  "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
@@ -15492,7 +15509,7 @@ dependencies = [
  "crossbeam-channel",
  "getrandom 0.2.11",
  "hex",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "module-generation",
  "move-binary-format",
  "move-bytecode-verifier",

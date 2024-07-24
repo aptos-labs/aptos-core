@@ -107,6 +107,7 @@ MOVE_CRATES="\
 # MOVE_COMPILER_V2 env var.
 MOVE_CRATES_V2_ENV_DEPENDENT="\
   -p aptos-transactional-test-harness \
+  -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
   -p move-async-vm \
   -p move-cli \

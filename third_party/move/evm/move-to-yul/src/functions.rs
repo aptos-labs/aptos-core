@@ -551,7 +551,7 @@ impl<'a> FunctionGenerator<'a> {
                     TestVariant(..)
                     | PackVariant(..)
                     | UnpackVariant(..)
-                    | BorrowFieldVariant(..) => {
+                    | BorrowVariantField(..) => {
                         unimplemented!("variants")
                     },
 

@@ -74,7 +74,7 @@ public fun m::condition_requires_copy($t0: m::Outer): m::Outer {
   1: $t3 := test_variant m::Outer::One($t2)
   2: if ($t3) goto 3 else goto 12
   3: label L2
-  4: $t4 := borrow_field_variant<m::Outer::One>.i($t2)
+  4: $t4 := borrow_variant_field<m::Outer::One>.i($t2)
   5: $t5 := read_ref($t4)
   6: $t3 := m::consume($t5)
   7: if ($t3) goto 8 else goto 12

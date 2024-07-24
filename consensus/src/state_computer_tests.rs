@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::MempoolError, payload_manager::PayloadManager, state_computer::ExecutionProxy,
-    state_replication::StateComputer, transaction_deduper::NoOpDeduper,
-    transaction_filter::TransactionFilter, transaction_shuffler::NoOpShuffler,
-    txn_notifier::TxnNotifier,
+    error::MempoolError, payload_manager::DirectMempoolPayloadManager,
+    state_computer::ExecutionProxy, state_replication::StateComputer,
+    transaction_deduper::NoOpDeduper, transaction_filter::TransactionFilter,
+    transaction_shuffler::NoOpShuffler, txn_notifier::TxnNotifier,
 };
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
@@ -136,6 +136,8 @@ impl BlockExecutorTrait for DummyBlockExecutor {
 #[tokio::test]
 #[cfg(test)]
 async fn schedule_compute_should_discover_validator_txns() {
+    use crate::payload_manager::DirectMempoolPayloadManager;
+
     let executor = Arc::new(DummyBlockExecutor::new());
 
     let execution_policy = ExecutionProxy::new(
@@ -162,7 +164,7 @@ async fn schedule_compute_should_discover_validator_txns() {
 
     execution_policy.new_epoch(
         &epoch_state,
-        Arc::new(PayloadManager::DirectMempool),
+        Arc::new(DirectMempoolPayloadManager::new()),
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
@@ -228,7 +230,7 @@ async fn commit_should_discover_validator_txns() {
 
     execution_policy.new_epoch(
         &epoch_state,
-        Arc::new(PayloadManager::DirectMempool),
+        Arc::new(DirectMempoolPayloadManager::new()),
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),

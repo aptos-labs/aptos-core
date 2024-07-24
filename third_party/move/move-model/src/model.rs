@@ -52,8 +52,8 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{
         AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
-        StructDefinitionIndex,
+        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken,
+        StructDefinitionIndex, VariantIndex,
     },
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
@@ -3311,6 +3311,7 @@ pub struct StructData {
 pub(crate) struct StructVariant {
     pub(crate) loc: Loc,
     pub(crate) attributes: Vec<Attribute>,
+    pub(crate) order: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -3465,14 +3466,16 @@ impl<'env> StructEnv<'env> {
         self.data.variants.is_some()
     }
 
-    /// Returns an iteration of the variant names in the struct.
+    /// Returns an iteration of the variant names in the struct, in the order they
+    /// are declared.
     pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env {
         self.data
             .variants
             .as_ref()
             .expect("struct has variants")
-            .keys()
-            .cloned()
+            .iter()
+            .sorted_by(|(_, v1), (_, v2)| v1.order.cmp(&v2.order))
+            .map(|(s, _)| *s)
     }
 
     /// Returns the location of the variant.
@@ -3482,6 +3485,13 @@ impl<'env> StructEnv<'env> {
             .as_ref()
             .and_then(|vars| vars.get(&variant).map(|v| &v.loc))
             .expect("variant defined")
+    }
+
+    /// Get the index of the variant in the struct.
+    pub fn get_variant_idx(&self, variant: Symbol) -> Option<VariantIndex> {
+        self.get_variants()
+            .position(|n| variant == n)
+            .map(|p| p as VariantIndex)
     }
 
     /// Returns the attributes of the variant.
@@ -3554,12 +3564,19 @@ impl<'env> StructEnv<'env> {
 
     /// Gets a field by its offset.
     pub fn get_field_by_offset(&'env self, offset: usize) -> FieldEnv<'env> {
-        for data in self.data.field_data.values() {
-            if data.offset == offset {
-                return FieldEnv {
-                    struct_env: self.clone(),
-                    data,
-                };
+        self.get_field_by_offset_optional_variant(None, offset)
+    }
+
+    /// Gets a field by its offset, in context of an optional variant.
+    pub fn get_field_by_offset_optional_variant(
+        &'env self,
+        variant: Option<Symbol>,
+        offset: usize,
+    ) -> FieldEnv<'env> {
+        // We may speed this up via a cache RefCell<BTreeMap<(variant, offset), FieldId>>
+        for field in self.get_fields_optional_variant(variant) {
+            if field.get_offset() == offset {
+                return field;
             }
         }
         unreachable!("invalid field lookup")
@@ -3669,13 +3686,18 @@ impl<'env> FieldEnv<'env> {
             self.struct_env.data.def_idx,
             &self.struct_env.module_env.data.source_map,
         ) {
-            if let Ok(smap) = mmap.get_struct_source_map(def_idx) {
-                let loc = self
-                    .struct_env
+            if let Some(loc) = mmap.get_struct_source_map(def_idx).ok().and_then(|smap| {
+                smap.get_field_location(
+                    self.data
+                        .variant
+                        .and_then(|v| self.struct_env.get_variant_idx(v)),
+                    self.data.offset as MemberCount,
+                )
+            }) {
+                self.struct_env
                     .module_env
                     .env
-                    .to_loc(&smap.fields[self.data.offset]);
-                self.struct_env.module_env.env.get_doc(&loc)
+                    .get_doc(&self.struct_env.module_env.env.to_loc(&loc))
             } else {
                 ""
             }
@@ -3692,6 +3714,16 @@ impl<'env> FieldEnv<'env> {
     /// Get field offset.
     pub fn get_offset(&self) -> usize {
         self.data.offset
+    }
+
+    /// Gets the variant this field is associated with
+    pub fn get_variant(&self) -> Option<Symbol> {
+        self.data.variant
+    }
+
+    /// Returns true if this field is common between variants
+    pub fn is_common_variant_field(&self) -> bool {
+        self.data.common_for_variants
     }
 }
 

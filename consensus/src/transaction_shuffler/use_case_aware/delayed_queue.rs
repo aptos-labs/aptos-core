@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_shuffler::use_case_aware::{
-    types::{InputIdx, OutputIdx, UseCaseAwareTransaction, UseCaseKey},
+    types::{InputIdx, OutputIdx},
     utils::StrictMap,
     Config,
 };
+use aptos_types::transaction::use_case::{UseCaseAwareTransaction, UseCaseKey};
 use move_core_types::account_address::AccountAddress;
 use std::{
     collections::{hash_map, BTreeMap, HashMap, VecDeque},
