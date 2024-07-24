@@ -57,7 +57,8 @@ impl AptosDB {
                 state_merkle_db,
                 state_kv_db,
             ),
-            ledger_commit_lock: std::sync::Mutex::new(()),
+            pre_commit_lock: std::sync::Mutex::new(()),
+            commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
         }
