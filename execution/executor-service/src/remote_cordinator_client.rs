@@ -60,7 +60,7 @@ impl RemoteCoordinatorClient {
             RemoteStateViewClient::new(shard_id, controller, coordinator_address);
 
         OUTBOUND_RUNTIME.set(controller.get_outbound_rpc_runtime().clone()).ok();
-        let command_finished_rx = controller.create_inbound_channel("command_completed".to_string());
+        let command_finished_rx = controller.create_inbound_channel("cmd_completed".to_string());
 
         Self {
             state_view_client: Arc::new(state_view_client),
