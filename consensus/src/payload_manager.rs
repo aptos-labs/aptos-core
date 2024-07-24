@@ -178,7 +178,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                         .collect::<Vec<_>>()
                 },
                 Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.get_all_batch_infos()
+                    opt_quorum_store_payload.into_inner().get_all_batch_infos()
                 },
             })
             .collect();
