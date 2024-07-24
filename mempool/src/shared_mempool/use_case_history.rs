@@ -180,6 +180,7 @@ fn test_use_case_history() {
     history.update_usecases(&[
         ct(usecase2.clone()),
         ct(usecase2.clone()),
+        ct(usecase2.clone()),
         ct(usecase3.clone()),
     ]);
     assert_eq!(
