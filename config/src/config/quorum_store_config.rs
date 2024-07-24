@@ -22,6 +22,7 @@ pub struct QuorumStoreBackPressureConfig {
     pub decrease_fraction: f64,
     pub dynamic_min_txn_per_s: u64,
     pub dynamic_max_txn_per_s: u64,
+    pub additive_increase_when_no_backpressure: u64,
 }
 
 impl Default for QuorumStoreBackPressureConfig {
@@ -37,6 +38,9 @@ impl Default for QuorumStoreBackPressureConfig {
             decrease_fraction: 0.5,
             dynamic_min_txn_per_s: 160,
             dynamic_max_txn_per_s: 12000,
+            // When the QS is no longer backpressured, we increase number of txns to be pulled from mempool
+            // by this amount every second until we reach dynamic_max_txn_per_s
+            additive_increase_when_no_backpressure: 2000,
         }
     }
 }
