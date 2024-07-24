@@ -108,8 +108,8 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             Some(ms_since_epoch) => Message::create_with_metadata(
                 network_message.message,
                 ms_since_epoch,
-                network_message.seq_no.unwrap(),
-                network_message.shard_id.unwrap(),
+                network_message.seq_no.unwrap_or_default(),
+                network_message.shard_id.unwrap_or_default(),
             ),
             None => Message::new(network_message.message),
         };
@@ -122,7 +122,10 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             if curr_time > msg.start_ms_since_epoch.unwrap() {
                 delta = (curr_time - msg.start_ms_since_epoch.unwrap());
             }
-            if message_type.get_type().starts_with("remote_kv_request")  {
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                .with_label_values(&["network_message_latency"]).observe(delta as f64);
+
+            if message_type.get_type() == "remote_kv_request" {
                 REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                     .with_label_values(&["2_kv_req_coord_grpc_recv"]).observe(delta as f64);
             } else if message_type.get_type() == "remote_kv_response" {
@@ -138,7 +141,7 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
                 if curr_time > msg.start_ms_since_epoch.unwrap() {
                     delta = (curr_time - msg.start_ms_since_epoch.unwrap());
                 }
-                if message_type.get_type().starts_with("remote_kv_request") {
+                if message_type.get_type() == "remote_kv_request" {
                     REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                         .with_label_values(&["2_kv_req_coord_grpc_recv_got_inbound_lock"]).observe(delta as f64);
                 } else if message_type.get_type() == "remote_kv_response" {
@@ -192,10 +195,11 @@ impl GRPCNetworkMessageServiceClientWrapper {
         message: Message,
         mt: &MessageType,
     ) {
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         let request = tonic::Request::new(NetworkMessage {
             message: message.data,
             message_type: mt.get_type(),
-            ms_since_epoch: message.start_ms_since_epoch,
+            ms_since_epoch: Some(curr_time), //message.start_ms_since_epoch,
             seq_no: message.seq_num,
             shard_id: message.shard_id,
         });
@@ -206,7 +210,7 @@ impl GRPCNetworkMessageServiceClientWrapper {
             if curr_time > message.start_ms_since_epoch.unwrap() {
                 delta = (curr_time - message.start_ms_since_epoch.unwrap()) as f64;
             }
-            if mt.get_type().starts_with("remote_kv_request") {
+            if mt.get_type() == "remote_kv_request" {
                 REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                     .with_label_values(&["1_kv_req_grpc_shard_send"]).observe(delta);
             } else if mt.get_type() == "remote_kv_response" {
