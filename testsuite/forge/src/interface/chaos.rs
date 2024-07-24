@@ -121,6 +121,6 @@ impl Display for SwarmCpuStress {
 pub struct GroupCpuStress {
     pub name: String,
     pub target_nodes: Vec<PeerId>,
-    pub num_workers: u64,
-    pub load_per_worker: u64,
+    pub num_workers: usize,
+    pub load_per_worker: usize,
 }

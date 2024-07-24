@@ -202,14 +202,16 @@ impl Test for NetworkUnreliabilityTest {
 #[derive(Clone)]
 pub struct CpuChaosConfig {
     pub num_groups: usize,
-    pub load_per_worker: u64,
+    pub num_workers: usize,
+    pub max_load_per_worker: usize,
 }
 
 impl Default for CpuChaosConfig {
     fn default() -> Self {
         Self {
-            num_groups: 4,
-            load_per_worker: 100,
+            num_groups: 10,
+            num_workers: 32,
+            max_load_per_worker: 40,
         }
     }
 }
@@ -257,30 +259,27 @@ pub fn create_swarm_cpu_stress(
     // Determine the CPU chaos config to use
     let cpu_chaos_config = cpu_chaos_config.unwrap_or_default();
 
+    let num_groups = cpu_chaos_config.num_groups.min(all_peers.len());
     // Chunk the peers into groups and create a GroupCpuStress for each group
     let all_peers = all_peers.iter().map(|id| vec![*id]).collect();
-    let peer_chunks = chunk_peers(all_peers, cpu_chaos_config.num_groups);
+    let peer_chunks = chunk_peers(all_peers, num_groups);
     let group_cpu_stresses = peer_chunks
         .into_iter()
         .enumerate()
+        .filter(|(idx, _)| *idx > 0) // skip cpu stress on first group
         .map(|(idx, chunk)| {
-            // Lower bound the number of workers
-            let num_workers = if cpu_chaos_config.num_groups > idx {
-                (cpu_chaos_config.num_groups - idx) as u64
-            } else {
-                1
-            };
+            let load_per_worker = idx * cpu_chaos_config.max_load_per_worker / (num_groups - 1);
 
             // Create the cpu stress for the group
             info!(
-                "Creating CPU stress for group {} with {} workers",
-                idx, num_workers
+                "Creating CPU stress for group {} with {} workers and {}% load, for peers: {:?}",
+                idx, cpu_chaos_config.num_workers, load_per_worker, chunk
             );
             GroupCpuStress {
                 name: format!("group-{}-cpu-stress", idx),
                 target_nodes: chunk,
-                num_workers,
-                load_per_worker: cpu_chaos_config.load_per_worker,
+                num_workers: cpu_chaos_config.num_workers,
+                load_per_worker,
             }
         })
         .collect();
