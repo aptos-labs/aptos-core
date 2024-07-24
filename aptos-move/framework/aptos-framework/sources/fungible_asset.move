@@ -215,6 +215,20 @@ module aptos_framework::fungible_asset {
         frozen: bool,
     }
 
+    #[event]
+    /// Emitted when fungible assets are minted.
+    struct Mint has drop, store {
+        metadata: address,
+        amount: u64,
+    }
+
+    #[event]
+    /// Emitted when fungible assets are burned.
+    struct Burn has drop, store {
+        metadata: address,
+        amount: u64,
+    }
+
     inline fun default_to_concurrent_fungible_supply(): bool {
         features::concurrent_fungible_assets_enabled()
     }
@@ -834,6 +848,10 @@ module aptos_framework::fungible_asset {
         amount: u64
     ): FungibleAsset acquires Supply, ConcurrentSupply {
         increase_supply(&metadata, amount);
+        event::emit(Mint {
+            metadata: object::object_address(&metadata),
+            amount
+        });
         FungibleAsset {
             metadata,
             amount
@@ -887,6 +905,10 @@ module aptos_framework::fungible_asset {
             metadata,
             amount
         } = fa;
+        event::emit(Burn {
+            metadata: object::object_address(&metadata),
+            amount
+        });
         decrease_supply(&metadata, amount);
         amount
     }

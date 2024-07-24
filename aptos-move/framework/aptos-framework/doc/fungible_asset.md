@@ -23,6 +23,8 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `Deposit`](#0x1_fungible_asset_Deposit)
 -  [Struct `Withdraw`](#0x1_fungible_asset_Withdraw)
 -  [Struct `Frozen`](#0x1_fungible_asset_Frozen)
+-  [Struct `Mint`](#0x1_fungible_asset_Mint)
+-  [Struct `Burn`](#0x1_fungible_asset_Burn)
 -  [Resource `FungibleAssetEvents`](#0x1_fungible_asset_FungibleAssetEvents)
 -  [Struct `DepositEvent`](#0x1_fungible_asset_DepositEvent)
 -  [Struct `WithdrawEvent`](#0x1_fungible_asset_WithdrawEvent)
@@ -655,6 +657,76 @@ Emitted when a store's frozen status is updated.
 </dd>
 <dt>
 <code>frozen: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_Mint"></a>
+
+## Struct `Mint`
+
+Emitted when fungible assets are minted.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Mint">Mint</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>metadata: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_Burn"></a>
+
+## Struct `Burn`
+
+Emitted when fungible assets are burned.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Burn">Burn</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>metadata: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
 </dt>
 <dd>
 
@@ -2824,6 +2896,10 @@ CAN ONLY BE CALLED BY coin.move for migration.
     amount: u64
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_increase_supply">increase_supply</a>(&metadata, amount);
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Mint">Mint</a> {
+        metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
+        amount
+    });
     <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
         metadata,
         amount
@@ -2977,6 +3053,10 @@ CAN ONLY BE CALLED BY coin.move for migration.
         metadata,
         amount
     } = fa;
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Burn">Burn</a> {
+        metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
+        amount
+    });
     <a href="fungible_asset.md#0x1_fungible_asset_decrease_supply">decrease_supply</a>(&metadata, amount);
     amount
 }
