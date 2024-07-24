@@ -118,9 +118,9 @@ impl BlockRetrievalResponse {
         ensure!(
             self.status != BlockRetrievalStatus::SucceededWithTarget
                 || self
-                        .blocks
-                        .last()
-                        .map_or(false, |block| retrieval_request.match_target_id(block.id())),
+                    .blocks
+                    .last()
+                    .map_or(false, |block| retrieval_request.match_target_id(block.id())),
             "target not found in blocks returned, expect {:?}",
             retrieval_request.target_block_id(),
         );

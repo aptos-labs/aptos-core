@@ -66,7 +66,7 @@ impl PendingBlockStore {
                 entry.insert(ordered_block);
             },
         }
-      
+
         // Perform garbage collection if the store is too large
         self.garbage_collect_pending_blocks();
     }
