@@ -231,7 +231,7 @@ impl BlockTree {
     // TODO: how to know if the window is complete?
     pub fn get_block_window(&self, block: &Block) -> Option<OrderedBlockWindow> {
         let min_round = (block.round() + 1).saturating_sub(self.window_size as u64);
-        let window_size = block.round() - min_round;
+        let window_size = (block.round() + 1) - min_round;
         assert!(window_size > 0, "window_size must be greater than 0");
         match self.get_block(&block.parent_id()) {
             // TODO: something cleaner?

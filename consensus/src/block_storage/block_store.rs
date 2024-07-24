@@ -33,7 +33,10 @@ use futures::executor::block_on;
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -371,13 +374,21 @@ impl BlockStore {
             .context("Insert block failed when saving block")?;
         let mut block_tree = self.inner.write();
         if let Some(block_window) = block_tree.get_block_window(&block) {
+            let now = Instant::now();
+            for block in block_window.blocks() {
+                if let Some(payload) = block.payload() {
+                    self.payload_manager
+                        .prefetch_payload_data(payload, block.timestamp_usecs());
+                }
+            }
             info!(
-                "block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}",
+                "block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, block_window: {:?}, prefetch time: {} ms",
                 block.id(),
                 block.parent_id(),
                 block.round(),
                 block.epoch(),
                 block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
+                now.elapsed().as_millis()
             );
             let pipelined_block = PipelinedBlock::new_ordered(block.clone(), block_window);
             block_tree.insert_block(pipelined_block)
