@@ -13,7 +13,6 @@ use aptos_crypto::{
     encoding_type::EncodingType,
     PrivateKey, SigningKey,
 };
-use aptos_framework::natives::cryptography::algebra::new;
 use aptos_ledger;
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
@@ -270,16 +269,15 @@ impl CliCommand<RotateSummary> for RotateKey {
 
         let txn_string = serde_json::to_string_pretty(&txn_summary)
             .map_err(|err| CliError::UnableToParse("transaction summary", err.to_string()))?;
+        eprintln!("{}", txn_string);
 
         if let Some(txn_success) = txn_summary.success {
             if !txn_success {
-                eprintln!("{}", txn_string);
                 return Err(CliError::ApiError(
                     "Transaction was not executed successfully".to_string(),
                 ));
             }
         } else {
-            eprintln!("{}", txn_string);
             return Err(CliError::UnexpectedError(
                 "Malformed transaction response".to_string(),
             ));
