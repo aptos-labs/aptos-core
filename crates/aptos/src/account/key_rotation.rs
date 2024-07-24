@@ -13,6 +13,7 @@ use aptos_crypto::{
     encoding_type::EncodingType,
     PrivateKey, SigningKey,
 };
+use aptos_framework::natives::cryptography::algebra::new;
 use aptos_ledger;
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
@@ -207,30 +208,46 @@ impl CliCommand<RotateSummary> for RotateKey {
         let rotation_msg =
             bcs::to_bytes(&rotation_proof).map_err(|err| CliError::BCS("rotation_proof", err))?;
 
+        // Determine if current and new keys are hardware wallets, for better user feedback.
+        let current_is_hardware_wallet = current_derivation_path.is_some();
+        let new_is_hardware_wallet = new_derivation_path.is_some();
+
         // Sign the struct using both the current private key and the new private key.
-        let rotation_proof_signed_by_current_private_key = if current_derivation_path.is_some() {
-            eprintln!("Approve rotation proof challenge signature on your Ledger device");
-            aptos_ledger::sign_message(
-                current_derivation_path.clone().unwrap().as_str(),
-                &rotation_msg.clone(),
-            )?
-        } else {
-            current_private_key
-                .unwrap()
-                .sign_arbitrary_message(&rotation_msg.clone())
-        };
-        let rotation_proof_signed_by_new_private_key = if new_derivation_path.is_some() {
-            eprintln!("Approve rotation proof challenge signature on your Ledger device");
-            aptos_ledger::sign_message(
-                new_derivation_path.clone().unwrap().as_str(),
-                &rotation_msg.clone(),
-            )?
-        } else {
-            new_private_key
-                .clone()
-                .unwrap()
-                .sign_arbitrary_message(&rotation_msg.clone())
-        };
+        let rotation_proof_signed_by_current_private_key =
+            if let Some(current_derivation_path) = current_derivation_path.clone() {
+                eprintln!("Sign rotation proof challenge on your Ledger device (current key)");
+                let challenge_signature = aptos_ledger::sign_message(
+                    current_derivation_path.as_str(),
+                    &rotation_msg.clone(),
+                )?;
+                eprintln!("Rotation proof challenge successfully signed (current key)");
+                if !new_is_hardware_wallet {
+                    eprintln!("You will still need to sign the transaction on your Ledger device");
+                }
+                challenge_signature
+            } else {
+                current_private_key
+                    .unwrap()
+                    .sign_arbitrary_message(&rotation_msg.clone())
+            };
+        let rotation_proof_signed_by_new_private_key =
+            if let Some(new_derivation_path) = new_derivation_path.clone() {
+                eprintln!("Sign rotation proof challenge on your Ledger device (new key)");
+                let challenge_signature = aptos_ledger::sign_message(
+                    new_derivation_path.clone().as_str(),
+                    &rotation_msg.clone(),
+                )?;
+                eprintln!("Rotation proof challenge successfully signed (new key)");
+                if current_is_hardware_wallet {
+                    eprintln!("You will still need to sign the transaction on your Ledger device");
+                }
+                challenge_signature
+            } else {
+                new_private_key
+                    .clone()
+                    .unwrap()
+                    .sign_arbitrary_message(&rotation_msg.clone())
+            };
 
         // Submit transaction.
         if current_derivation_path.is_some() {
