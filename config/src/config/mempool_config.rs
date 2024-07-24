@@ -92,7 +92,7 @@ impl Default for MempoolConfig {
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
             eager_expire_threshold_ms: Some(15_000),
             eager_expire_time_ms: 6_000,
-            include_ready_time_in_broadcast: true,
+            include_ready_time_in_broadcast: false,
             usecase_stats_num_blocks_to_track: 40,
             usecase_stats_num_top_to_track: 5,
         }
