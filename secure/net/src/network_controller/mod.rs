@@ -108,7 +108,7 @@ impl NetworkController {
         let inbound_handler = Arc::new(Mutex::new(InboundHandler::new(
             service.clone(),
             listen_addr,
-            timeout_ms,
+            10u64, //timeout_ms,
         )));
         let outbound_handler = OutboundHandler::new(service, listen_addr, inbound_handler.clone());
         info!("Network controller created for node {}", listen_addr);
