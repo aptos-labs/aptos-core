@@ -196,6 +196,48 @@ pub fn core_mempool_txn_commit_latency(
         .observe(latency.as_secs_f64());
 }
 
+pub static MEMPOOL_READ_TIMELINE_FREQUENCY: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_read_timeline",
+        "Number of times core mempool read_timeline is invoked"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_READ_TIMELINE_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_max_txns",
+        "Number of max txns being pulled in read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_READ_TIMELINE_OUTPUT_SIZE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_output_size",
+        "Number of transactions returned by read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_EXECUTE_BROADCAST_SCHEDULED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_execute_broadcast_scheduled",
+        "Numebr of times execute broadcast is called"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_EXECUTE_BROADCAST_PEER_UPDATE: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_execute_broadcast_peer_updated",
+        "Numebr of times execute broadcast is called"
+    )
+    .unwrap()
+});
+
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
 static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
