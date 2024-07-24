@@ -351,6 +351,9 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["0_cmd_tx_start"]).observe(get_delta_time(duration_since_epoch) as f64);
 
+        let cmd_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "0_cmd_timer_coord"])
+            .start_timer();
         let mut expected_outputs = vec![0; self.num_shards()];
         let batch_size = 200;
 
@@ -410,6 +413,10 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 .unwrap()
                 .send(Message::new(vec![]), &MessageType::new("cmd_completed".to_string()));
         }
+        drop(cmd_timer);
+        let kv_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "1_kv_timer_coord"])
+            .start_timer();
         //let execution_results = self.get_output_from_shards()?;
         //sleep(Duration::from_millis(200));
         let mut shard_with_kv_completed = 0;
@@ -419,9 +426,14 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 break;
             }
         }
+        drop(kv_timer);
 
+        let result_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "2_result_timer_coord"])
+            .start_timer();
         let results = self.get_streamed_output_from_shards(expected_outputs, duration_since_epoch);
-
+        drop(result_timer);
+        
         let timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "drop_state_view_finally"])
             .start_timer();
