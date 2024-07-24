@@ -9,6 +9,8 @@ use aptos_block_partitioner::{
         PrePartitionerConfig,
     },
     v2::config::PartitionerV2Config,
+    v3::V3NaivePartitionerConfig,
+    PartitionerConfig,
 };
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
@@ -31,6 +33,8 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_streaming_partitioner::V3FennelBasedPartitionerConfig;
+use aptos_transaction_orderer::V3ReorderingPartitionerConfig;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -172,17 +176,20 @@ impl ShardingOpt {
         }
     }
 
-    fn partitioner_config(&self) -> PartitionerV2Config {
+    fn partitioner_config(&self) -> Box<dyn PartitionerConfig> {
         match self.partitioner_version.as_deref() {
-            Some("v2") => PartitionerV2Config {
+            Some("v2") => Box::new(PartitionerV2Config {
                 num_threads: self.partitioner_v2_num_threads,
                 max_partitioning_rounds: self.max_partitioning_rounds,
                 cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
                 dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
                 partition_last_round: !self.use_global_executor,
                 pre_partitioner_config: self.pre_partitioner_config(),
-            },
-            None => PartitionerV2Config::default(),
+            }),
+            Some("v3-naive") => Box::new(V3NaivePartitionerConfig {}),
+            Some("v3-orderer") => Box::new(V3ReorderingPartitionerConfig {}),
+            Some("v3-fennel") => Box::new(V3FennelBasedPartitionerConfig {}),
+            None => Box::<PartitionerV2Config>::default(),
             _ => panic!(
                 "Unknown partitioner version: {:?}",
                 self.partitioner_version

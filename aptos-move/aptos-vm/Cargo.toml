@@ -31,6 +31,8 @@ aptos-metrics-core = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-native-interface = { workspace = true }
+aptos-transaction-orderer = { workspace = true }
+aptos-streaming-partitioner = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-utils = { workspace = true }

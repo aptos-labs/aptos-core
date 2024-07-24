@@ -13,7 +13,7 @@ use aptos_logger::info;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
-        partitioner::{PartitionedTransactions, SubBlocksForShard},
+        partitioner::{PartitionV3, PartitionedTransactions, SubBlocksForShard},
     },
     state_store::StateView,
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
@@ -47,7 +47,15 @@ pub enum ExecutorShardCommand<S> {
         usize,
         BlockExecutorConfigFromOnchain,
     ),
+    ExecuteV3Partition(ExecuteV3PartitionCommand<S>),
     Stop,
+}
+
+pub struct ExecuteV3PartitionCommand<S> {
+    pub state_view: Arc<S>,
+    pub partition: PartitionV3,
+    pub concurrency_level_per_shard: usize,
+    pub onchain_config: BlockExecutorConfigFromOnchain,
 }
 
 impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExecutor<S, C> {
@@ -84,6 +92,16 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
             "Block must be partitioned into {} sub-blocks",
             num_executor_shards
         );
+
+        if let PartitionedTransactions::V3(obj) = transactions {
+            return self.executor_client.execute_block_v3(
+                state_view,
+                obj,
+                concurrency_level_per_shard,
+                onchain_config,
+            );
+        }
+
         let (sharded_output, global_output) = self
             .executor_client
             .execute_block(

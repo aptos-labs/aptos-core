@@ -3,7 +3,7 @@
 
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, partitioner::{PartitionedTransactions, PartitionedTransactionsV3},
     },
     state_store::StateView,
     transaction::TransactionOutput,
@@ -47,4 +47,12 @@ pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     ) -> Result<ShardedExecutionOutput, VMStatus>;
 
     fn shutdown(&mut self);
+
+    fn execute_block_v3(
+        &self,
+        state_view: Arc<S>,
+        transactions: PartitionedTransactionsV3,
+        concurrency_level_per_shard: usize,
+        onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }

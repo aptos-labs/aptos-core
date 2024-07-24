@@ -89,7 +89,7 @@ impl VMExecutor for FakeVM {
     }
 
     fn execute_block(
-        _transactions: &[SignatureVerifiedTransaction],
+        _transactions: Vec<SignatureVerifiedTransaction>,
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {

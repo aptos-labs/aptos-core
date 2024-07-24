@@ -24,24 +24,26 @@ use move_vm_types::{
     values::Value,
 };
 use std::{cell::RefCell, collections::HashSet, sync::Arc};
+use crate::txn_provider::TxnIndexProvider;
 
 pub(crate) struct TemporaryValueToIdentifierMapping<
     'a,
     T: Transaction,
     S: TStateView<Key = T::Key>,
     X: Executable,
+    TP: TxnIndexProvider,
 > {
-    latest_view: &'a LatestView<'a, T, S, X>,
+    latest_view: &'a LatestView<'a, T, S, X, TP>,
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
     delayed_field_ids: RefCell<HashSet<T::Identifier>>,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
-    TemporaryValueToIdentifierMapping<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider>
+    TemporaryValueToIdentifierMapping<'a, T, S, X, TP>
 {
-    pub fn new(latest_view: &'a LatestView<'a, T, S, X>, txn_idx: TxnIndex) -> Self {
+    pub fn new(latest_view: &'a LatestView<'a, T, S, X, TP>, txn_idx: TxnIndex) -> Self {
         Self {
             latest_view,
             txn_idx,
@@ -61,8 +63,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
-    for TemporaryValueToIdentifierMapping<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> ValueToIdentifierMapping
+    for TemporaryValueToIdentifierMapping<'a, T, S, X, TP>
 {
     type Identifier = T::Identifier;
 

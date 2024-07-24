@@ -7,6 +7,7 @@ pub(crate) mod vm_wrapper;
 use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
+    AptosVM,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
@@ -15,6 +16,7 @@ use aptos_block_executor::{
     errors::BlockExecutionError, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
+    txn_provider::{BlockSTMPlugin, TxnIndexProvider},
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -397,15 +399,20 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        TP: TxnIndexProvider
+            + BlockSTMPlugin<SignatureVerifiedTransaction, AptosTransactionOutput, VMStatus>
+            + Send
+            + Sync
+            + 'static,
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        signature_verified_block: &[SignatureVerifiedTransaction],
+        txn_provider: Arc<TP>,
         state_view: &S,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-        let num_txns = signature_verified_block.len();
+        let num_txns = txn_provider.num_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
@@ -419,9 +426,10 @@ impl BlockAptosVM {
             S,
             L,
             ExecutableTestType,
+            TP,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let ret = executor.execute_block(state_view, txn_provider.clone(), state_view);
         match ret {
             Ok(block_output) => {
                 let transaction_outputs = block_output.into_inner();

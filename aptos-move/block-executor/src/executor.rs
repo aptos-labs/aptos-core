@@ -17,6 +17,7 @@ use crate::{
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
     types::ReadWriteSummary,
+    txn_provider::{BlockSTMPlugin, TxnIndexProvider},
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::{
@@ -55,27 +56,28 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
         Arc,
     },
 };
 
-pub struct BlockExecutor<T, E, S, L, X> {
+pub struct BlockExecutor<T, E, S, L, X, TP> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, X)>,
+    phantom: PhantomData<(T, E, S, L, X, TP)>,
 }
 
-impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
+impl<T, E, S, L, X, TP> BlockExecutor<T, E, S, L, X, TP>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
+    TP: TxnIndexProvider + BlockSTMPlugin<T, E::Output, E::Error> + Send + Sync + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -100,16 +102,15 @@ where
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        signature_verified_block: &[T],
+        txn_provider: &TP,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
         base_view: &S,
-        latest_view: ParallelState<T, X>,
+        latest_view: ParallelState<T, X, TP>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
-        let txn = &signature_verified_block[idx_to_execute as usize];
-
+        let txn = txn_provider.txn(idx_to_execute);
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
@@ -289,7 +290,8 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if !last_input_output.record(idx_to_execute, read_set, result, resource_write_set) {
+        let txn_idx_local = txn_provider.local_index(idx_to_execute);
+        if !last_input_output.record(idx_to_execute, txn_idx_local, read_set, result, resource_write_set) {
             // Module R/W is an expected fallback behavior, no alert is required.
             debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
 
@@ -369,7 +371,7 @@ where
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
+        scheduler: &Scheduler<TP>,
     ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
@@ -389,6 +391,7 @@ where
 
     fn validate_commit_ready(
         txn_idx: TxnIndex,
+        local_txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
     ) -> Result<bool, PanicError> {
@@ -403,7 +406,7 @@ where
             if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
                 if let Err(e) = versioned_cache
                     .delayed_fields()
-                    .try_commit(txn_idx, delayed_field_ids.collect())
+                    .try_commit(txn_idx, local_txn_idx, delayed_field_ids.collect())
                 {
                     match e {
                         CommitError::ReExecutionNeeded(_) => {
@@ -430,7 +433,7 @@ where
     fn prepare_and_queue_commit_ready_txns(
         &self,
         block_gas_limit_type: &BlockGasLimitType,
-        scheduler: &Scheduler,
+        scheduler: &Scheduler<TP>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -439,12 +442,13 @@ where
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
-        block: &[T],
+        block: &TP,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
-            if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
+            let txn_idx_local = block.local_index(txn_idx) as TxnIndex;
+            if !Self::validate_commit_ready(txn_idx, txn_idx_local, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
 
                 Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
@@ -473,7 +477,7 @@ where
                 let validation_result =
                     Self::validate(txn_idx, last_input_output, versioned_cache)?;
                 if !validation_result
-                    || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
+                    || !Self::validate_commit_ready(txn_idx, txn_idx_local, versioned_cache, last_input_output)
                         .unwrap_or(false)
                 {
                     return Err(code_invariant_error(format!(
@@ -497,7 +501,7 @@ where
                         .map(|approx_output| {
                             approx_output
                                 + if block_gas_limit_type.include_user_txn_size_in_block_output() {
-                                    block[txn_idx as usize].user_txn_bytes_len()
+                                    block.txn(txn_idx).user_txn_bytes_len()
                                 } else {
                                     0
                                 } as u64
@@ -514,7 +518,7 @@ where
                     approx_output_size,
                 );
 
-                if txn_idx < scheduler.num_txns() - 1
+                if txn_idx_local < ((scheduler.num_txns() - 1) as TxnIndex)
                     && block_limit_processor.should_end_block_parallel()
                 {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
@@ -544,7 +548,7 @@ where
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            last_input_output.record_finalized_group(txn_idx, finalized_groups);
+            last_input_output.record_finalized_group(txn_idx_local, finalized_groups);
             defer! {
                 scheduler.add_to_commit_queue(txn_idx);
             }
@@ -554,10 +558,10 @@ where
             // a) all transactions are scheduled for committing
             // b) we skip_rest after a transaction
             // Either all txn committed, or a committed txn caused an early halt.
-            if txn_idx + 1 == scheduler.num_txns()
+            if txn_idx_local + 1 == scheduler.num_txns() as TxnIndex
                 || last_input_output.block_skips_rest_at_idx(txn_idx)
             {
-                if txn_idx + 1 == scheduler.num_txns() {
+                if scheduler.next_txn(txn_idx) == block.end_txn_idx() {
                     assert!(
                         !matches!(scheduler_task, SchedulerTask::ExecutionTask(_, _, _)),
                         "All transactions can be committed, can't have execution task"
@@ -566,8 +570,8 @@ where
 
                 if scheduler.halt() {
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
-                        txn_idx + 1,
-                        scheduler.num_txns(),
+                        txn_idx_local + 1,
+                        scheduler.num_txns() as TxnIndex,
                     );
 
                     // failpoint triggering error at the last committed transaction,
@@ -588,6 +592,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         base_view: &S,
+        txn_provider: &TP,
     ) -> Vec<(T::Key, WriteOp)> {
         // Materialize all the aggregator v1 deltas.
         let aggregator_v1_delta_keys = last_input_output.aggregator_v1_delta_keys(txn_idx);
@@ -639,21 +644,23 @@ where
         &self,
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
+        scheduler: &Scheduler<TP>,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        txn_provider: &TP,
     ) -> Result<(), PanicError> {
-        let parallel_state = ParallelState::<T, X>::new(
+        let parallel_state = ParallelState::<T, X, TP>::new(
             versioned_cache,
             scheduler,
             start_shared_counter,
             shared_counter,
         );
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
-        let finalized_groups = last_input_output.take_finalized_group(txn_idx);
+        let local_txn_idx = txn_provider.local_index(txn_idx) as TxnIndex;
+        let finalized_groups = last_input_output.take_finalized_group(local_txn_idx);
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
 
@@ -662,7 +669,8 @@ where
                 code_invariant_error(format!("Panic error in serializing groups {e:?}"))
             })?;
 
-        let resource_write_set = last_input_output.take_resource_write_set(txn_idx);
+        let local_txn_idx = txn_provider.local_index(txn_idx) as TxnIndex;
+        let resource_write_set = last_input_output.take_resource_write_set(local_txn_idx);
         let resource_writes_to_materialize = resource_writes_to_materialize!(
             resource_write_set,
             last_input_output,
@@ -679,7 +687,10 @@ where
             last_input_output,
             versioned_cache,
             base_view,
+            txn_provider,
         );
+
+        txn_provider.on_local_commit(txn_idx, last_input_output, &aggregator_v1_delta_writes);
 
         last_input_output.record_materialized_txn_output(
             txn_idx,
@@ -708,7 +719,7 @@ where
         let mut final_results = final_results.acquire();
         match last_input_output.take_output(txn_idx) {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                final_results[txn_idx as usize] = t;
+                final_results[txn_provider.local_index(txn_idx)] = t;
             },
             ExecutionStatus::Abort(_) => (),
             ExecutionStatus::SpeculativeExecutionAbortError(msg)
@@ -722,10 +733,10 @@ where
     fn worker_loop(
         &self,
         executor_arguments: &E::Argument,
-        block: &[T],
+        txn_provider: &TP,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
+        scheduler: &Scheduler<TP>,
         // TODO: should not need to pass base view.
         base_view: &S,
         start_shared_counter: u32,
@@ -752,6 +763,7 @@ where
                     last_input_output,
                     base_view,
                     final_results,
+                    txn_provider,
                 )?;
             }
             Ok(())
@@ -770,7 +782,7 @@ where
                     start_shared_counter,
                     shared_counter,
                     &executor,
-                    block,
+                    txn_provider,
                 )?;
                 scheduler.queueing_commits_mark_done();
             }
@@ -798,7 +810,7 @@ where
                     let updates_outside = Self::execute(
                         txn_idx,
                         incarnation,
-                        block,
+                        txn_provider,
                         last_input_output,
                         versioned_cache,
                         &executor,
@@ -837,7 +849,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &[T],
+        txn_provider: Arc<TP>,
         base_view: &S,
     ) -> Result<BlockOutput<E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -851,14 +863,23 @@ where
         );
 
         let versioned_cache = MVHashMap::new();
-        let start_shared_counter = gen_id_start_value(false);
+        for (global_txn_idx, key) in txn_provider.remote_dependencies() {
+            versioned_cache
+                .data()
+                .force_mark_estimate(key, global_txn_idx);
+            //sharding todo: what about `versioned_cache.modules()`?
+        }
+
+        let start_shared_counter = gen_id_start_value(false); //sharding todo: should anything be done here ?
         let shared_counter = AtomicU32::new(start_shared_counter);
 
-        if signature_verified_block.is_empty() {
+        let num_txns = txn_provider.num_txns();
+        if num_txns == 0 {
             return Ok(BlockOutput::new(vec![]));
         }
 
-        let num_txns = signature_verified_block.len();
+        let last_input_output = TxnLastInputOutput::new(txn_provider.clone());
+        let scheduler = Scheduler::new(txn_provider.clone());
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -874,18 +895,20 @@ where
                 .resize_with(num_txns, E::Output::skip_output);
         }
 
-        let num_txns = num_txns as u32;
-
-        let last_input_output = TxnLastInputOutput::new(num_txns);
-        let scheduler = Scheduler::new(num_txns);
-
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
+        let num_active_workers = AtomicUsize::new(self.config.local.concurrency_level);
+
         self.executor_thread_pool.scope(|s| {
+            s.spawn(|_| {
+                txn_provider
+                    .as_ref()
+                    .run_sharding_msg_loop(&versioned_cache, &scheduler);
+            });
             for _ in 0..self.config.local.concurrency_level {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         &executor_initial_arguments,
-                        signature_verified_block,
+                        txn_provider.as_ref(),
                         &last_input_output,
                         &versioned_cache,
                         &scheduler,
@@ -905,6 +928,9 @@ where
 
                         // Make sure to halt the scheduler if it hasn't already been halted.
                         scheduler.halt();
+                    }
+                    if num_active_workers.fetch_sub(1, Ordering::SeqCst) == 1 {
+                        txn_provider.shutdown_receiver();
                     }
                 });
             }
@@ -1001,11 +1027,11 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &[T],
+        txn_provider: Arc<TP>,
         base_view: &S,
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
-        let num_txns = signature_verified_block.len();
+        let num_txns = txn_provider.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
         drop(init_timer);
@@ -1013,6 +1039,7 @@ where
         let start_counter = gen_id_start_value(true);
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
+        //sharding v3 todo: support ESTIMATE in `UnsyncMap`.
         let mut ret = Vec::with_capacity(num_txns);
         let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -1020,10 +1047,11 @@ where
         );
 
         let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
-            TxnLastInputOutput::new(num_txns as TxnIndex);
+            TxnLastInputOutput::new(txn_provider.clone());
 
-        for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let latest_view = LatestView::<T, S, X>::new(
+        for idx in txn_provider.txns() {
+            let txn = txn_provider.txn(idx);
+            let latest_view = LatestView::<T, S, X, TP>::new(
                 base_view,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
@@ -1265,7 +1293,7 @@ where
                 break;
             }
 
-            if idx < num_txns - 1 && block_limit_processor.should_end_block_sequential() {
+            if ((idx as usize) < num_txns - 1) && (block_limit_processor.should_end_block_sequential()) {
                 break;
             }
         }
@@ -1286,13 +1314,13 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &[T],
+        txn_provider: Arc<TP>,
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         if self.config.local.concurrency_level > 1 {
             let parallel_result = self.execute_transactions_parallel(
                 executor_arguments,
-                signature_verified_block,
+                txn_provider.clone(),
                 base_view,
             );
 
@@ -1307,7 +1335,7 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.len());
+            init_speculative_logs(txn_provider.num_txns());
 
             info!("parallel execution requiring fallback");
         }
@@ -1315,7 +1343,7 @@ where
         // If we didn't run parallel or it didn't finish successfully - run sequential
         let sequential_result = self.execute_transactions_sequential(
             executor_arguments,
-            signature_verified_block,
+            txn_provider.clone(),
             base_view,
             false,
         );
@@ -1334,11 +1362,11 @@ where
                 // and whether clearing them below is needed at all.
                 // All logs from the first pass of sequential execution should be cleared and not reported.
                 // Clear by re-initializing the speculative logs.
-                init_speculative_logs(signature_verified_block.len());
+                init_speculative_logs(txn_provider.num_txns());
 
                 let sequential_result = self.execute_transactions_sequential(
                     executor_arguments,
-                    signature_verified_block,
+                    txn_provider.clone(),
                     base_view,
                     true,
                 );
@@ -1371,13 +1399,18 @@ where
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                 },
             };
-            let ret = signature_verified_block
+            let ret = txn_provider
+                .txns()
                 .iter()
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
             return Ok(BlockOutput::new(ret));
         }
 
+        self.executor_thread_pool.spawn(move || {
+            // Explicit async drops.
+            drop(txn_provider);
+        });
         Err(sequential_error)
     }
 }

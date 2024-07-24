@@ -16,6 +16,7 @@ use crate::{
         DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
     },
     txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::{default::DefaultTxnProvider, DefaultIndexProvider},
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
@@ -247,18 +248,20 @@ where
             .unwrap(),
     );
 
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
     let output = BlockExecutor::<
         MockTransaction<K, E>,
         MockTask<K, E>,
         DeltaDataView<K>,
         NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
         ExecutableTestType,
+        _,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
         None,
     )
-    .execute_transactions_parallel((), &transactions, &data_view);
+    .execute_transactions_parallel((), txn_provider, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);
     baseline.assert_parallel_output(&output);
@@ -525,7 +528,7 @@ fn early_skips() {
 
 #[test]
 fn scheduler_tasks() {
-    let s = Scheduler::new(5);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(5)));
 
     for i in 0..5 {
         // No validation tasks.
@@ -616,7 +619,7 @@ fn scheduler_tasks() {
 
 #[test]
 fn scheduler_first_wave() {
-    let s = Scheduler::new(6);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(6)));
 
     for i in 0..5 {
         // Nothing to validate.
@@ -653,7 +656,7 @@ fn scheduler_first_wave() {
 
 #[test]
 fn scheduler_dependency() {
-    let s = Scheduler::new(10);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(10)));
 
     for i in 0..5 {
         // Nothing to validate.
@@ -687,8 +690,8 @@ fn scheduler_dependency() {
 
 // Will return a scheduler in a state where all transactions are scheduled for
 // for execution, validation index = num_txns, and wave = 0.
-fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler {
-    let s = Scheduler::new(num_txns);
+fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler<DefaultIndexProvider> {
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(num_txns)));
 
     for i in 0..num_txns {
         // Get the first executions out of the way.
@@ -791,7 +794,7 @@ fn scheduler_incarnation() {
 
 #[test]
 fn scheduler_basic() {
-    let s = Scheduler::new(3);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(3)));
 
     for i in 0..3 {
         // Nothing to validate.
@@ -823,7 +826,7 @@ fn scheduler_basic() {
 
 #[test]
 fn scheduler_drain_idx() {
-    let s = Scheduler::new(3);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(3)));
 
     for i in 0..3 {
         // Nothing to validate.
@@ -945,7 +948,7 @@ fn no_conflict_task_count() {
 
     let num_txns: TxnIndex = 1000;
     for num_concurrent_tasks in [1, 5, 10, 20] {
-        let s = Scheduler::new(num_txns);
+        let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(num_txns)));
 
         let mut tasks = BTreeMap::new();
 

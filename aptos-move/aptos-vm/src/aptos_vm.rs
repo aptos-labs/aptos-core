@@ -24,7 +24,9 @@ use crate::{
     VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    txn_commit_hook::NoOpTransactionCommitHook, txn_provider::default::DefaultTxnProvider,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
@@ -2540,7 +2542,7 @@ impl VMExecutor for AptosVM {
     /// mutability. Writes to be applied to the data view are encoded in the write set part of a
     /// transaction output.
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
@@ -2561,9 +2563,10 @@ impl VMExecutor for AptosVM {
         let ret = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
+            Arc::new(DefaultTxnProvider::new(transactions)),
             state_view,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {

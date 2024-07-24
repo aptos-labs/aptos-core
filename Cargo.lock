@@ -1403,8 +1403,10 @@ dependencies = [
  "aptos-push-metrics",
  "aptos-sdk",
  "aptos-storage-interface",
+ "aptos-streaming-partitioner",
  "aptos-temppath",
  "aptos-transaction-generator-lib",
+ "aptos-transaction-orderer",
  "aptos-types",
  "aptos-vm",
  "async-trait",
@@ -1430,6 +1432,7 @@ dependencies = [
 name = "aptos-executor-service"
 version = "0.1.0"
 dependencies = [
+ "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-config",
  "aptos-infallible",
@@ -1914,6 +1917,21 @@ dependencies = [
 [[package]]
 name = "aptos-global-constants"
 version = "0.1.0"
+
+[[package]]
+name = "aptos-graphs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-logger",
+ "aptos-types",
+ "itertools 0.12.1",
+ "metis",
+ "namable_closures",
+ "nonmax",
+ "rand 0.7.3",
+ "thiserror",
+]
 
 [[package]]
 name = "aptos-id-generator"
@@ -3697,6 +3715,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-streaming-partitioner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-block-partitioner",
+ "aptos-graphs",
+ "aptos-logger",
+ "aptos-transaction-orderer",
+ "aptos-types",
+ "clap 4.4.14",
+ "itertools 0.12.1",
+ "namable_closures",
+ "nonmax",
+ "rand 0.7.3",
+ "rayon",
+ "smallvec",
+ "thiserror",
+]
+
+[[package]]
 name = "aptos-system-utils"
 version = "0.1.0"
 dependencies = [
@@ -3948,6 +3987,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transaction-orderer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-block-partitioner",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "bcs 0.1.4",
+ "clap 4.4.14",
+ "dashmap",
+ "itertools 0.12.1",
+ "move-core-types",
+ "once_cell",
+ "rand 0.7.3",
+ "rayon",
+]
+
+[[package]]
 name = "aptos-transactional-test-harness"
 version = "0.1.0"
 dependencies = [
@@ -4022,6 +4082,7 @@ dependencies = [
  "move-table-extension",
  "move-vm-runtime",
  "move-vm-types",
+ "namable_closures",
  "num-bigint 0.3.3",
  "num-derive",
  "num-traits",
@@ -4129,7 +4190,9 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-mvhashmap",
  "aptos-native-interface",
+ "aptos-streaming-partitioner",
  "aptos-table-natives",
+ "aptos-transaction-orderer",
  "aptos-types",
  "aptos-utils",
  "aptos-vm-logging",
@@ -5195,6 +5258,26 @@ dependencies = [
  "lazycell",
  "peeking_take_while",
  "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn 2.0.48",
+]
+
+[[package]]
+name = "bindgen"
+version = "0.66.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b84e06fc203107bfbad243f4aba2af864eb7db3b1cf46ea0a023b0b433d2a7"
+dependencies = [
+ "bitflags 2.4.1",
+ "cexpr",
+ "clang-sys",
+ "lazy_static",
+ "lazycell",
+ "peeking_take_while",
  "proc-macro2",
  "quote",
  "regex",
@@ -9748,7 +9831,7 @@ version = "0.11.0+8.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3386f101bcb4bd252d8e9d2fb41ec3b0862a15a62b478c355b2982efa469e3e"
 dependencies = [
- "bindgen",
+ "bindgen 0.65.1",
  "bzip2-sys",
  "cc",
  "glob",
@@ -10049,6 +10132,24 @@ dependencies = [
  "keccak",
  "rand_core 0.6.4",
  "zeroize",
+]
+
+[[package]]
+name = "metis"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62d65169fd55c134e5498444453fe968349421e7248e4d6547c6846e0082c397"
+dependencies = [
+ "metis-sys",
+]
+
+[[package]]
+name = "metis-sys"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc898b11f9da2e428afa54b5f092dac7edd3f87281084d789b9a9a15b6f81853"
+dependencies = [
+ "bindgen 0.66.1",
 ]
 
 [[package]]
@@ -11126,6 +11227,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "namable_closures"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3692f03a721113e0b493831f0ca52d589f694b1b6225ebef34a0edfa8561956f"
+
+[[package]]
 name = "named-lock"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11231,6 +11338,12 @@ dependencies = [
  "memchr",
  "minimal-lexical",
 ]
+
+[[package]]
+name = "nonmax"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99756f5493e135528f0cd660ac67b4c3a542bb65a3565efe92bb2c2317eb3669"
 
 [[package]]
 name = "normalize-line-endings"

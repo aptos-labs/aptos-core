@@ -33,7 +33,7 @@ fn test_partitioner_v2_uniform_correctness() {
             let block = block_generator.rand_block(&mut rng, block_size);
             let block_clone = block.clone();
             let partitioned = partitioner.partition(block, num_shards);
-            crate::test_utils::verify_partitioner_output(&block_clone, &partitioned);
+            crate::test_utils::verify_partitioner_output(&block_clone, partitioned.as_v2_ref());
         }
     }
 }
@@ -74,7 +74,7 @@ fn test_partitioner_v2_connected_component_correctness() {
             let block = block_generator.rand_block(&mut rng, block_size);
             let block_clone = block.clone();
             let partitioned = partitioner.partition(block, num_shards);
-            crate::test_utils::verify_partitioner_output(&block_clone, &partitioned);
+            crate::test_utils::verify_partitioner_output(&block_clone, partitioned.as_v2_ref());
         }
     }
 }

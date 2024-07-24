@@ -507,13 +507,18 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// before given idx are in Value state.
     ///
     /// Must be called for each transaction index, in order.
-    pub fn try_commit(&self, idx_to_commit: TxnIndex, ids: Vec<K>) -> Result<(), CommitError> {
+    pub fn try_commit(&self, idx_to_commit: TxnIndex, local_txn_idx: TxnIndex, ids: Vec<K>) -> Result<(), CommitError> {
         // we may not need to return values here, we can just read them.
         use DelayedApplyEntry::*;
 
-        if idx_to_commit != self.next_idx_to_commit.load(Ordering::SeqCst) {
+        if local_txn_idx != self.next_idx_to_commit.load(Ordering::SeqCst) {
+            let err_msg = format!(
+                "idx_to_commit: {}, next_idx_to_commit: {}; idx_to_commit must be next_idx_to_commit",
+                idx_to_commit,
+                self.next_idx_to_commit.load(Ordering::SeqCst)
+            );
             return Err(CommitError::CodeInvariantError(
-                "idx_to_commit must be next_idx_to_commit".to_string(),
+                err_msg,
             ));
         }
 
@@ -639,7 +644,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         // and value is checked at the start.
         // Need to assert, because if not matching we are in an inconsistent state.
         assert_eq!(
-            idx_to_commit,
+            local_txn_idx,
             self.next_idx_to_commit.fetch_add(1, Ordering::SeqCst)
         );
 

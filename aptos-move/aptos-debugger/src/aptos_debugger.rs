@@ -50,11 +50,11 @@ impl AptosDebugger {
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
 
-        let result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
+        let result = AptosVM::execute_block_no_limit(sig_verified_txns.clone(), &state_view)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
         for i in 1..repeat_execution_times {
-            let repeat_result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
+            let repeat_result = AptosVM::execute_block_no_limit(sig_verified_txns.clone(), &state_view)
                 .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
             println!(
                 "Finished execution round {}/{} with {} transactions",

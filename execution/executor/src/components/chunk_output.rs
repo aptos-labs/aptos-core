@@ -70,7 +70,7 @@ impl ChunkOutput {
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
-        let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
+        let block_output = Self::execute_block::<V>(transactions.clone(), &state_view, onchain_config)?;
 
         let transaction_outputs = block_output.into_inner();
         // TODO add block_limit_info to ChunkOutput, to add it to StateCheckpoint
@@ -192,7 +192,7 @@ impl ChunkOutput {
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
     fn execute_block<V: VMExecutor>(
-        transactions: &[SignatureVerifiedTransaction],
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>> {
@@ -205,7 +205,7 @@ impl ChunkOutput {
     /// gas and a [ExecutionStatus::Success] for each of the [Transaction]s.
     #[cfg(feature = "consensus-only-perf-test")]
     fn execute_block<V: VMExecutor>(
-        transactions: &[SignatureVerifiedTransaction],
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>> {

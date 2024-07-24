@@ -3,7 +3,8 @@
 
 use crate::{
     remote_cordinator_client::RemoteCoordinatorClient,
-    remote_cross_shard_client::RemoteCrossShardClient, remote_state_view::RemoteStateViewClient,
+    remote_cross_shard_client::{RemoteCrossShardClient, RemoteCrossShardClientV3},
+    remote_state_view::RemoteStateViewClient,
 };
 use aptos_secure_net::network_controller::NetworkController;
 use aptos_types::block_executor::partitioner::ShardId;
@@ -38,13 +39,14 @@ impl ExecutorService {
             &mut controller,
             remote_shard_addresses,
         ));
-
+        let v3_client = Arc::new(RemoteCrossShardClientV3 {});
         let executor_service = Arc::new(ShardedExecutorService::new(
             shard_id,
             num_shards,
             num_threads,
             coordinator_client,
             cross_shard_client,
+            v3_client,
         ));
 
         Self {

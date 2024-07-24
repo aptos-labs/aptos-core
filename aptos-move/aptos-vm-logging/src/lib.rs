@@ -120,6 +120,10 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
 /// log / event storage with None. Must be called after block execution is complete as it
 /// removes the storage from Arc.
 pub fn flush_speculative_logs(num_to_flush: usize) {
+    if speculation_disabled() {
+        return;
+    }
+
     match BUFFERED_LOG_EVENTS.swap(None) {
         Some(log_events_ptr) => {
             match Arc::try_unwrap(log_events_ptr) {

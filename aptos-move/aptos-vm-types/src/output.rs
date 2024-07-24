@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::change_set::VMChangeSet;
-use aptos_aggregator::{resolver::AggregatorV1Resolver, types::code_invariant_error};
+use aptos_aggregator::{bounded_math::SignedU128, resolver::AggregatorV1Resolver, types::code_invariant_error};
 use aptos_types::fee_statement::FeeStatement;
 use aptos_types::{
     contract_event::ContractEvent, //contract_event::ContractEvent,
     delayed_fields::PanicError,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::{WriteOp, TOTAL_SUPPLY_STATE_KEY},
 };
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
@@ -137,8 +137,9 @@ impl VMOutput {
         mut self,
         resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
+        let total_supply_delta = self.total_supply_delta();
         self.try_materialize(resolver)?;
-        Self::convert_to_transaction_output(self).map_err(|e| {
+        Self::convert_to_transaction_output(self, total_supply_delta).map_err(|e| {
             VMStatus::error(
                 StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                 Some(e.to_string()),
@@ -148,9 +149,10 @@ impl VMOutput {
 
     /// Constructs `TransactionOutput`, without doing `try_materialize`
     pub fn into_transaction_output(self) -> anyhow::Result<TransactionOutput, VMStatus> {
+        let total_supply_delta = self.total_supply_delta();
         let (change_set, fee_statement, status, auxiliary_data) = self.unpack_with_fee_statement();
         let output = VMOutput::new(change_set, fee_statement, status, auxiliary_data);
-        Self::convert_to_transaction_output(output).map_err(|e| {
+        Self::convert_to_transaction_output(output, total_supply_delta).map_err(|e| {
             VMStatus::error(
                 StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                 Some(e.to_string()),
@@ -160,16 +162,24 @@ impl VMOutput {
 
     fn convert_to_transaction_output(
         materialized_output: VMOutput,
+        total_supply_delta: Option<SignedU128>,
     ) -> Result<TransactionOutput, PanicError> {
         let (vm_change_set, gas_used, status, auxiliary_data) = materialized_output.unpack();
         let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();
+        let total_supply_delta_apt_types : Option<aptos_types::transaction::SignedU128> = match total_supply_delta {
+            Some(delta) => match delta {
+                SignedU128::Positive(v) => Some(aptos_types::transaction::SignedU128::Positive(v)),
+                SignedU128::Negative(v) => Some(aptos_types::transaction::SignedU128::Negative(v)),
+            }
+            None => None,
+        };
         Ok(TransactionOutput::new(
             write_set,
             events,
             gas_used,
             status,
             auxiliary_data,
-        ))
+        ).with_total_supply_delta(total_supply_delta_apt_types))
     }
 
     /// Updates the VMChangeSet based on the input aggregator v1 deltas, patched resource write set,
@@ -180,6 +190,7 @@ impl VMOutput {
         patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         patched_events: Vec<ContractEvent>,
     ) -> Result<TransactionOutput, PanicError> {
+        let total_supply_delta = self.total_supply_delta();
         // materialize aggregator V1 deltas into writes
         if materialized_aggregator_v1_deltas.len()
             != self.change_set().aggregator_v1_delta_set().len()
@@ -214,6 +225,15 @@ impl VMOutput {
         }
         self.change_set.set_events(patched_events.into_iter());
 
-        Self::convert_to_transaction_output(self)
+        Self::convert_to_transaction_output(self, total_supply_delta)
+    }
+
+    fn total_supply_delta(&self) -> Option<SignedU128> {
+        self.change_set
+            .aggregator_v1_delta_set()
+            .get(&TOTAL_SUPPLY_STATE_KEY)
+            .map(|op|
+                op.get_update()
+            )
     }
 }

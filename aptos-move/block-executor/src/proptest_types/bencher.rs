@@ -12,6 +12,7 @@ use crate::{
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
@@ -129,14 +130,16 @@ where
         );
 
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
+        let txn_provider = Arc::new(DefaultTxnProvider::new(self.transactions.clone()));
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
             EmptyDataView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
+            _,
         >::new(config, executor_thread_pool, None)
-        .execute_transactions_parallel((), &self.transactions, &data_view);
+        .execute_transactions_parallel((), txn_provider, &data_view);
 
         self.baseline_output.assert_parallel_output(&output);
     }

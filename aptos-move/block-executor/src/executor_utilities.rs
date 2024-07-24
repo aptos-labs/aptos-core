@@ -81,6 +81,7 @@ macro_rules! resource_writes_to_materialize {
 
 pub(crate) use groups_to_finalize;
 pub(crate) use resource_writes_to_materialize;
+use crate::txn_provider::TxnIndexProvider;
 
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,
@@ -166,9 +167,10 @@ pub(crate) fn map_id_to_values_in_group_writes<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
+    TP: TxnIndexProvider,
 >(
     finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
-    latest_view: &LatestView<T, S, X>,
+    latest_view: &LatestView<T, S, X, TP>,
 ) -> ::std::result::Result<Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>, PanicError> {
     let mut patched_finalized_groups = Vec::with_capacity(finalized_groups.len());
     for (group_key, group_metadata_op, resource_vec) in finalized_groups.into_iter() {
@@ -194,9 +196,10 @@ pub(crate) fn map_id_to_values_in_write_set<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
+    TP: TxnIndexProvider,
 >(
     resource_write_set: Vec<(T::Key, Arc<T::Value>, Arc<MoveTypeLayout>)>,
-    latest_view: &LatestView<T, S, X>,
+    latest_view: &LatestView<T, S, X, TP>,
 ) -> Result<Vec<(T::Key, T::Value)>, PanicError> {
     resource_write_set
         .into_iter()
@@ -214,9 +217,10 @@ pub(crate) fn map_id_to_values_events<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
+    TP: TxnIndexProvider,
 >(
     events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
-    latest_view: &LatestView<T, S, X>,
+    latest_view: &LatestView<T, S, X, TP>,
 ) -> Result<Vec<T::Event>, PanicError> {
     events
         .map(|(event, layout)| {
@@ -247,10 +251,11 @@ fn replace_ids_with_values<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
+    TP: TxnIndexProvider,
 >(
     value: &Arc<T::Value>,
     layout: &MoveTypeLayout,
-    latest_view: &LatestView<T, S, X>,
+    latest_view: &LatestView<T, S, X, TP>,
 ) -> Result<T::Value, PanicError> {
     let mut value = (**value).clone();
 

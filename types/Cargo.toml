@@ -41,6 +41,7 @@ move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num-bigint = { workspace = true }
+namable_closures = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }

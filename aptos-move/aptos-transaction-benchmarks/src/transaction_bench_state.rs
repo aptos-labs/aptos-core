@@ -3,7 +3,9 @@
 
 use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    txn_commit_hook::NoOpTransactionCommitHook, txn_provider::default::DefaultTxnProvider,
+};
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
@@ -190,7 +192,7 @@ where
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
         let txns = self.gen_transaction();
-        self.execute_benchmark_sequential(&txns, None);
+        self.execute_benchmark_sequential(txns, None);
     }
 
     /// Executes this state in a single block.
@@ -207,17 +209,19 @@ where
 
     fn execute_benchmark_sequential(
         &self,
-        transactions: &[SignatureVerifiedTransaction],
+        transactions: Vec<SignatureVerifiedTransaction>,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
+        let txn_provider = Arc::new(DefaultTxnProvider::new(transactions));
         let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
+            txn_provider,
             self.state_view.as_ref(),
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
             None,
@@ -261,12 +265,15 @@ where
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
+        let preprocessed_txns = BlockAptosVM::verify_transactions(transactions);
+        let txn_provider = Arc::new(DefaultTxnProvider::new(preprocessed_txns));
         let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
+            txn_provider,
             self.state_view.as_ref(),
             BlockExecutorConfig::new_maybe_block_limit(
                 concurrency_level_per_shard,
@@ -319,7 +326,7 @@ where
         let (output, seq_tps) = if run_seq {
             println!("Sequential execution starts...");
             let (output, tps) =
-                self.execute_benchmark_sequential(&transactions, maybe_block_gas_limit);
+                self.execute_benchmark_sequential(transactions, maybe_block_gas_limit);
             println!("Sequential execution finishes, TPS = {}", tps);
             (output, tps)
         } else {

@@ -3,6 +3,9 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_block_partitioner::v3::V3NaivePartitionerConfig;
+use aptos_transaction_orderer::V3ReorderingPartitionerConfig;
+
 /// It has to be integration tests because otherwise it forms an indirect dependency circle between
 /// aptos-vm and aptos-language-e2e-tests, which causes static variables to have two instances in
 /// the same process while testing, resulting in the counters failing to register with "AlreadyReg"
@@ -19,6 +22,7 @@ use aptos_vm::sharded_block_executor::{
     local_executor_shard::LocalExecutorService, ShardedBlockExecutor,
 };
 use rand::{rngs::OsRng, Rng};
+use aptos_streaming_partitioner::V3FennelBasedPartitionerConfig;
 
 #[test]
 fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict() {
@@ -30,7 +34,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict() {
             .partition_last_round(merge_discard)
             .pre_partitioner_config(Box::new(UniformPartitionerConfig {}))
             .build();
-        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor);
+        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, 2);
     }
 }
 
@@ -112,7 +116,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_no_conflict() 
             .partition_last_round(merge_discard)
             .pre_partitioner_config(Box::<ConnectedComponentPartitionerConfig>::default())
             .build();
-        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor);
+        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, 2);
     }
 }
 
@@ -183,6 +187,94 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
             1,
         )
     }
+}
+
+#[test]
+fn test_partitioner_v3_naive_sharded_block_executor_no_conflict() {
+    let num_shards = 8;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3NaivePartitionerConfig::default().build();
+    test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, 4);
+}
+
+#[test]
+// Sharded execution with cross shard conflict doesn't work for now because we don't have
+// cross round dependency tracking yet.
+fn test_partitioner_v3_naive_sharded_block_executor_with_conflict_parallel() {
+    let num_shards = 7;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3NaivePartitionerConfig::default().build();
+    test_utils::sharded_block_executor_with_conflict(partitioner, sharded_block_executor, 4);
+}
+
+#[test]
+fn test_partitioner_v3_naive_sharded_block_executor_with_random_transfers_parallel() {
+    let num_shards = 3;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3NaivePartitionerConfig::default().build();
+    test_utils::sharded_block_executor_with_random_transfers(partitioner, sharded_block_executor, 4)
+}
+
+#[test]
+fn test_partitioner_v3_orderer_sharded_block_executor_no_conflict() {
+    let num_shards = 8;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3ReorderingPartitionerConfig::default().build();
+    test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, 4);
+}
+
+#[test]
+// Sharded execution with cross shard conflict doesn't work for now because we don't have
+// cross round dependency tracking yet.
+fn test_partitioner_v3_orderer_sharded_block_executor_with_conflict_parallel() {
+    let num_shards = 7;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3ReorderingPartitionerConfig::default().build();
+    test_utils::sharded_block_executor_with_conflict(partitioner, sharded_block_executor, 4);
+}
+
+#[test]
+fn test_partitioner_v3_orderer_sharded_block_executor_with_random_transfers_parallel() {
+    let num_shards = 3;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3ReorderingPartitionerConfig::default().build();
+    test_utils::sharded_block_executor_with_random_transfers(partitioner, sharded_block_executor, 4)
+}
+
+
+#[test]
+fn test_partitioner_v3_fennel_sharded_block_executor_no_conflict() {
+    let num_shards = 8;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3FennelBasedPartitionerConfig::default().build();
+    test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, 4);
+}
+
+#[test]
+// Sharded execution with cross shard conflict doesn't work for now because we don't have
+// cross round dependency tracking yet.
+fn test_partitioner_v3_fennel_sharded_block_executor_with_conflict_parallel() {
+    let num_shards = 7;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3FennelBasedPartitionerConfig::default().build();
+    test_utils::sharded_block_executor_with_conflict(partitioner, sharded_block_executor, 4);
+}
+
+#[test]
+fn test_partitioner_v3_fennel_sharded_block_executor_with_random_transfers_parallel() {
+    let num_shards = 3;
+    let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(client);
+    let partitioner = V3FennelBasedPartitionerConfig::default().build();
+    test_utils::sharded_block_executor_with_random_transfers(partitioner, sharded_block_executor, 4)
 }
 
 mod test_utils {
@@ -284,6 +376,7 @@ mod test_utils {
     pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>(
         partitioner: Box<dyn BlockPartitioner>,
         sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+        concurrency_level_per_shard: usize,
     ) {
         let num_txns = 400;
         let num_shards = 8;
@@ -297,7 +390,7 @@ mod test_utils {
             .execute_block(
                 Arc::new(executor.data_store().clone()),
                 partitioned_txns.clone(),
-                2,
+                concurrency_level_per_shard,
                 BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
@@ -308,7 +401,7 @@ mod test_utils {
                 .map(|t| t.into_txn())
                 .collect();
         let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&ordered_txns, executor.data_store()).unwrap();
+            AptosVM::execute_block_no_limit(ordered_txns, executor.data_store()).unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -357,7 +450,7 @@ mod test_utils {
             .unwrap();
 
         let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+            AptosVM::execute_block_no_limit(execution_ordered_txns, executor.data_store())
                 .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
@@ -411,7 +504,7 @@ mod test_utils {
             .unwrap();
 
         let unsharded_txn_output =
-            AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+            AptosVM::execute_block_no_limit(execution_ordered_txns, executor.data_store())
                 .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }

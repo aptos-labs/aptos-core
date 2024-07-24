@@ -1,15 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardMessage};
 use aptos_secure_net::network_controller::{Message, NetworkController};
-use aptos_types::block_executor::partitioner::{RoundId, ShardId, MAX_ALLOWED_PARTITIONING_ROUNDS};
-use aptos_vm::sharded_block_executor::{
-    cross_shard_client::CrossShardClient, messages::CrossShardMsg,
+use aptos_types::{
+    block_executor::partitioner::{RoundId, ShardId, MAX_ALLOWED_PARTITIONING_ROUNDS},
+    vm_status::VMStatus,
+};
+use aptos_vm::{
+    sharded_block_executor::{cross_shard_client::CrossShardClient, messages::CrossShardMsg},
 };
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 
 pub struct RemoteCrossShardClient {
     // The senders of cross-shard messages to other shards per round.
@@ -63,5 +68,21 @@ impl CrossShardClient for RemoteCrossShardClient {
         let message = rx.recv().unwrap();
         let msg: CrossShardMsg = bcs::from_bytes(&message.to_bytes()).unwrap();
         msg
+    }
+}
+
+pub struct RemoteCrossShardClientV3 {}
+
+impl CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus> for RemoteCrossShardClientV3 {
+    fn send(
+        &self,
+        _shard_idx: usize,
+        _output: CrossShardMessage<SignatureVerifiedTransaction, VMStatus>,
+    ) {
+        todo!()
+    }
+
+    fn recv(&self) -> CrossShardMessage<SignatureVerifiedTransaction, VMStatus> {
+        todo!()
     }
 }

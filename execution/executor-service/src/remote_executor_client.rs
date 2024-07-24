@@ -10,7 +10,7 @@ use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, partitioner::{PartitionedTransactions, PartitionedTransactionsV3},
     },
     state_store::StateView,
     transaction::TransactionOutput,
@@ -214,5 +214,15 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
 
     fn shutdown(&mut self) {
         self.network_controller.shutdown();
+    }
+
+    fn execute_block_v3(
+        &self,
+        _state_view: Arc<S>,
+        _transactions: PartitionedTransactionsV3,
+        _concurrency_level_per_shard: usize,
+        _onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        todo!()
     }
 }

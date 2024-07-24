@@ -50,7 +50,7 @@ pub struct PtxBlockExecutor;
 
 impl VMExecutor for PtxBlockExecutor {
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
@@ -87,7 +87,7 @@ impl VMExecutor for PtxBlockExecutor {
 
             // Feed the transactions down the pipeline.
             for txn in transactions {
-                analyzer.analyze_transaction(txn.clone());
+                analyzer.analyze_transaction(txn);
             }
             analyzer.finish_block();
 

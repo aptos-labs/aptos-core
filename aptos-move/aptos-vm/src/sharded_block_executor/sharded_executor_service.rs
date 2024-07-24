@@ -13,14 +13,19 @@ use crate::{
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
-        ExecutorShardCommand,
+        ExecuteV3PartitionCommand, ExecutorShardCommand,
     },
+    AptosVM,
+};
+use aptos_block_executor::txn_provider::{
+    default::DefaultTxnProvider,
+    sharded::{CrossShardClientForV3, ShardedTxnProvider},
 };
 use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorLocalConfig},
-        partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
+        partitioner::{PartitionV3, ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
     },
     state_store::StateView,
     transaction::{
@@ -32,6 +37,10 @@ use aptos_types::{
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
+use rayon::{
+    iter::ParallelIterator,
+    prelude::{IndexedParallelIterator, IntoParallelIterator},
+};
 use std::sync::Arc;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
@@ -40,6 +49,7 @@ pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     executor_thread_pool: Arc<rayon::ThreadPool>,
     coordinator_client: Arc<dyn CoordinatorClient<S>>,
     cross_shard_client: Arc<dyn CrossShardClient>,
+    v3_client: Arc<dyn CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus>>,
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
@@ -49,6 +59,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         num_threads: usize,
         coordinator_client: Arc<dyn CoordinatorClient<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
+        v3_client: Arc<dyn CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus>>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -65,6 +76,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             executor_thread_pool,
             coordinator_client,
             cross_shard_client,
+            v3_client,
         }
     }
 
@@ -135,9 +147,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
+                let txn_provider = Arc::new(DefaultTxnProvider::new(signature_verified_transactions));
                 let ret = BlockAptosVM::execute_block(
                     executor_thread_pool,
-                    &signature_verified_transactions,
+                    txn_provider.clone(),
                     aggr_overridden_state_view.as_ref(),
                     config,
                     cross_shard_commit_sender,
@@ -163,7 +176,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 callback.send(ret).unwrap();
                 executor_thread_pool_clone.spawn(move || {
                     // Explicit async drop
-                    drop(signature_verified_transactions);
+                    drop(txn_provider);
                 });
             });
         });
@@ -245,6 +258,62 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         .with_label_values(&[&self.shard_id.to_string(), "result_tx"])
                         .start_timer();
                     self.coordinator_client.send_execution_result(ret);
+                },
+                ExecutorShardCommand::ExecuteV3Partition(cmd) => {
+                    let ExecuteV3PartitionCommand {
+                        state_view,
+                        partition,
+                        concurrency_level_per_shard,
+                        onchain_config,
+                    } = cmd;
+                    let PartitionV3 {
+                        block_id,
+                        txns,
+                        global_idxs,
+                        local_idx_by_global,
+                        key_sets_by_dep,
+                        follower_shard_sets,
+                    } = partition;
+                    let processed_txns = self.executor_thread_pool.install(|| {
+                        txns.into_par_iter()
+                            .with_min_len(25)
+                            .map(|analyzed_txn| {
+                                analyzed_txn.into_txn()
+                            })
+                            .collect()
+                    });
+                    let txn_provider = ShardedTxnProvider::new(
+                        block_id,
+                        self.num_shards,
+                        self.shard_id,
+                        self.v3_client.clone(),
+                        processed_txns,
+                        global_idxs,
+                        local_idx_by_global,
+                        key_sets_by_dep,
+                        follower_shard_sets,
+                    );
+
+                    disable_speculative_logging();
+                    let result = BlockAptosVM::execute_block(
+                        self.executor_thread_pool.clone(),
+                        Arc::new(txn_provider),
+                        state_view.as_ref(),
+                        BlockExecutorConfig {
+                            local: BlockExecutorLocalConfig {
+                                concurrency_level: concurrency_level_per_shard,
+                                allow_fallback: true,
+                                discard_failed_blocks: false,
+                            },
+                            onchain: onchain_config,
+                        },
+                        None::<CrossShardCommitSender>,
+                    ).map(BlockOutput::into_transaction_outputs_forced);
+
+                    // Wrap the 1D result as a 2D result so we can reuse the existing `result_rxs`.
+                    let wrapped_2d_result = result.map(|output_vec| vec![output_vec]);
+                    self.coordinator_client
+                        .send_execution_result(wrapped_2d_result)
                 },
                 ExecutorShardCommand::Stop => {
                     break;
