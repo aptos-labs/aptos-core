@@ -11,8 +11,8 @@ This module provides the foundation for typesafe Coins.
 -  [Resource `CoinStore`](#0x1_coin_CoinStore)
 -  [Resource `SupplyConfig`](#0x1_coin_SupplyConfig)
 -  [Resource `CoinInfo`](#0x1_coin_CoinInfo)
--  [Struct `DepositEvent`](#0x1_coin_DepositEvent)
--  [Struct `WithdrawEvent`](#0x1_coin_WithdrawEvent)
+-  [Struct `CoinDeposit`](#0x1_coin_CoinDeposit)
+-  [Struct `CoinWithdraw`](#0x1_coin_CoinWithdraw)
 -  [Struct `MintCapability`](#0x1_coin_MintCapability)
 -  [Struct `FreezeCapability`](#0x1_coin_FreezeCapability)
 -  [Struct `BurnCapability`](#0x1_coin_BurnCapability)
@@ -204,13 +204,13 @@ These are kept in a single resource to ensure locality of data.
 
 </dd>
 <dt>
-<code>deposit_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="coin.md#0x1_coin_DepositEvent">coin::DepositEvent</a>&gt;</code>
+<code>deposit_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="coin.md#0x1_coin_CoinDeposit">coin::CoinDeposit</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>withdraw_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">coin::WithdrawEvent</a>&gt;</code>
+<code>withdraw_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="coin.md#0x1_coin_CoinWithdraw">coin::CoinWithdraw</a>&gt;</code>
 </dt>
 <dd>
 
@@ -298,14 +298,14 @@ Information about a specific coin type. Stored on the creator of the coin's acco
 
 </details>
 
-<a id="0x1_coin_DepositEvent"></a>
+<a id="0x1_coin_CoinDeposit"></a>
 
-## Struct `DepositEvent`
+## Struct `CoinDeposit`
 
 Event emitted when some amount of a coin is deposited into an account.
 
 
-<pre><code><b>struct</b> <a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="coin.md#0x1_coin_CoinDeposit">CoinDeposit</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -315,6 +315,18 @@ Event emitted when some amount of a coin is deposited into an account.
 
 
 <dl>
+<dt>
+<code>coin_type: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><a href="account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>amount: u64</code>
 </dt>
@@ -326,14 +338,14 @@ Event emitted when some amount of a coin is deposited into an account.
 
 </details>
 
-<a id="0x1_coin_WithdrawEvent"></a>
+<a id="0x1_coin_CoinWithdraw"></a>
 
-## Struct `WithdrawEvent`
+## Struct `CoinWithdraw`
 
 Event emitted when some amount of a coin is withdrawn from an account.
 
 
-<pre><code><b>struct</b> <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="coin.md#0x1_coin_CoinWithdraw">CoinWithdraw</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -343,6 +355,18 @@ Event emitted when some amount of a coin is withdrawn from an account.
 
 
 <dl>
+<dt>
+<code>coin_type: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><a href="account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>amount: u64</code>
 </dt>
@@ -1243,9 +1267,9 @@ Deposit the coin balance into the recipient's account and emit an event.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="coin.md#0x1_coin_EFROZEN">EFROZEN</a>),
     );
 
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a>&gt;(
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_CoinDeposit">CoinDeposit</a>&gt;(
         &<b>mut</b> coin_store.deposit_events,
-        <a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a> { amount: <a href="coin.md#0x1_coin">coin</a>.value },
+        <a href="coin.md#0x1_coin_CoinDeposit">CoinDeposit</a> { coin_type: type_name&lt;CoinType&gt;(), <a href="account.md#0x1_account">account</a>: account_addr, amount: <a href="coin.md#0x1_coin">coin</a>.value, },
     );
 
     <a href="coin.md#0x1_coin_merge">merge</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, <a href="coin.md#0x1_coin">coin</a>);
@@ -1261,7 +1285,7 @@ Deposit the coin balance into the recipient's account and emit an event.
 ## Function `force_deposit`
 
 Deposit the coin balance into the recipient's account without checking if the account is frozen.
-This is for internal use only and doesn't emit an DepositEvent.
+This is for internal use only and doesn't emit an CoinDeposit.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_force_deposit">force_deposit</a>&lt;CoinType&gt;(account_addr: <b>address</b>, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
@@ -1814,8 +1838,8 @@ Returns minted <code><a href="coin.md#0x1_coin_Coin">Coin</a></code>.
     <b>let</b> coin_store = <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt; {
         <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a> { value: 0 },
         frozen: <b>false</b>,
-        deposit_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a>&gt;(<a href="account.md#0x1_account">account</a>),
-        withdraw_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a>&gt;(<a href="account.md#0x1_account">account</a>),
+        deposit_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="coin.md#0x1_coin_CoinDeposit">CoinDeposit</a>&gt;(<a href="account.md#0x1_account">account</a>),
+        withdraw_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="coin.md#0x1_coin_CoinWithdraw">CoinWithdraw</a>&gt;(<a href="account.md#0x1_account">account</a>),
     };
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, coin_store);
 }
@@ -1912,9 +1936,9 @@ Withdraw specified <code>amount</code> of coin <code>CoinType</code> from the si
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="coin.md#0x1_coin_EFROZEN">EFROZEN</a>),
     );
 
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a>&gt;(
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_CoinWithdraw">CoinWithdraw</a>&gt;(
         &<b>mut</b> coin_store.withdraw_events,
-        <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> { amount },
+        <a href="coin.md#0x1_coin_CoinWithdraw">CoinWithdraw</a> { coin_type: type_name&lt;CoinType&gt;(), <a href="account.md#0x1_account">account</a>: account_addr, amount },
     );
 
     <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount)
