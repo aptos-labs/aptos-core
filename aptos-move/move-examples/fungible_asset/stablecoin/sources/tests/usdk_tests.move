@@ -62,4 +62,46 @@ module stablecoin::usdk_tests {
 
         object::transfer(receiver, store, @0xdeadbeef);
     }
+
+    // Test freezing of a store
+    #[test(creator = @0xcafe, denylister = @0xcade, denylisted = @0xdead, master_minter = @0xbab, minter = @0xface)]
+    #[expected_failure(abort_code = 327683, location = aptos_framework::fungible_asset)]
+    fun test_freeze_store(creator: &signer, denylister: &signer, denylisted: &signer, master_minter: &signer, minter: &signer) {
+        usdk::init_for_test(creator);
+        let rando = @0xdeadbeef;
+        let rando_2 = @0xdeadbeef2;
+        let asset = usdk::metadata();
+
+        // mint tokens to denylisted
+        usdk::add_minter(master_minter, @0xface);
+        usdk::mint(minter, @0xface, 100);
+
+        // denylist account, check if account is denylisted
+        usdk::denylist(denylister, @0xdead);
+        assert!(primary_fungible_store::is_frozen(@0xdead, asset), 0);
+
+        // create store and generate signer for it
+        let store_constructor_ref = object::create_object(rando);
+        let store = fungible_asset::create_store(&store_constructor_ref, asset);
+        let extend_ref = object::generate_extend_ref(&store_constructor_ref);
+        let obj_signer = object::generate_signer_for_extending(&extend_ref);
+
+        // transfer tokens to the secondary store created
+        let minter_store = primary_fungible_store::ensure_primary_store_exists(@0xface, asset);
+        dispatchable_fungible_asset::transfer(minter, minter_store, store, 30);
+
+        // transfer tokens from the secondary store created to another account
+        let rando_2_store = primary_fungible_store::ensure_primary_store_exists(rando_2, asset);
+        dispatchable_fungible_asset::transfer(&obj_signer, store, rando_2_store, 10);
+        assert!(primary_fungible_store::balance(rando_2, asset) == 10, 0);
+
+        // freeze the store and check if the store is frozen
+        usdk::freeze_store(denylister, store);
+        assert!(fungible_asset::is_frozen(store), 0);
+
+        // attempt failed transfer using object signer
+        let rando_3 = @0xdeadbeef3;
+        let rando_3_store = primary_fungible_store::ensure_primary_store_exists(rando_3, asset);
+        dispatchable_fungible_asset::transfer(&obj_signer, store, rando_3_store, 10);
+    }
 }

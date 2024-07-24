@@ -1,0 +1,13 @@
+[package]
+name = "circle"
+version = "0.0.0"
+
+[dev-addresses]
+message_transmitter = "0xcafe"
+
+[addresses]
+message_transmitter = "_"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "main" }
+

@@ -195,6 +195,7 @@ module stablecoin::usdk {
     ) acquires State {
         assert_not_paused();
         assert_not_denylisted(object::owner(store));
+        assert_store_not_frozen(store);
         fungible_asset::deposit_with_ref(transfer_ref, store, fa);
     }
 
@@ -206,6 +207,7 @@ module stablecoin::usdk {
     ): FungibleAsset acquires State {
         assert_not_paused();
         assert_not_denylisted(object::owner(store));
+        assert_store_not_frozen(store);
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
@@ -305,6 +307,14 @@ module stablecoin::usdk {
         });
     }
 
+    public entry fun freeze_store(denylister: &signer, store: Object<FungibleStore>) acquires Management, State, Roles {
+        assert_not_paused();
+        let roles = borrow_global<Roles>(usdk_address());
+        assert!(signer::address_of(denylister) == roles.denylister, EUNAUTHORIZED);
+        let freeze_ref = &borrow_global<Management>(usdk_address()).transfer_ref;
+        fungible_asset::set_frozen_flag(freeze_ref, store, true);
+    }
+
     /// Add a new minter. This checks that the caller is the master minter and the account is not already a minter.
     public entry fun add_minter(admin: &signer, minter: address) acquires Roles, State {
         assert_not_paused();
@@ -323,6 +333,10 @@ module stablecoin::usdk {
     fun assert_not_paused() acquires State {
         let state = borrow_global<State>(usdk_address());
         assert!(!state.paused, EPAUSED);
+    }
+
+    fun assert_store_not_frozen<T: key>(store: Object<T>) {
+        assert!(!fungible_asset::is_frozen(store), EDENYLISTED);
     }
 
     // Check that the account is not denylisted by checking the frozen flag on the primary store
