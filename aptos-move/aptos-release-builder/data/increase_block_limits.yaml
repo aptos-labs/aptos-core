@@ -1,0 +1,27 @@
+---
+remote_endpoint: ~
+name: "increase block limits"
+proposals:
+  - name: increase_block_limits
+    metadata:
+      title: "AIP-74: Increase block gas limit to account for concurrency increase"
+      description: "AIP-74: Increase block gas limit to account for concurrency increase"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/375" 
+    execution_mode: MultiStep
+    update_sequence:
+      - Execution:  
+          V4:  
+            transaction_shuffler_type:  
+              sender_aware_v2: 32  
+            block_gas_limit_type: 
+              complex_limit_v1:  
+                effective_block_gas_limit: 30000  
+                execution_gas_effective_multiplier: 1  
+                io_gas_effective_multiplier: 1  
+                conflict_penalty_window: 9  
+                use_granular_resource_group_conflicts: false  
+                use_module_publishing_block_conflict: true  
+                block_output_limit: 5242880
+                include_user_txn_size_in_block_output: true  
+                add_block_limit_outcome_onchain: false
+            transaction_deduper_type: txn_hash_and_authenticator_v1
