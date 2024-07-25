@@ -37,7 +37,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn recover_from_ledger(&self) -> LedgerRecoveryData;
 
     /// Construct necessary data to start consensus.
-    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData;
+    fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData;
 
     /// Persist the highest 2chain timeout certificate for improved liveness - proof for other replicas
     /// to jump to this round
@@ -133,6 +133,7 @@ impl LedgerRecoveryData {
             .iter()
             .position(|block| block.id() == root_id)
             .ok_or_else(|| format_err!("unable to find root: {}", root_id))?;
+        // TODO: note, we probably have to remove the remove here.
         let root_block = blocks.remove(root_idx);
         let root_quorum_cert = quorum_certs
             .iter()
@@ -227,6 +228,7 @@ impl RecoveryData {
         mut quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
         order_vote_enabled: bool,
+        window_size: usize,
     ) -> Result<Self> {
         let root = ledger_recovery_data
             .find_root(&mut blocks, &mut quorum_certs, order_vote_enabled)
@@ -250,11 +252,15 @@ impl RecoveryData {
                 )
             })?;
 
+        // TODO: currently we are pruning, but need to do so respecting the window size
         let blocks_to_prune = Some(Self::find_blocks_to_prune(
             root.0.id(),
             &mut blocks,
             &mut quorum_certs,
         ));
+        // TODO: use window_size
+        info!("window_size: {}", window_size);
+        info!("Blocks to prune: {:?}", blocks_to_prune);
         let epoch = root.0.epoch();
         Ok(RecoveryData {
             last_vote: match last_vote {
@@ -371,7 +377,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         LedgerRecoveryData::new(latest_ledger_info)
     }
 
-    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData {
+    fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData {
         info!("Start consensus recovery.");
         let raw_data = self
             .db
@@ -419,6 +425,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             quorum_certs,
             highest_2chain_timeout_cert,
             order_vote_enabled,
+            window_size,
         ) {
             Ok(mut initial_data) => {
                 (self as &dyn PersistentLivenessStorage)

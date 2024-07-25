@@ -1232,7 +1232,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
-        match self.storage.start(consensus_config.order_vote_enabled()) {
+        match self.storage.start(
+            consensus_config.order_vote_enabled(),
+            consensus_config.window_size(),
+        ) {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 self.recovery_mode = false;
                 self.start_round_manager(

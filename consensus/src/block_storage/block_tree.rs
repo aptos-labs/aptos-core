@@ -170,6 +170,7 @@ impl BlockTree {
     }
 
     fn remove_block(&mut self, block_id: HashValue) {
+        info!("remove_block: {}", block_id);
         // Remove the block from the store
         self.id_to_block.remove(&block_id);
         self.id_to_quorum_cert.remove(&block_id);
@@ -230,46 +231,57 @@ impl BlockTree {
     // TODO: return an error when not enough blocks?
     // TODO: how to know if the window is complete?
     pub fn get_block_window(&self, block: &Block) -> Option<OrderedBlockWindow> {
+        // TODO: any other special cases that need to always have an empty window?
+        if block.is_nil_block() {
+            return Some(OrderedBlockWindow::new(vec![]));
+        }
+
         let min_round = (block.round() + 1).saturating_sub(self.window_size as u64);
         let window_size = (block.round() + 1) - min_round;
         assert!(window_size > 0, "window_size must be greater than 0");
-        match self.get_block(&block.parent_id()) {
-            // TODO: something cleaner?
-            None => {
-                if window_size == 1 {
-                    Some(OrderedBlockWindow::new(vec![]))
-                } else {
-                    None
-                }
-            },
-            Some(parent_block) => {
-                let mut current_block = &parent_block;
-                let mut block_window = vec![];
-                let mut reached_root = false;
-                for _ in 1..window_size {
-                    if current_block.parent_id() == HashValue::zero() {
-                        reached_root = true;
-                    }
-                    if current_block.round() < min_round {
-                        break;
-                    }
-                    info!(
-                        "current_block: {}, parent_block: {}, reached_root: {}",
-                        current_block.id(),
-                        current_block.parent_id(),
-                        reached_root
-                    );
-                    current_block = match self.get_linkable_block(&current_block.parent_id()) {
-                        Some(parent_block) => {
-                            block_window.push(parent_block.executed_block().block().clone());
-                            parent_block.executed_block()
-                        },
-                        None => break,
-                    };
-                }
-                Some(OrderedBlockWindow::new(block_window))
-            },
+        if window_size == 1 {
+            return Some(OrderedBlockWindow::new(vec![]));
         }
+
+        let mut window = vec![];
+        let mut current_block = block.clone();
+        loop {
+            if current_block.parent_id() == HashValue::zero() {
+                info!(
+                    "Break at block: {}, for window of block: {}",
+                    current_block, block
+                );
+                break;
+            }
+            if let Some(parent_block) = self.get_block(&current_block.parent_id()) {
+                current_block = parent_block.block().clone();
+                info!(
+                    "Visiting block: {}, for window of block: {}",
+                    current_block, block
+                );
+                if current_block.round() < min_round {
+                    info!(
+                        "Break at block: {}, for window of block: {}",
+                        current_block, block
+                    );
+                    break;
+                }
+                info!(
+                    "Added block: {}, for window of block: {}",
+                    current_block, block
+                );
+                window.push(current_block.clone());
+            } else {
+                panic!(
+                    "Visiting block: {} was not found, parent of block: {}, for window of block: {}",
+                    current_block.parent_id(),
+                    current_block,
+                    block
+                );
+            }
+        }
+        assert!(window.len() <= window_size as usize - 1);
+        Some(OrderedBlockWindow::new(window))
     }
 
     pub(super) fn insert_block(
@@ -517,6 +529,7 @@ impl BlockTree {
                 .saturating_add(1)
                 .saturating_sub(self.window_size as u64),
         );
+        info!("Pruning blocks: {:?}", ids_to_remove);
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with

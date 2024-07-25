@@ -46,7 +46,12 @@ use fail::fail_point;
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_channel::oneshot;
 use rand::{prelude::*, Rng};
-use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
+use std::{
+    clone::Clone,
+    cmp::{max, min},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{time, time::timeout};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -311,10 +316,14 @@ impl BlockStore {
         // For execution, we need the window starting from the highest_commit_cert + 1.
         // TODO: what happens cross-epoch?
         let highest_commit_cert_round = highest_commit_cert.ledger_info().ledger_info().round();
-        let target_round = min(
-            highest_commit_cert_round,
-            // commit_cert + 1 - (window_size - 1)
-            highest_commit_cert_round.saturating_sub(window_size as u64),
+        // TODO: we should not retrieve genesis, double check this is the right way to do that
+        let target_round = max(
+            1,
+            min(
+                highest_commit_cert_round,
+                // commit_cert + 1 - (window_size - 1)
+                highest_commit_cert_round.saturating_sub(window_size as u64),
+            ),
         );
 
         let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
@@ -454,7 +463,7 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data = match storage.start(order_vote_enabled) {
+        let recovery_data = match storage.start(order_vote_enabled, window_size) {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Failed to construct recovery data after fast forward sync"),
         };
