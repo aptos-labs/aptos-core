@@ -323,11 +323,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 shard_txns_start_index as TxnIndex,
                 stream_results_tx.clone(),
             );
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            info!("Block STM ended at time {}", curr_time);
             drop(state_view);
             drop(exe_timer);
 
             self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
-            self.coordinator_client.lock().unwrap().stream_execution_result(vec![]);
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             info!("Processed block at time {}", curr_time);
 
@@ -360,6 +361,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 .start_timer();
             // clearing the state value
             self.coordinator_client.lock().unwrap().reset_state_view();
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            info!("Finished block at time {}", curr_time);
             if (i % 50 == 49) {
                 let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
                     .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
