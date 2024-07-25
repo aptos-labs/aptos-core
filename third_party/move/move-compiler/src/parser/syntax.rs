@@ -321,7 +321,14 @@ fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Bo
     {
         return Err(unexpected_token_error(
             context.tokens,
-            "an identifier or an anonymous field `0`, `1`, ...",
+            &format!(
+                "an identifier {}",
+                if context.env.flags().lang_v2() {
+                    " or an anonymous field `0`, `1`, ..."
+                } else {
+                    ""
+                }
+            ),
         ));
     }
     let is_anonymous_field = context.tokens.peek() == Tok::NumValue;
