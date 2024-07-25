@@ -234,31 +234,12 @@ impl PrioritizedPeersState {
             .collect()
     }
 
-    /// Updates the prioritized peers list
-    pub fn update_prioritized_peers(
+    pub fn update_sender_bucket_for_peers(
         &mut self,
-        peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
+        peer_monitoring_data: &HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>>,
     ) {
-        let peer_monitoring_data: HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>> =
-            peers_and_metadata.clone().into_iter().collect();
+        let old_peer_to_sender_buckets = self.peer_to_sender_buckets.clone();
 
-        // Calculate the new set of prioritized peers
-        let new_prioritized_peers = self.sort_peers_by_priority(&peers_and_metadata);
-
-        // Update the prioritized peer metrics
-        self.update_prioritized_peer_metrics(&new_prioritized_peers);
-
-        // Update the prioritized peers
-        *self.prioritized_peers.write() = new_prioritized_peers;
-
-        // Check if we've now observed ping latencies for all peers
-        if !self.observed_all_ping_latencies {
-            self.observed_all_ping_latencies = peers_and_metadata
-                .iter()
-                .all(|(_, metadata)| get_peer_ping_latency(metadata).is_some());
-        }
-
-        // Divide the sender buckets amongst the top peers
         self.peer_to_sender_buckets = HashMap::new();
         if !self.prioritized_peers.read().is_empty() {
             let mut peer_index = 0;
@@ -311,7 +292,37 @@ impl PrioritizedPeersState {
                     }
                 }
             }
+
+            info!("Old peer to sender buckets: {:?}, New peer to sender buckets: {:?}, Peer monitoring data {:?}", old_peer_to_sender_buckets, self.peer_to_sender_buckets, peer_monitoring_data);
         }
+    }
+
+    /// Updates the prioritized peers list
+    pub fn update_prioritized_peers(
+        &mut self,
+        peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
+    ) {
+        let peer_monitoring_data: HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>> =
+            peers_and_metadata.clone().into_iter().collect();
+
+        // Calculate the new set of prioritized peers
+        let new_prioritized_peers = self.sort_peers_by_priority(&peers_and_metadata);
+
+        // Update the prioritized peer metrics
+        self.update_prioritized_peer_metrics(&new_prioritized_peers);
+
+        // Update the prioritized peers
+        *self.prioritized_peers.write() = new_prioritized_peers;
+
+        // Check if we've now observed ping latencies for all peers
+        if !self.observed_all_ping_latencies {
+            self.observed_all_ping_latencies = peers_and_metadata
+                .iter()
+                .all(|(_, metadata)| get_peer_ping_latency(metadata).is_some());
+        }
+
+        // Divide the sender buckets amongst the top peers
+        self.update_sender_bucket_for_peers(&peer_monitoring_data);
 
         // Set the last peer priority update time
         self.last_peer_priority_update = Some(self.time_service.now());
