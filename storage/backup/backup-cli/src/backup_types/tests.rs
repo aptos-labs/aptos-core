@@ -41,7 +41,7 @@ struct TestData {
 
 fn test_data_strategy() -> impl Strategy<Value = TestData> {
     let db = test_execution_with_storage_impl();
-    let latest_ver = db.get_synced_version().unwrap();
+    let latest_ver = db.expect_synced_version();
 
     let latest_epoch_state = db.get_latest_epoch_state().unwrap();
     let epoch_ending_lis = db
