@@ -367,6 +367,16 @@ pub static PROPOSER_PENDING_BLOCKS_FILL_FRACTION: Lazy<Gauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for max number of transactions calibrated block should have, based on the proposer
+pub static PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_estimated_calibrated_block_txns",
+        "Histogram for max number of transactions calibrated block should have, based on the proposer",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 /// Next set of counters are computed at leader election time, with some delay.
 
 /// Current voting power fraction that participated in consensus
