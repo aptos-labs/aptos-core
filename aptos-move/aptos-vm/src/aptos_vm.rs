@@ -61,7 +61,7 @@ use aptos_types::{
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignedTransaction, Transaction,
+        MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
@@ -712,6 +712,19 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         script: &Script,
     ) -> Result<(), VMStatus> {
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
+        {
+            for arg in script.args() {
+                if let TransactionArgument::Serialized(_) = arg {
+                    return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
+                        .finish(Location::Script)
+                        .into_vm_status());
+                }
+            }
+        }
+
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
@@ -2601,6 +2614,19 @@ impl VMValidator for AptosVM {
                 }
             } else {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            }
+        }
+
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
+        {
+            if let TransactionPayload::Script(script) = transaction.payload() {
+                for arg in script.args() {
+                    if let TransactionArgument::Serialized(_) = arg {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
             }
         }
 
