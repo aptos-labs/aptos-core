@@ -2529,13 +2529,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         // Process argument list
         let mut args = BTreeMap::new();
-        let (field_decls, _is_positional) = self
-            .get_field_decls_for_pack_unpack(
-                &struct_entry,
-                &struct_name,
-                &struct_name_loc,
-                variant,
-            )?;
+        let (field_decls, _is_positional) = self.get_field_decls_for_pack_unpack(
+            &struct_entry,
+            &struct_name,
+            &struct_name_loc,
+            variant,
+        )?;
         let field_decls = field_decls.clone();
         if let Some(fields) = fields {
             // Check whether all fields are covered.
@@ -4317,13 +4316,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // is equivalent.
         let mut bindings = BTreeMap::new();
         let mut args = BTreeMap::new();
-        let (field_decls, is_positional_constructor) = self
-            .get_field_decls_for_pack_unpack(
-                &struct_entry,
-                &struct_name,
-                &struct_name_loc,
-                variant,
-            )?;
+        let (field_decls, is_positional_constructor) = self.get_field_decls_for_pack_unpack(
+            &struct_entry,
+            &struct_name,
+            &struct_name_loc,
+            variant,
+        )?;
         let field_decls = field_decls.clone();
         if is_positional_constructor != expected_positional_constructor {
             let struct_name_display = struct_name.display(self.env());
@@ -4477,7 +4475,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         variant: Option<Symbol>,
     ) -> Option<(&BTreeMap<Symbol, FieldData>, bool)> {
         match (&s.layout, variant) {
-            (StructLayout::Singleton(fields, is_positional), None) => Some((fields, *is_positional)),
+            (StructLayout::Singleton(fields, is_positional), None) => {
+                Some((fields, *is_positional))
+            },
             (StructLayout::Variants(variants), Some(name)) => {
                 if let Some(variant) = variants.iter().find(|v| v.name == name) {
                     Some((&variant.fields, variant.is_positional))

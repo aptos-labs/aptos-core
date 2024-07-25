@@ -1221,7 +1221,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             EA::StructLayout::Singleton(fields, is_positional) => {
                 let (map, is_struct_empty) =
                     Self::build_field_map(&mut et, None, struct_abilities, &loc, fields);
-                (StructLayout::Singleton(map, *is_positional), is_struct_empty)
+                (
+                    StructLayout::Singleton(map, *is_positional),
+                    is_struct_empty,
+                )
             },
             EA::StructLayout::Variants(variants) => {
                 let mut variant_maps = variants
