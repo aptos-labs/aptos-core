@@ -30,6 +30,10 @@ static WARM_VM_CACHE: Lazy<WarmVmCache> = Lazy::new(|| WarmVmCache {
     cache: RwLock::new(HashMap::new()),
 });
 
+pub fn flush_warm_vm_cache() {
+    WARM_VM_CACHE.cache.write().clear();
+}
+
 impl WarmVmCache {
     pub(crate) fn get_warm_vm(
         native_builder: SafeNativeBuilder,

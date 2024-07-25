@@ -21,6 +21,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, vm_status::StatusCode,
 };
 pub use session::session_id::SessionId;
+pub use warm_vm_cache::flush_warm_vm_cache;
 
 pub(crate) fn resource_state_key(
     address: &AccountAddress,
