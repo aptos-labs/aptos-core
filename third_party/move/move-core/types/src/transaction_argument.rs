@@ -19,6 +19,7 @@ pub enum TransactionArgument {
     U16(u16),
     U32(u32),
     U256(u256::U256),
+    // Note: Gated by feature flag ALLOW_SERIALIZED_SCRIPT_ARGS
     Serialized(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
