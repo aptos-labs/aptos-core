@@ -495,7 +495,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                 transactions: transactions.into_iter().map(|(txn, _)| txn).collect(),
             }
         };
-        info!("send_batch_to_peer: peer: {}, batch_id: {:?}, transactions.len(): {}, priority: {}", peer, batch_id, transactions.len(), self.check_peer_prioritized(peer));
+        info!("send_batch_to_peer: peer: {}, batch_id: {:?}, transactions.len(): {}, priority: {:?}", peer, batch_id, transactions.len(), self.check_peer_prioritized(peer));
         if let Err(e) = self.network_client.send_to_peer(request, peer) {
             counters::network_send_fail_inc(counters::BROADCAST_TXNS);
             return Err(BroadcastError::NetworkError(peer, e.into()));
