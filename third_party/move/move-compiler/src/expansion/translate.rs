@@ -1424,8 +1424,8 @@ fn struct_layout(
 ) -> E::StructLayout {
     match parsed_layout {
         P::StructLayout::Native(loc) => E::StructLayout::Native(loc),
-        P::StructLayout::Singleton(fields) => {
-            E::StructLayout::Singleton(struct_fields(context, fields))
+        P::StructLayout::Singleton(fields, is_positional) => {
+            E::StructLayout::Singleton(struct_fields(context, fields), is_positional)
         },
         P::StructLayout::Variants(variants) => {
             let mut previous_variants = BTreeMap::new();
@@ -1461,6 +1461,7 @@ fn struct_layout(
                             loc: v.loc,
                             name: v.name,
                             fields: struct_fields(context, v.fields),
+                            is_positional: v.is_positional,
                         }
                     })
                     .collect(),

@@ -678,7 +678,7 @@ fn struct_def(
 fn struct_fields(context: &mut Context, _loc: Loc, elayout: E::StructLayout) -> N::StructFields {
     match elayout {
         E::StructLayout::Native(loc) => N::StructFields::Native(loc),
-        E::StructLayout::Singleton(em) => {
+        E::StructLayout::Singleton(em, _) => {
             N::StructFields::Defined(em.map(|_f, (idx, t)| (idx, type_(context, t))))
         },
         E::StructLayout::Variants(_) => {

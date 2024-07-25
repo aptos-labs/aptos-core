@@ -133,7 +133,7 @@ pub(crate) struct StructEntry {
 
 #[derive(Debug, Clone)]
 pub(crate) enum StructLayout {
-    Singleton(BTreeMap<Symbol, FieldData>),
+    Singleton(BTreeMap<Symbol, FieldData>, bool),
     Variants(Vec<StructVariant>),
     None,
 }
@@ -144,6 +144,7 @@ pub(crate) struct StructVariant {
     pub name: Symbol,
     pub attributes: Vec<Attribute>,
     pub fields: BTreeMap<Symbol, FieldData>,
+    pub is_positional: bool,
 }
 
 /// A declaration of a function.
@@ -557,7 +558,7 @@ impl<'env> ModelBuilder<'env> {
                 .collect()
         };
         match &entry.layout {
-            StructLayout::Singleton(fields) => (instantiate_fields(fields, false), false),
+            StructLayout::Singleton(fields, _) => (instantiate_fields(fields, false), false),
             StructLayout::Variants(variants) => (
                 if variants.is_empty() {
                     BTreeMap::new()

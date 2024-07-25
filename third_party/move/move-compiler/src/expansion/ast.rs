@@ -172,7 +172,8 @@ pub struct StructDefinition {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructLayout {
-    Singleton(Fields<Type>),
+    // the second field is true iff the struct has positional fields
+    Singleton(Fields<Type>, bool),
     Variants(Vec<StructVariant>),
     Native(Loc),
 }
@@ -183,6 +184,7 @@ pub struct StructVariant {
     pub loc: Loc,
     pub name: VariantName,
     pub fields: Fields<Type>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -1101,7 +1103,7 @@ impl AstDebug for (StructName, &StructDefinition) {
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
-        if let StructLayout::Singleton(fields) = fields {
+        if let StructLayout::Singleton(fields, _) = fields {
             w.block(|w| {
                 w.list(fields, ",", |w, (_, f, idx_st)| {
                     let (idx, st) = idx_st;

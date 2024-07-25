@@ -2741,23 +2741,26 @@ fn parse_struct_decl(
                 consume_token(context.tokens, Tok::RBrace)?;
                 StructLayout::Variants(list)
             } else {
-                let list = if context.tokens.peek() == Tok::LParen {
+                let (list, is_positional) = if context.tokens.peek() == Tok::LParen {
                     let loc = current_token_loc(context.tokens);
                     require_move_2(context, loc, "anonymous fields");
                     let list = parse_anonymous_fields(context)?;
                     abilities = parse_abilities(context)?;
                     consume_token(context.tokens, Tok::Semicolon)?;
-                    list
+                    (list, true)
                 } else {
-                    parse_comma_list(
-                        context,
-                        Tok::LBrace,
-                        Tok::RBrace,
-                        parse_field_annot,
-                        "a field",
-                    )?
+                    (
+                        parse_comma_list(
+                            context,
+                            Tok::LBrace,
+                            Tok::RBrace,
+                            parse_field_annot,
+                            "a field",
+                        )?,
+                        false,
+                    )
                 };
-                StructLayout::Singleton(list)
+                StructLayout::Singleton(list, is_positional)
             }
         },
     };
@@ -2812,7 +2815,7 @@ fn parse_struct_variant(context: &mut Context) -> Result<(StructVariant, bool), 
     let attributes = parse_attributes(context)?;
     context.tokens.match_doc_comments();
     let name = VariantName(parse_identifier(context)?);
-    let (fields, has_block) = if context.tokens.peek() == Tok::LBrace {
+    let (fields, has_block, is_positional) = if context.tokens.peek() == Tok::LBrace {
         (
             parse_comma_list(
                 context,
@@ -2822,13 +2825,14 @@ fn parse_struct_variant(context: &mut Context) -> Result<(StructVariant, bool), 
                 "a field",
             )?,
             true,
+            false,
         )
     } else if context.tokens.peek() == Tok::LParen {
         let loc = current_token_loc(context.tokens);
         require_move_2(context, loc, "anonymous fields");
-        (parse_anonymous_fields(context)?, true)
+        (parse_anonymous_fields(context)?, true, true)
     } else {
-        (vec![], false)
+        (vec![], false, false)
     };
     let loc = make_loc(
         context.tokens.file_hash(),
@@ -2841,6 +2845,7 @@ fn parse_struct_variant(context: &mut Context) -> Result<(StructVariant, bool), 
             loc,
             name,
             fields,
+            is_positional,
         },
         has_block,
     ))

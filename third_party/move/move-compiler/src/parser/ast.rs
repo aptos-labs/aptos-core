@@ -222,7 +222,8 @@ pub struct StructDefinition {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructLayout {
-    Singleton(Vec<(Field, Type)>),
+    // the second field is true iff the struct has positional fields
+    Singleton(Vec<(Field, Type)>, bool),
     Variants(Vec<StructVariant>),
     Native(Loc),
 }
@@ -233,6 +234,7 @@ pub struct StructVariant {
     pub loc: Loc,
     pub name: VariantName,
     pub fields: Vec<(Field, Type)>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -1315,7 +1317,7 @@ impl AstDebug for StructDefinition {
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         match layout {
-            StructLayout::Singleton(fields) => w.block(|w| {
+            StructLayout::Singleton(fields, _) => w.block(|w| {
                 w.semicolon(fields, |w, (f, st)| {
                     w.write(&format!("{}: ", f));
                     st.ast_debug(w);

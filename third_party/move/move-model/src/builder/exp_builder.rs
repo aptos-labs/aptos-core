@@ -1499,6 +1499,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Some(fields),
                     expected_type,
                     context,
+                    false,
                 ) {
                     exp
                 } else {
@@ -2528,14 +2529,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         // Process argument list
         let mut args = BTreeMap::new();
-        let field_decls = self
+        let (field_decls, _is_positional) = self
             .get_field_decls_for_pack_unpack(
                 &struct_entry,
                 &struct_name,
                 &struct_name_loc,
                 variant,
-            )?
-            .clone();
+            )?;
+        let field_decls = field_decls.clone();
         if let Some(fields) = fields {
             // Check whether all fields are covered.
             self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
@@ -2855,6 +2856,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Some(&fields),
                     expected_type,
                     context,
+                    true,
                 )
                 .or_else(|| Some(self.new_error_exp()));
         }
@@ -4281,6 +4283,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         fields: Option<&EA::Fields<EA::Exp>>,
         expected_type: &Type,
         context: &ErrorMessageContext,
+        expected_positional_constructor: bool,
     ) -> Option<ExpData> {
         // Resolve reference to struct
         let (struct_name, variant) = self.parent.module_access_to_qualified_with_variant(maccess);
@@ -4314,14 +4317,30 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // is equivalent.
         let mut bindings = BTreeMap::new();
         let mut args = BTreeMap::new();
-        let field_decls = self
+        let (field_decls, is_positional_constructor) = self
             .get_field_decls_for_pack_unpack(
                 &struct_entry,
                 &struct_name,
                 &struct_name_loc,
                 variant,
-            )?
-            .clone();
+            )?;
+        let field_decls = field_decls.clone();
+        if is_positional_constructor != expected_positional_constructor {
+            let struct_name_display = struct_name.display(self.env());
+            self.error(
+                loc,
+                &format!(
+                    "expected {} for struct constructor `{}`",
+                    if is_positional_constructor {
+                        format!("positional constructor `{}( ... )`", struct_name_display)
+                    } else {
+                        format!("struct constructor `{}{{ ... }}`", struct_name_display)
+                    },
+                    struct_name_display
+                ),
+            );
+            return None;
+        }
         if let Some(fields) = fields {
             self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
             let in_order_fields = self.in_order_fields(&field_decls, fields);
@@ -4439,7 +4458,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     ),
                 )
             },
-            StructLayout::Singleton(_) | StructLayout::None => self.error(
+            StructLayout::Singleton(..) | StructLayout::None => self.error(
                 loc,
                 &format!(
                     "struct `{}` has no variants",
@@ -4456,12 +4475,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         struct_name: &QualifiedSymbol,
         struct_name_loc: &Loc,
         variant: Option<Symbol>,
-    ) -> Option<&BTreeMap<Symbol, FieldData>> {
+    ) -> Option<(&BTreeMap<Symbol, FieldData>, bool)> {
         match (&s.layout, variant) {
-            (StructLayout::Singleton(fields), None) => Some(fields),
+            (StructLayout::Singleton(fields, is_positional), None) => Some((fields, *is_positional)),
             (StructLayout::Variants(variants), Some(name)) => {
                 if let Some(variant) = variants.iter().find(|v| v.name == name) {
-                    Some(&variant.fields)
+                    Some((&variant.fields, variant.is_positional))
                 } else {
                     self.error(
                         struct_name_loc,
