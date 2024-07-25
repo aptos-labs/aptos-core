@@ -199,11 +199,8 @@ impl PipelineBackpressureConfig {
                 .collect::<Vec<_>>();
             info!("Estimated block back-offs block sizes: {:?}", sizes);
             if sizes.len() >= config.min_blocks_to_activate {
-                Some(
-                    *sizes
-                        .get((config.percentile * sizes.len() as f64) as usize)
-                        .unwrap(),
-                )
+                let index = (config.percentile * sizes.len() as f64) as usize;
+                sizes.get(index).copied()
             } else {
                 None
             }
