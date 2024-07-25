@@ -1,6 +1,6 @@
 /// This module provides the foundation for typesafe Coins.
 module supra_framework::coin {
-    use std::string;
+    use std::string::{Self,String};
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
@@ -12,7 +12,7 @@ module supra_framework::coin {
     use supra_framework::optional_aggregator::{Self, OptionalAggregator};
     use supra_framework::system_addresses;
 
-    use aptos_std::type_info;
+    use aptos_std::type_info::{Self,type_name};
 
 	friend supra_framework::supra_coin;
     friend supra_framework::genesis;
@@ -92,8 +92,8 @@ module supra_framework::coin {
     struct CoinStore<phantom CoinType> has key {
         coin: Coin<CoinType>,
         frozen: bool,
-        deposit_events: EventHandle<DepositEvent>,
-        withdraw_events: EventHandle<WithdrawEvent>,
+        deposit_events: EventHandle<CoinDeposit>,
+        withdraw_events: EventHandle<CoinWithdraw>,
     }
 
     /// Maximum possible coin supply.
@@ -120,12 +120,16 @@ module supra_framework::coin {
     }
 
     /// Event emitted when some amount of a coin is deposited into an account.
-    struct DepositEvent has drop, store {
+    struct CoinDeposit has drop, store {
+		coin_type: String,
+		account: address,
         amount: u64,
     }
 
     /// Event emitted when some amount of a coin is withdrawn from an account.
-    struct WithdrawEvent has drop, store {
+    struct CoinWithdraw has drop, store {
+		coin_type: String,
+		account: address,
         amount: u64,
     }
 
@@ -358,16 +362,16 @@ module supra_framework::coin {
             error::permission_denied(EFROZEN),
         );
 
-        event::emit_event<DepositEvent>(
+        event::emit_event<CoinDeposit>(
             &mut coin_store.deposit_events,
-            DepositEvent { amount: coin.value },
+            CoinDeposit { coin_type: type_name<CoinType>(), account: account_addr, amount: coin.value, },
         );
 
         merge(&mut coin_store.coin, coin);
     }
 
     /// Deposit the coin balance into the recipient's account without checking if the account is frozen.
-    /// This is for internal use only and doesn't emit an DepositEvent.
+    /// This is for internal use only and doesn't emit an CoinDeposit.
     public(friend) fun force_deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) acquires CoinStore {
         assert!(
             is_account_registered<CoinType>(account_addr),
@@ -629,8 +633,8 @@ module supra_framework::coin {
         let coin_store = CoinStore<CoinType> {
             coin: Coin { value: 0 },
             frozen: false,
-            deposit_events: account::new_event_handle<DepositEvent>(account),
-            withdraw_events: account::new_event_handle<WithdrawEvent>(account),
+            deposit_events: account::new_event_handle<CoinDeposit>(account),
+            withdraw_events: account::new_event_handle<CoinWithdraw>(account),
         };
         move_to(account, coin_store);
     }
@@ -667,9 +671,9 @@ module supra_framework::coin {
             error::permission_denied(EFROZEN),
         );
 
-        event::emit_event<WithdrawEvent>(
+        event::emit_event<CoinWithdraw>(
             &mut coin_store.withdraw_events,
-            WithdrawEvent { amount },
+            CoinWithdraw { coin_type: type_name<CoinType>(), account: account_addr, amount },
         );
 
         extract(&mut coin_store.coin, amount)
