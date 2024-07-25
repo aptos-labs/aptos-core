@@ -1517,7 +1517,6 @@ impl AptosVM {
                     gas_meter,
                     Compatibility::new(
                         true,
-                        true,
                         !self
                             .features()
                             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
