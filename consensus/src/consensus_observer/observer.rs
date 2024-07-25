@@ -16,18 +16,19 @@ use crate::{
         payload_store::BlockPayloadStore,
         pending_blocks::PendingBlockStore,
         publisher::ConsensusPublisher,
-        subscription,
-        subscription::ConsensusObserverSubscription,
+        subscription::{self, ConsensusObserverSubscription},
     },
     dag::DagCommitSigner,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
     network_interface::CommitMessage,
-    payload_manager::PayloadManager,
+    payload_manager::{
+        ConsensusObserverPayloadManager, DirectMempoolPayloadManager, TPayloadManager,
+    },
     pipeline::execution_client::TExecutionClient,
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use aptos_config::{config::NodeConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::{pipeline, pipelined_block::PipelinedBlock};
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
@@ -46,7 +47,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
-        RandomnessConfigMoveStruct, ValidatorSet,
+        RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
     validator_signer::ValidatorSigner,
 };
@@ -65,8 +66,8 @@ const LOG_MESSAGES_AT_INFO_LEVEL: bool = true;
 
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
-    // The configuration of the consensus observer
-    consensus_observer_config: ConsensusObserverConfig,
+    // The configuration of the node
+    node_config: NodeConfig,
     // The consensus observer client to send network messages
     consensus_observer_client:
         Arc<ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>>,
@@ -107,7 +108,7 @@ pub struct ConsensusObserver {
 
 impl ConsensusObserver {
     pub fn new(
-        consensus_observer_config: ConsensusObserverConfig,
+        node_config: NodeConfig,
         consensus_observer_client: Arc<
             ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
         >,
@@ -123,8 +124,12 @@ impl ConsensusObserver {
             .get_latest_ledger_info()
             .expect("Failed to read latest ledger info!");
 
+        // Get the consensus observer config
+        let consensus_observer_config = node_config.consensus_observer;
+
+        // Create the consensus observer
         Self {
-            consensus_observer_config,
+            node_config,
             consensus_observer_client,
             epoch_state: None,
             quorum_store_enabled: false, // Updated on epoch changes
@@ -350,13 +355,13 @@ impl ConsensusObserver {
             // Send a subscription request to the peer and wait for the response.
             // Note: it is fine to block here because we assume only a single active subscription.
             let subscription_request = ConsensusObserverRequest::Subscribe;
+            let request_timeout_ms = self
+                .node_config
+                .consensus_observer
+                .network_request_timeout_ms;
             let response = self
                 .consensus_observer_client
-                .send_rpc_request_to_peer(
-                    selected_peer,
-                    subscription_request,
-                    self.consensus_observer_config.network_request_timeout_ms,
-                )
+                .send_rpc_request_to_peer(selected_peer, subscription_request, request_timeout_ms)
                 .await;
 
             // Process the response and update the active subscription
@@ -371,7 +376,7 @@ impl ConsensusObserver {
 
                     // Update the active subscription
                     let subscription = ConsensusObserverSubscription::new(
-                        self.consensus_observer_config,
+                        self.node_config.consensus_observer,
                         self.db_reader.clone(),
                         *selected_peer,
                         self.time_service.clone(),
@@ -994,7 +999,7 @@ impl ConsensusObserver {
         // Send an unsubscribe request to the peer and process the response.
         // Note: we execute this asynchronously, as we don't need to wait for the response.
         let consensus_observer_client = self.consensus_observer_client.clone();
-        let consensus_observer_config = self.consensus_observer_config;
+        let consensus_observer_config = self.node_config.consensus_observer;
         tokio::spawn(async move {
             // Send the unsubscribe request to the peer
             let unsubscribe_request = ConsensusObserverRequest::Unsubscribe;
@@ -1096,7 +1101,7 @@ impl ConsensusObserver {
         ) =
             &mut self.reconfig_events
         {
-            extract_on_chain_configs(reconfig_events).await
+            extract_on_chain_configs(&self.node_config, reconfig_events).await
         } else {
             panic!("Reconfig events are required to wait for a new epoch to start! Something has gone wrong!")
         };
@@ -1112,13 +1117,13 @@ impl ConsensusObserver {
         );
 
         // Create the payload manager
-        let payload_manager = if self.quorum_store_enabled {
-            PayloadManager::ConsensusObserver(
+        let payload_manager: Arc<dyn TPayloadManager> = if self.quorum_store_enabled {
+            Arc::new(ConsensusObserverPayloadManager::new(
                 self.block_payload_store.get_block_payloads(),
                 self.consensus_publisher.clone(),
-            )
+            ))
         } else {
-            PayloadManager::DirectMempool
+            Arc::new(DirectMempoolPayloadManager {})
         };
 
         // Start the new epoch
@@ -1133,7 +1138,7 @@ impl ConsensusObserver {
             .start_epoch(
                 epoch_state.clone(),
                 dummy_signer,
-                Arc::new(payload_manager),
+                payload_manager,
                 &consensus_config,
                 &execution_config,
                 &randomness_config,
@@ -1154,8 +1159,8 @@ impl ConsensusObserver {
     ) {
         // If the consensus publisher is enabled but the observer is disabled,
         // we should only forward incoming requests to the consensus publisher.
-        if self.consensus_observer_config.publisher_enabled
-            && !self.consensus_observer_config.observer_enabled
+        if self.node_config.consensus_observer.publisher_enabled
+            && !self.node_config.consensus_observer.observer_enabled
         {
             self.start_publisher_forwarding(&mut network_service_events)
                 .await;
@@ -1164,7 +1169,9 @@ impl ConsensusObserver {
 
         // Create a progress check ticker
         let mut progress_check_interval = IntervalStream::new(interval(Duration::from_millis(
-            self.consensus_observer_config.progress_check_interval_ms,
+            self.node_config
+                .consensus_observer
+                .progress_check_interval_ms,
         )))
         .fuse();
 
@@ -1270,6 +1277,7 @@ fn check_root_epoch_and_round(
 
 /// A simple helper function that extracts the on-chain configs from the reconfig events
 async fn extract_on_chain_configs(
+    node_config: &NodeConfig,
     reconfig_events: &mut ReconfigNotificationListener<DbBackedOnChainConfig>,
 ) -> (
     Arc<EpochState>,
@@ -1318,7 +1326,21 @@ async fn extract_on_chain_configs(
     let execution_config =
         onchain_execution_config.unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
 
-    // Extract the randomness config (or use the default if it's missing)
+    // Extract the randomness config sequence number (or use the default if it's missing)
+    let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
+        on_chain_configs.get();
+    if let Err(error) = &onchain_randomness_config_seq_num {
+        error!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Failed to read on-chain randomness config seq num! Error: {:?}",
+                error
+            ))
+        );
+    }
+    let onchain_randomness_config_seq_num = onchain_randomness_config_seq_num
+        .unwrap_or_else(|_| RandomnessConfigSeqNum::default_if_missing());
+
+    // Extract the randomness config
     let onchain_randomness_config: anyhow::Result<RandomnessConfigMoveStruct> =
         on_chain_configs.get();
     if let Err(error) = &onchain_randomness_config {
@@ -1329,9 +1351,11 @@ async fn extract_on_chain_configs(
             ))
         );
     }
-    let onchain_randomness_config = onchain_randomness_config
-        .and_then(OnChainRandomnessConfig::try_from)
-        .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
+    let onchain_randomness_config = OnChainRandomnessConfig::from_configs(
+        node_config.randomness_override_seq_num,
+        onchain_randomness_config_seq_num.seq_num,
+        onchain_randomness_config.ok(),
+    );
 
     // Return the extracted epoch state and on-chain configs
     (
@@ -1355,6 +1379,7 @@ fn log_received_message(message: String) {
 
 /// Spawns a task to sync to the given commit decision and notifies
 /// the consensus observer. Also, returns an abort handle to cancel the task.
+#[allow(clippy::unwrap_used)]
 fn sync_to_commit_decision(
     commit_decision: CommitDecision,
     decision_epoch: u64,

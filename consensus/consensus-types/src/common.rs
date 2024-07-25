@@ -169,6 +169,7 @@ impl ProofWithData {
         Self::new(vec![])
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn extend(&mut self, other: ProofWithData) {
         let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);
@@ -302,6 +303,29 @@ impl Payload {
                         .map(|(_, txns)| txns.len())
                         .sum::<usize>()
             },
+        }
+    }
+
+    pub fn len_for_execution(&self) -> u64 {
+        match self {
+            Payload::DirectMempool(txns) => txns.len() as u64,
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.len() as u64,
+            Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                // here we return the actual length of the payload; limit is considered at the stage
+                // where we prepare the block from the payload
+                (proof_with_status.proof_with_data.len() as u64)
+                    .min(proof_with_status.max_txns_to_execute.unwrap_or(u64::MAX))
+            },
+            Payload::QuorumStoreInlineHybrid(
+                inline_batches,
+                proof_with_data,
+                max_txns_to_execute,
+            ) => ((proof_with_data.len()
+                + inline_batches
+                    .iter()
+                    .map(|(_, txns)| txns.len())
+                    .sum::<usize>()) as u64)
+                .min(max_txns_to_execute.unwrap_or(u64::MAX)),
         }
     }
 

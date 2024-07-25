@@ -4,7 +4,7 @@
 
 mod index;
 mod mempool;
-mod transaction;
+pub mod transaction;
 mod transaction_store;
 
 #[cfg(test)]

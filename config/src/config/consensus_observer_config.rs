@@ -106,8 +106,9 @@ impl ConfigOptimizer for ConsensusObserverConfig {
             },
             NodeType::PublicFullnode => {
                 if ENABLE_ON_PUBLIC_FULLNODES && !observer_manually_set {
-                    // Only enable the observer for PFNs
+                    // Enable both the observer and the publisher for PFNs
                     consensus_observer_config.observer_enabled = true;
+                    consensus_observer_config.publisher_enabled = true;
                     modified_config = true;
                 }
             },

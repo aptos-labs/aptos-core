@@ -41,6 +41,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
 
 /// Helper function to start consensus based on configuration and return the runtime
+#[allow(clippy::unwrap_used)]
 pub fn start_consensus(
     node_config: &NodeConfig,
     network_client: NetworkClient<ConsensusMsg>,
@@ -195,7 +196,7 @@ pub fn start_consensus_observer(
     // Create the consensus observer
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let consensus_observer = ConsensusObserver::new(
-        node_config.consensus_observer,
+        node_config.clone(),
         consensus_observer_client,
         aptos_db.reader.clone(),
         execution_client,

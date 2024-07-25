@@ -70,6 +70,7 @@ impl From<serde_json::Error> for Error {
 }
 
 impl From<aptos_secure_net::Error> for Error {
+    #[allow(clippy::fallible_impl_from)]
     fn from(error: aptos_secure_net::Error) -> Self {
         Self::InternalError(error.to_string())
     }

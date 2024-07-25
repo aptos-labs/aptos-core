@@ -85,7 +85,8 @@ impl PendingOrderVotes {
                     );
                     return OrderVoteReceptionResult::UnknownAuthor(order_vote.author());
                 }
-                let validator_voting_power = validator_voting_power.unwrap();
+                let validator_voting_power =
+                    validator_voting_power.expect("Author must exist in the validator set.");
 
                 if validator_voting_power == 0 {
                     warn!(

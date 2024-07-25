@@ -109,6 +109,10 @@ pub trait Bytecode {
                     .map(|f| self.new_move_struct_field(f))
                     .collect(),
             ),
+            StructFieldInformation::DeclaredVariants(..) => {
+                // TODO(#13806): implement for enums. Currently we pretend they don't have fields
+                (false, vec![])
+            },
         };
         let name = self.identifier_at(handle.name).to_owned();
         let abilities = handle

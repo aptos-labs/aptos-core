@@ -60,7 +60,7 @@ impl GenesisMoveVM {
         );
 
         let vm = MoveVM::new_with_config(
-            aptos_natives_with_builder(&mut native_builder),
+            aptos_natives_with_builder(&mut native_builder, false),
             vm_config.clone(),
         );
 
@@ -105,6 +105,7 @@ impl MoveVmExt {
         gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
         gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
+        inject_create_signer_for_gov_sim: bool,
         resolver: &impl AptosMoveResolver,
     ) -> Self {
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
@@ -154,6 +155,7 @@ impl MoveVmExt {
                 vm_config,
                 resolver,
                 env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+                inject_create_signer_for_gov_sim,
             )
             .expect("should be able to create Move VM; check if there are duplicated natives"),
             env,
@@ -166,17 +168,25 @@ impl MoveVmExt {
         env: Arc<Environment>,
         resolver: &impl AptosMoveResolver,
     ) -> Self {
-        Self::new_impl(gas_feature_version, gas_params, env, None, resolver)
+        Self::new_impl(gas_feature_version, gas_params, env, None, false, resolver)
     }
 
-    pub fn new_with_gas_hook(
+    pub fn new_with_extended_options(
         gas_feature_version: u64,
         gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
         gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
+        inject_create_signer_for_gov_sim: bool,
         resolver: &impl AptosMoveResolver,
     ) -> Self {
-        Self::new_impl(gas_feature_version, gas_params, env, gas_hook, resolver)
+        Self::new_impl(
+            gas_feature_version,
+            gas_params,
+            env,
+            gas_hook,
+            inject_create_signer_for_gov_sim,
+            resolver,
+        )
     }
 
     pub fn new_session<'r, R: AptosMoveResolver>(
