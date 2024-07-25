@@ -937,6 +937,9 @@ TransactionArgument:
           TUPLEARRAY:
             CONTENT: U8
             SIZE: 32
+    9:
+      Serialized:
+        NEWTYPE: BYTES
 TransactionAuthenticator:
   ENUM:
     0:
