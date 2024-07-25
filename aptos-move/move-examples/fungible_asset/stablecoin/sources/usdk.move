@@ -195,7 +195,6 @@ module stablecoin::usdk {
     ) acquires State {
         assert_not_paused();
         assert_not_denylisted(object::owner(store));
-        assert_store_not_frozen(store);
         fungible_asset::deposit_with_ref(transfer_ref, store, fa);
     }
 
@@ -207,7 +206,6 @@ module stablecoin::usdk {
     ): FungibleAsset acquires State {
         assert_not_paused();
         assert_not_denylisted(object::owner(store));
-        assert_store_not_frozen(store);
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
@@ -333,10 +331,6 @@ module stablecoin::usdk {
     fun assert_not_paused() acquires State {
         let state = borrow_global<State>(usdk_address());
         assert!(!state.paused, EPAUSED);
-    }
-
-    fun assert_store_not_frozen<T: key>(store: Object<T>) {
-        assert!(!fungible_asset::is_frozen(store), EDENYLISTED);
     }
 
     // Check that the account is not denylisted by checking the frozen flag on the primary store

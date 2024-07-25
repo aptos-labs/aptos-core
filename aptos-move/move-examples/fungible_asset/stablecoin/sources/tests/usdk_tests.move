@@ -66,13 +66,13 @@ module stablecoin::usdk_tests {
     // Test freezing of a store
     #[test(creator = @0xcafe, denylister = @0xcade, denylisted = @0xdead, master_minter = @0xbab, minter = @0xface)]
     #[expected_failure(abort_code = 327683, location = aptos_framework::fungible_asset)]
-    fun test_freeze_store(creator: &signer, denylister: &signer, denylisted: &signer, master_minter: &signer, minter: &signer) {
+    fun test_freeze_store(creator: &signer, denylister: &signer, master_minter: &signer, minter: &signer) {
         usdk::init_for_test(creator);
         let rando = @0xdeadbeef;
         let rando_2 = @0xdeadbeef2;
         let asset = usdk::metadata();
 
-        // mint tokens to denylisted
+        // mint tokens to minter
         usdk::add_minter(master_minter, @0xface);
         usdk::mint(minter, @0xface, 100);
 
