@@ -101,6 +101,7 @@ async fn wait_for_account(client: &RestClient, address: AccountAddress) -> Resul
 }
 
 fn enable_internal_indexer(node_config: &mut NodeConfig) {
+    node_config.storage.rocksdb_configs.enable_storage_sharding = true;
     node_config.indexer_db_config.enable_event = true;
     node_config.indexer_db_config.enable_transaction = true;
     node_config.indexer_db_config.enable_statekeys = true;
@@ -173,18 +174,19 @@ async fn test_internal_indexer_with_fast_sync() {
 
 fn check_indexer_db(vfn_config: &NodeConfig) {
     let internal_indexer_db = InternalIndexerDBService::get_indexer_db(vfn_config).unwrap();
+    let opt = internal_indexer_db
+        .get_restore_version_and_progress()
+        .unwrap();
+    assert!(opt.is_some());
     let indexer_keys: HashSet<StateKey> = get_indexer_db_content::<StateKeysSchema, StateKey>(
-        internal_indexer_db.get_inner_db_clone().clone(),
+        internal_indexer_db.get_inner_db_clone(),
     );
-    println!("Total state keys:{}", indexer_keys.len());
-    assert!(!indexer_keys.is_empty());
-
-    // we expect the indexer pruner start working
     let meta_keys = get_indexer_db_content::<InternalIndexerMetadataSchema, MetadataKey>(
-        internal_indexer_db.get_inner_db_clone().clone(),
+        internal_indexer_db.get_inner_db_clone(),
     );
     assert!(meta_keys.contains(&MetadataKey::EventPrunerProgress));
     assert!(meta_keys.contains(&MetadataKey::TransactionPrunerProgress));
+    assert!(!indexer_keys.is_empty());
 }
 
 fn get_indexer_db_content<T, U>(internal_indexer_db: Arc<DB>) -> HashSet<U>

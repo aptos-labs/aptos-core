@@ -23,6 +23,7 @@ pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
 pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 
 // Core mempool stages labels
+pub const BROADCAST_RECEIVED_LABEL: &str = "broadcast_received";
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_ACCEPTED_BLOCK_LABEL: &str = "commit_accepted_block";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
@@ -190,9 +191,14 @@ pub fn core_mempool_txn_commit_latency(
     submitted_by: &'static str,
     bucket: &str,
     latency: Duration,
+    priority: &str,
 ) {
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
         .with_label_values(&[stage, submitted_by, bucket])
+        .observe(latency.as_secs_f64());
+
+    CORE_MEMPOOL_TXN_LATENCIES
+        .with_label_values(&[stage, submitted_by, bucket, priority])
         .observe(latency.as_secs_f64());
 }
 
@@ -203,6 +209,18 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
         &["stage", "submitted_by", "bucket"],
+        MEMPOOL_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Counter tracking latency of txns reaching various stages
+/// (e.g. time from txn entering core mempool to being pulled in consensus block)
+static CORE_MEMPOOL_TXN_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_core_mempool_txn_latencies",
+        "Latency of txn reaching various stages in mempool",
+        &["stage", "submitted_by", "bucket", "priority"],
         MEMPOOL_LATENCY_BUCKETS.to_vec()
     )
     .unwrap()

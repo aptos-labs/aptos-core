@@ -286,11 +286,19 @@ pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
-/// Counts when chain_health backoff is triggered
+/// Counts when pipeline backpressure is triggered
 pub static PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "aptos_pipeline_backpressure_on_proposal_triggered",
-        "Counts when chain_health backoff is triggered",
+        "Counts when pipeline backpressure is triggered",
+    )
+});
+
+/// Counts when execution backpressure is triggered
+pub static EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_execution_backpressure_on_proposal_triggered",
+        "Counts when execution backpressure is triggered",
     )
 });
 
@@ -314,12 +322,11 @@ pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<DurationHistogram> = Lazy::
 });
 
 /// Amount of time (in seconds) proposal is delayed due to backpressure/backoff
-pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
-    register_gauge!(
+pub static PROPOSER_DELAY_PROPOSAL: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "aptos_proposer_delay_proposal",
         "Amount of time (in seconds) proposal is delayed due to backpressure/backoff",
     )
-    .unwrap()
 });
 
 /// Histogram for max number of transactions (after filtering for dedup, expirations, etc) proposer uses when creating block.
@@ -327,16 +334,6 @@ pub static PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING: Lazy<Histogram> = Lazy::new(
     register_histogram!(
         "aptos_proposer_max_block_txns_after_filtering",
         "Histogram for max number of transactions (after filtering) proposer uses when creating block.",
-        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
-    )
-    .unwrap()
-});
-
-/// Histogram for max number of transactions proposer uses when creating block.
-pub static PROPOSER_MAX_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_proposer_max_block_txns",
-        "Histogram for max number of transactions proposer uses when creating block.",
         NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
     )
     .unwrap()

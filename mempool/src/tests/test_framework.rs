@@ -401,6 +401,35 @@ impl MempoolNode {
                 }
                 request_id
             },
+            MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
+                request_id,
+                transactions,
+                priority: _,
+            } => {
+                let transactions: Vec<_> =
+                    transactions.iter().map(|(txn, _)| txn.clone()).collect();
+                if !block_only_contains_transactions(&transactions, expected_txns) {
+                    let txns: Vec<_> = transactions
+                        .iter()
+                        .map(|txn| (txn.sender(), txn.sequence_number()))
+                        .collect();
+                    let expected_txns: Vec<_> = expected_txns
+                        .iter()
+                        .map(|txn| {
+                            (
+                                TestTransaction::get_address(txn.address),
+                                txn.sequence_number,
+                            )
+                        })
+                        .collect();
+
+                    panic!(
+                        "Request doesn't match. Actual: {:?} Expected: {:?}",
+                        txns, expected_txns
+                    );
+                }
+                request_id
+            },
             MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                 panic!("We aren't supposed to be getting as response here");
             },

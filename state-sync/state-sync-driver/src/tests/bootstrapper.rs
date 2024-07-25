@@ -1628,7 +1628,6 @@ fn create_bootstrapper(
         mock_streaming_client,
         Arc::new(mock_database_reader),
         mock_storage_synchronizer,
-        None,
     );
 
     (bootstrapper, output_fallback_handler)
@@ -1684,7 +1683,6 @@ fn create_bootstrapper_with_storage(
         mock_streaming_client,
         Arc::new(mock_database_reader),
         mock_storage_synchronizer,
-        None,
     )
 }
 

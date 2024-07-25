@@ -21,6 +21,7 @@ use crate::{
         transaction_auxiliary_data_db::TransactionAuxiliaryDataDb, transaction_db::TransactionDb,
         transaction_info_db::TransactionInfoDb, write_set_db::WriteSetDb,
     },
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
@@ -214,6 +215,17 @@ impl LedgerDb {
 
     pub(crate) fn enable_storage_sharding(&self) -> bool {
         self.enable_storage_sharding
+    }
+
+    pub(crate) fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
+        let mut iter = self.ledger_metadata_db.db().iter::<DbMetadataSchema>()?;
+        iter.seek_to_first();
+        while let Some((k, _v)) = iter.next().transpose()? {
+            if let DbMetadataKey::StateSnapshotKvRestoreProgress(version) = k {
+                return Ok(Some(version));
+            }
+        }
+        Ok(None)
     }
 
     pub(crate) fn create_checkpoint(

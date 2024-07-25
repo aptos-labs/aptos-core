@@ -829,7 +829,7 @@ fn optimize_for_maximum_throughput(
 ) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_unique_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_txns_after_filtering = max_txns_per_block as u64;
     config.consensus.max_sending_block_txns = config
         .consensus
         .max_sending_block_txns
@@ -2253,9 +2253,10 @@ pub fn changing_working_quorum_test_helper(
             } else {
                 for (i, item) in chain_health_backoff.iter_mut().enumerate() {
                     // as we have lower TPS, make limits smaller
-                    item.max_sending_block_txns_override =
+                    item.max_sending_block_txns_after_filtering_override =
                         (block_size / 2_u64.pow(i as u32 + 1)).max(2);
-                    min_block_txns = min_block_txns.min(item.max_sending_block_txns_override);
+                    min_block_txns =
+                        min_block_txns.min(item.max_sending_block_txns_after_filtering_override);
                     // as we have fewer nodes, make backoff triggered earlier:
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
@@ -2461,7 +2462,7 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
@@ -2472,7 +2473,7 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(95)
+            SuccessCriteria::new(4500)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)

@@ -805,8 +805,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.create_proposer_election(&epoch_state, &onchain_consensus_config);
         let chain_health_backoff_config =
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
-        let pipeline_backpressure_config =
-            PipelineBackpressureConfig::new(self.config.pipeline_backpressure.clone());
+        let pipeline_backpressure_config = PipelineBackpressureConfig::new(
+            self.config.pipeline_backpressure.clone(),
+            self.config.execution_backpressure.clone(),
+        );
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
@@ -850,7 +852,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.time_service.clone(),
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
             self.config.max_sending_block_txns,
-            self.config.max_sending_block_unique_txns,
+            self.config.max_sending_block_txns_after_filtering,
             self.config.max_sending_block_bytes,
             self.config.max_sending_inline_txns,
             self.config.max_sending_inline_bytes,

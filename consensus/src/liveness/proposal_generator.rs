@@ -8,27 +8,31 @@ use super::{
 use crate::{
     block_storage::BlockReader,
     counters::{
-        CHAIN_HEALTH_BACKOFF_TRIGGERED, PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
-        PROPOSER_DELAY_PROPOSAL, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
-        PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
-        PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
+        CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
+        PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
+        PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING, PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE,
+        PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     payload_client::PayloadClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-use aptos_config::config::{ChainHealthBackoffValues, PipelineBackpressureValues};
+use aptos_config::config::{
+    ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
+};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
     common::{Author, Payload, PayloadFilter, Round},
+    pipelined_block::ExecutionSummary,
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::future::BoxFuture;
+use itertools::Itertools;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
@@ -96,23 +100,31 @@ impl ChainHealthBackoffConfig {
 #[derive(Clone)]
 pub struct PipelineBackpressureConfig {
     backoffs: BTreeMap<Round, PipelineBackpressureValues>,
+    execution: Option<ExecutionBackpressureConfig>,
 }
 
 impl PipelineBackpressureConfig {
-    pub fn new(backoffs: Vec<PipelineBackpressureValues>) -> Self {
+    pub fn new(
+        backoffs: Vec<PipelineBackpressureValues>,
+        execution: Option<ExecutionBackpressureConfig>,
+    ) -> Self {
         let original_len = backoffs.len();
         let backoffs = backoffs
             .into_iter()
             .map(|v| (v.back_pressure_pipeline_latency_limit_ms, v))
             .collect::<BTreeMap<_, _>>();
         assert_eq!(original_len, backoffs.len());
-        Self { backoffs }
+        Self {
+            backoffs,
+            execution,
+        }
     }
 
     #[allow(dead_code)]
     pub fn new_no_backoff() -> Self {
         Self {
             backoffs: BTreeMap::new(),
+            execution: None,
         }
     }
 
@@ -138,6 +150,64 @@ impl PipelineBackpressureConfig {
                 );
                 v
             })
+    }
+
+    pub fn get_execution_block_size_backoff(
+        &self,
+        block_execution_times: &[ExecutionSummary],
+    ) -> Option<u64> {
+        info!(
+            "Estimated block execution times: {:?}",
+            block_execution_times
+        );
+
+        self.execution.as_ref().and_then(|config| {
+            let sizes = block_execution_times
+                .iter()
+                .flat_map(|summary| {
+                    // for each block, compute target (re-calibrated) block size
+
+                    let execution_time_ms = summary.execution_time.as_millis();
+                    // Only block above the time threshold are considered giving enough signal to support calibration
+                    // so we filter out shorter locks
+                    if execution_time_ms > config.min_block_time_ms_to_activate as u128 {
+                        // TODO: After cost of "retries" is reduced with execution pool, we
+                        // should be computing block gas limit here, simply as:
+                        // `config.target_block_time_ms / execution_time_ms * gas_consumed_by_block``
+                        //
+                        // Until then, we need to compute wanted block size to create.
+                        // Unfortunatelly, there is multiple layers where transactions are filtered.
+                        // After deduping/reordering logic is applied, max_txns_to_execute limits the transactions
+                        // passed to executor (`summary.payload_len` here), and then some are discarded for various
+                        // reasons, which we approximate are cheaply ignored.
+                        // For the rest, only `summary.to_commit` fraction of `summary.to_commit + summary.to_retry`
+                        // was executed. And so assuming same discard rate, we scale `summary.payload_len` with it.
+                        Some(
+                            ((config.target_block_time_ms as f64 / execution_time_ms as f64
+                                * (summary.to_commit as f64
+                                    / (summary.to_commit + summary.to_retry) as f64)
+                                * summary.payload_len as f64)
+                                .floor() as u64)
+                                .max(1),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .sorted()
+                // .sorted_by_key(|key| key.unwrap_or(u64::MAX))
+                .collect::<Vec<_>>();
+            info!("Estimated block back-offs block sizes: {:?}", sizes);
+            if sizes.len() >= config.min_blocks_to_activate {
+                Some(
+                    *sizes
+                        .get((config.percentile * sizes.len() as f64) as usize)
+                        .unwrap(),
+                )
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -327,11 +397,11 @@ impl ProposalGenerator {
                 .await;
 
             PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING.observe(max_block_txns_after_filtering as f64);
-            PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE.observe(
-                max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering) as f64,
-            );
+            if let Some(max_to_execute) = max_txns_from_block_to_execute {
+                PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE.observe(max_to_execute as f64);
+            }
 
-            PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
+            PROPOSER_DELAY_PROPOSAL.observe(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
                 tokio::time::sleep(proposal_delay).await;
             }
@@ -429,7 +499,7 @@ impl ProposalGenerator {
         timestamp: Duration,
         round: Round,
     ) -> (u64, u64, Option<u64>, Duration) {
-        let mut values_max_block_txns = vec![self.max_block_txns_after_filtering];
+        let mut values_max_block_txns_after_filtering = vec![self.max_block_txns_after_filtering];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
         let mut values_max_txns_from_block_to_execute = vec![];
@@ -438,7 +508,8 @@ impl ProposalGenerator {
             .chain_health_backoff_config
             .get_backoff(voting_power_ratio);
         if let Some(value) = chain_health_backoff {
-            values_max_block_txns.push(value.max_sending_block_txns_override);
+            values_max_block_txns_after_filtering
+                .push(value.max_sending_block_txns_after_filtering_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
             if let Some(val) = value.max_txns_from_block_to_execute {
                 values_max_txns_from_block_to_execute.push(val);
@@ -449,11 +520,13 @@ impl ProposalGenerator {
             CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0.0);
         }
 
+        let pipeline_pending_latency = self.block_store.pipeline_pending_latency(timestamp);
         let pipeline_backpressure = self
             .pipeline_backpressure_config
-            .get_backoff(self.block_store.pipeline_pending_latency(timestamp));
+            .get_backoff(pipeline_pending_latency);
         if let Some(value) = pipeline_backpressure {
-            values_max_block_txns.push(value.max_sending_block_txns_override);
+            values_max_block_txns_after_filtering
+                .push(value.max_sending_block_txns_after_filtering_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
             if let Some(val) = value.max_txns_from_block_to_execute {
                 values_max_txns_from_block_to_execute.push(val);
@@ -463,24 +536,65 @@ impl ProposalGenerator {
         } else {
             PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(0.0);
         };
+
+        let mut execution_backpressure_applied = false;
+        if let Some(config) = &self.pipeline_backpressure_config.execution {
+            if pipeline_pending_latency.as_millis()
+                > config.back_pressure_pipeline_latency_limit_ms as u128
+            {
+                let execution_backpressure = self
+                    .pipeline_backpressure_config
+                    .get_execution_block_size_backoff(
+                        &self
+                            .block_store
+                            .get_recent_block_execution_times(config.num_blocks_to_look_at),
+                    );
+                if let Some(execution_backpressure_block_size) = execution_backpressure {
+                    values_max_block_txns_after_filtering.push(
+                        (execution_backpressure_block_size as f64
+                            * config.reordering_ovarpacking_factor.max(1.0))
+                            as u64,
+                    );
+                    values_max_txns_from_block_to_execute.push(execution_backpressure_block_size);
+                    execution_backpressure_applied = true;
+                }
+            }
+        }
+        EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(
+            if execution_backpressure_applied {
+                1.0
+            } else {
+                0.0
+            },
+        );
+
         // the unwrap are safe because we always have at least one value in the vectors, see initialization.
-        let max_block_txns = values_max_block_txns.into_iter().min().unwrap();
+        let max_block_txns = values_max_block_txns_after_filtering
+            .into_iter()
+            .min()
+            .unwrap();
+
         let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
         let proposal_delay = values_proposal_delay.into_iter().max().unwrap();
-        let max_txns_from_block_to_execute =
-            values_max_txns_from_block_to_execute.into_iter().min();
-        if pipeline_backpressure.is_some() || chain_health_backoff.is_some() {
-            warn!(
-                "Generating proposal: reducing limits to {} txns (filtered to {:?}) and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms. Round: {}",
-                max_block_txns,
-                max_txns_from_block_to_execute,
-                max_block_bytes,
-                pipeline_backpressure.is_some(),
-                chain_health_backoff.is_some(),
-                proposal_delay.as_millis(),
-                round,
-            );
-        }
+        let max_txns_from_block_to_execute = values_max_txns_from_block_to_execute
+            .into_iter()
+            .min()
+            .filter(|v| *v < max_block_txns);
+
+        warn!(
+            pipeline_pending_latency = pipeline_pending_latency.as_millis(),
+            proposal_delay_ms = proposal_delay.as_millis(),
+            max_block_txns = max_block_txns,
+            max_txns_from_block_to_execute =
+                max_txns_from_block_to_execute.unwrap_or(max_block_txns),
+            max_block_bytes = max_block_bytes,
+            is_pipeline_backpressure = pipeline_backpressure.is_some(),
+            is_execution_backpressure = execution_backpressure_applied,
+            is_chain_health_backoff = chain_health_backoff.is_some(),
+            round = round,
+            "Proposal generation backpressure details",
+        );
+
         (
             max_block_txns,
             max_block_bytes,
