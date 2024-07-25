@@ -23,10 +23,38 @@ use proptest::{
 };
 use std::{collections::HashMap, sync::Arc};
 
-pub fn mempool_incoming_transactions_strategy(
-) -> impl Strategy<Value = (Vec<(SignedTransaction, Option<u64>)>, TimelineState)> {
+impl Arbitrary for BroadcastPeerPriority {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        prop_oneof![
+            Just(BroadcastPeerPriority::Primary),
+            Just(BroadcastPeerPriority::Failover),
+        ]
+        .boxed()
+    }
+}
+
+pub fn mempool_incoming_transactions_strategy() -> impl Strategy<
+    Value = (
+        Vec<(
+            SignedTransaction,
+            Option<u64>,
+            Option<BroadcastPeerPriority>,
+        )>,
+        TimelineState,
+    ),
+> {
     (
-        proptest::collection::vec(any::<(SignedTransaction, Option<u64>)>(), 0..100),
+        proptest::collection::vec(
+            any::<(
+                SignedTransaction,
+                Option<u64>,
+                Option<BroadcastPeerPriority>,
+            )>(),
+            0..100,
+        ),
         prop_oneof![
             Just(TimelineState::NotReady),
             Just(TimelineState::NonQualified)
@@ -35,7 +63,11 @@ pub fn mempool_incoming_transactions_strategy(
 }
 
 pub fn test_mempool_process_incoming_transactions_impl(
-    txns: Vec<(SignedTransaction, Option<u64>)>,
+    txns: Vec<(
+        SignedTransaction,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
     timeline_state: TimelineState,
 ) {
     let config = NodeConfig::default();
@@ -57,13 +89,7 @@ pub fn test_mempool_process_incoming_transactions_impl(
         config.base.role,
     );
 
-    let _ = tasks::process_incoming_transactions(
-        &smp,
-        txns,
-        timeline_state,
-        false,
-        BroadcastPeerPriority::Primary,
-    );
+    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);
 }
 
 proptest! {

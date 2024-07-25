@@ -254,7 +254,10 @@ impl PeerSyncState {
     pub fn new(num_broadcast_buckets: usize, num_sender_buckets: MempoolSenderBucket) -> Self {
         let mut timelines = HashMap::new();
         for i in 0..num_sender_buckets {
-            timelines.insert(i as MempoolSenderBucket, MultiBucketTimelineIndexIds::new(num_broadcast_buckets));
+            timelines.insert(
+                i as MempoolSenderBucket,
+                MultiBucketTimelineIndexIds::new(num_broadcast_buckets),
+            );
         }
         PeerSyncState {
             timelines,
@@ -315,7 +318,8 @@ impl MultiBucketTimelineIndexIds {
         }
 
         for (index_identifier, (_start, end)) in start_end_pairs {
-            self.id_per_bucket[index_identifier as usize] = std::cmp::max(self.id_per_bucket[index_identifier as usize],end);
+            self.id_per_bucket[index_identifier as usize] =
+                std::cmp::max(self.id_per_bucket[index_identifier as usize], end);
         }
     }
 }
@@ -342,7 +346,10 @@ pub struct MempoolMessageId(pub Vec<(u64, u64)>);
 
 impl MempoolMessageId {
     pub(crate) fn from_timeline_ids(
-        timeline_ids: Vec<(MempoolSenderBucket, (MultiBucketTimelineIndexIds, MultiBucketTimelineIndexIds))>,
+        timeline_ids: Vec<(
+            MempoolSenderBucket,
+            (MultiBucketTimelineIndexIds, MultiBucketTimelineIndexIds),
+        )>,
     ) -> Self {
         Self(
             timeline_ids
@@ -356,22 +363,30 @@ impl MempoolMessageId {
                         .map(move |(index, (old, new))| {
                             let sender_bucket = *sender_bucket as u64;
                             let timeline_index_identifier = index as u64;
-                            (sender_bucket << 56 | timeline_index_identifier << 48 | old, sender_bucket << 56 | timeline_index_identifier << 48 | new)
+                            (
+                                sender_bucket << 56 | timeline_index_identifier << 48 | old,
+                                sender_bucket << 56 | timeline_index_identifier << 48 | new,
+                            )
                         })
                 })
                 .collect(),
         )
     }
 
-    pub(crate) fn decode(&self) -> HashMap<MempoolSenderBucket, HashMap<TimelineIndexIdentifier, (u64, u64)>> {
+    pub(crate) fn decode(
+        &self,
+    ) -> HashMap<MempoolSenderBucket, HashMap<TimelineIndexIdentifier, (u64, u64)>> {
         let mut result = HashMap::new();
         for (start, end) in self.0.iter() {
             let sender_bucket = (start >> 56) as MempoolSenderBucket;
-            let timeline_index_identifier = (start >> 48 & 0xff) as TimelineIndexIdentifier;
+            let timeline_index_identifier = (start >> 48 & 0xFF) as TimelineIndexIdentifier;
             // Remove the leading two bytes that indicates the sender bucket.
-            let start = start & 0x0000ffffffffffff;
-            let end = end & 0x0000ffffffffffff;
-            result.entry(sender_bucket).or_insert_with(HashMap::new).insert(timeline_index_identifier,(start, end));
+            let start = start & 0x0000FFFFFFFFFFFF;
+            let end = end & 0x0000FFFFFFFFFFFF;
+            result
+                .entry(sender_bucket)
+                .or_insert_with(HashMap::new)
+                .insert(timeline_index_identifier, (start, end));
         }
         result
     }
@@ -398,7 +413,9 @@ impl Ord for MempoolMessageId {
 
 #[cfg(test)]
 mod test {
-    use crate::shared_mempool::types::{MempoolMessageId, MultiBucketTimelineIndexIds, TimelineIndexIdentifier};
+    use crate::shared_mempool::types::{
+        MempoolMessageId, MultiBucketTimelineIndexIds, TimelineIndexIdentifier,
+    };
     use std::collections::HashMap;
 
     #[test]
@@ -416,7 +433,6 @@ mod test {
 
     #[test]
     fn test_message_id_ordering() {
-
         let left = MempoolMessageId(vec![(0, 3), (1, 4), (2, 5)]);
         let right = MempoolMessageId(vec![(2, 5), (1, 4), (0, 3)]);
         assert!(left > right);
@@ -426,7 +442,7 @@ mod test {
         let right = MempoolMessageId(vec![(2 | sender, 5), (1, 4), (0, 3)]);
         assert!(right > left);
 
-        let left = MempoolMessageId(vec![(0 | sender, 3), (1 | sender, 4), (2 | sender, 5)]);
+        let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 4), (2 | sender, 5)]);
         let right = MempoolMessageId(vec![(2 | sender, 5), (1, 4), (0, 3)]);
         assert!(left > right);
     }

@@ -4,7 +4,10 @@
 
 use crate::{
     core_mempool::CoreMempool,
-    shared_mempool::{start_shared_mempool, types::{MempoolMessageId, MempoolSenderBucket}},
+    shared_mempool::{
+        start_shared_mempool,
+        types::{MempoolMessageId, MempoolSenderBucket},
+    },
     tests::common::{self, TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
@@ -254,7 +257,10 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
         let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
-        let message_id_in_request = MempoolMessageId::from_timeline_ids(vec![(0 as MempoolSenderBucket, (vec![1].into(), vec![10].into()))]);
+        let message_id_in_request = MempoolMessageId::from_timeline_ids(vec![(
+            0 as MempoolSenderBucket,
+            (vec![1].into(), vec![10].into()),
+        )]);
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
             message_id: message_id_in_request.clone(),
             transactions: sign_transactions(txns),
@@ -404,10 +410,9 @@ impl MempoolNode {
             MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
                 message_id,
                 transactions,
-                priority: _,
             } => {
                 let transactions: Vec<_> =
-                    transactions.iter().map(|(txn, _)| txn.clone()).collect();
+                    transactions.iter().map(|(txn, _, _)| txn.clone()).collect();
                 if !block_only_contains_transactions(&transactions, expected_txns) {
                     let txns: Vec<_> = transactions
                         .iter()

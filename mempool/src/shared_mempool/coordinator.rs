@@ -278,9 +278,12 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     network_id: NetworkId,
     message_id: MempoolMessageId,
-    transactions: Vec<(SignedTransaction, Option<u64>)>,
+    transactions: Vec<(
+        SignedTransaction,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
     peer_id: PeerId,
-    priority: BroadcastPeerPriority,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
@@ -315,7 +318,6 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
             timeline_state,
             peer,
             task_start_timer,
-            priority,
         ))
         .await;
 }
@@ -345,25 +347,25 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                         smp,
                         network_id,
                         message_id,
-                        transactions.into_iter().map(|t| (t, None)).collect(),
+                        transactions.into_iter().map(|t| (t, None, None)).collect(),
                         peer_id,
-                        BroadcastPeerPriority::Primary,
                     )
                     .await;
                 },
                 MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
                     message_id,
                     transactions,
-                    priority,
                 } => {
                     process_received_txns(
                         bounded_executor,
                         smp,
                         network_id,
                         message_id,
-                        transactions.into_iter().map(|t| (t.0, Some(t.1))).collect(),
+                        transactions
+                            .into_iter()
+                            .map(|t| (t.0, Some(t.1), Some(t.2)))
+                            .collect(),
                         peer_id,
-                        priority,
                     )
                     .await;
                 },

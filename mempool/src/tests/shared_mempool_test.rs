@@ -25,11 +25,7 @@ async fn test_consensus_events_rejected_txns() {
     let rejected_txn = TestTransaction::new(0, 0, 1).make_signed_transaction();
     let kept_txn_1 = TestTransaction::new(1, 0, 1).make_signed_transaction();
     let kept_txn_2 = TestTransaction::new(0, 1, 1).make_signed_transaction();
-    let txns = vec![
-        rejected_txn.clone(),
-        kept_txn_1.clone(),
-        kept_txn_2.clone(),
-    ];
+    let txns = vec![rejected_txn.clone(), kept_txn_1.clone(), kept_txn_2.clone()];
     // Add txns to mempool
     {
         let mut pool = smp.mempool.lock();
