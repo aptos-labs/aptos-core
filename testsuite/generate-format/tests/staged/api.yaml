@@ -607,7 +607,7 @@ TransactionArgument:
             CONTENT: U8
             SIZE: 32
     9:
-      Raw:
+      Serialized:
         NEWTYPE: BYTES
 TransactionAuthenticator:
   ENUM:

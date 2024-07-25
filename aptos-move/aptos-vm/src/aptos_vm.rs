@@ -712,6 +712,19 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         script: &Script,
     ) -> Result<(), VMStatus> {
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
+        {
+            for arg in script.args() {
+                if let TransactionArgument::Serialized(_) = arg {
+                    return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
+                        .finish(Location::Script)
+                        .into_vm_status());
+                }
+            }
+        }
+
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
@@ -721,16 +734,6 @@ impl AptosVM {
                 traversal_context,
                 script.code(),
             )?;
-        }
-
-        if !self.features().is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS) {
-            for arg in script.args() {
-                if let TransactionArgument::Serialized(_) = arg {
-                    return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
-                        .finish(Location::Script)
-                        .into_vm_status());
-                }
-            }
         }
 
         let func = session.load_script(script.code(), script.ty_args())?;

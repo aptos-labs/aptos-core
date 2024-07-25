@@ -275,9 +275,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         let ret = match payload {
             Script(s) => {
                 let (code, ty_args, args) = s.into_inner();
-                let func_args = self.inner.view_script_arguments(&code, &args, &ty_args);
+                let script_args = self.inner.view_script_arguments(&code, &args, &ty_args);
 
-                let json_args = match func_args {
+                let json_args = match script_args {
                     Ok(values) => values
                         .into_iter()
                         .map(|v| MoveValue::try_from(v)?.json())

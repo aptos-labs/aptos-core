@@ -36,7 +36,9 @@ impl fmt::Debug for TransactionArgument {
             TransactionArgument::U16(value) => write!(f, "{{U16: {}}}", value),
             TransactionArgument::U32(value) => write!(f, "{{U32: {}}}", value),
             TransactionArgument::U256(value) => write!(f, "{{U256: {}}}", value),
-            TransactionArgument::Serialized(value) => write!(f, "{{RAW_BYTES: {}}}", hex::encode(value)),
+            TransactionArgument::Serialized(value) => {
+                write!(f, "{{RAW_BYTES: {}}}", hex::encode(value))
+            },
         }
     }
 }

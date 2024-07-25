@@ -135,7 +135,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         let args_bytes = convert_txn_args(args);
-        self.view_function_arguments_impl(&param_tys, ty_args, &args_bytes, &mut limit)
+        self.view_arguments_impl(&param_tys, ty_args, &args_bytes, &mut limit)
     }
 
     pub fn view_function_arguments(
@@ -147,10 +147,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
         let mut limit = Limiter::default();
         let param_tys = self.resolve_function_arguments(module, function, &mut limit)?;
-        self.view_function_arguments_impl(&param_tys, ty_args, args, &mut limit)
+        self.view_arguments_impl(&param_tys, ty_args, args, &mut limit)
     }
 
-    fn view_function_arguments_impl(
+    fn view_arguments_impl(
         &self,
         param_tys: &[FatType],
         ty_args: &[TypeTag],

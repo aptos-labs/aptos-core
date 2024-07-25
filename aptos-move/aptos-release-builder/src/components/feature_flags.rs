@@ -319,7 +319,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
             },
             FeatureFlag::DisallowUserNative => AptosFeatureFlag::DISALLOW_USER_NATIVES,
-            FeatureFlag::AllowSerializedScriptArgs => AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
+            FeatureFlag::AllowSerializedScriptArgs => {
+                AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS
+            },
         }
     }
 }
@@ -445,7 +447,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::AbortIfMultisigPayloadMismatch
             },
             AptosFeatureFlag::DISALLOW_USER_NATIVES => FeatureFlag::DisallowUserNative,
-            AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS => FeatureFlag::AllowSerializedScriptArgs,
+            AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS => {
+                FeatureFlag::AllowSerializedScriptArgs
+            },
         }
     }
 }
