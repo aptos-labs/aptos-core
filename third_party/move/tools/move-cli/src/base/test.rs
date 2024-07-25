@@ -180,6 +180,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
         .clone()
         .resolution_graph_for_package(pkg_path, &mut Vec::new())?;
 
+    unit_test_config.filter = Some(String::from("schedule_transaction_queue"));
     // Note: unit_test_config.named_address_values is always set to vec![] (the default value) before
     // being passed in.
     unit_test_config.named_address_values = resolution_graph

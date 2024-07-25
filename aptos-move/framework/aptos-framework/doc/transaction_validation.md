@@ -17,6 +17,7 @@
 -  [Function `epilogue_gas_payer`](#0x1_transaction_validation_epilogue_gas_payer)
 -  [Function `scheduled_txn_prologue`](#0x1_transaction_validation_scheduled_txn_prologue)
 -  [Function `scheduled_txn_epilogue`](#0x1_transaction_validation_scheduled_txn_epilogue)
+-  [Function `scheduled_txn_cleanup`](#0x1_transaction_validation_scheduled_txn_cleanup)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -759,6 +760,30 @@ Called by the Adapter
         <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount)
     };
 
+    <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_validation_scheduled_txn_cleanup"></a>
+
+## Function `scheduled_txn_cleanup`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>() {
     <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_finish_execution">schedule_transaction_queue::finish_execution</a>();
 }
 </code></pre>

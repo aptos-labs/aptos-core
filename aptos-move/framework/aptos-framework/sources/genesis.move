@@ -175,15 +175,22 @@ module aptos_framework::genesis {
         aptos_account::register_apt(&core_resources); // registers APT store
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
 
-        // test
-        schedule_transaction_queue::insert(
-            &core_resources,
-            schedule_transaction_queue::new_transaction(
-                100,
-                1000,
-                transaction_context::new_entry_function_payload(@0x1, string::utf8(b"test_schedule_txn"), string::utf8(b"bar"), vector[], vector[]),
-                @core_resources,
-        ));
+        // test scheduled txn
+        let to_create = vector[@core_resources, @0x123, @0x234, @0x345, @0x456, @0x567];
+        let i = 0;
+        while (i < vector::length(&to_create))  {
+            let addr = *vector::borrow(&to_create, i);
+            let acc = create_account(aptos_framework, addr, 100000000000);
+            schedule_transaction_queue::insert(
+                &acc,
+                schedule_transaction_queue::new_transaction(
+                    100,
+                    100000,
+                    transaction_context::new_entry_function_payload(@0x1, string::utf8(b"test_schedule_txn"), string::utf8(b"recurring"), vector[], vector[]),
+                    addr,
+            ));
+            i = i + 1;
+        }
     }
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {

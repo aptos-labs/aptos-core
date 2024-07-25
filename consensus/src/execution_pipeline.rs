@@ -200,6 +200,7 @@ impl ExecutionPipeline {
                     });
                     let timestamp_sec = block_timestamp / 1_000_000;
                     let state_view = executor.state_view(parent_block_id)?;
+                    let limit = 100u64;
                     let scheduled_transactions = bcs::from_bytes::<Vec<ScheduledTransaction>>(
                         &AptosVM::execute_view_function(
                             &state_view,
@@ -211,7 +212,7 @@ impl ExecutionPipeline {
                             vec![], // ty_args,
                             vec![
                                 bcs::to_bytes(&timestamp_sec).unwrap(),
-                                bcs::to_bytes(&100u64).unwrap(),
+                                bcs::to_bytes(&limit).unwrap(),
                             ],
                             u64::MAX,
                         )
@@ -221,9 +222,12 @@ impl ExecutionPipeline {
                         .expect("view function output is empty"),
                     )
                     .expect("failed to deserialize scheduled transactions");
+                    assert!(scheduled_transactions.len() <= limit as usize);
                     println!(
-                        "block id: {}, timestamp: {}, scheduled_transactions: {:?}",
-                        block_id, timestamp_sec, scheduled_transactions
+                        "block id: {}, timestamp: {}, numbers of scheduled_transactions: {}",
+                        block_id,
+                        timestamp_sec,
+                        scheduled_transactions.len()
                     );
 
                     let extra_txns: Vec<_> = scheduled_transactions

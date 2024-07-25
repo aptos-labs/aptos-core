@@ -449,15 +449,22 @@ Only called for testnets and e2e tests.
     <a href="aptos_account.md#0x1_aptos_account_register_apt">aptos_account::register_apt</a>(&core_resources); // registers APT store
     <a href="aptos_coin.md#0x1_aptos_coin_configure_accounts_for_test">aptos_coin::configure_accounts_for_test</a>(aptos_framework, &core_resources, mint_cap);
 
-    // test
-    <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">schedule_transaction_queue::insert</a>(
-        &core_resources,
-        <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">schedule_transaction_queue::new_transaction</a>(
-            100,
-            1000,
-            <a href="transaction_context.md#0x1_transaction_context_new_entry_function_payload">transaction_context::new_entry_function_payload</a>(@0x1, <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="test_schedule_txn.md#0x1_test_schedule_txn">test_schedule_txn</a>"), <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"bar"), <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]),
-            @core_resources,
-    ));
+    // test scheduled txn
+    <b>let</b> to_create = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[@core_resources, @0x123, @0x234, @0x345, @0x456, @0x567];
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&to_create))  {
+        <b>let</b> addr = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&to_create, i);
+        <b>let</b> acc = <a href="genesis.md#0x1_genesis_create_account">create_account</a>(aptos_framework, addr, 100000000000);
+        <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">schedule_transaction_queue::insert</a>(
+            &acc,
+            <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_new_transaction">schedule_transaction_queue::new_transaction</a>(
+                100,
+                100000,
+                <a href="transaction_context.md#0x1_transaction_context_new_entry_function_payload">transaction_context::new_entry_function_payload</a>(@0x1, <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="test_schedule_txn.md#0x1_test_schedule_txn">test_schedule_txn</a>"), <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"recurring"), <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]),
+                addr,
+        ));
+        i = i + 1;
+    }
 }
 </code></pre>
 

@@ -23,14 +23,16 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation,
-    transaction_validation::{run_scheduled_txn_epilogue, run_scheduled_txn_prologue},
+    transaction_validation::{
+        run_scheduled_txn_cleanup, run_scheduled_txn_epilogue, run_scheduled_txn_prologue,
+    },
     verifier,
     verifier::randomness::get_randomness_annotation,
     VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
     RuntimeModuleMetadataV1,
@@ -61,11 +63,12 @@ use aptos_types::{
     randomness::Randomness,
     state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
-        authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
-        BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        authenticator::AnySignature, scheduled_transaction::ScheduledTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, EntryFunction,
+        ExecutionError, ExecutionStatus, ModuleBundle, Multisig, MultisigTransactionPayload,
+        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -2466,45 +2469,70 @@ impl AptosVM {
                 (vm_status, output)
             },
             Transaction::ScheduledTransaction(txn) => {
-                let balance = txn.max_gas_unit.into();
-                let storage_gas = get_or_vm_startup_failure(&self.storage_gas_params, log_context)?;
-                let mut gas_meter = make_prod_gas_meter(
-                    self.gas_feature_version,
-                    get_or_vm_startup_failure(&self.gas_params, log_context)?
-                        .vm
-                        .clone(),
-                    storage_gas.clone(),
-                    false,
-                    balance,
-                );
-                let mut session = self.new_session(resolver, SessionId::ScheduledTxn, None);
                 let storage = TraversalStorage::new();
                 let mut context = TraversalContext::new(&storage);
-                run_scheduled_txn_prologue(&mut session, &txn, log_context, &mut context).unwrap();
-                self.validate_and_execute_entry_function(
+                match self.process_scheduled_transaction(
                     resolver,
-                    &mut session,
-                    &mut gas_meter,
+                    txn.clone(),
                     &mut context,
-                    vec![txn.sender],
-                    &txn.payload,
-                )
-                .unwrap();
-                run_scheduled_txn_epilogue(
-                    &mut session,
-                    &txn,
-                    gas_meter.balance(),
-                    Self::fee_statement_from_gas_meter(txn.max_gas_unit.into(), &gas_meter, 0),
-                    &mut context,
-                )
-                .unwrap();
-                let output =
-                    get_system_transaction_output(session, &storage_gas.change_set_configs)
-                        .unwrap();
-                println!("Scheduled transaction output: {:?}", output);
-                (VMStatus::Executed, output)
+                    log_context,
+                ) {
+                    Ok((vm_status, output)) => (vm_status, output),
+                    Err(e) => {
+                        let storage_gas =
+                            get_or_vm_startup_failure(&self.storage_gas_params, log_context)?;
+                        let mut session =
+                            self.new_session(resolver, SessionId::scheduled_txn(txn.hash()), None);
+                        run_scheduled_txn_cleanup(&mut session, &mut context);
+                        let output =
+                            get_system_transaction_output(session, &storage_gas.change_set_configs)
+                                .unwrap();
+                        println!("scheduled transaction {:?} failed: {:?}", txn, e);
+                        (VMStatus::Executed, output)
+                    },
+                }
             },
         })
+    }
+
+    pub(crate) fn process_scheduled_transaction(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        txn: ScheduledTransaction,
+        context: &mut TraversalContext,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        let balance = txn.max_gas_unit.into();
+        let storage_gas = get_or_vm_startup_failure(&self.storage_gas_params, log_context)?;
+        let mut gas_meter = make_prod_gas_meter(
+            self.gas_feature_version,
+            get_or_vm_startup_failure(&self.gas_params, log_context)?
+                .vm
+                .clone(),
+            storage_gas.clone(),
+            false,
+            balance,
+        );
+        let mut session = self.new_session(resolver, SessionId::scheduled_txn(txn.hash()), None);
+        run_scheduled_txn_prologue(&mut session, &txn, log_context, context)?;
+        self.validate_and_execute_entry_function(
+            resolver,
+            &mut session,
+            &mut gas_meter,
+            context,
+            vec![txn.sender],
+            &txn.payload,
+        )?;
+        run_scheduled_txn_epilogue(
+            &mut session,
+            &txn,
+            gas_meter.balance(),
+            Self::fee_statement_from_gas_meter(txn.max_gas_unit.into(), &gas_meter, 0),
+            context,
+        )?;
+        let output = get_system_transaction_output(session, &storage_gas.change_set_configs)?;
+        // println!("scheduled transaction output: {:?}", output);
+        Ok((VMStatus::Executed, output))
     }
 }
 

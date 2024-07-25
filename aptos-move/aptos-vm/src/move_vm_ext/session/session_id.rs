@@ -51,7 +51,9 @@ pub enum SessionId {
         script_hash: Vec<u8>,
     },
     // TODO: unique id for each scheduled txn
-    ScheduledTxn,
+    ScheduledTxn {
+        hash: HashValue,
+    },
 }
 
 impl SessionId {
@@ -113,6 +115,10 @@ impl SessionId {
         }
     }
 
+    pub fn scheduled_txn(hash: HashValue) -> Self {
+        Self::ScheduledTxn { hash }
+    }
+
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
@@ -144,7 +150,7 @@ impl SessionId {
             | Self::Genesis { id: _ }
             | Self::Void
             | Self::BlockMetaExt { id: _ }
-            | Self::ScheduledTxn => vec![],
+            | Self::ScheduledTxn { .. } => vec![],
         }
     }
 }

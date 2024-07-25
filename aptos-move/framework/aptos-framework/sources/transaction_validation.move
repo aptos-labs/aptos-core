@@ -389,6 +389,10 @@ module aptos_framework::transaction_validation {
             transaction_fee::mint_and_refund(gas_payer, mint_amount)
         };
 
+        scheduled_txn_cleanup();
+    }
+
+    fun scheduled_txn_cleanup() {
         schedule_transaction_queue::finish_execution();
     }
 }

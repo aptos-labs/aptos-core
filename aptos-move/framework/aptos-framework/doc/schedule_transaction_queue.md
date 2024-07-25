@@ -11,6 +11,7 @@
 -  [Resource `ToRemove`](#0x1_schedule_transaction_queue_ToRemove)
 -  [Function `new_transaction`](#0x1_schedule_transaction_queue_new_transaction)
 -  [Function `initialize`](#0x1_schedule_transaction_queue_initialize)
+-  [Function `access_key`](#0x1_schedule_transaction_queue_access_key)
 -  [Function `insert`](#0x1_schedule_transaction_queue_insert)
 -  [Function `cancel`](#0x1_schedule_transaction_queue_cancel)
 -  [Function `get_ready_transactions`](#0x1_schedule_transaction_queue_get_ready_transactions)
@@ -27,6 +28,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
+<b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 </code></pre>
 
@@ -225,13 +227,13 @@
 
 </details>
 
-<a id="0x1_schedule_transaction_queue_insert"></a>
+<a id="0x1_schedule_transaction_queue_access_key"></a>
 
-## Function `insert`
+## Function `access_key`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">insert</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn: <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">schedule_transaction_queue::ScheduledTransaction</a>)
+<pre><code><b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_access_key">access_key</a>(queue: &<a href="avl_tree.md#0x1_avl_queue_AVLqueue">avl_queue::AVLqueue</a>&lt;<a href="../../aptos-stdlib/doc/iterable_table.md#0x1_iterable_table_IterableTable">iterable_table::IterableTable</a>&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_TransactionId">schedule_transaction_queue::TransactionId</a>, bool&gt;&gt;, insertion_key: u64): u64
 </code></pre>
 
 
@@ -240,25 +242,58 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">insert</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn: <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">ScheduledTransaction</a>) <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a> {
+<pre><code><b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_access_key">access_key</a>(queue: &AVLqueue&lt;IterableTable&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_TransactionId">TransactionId</a>, bool&gt;&gt;, insertion_key: u64): u64 {
+    <b>let</b> (node_id, found) = <a href="avl_tree.md#0x1_avl_queue_search">avl_queue::search</a>(queue, insertion_key);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&found), 1);
+    // I "THINK" <b>with</b> unique insertion key, this should be the correct access key
+    // Number of bits list node ID is shifted in an access key.
+    // <b>const</b> SHIFT_ACCESS_LIST_NODE_ID: u8 = 33;
+    /// Number of bits tree node ID is shifted in an access key.
+    // <b>const</b> SHIFT_ACCESS_TREE_NODE_ID: u8 = 47;
+    ((node_id &lt;&lt; 33) | (node_id &lt;&lt; 47))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_schedule_transaction_queue_insert"></a>
+
+## Function `insert`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">insert</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn: <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">schedule_transaction_queue::ScheduledTransaction</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_insert">insert</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn: <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledTransaction">ScheduledTransaction</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender) == txn.sender, 1);
     <b>let</b> scheduled_queue = <b>borrow_global_mut</b>&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a>&gt;(@aptos_framework);
     <b>let</b> id = <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_TransactionId">TransactionId</a> { <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: sha3_256(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&txn)) };
+    // already <b>exists</b>
     <b>if</b> (<a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_contains">table_with_length::contains</a>(&scheduled_queue.items, id)) {
-        <b>return</b>
+        <b>return</b> id.<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
     };
-    // <b>assert</b> <a href="timestamp.md#0x1_timestamp">timestamp</a> range
+    // time in the past
+    <b>let</b> block_time = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>();
+    <b>assert</b>!(txn.scheduled_time &gt; block_time, 1);
+
     <b>let</b> time = txn.scheduled_time;
     <b>if</b> (!<a href="avl_tree.md#0x1_avl_queue_has_key">avl_queue::has_key</a>(&scheduled_queue.queue, time)) {
         <a href="avl_tree.md#0x1_avl_queue_insert">avl_queue::insert</a>(&<b>mut</b> scheduled_queue.queue, time, <a href="../../aptos-stdlib/doc/iterable_table.md#0x1_iterable_table_new">iterable_table::new</a>());
     };
-    <b>let</b> (node_id, _) = <a href="avl_tree.md#0x1_avl_queue_search">avl_queue::search</a>(&scheduled_queue.queue, time);
-    // Number of bits list node ID is shifted in an access key.
-    // <b>const</b> SHIFT_ACCESS_LIST_NODE_ID: u8 = 33;
-    <b>let</b> access_key = node_id &lt;&lt; 33;
+    <b>let</b> access_key = <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_access_key">access_key</a>(&<b>mut</b> scheduled_queue.queue, time);
     <a href="../../aptos-stdlib/doc/iterable_table.md#0x1_iterable_table_add">iterable_table::add</a>(
         <a href="avl_tree.md#0x1_avl_queue_borrow_mut">avl_queue::borrow_mut</a>(&<b>mut</b> scheduled_queue.queue, access_key), id, <b>false</b>);
     <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> scheduled_queue.items, id, txn);
+    id.<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
 }
 </code></pre>
 
@@ -272,7 +307,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_cancel">cancel</a>(sender: <b>address</b>, txn_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_cancel">cancel</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -281,20 +316,23 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_cancel">cancel</a>(sender: <b>address</b>, txn_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_cancel">cancel</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a> {
     <b>let</b> scheduled_queue = <b>borrow_global_mut</b>&lt;<a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_ScheduledQueue">ScheduledQueue</a>&gt;(@aptos_framework);
-    <b>let</b> id = <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_TransactionId">TransactionId</a> { <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: txn_id };
-    <b>if</b> (!<a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_contains">table_with_length::contains</a>(&scheduled_queue.items, id)) {
+    <b>let</b> txn_id = <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_TransactionId">TransactionId</a> { <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: txn_id };
+    <b>if</b> (!<a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_contains">table_with_length::contains</a>(&scheduled_queue.items, txn_id)) {
         <b>return</b>
     };
-    <b>let</b> item = <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> scheduled_queue.items, id);
-    <b>if</b> (item.sender != sender) {
-        <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> scheduled_queue.items, id, item);
+    <b>let</b> item = <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> scheduled_queue.items, txn_id);
+    <b>if</b> (item.sender != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender)) {
+        <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> scheduled_queue.items, txn_id, item);
     } <b>else</b> {
+        <b>let</b> access_key = <a href="schedule_transaction_queue.md#0x1_schedule_transaction_queue_access_key">access_key</a>(&<b>mut</b> scheduled_queue.queue, item.scheduled_time);
         <a href="../../aptos-stdlib/doc/iterable_table.md#0x1_iterable_table_remove">iterable_table::remove</a>(<a href="avl_tree.md#0x1_avl_queue_borrow_mut">avl_queue::borrow_mut</a>(
-            &<b>mut</b> scheduled_queue.queue, item.scheduled_time), id);
-        <b>if</b> (<a href="../../aptos-stdlib/doc/iterable_table.md#0x1_iterable_table_length">iterable_table::length</a>(<a href="avl_tree.md#0x1_avl_queue_borrow">avl_queue::borrow</a>(&scheduled_queue.queue, item.scheduled_time)) == 0) {
-            <b>let</b> empty_table = <a href="avl_tree.md#0x1_avl_queue_remove">avl_queue::remove</a>(&<b>mut</b> scheduled_queue.queue, item.scheduled_time);
+            &<b>mut</b> scheduled_queue.queue, access_key), txn_id);
+        // I don't know how <b>to</b> get the tree node id from the queue <b>to</b> construct the full access key for removal
+        // it'll be removed when it becomes head
+        <b>if</b> (<a href="../../aptos-stdlib/doc/iterable_table.md#0x1_iterable_table_length">iterable_table::length</a>(<a href="avl_tree.md#0x1_avl_queue_borrow">avl_queue::borrow</a>(&scheduled_queue.queue, access_key)) == 0) {
+            <b>let</b> empty_table = <a href="avl_tree.md#0x1_avl_queue_remove">avl_queue::remove</a>(&<b>mut</b> scheduled_queue.queue, access_key);
             <a href="../../aptos-stdlib/doc/iterable_table.md#0x1_iterable_table_destroy_empty">iterable_table::destroy_empty</a>(empty_table);
         }
     }

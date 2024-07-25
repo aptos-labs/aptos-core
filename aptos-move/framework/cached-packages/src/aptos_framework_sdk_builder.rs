@@ -908,7 +908,9 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    TestScheduleTxnBar {},
+    TestScheduleTxnCancel {
+        txn_id: Vec<u8>,
+    },
 
     TestScheduleTxnFoo {},
 
@@ -917,11 +919,15 @@ pub enum EntryFunctionCall {
         b: u64,
     },
 
+    TestScheduleTxnFooWithNewStorage {
+        _val: u64,
+    },
+
     TestScheduleTxnFooWithSignerAndArg {
         value: u64,
     },
 
-    TestScheduleTxnInitialize {},
+    TestScheduleTxnRecurring {},
 
     TransactionFeeConvertToAptosFaBurnRef {},
 
@@ -1586,13 +1592,16 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
-            TestScheduleTxnBar {} => test_schedule_txn_bar(),
+            TestScheduleTxnCancel { txn_id } => test_schedule_txn_cancel(txn_id),
             TestScheduleTxnFoo {} => test_schedule_txn_foo(),
             TestScheduleTxnFooWithArg { a, b } => test_schedule_txn_foo_with_arg(a, b),
+            TestScheduleTxnFooWithNewStorage { _val } => {
+                test_schedule_txn_foo_with_new_storage(_val)
+            },
             TestScheduleTxnFooWithSignerAndArg { value } => {
                 test_schedule_txn_foo_with_signer_and_arg(value)
             },
-            TestScheduleTxnInitialize {} => test_schedule_txn_initialize(),
+            TestScheduleTxnRecurring {} => test_schedule_txn_recurring(),
             TransactionFeeConvertToAptosFaBurnRef {} => {
                 transaction_fee_convert_to_aptos_fa_burn_ref()
             },
@@ -4258,7 +4267,7 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
-pub fn test_schedule_txn_bar() -> TransactionPayload {
+pub fn test_schedule_txn_cancel(txn_id: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -4267,9 +4276,9 @@ pub fn test_schedule_txn_bar() -> TransactionPayload {
             ]),
             ident_str!("test_schedule_txn").to_owned(),
         ),
-        ident_str!("bar").to_owned(),
+        ident_str!("cancel").to_owned(),
         vec![],
-        vec![],
+        vec![bcs::to_bytes(&txn_id).unwrap()],
     ))
 }
 
@@ -4303,6 +4312,21 @@ pub fn test_schedule_txn_foo_with_arg(a: u64, b: u64) -> TransactionPayload {
     ))
 }
 
+pub fn test_schedule_txn_foo_with_new_storage(_val: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("test_schedule_txn").to_owned(),
+        ),
+        ident_str!("foo_with_new_storage").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&_val).unwrap()],
+    ))
+}
+
 pub fn test_schedule_txn_foo_with_signer_and_arg(value: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4318,7 +4342,7 @@ pub fn test_schedule_txn_foo_with_signer_and_arg(value: u64) -> TransactionPaylo
     ))
 }
 
-pub fn test_schedule_txn_initialize() -> TransactionPayload {
+pub fn test_schedule_txn_recurring() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -4327,7 +4351,7 @@ pub fn test_schedule_txn_initialize() -> TransactionPayload {
             ]),
             ident_str!("test_schedule_txn").to_owned(),
         ),
-        ident_str!("initialize").to_owned(),
+        ident_str!("recurring").to_owned(),
         vec![],
         vec![],
     ))
@@ -6218,9 +6242,11 @@ mod decoder {
         }
     }
 
-    pub fn test_schedule_txn_bar(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
-            Some(EntryFunctionCall::TestScheduleTxnBar {})
+    pub fn test_schedule_txn_cancel(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TestScheduleTxnCancel {
+                txn_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
         } else {
             None
         }
@@ -6247,6 +6273,18 @@ mod decoder {
         }
     }
 
+    pub fn test_schedule_txn_foo_with_new_storage(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TestScheduleTxnFooWithNewStorage {
+                _val: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn test_schedule_txn_foo_with_signer_and_arg(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6259,9 +6297,9 @@ mod decoder {
         }
     }
 
-    pub fn test_schedule_txn_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+    pub fn test_schedule_txn_recurring(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(_script) = payload {
-            Some(EntryFunctionCall::TestScheduleTxnInitialize {})
+            Some(EntryFunctionCall::TestScheduleTxnRecurring {})
         } else {
             None
         }
@@ -6985,8 +7023,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::staking_proxy_set_voter),
         );
         map.insert(
-            "test_schedule_txn_bar".to_string(),
-            Box::new(decoder::test_schedule_txn_bar),
+            "test_schedule_txn_cancel".to_string(),
+            Box::new(decoder::test_schedule_txn_cancel),
         );
         map.insert(
             "test_schedule_txn_foo".to_string(),
@@ -6997,12 +7035,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::test_schedule_txn_foo_with_arg),
         );
         map.insert(
+            "test_schedule_txn_foo_with_new_storage".to_string(),
+            Box::new(decoder::test_schedule_txn_foo_with_new_storage),
+        );
+        map.insert(
             "test_schedule_txn_foo_with_signer_and_arg".to_string(),
             Box::new(decoder::test_schedule_txn_foo_with_signer_and_arg),
         );
         map.insert(
-            "test_schedule_txn_initialize".to_string(),
-            Box::new(decoder::test_schedule_txn_initialize),
+            "test_schedule_txn_recurring".to_string(),
+            Box::new(decoder::test_schedule_txn_recurring),
         );
         map.insert(
             "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),
