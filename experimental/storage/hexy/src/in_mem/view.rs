@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    hashing::HexyHashBuilder,
     in_mem::{base::HexyBase, overlay::HexyOverlay},
     metrics::TIMER,
     utils::sort_dedup,
     LeafIdx, NodePosition, ARITY,
 };
-use aptos_crypto::{
-    hash::{CryptoHasher, HexyHasher, HOT_STATE_PLACE_HOLDER_HASH},
-    HashValue,
-};
+use anyhow::Result;
+use aptos_crypto::{hash::HOT_STATE_PLACE_HOLDER_HASH, HashValue};
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_metrics_core::TimerHelper;
 use itertools::Itertools;
@@ -26,7 +25,7 @@ impl HexyView {
         Self { base, overlay }
     }
 
-    pub fn new_overlay(&self, leaves: Vec<(LeafIdx, HashValue)>) -> HexyOverlay {
+    pub fn new_overlay(&self, leaves: Vec<(LeafIdx, HashValue)>) -> Result<HexyOverlay> {
         // Sort and dedup leaves.
         let sorted_leaves = sort_dedup(leaves);
 
@@ -50,7 +49,7 @@ impl HexyView {
                 .iter()
                 .chunk_by(|upd| upd.0.parent_index_in_level())
             {
-                let mut hasher = HexyHasher::default();
+                let mut hasher = HexyHashBuilder::default();
 
                 let parent_position =
                     NodePosition::height_and_index(height, parent_idx_in_level as usize);
@@ -58,18 +57,18 @@ impl HexyView {
                 for (updated_child_position, updated_child_hash) in updated_children.into_iter() {
                     let updated_child = updated_child_position.index_in_siblings();
                     for child in next_child..updated_child {
-                        hasher.update(self.expect_hash(parent_position.child(child)).as_slice());
+                        hasher.add_child(&self.expect_hash(parent_position.child(child)))?;
                     }
                     // n.b. There's the rule of "16 placeholders hash to the placeholder", and
                     // it seems a waste to detect that.
                     assert_ne!(updated_child_hash, &*HOT_STATE_PLACE_HOLDER_HASH);
-                    hasher.update(updated_child_hash.as_slice());
+                    hasher.add_child(updated_child_hash)?;
                     next_child = updated_child + 1;
                 }
                 for child in next_child..ARITY {
-                    hasher.update(self.expect_hash(parent_position.child(child)).as_slice());
+                    hasher.add_child(&self.expect_hash(parent_position.child(child)))?;
                 }
-                this_level_updates.push((parent_position, hasher.finish()))
+                this_level_updates.push((parent_position, hasher.finish()?))
             } // end for children per parent
 
             prev_level_begin = updates.len();
@@ -91,7 +90,7 @@ impl HexyView {
         let overlay = self.overlay.new_layer(&updates);
         Self::maybe_log_hashing_under_estimation(estimated_total_hashes, updates);
 
-        HexyOverlay { overlay, root_hash }
+        Ok(HexyOverlay { overlay, root_hash })
     }
 
     fn maybe_log_hashing_under_estimation(

@@ -85,7 +85,7 @@ proptest! {
 
         for batch in updates.iter() {
             let view = top_overlay.view(&base, &bottom_overlay);
-            top_overlay = view.new_overlay(batch.clone());
+            top_overlay = view.new_overlay(batch.clone()).unwrap();
         }
 
         prop_assert_eq!(

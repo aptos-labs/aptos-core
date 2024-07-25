@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod hashing;
 pub mod in_mem;
 mod metrics;
 #[cfg(test)]
