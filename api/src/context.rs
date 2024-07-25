@@ -252,6 +252,35 @@ impl Context {
         ))
     }
 
+    pub fn get_latest_ledger_info_and_verify_internal_indexer_lookup_version<E: StdApiError>(
+        &self,
+        requested_ledger_version: Option<Version>,
+    ) -> Result<(LedgerInfo, Version), E> {
+        if self.indexer_reader.is_none() {
+            return Err(E::internal_with_code_no_info(
+                "Indexer reader doesn't exist",
+                AptosErrorCode::InternalError,
+            ));
+        }
+
+        let (latest_ledger_info, latest_internal_indexer_ledger_version) =
+            self.get_latest_internal_indexer_ledger_version_and_main_db_info()?;
+        if let Some(version) = requested_ledger_version {
+            let request_ledger_version = Version::from(version);
+            if latest_internal_indexer_ledger_version < request_ledger_version {
+                return Err(version_not_found(
+                    request_ledger_version,
+                    &latest_ledger_info,
+                ));
+            } else if request_ledger_version < latest_ledger_info.oldest_ledger_version.0 {
+                return Err(version_pruned(request_ledger_version, &latest_ledger_info));
+            }
+            Ok((latest_ledger_info, request_ledger_version))
+        } else {
+            Ok((latest_ledger_info, latest_internal_indexer_ledger_version))
+        }
+    }
+
     pub fn get_latest_ledger_info_and_verify_lookup_version<E: StdApiError>(
         &self,
         requested_ledger_version: Option<Version>,
@@ -275,6 +304,25 @@ impl Context {
         }
 
         Ok((latest_ledger_info, requested_ledger_version))
+    }
+
+    pub fn get_latest_internal_indexer_ledger_version_and_main_db_info<E: StdApiError>(
+        &self,
+    ) -> Result<(LedgerInfo, Version), E> {
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            if let Some(latest_version) = indexer_reader
+                .get_latest_internal_indexer_ledger_version()
+                .map_err(|err| E::internal_with_code_no_info(err, AptosErrorCode::InternalError))?
+            {
+                let latest_ledger_info = self.get_latest_ledger_info()?;
+                return Ok((latest_ledger_info, latest_version));
+            }
+        }
+
+        Err(E::internal_with_code_no_info(
+            "Indexer reader doesn't exist, or doesn't have data.",
+            AptosErrorCode::InternalError,
+        ))
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {

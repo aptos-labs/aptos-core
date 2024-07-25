@@ -39,6 +39,7 @@ impl AptosDB {
             hack_for_tests,
             empty_buffered_state_for_restore,
             skip_index_and_usage,
+            internal_indexer_db.clone(),
         ));
 
         let ledger_pruner =
