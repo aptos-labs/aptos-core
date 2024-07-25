@@ -274,7 +274,7 @@ impl fmt::Debug for PeerNetworkId {
 
 impl fmt::Display for PeerNetworkId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.network_id(), self.peer_id(),)
+        write!(f, "{}:{:?}", self.network_id(), self.peer_id())
     }
 }
 
