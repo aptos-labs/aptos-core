@@ -483,19 +483,20 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         // For each transaction, we include the ready time in millis since epoch
         transactions: Vec<(SignedTransaction, u64)>,
     ) -> Result<(), BroadcastError> {
+        let len = transactions.len();
         let request = if self.mempool_config.include_ready_time_in_broadcast {
             MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
-                request_id: batch_id,
+                request_id: batch_id.clone(),
                 transactions,
                 priority: self.check_peer_prioritized(peer)?,
             }
         } else {
             MempoolSyncMsg::BroadcastTransactionsRequest {
-                request_id: batch_id,
+                request_id: batch_id.clone(),
                 transactions: transactions.into_iter().map(|(txn, _)| txn).collect(),
             }
         };
-        info!("send_batch_to_peer: peer: {}, batch_id: {:?}, transactions.len(): {}, priority: {:?}", peer, batch_id, transactions.len(), self.check_peer_prioritized(peer));
+        info!("send_batch_to_peer: peer: {}, batch_id: {:?}, transactions.len(): {}, priority: {:?}", peer, batch_id, len, self.check_peer_prioritized(peer));
         if let Err(e) = self.network_client.send_to_peer(request, peer) {
             counters::network_send_fail_inc(counters::BROADCAST_TXNS);
             return Err(BroadcastError::NetworkError(peer, e.into()));
