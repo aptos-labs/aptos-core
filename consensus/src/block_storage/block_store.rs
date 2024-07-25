@@ -351,10 +351,6 @@ impl BlockStore {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
-        ensure!(
-            self.inner.read().ordered_root().round() < block.round(),
-            "Block with old round"
-        );
 
         // ensure local time past the block time
         let block_time = Duration::from_micros(block.timestamp_usecs());

@@ -16,7 +16,13 @@ use aptos_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
-use std::{cmp::max, collections::HashSet, fmt::Debug, sync::Arc};
+use num_traits::Saturating;
+use std::{
+    cmp::max,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    sync::Arc,
+};
 
 /// PersistentLivenessStorage is essential for maintaining liveness when a node crashes.  Specifically,
 /// upon a restart, a correct node will recover.  Even if all nodes crash, liveness is
@@ -134,7 +140,7 @@ impl LedgerRecoveryData {
             .position(|block| block.id() == root_id)
             .ok_or_else(|| format_err!("unable to find root: {}", root_id))?;
         // TODO: note, we probably have to remove the remove here.
-        let root_block = blocks.remove(root_idx);
+        let root_block = blocks[root_idx].clone();
         let root_quorum_cert = quorum_certs
             .iter()
             .find(|qc| qc.certified_block().id() == root_block.id())
@@ -252,14 +258,15 @@ impl RecoveryData {
                 )
             })?;
 
-        // TODO: currently we are pruning, but need to do so respecting the window size
         let blocks_to_prune = Some(Self::find_blocks_to_prune(
             root.0.id(),
             &mut blocks,
             &mut quorum_certs,
+            root.0
+                .round()
+                .saturating_add(1)
+                .saturating_sub(window_size as u64),
         ));
-        // TODO: use window_size
-        info!("window_size: {}", window_size);
         info!("Blocks to prune: {:?}", blocks_to_prune);
         let epoch = root.0.epoch();
         Ok(RecoveryData {
@@ -310,14 +317,44 @@ impl RecoveryData {
         root_id: HashValue,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
+        window_start_round: u64,
     ) -> Vec<HashValue> {
-        // prune all the blocks that don't have root as ancestor
+        // prune all the blocks that don't have root as ancestor, expect the blocks that are
+        // an ancestor of the root and are within the window size.
         let mut tree = HashSet::new();
         let mut to_remove = HashSet::new();
-        tree.insert(root_id);
+
+        let mut id_to_blocks = HashMap::new();
+        blocks.iter().for_each(|block| {
+            id_to_blocks.insert(block.id(), block);
+        });
+        let epoch = id_to_blocks
+            .get(&root_id)
+            .expect("Root block not found")
+            .epoch();
+
+        let mut curr_id = root_id;
+        while let Some(block) = id_to_blocks.get(&curr_id) {
+            info!("Checking block for tree: {}", block.id());
+            // TODO: can we remove this check?
+            if block.epoch() < epoch {
+                continue;
+            }
+            tree.insert(block.id());
+            info!("Adding block to tree: {}", block.id());
+            // Stop after adding the first block that is <= window_start_round
+            if block.round() <= window_start_round {
+                info!("Stop adding block to tree: {}", block.id());
+                break;
+            }
+            curr_id = block.parent_id();
+        }
+
         // assume blocks are sorted by round already
         blocks.retain(|block| {
-            if tree.contains(&block.parent_id()) {
+            if tree.contains(&block.id()) {
+                true
+            } else if tree.contains(&block.parent_id()) {
                 tree.insert(block.id());
                 true
             } else {
