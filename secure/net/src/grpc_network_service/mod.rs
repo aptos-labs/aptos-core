@@ -237,7 +237,7 @@ impl GRPCNetworkMessageServiceClientWrapper {
                 seq_no: message.seq_num,
                 shard_id: message.shard_id,
             });
-            match timeout(Duration::from_millis(20), self.remote_channel.simple_msg_exchange(request)).await {
+            match timeout(Duration::from_millis(50), self.remote_channel.simple_msg_exchange(request)).await {
                 Ok(Ok(_)) => {
                     // Operation succeeded
                     break;

@@ -195,8 +195,8 @@ impl OutboundRpcScheduler {
             self.outbound_rpc_runtime.spawn(async move {
                 loop {
                     let msg = outbound_rpc_scheduler_clone.recv().await;
-                    let seq_num = msg.msg.seq_num.unwrap();
-                    let shard_id = msg.msg.shard_id.unwrap();
+                    let seq_num = msg.msg.seq_num.unwrap_or_default();
+                    let shard_id = msg.msg.shard_id.unwrap_or_default();
                     msg.outbound_helper.lock().await.send_async(msg.msg, &msg.msg_type).await;
                     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
                     info!("Sent kv req batch {} sent to shard {} at time: {}", seq_num, shard_id, curr_time);

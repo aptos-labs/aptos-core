@@ -355,7 +355,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 Message::new(output_message),
                 MessageType::new(execute_result_type),
                 result_tx_clone[rand_result_rx_thread].clone(),
-                100);
+                0);
             // result_tx_clone[rand_result_rx_thread].lock().unwrap().send(Message::new(output_message), &MessageType::new(execute_result_type));
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             info!("Sent cmd results batch at time: {}", curr_time);
