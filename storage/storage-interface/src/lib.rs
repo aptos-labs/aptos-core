@@ -282,7 +282,7 @@ pub trait DbReader: Send + Sync {
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
         /// Returns the latest "synced" transaction version, potentially not "committed" yet.
-        fn get_synced_version(&self) -> Result<Version>;
+        fn get_synced_version(&self) -> Result<Option<Version>>;
 
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
@@ -486,6 +486,16 @@ pub trait DbReader: Send + Sync {
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         self.get_state_value_with_proof_by_version_ext(state_key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
+    }
+
+    fn ensure_synced_version(&self) -> Result<Version> {
+        self.get_synced_version()?
+            .ok_or_else(|| AptosDbError::NotFound("Synced version not found.".to_string()))
+    }
+
+    fn expect_synced_version(&self) -> Version {
+        self.ensure_synced_version()
+            .expect("Failed to get synced version.")
     }
 }
 

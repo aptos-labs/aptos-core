@@ -51,7 +51,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_synced_version(&self) -> Result<Version> {
+    fn get_synced_version(&self) -> Result<Option<Version>> {
         gauged_api("get_synced_version", || {
             self.ledger_db.metadata_db().get_synced_version()
         })
@@ -545,7 +545,7 @@ impl DbReader for AptosDB {
                     u64::max_value(),
                     Order::Descending,
                     num_events as u64,
-                    self.get_synced_version().unwrap_or(0),
+                    self.get_synced_version()?.unwrap_or(0),
                 );
             }
 
