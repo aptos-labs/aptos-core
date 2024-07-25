@@ -372,6 +372,10 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         // If the peer isn't prioritized, lets not broadcast
         let peer_priority = self.check_peer_prioritized(peer)?;
 
+        info!(
+            "determine_broadcast_batch: peer: {}, scheduled_backoff: {}, peer_priority: {:?}",
+            peer, scheduled_backoff, peer_priority
+        );
         // If backoff mode is on for this peer, only execute broadcasts that were scheduled as a backoff broadcast.
         // This is to ensure the backoff mode is actually honored (there is a chance a broadcast was scheduled
         // in non-backoff mode before backoff mode was turned on - ignore such scheduled broadcasts).
@@ -508,6 +512,17 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         fail_point!("mempool::send_to", |_| {
             Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
         });
+        let message_type = match &message {
+            MempoolSyncMsg::BroadcastTransactionsRequest { .. } => "Request",
+            MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime { .. } => {
+                "RequestWithReadyTime"
+            },
+            MempoolSyncMsg::BroadcastTransactionsResponse { .. } => "Response",
+        };
+        info!(
+            "send_message_to_peer: peer: {}, message: {:?}",
+            peer, message_type
+        );
         self.network_client.send_to_peer(message, peer)
     }
 
@@ -544,8 +559,16 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> Result<(), BroadcastError> {
         // Start timer for tracking broadcast latency.
         let start_time = Instant::now();
-        let (batch_id, transactions, metric_label) =
-            self.determine_broadcast_batch(peer, scheduled_backoff, smp)?;
+
+        let result = self.determine_broadcast_batch(peer, scheduled_backoff, smp);
+        info!(
+            "execute_broadcast: peer: {}, scheduled_backoff: {}, result: {:?}",
+            peer,
+            scheduled_backoff,
+            result.is_ok()
+        );
+        let (batch_id, transactions, metric_label) = result?;
+        info!("execute_broadcast: peer: {}, scheduled_backoff: {}, batch_id: {:?}, transactions.len(): {}, metric_label: {:?}", peer, scheduled_backoff, batch_id, transactions.len(), metric_label);
 
         let num_txns = transactions.len();
         let send_time = SystemTime::now();
