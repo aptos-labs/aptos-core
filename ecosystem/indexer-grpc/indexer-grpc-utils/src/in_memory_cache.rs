@@ -18,8 +18,9 @@ const IN_MEMORY_CACHE_GC_INTERVAL_MS: u64 = 100;
 // Max cache entry TTL: 30 seconds.
 // const MAX_IN_MEMORY_CACHE_ENTRY_TTL: u64 = 30;
 // Warm-up cache entries. Pre-fetch the cache entries to warm up the cache.
-pub const WARM_UP_CACHE_ENTRIES: u64 = 20_000;
+pub const WARM_UP_CACHE_ENTRIES: u64 = 100;
 pub const MAX_REDIS_FETCH_BATCH_SIZE: usize = 500;
+pub const MAX_FETCH_BATCH_SIZE: usize = 5000;
 
 /// Configuration for when we want to explicitly declare how large the cache should be.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -85,6 +86,7 @@ struct CacheMetadata {
 }
 
 /// InMemoryCache is a simple in-memory cache that stores the protobuf Transaction.
+#[derive(Debug)]
 pub struct InMemoryCache {
     /// Cache maps the cache key to the deserialized Transaction.
     cache: Arc<DashMap<u64, Arc<Transaction>>>,
@@ -156,7 +158,7 @@ impl InMemoryCache {
             // This is to avoid fetching too many transactions at once.
             let ending_version = std::cmp::min(
                 latest_version,
-                starting_version + MAX_REDIS_FETCH_BATCH_SIZE as u64,
+                starting_version + MAX_FETCH_BATCH_SIZE as u64,
             );
             break (
                 (starting_version..ending_version).collect::<Vec<u64>>(),
@@ -254,7 +256,7 @@ fn spawn_update_task<C>(
             }
             let end_version = std::cmp::min(
                 current_latest_version,
-                in_cache_latest_version + 10 * MAX_REDIS_FETCH_BATCH_SIZE as u64,
+                in_cache_latest_version + 10 * MAX_FETCH_BATCH_SIZE as u64,
             );
             let versions_to_fetch = (in_cache_latest_version..end_version).collect();
             let transactions = batch_get_transactions(&mut conn, versions_to_fetch, storage_format)

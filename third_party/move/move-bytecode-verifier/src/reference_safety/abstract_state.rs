@@ -11,10 +11,11 @@ use move_binary_format::{
     binary_views::FunctionView,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        CodeOffset, FieldHandleIndex, FunctionDefinitionIndex, LocalIndex, Signature,
-        SignatureToken, StructDefinitionIndex,
+        CodeOffset, FunctionDefinitionIndex, LocalIndex, Signature, SignatureToken,
+        StructDefinitionIndex,
     },
     safe_unwrap,
+    views::FieldOrVariantIndex,
 };
 use move_borrow_graph::references::RefID;
 use move_core_types::vm_status::StatusCode;
@@ -58,7 +59,7 @@ impl AbstractValue {
 enum Label {
     Local(LocalIndex),
     Global(StructDefinitionIndex),
-    Field(FieldHandleIndex),
+    Field(FieldOrVariantIndex),
 }
 
 // Needed for debugging with the borrow graph
@@ -67,7 +68,10 @@ impl std::fmt::Display for Label {
         match self {
             Label::Local(i) => write!(f, "local#{}", i),
             Label::Global(i) => write!(f, "resource@{}", i),
-            Label::Field(i) => write!(f, "field#{}", i),
+            Label::Field(FieldOrVariantIndex::FieldIndex(i)) => write!(f, "field#{}", i),
+            Label::Field(FieldOrVariantIndex::VariantFieldIndex(i)) => {
+                write!(f, "variant_field#{}", i)
+            },
         }
     }
 }
@@ -172,7 +176,7 @@ impl AbstractState {
         self.borrow_graph.add_weak_borrow((), parent, child)
     }
 
-    fn add_field_borrow(&mut self, parent: RefID, field: FieldHandleIndex, child: RefID) {
+    fn add_field_borrow(&mut self, parent: RefID, field: FieldOrVariantIndex, child: RefID) {
         self.borrow_graph
             .add_strong_field_borrow((), parent, Label::Field(field), child)
     }
@@ -248,7 +252,7 @@ impl AbstractState {
     /// checks if `id` is freezable
     /// - Mutable references are freezable if there are no consistent mutable borrows
     /// - Immutable references are not freezable by the typing rules
-    fn is_freezable(&self, id: RefID, at_field_opt: Option<FieldHandleIndex>) -> bool {
+    fn is_freezable(&self, id: RefID, at_field_opt: Option<FieldOrVariantIndex>) -> bool {
         assert!(self.borrow_graph.is_mutable(id));
         !self.has_consistent_mutable_borrows(id, at_field_opt.map(Label::Field))
     }
@@ -256,7 +260,7 @@ impl AbstractState {
     /// checks if `id` is readable
     /// - Mutable references are readable if they are freezable
     /// - Immutable references are always readable
-    fn is_readable(&self, id: RefID, at_field_opt: Option<FieldHandleIndex>) -> bool {
+    fn is_readable(&self, id: RefID, at_field_opt: Option<FieldOrVariantIndex>) -> bool {
         let is_mutable = self.borrow_graph.is_mutable(id);
         !is_mutable || self.is_freezable(id, at_field_opt)
     }
@@ -433,7 +437,7 @@ impl AbstractState {
         offset: CodeOffset,
         mut_: bool,
         id: RefID,
-        field: FieldHandleIndex,
+        field: FieldOrVariantIndex,
     ) -> PartialVMResult<AbstractValue> {
         // Any field borrows will be factored out, so don't check in the mutable case
         let is_mut_borrow_with_full_borrows = || mut_ && self.has_full_borrows(id);

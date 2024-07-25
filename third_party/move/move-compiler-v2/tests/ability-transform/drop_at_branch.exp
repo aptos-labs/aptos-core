@@ -36,6 +36,29 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
   7: return $t1
 }
 
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun explicate_drop::drop_at_branch($t0: bool): u8 {
+     var $t1: u8
+     # live vars: $t0
+  0: if ($t0) goto 1 else goto 4
+     # live vars:
+  1: label L0
+     # live vars:
+  2: $t1 := 1
+     # live vars: $t1
+  3: goto 6
+     # live vars:
+  4: label L1
+     # live vars:
+  5: $t1 := 0
+     # live vars: $t1
+  6: label L2
+     # live vars: $t1
+  7: return $t1
+}
+
 ============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]

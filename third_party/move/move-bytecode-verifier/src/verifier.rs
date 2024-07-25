@@ -31,6 +31,7 @@ pub struct VerifierConfig {
     pub max_push_size: Option<usize>,
     pub max_dependency_depth: Option<usize>,
     pub max_struct_definitions: Option<usize>,
+    pub max_struct_variants: Option<usize>,
     pub max_fields_in_struct: Option<usize>,
     pub max_function_definitions: Option<usize>,
     pub max_back_edges_per_function: Option<usize>,
@@ -194,6 +195,8 @@ impl Default for VerifierConfig {
             max_struct_definitions: None,
             // Max count of fields in a struct
             max_fields_in_struct: None,
+            // Max count of variants in a struct
+            max_struct_variants: None,
             // Max count of functions in a module
             max_function_definitions: None,
             // Max size set to 10000 to restrict number of pushes in one function
@@ -242,6 +245,7 @@ impl VerifierConfig {
             max_dependency_depth: Some(100),
             max_struct_definitions: Some(200),
             max_fields_in_struct: Some(30),
+            max_struct_variants: Some(90),
             max_function_definitions: Some(1000),
 
             // Do not use back edge constraints as they are superseded by metering

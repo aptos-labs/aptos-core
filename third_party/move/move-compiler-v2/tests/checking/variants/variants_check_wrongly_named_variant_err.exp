@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid name
+  ┌─ tests/checking/variants/variants_check_wrongly_named_variant_err.move:4:9
+  │
+4 │         rgb{red: u64, green: u64, blue: u64},
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid variant name 'rgb'. variant names must start with 'A'..'Z'

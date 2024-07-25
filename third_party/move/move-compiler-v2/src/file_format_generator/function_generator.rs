@@ -16,6 +16,7 @@ use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, Loc, NodeId, Parameter, QualifiedId, StructId, TypeParameter},
+    symbol::Symbol,
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
@@ -388,6 +389,18 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::PackGeneric,
                 );
             },
+            Operation::PackVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::PackVariant,
+                    FF::Bytecode::PackVariantGeneric,
+                );
+            },
             Operation::Unpack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -397,6 +410,30 @@ impl<'a> FunctionGenerator<'a> {
                     source,
                     FF::Bytecode::Unpack,
                     FF::Bytecode::UnpackGeneric,
+                );
+            },
+            Operation::UnpackVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::UnpackVariant,
+                    FF::Bytecode::UnpackVariantGeneric,
+                );
+            },
+            Operation::TestVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::TestVariant,
+                    FF::Bytecode::TestVariantGeneric,
                 );
             },
             Operation::MoveTo(mid, sid, inst) => {
@@ -447,6 +484,18 @@ impl<'a> FunctionGenerator<'a> {
                     dest,
                     mid.qualified(*sid),
                     inst.clone(),
+                    None,
+                    *offset,
+                    source,
+                );
+            },
+            Operation::BorrowVariantField(mid, sid, variants, inst, offset) => {
+                self.gen_borrow_field(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    inst.clone(),
+                    Some(variants),
                     *offset,
                     source,
                 );
@@ -631,6 +680,39 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_push_result(ctx, dest);
     }
 
+    fn gen_struct_variant_oper(
+        &mut self,
+        ctx: &BytecodeContext,
+        dest: &[TempIndex],
+        id: QualifiedId<StructId>,
+        variant: Symbol,
+        inst: &[Type],
+        source: &[TempIndex],
+        mk_simple: impl FnOnce(FF::StructVariantHandleIndex) -> FF::Bytecode,
+        mk_generic: impl FnOnce(FF::StructVariantInstantiationIndex) -> FF::Bytecode,
+    ) {
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source, None);
+        let struct_env = &fun_ctx.module.env.get_struct(id);
+        if inst.is_empty() {
+            let idx =
+                self.gen
+                    .struct_variant_index(&fun_ctx.module, &fun_ctx.loc, struct_env, variant);
+            self.emit(mk_simple(idx))
+        } else {
+            let idx = self.gen.struct_variant_inst_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                struct_env,
+                variant,
+                inst.to_vec(),
+            );
+            self.emit(mk_generic(idx))
+        }
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
     /// Generate code for the borrow-field instruction.
     fn gen_borrow_field(
         &mut self,
@@ -638,31 +720,65 @@ impl<'a> FunctionGenerator<'a> {
         dest: &[TempIndex],
         id: QualifiedId<StructId>,
         inst: Vec<Type>,
+        variants: Option<&[Symbol]>,
         offset: usize,
         source: &[TempIndex],
     ) {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source, None);
         let struct_env = &fun_ctx.module.env.get_struct(id);
-        let field_env = &struct_env.get_field_by_offset(offset);
         let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
-        if inst.is_empty() {
-            let idx = self
-                .gen
-                .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowField(idx))
+
+        if let Some(variants) = variants {
+            assert!(!variants.is_empty());
+            let field_env =
+                &struct_env.get_field_by_offset_optional_variant(Some(variants[0]), offset);
+            if inst.is_empty() {
+                let idx = self.gen.variant_field_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                );
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowVariantField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowVariantField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowField(idx))
+                let idx = self.gen.variant_field_inst_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                    inst,
+                );
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowVariantFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowVariantFieldGeneric(idx))
+                }
             }
         } else {
-            let idx = self
-                .gen
-                .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+            let field_env = &struct_env.get_field_by_offset_optional_variant(None, offset);
+            if inst.is_empty() {
+                let idx = self
+                    .gen
+                    .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                let idx = self
+                    .gen
+                    .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                }
             }
         }
         self.abstract_pop_n(ctx, source.len());
@@ -720,12 +836,7 @@ impl<'a> FunctionGenerator<'a> {
         }
     }
 
-    fn gen_vector_load_push(
-        &mut self,
-        ctx: &BytecodeContext,
-        vec: &Vec<Constant>,
-        vec_type: &Type,
-    ) {
+    fn gen_vector_load_push(&mut self, ctx: &BytecodeContext, vec: &[Constant], vec_type: &Type) {
         let fun_ctx = ctx.fun_ctx;
         let elem_type = if let Type::Vector(el) = vec_type {
             el.as_ref().clone()
@@ -997,7 +1108,10 @@ impl<'a> FunctionGenerator<'a> {
 impl<'env> FunctionContext<'env> {
     /// Emits an internal error for this function.
     pub fn internal_error(&self, msg: impl AsRef<str>) {
-        self.module.internal_error(&self.loc, msg)
+        self.module.internal_error(
+            &self.loc,
+            format!("file format generator: {}", msg.as_ref()),
+        )
     }
 
     /// Gets the type of the temporary.

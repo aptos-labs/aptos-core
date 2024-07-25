@@ -85,10 +85,6 @@ impl TDelayedFieldView for AptosBlankStorage {
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        false
-    }
-
     fn get_delayed_field_value(
         &self,
         _id: &Self::Identifier,
@@ -163,12 +159,16 @@ pub fn aptos_natives(
         misc_gas_params,
         timed_features,
         features,
+        None,
     );
 
-    aptos_natives_with_builder(&mut builder)
+    aptos_natives_with_builder(&mut builder, false)
 }
 
-pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunctionTable {
+pub fn aptos_natives_with_builder(
+    builder: &mut SafeNativeBuilder,
+    inject_create_signer_for_gov_sim: bool,
+) -> NativeFunctionTable {
     #[allow(unreachable_code)]
     aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
         .into_iter()
@@ -176,6 +176,7 @@ pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunc
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             builder,
+            inject_create_signer_for_gov_sim,
         ))
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,
@@ -237,6 +238,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeAggregatorContext::new(
         [0; 32],
         &*DUMMY_RESOLVER,
+        false,
         &*DUMMY_RESOLVER,
     ));
     exts.add(NativeRistrettoPointContext::new());

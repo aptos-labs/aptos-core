@@ -132,8 +132,20 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         }
                         self.seen_uses.exit_scope();
                     },
-                    Pre | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                    Pre | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
+                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
                 };
+            },
+            Match(_, _, arms) => match position {
+                BeforeMatchBody(_) => self.seen_uses.enter_scope(),
+                AfterMatchBody(idx) => {
+                    for (id, var) in arms[idx].pattern.vars() {
+                        self.node_symbol_decl_visitor(true, &id, &var, UsageKind::LocalVar)
+                    }
+                    self.seen_uses.exit_scope();
+                },
+                Pre | Post | BeforeBody | MidMutate | BeforeThen | BeforeElse
+                | PreSequenceValue => {},
             },
             Lambda(_, pat, _) => {
                 match position {
@@ -144,7 +156,8 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         }
                         self.seen_uses.exit_scope();
                     },
-                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
+                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
                 };
             },
             Quant(_, _, ranges, ..) => {
@@ -161,7 +174,8 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         }
                         self.seen_uses.exit_scope();
                     },
-                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
+                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
                 };
             },
             Assign(_, pat, _) => {

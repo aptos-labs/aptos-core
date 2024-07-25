@@ -548,6 +548,12 @@ impl<'a> FunctionGenerator<'a> {
 
                     // Unimplemented
                     Vector => unimplemented!("vector"),
+                    TestVariant(..)
+                    | PackVariant(..)
+                    | UnpackVariant(..)
+                    | BorrowVariantField(..) => {
+                        unimplemented!("variants")
+                    },
 
                     // Specification or other operations which can be ignored here
                     Release

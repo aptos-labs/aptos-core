@@ -1014,7 +1014,7 @@ pub async fn wait_for_monitoring_network_update(
             let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
 
             // Check if the distance from validators matches the expected value
-            if let Some(latest_network_info_response) =
+            if let Some(ref latest_network_info_response) =
                 peer_monitoring_metadata.latest_network_info_response
             {
                 if latest_network_info_response.distance_from_validators

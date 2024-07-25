@@ -38,7 +38,9 @@ use aptos_types::{
     executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
-    transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
+    transaction::{
+        block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
+    },
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
@@ -64,7 +66,7 @@ pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
-    executor_thread_pool: Arc<ThreadPool>,
+    executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
@@ -105,13 +107,13 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
         base_view: &S,
-        latest_view: ParallelState<T, X>,
+        parallel_state: ParallelState<T, X>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
-        let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
+        let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
@@ -462,6 +464,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
+        num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
@@ -590,6 +593,7 @@ where
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
+                        num_workers,
                     );
 
                     // failpoint triggering error at the last committed transaction,
@@ -743,7 +747,7 @@ where
 
     fn worker_loop(
         &self,
-        executor_arguments: &E::Argument,
+        env: &E::Environment,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
@@ -754,10 +758,11 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(*executor_arguments);
+        let executor = E::init(env.clone(), base_view);
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -793,6 +798,7 @@ where
                     shared_counter,
                     &executor,
                     block,
+                    num_workers,
                 )?;
                 scheduler.queueing_commits_mark_done();
             }
@@ -858,7 +864,7 @@ where
 
     pub(crate) fn execute_transactions_parallel(
         &self,
-        executor_initial_arguments: E::Argument,
+        env: &E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<BlockOutput<E::Output>, ()> {
@@ -877,10 +883,11 @@ where
         let shared_counter = AtomicU32::new(start_shared_counter);
 
         if signature_verified_block.is_empty() {
-            return Ok(BlockOutput::new(vec![]));
+            return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
         }
 
         let num_txns = signature_verified_block.len();
+        let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -903,10 +910,10 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..self.config.local.concurrency_level {
+            for _ in 0..num_workers {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
-                        &executor_initial_arguments,
+                        env,
                         signature_verified_block,
                         &last_input_output,
                         &versioned_cache,
@@ -916,9 +923,10 @@ where
                         &shared_counter,
                         &shared_commit_state,
                         &final_results,
+                        num_workers,
                     ) {
                         // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
+                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
                         // and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
@@ -938,11 +946,19 @@ where
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        // TODO add block end info to output.
-        // block_limit_processor.is_block_limit_reached();
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(shared_commit_state.into_inner().get_block_end_info())
+        } else {
+            None
+        };
 
         (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(final_results.into_inner()))
+            .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
             .ok_or(())
     }
 
@@ -1022,14 +1038,14 @@ where
 
     pub(crate) fn execute_transactions_sequential(
         &self,
-        executor_arguments: E::Argument,
+        env: E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(executor_arguments);
+        let executor = E::init(env, base_view);
         drop(init_timer);
 
         let start_counter = gen_id_start_value(true);
@@ -1299,24 +1315,47 @@ where
 
         counters::update_state_counters(unsync_map.stats(), false);
 
-        // TODO add block end info to output.
-        // block_limit_processor.is_block_limit_reached();
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(block_limit_processor.get_block_end_info())
+        } else {
+            None
+        };
 
-        Ok(BlockOutput::new(ret))
+        Ok(BlockOutput::new(ret, block_end_info))
+    }
+
+    fn empty_block_end_info(&self) -> Option<BlockEndInfo> {
+        if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(BlockEndInfo::V0 {
+                block_gas_limit_reached: false,
+                block_output_limit_reached: false,
+                block_effective_block_gas_units: 0,
+                block_approx_output_size: 0,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn execute_block(
         &self,
-        executor_arguments: E::Argument,
+        env: E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         if self.config.local.concurrency_level > 1 {
-            let parallel_result = self.execute_transactions_parallel(
-                executor_arguments,
-                signature_verified_block,
-                base_view,
-            );
+            let parallel_result =
+                self.execute_transactions_parallel(&env, signature_verified_block, base_view);
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
@@ -1334,9 +1373,9 @@ where
             info!("parallel execution requiring fallback");
         }
 
-        // If we didn't run parallel or it didn't finish successfully - run sequential
+        // If we didn't run parallel, or it didn't finish successfully - run sequential
         let sequential_result = self.execute_transactions_sequential(
-            executor_arguments,
+            env.clone(),
             signature_verified_block,
             base_view,
             false,
@@ -1359,7 +1398,7 @@ where
                 init_speculative_logs(signature_verified_block.len());
 
                 let sequential_result = self.execute_transactions_sequential(
-                    executor_arguments,
+                    env,
                     signature_verified_block,
                     base_view,
                     true,
@@ -1397,7 +1436,7 @@ where
                 .iter()
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret));
+            return Ok(BlockOutput::new(ret, self.empty_block_end_info()));
         }
 
         Err(sequential_error)

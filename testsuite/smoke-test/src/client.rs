@@ -4,7 +4,7 @@
 
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
-    test_utils::{
+    utils::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
         MAX_HEALTHY_WAIT_SECS,
     },

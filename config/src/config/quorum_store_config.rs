@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
+pub const DEFEAULT_MAX_BATCH_TXNS: usize = 250;
 const DEFAULT_MAX_NUM_BATCHES: usize = 20;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
@@ -49,15 +50,32 @@ pub struct QuorumStoreConfig {
     pub batch_generation_poll_interval_ms: usize,
     pub batch_generation_min_non_empty_interval_ms: usize,
     pub batch_generation_max_interval_ms: usize,
+    /// The maximum number of transactions that the batch generator puts in a batch.
     pub sender_max_batch_txns: usize,
+    /// The maximum number of bytes that the batch generator puts in a batch.
     pub sender_max_batch_bytes: usize,
+    /// The maximum number of batches that the batch generator creates every time it pull transactions
+    /// from the mempool. This is NOT the maximum number of batches that the batch generator can create
+    /// per second.
     pub sender_max_num_batches: usize,
+    /// The maximum number of transactions that the batch generator pulls from the mempool at a time.
+    /// After the transactions are pulled, the batch generator splits them into multiple batches. This is NOT
+    /// the maximum number of transactions the batch generator includes in batches per second.
     pub sender_max_total_txns: usize,
+    /// The maximum number of bytes that the batch generator pulls from the mempool at a time. This is NOT
+    /// the maximum number of bytes the batch generator includes in batches per second.
     pub sender_max_total_bytes: usize,
+    /// The maximum number of transactions a single batch received from peers could contain.
     pub receiver_max_batch_txns: usize,
+    /// The maximum number of bytes a single batch received from peers could contain.
     pub receiver_max_batch_bytes: usize,
+    /// The maximum number of batches a BatchMsg received from peers can contain.
     pub receiver_max_num_batches: usize,
+    /// The maximum number of transactions a BatchMsg received from peers can contain. Each BatchMsg can contain
+    /// multiple batches.
     pub receiver_max_total_txns: usize,
+    /// The maximum number of bytes a BatchMsg received from peers can contain. Each BatchMsg can contain
+    /// multiple batches.
     pub receiver_max_total_bytes: usize,
     pub batch_request_num_peers: usize,
     pub batch_request_retry_limit: usize,
@@ -84,7 +102,7 @@ impl Default for QuorumStoreConfig {
             batch_generation_poll_interval_ms: 25,
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
-            sender_max_batch_txns: 250,
+            sender_max_batch_txns: DEFEAULT_MAX_BATCH_TXNS,
             // TODO: on next release, remove BATCH_PADDING_BYTES
             sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,

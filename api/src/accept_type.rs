@@ -17,7 +17,6 @@ pub enum AcceptType {
 
 /// This impl allows us to get the data straight from the arguments to the
 /// endpoint handler.
-#[async_trait::async_trait]
 impl<'a> FromRequest<'a> for AcceptType {
     async fn from_request(request: &'a Request, _body: &mut RequestBody) -> Result<Self> {
         let accept = Accept::from_request_without_body(request).await?;

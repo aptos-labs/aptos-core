@@ -85,7 +85,7 @@ pub(crate) fn update_store(
             .unwrap();
         let ledger_batch = SchemaBatch::new();
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
-        let state_kv_metadata_batch = SchemaBatch::new();
+        let schema_batch = SchemaBatch::new();
         store
             .put_value_sets(
                 vec![&sharded_value_state_set],
@@ -94,7 +94,6 @@ pub(crate) fn update_store(
                 None,
                 &ledger_batch,
                 &sharded_state_kv_batches,
-                &state_kv_metadata_batch,
                 /*put_state_value_indices=*/ false,
                 /*skip_usage=*/ false,
                 /*last_checkpoint_index=*/ None,
@@ -107,7 +106,7 @@ pub(crate) fn update_store(
             .unwrap();
         store
             .state_kv_db
-            .commit(version, state_kv_metadata_batch, sharded_state_kv_batches)
+            .commit(version, schema_batch, sharded_state_kv_batches)
             .unwrap();
     }
     root_hash
@@ -125,7 +124,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     .insert(key.clone(), value.clone());
             });
         next_version += 1;
-        if txn_to_commit.is_state_checkpoint() {
+        if txn_to_commit.has_state_checkpoint_hash() {
             state.current = state
                 .current
                 .batch_update(
@@ -200,7 +199,7 @@ prop_compose! {
                 let event_root_hash = InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash();
 
                 // calculate state checkpoint hash and this must be the last txn
-                let state_checkpoint_hash = if txn.is_state_checkpoint() {
+                let state_checkpoint_hash = if txn.has_state_checkpoint_hash() {
                     Some(state_checkpoint_root_hash)
                 } else {
                     None
@@ -321,7 +320,7 @@ fn gen_snapshot_version(
     let last_checkpoint = txns_to_commit
         .iter()
         .enumerate()
-        .filter(|(_idx, x)| x.is_state_checkpoint())
+        .filter(|(_idx, x)| x.has_state_checkpoint_hash())
         .last()
         .map(|(idx, _)| idx);
     if let Some(idx) = last_checkpoint {
@@ -463,7 +462,7 @@ fn verify_snapshots(
     for snapshot_version in snapshot_versions {
         let start = (cur_version - start_version) as usize;
         let end = (snapshot_version - start_version) as usize;
-        assert!(txns_to_commit[end].is_state_checkpoint());
+        assert!(txns_to_commit[end].has_state_checkpoint_hash());
         let expected_root_hash = db
             .ledger_db
             .transaction_info_db()
@@ -826,7 +825,7 @@ pub fn verify_committed_transactions(
             assert_eq!(state_value_in_db, *state_value);
         }
 
-        if !txn_to_commit.is_state_checkpoint() {
+        if !txn_to_commit.has_state_checkpoint_hash() {
             // Fetch and verify transaction itself.
             let txn = txn_to_commit
                 .transaction()

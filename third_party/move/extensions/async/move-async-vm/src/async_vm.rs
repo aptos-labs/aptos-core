@@ -14,7 +14,6 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
@@ -25,7 +24,10 @@ use move_vm_runtime::{
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
-use move_vm_types::values::{Reference, Value};
+use move_vm_types::{
+    resolver::MoveResolver,
+    values::{Reference, Value},
+};
 use std::{
     collections::HashMap,
     error::Error,
@@ -68,10 +70,10 @@ impl AsyncVM {
             .collect();
         Ok(AsyncVM {
             move_vm: MoveVM::new(
-                natives.into_iter().chain(
-                    natives::actor_natives(async_lib_addr, actor_gas_parameters).into_iter(),
-                ),
-            )?,
+                natives
+                    .into_iter()
+                    .chain(natives::actor_natives(async_lib_addr, actor_gas_parameters)),
+            ),
             actor_metadata,
             message_table,
         })
@@ -82,7 +84,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
+        move_resolver: &'r impl MoveResolver,
     ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
@@ -97,7 +99,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
+        move_resolver: &'r impl MoveResolver,
         ext: NativeContextExtensions<'r>,
     ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);

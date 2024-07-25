@@ -143,7 +143,7 @@ impl ModelBuilder {
                     .build_options
                     .compiler_config
                     .language_version;
-                options.known_attributes = known_attributes.clone();
+                options.known_attributes.clone_from(known_attributes);
                 options.skip_attribute_checks = skip_attribute_checks;
                 let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
                 move_compiler_v2::run_move_compiler_for_analysis(&mut error_writer, options)

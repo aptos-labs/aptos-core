@@ -298,7 +298,7 @@ pub fn get_peer_monitoring_metadata(
     let peer_metadata = peers_and_metadata.get_metadata_for_peer(peer).unwrap();
 
     // Return the peer monitoring metadata
-    peer_metadata.get_peer_monitoring_metadata()
+    peer_metadata.get_peer_monitoring_metadata().clone()
 }
 
 /// Returns the peer priority for polling based on if `poll_priority_peers` is true

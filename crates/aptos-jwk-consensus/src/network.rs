@@ -28,8 +28,7 @@ use futures_util::{
 };
 #[cfg(test)]
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::timeout;
+use std::{collections::HashMap, time::Duration};
 
 pub struct IncomingRpcRequest {
     pub msg: JWKConsensusMsg,
@@ -59,28 +58,55 @@ impl NetworkSender {
 
 #[async_trait::async_trait]
 impl RBNetworkSender<JWKConsensusMsg> for NetworkSender {
+    async fn send_rb_rpc_raw(
+        &self,
+        receiver: AccountAddress,
+        raw_message: Bytes,
+        timeout: Duration,
+    ) -> anyhow::Result<JWKConsensusMsg> {
+        Ok(self
+            .jwk_network_client
+            .send_rpc_raw(receiver, raw_message, timeout)
+            .await?)
+    }
+
     async fn send_rb_rpc(
         &self,
-        receiver: Author,
-        msg: JWKConsensusMsg,
-        time_limit: Duration,
+        receiver: AccountAddress,
+        message: JWKConsensusMsg,
+        timeout: Duration,
     ) -> anyhow::Result<JWKConsensusMsg> {
         if receiver == self.author {
             let (tx, rx) = oneshot::channel();
-            let self_msg = Event::RpcRequest(receiver, msg, RPC[0], tx);
+            let protocol = RPC[0];
+            let self_msg = Event::RpcRequest(self.author, message, protocol, tx);
             self.self_sender.clone().send(self_msg).await?;
-            if let Ok(Ok(Ok(bytes))) = timeout(time_limit, rx).await {
-                Ok(RPC[0].from_bytes(&bytes)?)
+            if let Ok(Ok(Ok(bytes))) = tokio::time::timeout(timeout, rx).await {
+                let response_msg =
+                    tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
+                Ok(response_msg)
             } else {
                 bail!("self rpc failed");
             }
         } else {
             let result = self
                 .jwk_network_client
-                .send_rpc(receiver, msg, time_limit)
+                .send_rpc(receiver, message, timeout)
                 .await?;
             Ok(result)
         }
+    }
+
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<Author>,
+        message: JWKConsensusMsg,
+    ) -> Result<HashMap<Author, bytes::Bytes>, anyhow::Error> {
+        self.jwk_network_client.to_bytes_by_protocol(peers, message)
+    }
+
+    fn sort_peers_by_latency(&self, peers: &mut [AccountAddress]) {
+        self.jwk_network_client.sort_peers_by_latency(peers)
     }
 }
 
