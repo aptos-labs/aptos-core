@@ -14,7 +14,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
-    aggregate_signature::{self, AggregateSignature, PartialSignatures},
+    aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
@@ -105,7 +105,7 @@ async fn test_batch_request_exists() {
         .request_batch(
             *batch.digest(),
             batch.expiration(),
-            Vec::new(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )
@@ -201,7 +201,7 @@ async fn test_batch_request_not_exists_not_expired() {
         .request_batch(
             *batch.digest(),
             batch.expiration(),
-            Vec::new(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )
@@ -246,11 +246,10 @@ async fn test_batch_request_not_exists_expired() {
     let request_start = Instant::now();
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
-        .request_batch_for_proof(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+        .request_batch(
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )

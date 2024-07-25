@@ -156,10 +156,10 @@ impl TDataInfo for BatchInfo {
     }
 
     fn info(&self) -> &BatchInfo {
-        &self
+        self
     }
 
-    fn signers(&self, _ordered_authors: &Vec<PeerId>) -> Vec<PeerId> {
+    fn signers(&self, _ordered_authors: &[PeerId]) -> Vec<PeerId> {
         vec![self.author()]
     }
 }
@@ -406,7 +406,7 @@ impl TDataInfo for ProofOfStore {
         self.info()
     }
 
-    fn signers(&self, ordered_authors: &Vec<PeerId>) -> Vec<PeerId> {
+    fn signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId> {
         self.shuffled_signers(ordered_authors)
     }
 }

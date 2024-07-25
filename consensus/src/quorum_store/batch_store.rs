@@ -12,19 +12,18 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_consensus_types::proof_of_store::{BatchInfo, ProofOfStore, SignedBatchInfo};
+use aptos_consensus_types::proof_of_store::SignedBatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
 use dashmap::{
-    mapref::entry::Entry::{self, Occupied, Vacant},
+    mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
 };
 use fail::fail_point;
 use once_cell::sync::OnceCell;
 use std::{
-    hash::Hash,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Mutex,

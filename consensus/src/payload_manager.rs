@@ -13,7 +13,7 @@ use crate::{
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload, ProofWithData, Round},
-    payload::{CachedDataPointer, TDataInfo},
+    payload::{BatchPointer, TDataInfo},
     proof_of_store::BatchInfo,
 };
 use aptos_crypto::HashValue;
@@ -220,17 +220,17 @@ impl TPayloadManager for QuorumStorePayloadManager {
             };
 
         fn prefetch_helper<T: TDataInfo>(
-            data_pointer: &CachedDataPointer<T>,
+            data_pointer: &BatchPointer<T>,
             batch_reader: Arc<dyn BatchReader>,
             timestamp: u64,
-            ordered_authors: &Vec<PeerId>,
+            ordered_authors: &[PeerId],
         ) {
             if data_pointer.status.lock().is_some() {
                 return;
             }
             let receivers = QuorumStorePayloadManager::request_transactions(
                 data_pointer
-                    .pointer
+                    .batch_summary
                     .iter()
                     .map(|proof| (proof.info(), proof.signers(ordered_authors))),
                 timestamp,
@@ -446,10 +446,10 @@ async fn get_transactions_for_observer(
 }
 
 async fn process_payload_helper<T: TDataInfo>(
-    data_ptr: &CachedDataPointer<T>,
+    data_ptr: &BatchPointer<T>,
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
-    ordered_authors: &Vec<PeerId>,
+    ordered_authors: &[PeerId],
 ) -> ExecutorResult<Vec<SignedTransaction>> {
     let status = data_ptr.status.lock().take();
     match status.expect("Should have been updated before.") {
@@ -471,6 +471,13 @@ async fn process_payload_helper<T: TDataInfo>(
                     block.round()
                 );
             }
+            let batches_and_responders = data_ptr.batch_summary.iter().map(|proof| {
+                let mut signers = proof.signers(ordered_authors);
+                if let Some(author) = block.author() {
+                    signers.push(author);
+                }
+                (proof.info(), signers)
+            });
             for (digest, rx) in receivers {
                 match rx.await {
                     Err(e) => {
@@ -480,10 +487,7 @@ async fn process_payload_helper<T: TDataInfo>(
                             e
                         );
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
-                            data_ptr
-                                .pointer
-                                .iter()
-                                .map(|proof| (proof.info(), proof.signers(ordered_authors))),
+                            batches_and_responders,
                             block.timestamp_usecs(),
                             batch_reader.clone(),
                         );
@@ -499,10 +503,7 @@ async fn process_payload_helper<T: TDataInfo>(
                     },
                     Ok(Err(e)) => {
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
-                            data_ptr
-                                .pointer
-                                .iter()
-                                .map(|proof| (proof.info(), proof.signers(ordered_authors))),
+                            batches_and_responders,
                             block.timestamp_usecs(),
                             batch_reader.clone(),
                         );
@@ -532,7 +533,7 @@ async fn process_payload(
     proof_with_data: &ProofWithData,
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
-    ordered_authors: &Vec<PeerId>,
+    ordered_authors: &[PeerId],
 ) -> ExecutorResult<Vec<SignedTransaction>> {
     let status = proof_with_data.status.lock().take();
     match status.expect("Should have been updated before.") {
@@ -564,7 +565,7 @@ async fn process_payload(
                         );
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
                             proof_with_data.proofs.iter().map(|proof| {
-                                (proof.info(), proof.shuffled_signers(&ordered_authors))
+                                (proof.info(), proof.shuffled_signers(ordered_authors))
                             }),
                             block.timestamp_usecs(),
                             batch_reader.clone(),
@@ -582,7 +583,7 @@ async fn process_payload(
                     Ok(Err(e)) => {
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
                             proof_with_data.proofs.iter().map(|proof| {
-                                (proof.info(), proof.shuffled_signers(&ordered_authors))
+                                (proof.info(), proof.shuffled_signers(ordered_authors))
                             }),
                             block.timestamp_usecs(),
                             batch_reader.clone(),

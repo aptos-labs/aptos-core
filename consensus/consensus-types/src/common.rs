@@ -6,6 +6,7 @@ use crate::{
     payload::OptQuorumStorePayload,
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
+use anyhow::bail;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -18,15 +19,14 @@ use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
     validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, PeerId,
 };
-use futures::future::Lazy;
 use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
-    backtrace,
     collections::HashSet,
     fmt::{self, Write},
     sync::Arc,
+    u64,
 };
 use tokio::sync::oneshot;
 
@@ -340,6 +340,9 @@ impl Payload {
                     .map(|(_, txns)| txns.len())
                     .sum::<usize>()) as u64)
                 .min(max_txns_to_execute.unwrap_or(u64::MAX)),
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                opt_qs_payload.max_txns_to_execute().unwrap_or(u64::MAX)
+            },
         }
     }
 
@@ -501,8 +504,9 @@ impl Payload {
             },
             (true, Payload::OptQuorumStore(opt_quorum_store)) => {
                 let proof_with_data = opt_quorum_store.proof_with_data();
-                Self::verify_with_cache(&proof_with_data.pointer, validator, proof_cache)?;
-                Ok(())
+                Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
+                // TODO(ibalajiarun): Remove this when ready to support OptQuorumStore.
+                bail!("OptQuorumStore is not supported yet.");
             },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
@@ -654,10 +658,10 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         error!("DirectMempool payload in InQuorumStore filter");
                     },
                     Payload::OptQuorumStore(opt_qs_payload) => {
-                        for batch_info in &opt_qs_payload.opt_batches().pointer {
+                        for batch_info in &opt_qs_payload.opt_batches().batch_summary {
                             exclude_proofs.insert(batch_info.clone());
                         }
-                        for proof in &opt_qs_payload.proof_with_data().pointer {
+                        for proof in &opt_qs_payload.proof_with_data().batch_summary {
                             exclude_proofs.insert(proof.info().clone());
                         }
                     },

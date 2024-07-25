@@ -510,7 +510,7 @@ impl BlockTransactionPayload {
             },
             Payload::OptQuorumStore(opt_qs_payload) => {
                 // Verify the batches in the requested block
-                self.verify_batches(&opt_qs_payload.proof_with_data())?;
+                self.verify_batches(opt_qs_payload.proof_with_data())?;
 
                 // Verify the inline batches
                 self.verify_opt_batches(opt_qs_payload.opt_batches())?;

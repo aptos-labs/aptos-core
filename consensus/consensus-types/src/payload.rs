@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{
     common::DataStatus,
     proof_of_store::{BatchInfo, ProofOfStore},
@@ -18,79 +21,82 @@ pub trait TDataInfo {
 
     fn info(&self) -> &BatchInfo;
 
-    fn signers(&self, ordered_authors: &Vec<PeerId>) -> Vec<PeerId>;
+    fn signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId>;
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct CachedDataPointer<T> {
-    pub pointer: Vec<T>,
+pub struct BatchPointer<T> {
+    pub batch_summary: Vec<T>,
     #[serde(skip)]
     pub status: Arc<Mutex<Option<DataStatus>>>,
 }
 
-impl<T> CachedDataPointer<T>
+impl<T> BatchPointer<T>
 where
     T: TDataInfo,
 {
     pub fn new(metadata: Vec<T>) -> Self {
         Self {
-            pointer: metadata,
+            batch_summary: metadata,
             status: Arc::new(Mutex::new(None)),
         }
     }
 
-    pub fn extend(&mut self, other: CachedDataPointer<T>) {
+    pub fn extend(&mut self, other: BatchPointer<T>) {
         let other_data_status = other.status.lock().as_mut().unwrap().take();
-        self.pointer.extend(other.pointer);
+        self.batch_summary.extend(other.batch_summary);
         let mut status = self.status.lock();
-        if status.is_none() {
-            *status = Some(other_data_status);
-        } else {
-            status.as_mut().unwrap().extend(other_data_status);
-        }
+        *status = match &mut *status {
+            None => Some(other_data_status),
+            Some(status) => {
+                status.extend(other_data_status);
+                return;
+            },
+        };
     }
 
     pub fn num_txns(&self) -> usize {
-        self.pointer
+        self.batch_summary
             .iter()
             .map(|info| info.num_txns() as usize)
             .sum()
     }
 
     pub fn num_bytes(&self) -> usize {
-        self.pointer
+        self.batch_summary
             .iter()
             .map(|info| info.num_bytes() as usize)
             .sum()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.pointer.is_empty()
+        self.batch_summary.is_empty()
     }
 }
 
-impl<T: PartialEq> PartialEq for CachedDataPointer<T> {
+impl<T: PartialEq> PartialEq for BatchPointer<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.pointer == other.pointer && Arc::as_ptr(&self.status) == Arc::as_ptr(&other.status)
+        self.batch_summary == other.batch_summary
+            && Arc::as_ptr(&self.status) == Arc::as_ptr(&other.status)
     }
 }
 
-impl<T: Eq> Eq for CachedDataPointer<T> {}
+impl<T: Eq> Eq for BatchPointer<T> {}
 
-impl<T> Deref for CachedDataPointer<T> {
+impl<T> Deref for BatchPointer<T> {
     type Target = Vec<T>;
 
     fn deref(&self) -> &Self::Target {
-        &self.pointer
+        &self.batch_summary
     }
 }
 
-impl<T> IntoIterator for CachedDataPointer<T> {
+impl<T> IntoIterator for BatchPointer<T> {
     type IntoIter = std::vec::IntoIter<T>;
     type Item = T;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.pointer.into_iter()
+        self.batch_summary.into_iter()
     }
 }
 
@@ -173,8 +179,8 @@ impl DerefMut for InlineBatches {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct OptQuorumStorePayloadV1 {
     inline_batches: InlineBatches,
-    opt_batches: CachedDataPointer<BatchInfo>,
-    proofs: CachedDataPointer<ProofOfStore>,
+    opt_batches: BatchPointer<BatchInfo>,
+    proofs: BatchPointer<ProofOfStore>,
     execution_limits: PayloadExecutionLimit,
 }
 
@@ -190,7 +196,7 @@ impl OptQuorumStorePayloadV1 {
             .0
             .into_iter()
             .map(|batch| batch.batch_info)
-            .chain(opt_batches.into_iter())
+            .chain(opt_batches)
             .chain(proofs.into_iter().map(|proof| proof.info().clone()))
             .collect()
     }
@@ -240,11 +246,11 @@ impl OptQuorumStorePayload {
         &self.inline_batches
     }
 
-    pub fn proof_with_data(&self) -> &CachedDataPointer<ProofOfStore> {
+    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore> {
         &self.proofs
     }
 
-    pub fn opt_batches(&self) -> &CachedDataPointer<BatchInfo> {
+    pub fn opt_batches(&self) -> &BatchPointer<BatchInfo> {
         &self.opt_batches
     }
 }

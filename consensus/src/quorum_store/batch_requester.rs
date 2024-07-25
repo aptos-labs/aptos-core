@@ -9,7 +9,7 @@ use crate::{
         types::{BatchRequest, BatchResponse, PersistedValue},
     },
 };
-use aptos_consensus_types::proof_of_store::{BatchInfo, ProofOfStore};
+use aptos_consensus_types::proof_of_store::BatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
 use aptos_logger::prelude::*;
