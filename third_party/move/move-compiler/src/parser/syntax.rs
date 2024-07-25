@@ -324,7 +324,7 @@ fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Bo
             &format!(
                 "an identifier {}",
                 if context.env.flags().lang_v2() {
-                    " or a positional field `0`, `1`, ..."
+                    "or a positional field `0`, `1`, ..."
                 } else {
                     ""
                 }
