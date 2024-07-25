@@ -579,15 +579,22 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
                 .check_voting_power(partial_signatures.signatures().keys(), true)
                 .is_ok()
         {
-            let aggregated_signature = self
+            let aggregated_signature = match self
                 .epoch_state
                 .verifier
                 .aggregate_signatures(partial_signatures)
-                .expect("Signature aggregation should succeed");
+            {
+                Ok(signature) => signature,
+                Err(_) => return Err(anyhow::anyhow!("Signature aggregation failed")),
+            };
             observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
             let certificate = NodeCertificate::new(self.metadata.clone(), aggregated_signature);
 
-            _ = tx.take().expect("must exist").send(certificate);
+            // Invariant Violation: The one-shot channel sender must exist to send the NodeCertificate
+            _ = tx
+                .take()
+                .expect("The one-shot channel sender must exist to send the NodeCertificate")
+                .send(certificate);
         }
 
         if partial_signatures.signatures().len() == self.epoch_state.verifier.len() {
@@ -885,7 +892,7 @@ impl TConsensusMsg for DAGMessage {
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
             epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
+            data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes"),
         })
     }
 }
@@ -927,7 +934,7 @@ impl TConsensusMsg for DAGRpcResult {
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
             epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
+            data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes!"),
         })
     }
 }

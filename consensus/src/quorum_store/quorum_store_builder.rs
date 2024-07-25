@@ -268,6 +268,7 @@ impl InnerBuilder {
         batch_reader
     }
 
+    #[allow(clippy::unwrap_used)]
     fn spawn_quorum_store(
         mut self,
     ) -> (

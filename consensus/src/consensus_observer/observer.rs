@@ -1379,6 +1379,7 @@ fn log_received_message(message: String) {
 
 /// Spawns a task to sync to the given commit decision and notifies
 /// the consensus observer. Also, returns an abort handle to cancel the task.
+#[allow(clippy::unwrap_used)]
 fn sync_to_commit_decision(
     commit_decision: CommitDecision,
     decision_epoch: u64,

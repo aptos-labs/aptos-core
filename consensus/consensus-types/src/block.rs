@@ -495,7 +495,7 @@ impl Block {
                         )
                     })
             })
-            .map(|index| u32::try_from(index).unwrap())
+            .map(|index| u32::try_from(index).expect("Index is out of bounds for u32"))
             .collect()
     }
 }
