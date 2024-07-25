@@ -80,6 +80,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: KeylessPublicKey
+    4:
+      FederatedKeyless:
+        STRUCT:
+          - public_key:
+              TYPENAME: FederatedKeylessPublicKey
 AnySignature:
   ENUM:
     0:
@@ -308,6 +313,12 @@ ExecutionStatus:
       MiscellaneousError:
         NEWTYPE:
           OPTION: U64
+FederatedKeylessPublicKey:
+  STRUCT:
+    - jwk_addr:
+        TYPENAME: AccountAddress
+    - pk:
+        TYPENAME: KeylessPublicKey
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:
