@@ -179,6 +179,7 @@ impl PrioritizedPeersState {
 
     /// Returns true iff the prioritized peers list is ready for another update
     pub fn ready_for_update(&self, peers_changed: bool) -> bool {
+        info!("ready for update: peers_changed: {}, observed_all_ping_latencies: {}, last_peer_priority_update: {:?}", peers_changed, self.observed_all_ping_latencies, self.last_peer_priority_update);
         // If intelligent peer prioritization is disabled, we should only
         // update the prioritized peers if the peers have changed.
         if !self.mempool_config.enable_intelligent_peer_prioritization {
@@ -302,6 +303,7 @@ impl PrioritizedPeersState {
         &mut self,
         peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
     ) {
+        info!("Updating prioritized peers: {:?}", peers_and_metadata);
         let peer_monitoring_data: HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>> =
             peers_and_metadata.clone().into_iter().collect();
 

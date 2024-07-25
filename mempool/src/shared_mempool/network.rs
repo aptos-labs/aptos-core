@@ -133,6 +133,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         &self,
         updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
     ) -> (Vec<(PeerNetworkId, ConnectionMetadata)>, Vec<PeerNetworkId>) {
+        info!("updated_peers {:?}", updated_peers);
         let sync_states = self.sync_states.read();
         let to_disable: Vec<_> = sync_states
             .keys()
@@ -187,7 +188,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
         // Get the upstream peers to add or disable, using a read lock
         let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
-
+        info!("to_add {:?}, to_disable: {:?}", to_add, to_disable);
         // If there are updates, apply using a write lock
         self.add_and_disable_upstream_peers(&to_add, &to_disable);
 
@@ -343,6 +344,10 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         ),
         BroadcastError,
     > {
+        info!(
+            "determine_broadcast_batch for peer: {}, scheduled_backoff: {}",
+            peer, scheduled_backoff
+        );
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
@@ -448,6 +453,10 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                         self.prioritized_peers_state
                             .get_sender_buckets_for_peer(&peer)
                             .ok_or_else(|| {
+                                info!(
+                                    "Peer {} not prioritized. {:?}",
+                                    peer, self.prioritized_peers_state
+                                );
                                 BroadcastError::PeerNotPrioritized(
                                     peer,
                                     self.prioritized_peers_state.get_peer_priority(&peer),
@@ -589,8 +598,20 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> Result<(), BroadcastError> {
         // Start timer for tracking broadcast latency.
         let start_time = Instant::now();
-        let (message_id, transactions, metric_label) =
-            self.determine_broadcast_batch(peer, scheduled_backoff, smp)?;
+        let result = self.determine_broadcast_batch(peer, scheduled_backoff, smp);
+        info!(
+            "execute_broadcast for peer: {}. result: {}",
+            peer,
+            result.is_ok()
+        );
+        let (message_id, transactions, metric_label) = result?;
+        info!(
+            "execute_broadcast for peer: {}. message_id: {:?}, num_txns: {}, metric_label: {:?}",
+            peer,
+            message_id,
+            transactions.len(),
+            metric_label
+        );
 
         let num_txns = transactions.len();
         let send_time = SystemTime::now();
