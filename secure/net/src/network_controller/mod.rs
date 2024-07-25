@@ -199,7 +199,7 @@ impl OutboundRpcScheduler {
                     let shard_id = msg.msg.shard_id.unwrap_or_default();
                     msg.outbound_helper.lock().await.send_async(msg.msg, &msg.msg_type).await;
                     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-                    info!("Sent kv req batch {} sent to shard {} at time: {}", seq_num, shard_id, curr_time);
+                    //info!("Sent kv req batch {} sent to shard {} at time: {}", seq_num, shard_id, curr_time);
                 }
             });
         }
