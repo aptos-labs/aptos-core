@@ -310,7 +310,7 @@ fn parse_identifier(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
     Ok(spanned(context.tokens.file_hash(), start_loc, end_loc, id))
 }
 
-// Parse an identifier or an anonymous field
+// Parse an identifier or an positional field
 //     <Identifier> | (0-9)*
 fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -324,7 +324,7 @@ fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Bo
             &format!(
                 "an identifier {}",
                 if context.env.flags().lang_v2() {
-                    " or an anonymous field `0`, `1`, ..."
+                    " or a positional field `0`, `1`, ..."
                 } else {
                     ""
                 }
@@ -336,7 +336,7 @@ fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Bo
     let end_loc = context.tokens.previous_end_loc();
     let loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
     if is_anonymous_field {
-        require_move_2(context, loc, "anonymous field");
+        require_move_2(context, loc, "positional field");
     }
     Ok(Spanned::new(loc, id))
 }
@@ -791,11 +791,11 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
             Tok::LParen,
             Tok::RParen,
             parse_bind,
-            "an anonymous field binding",
+            "a positional field binding",
         )?;
         let end_loc = context.tokens.previous_end_loc();
         let loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
-        require_move_2(context, loc, "anonymous field");
+        require_move_2(context, loc, "positional field");
         Bind_::PositionalUnpack(Box::new(ty), ty_args, args)
     } else {
         Bind_::Unpack(Box::new(ty), ty_args, vec![])
@@ -2750,7 +2750,7 @@ fn parse_struct_decl(
             } else {
                 let (list, is_positional) = if context.tokens.peek() == Tok::LParen {
                     let loc = current_token_loc(context.tokens);
-                    require_move_2(context, loc, "anonymous fields");
+                    require_move_2(context, loc, "positional fields");
                     let list = parse_anonymous_fields(context)?;
                     abilities = parse_abilities(context)?;
                     consume_token(context.tokens, Tok::Semicolon)?;
@@ -2836,7 +2836,7 @@ fn parse_struct_variant(context: &mut Context) -> Result<(StructVariant, bool), 
         )
     } else if context.tokens.peek() == Tok::LParen {
         let loc = current_token_loc(context.tokens);
-        require_move_2(context, loc, "anonymous fields");
+        require_move_2(context, loc, "positional fields");
         (parse_anonymous_fields(context)?, true, true)
     } else {
         (vec![], false, false)

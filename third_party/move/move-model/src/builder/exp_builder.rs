@@ -2835,9 +2835,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             return None;
         }
 
-        // handles call of struct/variant with anonymous fields
+        // handles call of struct/variant with positional fields
         if maccess.value.is_struct_or_schema_name() && self.can_resolve_to_struct(maccess) {
-            self.check_language_version(loc, "anonymous fields", LanguageVersion::V2_0);
+            self.check_language_version(loc, "positional fields", LanguageVersion::V2_0);
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =
                 EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
