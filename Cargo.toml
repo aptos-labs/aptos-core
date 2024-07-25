@@ -181,6 +181,7 @@ members = [
     "storage/storage-interface",
     "testsuite/forge",
     "testsuite/forge-cli",
+    "testsuite/forge-pilot",
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
     "testsuite/generate-format",
