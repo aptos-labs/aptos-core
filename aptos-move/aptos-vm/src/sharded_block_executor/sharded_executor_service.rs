@@ -329,8 +329,11 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             drop(exe_timer);
 
             self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
+            self.coordinator_client.lock().unwrap().stream_execution_result(vec![]);
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             info!("Processed block at time {}", curr_time);
+
+
 
             let coordinator_client_clone = self.coordinator_client.clone();
             let stream_results_thread = thread::spawn(move || {
