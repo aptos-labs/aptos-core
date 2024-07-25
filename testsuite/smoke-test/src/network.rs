@@ -5,7 +5,7 @@
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
     state_sync::test_all_validator_failures,
-    test_utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
+    utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
 };
 use aptos::test::CliTestFramework;
 use aptos_config::{

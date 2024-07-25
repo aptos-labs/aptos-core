@@ -18,7 +18,7 @@ error: type `R<key>` is missing required ability `key` (type was inferred)
    │              - declaration of type parameter `T`
    ·
 12 │         R {r: R { r: _ } } = R { r: R { r: 0 }};
-   │         ^
+   │         ^^^^^^^^^^^^^^^^^^
    │
    = required by instantiating type parameter `T:key` of struct `R`
 

@@ -51,6 +51,9 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 
+[dev-dependencies]
+claims = { workspace = true }
+
 [features]
 default = []
 fuzzing = []

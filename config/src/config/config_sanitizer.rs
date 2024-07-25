@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::internal_indexer_db_config::InternalIndexerDBConfig;
 use crate::config::{
     node_config_loader::NodeType,
     utils::{are_failpoints_enabled, get_config_name},
@@ -62,6 +63,7 @@ impl ConfigSanitizer for NodeConfig {
         NetbenchConfig::sanitize(node_config, node_type, chain_id)?;
         StateSyncConfig::sanitize(node_config, node_type, chain_id)?;
         StorageConfig::sanitize(node_config, node_type, chain_id)?;
+        InternalIndexerDBConfig::sanitize(node_config, node_type, chain_id)?;
         sanitize_validator_network_config(node_config, node_type, chain_id)?;
 
         Ok(()) // All configs passed validation

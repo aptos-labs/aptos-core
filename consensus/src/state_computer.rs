@@ -9,7 +9,7 @@ use crate::{
     error::StateSyncError,
     execution_pipeline::ExecutionPipeline,
     monitor,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
@@ -34,7 +34,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
+use std::{boxed::Box, sync::Arc, time::Duration};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
@@ -43,11 +43,20 @@ pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecu
 pub struct PipelineExecutionResult {
     pub input_txns: Vec<SignedTransaction>,
     pub result: StateComputeResult,
+    pub execution_time: Duration,
 }
 
 impl PipelineExecutionResult {
-    pub fn new(input_txns: Vec<SignedTransaction>, result: StateComputeResult) -> Self {
-        Self { input_txns, result }
+    pub fn new(
+        input_txns: Vec<SignedTransaction>,
+        result: StateComputeResult,
+        execution_time: Duration,
+    ) -> Self {
+        Self {
+            input_txns,
+            result,
+            execution_time,
+        }
     }
 }
 
@@ -72,7 +81,7 @@ impl LogicalTime {
 #[derive(Clone)]
 struct MutableState {
     validators: Arc<[AccountAddress]>,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     transaction_shuffler: Arc<dyn TransactionShuffler>,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
@@ -382,7 +391,7 @@ impl StateComputer for ExecutionProxy {
     fn new_epoch(
         &self,
         epoch_state: &EpochState,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
@@ -412,7 +421,8 @@ impl StateComputer for ExecutionProxy {
 #[tokio::test]
 async fn test_commit_sync_race() {
     use crate::{
-        error::MempoolError, transaction_deduper::create_transaction_deduper,
+        error::MempoolError, payload_manager::DirectMempoolPayloadManager,
+        transaction_deduper::create_transaction_deduper,
         transaction_shuffler::create_transaction_shuffler,
     };
     use aptos_config::config::transaction_filter_type::Filter;
@@ -544,7 +554,7 @@ async fn test_commit_sync_race() {
 
     executor.new_epoch(
         &EpochState::empty(),
-        Arc::new(PayloadManager::DirectMempool),
+        Arc::new(DirectMempoolPayloadManager {}),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),

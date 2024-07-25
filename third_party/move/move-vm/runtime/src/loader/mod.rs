@@ -12,7 +12,7 @@ use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        AbilitySet, CompiledModule, CompiledScript, Constant, ConstantPoolIndex, FieldHandleIndex,
+        CompiledModule, CompiledScript, Constant, ConstantPoolIndex, FieldHandleIndex,
         FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
         StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation, TableIndex,
         TypeParameterIndex,
@@ -50,9 +50,15 @@ mod modules;
 mod script;
 mod type_loader;
 
+use crate::loader::modules::{StructVariantInfo, VariantFieldInfo};
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
+use move_binary_format::file_format::{
+    StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
+    VariantFieldInstantiationIndex, VariantIndex,
+};
+use move_vm_types::loaded_data::runtime_types::{StructLayout, TypeBuilder};
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -228,6 +234,10 @@ impl Loader {
         &self.vm_config
     }
 
+    pub(crate) fn ty_builder(&self) -> &TypeBuilder {
+        &self.vm_config.ty_builder
+    }
+
     /// Flush this cache if it is marked as invalidated.
     pub(crate) fn flush_if_invalidated(&self) {
         let mut invalidated = self.invalidated.write();
@@ -319,29 +329,14 @@ impl Loader {
             .iter()
             .map(|ty| self.load_type(ty, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
-        if self.vm_config.type_size_limit
-            && ty_args
-                .iter()
-                .map(|ty| self.count_type_nodes(ty))
-                .sum::<u64>()
-                > MAX_TYPE_INSTANTIATION_NODES
-        {
-            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES)
-                .with_message(format!(
-                    "Too many type nodes when instantiating a type for script {}",
-                    &main.name
-                ))
-                .finish(Location::Script));
-        };
 
-        self.verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
-            .map_err(|e| {
-                e.with_message(format!(
-                    "Failed to verify type arguments for script {}",
-                    &main.name
-                ))
-                .finish(Location::Script)
-            })?;
+        Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args).map_err(|e| {
+            e.with_message(format!(
+                "Failed to verify type arguments for script {}",
+                &main.name
+            ))
+            .finish(Location::Script)
+        })?;
 
         Ok(LoadedFunction {
             ty_args,
@@ -529,7 +524,7 @@ impl Loader {
             }
         }
 
-        self.verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         Ok(LoadedFunction { ty_args, function })
@@ -564,7 +559,7 @@ impl Loader {
                 err
             })?;
 
-        self.verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         Ok(LoadedFunction { ty_args, function })
@@ -733,55 +728,18 @@ impl Loader {
 
     pub(crate) fn load_type(
         &self,
-        type_tag: &TypeTag,
+        ty_tag: &TypeTag,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Type> {
-        Ok(match type_tag {
-            TypeTag::Bool => Type::Bool,
-            TypeTag::U8 => Type::U8,
-            TypeTag::U16 => Type::U16,
-            TypeTag::U32 => Type::U32,
-            TypeTag::U64 => Type::U64,
-            TypeTag::U128 => Type::U128,
-            TypeTag::U256 => Type::U256,
-            TypeTag::Address => Type::Address,
-            TypeTag::Signer => Type::Signer,
-            TypeTag::Vector(elem_tag) => Type::Vector(triomphe::Arc::new(self.load_type(
-                elem_tag,
-                data_store,
-                module_store,
-            )?)),
-            TypeTag::Struct(struct_tag) => {
-                let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
-                self.load_module(&module_id, data_store, module_store)?;
-                let struct_type = module_store
-                    .get_struct_type_by_identifier(&struct_tag.name, &module_id)
-                    .map_err(|e| e.finish(Location::Undefined))?;
-                if struct_type.ty_params.is_empty() && struct_tag.type_args.is_empty() {
-                    Type::Struct {
-                        idx: struct_type.idx,
-                        ability: AbilityInfo::struct_(struct_type.abilities),
-                    }
-                } else {
-                    let ty_args = struct_tag
-                        .type_args
-                        .iter()
-                        .map(|ty| self.load_type(ty, data_store, module_store))
-                        .collect::<VMResult<Vec<_>>>()?;
-                    self.verify_ty_arg_abilities(struct_type.ty_param_constraints(), &ty_args)
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                    Type::StructInstantiation {
-                        idx: struct_type.idx,
-                        ty_args: triomphe::Arc::new(ty_args),
-                        ability: AbilityInfo::generic_struct(
-                            struct_type.abilities,
-                            struct_type.phantom_ty_params_mask.clone(),
-                        ),
-                    }
-                }
-            },
-        })
+        let resolver = |struct_tag: &StructTag| -> VMResult<Arc<StructType>> {
+            let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
+            self.load_module(&module_id, data_store, module_store)?;
+            module_store
+                .get_struct_type_by_identifier(&struct_tag.name, &module_id)
+                .map_err(|e| e.finish(Location::Undefined))
+        };
+        self.ty_builder().create_ty(ty_tag, resolver)
     }
 
     /// Traverses the whole transitive closure of dependencies, starting from the specified
@@ -863,48 +821,6 @@ impl Loader {
                     stack.push((addr, name, false));
                 }
             }
-        }
-
-        Ok(())
-    }
-
-    /// Similar to `check_dependencies_and_charge_gas`, except that this does not recurse
-    /// into transitive dependencies and allows non-existent modules.
-    pub(crate) fn check_dependencies_and_charge_gas_non_recursive_optional<'a, I>(
-        &self,
-        module_store: &ModuleStorageAdapter,
-        data_store: &mut TransactionDataCache,
-        gas_meter: &mut impl GasMeter,
-        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
-        ids: I,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-    {
-        for (addr, name) in ids.into_iter() {
-            // TODO: Allow the check of special addresses to be customized.
-            if !addr.is_special() && visited.insert((addr, name), ()).is_some() {
-                continue;
-            }
-
-            // Load and deserialize the module only if it has not been cached by the loader.
-            // Otherwise this will cause a significant regression in performance.
-            let size = match module_store.module_at_by_ref(addr, name) {
-                Some(module) => module.size,
-                None => match data_store
-                    .load_compiled_module_to_cache(ModuleId::new(*addr, name.to_owned()), true)
-                {
-                    Ok((_module, size, _hash)) => size,
-                    Err(err) if err.major_status() == StatusCode::LINKER_ERROR => continue,
-                    Err(err) => return Err(err),
-                },
-            };
-
-            gas_meter
-                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
-                .map_err(|err| {
-                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                })?;
         }
 
         Ok(())
@@ -1165,75 +1081,6 @@ impl Loader {
         Ok(())
     }
 
-    // Return an instantiated type given a generic and an instantiation.
-    // Stopgap to avoid a recursion that is either taking too long or using too
-    // much memory
-    fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
-        // Before instantiating the type, count the # of nodes of all type arguments plus
-        // existing type instantiation.
-        // If that number is larger than MAX_TYPE_INSTANTIATION_NODES, refuse to construct this type.
-        // This prevents constructing larger and lager types via struct instantiation.
-        match ty {
-            Type::MutableReference(_) | Type::Reference(_) | Type::Vector(_) => {
-                if self.vm_config.type_size_limit
-                    && self.count_type_nodes(ty) > MAX_TYPE_INSTANTIATION_NODES
-                {
-                    return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-                }
-            },
-            Type::StructInstantiation {
-                ty_args: struct_inst,
-                ..
-            } => {
-                let mut sum_nodes = 1u64;
-                for ty in ty_args.iter().chain(struct_inst.iter()) {
-                    sum_nodes = sum_nodes.saturating_add(self.count_type_nodes(ty));
-                    if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
-                        return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-                    }
-                }
-            },
-            Type::Address
-            | Type::Bool
-            | Type::Signer
-            | Type::Struct { .. }
-            | Type::TyParam(_)
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128
-            | Type::U256 => (),
-        };
-        ty.subst(ty_args)
-    }
-
-    // Verify the kind (constraints) of an instantiation.
-    // Both function and script invocation use this function to verify correctness
-    // of type arguments provided
-    fn verify_ty_arg_abilities<'a, I>(
-        &self,
-        expected_ty_arg_abilities: I,
-        ty_args: &[Type],
-    ) -> PartialVMResult<()>
-    where
-        I: IntoIterator<Item = &'a AbilitySet>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        let expected_ty_arg_abilities = expected_ty_arg_abilities.into_iter();
-        if expected_ty_arg_abilities.len() != ty_args.len() {
-            return Err(PartialVMError::new(
-                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
-            ));
-        }
-        for (ty, expected_ability) in ty_args.iter().zip(expected_ty_arg_abilities) {
-            if !expected_ability.is_subset(ty.abilities()?) {
-                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
-            }
-        }
-        Ok(())
-    }
-
     //
     // Internal helpers
     //
@@ -1359,18 +1206,11 @@ impl<'a> Resolver<'a> {
             }
         }
 
+        let ty_builder = self.loader().ty_builder();
         let mut instantiation = vec![];
         for ty in &func_inst.instantiation {
-            instantiation.push(self.subst(ty, ty_args)?);
-        }
-        // Check if the function instantiation over all generics is larger
-        // than MAX_TYPE_INSTANTIATION_NODES.
-        let mut sum_nodes = 1u64;
-        for ty in ty_args.iter().chain(instantiation.iter()) {
-            sum_nodes = sum_nodes.saturating_add(self.loader.count_type_nodes(ty));
-            if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
-                return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-            }
+            let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
+            instantiation.push(ty);
         }
         Ok(instantiation)
     }
@@ -1379,18 +1219,35 @@ impl<'a> Resolver<'a> {
     // Type resolution
     //
 
-    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> PartialVMResult<Type> {
-        let struct_def = match &self.binary {
+    pub(crate) fn get_struct_ty(&self, idx: StructDefinitionIndex) -> Type {
+        let struct_ty = match &self.binary {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        Ok(Type::Struct {
-            idx: struct_def.idx,
-            ability: AbilityInfo::struct_(struct_def.abilities),
-        })
+        self.create_struct_ty(&struct_ty)
     }
 
-    pub(crate) fn get_struct_type_generic(
+    pub(crate) fn get_struct_variant_at(
+        &self,
+        idx: StructVariantHandleIndex,
+    ) -> &StructVariantInfo {
+        match &self.binary {
+            BinaryType::Module(module) => module.struct_variant_at(idx),
+            BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
+        }
+    }
+
+    pub(crate) fn get_struct_variant_instantiation_at(
+        &self,
+        idx: StructVariantInstantiationIndex,
+    ) -> &StructVariantInfo {
+        match &self.binary {
+            BinaryType::Module(module) => module.struct_variant_instantiation_at(idx),
+            BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
+        }
+    }
+
+    pub(crate) fn get_generic_struct_ty(
         &self,
         idx: StructDefInstantiationIndex,
         ty_args: &[Type],
@@ -1400,52 +1257,22 @@ impl<'a> Resolver<'a> {
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
 
-        // Before instantiating the type, count the # of nodes of all type arguments plus
-        // existing type instantiation.
-        // If that number is larger than MAX_TYPE_INSTANTIATION_NODES, refuse to construct this type.
-        // This prevents constructing larger and larger types via struct instantiation.
-        let mut sum_nodes = 1u64;
-        for ty in ty_args.iter().chain(struct_inst.instantiation.iter()) {
-            sum_nodes = sum_nodes.saturating_add(self.loader.count_type_nodes(ty));
-            if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
-                return Err(
-                    PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                        "Number of type instantiation nodes exceeded the maximum of {}",
-                        MAX_TYPE_INSTANTIATION_NODES
-                    )),
-                );
-            }
-        }
-
-        let struct_ = &struct_inst.definition_struct_type;
-        Ok(Type::StructInstantiation {
-            idx: struct_.idx,
-            ty_args: triomphe::Arc::new(
-                struct_inst
-                    .instantiation
-                    .iter()
-                    .map(|ty| self.subst(ty, ty_args))
-                    .collect::<PartialVMResult<_>>()?,
-            ),
-            ability: AbilityInfo::generic_struct(
-                struct_.abilities,
-                struct_.phantom_ty_params_mask.clone(),
-            ),
-        })
+        let struct_ty = &struct_inst.definition_struct_type;
+        let ty_builder = self.loader().ty_builder();
+        ty_builder.create_struct_instantiation_ty(struct_ty, &struct_inst.instantiation, ty_args)
     }
 
-    pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
+    pub(crate) fn get_field_ty(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let handle = &module.field_handles[idx.0 as usize];
-
-                Ok(handle.definition_struct_type.field_tys[handle.offset].clone())
+                Ok(&handle.field_ty)
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         }
     }
 
-    pub(crate) fn get_field_type_generic(
+    pub(crate) fn get_generic_field_ty(
         &self,
         idx: FieldInstantiationIndex,
         ty_args: &[Type],
@@ -1454,19 +1281,42 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => &module.field_instantiations[idx.0 as usize],
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-
-        let instantiation_types = field_instantiation
-            .instantiation
-            .iter()
-            .map(|inst_ty| inst_ty.subst(ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-
-        // TODO: Is this type substitution unbounded?
-        field_instantiation.definition_struct_type.field_tys[field_instantiation.offset]
-            .subst(&instantiation_types)
+        let field_ty = &field_instantiation.uninstantiated_field_ty;
+        self.instantiate_ty(field_ty, ty_args, &field_instantiation.instantiation)
     }
 
-    pub(crate) fn get_struct_field_tys(
+    pub(crate) fn instantiate_ty(
+        &self,
+        ty: &Type,
+        ty_args: &[Type],
+        instantiation_tys: &[Type],
+    ) -> PartialVMResult<Type> {
+        let ty_builder = self.loader().ty_builder();
+        let instantiation_tys = instantiation_tys
+            .iter()
+            .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        ty_builder.create_ty_with_subst(ty, &instantiation_tys)
+    }
+
+    pub(crate) fn variant_field_info_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldInfo {
+        match &self.binary {
+            BinaryType::Module(module) => module.variant_field_info_at(idx),
+            BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
+        }
+    }
+
+    pub(crate) fn variant_field_instantiation_info_at(
+        &self,
+        idx: VariantFieldInstantiationIndex,
+    ) -> &VariantFieldInfo {
+        match &self.binary {
+            BinaryType::Module(module) => module.variant_field_instantiation_info_at(idx),
+            BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
+        }
+    }
+
+    pub(crate) fn get_struct(
         &self,
         idx: StructDefinitionIndex,
     ) -> PartialVMResult<Arc<StructType>> {
@@ -1485,18 +1335,45 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_instantiation_at(idx.0),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        let struct_type = &struct_inst.definition_struct_type;
+        let struct_ty = &struct_inst.definition_struct_type;
+        self.instantiate_generic_fields(struct_ty, None, &struct_inst.instantiation, ty_args)
+    }
 
-        let instantiation_types = struct_inst
-            .instantiation
+    pub(crate) fn instantiate_generic_struct_variant_fields(
+        &self,
+        idx: StructVariantInstantiationIndex,
+        ty_args: &[Type],
+    ) -> PartialVMResult<Vec<Type>> {
+        let struct_inst = match &self.binary {
+            BinaryType::Module(module) => module.struct_variant_instantiation_at(idx),
+            BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
+        };
+        let struct_ty = &struct_inst.definition_struct_type;
+        self.instantiate_generic_fields(
+            struct_ty,
+            Some(struct_inst.variant),
+            &struct_inst.instantiation,
+            ty_args,
+        )
+    }
+
+    pub(crate) fn instantiate_generic_fields(
+        &self,
+        struct_ty: &Arc<StructType>,
+        variant: Option<VariantIndex>,
+        instantiation: &[Type],
+        ty_args: &[Type],
+    ) -> PartialVMResult<Vec<Type>> {
+        let ty_builder = self.loader().ty_builder();
+        let instantiation_tys = instantiation
             .iter()
-            .map(|inst_ty| inst_ty.subst(ty_args))
+            .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        struct_type
-            .field_tys
+        struct_ty
+            .fields(variant)?
             .iter()
-            .map(|ty| ty.subst(&instantiation_types))
+            .map(|(_, inst_ty)| ty_builder.create_ty_with_subst(inst_ty, &instantiation_tys))
             .collect::<PartialVMResult<Vec<_>>>()
     }
 
@@ -1515,14 +1392,10 @@ impl<'a> Resolver<'a> {
         let ty = self.single_type_at(idx);
 
         if !ty_args.is_empty() {
-            self.subst(ty, ty_args)
+            self.loader().ty_builder().create_ty_with_subst(ty, ty_args)
         } else {
             Ok(ty.clone())
         }
-    }
-
-    pub(crate) fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
-        self.loader.subst(ty, ty_args)
     }
 
     //
@@ -1557,14 +1430,13 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
+    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
         match &self.binary {
             BinaryType::Module(module) => {
-                let struct_ = &module.field_handles[idx.0 as usize].definition_struct_type;
-                Ok(Type::Struct {
-                    idx: struct_.idx,
-                    ability: AbilityInfo::struct_(struct_.abilities),
-                })
+                let struct_ty = &module.field_handles[idx.0 as usize].definition_struct_type;
+                self.loader()
+                    .ty_builder()
+                    .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
@@ -1573,31 +1445,34 @@ impl<'a> Resolver<'a> {
     pub(crate) fn field_instantiation_to_struct(
         &self,
         idx: FieldInstantiationIndex,
-        args: &[Type],
+        ty_args: &[Type],
     ) -> PartialVMResult<Type> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let field_inst = &module.field_instantiations[idx.0 as usize];
-
-                let struct_ = &field_inst.definition_struct_type;
-
-                Ok(Type::StructInstantiation {
-                    idx: struct_.idx,
-                    ty_args: triomphe::Arc::new(
-                        field_inst
-                            .instantiation
-                            .iter()
-                            .map(|ty| ty.subst(args))
-                            .collect::<PartialVMResult<Vec<_>>>()?,
-                    ),
-                    ability: AbilityInfo::generic_struct(
-                        struct_.abilities,
-                        struct_.phantom_ty_params_mask.clone(),
-                    ),
-                })
+                let struct_ty = &field_inst.definition_struct_type;
+                let ty_params = &field_inst.instantiation;
+                self.create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
+    }
+
+    pub(crate) fn create_struct_ty(&self, struct_ty: &Arc<StructType>) -> Type {
+        self.loader()
+            .ty_builder()
+            .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
+    }
+
+    pub(crate) fn create_struct_instantiation_ty(
+        &self,
+        struct_ty: &Arc<StructType>,
+        ty_params: &[Type],
+        ty_args: &[Type],
+    ) -> PartialVMResult<Type> {
+        self.loader()
+            .ty_builder()
+            .create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
     }
 
     pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
@@ -1620,12 +1495,10 @@ impl<'a> Resolver<'a> {
             .type_to_fully_annotated_layout(ty, self.module_store)
     }
 
-    // get the loader
     pub(crate) fn loader(&self) -> &Loader {
         self.loader
     }
 
-    // get the loader
     pub(crate) fn module_store(&self) -> &ModuleStorageAdapter {
         self.module_store
     }
@@ -1681,10 +1554,6 @@ pub const VALUE_DEPTH_MAX: u64 = 128;
 /// Maximal nodes which are allowed when converting to layout. This includes the types of
 /// fields for struct types.
 const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
-
-/// Maximal nodes which are all allowed when instantiating a generic type. This does not include
-/// field types of structs.
-const MAX_TYPE_INSTANTIATION_NODES: u64 = 128;
 
 struct PseudoGasContext {
     max_cost: u64,
@@ -1770,7 +1639,14 @@ impl Loader {
             Type::U256 => TypeTag::U256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
-            Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
+            Type::Vector(ty) => {
+                let el_ty_tag = if self.vm_config.pseudo_meter_vector_ty_to_ty_tag_construction {
+                    self.type_to_type_tag_impl(ty, gas_context)?
+                } else {
+                    self.type_to_type_tag(ty)?
+                };
+                TypeTag::Vector(Box::new(el_ty_tag))
+            },
             Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
                 *idx,
                 &[],
@@ -1786,31 +1662,6 @@ impl Loader {
                 );
             },
         })
-    }
-
-    fn count_type_nodes(&self, ty: &Type) -> u64 {
-        let mut todo = vec![ty];
-        let mut result = 0;
-        while let Some(ty) = todo.pop() {
-            match ty {
-                Type::Vector(ty) => {
-                    result += 1;
-                    todo.push(ty);
-                },
-                Type::Reference(ty) | Type::MutableReference(ty) => {
-                    result += 1;
-                    todo.push(ty);
-                },
-                Type::StructInstantiation { ty_args, .. } => {
-                    result += 1;
-                    todo.extend(ty_args.iter())
-                },
-                _ => {
-                    result += 1;
-                },
-            }
-        }
-        result
     }
 
     fn struct_name_to_type_layout(
@@ -1837,43 +1688,72 @@ impl Loader {
         let count_before = *count;
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
 
-        // Some types can have fields which are lifted at serialization or deserialization
-        // times. Right now these are Aggregator and AggregatorSnapshot.
-        let maybe_mapping = self.get_identifier_mapping_kind(name);
+        let mut has_identifier_mappings = false;
 
-        let field_tys = struct_type
-            .field_tys
-            .iter()
-            .map(|ty| self.subst(ty, ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
-            field_tys
-                .iter()
-                .map(|ty| self.type_to_type_layout_impl(ty, module_store, count, depth))
-                .collect::<PartialVMResult<Vec<_>>>()?
-                .into_iter()
-                .unzip();
+        let layout = match &struct_type.layout {
+            StructLayout::Single(fields) => {
+                // Some types can have fields which are lifted at serialization or deserialization
+                // times. Right now these are Aggregator and AggregatorSnapshot.
+                let maybe_mapping = self.get_identifier_mapping_kind(name);
 
-        let has_identifier_mappings =
-            maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
+                let field_tys = fields
+                    .iter()
+                    .map(|(_, ty)| self.ty_builder().create_ty_with_subst(ty, ty_args))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                let (mut field_layouts, field_has_identifier_mappings): (
+                    Vec<MoveTypeLayout>,
+                    Vec<bool>,
+                ) = field_tys
+                    .iter()
+                    .map(|ty| self.type_to_type_layout_impl(ty, module_store, count, depth))
+                    .collect::<PartialVMResult<Vec<_>>>()?
+                    .into_iter()
+                    .unzip();
 
-        let field_node_count = *count - count_before;
-        let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
-            // For DerivedString, the whole object should be lifted.
-            MoveTypeLayout::Native(
-                IdentifierMappingKind::DerivedString,
-                Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))),
-            )
-        } else {
-            // For aggregators / snapshots, the first field should be lifted.
-            if let Some(kind) = &maybe_mapping {
-                if let Some(l) = field_layouts.first_mut() {
-                    *l = MoveTypeLayout::Native(kind.clone(), Box::new(l.clone()));
-                }
-            }
-            MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))
+                has_identifier_mappings =
+                    maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
+
+                let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
+                    // For DerivedString, the whole object should be lifted.
+                    MoveTypeLayout::Native(
+                        IdentifierMappingKind::DerivedString,
+                        Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))),
+                    )
+                } else {
+                    // For aggregators / snapshots, the first field should be lifted.
+                    if let Some(kind) = &maybe_mapping {
+                        if let Some(l) = field_layouts.first_mut() {
+                            *l = MoveTypeLayout::Native(kind.clone(), Box::new(l.clone()));
+                        }
+                    }
+                    MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))
+                };
+                layout
+            },
+            StructLayout::Variants(variants) => {
+                // We do not support variants to have direct identifier mappings,
+                // but their inner types may.
+                let variant_layouts = variants
+                    .iter()
+                    .map(|variant| {
+                        variant
+                            .1
+                            .iter()
+                            .map(|(_, ty)| {
+                                let ty = self.ty_builder().create_ty_with_subst(ty, ty_args)?;
+                                let (ty, has_id_mappings) =
+                                    self.type_to_type_layout_impl(&ty, module_store, count, depth)?;
+                                has_identifier_mappings |= has_id_mappings;
+                                Ok(ty)
+                            })
+                            .collect::<PartialVMResult<Vec<_>>>()
+                    })
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(variant_layouts))
+            },
         };
 
+        let field_node_count = *count - count_before;
         let mut cache = self.type_cache.write();
         let info = cache
             .structs
@@ -1899,7 +1779,7 @@ impl Loader {
         &self,
         struct_name: &StructIdentifier,
     ) -> Option<IdentifierMappingKind> {
-        if !self.vm_config.aggregator_v2_type_tagging {
+        if !self.vm_config.delayed_field_optimization_enabled {
             return None;
         }
 
@@ -2032,15 +1912,13 @@ impl Loader {
         }
 
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
-        if struct_type.field_tys.len() != struct_type.field_names.len() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    format!(
-                    "Field types did not match the length of field names in loaded struct {}::{}",
-                    &name.module, &name.name
-                ),
-                ),
-            );
+
+        // TODO(#13806): have annotated layouts for variants. Currently, we just return the raw
+        //   layout for them.
+        if matches!(struct_type.layout, StructLayout::Variants(_)) {
+            return self
+                .struct_name_to_type_layout(struct_idx, module_store, ty_args, count, depth)
+                .map(|(l, _)| l);
         }
 
         let count_before = *count;
@@ -2051,12 +1929,12 @@ impl Loader {
             cost_per_byte: self.vm_config.type_byte_cost,
         };
         let struct_tag = self.struct_name_to_type_tag(struct_idx, ty_args, &mut gas_context)?;
-        let field_layouts = struct_type
-            .field_names
+        let fields = struct_type.fields(None)?;
+
+        let field_layouts = fields
             .iter()
-            .zip(&struct_type.field_tys)
             .map(|(n, ty)| {
-                let ty = self.subst(ty, ty_args)?;
+                let ty = self.ty_builder().create_ty_with_subst(ty, ty_args)?;
                 let l =
                     self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth)?;
                 Ok(MoveFieldLayout::new(n.clone(), l))
@@ -2150,12 +2028,18 @@ impl Loader {
         }
 
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
+        let formulas = match &struct_type.layout {
+            StructLayout::Single(fields) => fields
+                .iter()
+                .map(|(_, field_ty)| self.calculate_depth_of_type(field_ty, module_store))
+                .collect::<PartialVMResult<Vec<_>>>()?,
+            StructLayout::Variants(variants) => variants
+                .iter()
+                .flat_map(|variant| variant.1.iter().map(|(_, ty)| ty))
+                .map(|field_ty| self.calculate_depth_of_type(field_ty, module_store))
+                .collect::<PartialVMResult<Vec<_>>>()?,
+        };
 
-        let formulas = struct_type
-            .field_tys
-            .iter()
-            .map(|field_type| self.calculate_depth_of_type(field_type, module_store))
-            .collect::<PartialVMResult<Vec<_>>>()?;
         let formula = DepthFormula::normalize(formulas);
         let prev = self
             .type_cache

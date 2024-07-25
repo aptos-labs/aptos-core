@@ -151,6 +151,7 @@ impl<
         StreamingClient,
     >
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_notification_listener: ClientNotificationListener,
         commit_notification_listener: CommitNotificationListener,
@@ -312,8 +313,6 @@ impl<
             ))
         );
         self.update_consensus_commit_metrics(&consensus_commit_notification);
-
-        // TODO(joshlind): can we get consensus to forward the events?
 
         // Handle the commit notification
         let committed_transactions = CommittedTransactions {

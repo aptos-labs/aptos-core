@@ -11,9 +11,9 @@ use crate::{
         mempool::Mempool,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
     },
-    counters,
-    counters::{BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
+    counters::{self, BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
+    network::BroadcastPeerPriority,
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
@@ -156,9 +156,13 @@ impl TransactionStore {
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<(&InsertionInfo, &str)> {
+    ) -> Option<(&InsertionInfo, &str, &BroadcastPeerPriority)> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
-            return Some((&txn.insertion_info, self.get_bucket(txn.ranking_score)));
+            return Some((
+                &txn.insertion_info,
+                self.get_bucket(txn.ranking_score),
+                &txn.priority_of_sender,
+            ));
         }
         None
     }
@@ -362,6 +366,7 @@ impl TransactionStore {
         bucket: &str,
         insertion_info: &mut InsertionInfo,
         broadcast_ready: bool,
+        priority: &str,
     ) {
         insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
@@ -372,12 +377,14 @@ impl TransactionStore {
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority,
                 );
                 counters::core_mempool_txn_commit_latency(
                     BROADCAST_READY_LABEL,
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority,
                 );
             } else {
                 counters::core_mempool_txn_commit_latency(
@@ -385,6 +392,7 @@ impl TransactionStore {
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority,
                 );
             }
         }
@@ -429,6 +437,7 @@ impl TransactionStore {
                         self.timeline_index.get_bucket(txn.ranking_score),
                         &mut txn.insertion_info,
                         process_broadcast_ready,
+                        txn.priority_of_sender.to_string().as_str(),
                     );
                 }
 
@@ -555,13 +564,16 @@ impl TransactionStore {
 
     /// Read at most `count` transactions from timeline since `timeline_id`.
     /// This method takes into account the max number of bytes per transaction batch.
-    /// Returns block of transactions and new last_timeline_id.
+    /// Returns block of transactions along with their transaction ready times
+    /// and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
-    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
+        // The priority of the receipient of the transactions
+        priority_of_receiver: BroadcastPeerPriority,
+    ) -> (Vec<(SignedTransaction, u64)>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
         let mut last_timeline_id = timeline_id.id_per_bucket.clone();
@@ -580,7 +592,13 @@ impl TransactionStore {
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
                         break; // The batch is full
                     } else {
-                        batch.push(txn.txn.clone());
+                        batch.push((
+                            txn.txn.clone(),
+                            aptos_infallible::duration_since_epoch_at(
+                                &txn.insertion_info.ready_time,
+                            )
+                            .as_millis() as u64,
+                        ));
                         batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
                         if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                             last_timeline_id[i] = timeline_id;
@@ -590,6 +608,7 @@ impl TransactionStore {
                             &txn.insertion_info,
                             bucket,
                             BROADCAST_BATCHED_LABEL,
+                            priority_of_receiver.to_string().as_str(),
                         );
                         counters::core_mempool_txn_ranking_score(
                             BROADCAST_BATCHED_LABEL,
@@ -607,8 +626,8 @@ impl TransactionStore {
 
     pub(crate) fn timeline_range(
         &self,
-        start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+        start_end_pairs: &[(u64, u64)],
+    ) -> Vec<(SignedTransaction, u64)> {
         self.timeline_index
             .timeline_range(start_end_pairs)
             .iter()
@@ -616,7 +635,15 @@ impl TransactionStore {
                 self.transactions
                     .get(account)
                     .and_then(|txns| txns.get(sequence_number))
-                    .map(|txn| txn.txn.clone())
+                    .map(|txn| {
+                        (
+                            txn.txn.clone(),
+                            aptos_infallible::duration_since_epoch_at(
+                                &txn.insertion_info.ready_time,
+                            )
+                            .as_millis() as u64,
+                        )
+                    })
             })
             .collect()
     }

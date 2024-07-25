@@ -32,7 +32,7 @@ module 0x8675309::M {
     private fun t2() {
         loop {
           {
-            let M::S{ f: _, b: x: bool }: M::S = pack M::S(0, false);
+            let M::S{ f: _, b: x } = pack M::S(0, false);
             false;
             break
           }

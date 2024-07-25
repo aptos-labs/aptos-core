@@ -24,7 +24,7 @@ pub mod util;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
-use aptos_native_interface::SafeNativeBuilder;
+use aptos_native_interface::{RawSafeNative, SafeNativeBuilder};
 use cryptography::ed25519;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
@@ -39,6 +39,7 @@ pub mod status {
 pub fn all_natives(
     framework_addr: AccountAddress,
     builder: &SafeNativeBuilder,
+    inject_create_signer_for_gov_sim: bool,
 ) -> NativeFunctionTable {
     let mut natives = vec![];
 
@@ -90,6 +91,16 @@ pub fn all_natives(
         "dispatchable_fungible_asset",
         dispatchable_fungible_asset::make_all(builder)
     );
+
+    if inject_create_signer_for_gov_sim {
+        add_natives_from_module!(
+            "aptos_governance",
+            builder.make_named_natives([(
+                "create_signer",
+                create_signer::native_create_signer as RawSafeNative
+            )])
+        );
+    }
 
     make_table_from_iter(framework_addr, natives)
 }

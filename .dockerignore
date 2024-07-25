@@ -20,7 +20,7 @@
 !**/*.errmap
 !config/src/config/test_data
 !aptos-move/aptos-gas-profiling/templates/
-!aptos-move/aptos-release-builder/data/release.yaml
+!aptos-move/aptos-release-builder/data/*.yaml
 !aptos-move/aptos-release-builder/data/proposals/*
 !aptos-move/framework/
 !aptos-move/move-examples/hello_blockchain/

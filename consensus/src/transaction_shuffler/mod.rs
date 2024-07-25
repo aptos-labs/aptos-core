@@ -2,18 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_logger::info;
-use aptos_types::{
-    on_chain_config::{
-        TransactionShufflerType,
-        TransactionShufflerType::{DeprecatedSenderAwareV1, NoShuffling, SenderAwareV2},
-    },
-    transaction::SignedTransaction,
-};
+use aptos_types::{on_chain_config::TransactionShufflerType, transaction::SignedTransaction};
 use sender_aware::SenderAwareShuffler;
 use std::sync::Arc;
 
-mod fairness;
+mod deprecated_fairness;
 mod sender_aware;
+mod use_case_aware;
 
 /// Interface to shuffle transactions
 pub trait TransactionShuffler: Send + Sync {
@@ -32,6 +27,8 @@ impl TransactionShuffler for NoOpShuffler {
 pub fn create_transaction_shuffler(
     shuffler_type: TransactionShufflerType,
 ) -> Arc<dyn TransactionShuffler> {
+    use TransactionShufflerType::*;
+
     match shuffler_type {
         NoShuffling => {
             info!("Using no-op transaction shuffling");
@@ -48,7 +45,7 @@ pub fn create_transaction_shuffler(
             );
             Arc::new(SenderAwareShuffler::new(conflict_window_size as usize))
         },
-        TransactionShufflerType::Fairness {
+        DeprecatedFairness {
             sender_conflict_window_size,
             module_conflict_window_size,
             entry_fun_conflict_window_size,
@@ -59,11 +56,27 @@ pub fn create_transaction_shuffler(
                 module_conflict_window_size,
                 entry_fun_conflict_window_size
             );
-            Arc::new(fairness::FairnessShuffler {
+            Arc::new(deprecated_fairness::FairnessShuffler {
                 sender_conflict_window_size: sender_conflict_window_size as usize,
                 module_conflict_window_size: module_conflict_window_size as usize,
                 entry_fun_conflict_window_size: entry_fun_conflict_window_size as usize,
             })
+        },
+        UseCaseAware {
+            sender_spread_factor,
+            platform_use_case_spread_factor,
+            user_use_case_spread_factor,
+        } => {
+            let config = use_case_aware::Config {
+                sender_spread_factor,
+                platform_use_case_spread_factor,
+                user_use_case_spread_factor,
+            };
+            info!(
+                config = ?config,
+                "Using use case aware transaction shuffling."
+            );
+            Arc::new(use_case_aware::UseCaseAwareShuffler { config })
         },
     }
 }

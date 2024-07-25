@@ -15,6 +15,6 @@ module 0x8675309::M {
         Shl<u64>(Copy(x), Copy(b));
         Shl<u64>(select M::R.f<M::R>(r), select M::R.b<M::R>(r));
         Shl<u64>(Shl<u64>(Shl<u64>(1, select M::R.b<M::R>(r)), select M::R.b<M::R>(r)), 0);
-        M::R{ f: _, b: _ }: M::R = r
+        M::R{ f: _, b: _ } = r
     }
 } // end 0x8675309::M

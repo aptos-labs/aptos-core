@@ -4,7 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::MempoolSyncMsg,
+    network::{BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{tasks, types::SharedMempool},
 };
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
@@ -24,9 +24,9 @@ use proptest::{
 use std::{collections::HashMap, sync::Arc};
 
 pub fn mempool_incoming_transactions_strategy(
-) -> impl Strategy<Value = (Vec<SignedTransaction>, TimelineState)> {
+) -> impl Strategy<Value = (Vec<(SignedTransaction, Option<u64>)>, TimelineState)> {
     (
-        proptest::collection::vec(any::<SignedTransaction>(), 0..100),
+        proptest::collection::vec(any::<(SignedTransaction, Option<u64>)>(), 0..100),
         prop_oneof![
             Just(TimelineState::NotReady),
             Just(TimelineState::NonQualified)
@@ -35,7 +35,7 @@ pub fn mempool_incoming_transactions_strategy(
 }
 
 pub fn test_mempool_process_incoming_transactions_impl(
-    txns: Vec<SignedTransaction>,
+    txns: Vec<(SignedTransaction, Option<u64>)>,
     timeline_state: TimelineState,
 ) {
     let config = NodeConfig::default();
@@ -57,7 +57,13 @@ pub fn test_mempool_process_incoming_transactions_impl(
         config.base.role,
     );
 
-    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);
+    let _ = tasks::process_incoming_transactions(
+        &smp,
+        txns,
+        timeline_state,
+        false,
+        BroadcastPeerPriority::Primary,
+    );
 }
 
 proptest! {

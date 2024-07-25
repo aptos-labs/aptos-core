@@ -10,6 +10,8 @@ publish = false
 edition = "2021"
 
 [dependencies]
+bcs = { workspace = true }
+bytes = { workspace = true }
 derivative = { workspace = true }
 itertools = { workspace = true }
 proptest = { workspace = true, optional = true }
@@ -17,8 +19,6 @@ serde = { workspace = true, features = ["derive", "rc"] }
 smallbitvec = { workspace = true }
 smallvec = { workspace = true }
 triomphe = { workspace = true }
-
-bcs = { workspace = true }
 
 move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
