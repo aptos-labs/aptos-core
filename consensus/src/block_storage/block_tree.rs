@@ -105,11 +105,8 @@ impl BlockTree {
         window_size: usize,
         highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     ) -> Self {
-        assert_eq!(
-            root.id(),
-            root_ordered_cert.commit_info().id(),
-            "inconsistent root and ledger info"
-        );
+        assert_eq!(root.epoch(), root_ordered_cert.commit_info().epoch());
+        assert!(root.round() <= root_ordered_cert.commit_info().round());
         let root_id = root.id();
 
         let mut id_to_block = HashMap::new();
@@ -236,8 +233,8 @@ impl BlockTree {
             return Some(OrderedBlockWindow::new(vec![]));
         }
 
-        let min_round = (block.round() + 1).saturating_sub(self.window_size as u64);
-        let window_size = (block.round() + 1) - min_round;
+        let window_start_round = (block.round() + 1).saturating_sub(self.window_size as u64);
+        let window_size = (block.round() + 1) - window_start_round;
         assert!(window_size > 0, "window_size must be greater than 0");
         if window_size == 1 {
             return Some(OrderedBlockWindow::new(vec![]));
@@ -259,7 +256,7 @@ impl BlockTree {
                     "Visiting block: {}, for window of block: {}",
                     current_block, block
                 );
-                if current_block.round() < min_round {
+                if current_block.round() < window_start_round {
                     info!(
                         "Break at block: {}, for window of block: {}",
                         current_block, block
@@ -272,12 +269,13 @@ impl BlockTree {
                 );
                 window.push(current_block.clone());
             } else {
-                panic!(
+                info!(
                     "Visiting block: {} was not found, parent of block: {}, for window of block: {}",
                     current_block.parent_id(),
                     current_block,
                     block
                 );
+                return None;
             }
         }
         assert!(window.len() <= window_size as usize - 1);

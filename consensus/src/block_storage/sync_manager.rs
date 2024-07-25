@@ -434,6 +434,7 @@ impl BlockStore {
                 &mut blocks.clone(),
                 &mut quorum_certs.clone(),
                 order_vote_enabled,
+                window_size,
             )
             .with_context(|| {
                 // for better readability

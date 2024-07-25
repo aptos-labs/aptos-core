@@ -105,6 +105,7 @@ impl LedgerRecoveryData {
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
         order_vote_enabled: bool,
+        window_size: usize,
     ) -> Result<RootInfo> {
         info!(
             "The last committed block id as recorded in storage: {}",
@@ -113,34 +114,78 @@ impl LedgerRecoveryData {
 
         // We start from the block that storage's latest ledger info, if storage has end-epoch
         // LedgerInfo, we generate the virtual genesis block
-        let (root_id, latest_ledger_info_sig) = if self.storage_ledger.ledger_info().ends_epoch() {
-            let genesis =
-                Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
-            let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
-                self.storage_ledger.ledger_info(),
-                genesis.id(),
-            );
-            let genesis_ledger_info = genesis_qc.ledger_info().clone();
-            let genesis_id = genesis.id();
-            blocks.push(genesis);
-            quorum_certs.push(genesis_qc);
-            (genesis_id, genesis_ledger_info)
-        } else {
-            (
-                self.storage_ledger.ledger_info().consensus_block_id(),
-                self.storage_ledger.clone(),
-            )
-        };
+        let (latest_commit_id, latest_ledger_info_sig) =
+            if self.storage_ledger.ledger_info().ends_epoch() {
+                let genesis =
+                    Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
+                let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
+                    self.storage_ledger.ledger_info(),
+                    genesis.id(),
+                );
+                let genesis_ledger_info = genesis_qc.ledger_info().clone();
+                let genesis_id = genesis.id();
+                blocks.push(genesis);
+                quorum_certs.push(genesis_qc);
+                (genesis_id, genesis_ledger_info)
+            } else {
+                (
+                    self.storage_ledger.ledger_info().consensus_block_id(),
+                    self.storage_ledger.clone(),
+                )
+            };
 
         // sort by (epoch, round) to guarantee the topological order of parent <- child
         blocks.sort_by_key(|b| (b.epoch(), b.round()));
+
+        let latest_commit_idx = blocks
+            .iter()
+            .position(|block| block.id() == latest_commit_id)
+            .ok_or_else(|| format_err!("unable to find root: {}", latest_commit_id))?;
+        let window_start_round = blocks[latest_commit_idx]
+            .round()
+            .saturating_add(1)
+            .saturating_sub(window_size as u64);
+        let epoch = blocks[latest_commit_idx].epoch();
+        let mut id_to_blocks = HashMap::new();
+        blocks.iter().for_each(|block| {
+            id_to_blocks.insert(block.id(), block);
+        });
+
+        let mut prev_id = HashValue::zero();
+        let mut curr_id = latest_commit_id;
+        let mut root_id = HashValue::zero();
+        while let Some(block) = id_to_blocks.get(&curr_id) {
+            // TODO: do we ever fetch block cross-epoch?
+            if block.epoch() < epoch {
+                info!(
+                    "Epoch change detected: {}, prev_root: {}",
+                    block, blocks[latest_commit_idx]
+                );
+                root_id = prev_id;
+                break;
+            }
+            if block.round() < window_start_round {
+                info!(
+                    "Stop finding root block: {}, prev_root: {}",
+                    block, blocks[latest_commit_idx]
+                );
+                root_id = curr_id;
+                break;
+            }
+
+            root_id = curr_id;
+            prev_id = curr_id;
+            curr_id = block.parent_id();
+        }
+        // TODO: panic or bail?
+        assert_ne!(root_id, HashValue::zero(), "Root block not found");
 
         let root_idx = blocks
             .iter()
             .position(|block| block.id() == root_id)
             .ok_or_else(|| format_err!("unable to find root: {}", root_id))?;
-        // TODO: note, we probably have to remove the remove here.
-        let root_block = blocks[root_idx].clone();
+        let root_block = blocks.remove(root_idx);
+
         let root_quorum_cert = quorum_certs
             .iter()
             .find(|qc| qc.certified_block().id() == root_block.id())
@@ -237,7 +282,12 @@ impl RecoveryData {
         window_size: usize,
     ) -> Result<Self> {
         let root = ledger_recovery_data
-            .find_root(&mut blocks, &mut quorum_certs, order_vote_enabled)
+            .find_root(
+                &mut blocks,
+                &mut quorum_certs,
+                order_vote_enabled,
+                window_size,
+            )
             .with_context(|| {
                 // for better readability
                 blocks.sort_by_key(|block| block.round());
@@ -262,10 +312,6 @@ impl RecoveryData {
             root.0.id(),
             &mut blocks,
             &mut quorum_certs,
-            root.0
-                .round()
-                .saturating_add(1)
-                .saturating_sub(window_size as u64),
         ));
         info!("Blocks to prune: {:?}", blocks_to_prune);
         let epoch = root.0.epoch();
@@ -317,44 +363,14 @@ impl RecoveryData {
         root_id: HashValue,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
-        window_start_round: u64,
     ) -> Vec<HashValue> {
-        // prune all the blocks that don't have root as ancestor, expect the blocks that are
-        // an ancestor of the root and are within the window size.
+        // prune all the blocks that don't have root as ancestor
         let mut tree = HashSet::new();
         let mut to_remove = HashSet::new();
-
-        let mut id_to_blocks = HashMap::new();
-        blocks.iter().for_each(|block| {
-            id_to_blocks.insert(block.id(), block);
-        });
-        let epoch = id_to_blocks
-            .get(&root_id)
-            .expect("Root block not found")
-            .epoch();
-
-        let mut curr_id = root_id;
-        while let Some(block) = id_to_blocks.get(&curr_id) {
-            info!("Checking block for tree: {}", block.id());
-            // TODO: can we remove this check?
-            if block.epoch() < epoch {
-                continue;
-            }
-            tree.insert(block.id());
-            info!("Adding block to tree: {}", block.id());
-            // Stop after adding the first block that is <= window_start_round
-            if block.round() <= window_start_round {
-                info!("Stop adding block to tree: {}", block.id());
-                break;
-            }
-            curr_id = block.parent_id();
-        }
-
+        tree.insert(root_id);
         // assume blocks are sorted by round already
         blocks.retain(|block| {
-            if tree.contains(&block.id()) {
-                true
-            } else if tree.contains(&block.parent_id()) {
+            if tree.contains(&block.parent_id()) {
                 tree.insert(block.id());
                 true
             } else {

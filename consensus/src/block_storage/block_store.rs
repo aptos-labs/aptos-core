@@ -19,8 +19,12 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
-    block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    block::Block,
+    common::Round,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutCertificate,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
@@ -351,6 +355,7 @@ impl BlockStore {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
+        let with_window = self.commit_root().round() < block.round();
 
         // ensure local time past the block time
         let block_time = Duration::from_micros(block.timestamp_usecs());
@@ -389,7 +394,16 @@ impl BlockStore {
             let pipelined_block = PipelinedBlock::new_ordered(block.clone(), block_window);
             block_tree.insert_block(pipelined_block)
         } else {
-            bail!("Could not get block window for {}", block.id())
+            info!(
+                "no block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}",
+                block.id(),
+                block.parent_id(),
+                block.round(),
+                block.epoch(),
+            );
+            let pipelined_block =
+                PipelinedBlock::new_ordered(block.clone(), OrderedBlockWindow::empty());
+            block_tree.insert_block(pipelined_block)
         }
     }
 

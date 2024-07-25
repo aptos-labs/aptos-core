@@ -38,10 +38,6 @@ impl OrderedBlockWindow {
         Self { blocks: vec![] }
     }
 
-    pub fn is_valid(&self) -> bool {
-        !self.blocks.is_empty()
-    }
-
     pub fn blocks(&self) -> &Vec<Block> {
         &self.blocks
     }
@@ -210,6 +206,7 @@ impl PipelinedBlock {
         &self.block
     }
 
+    // TODO: make this an Option?
     pub fn block_window(&self) -> &OrderedBlockWindow {
         &self.block_window
     }
