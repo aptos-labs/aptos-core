@@ -199,11 +199,8 @@ impl PipelineBackpressureConfig {
                 .collect::<Vec<_>>();
             info!("Estimated block back-offs block sizes: {:?}", sizes);
             if sizes.len() >= config.min_blocks_to_activate {
-                Some(
-                    *sizes
-                        .get((config.percentile * sizes.len() as f64) as usize)
-                        .unwrap(),
-                )
+                let index = (config.percentile * sizes.len() as f64) as usize;
+                sizes.get(index).copied()
             } else {
                 None
             }
@@ -453,7 +450,7 @@ impl ProposalGenerator {
 
             if !payload.is_direct()
                 && max_txns_from_block_to_execute.is_some()
-                && payload.len() as u64 > max_txns_from_block_to_execute.unwrap()
+                && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
             {
                 payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
             }
@@ -492,6 +489,7 @@ impl ProposalGenerator {
         Ok(block)
     }
 
+    #[allow(clippy::unwrap_used)]
     async fn calculate_max_block_sizes(
         &mut self,
         voting_power_ratio: f64,
@@ -567,10 +565,12 @@ impl ProposalGenerator {
             },
         );
 
+        // the unwrap are safe because we always have at least one value in the vectors, see initialization.
         let max_block_txns = values_max_block_txns_after_filtering
             .into_iter()
             .min()
             .unwrap();
+
         let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
         let proposal_delay = values_proposal_delay.into_iter().max().unwrap();
         let max_txns_from_block_to_execute = values_max_txns_from_block_to_execute

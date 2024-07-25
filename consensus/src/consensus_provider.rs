@@ -41,6 +41,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
 
 /// Helper function to start consensus based on configuration and return the runtime
+#[allow(clippy::unwrap_used)]
 pub fn start_consensus(
     node_config: &NodeConfig,
     network_client: NetworkClient<ConsensusMsg>,
