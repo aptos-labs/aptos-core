@@ -110,6 +110,8 @@ impl InMemDag {
         );
 
         let node = Arc::new(node);
+        // Invariant violation, we must get the node ref (COMMENT ME)
+        #[allow(clippy::unwrap_in_result)]
         let round_ref = self
             .get_node_ref_mut(node.round(), node.author())
             .expect("must be present");
@@ -323,7 +325,11 @@ impl InMemDag {
         filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
-        let initial_round = targets.clone().map(|t| t.round()).max().unwrap();
+        let initial_round = targets
+            .clone()
+            .map(|t| t.round())
+            .max()
+            .expect("Round should be not empty!");
         let initial = targets.map(|t| *t.digest()).collect();
 
         let mut reachable_filter = Self::reachable_filter(initial);
@@ -397,6 +403,8 @@ impl InMemDag {
         DagSnapshotBitmask::new(from_round, bitmask)
     }
 
+    /// unwrap is only used in debug mode
+    #[allow(clippy::unwrap_used)]
     pub(super) fn prune(&mut self) -> BTreeMap<u64, Vec<Option<NodeStatus>>> {
         let to_keep = self.nodes_by_round.split_off(&self.start_round);
         let to_prune = std::mem::replace(&mut self.nodes_by_round, to_keep);

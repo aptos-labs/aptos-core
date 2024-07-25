@@ -76,7 +76,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
                 vec![],
             ))
             .await
-            .unwrap();
+            .expect("We should be able to send the proof of store message");
     }
 
     async fn send_proof_of_store_msg_to_self(&mut self, _proof_of_stores: Vec<ProofOfStore>) {

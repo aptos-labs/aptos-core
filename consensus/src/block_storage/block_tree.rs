@@ -432,7 +432,7 @@ impl BlockTree {
             .create_merged_with_executed_state(commit_decision)
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
 
-        let block_to_commit = blocks_to_commit.last().unwrap().clone();
+        let block_to_commit = blocks_to_commit.last().expect("pipeline is empty").clone();
         update_counters_for_committed_blocks(blocks_to_commit);
         let current_round = self.commit_root().round();
         let committed_round = block_to_commit.round();

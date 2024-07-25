@@ -66,14 +66,15 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             lifetime_guard,
         } = req;
 
-        if ordered_blocks.is_empty() {
-            return ExecutionWaitRequest {
-                block_id: HashValue::zero(),
-                fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
-            };
-        }
-
-        let block_id = ordered_blocks.last().unwrap().id();
+        let block_id = match ordered_blocks.last() {
+            Some(block) => block.id(),
+            None => {
+                return ExecutionWaitRequest {
+                    block_id: HashValue::zero(),
+                    fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
+                }
+            },
+        };
 
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.

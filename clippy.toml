@@ -6,3 +6,5 @@ type-complexity-threshold = 10000
 too-many-arguments-threshold = 14
 # Reasonably large enum variants are okay
 enum-variant-size-threshold = 1000
+# Allow unwrap in test
+allow-unwrap-in-tests = true
