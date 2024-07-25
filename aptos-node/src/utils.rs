@@ -6,6 +6,7 @@ use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_types::{
     account_config::ChainIdResource, chain_id::ChainId, on_chain_config::OnChainConfig,
+    vm::configs::set_paranoid_type_checks,
 };
 use aptos_vm::AptosVM;
 use std::cmp::min;
@@ -45,7 +46,7 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
 
 /// Sets the Aptos VM configuration based on the node configurations
 pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
-    AptosVM::set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
+    set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
     let effective_concurrency_level = if node_config.execution.concurrency_level == 0 {
         min(
             DEFAULT_EXECUTION_CONCURRENCY_LEVEL,

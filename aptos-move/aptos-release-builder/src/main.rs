@@ -4,9 +4,11 @@
 use anyhow::Context;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_framework::natives::code::PackageRegistry;
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_release_builder::{
     components::fetch_config,
     initialize_aptos_core_path,
+    simulate::simulate_all_proposals,
     validate::{DEFAULT_RESOLUTION_TIME, FAST_RESOLUTION_TIME},
 };
 use aptos_types::{
@@ -15,7 +17,8 @@ use aptos_types::{
     jwks::{ObservedJWKs, SupportedOIDCProviders},
 };
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
+use url::Url;
 
 #[derive(Parser)]
 pub struct Argument {
@@ -23,6 +26,43 @@ pub struct Argument {
     cmd: Commands,
     #[clap(long)]
     aptos_core_path: Option<PathBuf>,
+}
+
+// TODO(vgao1996): unify with `ReplayNetworkSelection` in the `aptos` crate.
+#[derive(Clone, Debug)]
+pub enum NetworkSelection {
+    Mainnet,
+    Testnet,
+    Devnet,
+    RestEndpoint(String),
+}
+
+impl FromStr for NetworkSelection {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
+        Ok(match s {
+            "mainnet" => Self::Mainnet,
+            "testnet" => Self::Testnet,
+            "devnet" => Self::Devnet,
+            _ => Self::RestEndpoint(s.to_owned()),
+        })
+    }
+}
+
+impl NetworkSelection {
+    fn to_url(&self) -> anyhow::Result<Url> {
+        use NetworkSelection::*;
+
+        let s = match &self {
+            Mainnet => "https://fullnode.mainnet.aptoslabs.com",
+            Testnet => "https://fullnode.testnet.aptoslabs.com",
+            Devnet => "https://fullnode.devnet.aptoslabs.com",
+            RestEndpoint(url) => url,
+        };
+
+        Ok(Url::parse(s)?)
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -33,6 +73,24 @@ pub enum Commands {
         release_config: PathBuf,
         #[clap(short, long)]
         output_dir: PathBuf,
+
+        #[clap(long)]
+        simulate: Option<NetworkSelection>,
+    },
+    /// Simulate a multi-step proposal on the specified network, using its current states.
+    /// The simulation will execute the governance scripts, as if the proposal is already
+    /// approved.
+    Simulate {
+        /// Directory that may contain one or more proposals at any level
+        /// within its sub-directory hierarchy.
+        #[clap(short, long)]
+        path: PathBuf,
+
+        /// The network to simulate on.
+        ///
+        /// Possible values: devnet, testnet, mainnet, <url to rest endpoint>
+        #[clap(long)]
+        network: NetworkSelection,
     },
     /// Generate sets of governance proposals with default release config.
     WriteDefault {
@@ -56,6 +114,16 @@ pub enum Commands {
         /// Mint to validator such that it has enough stake to allow fast voting resolution.
         #[clap(long)]
         mint_to_validator: bool,
+    },
+    /// Generate a gas schedule using the current values and store it to a file.
+    GenerateGasSchedule {
+        /// The version of the gas schedule to generate.
+        #[clap(short, long)]
+        version: Option<u64>,
+
+        /// Path of the output file.
+        #[clap(short, long)]
+        output_path: Option<PathBuf>,
     },
     /// Print out current values of on chain configs.
     PrintConfigs {
@@ -115,11 +183,23 @@ async fn main() -> anyhow::Result<()> {
         Commands::GenerateProposals {
             release_config,
             output_dir,
+            simulate,
         } => {
             aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())
                 .with_context(|| "Failed to load release config".to_string())?
                 .generate_release_proposal_scripts(output_dir.as_path())
+                .await
                 .with_context(|| "Failed to generate release proposal scripts".to_string())?;
+
+            if let Some(network) = simulate {
+                let remote_endpoint = network.to_url()?;
+                simulate_all_proposals(remote_endpoint, output_dir.as_path()).await?;
+            }
+
+            Ok(())
+        },
+        Commands::Simulate { network, path } => {
+            simulate_all_proposals(network.to_url()?, &path).await?;
             Ok(())
         },
         Commands::WriteDefault { output_path } => {
@@ -199,6 +279,22 @@ async fn main() -> anyhow::Result<()> {
             network_config
                 .set_fast_resolve(DEFAULT_RESOLUTION_TIME)
                 .await?;
+            Ok(())
+        },
+        Commands::GenerateGasSchedule {
+            version,
+            output_path,
+        } => {
+            let version = version.unwrap_or(LATEST_GAS_FEATURE_VERSION);
+            let output_path =
+                output_path.unwrap_or_else(|| PathBuf::from_str("gas_schedule.json").unwrap());
+
+            let gas_schedule = aptos_gas_schedule_updator::current_gas_schedule(version);
+            let json = serde_json::to_string_pretty(&gas_schedule)?;
+
+            std::fs::write(&output_path, json)?;
+            println!("Gas scheduled saved to {}.", output_path.display());
+
             Ok(())
         },
         Commands::PrintConfigs {

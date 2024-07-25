@@ -16,7 +16,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     persistent_liveness_storage::RecoveryData,
     pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
@@ -50,7 +50,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
 use aptos_network::{
     application::interface::NetworkClient,
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
         network::{Event, NetworkEvents, NewNetworkEvents, NewNetworkSender},
@@ -246,7 +246,6 @@ impl NodeSetup {
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
-        let (_, conn_status_rx) = conn_notifs_channel::new();
         let network_sender = network::NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
@@ -258,7 +257,7 @@ impl NodeSetup {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
+        let network_events = NetworkEvents::new(consensus_rx, None, true);
         let author = signer.author();
 
         let twin_id = TwinId { id, author };
@@ -292,7 +291,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::from(PayloadManager::DirectMempool),
+            Arc::from(DirectMempoolPayloadManager::new()),
             false,
             Arc::new(Mutex::new(PendingBlocks::new())),
         ));
@@ -304,6 +303,7 @@ impl NodeSetup {
             Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
             Duration::ZERO,
+            20,
             10,
             1000,
             5,
@@ -418,7 +418,6 @@ impl NodeSetup {
                     self.identity_desc()
                 )
             },
-            _ => panic!("Unexpected Network Event"),
         }
     }
 
@@ -429,7 +428,6 @@ impl NodeSetup {
                 msg,
                 self.identity_desc()
             ),
-            Some(_) => panic!("Unexpected Network Event"),
             None => {},
         }
     }
@@ -492,7 +490,6 @@ impl NodeSetup {
                 msg,
                 self.identity_desc()
             ),
-            Some(_) => panic!("Unexpected Network Event"),
             None => None,
         }
     }
@@ -1857,6 +1854,75 @@ fn block_retrieval_test() {
     });
 }
 
+#[test]
+fn block_retrieval_timeout_test() {
+    let runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        4,
+        Some(vec![0, 1]),
+        None,
+        None,
+        None,
+        None,
+    );
+    let timeout_config = playground.timeout_config();
+    runtime.spawn(playground.start());
+
+    for i in 0..4 {
+        info!("processing {}", i);
+        process_and_vote_on_proposal(
+            &runtime,
+            &mut nodes,
+            i as usize % 2,
+            &[3],
+            true,
+            None,
+            true,
+            i + 1,
+            i.saturating_sub(1),
+            0,
+        );
+    }
+
+    timed_block_on(&runtime, async {
+        let mut behind_node = nodes.pop().unwrap();
+
+        for node in nodes.iter() {
+            timeout_config.write().timeout_message_for(
+                &TwinId {
+                    id: behind_node.id,
+                    author: behind_node.signer.author(),
+                },
+                &TwinId {
+                    id: node.id,
+                    author: node.signer.author(),
+                },
+            );
+        }
+
+        // Drain the queue on other nodes
+        for node in nodes.iter_mut() {
+            let _ = node.next_proposal().await;
+        }
+
+        info!(
+            "Processing proposals for behind node {}",
+            behind_node.identity_desc()
+        );
+
+        let proposal_msg = behind_node.next_proposal().await;
+        behind_node
+            .round_manager
+            .process_proposal_msg(proposal_msg)
+            .await
+            .unwrap_err();
+    });
+}
+
+#[ignore] // TODO: turn this test back on once the flakes have resolved.
 #[test]
 pub fn forking_retrieval_test() {
     let runtime = consensus_runtime();

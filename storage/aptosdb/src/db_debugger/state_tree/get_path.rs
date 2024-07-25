@@ -45,9 +45,7 @@ impl Cmd {
         );
 
         let db = self.db_dir.open_state_merkle_db()?;
-        let mut iter = db
-            .metadata_db()
-            .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        let mut iter = db.metadata_db().rev_iter::<JellyfishMerkleNodeSchema>()?;
 
         iter.seek_for_prev(&NodeKey::new_empty_path(self.before_version - 1))?;
         let mut version = iter.next().transpose()?.unwrap().0.version();

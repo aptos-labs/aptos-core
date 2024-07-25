@@ -20,6 +20,7 @@ mod indexer_config;
 mod indexer_grpc_config;
 mod indexer_table_info_config;
 mod inspection_service_config;
+pub mod internal_indexer_db_config;
 mod jwk_consensus_config;
 mod logger_config;
 mod mempool_config;

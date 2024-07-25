@@ -67,7 +67,7 @@ impl Generator {
     ) {
         emitln!(ctx.writer, "if iszero(lt(calldatasize(), 4))");
         let mut selectors = BTreeMap::new();
-        let para_vec = vec!["calldataload(0)".to_string(), "224".to_string()];
+        let para_vec = ["calldataload(0)".to_string(), "224".to_string()];
         let shr224 = self.call_builtin_str(ctx, YulFunction::Shr, para_vec.iter().cloned());
         ctx.emit_block(|| {
             emitln!(ctx.writer, "let selector := {}", shr224);
@@ -528,7 +528,7 @@ impl Generator {
                     .enumerate()
                 {
                     let is_static = ty.is_static();
-                    let local_typ_var = vec![ret_var[stack_pos].clone()];
+                    let local_typ_var = [ret_var[stack_pos].clone()];
                     let abi_decode_type =
                         gen.generate_abi_decoding_type(ctx, ty, move_ty, from_memory);
                     ctx.emit_block(|| {
@@ -631,7 +631,7 @@ impl Generator {
                 {
                     let is_static = ty.is_static();
                     // TODO: consider the case size_on_stack is not 1
-                    let local_typ_var = vec![ret_var[stack_pos].clone()];
+                    let local_typ_var = [ret_var[stack_pos].clone()];
                     let abi_decode_type =
                         gen.generate_abi_decoding_type(ctx, ty, move_ty, from_memory);
                     ctx.emit_block(|| {
@@ -1453,7 +1453,7 @@ impl Generator {
                     .enumerate()
                 {
                     let is_static = ty.is_static();
-                    let local_typ_var = vec![ret_var[stack_pos].clone()];
+                    let local_typ_var = [ret_var[stack_pos].clone()];
                     let memory_func = ctx.memory_load_builtin_fun(move_ty);
                     if local_typ_var.len() == 1 {
                         emitln!(

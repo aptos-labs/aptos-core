@@ -39,11 +39,33 @@ spec aptos_framework::aggregator_v2 {
         pragma opaque;
     }
 
+    spec read_snapshot {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
+
+    spec read_derived_string {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
+
+    spec create_derived_string {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
+
+    spec derive_string_concat {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
+
+    // deprecated
     spec copy_snapshot {
         // TODO: temporary mockup.
         pragma opaque;
     }
 
+    // deprecated
     spec string_concat {
         // TODO: temporary mockup.
         pragma opaque;

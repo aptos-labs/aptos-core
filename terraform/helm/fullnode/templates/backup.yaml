@@ -30,12 +30,14 @@ spec:
       labels:
         {{- include "backup.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: backup
+        {{- if or $.Values.chain.label $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.label | default $.Values.chain.name }}
+        {{- end}}
       annotations:
         {{- if $.Values.metrics.destination }}
         aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
         {{- end}}
     spec:
-      terminationGracePeriodSeconds: 0
       containers:
       - name: backup
         {{- if and $backup_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -118,4 +120,4 @@ spec:
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}
       {{- end }}
-{{- end }}
+{{- end }} # if $.Values.backup.enable

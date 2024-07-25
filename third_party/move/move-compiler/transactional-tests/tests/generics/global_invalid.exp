@@ -68,6 +68,6 @@ error[E03002]: unbound module
    ┌─ TEMPFILE2:28:9
    │
 28 │         M::test_resource(&account)
-   │         ^ Unbound module alias 'M'
+   │         ^ Unbound module or type alias 'M'
 
 

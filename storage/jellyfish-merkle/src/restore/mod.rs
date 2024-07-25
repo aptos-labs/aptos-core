@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module implements the functionality to restore a `JellyfishMerkleTree` from small chunks
-//! of accounts.
+//! of states.
 
 use crate::{
     node_type::{
@@ -153,10 +153,10 @@ pub struct JellyfishMerkleRestore<K> {
     ///                             |         |
     ///                             |         |
     ///                             v         v
-    ///                            Frozen    Previously inserted account
+    ///                            Frozen    Previously inserted state
     /// ```
     ///
-    /// We insert the accounts from left to right. So if the next account appears at position `A`,
+    /// We insert the states from left to right. So if the next state appears at position `A`,
     /// it will cause the leaf at position `B` to be frozen. If it appears at position `B`, it
     /// might cause a few internal nodes to be created additionally. If it appears at position `C`,
     /// it will also cause `partial_nodes[1]` to be added to `frozen_nodes` as an internal node and
@@ -334,7 +334,7 @@ where
         Ok(partial_nodes)
     }
 
-    /// Restores a chunk of accounts. This function will verify that the given chunk is correct
+    /// Restores a chunk of states. This function will verify that the given chunk is correct
     /// using the proof and root hash, then write things to storage. If the chunk is invalid, an
     /// error will be returned and nothing will be written to storage.
     pub fn add_chunk_impl(
@@ -376,7 +376,7 @@ where
             if let Some(ref prev_leaf) = self.previous_leaf {
                 ensure!(
                     hashed_key > prev_leaf.account_key(),
-                    "Account keys must come in increasing order.",
+                    "State keys must come in increasing order.",
                 )
             }
             self.previous_leaf.replace(LeafNode::new(
@@ -413,7 +413,7 @@ where
         Ok(())
     }
 
-    /// Restores one account.
+    /// Restores one state.
     fn add_one(&mut self, new_key: &K, new_value_hash: HashValue) {
         let new_hashed_key = new_key.hash();
         let nibble_path = NibblePath::new_even(new_hashed_key.to_vec());
@@ -462,14 +462,14 @@ where
                     );
 
                     // We do not add this leaf node to self.frozen_nodes because we don't know its
-                    // node key yet. We will know its node key when the next account comes.
+                    // node key yet. We will know its node key when the next state comes.
                     break;
                 },
             }
         }
     }
 
-    /// Inserts a new account at the position of the existing leaf node. We may need to create
+    /// Inserts a new state at the position of the existing leaf node. We may need to create
     /// multiple internal nodes depending on the length of the common prefix of the existing key
     /// and the new key.
     fn insert_at_leaf(
@@ -622,9 +622,9 @@ where
         }
     }
 
-    /// Verifies that all accounts that have been added so far (from the leftmost one to
+    /// Verifies that all states that have been added so far (from the leftmost one to
     /// `self.previous_leaf`) are correct, i.e., we are able to construct `self.expected_root_hash`
-    /// by combining all existing accounts and `proof`.
+    /// by combining all existing states and `proof`.
     #[allow(clippy::collapsible_if)]
     fn verify(&self, proof: SparseMerkleRangeProof) -> Result<()> {
         let previous_leaf = self
@@ -635,7 +635,7 @@ where
         let previous_key = previous_leaf.account_key();
         // If we have all siblings on the path from root to `previous_key`, we should be able to
         // compute the root hash. The siblings on the right are already in the proof. Now we
-        // compute the siblings on the left side, which represent all the accounts that have ever
+        // compute the siblings on the left side, which represent all the states that have ever
         // been added.
         let mut left_siblings = vec![];
 
@@ -746,7 +746,7 @@ where
         Ok(())
     }
 
-    /// Finishes the restoration process. This tells the code that there is no more account,
+    /// Finishes the restoration process. This tells the code that there is no more state,
     /// otherwise we can not freeze the rightmost leaf and its ancestors.
     pub fn finish_impl(mut self) -> Result<()> {
         self.wait_for_async_commit()?;

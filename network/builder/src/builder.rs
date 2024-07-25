@@ -13,9 +13,8 @@
 use aptos_config::{
     config::{
         DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType, CONNECTION_BACKOFF_BASE,
-        CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONCURRENT_NETWORK_REQS, MAX_CONNECTION_DELAY_MS,
-        MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS,
-        NETWORK_CHANNEL_SIZE,
+        CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS, MAX_FRAME_SIZE,
+        MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS, NETWORK_CHANNEL_SIZE,
     },
     network_id::NetworkContext,
 };
@@ -84,7 +83,6 @@ impl NetworkBuilder {
         max_message_size: usize,
         enable_proxy_protocol: bool,
         network_channel_size: usize,
-        max_concurrent_network_reqs: usize,
         inbound_connection_limit: usize,
         tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
@@ -98,7 +96,6 @@ impl NetworkBuilder {
             peers_and_metadata.clone(),
             authentication_mode,
             network_channel_size,
-            max_concurrent_network_reqs,
             max_frame_size,
             max_message_size,
             enable_proxy_protocol,
@@ -141,7 +138,6 @@ impl NetworkBuilder {
             MAX_MESSAGE_SIZE,
             false, /* Disable proxy protocol */
             NETWORK_CHANNEL_SIZE,
-            MAX_CONCURRENT_NETWORK_REQS,
             MAX_INBOUND_CONNECTIONS,
             TCPBufferCfg::default(),
         );
@@ -192,7 +188,6 @@ impl NetworkBuilder {
             config.max_message_size,
             config.enable_proxy_protocol,
             config.network_channel_size,
-            config.max_concurrent_network_reqs,
             config.max_inbound_connections,
             TCPBufferCfg::new_configs(
                 config.inbound_rx_buffer_size_bytes,
@@ -412,6 +407,7 @@ impl NetworkBuilder {
         let (hc_network_tx, hc_network_rx) = self.add_client_and_service(
             &health_checker::health_checker_network_config(),
             max_parallel_deserialization_tasks,
+            true,
         );
         self.health_checker_builder = Some(HealthCheckerBuilder::new(
             self.network_context(),
@@ -437,12 +433,14 @@ impl NetworkBuilder {
         &mut self,
         config: &NetworkApplicationConfig,
         max_parallel_deserialization_tasks: Option<usize>,
+        allow_out_of_order_delivery: bool,
     ) -> (SenderT, EventsT) {
         (
             self.add_client(&config.network_client_config),
             self.add_service(
                 &config.network_service_config,
                 max_parallel_deserialization_tasks,
+                allow_out_of_order_delivery,
             ),
         )
     }
@@ -461,13 +459,13 @@ impl NetworkBuilder {
         &mut self,
         config: &NetworkServiceConfig,
         max_parallel_deserialization_tasks: Option<usize>,
+        allow_out_of_order_delivery: bool,
     ) -> EventsT {
-        let (peer_mgr_reqs_rx, connection_notifs_rx) =
-            self.peer_manager_builder.add_service(config);
+        let peer_mgr_reqs_rx = self.peer_manager_builder.add_service(config);
         EventsT::new(
             peer_mgr_reqs_rx,
-            connection_notifs_rx,
             max_parallel_deserialization_tasks,
+            allow_out_of_order_delivery,
         )
     }
 }

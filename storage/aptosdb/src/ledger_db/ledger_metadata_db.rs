@@ -13,7 +13,7 @@ use crate::{
     utils::{get_progress, iterators::EpochEndingLedgerInfoIter},
 };
 use anyhow::anyhow;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{block_info::BlockInfo, db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
@@ -24,7 +24,7 @@ use arc_swap::ArcSwap;
 use std::{ops::Deref, path::Path, sync::Arc};
 
 fn get_latest_ledger_info_in_db_impl(db: &DB) -> Result<Option<LedgerInfoWithSignatures>> {
-    let mut iter = db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
+    let mut iter = db.iter::<LedgerInfoSchema>()?;
     iter.seek_to_last();
     Ok(iter.next().transpose()?.map(|(_, v)| v))
 }
@@ -126,7 +126,7 @@ impl LedgerMetadataDb {
         start_epoch: u64,
         end_epoch: u64,
     ) -> Result<EpochEndingLedgerInfoIter> {
-        let mut iter = self.db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<LedgerInfoSchema>()?;
         iter.seek(&start_epoch)?;
         Ok(EpochEndingLedgerInfoIter::new(iter, start_epoch, end_epoch))
     }
@@ -202,9 +202,7 @@ impl LedgerMetadataDb {
 impl LedgerMetadataDb {
     /// Returns the epoch at the given version.
     pub(crate) fn get_epoch(&self, version: Version) -> Result<u64> {
-        let mut iter = self
-            .db
-            .iter::<EpochByVersionSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<EpochByVersionSchema>()?;
         // Search for the end of the previous epoch.
         iter.seek_for_prev(&version)?;
         let (epoch_end_version, epoch) = match iter.next().transpose()? {
@@ -254,9 +252,7 @@ impl LedgerMetadataDb {
         }
         let prev_version = version - 1;
 
-        let mut iter = self
-            .db
-            .iter::<EpochByVersionSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<EpochByVersionSchema>()?;
         // Search for the end of the previous epoch.
         iter.seek_for_prev(&prev_version)?;
         iter.next().transpose()
@@ -272,9 +268,7 @@ impl LedgerMetadataDb {
 
     /// Returns the corresponding block height for a given version.
     pub(crate) fn get_block_height_by_version(&self, version: Version) -> Result<u64> {
-        let mut iter = self
-            .db
-            .iter::<BlockByVersionSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<BlockByVersionSchema>()?;
 
         iter.seek_for_prev(&version)?;
         let (_, block_height) = iter.next().transpose()?.ok_or(anyhow!(
@@ -288,9 +282,7 @@ impl LedgerMetadataDb {
         &self,
         version: Version,
     ) -> Result<(Version, BlockHeight)> {
-        let mut iter = self
-            .db
-            .iter::<BlockByVersionSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<BlockByVersionSchema>()?;
         iter.seek(&version)?;
         let (block_version, block_height) = iter
             .next()
@@ -335,7 +327,7 @@ impl LedgerMetadataDb {
         &self,
         version: Version,
     ) -> Result<(Version, StateStorageUsage)> {
-        let mut iter = self.db.iter::<VersionDataSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<VersionDataSchema>()?;
         iter.seek_for_prev(&version)?;
         match iter.next().transpose()? {
             Some((previous_version, data)) => {

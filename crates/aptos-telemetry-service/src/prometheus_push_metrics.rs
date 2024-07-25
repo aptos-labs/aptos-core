@@ -10,8 +10,10 @@ use crate::{
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
+use aptos_types::PeerId;
+use rand::Rng;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
-use std::time::Duration;
+use std::{env, time::Duration};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
@@ -43,13 +45,34 @@ pub async fn handle_metrics_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling prometheus metrics ingest");
 
-    let extra_labels = claims_to_extra_labels(
-        &claims,
-        context
-            .peer_identities()
-            .get(&claims.chain_id)
-            .and_then(|peers| peers.get(&claims.peer_id)),
-    );
+    let enable_random_label = env::var("FEATURE_RANDOM_LABEL_ENABLED")
+        .map(|val| val.parse::<bool>().unwrap_or(false))
+        .unwrap_or(false);
+
+    let max_random_value = env::var("FEATURE_RANDOM_LABEL_MAX_VALUE")
+        .map(|val| val.parse::<i32>().unwrap_or(20))
+        .unwrap_or(20);
+
+    let extra_labels = [
+        claims_to_extra_labels(
+            &claims,
+            context
+                .peer_identities()
+                .get(&claims.chain_id)
+                .and_then(|peers| peers.get(&claims.peer_id)),
+        ),
+        peer_location_labels(&context, &claims.peer_id),
+    ]
+    .concat();
+
+    let extra_labels_with_random_label = if enable_random_label {
+        let random_num = rand::thread_rng().gen_range(0, max_random_value);
+        let mut labels = extra_labels.clone();
+        labels.push(format!("random_label={}", random_num));
+        labels
+    } else {
+        extra_labels.clone()
+    };
 
     let client = match claims.node_type {
         NodeType::UnknownValidator | NodeType::UnknownFullNode => {
@@ -61,6 +84,11 @@ pub async fn handle_metrics_ingest(
     let start_timer = Instant::now();
 
     let post_futures = client.iter().map(|(name, client)| async {
+        let extra_labels = if client.is_selfhosted_vm_client() {
+            extra_labels_with_random_label.clone()
+        } else {
+            extra_labels.clone()
+        };
         let result = tokio::time::timeout(
             Duration::from_secs(MAX_METRICS_POST_WAIT_DURATION_SECS),
             client.post_prometheus_metrics(
@@ -155,10 +183,29 @@ fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<
     ]
 }
 
+fn sanitize_location(location: &str) -> String {
+    location.to_lowercase().replace(' ', "_")
+}
+
+fn peer_location_labels(context: &Context, peer_id: &PeerId) -> Vec<String> {
+    let peer_locations = context.peer_locations().read();
+    let peer_location = peer_locations.get(peer_id);
+    let mut labels = vec![];
+    if let Some(location) = peer_location {
+        if let Some(country) = &location.country {
+            labels.push(format!("country={}", sanitize_location(country)));
+        }
+        if let Some(region) = &location.region {
+            labels.push(format!("region={}", sanitize_location(region)));
+        }
+    }
+    labels
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{tests::test_context, MetricsClient};
+    use crate::{peer_location::PeerLocation, tests::test_context, MetricsClient};
     use aptos_types::{chain_id::ChainId, PeerId};
     use httpmock::MockServer;
     use reqwest::Url;
@@ -318,5 +365,25 @@ mod test {
         assert!(mock1.hits_async().await >= 1);
         mock2.assert();
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_peer_location_labels() {
+        let test_context = test_context::new_test_context().await;
+        let peer_id = PeerId::from_str("0x1").unwrap();
+        {
+            let mut peer_locations = test_context.inner.peer_locations().write();
+            peer_locations.insert(peer_id, PeerLocation {
+                geo_updated_at: Some("1985-04-12T23:20:50.52Z".to_string()),
+                country: Some("United Kingdom".to_string()),
+                region: Some("Western_Europe".to_string()),
+                peer_id,
+            });
+        }
+        let labels = peer_location_labels(&test_context.inner, &peer_id);
+        assert_eq!(labels, vec![
+            "country=united_kingdom",
+            "region=western_europe"
+        ]);
     }
 }

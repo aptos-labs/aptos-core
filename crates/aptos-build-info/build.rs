@@ -9,6 +9,11 @@ fn main() -> shadow_rs::SdResult<()> {
         std::env::var("CARGO_CFG_TOKIO_UNSTABLE").is_ok()
     );
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=../../.git/HEAD");
+    // Check for this path first, otherwise it will force a rebuild every time
+    // https://github.com/rust-lang/cargo/issues/4213
+    let git_head = std::path::Path::new("../../.git/HEAD");
+    if git_head.exists() {
+        println!("cargo:rerun-if-changed=../../.git/HEAD");
+    }
     shadow_rs::new()
 }

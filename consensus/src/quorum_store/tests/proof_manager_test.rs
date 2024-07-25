@@ -55,12 +55,14 @@ async fn get_proposal(
     let filter_set = HashSet::from_iter(filter.iter().cloned());
     let req = GetPayloadCommand::GetPayloadRequest(
         max_txns,
+        max_txns,
         1000000,
         max_txns / 2,
         100000,
         true,
         PayloadFilter::InQuorumStore(filter_set),
         callback_tx,
+        aptos_infallible::duration_since_epoch(),
     );
     proof_manager.handle_proposal_request(req);
     let GetPayloadResponse::GetPayloadResponse(payload) = callback_rx.await.unwrap().unwrap();
@@ -70,7 +72,7 @@ async fn get_proposal(
 fn assert_payload_response(
     payload: Payload,
     expected: &[ProofOfStore],
-    max_txns_from_block_to_execute: Option<usize>,
+    max_txns_from_block_to_execute: Option<u64>,
 ) {
     match payload {
         Payload::InQuorumStore(proofs) => {

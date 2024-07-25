@@ -60,6 +60,11 @@ pub struct MempoolConfig {
     pub broadcast_buckets: Vec<u64>,
     pub eager_expire_threshold_ms: Option<u64>,
     pub eager_expire_time_ms: u64,
+    /// Uses the BroadcastTransactionsRequestWithReadyTime instead of BroadcastTransactionsRequest when sending
+    /// mempool transactions to upstream nodes.
+    pub include_ready_time_in_broadcast: bool,
+    pub usecase_stats_num_blocks_to_track: usize,
+    pub usecase_stats_num_top_to_track: usize,
 }
 
 impl Default for MempoolConfig {
@@ -85,8 +90,11 @@ impl Default for MempoolConfig {
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
-            eager_expire_threshold_ms: Some(10_000),
-            eager_expire_time_ms: 3_000,
+            eager_expire_threshold_ms: Some(15_000),
+            eager_expire_time_ms: 6_000,
+            include_ready_time_in_broadcast: false,
+            usecase_stats_num_blocks_to_track: 40,
+            usecase_stats_num_top_to_track: 5,
         }
     }
 }

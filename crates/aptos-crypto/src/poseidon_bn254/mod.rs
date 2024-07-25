@@ -97,8 +97,7 @@ fn hash_bytes(bytes: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
 /// example ASCII strings. Otherwise, unexpected collisions can occur.
 ///
 /// We do not expose this to minimize the risk of collisions due to improper use by the caller.
-#[allow(unused)]
-fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
+pub fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
     let scalars = pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?;
     hash_scalars(scalars)
 }

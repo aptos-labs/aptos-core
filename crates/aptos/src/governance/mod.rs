@@ -769,7 +769,7 @@ impl std::fmt::Display for ProposalMetadata {
     }
 }
 
-fn compile_in_temp_dir(
+pub fn compile_in_temp_dir(
     script_name: &str,
     script_path: &Path,
     framework_package_args: &FrameworkPackageArgs,
@@ -1001,6 +1001,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             move_options.dev,
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
+            move_options.override_std,
             move_options.bytecode_version,
             move_options.compiler_version,
             move_options.language_version,

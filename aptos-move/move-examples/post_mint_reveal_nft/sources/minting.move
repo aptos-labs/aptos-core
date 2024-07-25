@@ -717,7 +717,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -820,7 +820,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -844,7 +844,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -887,7 +887,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -906,7 +906,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -926,7 +926,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -945,7 +945,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -971,7 +971,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -999,7 +999,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -1029,7 +1029,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -1054,7 +1054,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -1078,7 +1078,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -1102,7 +1102,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -1132,7 +1132,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -1167,7 +1167,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -1187,7 +1187,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         public_nft_claimer = @0x234,
         treasury_account = @0x345,
@@ -1235,7 +1235,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         wl_nft_claimer2 = @0x234,
         treasury_account = @0x345,
@@ -1288,7 +1288,7 @@ module post_mint_reveal_nft::minting {
     }
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         wl_nft_claimer2 = @0x234,
         treasury_account = @0x345,
@@ -1315,7 +1315,7 @@ module post_mint_reveal_nft::minting {
 
 
     #[test (
-        admin_account = @0xcafe,
+        admin_account = @post_mint_reveal_nft,
         wl_nft_claimer = @0x123,
         wl_nft_claimer2 = @0x234,
         treasury_account = @0x345,

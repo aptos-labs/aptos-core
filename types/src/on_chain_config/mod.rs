@@ -52,7 +52,7 @@ pub use self::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
         OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
-    gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
+    gas_schedule::{DiffItem, GasSchedule, GasScheduleV2, StorageGasSchedule},
     jwk_consensus_config::{
         ConfigV1 as JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig,
     },

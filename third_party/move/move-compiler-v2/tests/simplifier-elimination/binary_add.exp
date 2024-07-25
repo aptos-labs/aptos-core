@@ -58,7 +58,7 @@ module 0x8675309::M {
         Add<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
         Add<u64>(Add<u64>(Add<u64>(1, select M::R.f<M::R>(r)), select M::R.f<M::R>(r)), 0);
         {
-          let M::R{ f: _ }: M::R = r;
+          let M::R{ f: _ } = r;
           Tuple()
         }
     }

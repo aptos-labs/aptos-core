@@ -215,6 +215,10 @@ fn make_module_with_function(
                 code: vec![Bytecode::LdU64(0), Bytecode::Abort],
             }),
         }],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
     (module, function_name)
 }
@@ -247,7 +251,7 @@ fn call_script_with_args_ty_args_signers(
     ty_args: Vec<TypeTag>,
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
-    let move_vm = MoveVM::new(vec![]).unwrap();
+    let move_vm = MoveVM::new(vec![]);
     let remote_view = InMemoryStorage::new();
     let mut session = move_vm.new_session(&remote_view);
     let traversal_storage = TraversalStorage::new();
@@ -274,7 +278,7 @@ fn call_script_function_with_args_ty_args_signers(
     ty_args: Vec<TypeTag>,
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
-    let move_vm = MoveVM::new(vec![]).unwrap();
+    let move_vm = MoveVM::new(vec![]);
     let mut remote_view = InMemoryStorage::new();
 
     let module_id = module.self_id();
@@ -776,7 +780,7 @@ fn call_missing_item() {
 
     // missing module
     let function_name = ident_str!("foo");
-    let move_vm = MoveVM::new(vec![]).unwrap();
+    let move_vm = MoveVM::new(vec![]);
     let mut remote_view = InMemoryStorage::new();
     let mut session = move_vm.new_session(&remote_view);
     let traversal_storage = TraversalStorage::new();

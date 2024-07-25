@@ -318,7 +318,7 @@ impl CFG {
     /// instruction sequence.
     fn get_block_offset(cfg: &CFG, block_order: &[BlockIDSize], block_id: BlockIDSize) -> u16 {
         assert!(
-            (0..block_id).all(|id| cfg.basic_blocks.get(&id).is_some()),
+            (0..block_id).all(|id| cfg.basic_blocks.contains_key(&id)),
             "Error: Invalid block_id given"
         );
         let mut offset: u16 = 0;

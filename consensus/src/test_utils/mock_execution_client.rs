@@ -5,7 +5,7 @@
 use crate::{
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
-    payload_manager::PayloadManager,
+    payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     pipeline::{
         buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
         signing_phase::CommitSignerProvider,
@@ -40,7 +40,7 @@ pub struct MockExecutionClient {
     executor_channel: UnboundedSender<OrderedBlocks>,
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
 }
 
 impl MockExecutionClient {
@@ -54,7 +54,7 @@ impl MockExecutionClient {
             executor_channel,
             consensus_db,
             block_cache: Mutex::new(HashMap::new()),
-            payload_manager: Arc::from(PayloadManager::DirectMempool),
+            payload_manager: Arc::from(DirectMempoolPayloadManager::new()),
         }
     }
 
@@ -96,14 +96,14 @@ impl TExecutionClient for MockExecutionClient {
         &self,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        _payload_manager: Arc<PayloadManager>,
+        _payload_manager: Arc<dyn TPayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        _highest_ordered_round: Round,
+        _highest_committed_round: Round,
     ) {
     }
 
@@ -168,6 +168,10 @@ impl TExecutionClient for MockExecutionClient {
         );
         self.consensus_db
             .commit_to_storage(commit.ledger_info().clone());
+        Ok(())
+    }
+
+    async fn reset(&self, _target: &LedgerInfoWithSignatures) -> Result<()> {
         Ok(())
     }
 

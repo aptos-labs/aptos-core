@@ -9,7 +9,7 @@ module 0x42::m {
         {
           let a: m::A = MoveFrom<m::A>(input);
           {
-            let m::A{ addr: addr: address }: m::A = a;
+            let m::A{ addr } = a;
             addr
           }
         }

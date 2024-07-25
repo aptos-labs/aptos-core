@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: Cannot use both package and friend visibility in the same module
+  ┌─ tests/visibility-checker/package_visibility_already_friend.move:4:5
+  │
+4 │     friend 0x42::B;
+  │     ^^^^^^^^^^^^^^^
+  │     │
+  │     friend visibility declared here
+5 │     fun foo() {}
+6 │     public(package) fun bar() {}
+  │     --------------- package visibility declared here

@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
-    test_utils::create_and_fund_account,
+    utils::create_and_fund_account,
 };
 use anyhow::ensure;
 use aptos_forge::{
@@ -206,8 +206,9 @@ async fn test_txn_emmitter_low_funds() {
             mempool_backlog: 10,
         });
 
+    let account_1 = Arc::new(account_1);
     let txn_stat = emitter
-        .emit_txn_for_with_stats(&account_1, emit_job_request, Duration::from_secs(10), 3)
+        .emit_txn_for_with_stats(account_1, emit_job_request, Duration::from_secs(10), 3)
         .await
         .unwrap();
 
