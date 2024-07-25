@@ -55,7 +55,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_synced_version(&self) -> Result<Version> {
+    fn get_synced_version(&self) -> Result<Option<Version>> {
         gauged_api("get_synced_version", || {
             self.ledger_db.metadata_db().get_synced_version()
         })
@@ -562,7 +562,7 @@ impl DbReader for AptosDB {
     // TODO(grao): Remove after DAG.
     fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {
         gauged_api("get_latest_block_events", || {
-            let latest_version = self.get_synced_version();
+            let latest_version = self.get_synced_version()?;
             if !self.skip_index_and_usage {
                 return self.get_events(
                     &new_block_event_key(),
