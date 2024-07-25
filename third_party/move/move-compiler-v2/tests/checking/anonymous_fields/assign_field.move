@@ -9,6 +9,11 @@ module 0x42::test {
 
     struct S3(S2, S0, S2);
 
+    enum E {
+        V1(u8, bool),
+        V2(S3),
+    }
+
     fun simple(x: S1) {
         x.0 = 42;
         x.1 = true;
@@ -39,8 +44,22 @@ module 0x42::test {
 
     fun assign_chained(x: S3) {
         x.0.0.x + x.1.x + x.2.0.x;
-        x.0.0.x = 42;
-        x.1.x = 42;
-        x.2.0.x = 42;
+        x.0.0.x = 0;
+        x.1.x = 1;
+        x.2.0.x = 2;
+    }
+
+    fun assign_enum(x: &mut E) {
+        match (x) {
+            E::V1(x, y) => {
+                *x = 42;
+                *y = true;
+            },
+            E::V2(x) => {
+                x.0.0.x = 0;
+                x.1.x = 1;
+                x.2.0.x = 2;
+            }
+        }
     }
 }
