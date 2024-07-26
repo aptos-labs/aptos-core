@@ -925,6 +925,7 @@ fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
 async fn wait_for_accounts_sequence(
     start_time: Instant,
     clients: &Vec<RestClient>,
+    main_client_index: usize,
     account_seqs: &HashMap<AccountAddress, (u64, u64)>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
@@ -933,8 +934,13 @@ async fn wait_for_accounts_sequence(
     let mut latest_fetched_counts = HashMap::new();
 
     let mut sum_of_completion_timestamps_millis = 0u128;
+    let start_time = Instant::now();
     loop {
-        let client = pick_client(clients);
+        let client = if start_time.elapsed().as_secs_f32() > 2.0 {
+            pick_client(clients)
+        } else {
+            &clients[main_client_index]
+        };
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();
