@@ -47,14 +47,12 @@ impl DbWriter for AptosDB {
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
 
-                if !txns_to_commit.is_empty() {
-                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
-                    buffered_state.update(
-                        state_updates_until_last_checkpoint,
-                        latest_in_memory_state,
-                        sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
-                    )?;
-                }
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
+                buffered_state.update(
+                    state_updates_until_last_checkpoint,
+                    latest_in_memory_state,
+                    sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
+                )?;
             }
             self.ledger_db.metadata_db().set_pre_committed_version(last_version);
             Ok(())
@@ -179,7 +177,7 @@ impl DbWriter for AptosDB {
                 &transaction_infos,
                 &events,
                 wsets,
-                Option::Some((
+                Some((
                     &mut ledger_db_batch,
                     &mut sharded_kv_batch,
                     &state_kv_metadata_batch,
@@ -224,6 +222,7 @@ impl DbWriter for AptosDB {
                 .save_min_readable_version(version)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
+            self.ledger_db.metadata_db().set_pre_committed_version(version);
             self.state_store.reset();
 
             Ok(())
@@ -256,7 +255,7 @@ impl AptosDB {
             latest_in_memory_state.current_version.expect("Must exist"),
         );
 
-        let num_transactions_in_db = self.get_synced_version()?.map_or(0, |v| v + 1);
+        let num_transactions_in_db = self.get_pre_committed_version()?.map_or(0, |v| v + 1);
         {
             let buffered_state = self.state_store.buffered_state().lock();
             ensure!(
@@ -275,7 +274,7 @@ impl AptosDB {
                 .map(|version| version + 1)
                 .unwrap_or(0);
             ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
-                "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
+                "The first version passed in ({}), the next version in buffered state ({}) and the next version in db ({}) are inconsistent.",
                 first_version,
                 next_version_in_buffered_state,
                 num_transactions_in_db,

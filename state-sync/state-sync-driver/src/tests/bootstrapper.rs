@@ -1614,6 +1614,9 @@ fn create_bootstrapper(
     mock_database_reader
         .expect_get_synced_version()
         .returning(|| Ok(Some(0)));
+    mock_database_reader
+        .expect_get_pre_committed_version()
+        .returning(|| Ok(Some(0)));
 
     // Create the output fallback handler
     let time_service = time_service.unwrap_or_else(TimeService::mock);
@@ -1670,6 +1673,9 @@ fn create_bootstrapper_with_storage(
         .returning(move || Ok(epoch_ending_ledger_info.clone()));
     mock_database_reader
         .expect_get_synced_version()
+        .returning(move || Ok(Some(latest_synced_version)));
+    mock_database_reader
+        .expect_get_pre_committed_version()
         .returning(move || Ok(Some(latest_synced_version)));
 
     // Create the output fallback handler

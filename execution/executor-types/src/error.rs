@@ -41,6 +41,9 @@ pub enum ExecutorError {
 
     #[error("request timeout")]
     CouldNotGetData,
+
+    #[error("Execution failed, no need to call pre-commit.")]
+    PreCommitSkipped,
 }
 
 impl From<anyhow::Error> for ExecutorError {

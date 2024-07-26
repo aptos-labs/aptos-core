@@ -11,6 +11,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
+    transaction::Version,
 };
 use std::{collections::VecDeque, sync::Arc};
 
@@ -62,6 +63,10 @@ impl ChunkCommitQueue {
 
     pub(crate) fn latest_state(&self) -> StateDelta {
         self.latest_state.clone()
+    }
+
+    pub(crate) fn expecting_version(&self) -> Version {
+        self.latest_txn_accumulator.num_leaves()
     }
 
     pub(crate) fn expect_latest_view(&self) -> Result<ExecutedTrees> {

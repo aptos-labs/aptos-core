@@ -166,24 +166,26 @@ pub trait BlockExecutorTrait: Send + Sync {
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult>;
 
-    /// Saves eligible blocks to persistent storage.
-    /// If we have multiple blocks and not all of them have signatures, we may send them to storage
-    /// in a few batches. For example, if we have
-    /// ```text
-    /// A <- B <- C <- D <- E
-    /// ```
-    /// and only `C` and `E` have signatures, we will send `A`, `B` and `C` in the first batch,
-    /// then `D` and `E` later in the another batch.
-    /// Commits a block and all its ancestors in a batch manner.
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
+    ) -> ExecutorResult<()> {
+        let mut parent_block_id = self.committed_block_id();
+        for block_id in block_ids {
+            self.pre_commit_block(block_id, parent_block_id)?;
+            parent_block_id = block_id;
+        }
+        self.commit_ledger(ledger_info_with_sigs)
+    }
+
+    fn pre_commit_block(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
     ) -> ExecutorResult<()>;
 
-    fn pre_commit(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<()>;
-
-    fn latest_synced_version(&self) -> Version;
+    fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()>;
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
