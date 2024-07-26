@@ -23,7 +23,7 @@ use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
     TransactionReplayer, VerifyExecutionMode,
 };
-use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
@@ -45,20 +45,8 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use fail::fail_point;
-use itertools::multizip;
-use once_cell::sync::Lazy;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use itertools::{multizip, Itertools};
 use std::{iter::once, marker::PhantomData, sync::Arc};
-
-pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(8) // More than 8 threads doesn't seem to help much
-            .thread_name(|index| format!("signature-checker-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -257,16 +245,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .map(|t| t.state_checkpoint_hash())
             .collect();
 
-        // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
-        // as only transactions with verified signatures are committed to the storage.
         let num_txns = transactions.len();
-        let sig_verified_txns = SIG_VERIFY_POOL.install(|| {
-            transactions
-                .into_par_iter()
-                .with_min_len(optimal_min_len(num_txns, 32))
-                .map(|t| t.into())
-                .collect::<Vec<_>>()
-        });
+        // Don't need to check signature since the transaction list has been verified to be part
+        // of the chain.
+        let sig_verified_txns = transactions
+            .into_iter()
+            .map(SignatureVerifiedTransaction::Valid)
+            .collect_vec();
 
         // Execute transactions.
         let state_view = self.latest_state_view(&parent_state)?;
