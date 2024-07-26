@@ -5,7 +5,7 @@
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
-        BlockReader, BlockRetriever, BlockStore,
+        BlockReader, BlockRetriever, BlockStore, NeedFetchResult,
     },
     counters::{
         self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED,
@@ -250,7 +250,6 @@ pub struct RoundManager {
     // To avoid duplicate broadcasts for the same block, we keep track of blocks for
     // which we recently broadcasted fast shares.
     blocks_with_broadcasted_fast_shares: LruCache<HashValue, ()>,
-    verified_quorum_cert_cache: LruCache<HashValue, Vec<QuorumCert>>,
 }
 
 impl RoundManager {
@@ -299,7 +298,6 @@ impl RoundManager {
             fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
-            verified_quorum_cert_cache: LruCache::new(10),
         }
     }
 
@@ -982,39 +980,7 @@ impl RoundManager {
             });
 
             let order_vote = order_vote_msg.order_vote();
-
-            // Quorum certificate was not verified in the OrderVoteMsg::verify function.
-            // Need to be verified here.
-            let quorum_cert = order_vote_msg.quorum_cert();
-            let verifier = self.epoch_state().verifier.clone();
-            let start_time = Instant::now();
-            if let Some(existing_quorum_certs) = self
-                .verified_quorum_cert_cache
-                .get_mut(&quorum_cert.certified_block().id())
-            {
-                if !existing_quorum_certs.iter().any(|qc| qc == quorum_cert) {
-                    quorum_cert
-                        .verify(&verifier)
-                        .context("[OrderVoteMsg QuorumCert verification failed")?;
-                    counters::ORDER_VOTE_QC_VERIFICATION.inc();
-                    if existing_quorum_certs.len() < 25 {
-                        existing_quorum_certs.push(quorum_cert.clone());
-                    }
-                }
-            } else {
-                quorum_cert
-                    .verify(&verifier)
-                    .context("[OrderVoteMsg QuorumCert verification failed")?;
-                counters::ORDER_VOTE_QC_VERIFICATION.inc();
-                self.verified_quorum_cert_cache
-                    .put(
-                        quorum_cert.certified_block().id(),
-                        vec![quorum_cert.clone()],
-                    );
-            }
-            counters::VERIFY_MSG
-                .with_label_values(&["order_vote_qc"])
-                .observe(start_time.elapsed().as_secs_f64());
+            self.new_qc_from_order_vote_msg(&order_vote_msg).await?;
 
             debug!(
                 self.new_log(LogEvent::ReceiveOrderVote)
@@ -1254,6 +1220,47 @@ impl RoundManager {
             .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
+        self.process_certificates().await?;
+        result
+    }
+
+    async fn new_qc_from_order_vote_msg(
+        &mut self,
+        order_vote_msg: &OrderVoteMsg,
+    ) -> anyhow::Result<()> {
+        ensure!(
+            order_vote_msg
+                .order_vote()
+                .ledger_info()
+                .consensus_block_id()
+                == order_vote_msg.quorum_cert().certified_block().id(),
+            "QuorumCert attached to order vote doesn't match"
+        );
+
+        if let NeedFetchResult::QCAlreadyExist = self
+            .block_store
+            .need_fetch_for_quorum_cert(order_vote_msg.quorum_cert())
+        {
+            return Ok(());
+        }
+
+        let start = Instant::now();
+        order_vote_msg
+            .quorum_cert()
+            .verify(&self.epoch_state().verifier)
+            .context("[OrderVoteMsg QuorumCert verification failed")?;
+        counters::VERIFY_MSG
+            .with_label_values(&["order_vote_qc"])
+            .observe(start.elapsed().as_secs_f64());
+
+        let result = self
+            .block_store
+            .insert_quorum_cert(
+                order_vote_msg.quorum_cert(),
+                &mut self.create_block_retriever(order_vote_msg.order_vote().author()),
+            )
+            .await
+            .context("[RoundManager] Failed to process the QC from order vote msg");
         self.process_certificates().await?;
         result
     }

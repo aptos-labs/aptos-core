@@ -10,7 +10,10 @@ use aptos_consensus_types::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
-pub use block_store::{sync_manager::BlockRetriever, BlockStore};
+pub use block_store::{
+    sync_manager::{BlockRetriever, NeedFetchResult},
+    BlockStore,
+};
 use std::{sync::Arc, time::Duration};
 
 mod block_store;
