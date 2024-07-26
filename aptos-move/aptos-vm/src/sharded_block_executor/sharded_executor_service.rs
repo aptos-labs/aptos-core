@@ -230,6 +230,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         // Setting shard id for the transaction provider
         static_set_shard_id(self.shard_id);
 
+        info!("Shard {} is starting.", self.shard_id);
         self.coordinator_client.lock().unwrap().test_network();
 
         // let mut cumulative_txns = 0;

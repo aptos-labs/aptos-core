@@ -47,9 +47,9 @@ impl RemoteCoordinatorClient {
     ) -> Self {
         let execute_command_type = format!("execute_command_{}", shard_id);
         let execute_result_type = format!("execute_result_{}", shard_id);
-        let command_rx = controller.create_inbound_channel(execute_command_type);
+        let command_rx = controller.create_inbound_channel(execute_command_type.to_string());
+        let command_finished_rx = controller.create_inbound_channel("cmd_completed".to_string());
         let result_tx = OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime());
-            //controller.create_outbound_channel(coordinator_address, execute_result_type);
 
         let num_kv_req_threads = 8;
         let mut kv_req_tx = vec![];
@@ -72,7 +72,6 @@ impl RemoteCoordinatorClient {
             RemoteStateViewClient::new(shard_id, controller, coordinator_address);
 
         OUTBOUND_RUNTIME.set(controller.get_outbound_rpc_runtime().clone()).ok();
-        let command_finished_rx = controller.create_inbound_channel("cmd_completed".to_string());
 
         Self {
             state_view_client: Arc::new(state_view_client),
