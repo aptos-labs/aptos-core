@@ -352,7 +352,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     }
     fn test_network(&mut self) {
         self.command_finished_rx.recv().unwrap();
-        let num_requests = 100000;
+        let num_requests = 500000;
         info!("Testing network started on shard {} with #requests: {}", self.shard_id, num_requests);
 
         let mut send_timestamps = vec![];
@@ -385,16 +385,20 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
 
         let mut sum = 0;
         let mut max_delta = 0;
+        let mut obs = 0;
         for i in 0..num_requests {
             let send_time = send_timestamps[i as usize];
             let recv_time = receive_timestamps.lock().unwrap()[i as usize];
             let delta = recv_time - send_time;
-            REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                .with_label_values(&["7_kv_req_rnd_trp"]).observe(delta as f64);
-            sum += delta;
+            if delta > 0 {
+                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["7_kv_req_rnd_trp"]).observe(delta as f64);
+                sum += delta;
+                obs += 1;
+            }
             max_delta = max_delta.max(delta);
         }
-        let avg_delta = sum as f64 / num_requests as f64;
+        let avg_delta = sum as f64 / obs as f64;
         info!("Testing network finished on shard {} with #requests: {}, avg_delta: {}, max_delta: {}", self.shard_id, num_requests, avg_delta, max_delta);
         self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
         let execute_result_type = format!("execute_result_{}", self.shard_id);
