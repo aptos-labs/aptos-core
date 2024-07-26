@@ -250,6 +250,7 @@ pub struct RoundManager {
     // To avoid duplicate broadcasts for the same block, we keep track of blocks for
     // which we recently broadcasted fast shares.
     blocks_with_broadcasted_fast_shares: LruCache<HashValue, ()>,
+    verified_quorum_cert_cache: LruCache<HashValue, Vec<QuorumCert>>,
 }
 
 impl RoundManager {
@@ -298,6 +299,7 @@ impl RoundManager {
             fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
+            verified_quorum_cert_cache: LruCache::new(5),
         }
     }
 
@@ -980,6 +982,35 @@ impl RoundManager {
             });
 
             let order_vote = order_vote_msg.order_vote();
+
+            // Quorum certificate was not verified in the OrderVoteMsg::verify function.
+            // Need to be verified here.
+            let quorum_cert = order_vote_msg.quorum_cert();
+            let verifier = self.epoch_state().verifier.clone();
+            if let Some(existing_quorum_certs) = self
+                .verified_quorum_cert_cache
+                .get_mut(&quorum_cert.certified_block().id())
+            {
+                if !existing_quorum_certs.iter().any(|qc| qc == quorum_cert) {
+                    quorum_cert
+                        .verify(&verifier)
+                        .context("[OrderVoteMsg QuorumCert verification failed")?;
+                    if existing_quorum_certs.len() < 10 {
+                        existing_quorum_certs.push(quorum_cert.clone());
+                    }
+                }
+            } else {
+                quorum_cert
+                    .verify(&verifier)
+                    .context("[OrderVoteMsg QuorumCert verification failed")?;
+                self.verified_quorum_cert_cache
+                    .put(
+                        quorum_cert.certified_block().id(),
+                        vec![quorum_cert.clone()],
+                    );
+                counters::ORDER_VOTE_QC_VERIFICATION.inc();
+            }
+
             debug!(
                 self.new_log(LogEvent::ReceiveOrderVote)
                     .remote_peer(order_vote.author()),

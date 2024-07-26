@@ -52,12 +52,6 @@ impl OrderVoteMsg {
         self.order_vote
             .verify(validator)
             .context("[OrderVoteMsg] OrderVote verification failed")?;
-
-        // TODO: As we receive many order votes with the same quroum cert, we could cache it
-        // without verifying it every time.
-        self.quorum_cert
-            .verify(validator)
-            .context("[OrderVoteMsg QuorumCert verification failed")?;
         Ok(())
     }
 }

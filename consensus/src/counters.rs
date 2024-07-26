@@ -604,6 +604,14 @@ pub static LATE_EXECUTION_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static ORDER_VOTE_QC_VERIFICATION: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_qc_verification",
+        "Count of the number of QC verification is done for order votes"
+    )
+    .unwrap()
+});
+
 // Created order certificate from order votes. But the block isn't available in the block store.
 pub static ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
