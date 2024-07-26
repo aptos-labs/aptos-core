@@ -26,6 +26,7 @@ use move_binary_format::file_format_common::VERSION_6;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_model::metadata::CompilerVersion;
 use std::{cmp, collections::HashMap, env, path::PathBuf, sync::Arc};
+// use std::cmp::min;
 
 fn add_packages_to_data_store(
     data_store: &mut FakeDataStore,
@@ -392,6 +393,7 @@ impl Execution {
         if v2_flag {
             features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
         } else {
+            features.disable(FeatureFlag::VM_BINARY_FORMAT_V7);
             features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
         }
         state.set_features(features);
@@ -401,8 +403,8 @@ impl Execution {
         let executor = FakeExecutor::no_genesis();
         let mut txns = vec![txn.clone()];
         for txn in &mut txns {
-            if let UserTransaction(signed_transaction) = txn {
-                signed_transaction.set_max_gmount(signed_transaction.max_gas_amount() * 2);
+            if let UserTransaction(_signed_transaction) = txn {
+                // signed_transaction.set_max_gmount(min(100_000, signed_transaction.max_gas_amount() * 2));
             }
         }
         if let Some(debugger) = debugger_opt {
@@ -418,6 +420,12 @@ impl Execution {
                 .execute_transaction_block_with_state_view(txns, &state, false)
                 .map(|mut res| {
                     let res_i = res.pop().unwrap();
+                    println!(
+                        "v2 flag:{} gas used:{}, status:{:?}",
+                        v2_flag,
+                        res_i.gas_used(),
+                        res_i.status()
+                    );
                     (res_i.clone().into(), res_i.status().clone())
                 });
             res
