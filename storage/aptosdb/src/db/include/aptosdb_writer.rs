@@ -47,14 +47,12 @@ impl DbWriter for AptosDB {
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
 
-                if !txns_to_commit.is_empty() {
-                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
-                    buffered_state.update(
-                        state_updates_until_last_checkpoint,
-                        latest_in_memory_state,
-                        sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
-                    )?;
-                }
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
+                buffered_state.update(
+                    state_updates_until_last_checkpoint,
+                    latest_in_memory_state,
+                    sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
+                )?;
             }
             self.ledger_db.metadata_db().set_pre_committed_version(last_version);
             Ok(())
@@ -78,7 +76,7 @@ impl DbWriter for AptosDB {
                 .expect("Concurrent committing detected.");
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_ledger"]);
 
-            let old_committed_ver = self.get_and_check_commit_range(version, txns_to_commit)?;
+            let old_committed_ver = self.get_and_check_commit_range(version)?;
 
             let ledger_batch = SchemaBatch::new();
             // Write down LedgerInfo if provided.
@@ -179,7 +177,7 @@ impl DbWriter for AptosDB {
                 &transaction_infos,
                 &events,
                 wsets,
-                Option::Some((
+                Some((
                     &mut ledger_db_batch,
                     &mut sharded_kv_batch,
                     &state_kv_metadata_batch,
@@ -224,6 +222,7 @@ impl DbWriter for AptosDB {
                 .save_min_readable_version(version)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
+            self.ledger_db.metadata_db().set_pre_committed_version(version);
             self.state_store.reset();
 
             Ok(())
@@ -256,7 +255,7 @@ impl AptosDB {
             latest_in_memory_state.current_version.expect("Must exist"),
         );
 
-        let num_transactions_in_db = self.get_synced_version()?.map_or(0, |v| v + 1);
+        let num_transactions_in_db = self.get_pre_committed_version()?.map_or(0, |v| v + 1);
         {
             let buffered_state = self.state_store.buffered_state().lock();
             ensure!(
@@ -275,7 +274,7 @@ impl AptosDB {
                 .map(|version| version + 1)
                 .unwrap_or(0);
             ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
-                "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
+                "The first version passed in ({}), the next version in buffered state ({}) and the next version in db ({}) are inconsistent.",
                 first_version,
                 next_version_in_buffered_state,
                 num_transactions_in_db,
@@ -591,7 +590,6 @@ impl AptosDB {
     fn get_and_check_commit_range(
         &self,
         version_to_commit: Version,
-        txns_to_commit: Option<&[TransactionToCommit]>
     ) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
         let pre_committed_ver = self.ledger_db.metadata_db().get_pre_committed_version();
@@ -607,16 +605,6 @@ impl AptosDB {
             pre_committed_ver,
             version_to_commit,
         );
-        if let Some(txns_to_commit) = txns_to_commit {
-            let expected_next_to_commit = old_committed_ver.map_or(0, |v| v + 1);
-            ensure!(
-                txns_to_commit.len() as u64 == version_to_commit + 1 - expected_next_to_commit,
-                "Bad commit range. to-commit: {}, committed: {:?}, Num txns: {}",
-                version_to_commit,
-                old_committed_ver,
-                txns_to_commit.len(),
-            );
-        }
         Ok(old_committed_ver)
     }
 
@@ -694,8 +682,10 @@ impl AptosDB {
             // created in this same chunk of transactions.
             if let Some(indexer) = &self.indexer {
                 let _timer = OTHER_TIMERS_SECONDS.timer_with(&["indexer_index"]);
-                if let Some(txns_to_commit) = txns_to_commit {
-                    let write_sets = txns_to_commit.iter().map(|txn| txn.write_set()).collect_vec();
+                // n.b. txns_to_commit can be partial, when the control was handed over from consensus to state sync
+                // where state sync won't send the pre-committed part to the DB again.
+                if txns_to_commit.is_some() && txns_to_commit.unwrap().len() == num_txns as usize {
+                    let write_sets = txns_to_commit.unwrap().iter().map(|txn| txn.write_set()).collect_vec();
                     indexer.index(self.state_store.clone(), first_version, &write_sets)?;
                 } else {
                     let write_sets: Vec<_> = self.ledger_db.write_set_db().get_write_set_iter(first_version, num_txns as usize)?.try_collect()?;

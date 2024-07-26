@@ -7,16 +7,17 @@ use crate::{
     block_preparer::BlockPreparer,
     counters::{self, log_executor_error_occurred},
     monitor,
-    state_computer::{PipelineExecutionResult, StateComputeResultFut},
+    pipeline::pipeline_phase::CountedRequest,
+    state_computer::StateComputeResultFut,
 };
-use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{block::Block, pipeline_execution_result::PipelineExecutionResult};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
     ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, warn};
 use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata_ext::BlockMetadataExt,
@@ -53,7 +54,7 @@ impl ExecutionPipeline {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
-        let (prec_commit_tx, pre_commit_rx) = mpsc::unbounded_channel();
+        let (pre_commit_tx, pre_commit_rx) = mpsc::unbounded_channel();
 
         runtime.spawn(Self::prepare_block_stage(
             prepare_block_rx,
@@ -66,7 +67,7 @@ impl ExecutionPipeline {
         ));
         runtime.spawn(Self::ledger_apply_stage(
             ledger_apply_rx,
-            prec_commit_tx,
+            pre_commit_tx,
             executor.clone(),
         ));
         runtime.spawn(Self::pre_commit_stage(pre_commit_rx, executor));
@@ -81,6 +82,7 @@ impl ExecutionPipeline {
         parent_block_id: HashValue,
         txn_generator: BlockPreparer,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
+        lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         let block_id = block.id();
@@ -92,6 +94,7 @@ impl ExecutionPipeline {
                 parent_block_id,
                 block_preparer: txn_generator,
                 result_tx,
+                lifetime_guard,
             })
             .expect("Failed to send block to execution pipeline.");
 
@@ -118,14 +121,15 @@ impl ExecutionPipeline {
             parent_block_id,
             block_preparer,
             result_tx,
+            lifetime_guard,
         } = command;
 
         debug!("prepare_block received block {}.", block.id());
         let input_txns = block_preparer.prepare_block(&block).await;
         if let Err(e) = input_txns {
-            result_tx.send(Err(e)).unwrap_or_else(|value| {
-                process_failed_to_send_result(value, block.id(), "prepare")
-            });
+            result_tx
+                .send(Err(e))
+                .unwrap_or_else(log_failed_to_send_result("prepare_block", block.id()));
             return;
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
@@ -149,6 +153,7 @@ impl ExecutionPipeline {
                     parent_block_id,
                     block_executor_onchain_config,
                     result_tx,
+                    lifetime_guard,
                 })
                 .expect("Failed to send block to execution pipeline.");
         })
@@ -180,6 +185,7 @@ impl ExecutionPipeline {
             parent_block_id,
             block_executor_onchain_config,
             result_tx,
+            lifetime_guard,
         }) = block_rx.recv().await
         {
             let block_id = block.block_id;
@@ -213,6 +219,7 @@ impl ExecutionPipeline {
                     parent_block_id,
                     state_checkpoint_output,
                     result_tx,
+                    lifetime_guard,
                 })
                 .expect("Failed to send block to ledger_apply stage.");
         }
@@ -230,6 +237,7 @@ impl ExecutionPipeline {
             parent_block_id,
             state_checkpoint_output: execution_result,
             result_tx,
+            lifetime_guard,
         }) = block_rx.recv().await
         {
             debug!("ledger_apply stage received block {}.", block_id);
@@ -247,22 +255,27 @@ impl ExecutionPipeline {
                 .map(|output| (output, execution_duration))
             }
             .await;
-            let (commit_tx, commit_rx) = oneshot::channel();
-            let pipe_line_res = res.map(|(output, execution_duration)| {
-                PipelineExecutionResult::new(input_txns, output, execution_duration, commit_rx)
+            let pipeline_res = res.map(|(output, execution_duration)| {
+                let (pre_commit_result_tx, pre_commit_result_rx) = oneshot::channel();
+                // schedule pre-commit
+                pre_commit_tx
+                    .send(PreCommitCommand {
+                        block_id,
+                        parent_block_id,
+                        result_tx: pre_commit_result_tx,
+                        lifetime_guard,
+                    })
+                    .expect("Failed to send block to pre_commit stage.");
+                PipelineExecutionResult::new(
+                    input_txns,
+                    output,
+                    execution_duration,
+                    pre_commit_result_rx,
+                )
             });
-            pre_commit_tx
-                .send(PreCommitCommand {
-                    block_id,
-                    parent_block_id,
-                    result_tx: commit_tx,
-                })
-                .unwrap_or_else(|_| {
-                    // FIXME(aldenhu): fix error processing
-                });
-            result_tx.send(pipe_line_res).unwrap_or_else(|value| {
-                process_failed_to_send_result(value, block_id, "ledger_apply")
-            });
+            result_tx
+                .send(pipeline_res)
+                .unwrap_or_else(log_failed_to_send_result("ledger_apply", block_id));
         }
         debug!("ledger_apply stage quitting.");
     }
@@ -275,6 +288,7 @@ impl ExecutionPipeline {
             block_id,
             parent_block_id,
             result_tx,
+            lifetime_guard,
         }) = block_rx.recv().await
         {
             debug!("pre_commit stage received block {}.", block_id);
@@ -283,19 +297,17 @@ impl ExecutionPipeline {
                 monitor!(
                     "pre_commit",
                     tokio::task::spawn_blocking(move || {
-                        executor.pre_commit(block_id, parent_block_id)
+                        executor.pre_commit_block(block_id, parent_block_id)
                     })
                 )
                 .await
                 .expect("Failed to spawn_blocking().")
             }
             .await;
-            result_tx.send(res).unwrap_or_else(|err| {
-                error!(
-                    block_id = block_id,
-                    "Failed to send back execution result for block {}: {:?}", block_id, err,
-                );
-            });
+            result_tx
+                .send(res)
+                .unwrap_or_else(log_failed_to_send_result("pre_commit", block_id));
+            drop(lifetime_guard);
         }
         debug!("pre_commit stage quitting.");
     }
@@ -309,6 +321,7 @@ struct PrepareBlockCommand {
     parent_block_id: HashValue,
     block_preparer: BlockPreparer,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+    lifetime_guard: CountedRequest<()>,
 }
 
 struct ExecuteBlockCommand {
@@ -317,6 +330,7 @@ struct ExecuteBlockCommand {
     parent_block_id: HashValue,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+    lifetime_guard: CountedRequest<()>,
 }
 
 struct LedgerApplyCommand {
@@ -325,30 +339,34 @@ struct LedgerApplyCommand {
     parent_block_id: HashValue,
     state_checkpoint_output: ExecutorResult<(StateCheckpointOutput, Duration)>,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+    lifetime_guard: CountedRequest<()>,
 }
 
 struct PreCommitCommand {
     block_id: HashValue,
     parent_block_id: HashValue,
     result_tx: oneshot::Sender<ExecutorResult<()>>,
+    lifetime_guard: CountedRequest<()>,
 }
 
-fn process_failed_to_send_result(
-    value: Result<PipelineExecutionResult, ExecutorError>,
+fn log_failed_to_send_result<T>(
+    from_stage: &'static str,
     block_id: HashValue,
-    from_stage: &str,
-) {
-    error!(
-        block_id = block_id,
-        is_err = value.is_err(),
-        "Failed to send back execution result from {from_stage} stage",
-    );
-    if let Err(e) = value {
-        // receive channel discarding error, log for debugging.
-        log_executor_error_occurred(
-            e,
-            &counters::PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT,
-            block_id,
+) -> impl FnOnce(ExecutorResult<T>) {
+    move |value| {
+        warn!(
+            from_stage = from_stage,
+            block_id = block_id,
+            is_err = value.is_err(),
+            "Failed to send back execution/pre_commit result. (rx dropped)",
         );
+        if let Err(e) = value {
+            // receive channel discarding error, log for debugging.
+            log_executor_error_occurred(
+                e,
+                &counters::PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT,
+                block_id,
+            );
+        }
     }
 }

@@ -61,6 +61,12 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_pre_committed_version(&self) -> Result<Option<Version>> {
+        gauged_api("get_pre_committed_version", || {
+            Ok(self.ledger_db.metadata_db().get_pre_committed_version())
+        })
+    }
+
     fn get_account_transaction(
         &self,
         address: AccountAddress,
