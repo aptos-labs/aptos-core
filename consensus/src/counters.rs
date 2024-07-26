@@ -607,7 +607,7 @@ pub static LATE_EXECUTION_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
 pub static ORDER_VOTE_QC_VERIFICATION: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_order_vote_qc_verification",
-        "Count of the number of QC verification is done for order votes"
+        "Count of the number of time QC verification is done for order votes"
     )
     .unwrap()
 });
