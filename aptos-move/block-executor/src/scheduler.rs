@@ -1211,7 +1211,7 @@ impl Scheduler {
                     let (lock, cvar) = &**condvar;
                     // Mark dependency resolved.
                     let mut lock = lock.lock();
-                    *lock = DependencyStatus::Resolved;
+                    *lock = DependencyStatus::ExecutionHalted;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
                 }
