@@ -352,7 +352,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     }
     fn test_network(&mut self) {
         self.command_finished_rx.recv().unwrap();
-        let num_requests = 10000;
+        let num_requests = 10000000;
         info!("Testing network started on shard {} with #requests: {}", self.shard_id, num_requests);
 
         let mut send_timestamps = vec![];
