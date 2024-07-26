@@ -6,4 +6,5 @@ images:
   aptos-ubuntu-x64-latest:
     platform: "linux"
     arch: "x64"
+    owner: "058264343338" # aptos-ci AWS account id
     name: "aptos-runs-on-*"
