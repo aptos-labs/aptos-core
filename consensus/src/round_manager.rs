@@ -987,6 +987,7 @@ impl RoundManager {
             // Need to be verified here.
             let quorum_cert = order_vote_msg.quorum_cert();
             let verifier = self.epoch_state().verifier.clone();
+            let start_time = Instant::now();
             if let Some(existing_quorum_certs) = self
                 .verified_quorum_cert_cache
                 .get_mut(&quorum_cert.certified_block().id())
@@ -1011,6 +1012,9 @@ impl RoundManager {
                         vec![quorum_cert.clone()],
                     );
             }
+            counters::VERIFY_MSG
+                .with_label_values(&["order_vote_qc"])
+                .observe(start_time.elapsed().as_secs_f64());
 
             debug!(
                 self.new_log(LogEvent::ReceiveOrderVote)
