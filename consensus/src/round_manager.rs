@@ -995,6 +995,7 @@ impl RoundManager {
                     quorum_cert
                         .verify(&verifier)
                         .context("[OrderVoteMsg QuorumCert verification failed")?;
+                    counters::ORDER_VOTE_QC_VERIFICATION.inc();
                     if existing_quorum_certs.len() < 10 {
                         existing_quorum_certs.push(quorum_cert.clone());
                     }
@@ -1003,12 +1004,12 @@ impl RoundManager {
                 quorum_cert
                     .verify(&verifier)
                     .context("[OrderVoteMsg QuorumCert verification failed")?;
+                counters::ORDER_VOTE_QC_VERIFICATION.inc();
                 self.verified_quorum_cert_cache
                     .put(
                         quorum_cert.certified_block().id(),
                         vec![quorum_cert.clone()],
                     );
-                counters::ORDER_VOTE_QC_VERIFICATION.inc();
             }
 
             debug!(
