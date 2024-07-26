@@ -356,7 +356,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         info!("Testing network started on shard {} with #requests: {}", self.shard_id, num_requests);
 
         let mut send_timestamps = vec![];
-        let receive_timestamps = Arc::new(Mutex::new( vec![Default::default(), num_requests + 2]));
+        let receive_timestamps = Arc::new(Mutex::new( vec![Default::default(); num_requests]));
         let (test_finished_tx, test_finished_rx) = crossbeam_channel::bounded(1);
         let kv_req_rx_clone = self.kv_req_rx.clone();
         let receive_timestamps_clone = receive_timestamps.clone();
@@ -365,7 +365,6 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             let mut received = 0;
             while let Ok(msg) = kv_req_rx_clone.recv() {
                 let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-                info!("Vector len {}, msg idx {}", lock.len(), msg.seq_num.unwrap() as usize);
                 lock[msg.seq_num.unwrap() as usize] = curr_time;
                 received += 1;
                 if received == num_requests {
@@ -377,7 +376,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
 
         for request_id in 0..num_requests {
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            let message = Message::create_with_metadata(vec![], 0, request_id, self.shard_id as u64);
+            let message = Message::create_with_metadata(vec![], 0, request_id as u64, self.shard_id as u64);
             self.kv_req_tx[0].lock().unwrap().send(message, &MessageType::new(format!("remote_kv_request_{}", self.shard_id as u64)));
             send_timestamps.push(curr_time);
         }
