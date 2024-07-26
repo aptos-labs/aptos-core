@@ -681,12 +681,10 @@ impl Scheduler {
                     ExecutionStatus::Executing(incarnation, _, ref mut flag)
                     | ExecutionStatus::ReadyToWakeUp(incarnation, _, ref mut flag) => match flag {
                         ExecutingFlag::Main => {
-                            println!("only main thread, idx={}", txn_idx);
                             *flag = ExecutingFlag::Writing;
                             Some(false)
                         },
                         ExecutingFlag::Fallback => {
-                            println!("saw fallback, trying to validate, idx={}", txn_idx);
                             let old_incarnation = *incarnation;
                             drop(status);
                             if validation_f() {
@@ -699,10 +697,7 @@ impl Scheduler {
                                 None
                             }
                         },
-                        ExecutingFlag::Writing => {
-                            println!("lost writing, inside set executionflag, idx={}", txn_idx);
-                            None
-                        },
+                        ExecutingFlag::Writing => None,
                     },
                     ExecutionStatus::Suspended(_, _)
                     | ExecutionStatus::ReadyToExecute(_)
@@ -714,18 +709,10 @@ impl Scheduler {
                         // for the same reason it can not be ReadyToExecute or Aborting
                         unreachable!("May not be Suspended, Aborting or ReadyToExecute");
                     },
-                    ExecutionStatus::Committed(_) => {
-                        println!("saw already committed, idx={}", txn_idx);
-                        None
-                    },
-                    ExecutionStatus::Executed(_) => {
-                        println!("saw already executed, idx={}", txn_idx);
-                        None
-                    },
+                    ExecutionStatus::Committed(_) => None,
+                    ExecutionStatus::Executed(_) => None,
                     ExecutionStatus::ExecutionHalted => {
                         // Transaction is Commited, Executed/about to be Committed, or Execution is Halted
-                        println!("saw execution halted, idx={}", txn_idx);
-
                         None
                     },
                 }
@@ -873,10 +860,6 @@ impl TWaitForDependency for Scheduler {
             ));
         }
 
-        println!(
-            "transaction idx={}, waiting for transaction={}",
-            txn_idx, dep_txn_idx
-        );
         // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
         // usually has just observed the read dependency.
 
@@ -1176,7 +1159,6 @@ impl Scheduler {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match &*status {
             ExecutionStatus::Suspended(incarnation, dep_condvar) => {
-                println!("resumed transaction={}", txn_idx);
                 *status = ExecutionStatus::ReadyToWakeUp(
                     *incarnation,
                     dep_condvar.clone(),
@@ -1222,13 +1204,10 @@ impl Scheduler {
                 // The execution is already halted.
                 Ok(())
             },
-            _ => {
-                println!("error due executed status, idx={}", txn_idx);
-                Err(code_invariant_error(format!(
-                    "Expected Executing incarnation {incarnation}, got {:?}",
-                    &*status,
-                )))
-            },
+            _ => Err(code_invariant_error(format!(
+                "Expected Executing incarnation {incarnation}, got {:?}",
+                &*status,
+            ))),
         }
     }
 

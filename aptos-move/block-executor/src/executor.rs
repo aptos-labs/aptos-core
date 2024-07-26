@@ -512,7 +512,6 @@ where
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
                 // Because of that, we can also ignore _needs_suffix_validation result.
-                println!("executing during commit, idx={}", txn_idx);
                 let _validation_mode = Self::execute(
                     txn_idx,
                     incarnation + 1,
@@ -628,7 +627,6 @@ where
                 }
 
                 if scheduler.halt() {
-                    println!("called halt, txn_idx={}", txn_idx + 1);
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
@@ -874,7 +872,6 @@ where
                                 incarnation,
                                 validation_mode,
                             )?;
-                            println!("critical path, finished execution, txn={}", last_commit_idx);
                             drain_commit_queue()?;
                             continue;
                         }
@@ -922,12 +919,8 @@ where
                     )? {
                         let temp =
                             scheduler.finish_execution(txn_idx, incarnation, validation_mode)?;
-                        if matches!(temp, SchedulerTask::Retry) {
-                            println!("critical path, finished execution, txn={}", txn_idx);
-                        }
                         temp
                     } else {
-                        println!("failed to get write lock, idx={}", txn_idx);
                         SchedulerTask::Retry
                     }
                 },
@@ -1027,7 +1020,6 @@ where
                             println!("{:?}", err_msg);
                         }
                         shared_maybe_error.store(true, Ordering::SeqCst);
-                        println!("calling halt due to panic");
                         // Make sure to halt the scheduler if it hasn't already been halted.
                         scheduler.halt();
                     }
