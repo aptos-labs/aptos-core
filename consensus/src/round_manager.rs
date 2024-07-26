@@ -299,7 +299,7 @@ impl RoundManager {
             fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
-            verified_quorum_cert_cache: LruCache::new(5),
+            verified_quorum_cert_cache: LruCache::new(10),
         }
     }
 
@@ -997,7 +997,7 @@ impl RoundManager {
                         .verify(&verifier)
                         .context("[OrderVoteMsg QuorumCert verification failed")?;
                     counters::ORDER_VOTE_QC_VERIFICATION.inc();
-                    if existing_quorum_certs.len() < 10 {
+                    if existing_quorum_certs.len() < 25 {
                         existing_quorum_certs.push(quorum_cert.clone());
                     }
                 }
