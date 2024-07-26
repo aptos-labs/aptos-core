@@ -35,6 +35,8 @@ pub struct RemoteCoordinatorClient {
     is_block_init_done: Arc<AtomicBool>,//Mutex<bool>,
     cmd_rx_thread_pool: Arc<rayon::ThreadPool>,
     command_finished_rx: Receiver<Message>,
+    kv_req_tx: Vec<Mutex<OutboundRpcHelper>>,
+    kv_req_rx: Receiver<Message>,
 }
 
 impl RemoteCoordinatorClient {
@@ -48,6 +50,16 @@ impl RemoteCoordinatorClient {
         let command_rx = controller.create_inbound_channel(execute_command_type);
         let result_tx = OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime());
             //controller.create_outbound_channel(coordinator_address, execute_result_type);
+
+        let num_kv_req_threads = 8;
+        let mut kv_req_tx = vec![];
+        for _ in 0..num_kv_req_threads {
+            kv_req_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
+        }
+        let kv_response_type = "remote_kv_response";
+        let kv_req_rx = controller.create_inbound_channel(kv_response_type.to_string());
+
+
         let cmd_rx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("remote-state-view-shard-send-request-{}-{}", shard_id, index))
@@ -71,6 +83,8 @@ impl RemoteCoordinatorClient {
             is_block_init_done: Arc::new(AtomicBool::new(false)),
             cmd_rx_thread_pool,
             command_finished_rx,
+            kv_req_tx,
+            kv_req_rx,
         }
     }
 
@@ -337,6 +351,57 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             Err(_) => StreamedExecutorShardCommand::Stop,
         }
     }
+    fn test_network(&mut self) {
+        self.command_finished_rx.recv().unwrap();
+        let num_requests = 10000;
+        info!("Testing network started on shard {} with #requests: {}", self.shard_id, num_requests);
+
+        let mut send_timestamps = vec![];
+        let receive_timestamps = Arc::new(Mutex::new(vec![Default::default(), num_requests]));
+        let (test_finished_tx, test_finished_rx) = crossbeam_channel::bounded(1);
+        let kv_req_rx_clone = self.kv_req_rx.clone();
+        let receive_timestamps_clone = receive_timestamps.clone();
+        rayon::spawn(move || {
+            let mut lock = receive_timestamps_clone.lock().unwrap();
+            let mut received = 0;
+            while let msg = kv_req_rx_clone.recv() {
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                lock[msg.unwrap().seq_num.unwrap() as usize] = curr_time;
+                received += 1;
+                if received == num_requests {
+                   break;
+               }
+            }
+            test_finished_tx.send(()).unwrap();
+        });
+
+        for request_id in 0..num_requests {
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            let message = Message::create_with_metadata(vec![], 0, request_id, self.shard_id as u64);
+            self.kv_req_tx[0].lock().unwrap().send(message, &MessageType::new(format!("remote_kv_request_{}", self.shard_id as u64)));
+            send_timestamps.push(curr_time);
+        }
+
+        test_finished_rx.recv().unwrap();
+
+        let mut sum = 0;
+        let mut max_delta = 0;
+        for i in 0..num_requests {
+            let send_time = send_timestamps[i as usize];
+            let recv_time = receive_timestamps.lock().unwrap()[i as usize];
+            let delta = recv_time - send_time;
+            REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                .with_label_values(&["7_kv_req_rnd_trp"]).observe(delta as f64);
+            sum += delta;
+            max_delta = max_delta.max(delta);
+        }
+        let avg_delta = sum as f64 / num_requests as f64;
+        info!("Testing network finished on shard {} with #requests: {}, avg_delta: {}, max_delta: {}", self.shard_id, num_requests, avg_delta, max_delta);
+        self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
+        let execute_result_type = format!("execute_result_{}", self.shard_id);
+        self.result_tx.send(Message::create_with_metadata(vec![], avg_delta as u64, max_delta, self.shard_id as u64), &MessageType::new(execute_result_type));
+    }
+
     fn reset_block_init(&self) {
         self.is_block_init_done.store(false, std::sync::atomic::Ordering::Relaxed);
     }

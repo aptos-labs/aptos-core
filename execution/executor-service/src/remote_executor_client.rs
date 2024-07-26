@@ -244,58 +244,23 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             let expected_outputs_clone = expected_outputs.clone();
             let result_rxs_clone = self.result_rxs[shard_id].clone();
             self.thread_pool.spawn(move || {
-                let mut num_outputs_received: u64 = 0;
-                let mut outputs = vec![];
-                loop {
-                    let received_msg = result_rxs_clone.recv().unwrap();
-                    let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
-                        .with_label_values(&["0", "result_rx_bcs_deser"])
-                        .start_timer();
-                    let result: Vec<TransactionIdxAndOutput> = bcs::from_bytes(&received_msg.to_bytes()).unwrap();
-                    drop(bcs_deser_timer);
-                    num_outputs_received += result.len() as u64;
-                    //info!("Streamed output from shard {}; txn_id {}", shard_id, result.txn_idx);
-                    outputs.extend(result);
-                    if num_outputs_received == expected_outputs_clone[shard_id] {
-                        let delta = get_delta_time(duration_since_epoch);
-                        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                            .with_label_values(&["9_1_results_tx_msg_remote_exe_recv"]).observe(delta as f64);
-                        break;
-                    }
-                }
-                send_outputs_clone.send((shard_id, outputs)).expect("Failed to send outputs to main thread");
+                let received_msg = result_rxs_clone.recv().unwrap();
+                info!("Testing network finished on shard {} with avg_delta: {}, max_delta: {}",
+                    received_msg.shard_id.unwrap(),
+                    received_msg.start_ms_since_epoch.unwrap(),
+                    received_msg.seq_num.unwrap()
+                );
+                send_outputs_clone.send(()).unwrap();
             });
         });
         let mut cnt = 0;
         while let Ok(msg) = recv_outputs.recv() {
-            results[msg.0] = msg.1;
+            //results[msg.0] = msg.1;
             cnt += 1;
             if cnt == self.num_shards() {
                 break;
             }
         }
-        // let results: Vec<Vec<TransactionIdxAndOutput>> = (0..self.num_shards()).into_par_iter().map(|shard_id| {
-        //     let mut num_outputs_received: u64 = 0;
-        //     let mut outputs = vec![];
-        //     loop {
-        //         let received_msg = self.result_rxs[shard_id].recv().unwrap();
-        //         let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
-        //             .with_label_values(&["0", "result_rx_bcs_deser"])
-        //             .start_timer();
-        //         let result: Vec<TransactionIdxAndOutput> = bcs::from_bytes(&received_msg.to_bytes()).unwrap();
-        //         drop(bcs_deser_timer);
-        //         num_outputs_received += result.len() as u64;
-        //         //info!("Streamed output from shard {}; txn_id {}", shard_id, result.txn_idx);
-        //         outputs.extend(result);
-        //         if num_outputs_received == expected_outputs[shard_id] {
-        //             let delta = get_delta_time(duration_since_epoch);
-        //             REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-        //                 .with_label_values(&["9_1_results_tx_msg_remote_exe_recv"]).observe(delta as f64);
-        //             break;
-        //         }
-        //     }
-        //     outputs
-        // }).collect();
 
         let delta = get_delta_time(duration_since_epoch);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER

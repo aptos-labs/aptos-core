@@ -230,169 +230,171 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         // Setting shard id for the transaction provider
         static_set_shard_id(self.shard_id);
 
-        let mut cumulative_txns = 0;
-        let mut i = 0;
-        loop {
-           // info!("Looping back to recv cmd after execution of a block********************");
-           let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-           info!("Started processing block in time {}", curr_time);
-            let mut command = self.coordinator_client.lock().unwrap().receive_execute_command_stream();
-            let (state_view, num_txns_in_the_block, shard_txns_start_index, onchain_config, blocking_transactions_provider) = match command {
-                StreamedExecutorShardCommand::InitBatch(
-                    state_view,
-                    transactions,
-                    num_txns_in_the_block,
-                    shard_txns_start_index,
-                    onchain_config,
-                    batch_start_index,
-                    blocking_transactions_provider,
-                ) => {
-                    if transactions.len() == num_txns_in_the_block {
-                        self.coordinator_client.lock().unwrap().reset_block_init();
-                    }
-                    (state_view, num_txns_in_the_block, shard_txns_start_index, onchain_config, blocking_transactions_provider)
-                },
-                StreamedExecutorShardCommand::Stop => {
-                    break;
-                },
-            };
+        self.coordinator_client.lock().unwrap().test_network();
 
-            cumulative_txns += num_txns_in_the_block;
-            /*let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
-
-            let coordinator_client_clone_2 = self.coordinator_client.clone();
-            thread::spawn(move || {
-                let mut num_txns_processed = 0;
-                loop {
-                    num_txns_processed += transactions.len();
-                    let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
-                        blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
-                    });
-                    if num_txns_processed == num_txns_in_the_block {
-                        coordinator_client_clone_2.lock().unwrap().reset_block_init();
-                        break;
-                    }
-                    let command2 = coordinator_client_clone_2.lock().unwrap().receive_execute_command_stream();
-                    let txnsAndStIdx = match command2 {
-                        StreamedExecutorShardCommand::InitBatch(
-                            _,
-                            _,
-                            _,
-                            _,
-                            _,
-                            _,
-                        ) => {
-                            panic!("Init Batch must not be called before executing all txns in the block");
-                        },
-                        StreamedExecutorShardCommand::ExecuteBatch(
-                            transactions,
-                            batch_start_index,
-                        ) => {
-                            (transactions, batch_start_index)
-                        },
-                        StreamedExecutorShardCommand::Stop => {
-                            break;
-                        },
-                    };
-                    transactions = txnsAndStIdx.0;
-                    batch_start_index = txnsAndStIdx.1;
-                }
-            });*/
-
-            let (stream_results_tx, stream_results_rx) = unbounded();
-
-            trace!(
-                    "Shard {} received ExecuteBlock command of block size {} ",
-                    self.shard_id,
-                    num_txns_in_the_block
-                );
-            let exe_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
-                .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-                .start_timer();
-            let ret = self.execute_block(
-                blocking_transactions_provider,
-                state_view.as_ref(),
-                BlockExecutorConfig {
-                    local: BlockExecutorLocalConfig {
-                        concurrency_level: AptosVM::get_concurrency_level(),
-                        allow_fallback: true,
-                        discard_failed_blocks: false,
-                    },
-                    onchain: onchain_config,
-                },
-                shard_txns_start_index as TxnIndex,
-                stream_results_tx.clone(),
-            );
-            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            info!("Block STM ended at time {}", curr_time);
-            drop(state_view);
-            drop(exe_timer);
-
-            self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
-            self.coordinator_client.lock().unwrap().stream_execution_result(vec![]);
-            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            info!("Processed block at time {}", curr_time);
-
-
-
-            let coordinator_client_clone = self.coordinator_client.clone();
-            let stream_results_thread = thread::spawn(move || {
-                let batch_size = 200;
-                let mut curr_batch = vec![];
-                loop {
-                    let txn_idx_output: TransactionIdxAndOutput = stream_results_rx.recv().unwrap();
-                    if txn_idx_output.txn_idx == u32::MAX {
-                        if !curr_batch.is_empty() {
-                            coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
-                        }
-                        break;
-                    }
-                    curr_batch.push(txn_idx_output);
-                    if curr_batch.len() == batch_size {
-                        coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
-                        curr_batch = vec![];
-                    }
-                }
-            });
-            stream_results_tx.send(TransactionIdxAndOutput {
-                txn_idx: u32::MAX,
-                txn_output: TransactionOutput::default(),
-            }).unwrap();
-            stream_results_thread.join().unwrap();
-            let drop_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
-                .with_label_values(&[&self.shard_id.to_string(), "dropping state view"])
-                .start_timer();
-            // clearing the state value
-            self.coordinator_client.lock().unwrap().reset_state_view();
-            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            info!("Finished block at time {}", curr_time);
-            if (i % 50 == 49) {
-                let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
-                    .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-                    .unwrap()
-                    .get_sample_sum();
-                info!(
-                    "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
-                    self.shard_id,
-                    (cumulative_txns as f64 / exe_time),
-                    cumulative_txns,
-                    exe_time
-                );
-            }
-            i = i + 1;
-        }
-
-        let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
-            .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-            .unwrap()
-            .get_sample_sum();
-        info!(
-            "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
-            self.shard_id,
-            (cumulative_txns as f64 / exe_time),
-            cumulative_txns,
-            exe_time
-        );
+        // let mut cumulative_txns = 0;
+        // let mut i = 0;
+        // loop {
+        //    // info!("Looping back to recv cmd after execution of a block********************");
+        //    let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        //    info!("Started processing block in time {}", curr_time);
+        //     let mut command = self.coordinator_client.lock().unwrap().receive_execute_command_stream();
+        //     let (state_view, num_txns_in_the_block, shard_txns_start_index, onchain_config, blocking_transactions_provider) = match command {
+        //         StreamedExecutorShardCommand::InitBatch(
+        //             state_view,
+        //             transactions,
+        //             num_txns_in_the_block,
+        //             shard_txns_start_index,
+        //             onchain_config,
+        //             batch_start_index,
+        //             blocking_transactions_provider,
+        //         ) => {
+        //             if transactions.len() == num_txns_in_the_block {
+        //                 self.coordinator_client.lock().unwrap().reset_block_init();
+        //             }
+        //             (state_view, num_txns_in_the_block, shard_txns_start_index, onchain_config, blocking_transactions_provider)
+        //         },
+        //         StreamedExecutorShardCommand::Stop => {
+        //             break;
+        //         },
+        //     };
+        //
+        //     cumulative_txns += num_txns_in_the_block;
+        //     /*let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
+        //
+        //     let coordinator_client_clone_2 = self.coordinator_client.clone();
+        //     thread::spawn(move || {
+        //         let mut num_txns_processed = 0;
+        //         loop {
+        //             num_txns_processed += transactions.len();
+        //             let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
+        //                 blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
+        //             });
+        //             if num_txns_processed == num_txns_in_the_block {
+        //                 coordinator_client_clone_2.lock().unwrap().reset_block_init();
+        //                 break;
+        //             }
+        //             let command2 = coordinator_client_clone_2.lock().unwrap().receive_execute_command_stream();
+        //             let txnsAndStIdx = match command2 {
+        //                 StreamedExecutorShardCommand::InitBatch(
+        //                     _,
+        //                     _,
+        //                     _,
+        //                     _,
+        //                     _,
+        //                     _,
+        //                 ) => {
+        //                     panic!("Init Batch must not be called before executing all txns in the block");
+        //                 },
+        //                 StreamedExecutorShardCommand::ExecuteBatch(
+        //                     transactions,
+        //                     batch_start_index,
+        //                 ) => {
+        //                     (transactions, batch_start_index)
+        //                 },
+        //                 StreamedExecutorShardCommand::Stop => {
+        //                     break;
+        //                 },
+        //             };
+        //             transactions = txnsAndStIdx.0;
+        //             batch_start_index = txnsAndStIdx.1;
+        //         }
+        //     });*/
+        //
+        //     // let (stream_results_tx, stream_results_rx) = unbounded();
+        //     //
+        //     // trace!(
+        //     //         "Shard {} received ExecuteBlock command of block size {} ",
+        //     //         self.shard_id,
+        //     //         num_txns_in_the_block
+        //     //     );
+        //     // let exe_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+        //     //     .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+        //     //     .start_timer();
+        //     // let ret = self.execute_block(
+        //     //     blocking_transactions_provider,
+        //     //     state_view.as_ref(),
+        //     //     BlockExecutorConfig {
+        //     //         local: BlockExecutorLocalConfig {
+        //     //             concurrency_level: AptosVM::get_concurrency_level(),
+        //     //             allow_fallback: true,
+        //     //             discard_failed_blocks: false,
+        //     //         },
+        //     //         onchain: onchain_config,
+        //     //     },
+        //     //     shard_txns_start_index as TxnIndex,
+        //     //     stream_results_tx.clone(),
+        //     // );
+        //     // let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        //     // info!("Block STM ended at time {}", curr_time);
+        //     // drop(state_view);
+        //     // drop(exe_timer);
+        //     //
+        //     // self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
+        //     self.coordinator_client.lock().unwrap().stream_execution_result(vec![]);
+        //     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        //     info!("Processed block at time {}", curr_time);
+        //
+        //
+        //
+        //     let coordinator_client_clone = self.coordinator_client.clone();
+        //     let stream_results_thread = thread::spawn(move || {
+        //         let batch_size = 200;
+        //         let mut curr_batch = vec![];
+        //         loop {
+        //             let txn_idx_output: TransactionIdxAndOutput = stream_results_rx.recv().unwrap();
+        //             if txn_idx_output.txn_idx == u32::MAX {
+        //                 if !curr_batch.is_empty() {
+        //                     coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+        //                 }
+        //                 break;
+        //             }
+        //             curr_batch.push(txn_idx_output);
+        //             if curr_batch.len() == batch_size {
+        //                 coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+        //                 curr_batch = vec![];
+        //             }
+        //         }
+        //     });
+        //     stream_results_tx.send(TransactionIdxAndOutput {
+        //         txn_idx: u32::MAX,
+        //         txn_output: TransactionOutput::default(),
+        //     }).unwrap();
+        //     stream_results_thread.join().unwrap();
+        //     let drop_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+        //         .with_label_values(&[&self.shard_id.to_string(), "dropping state view"])
+        //         .start_timer();
+        //     // clearing the state value
+        //     self.coordinator_client.lock().unwrap().reset_state_view();
+        //     let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        //     info!("Finished block at time {}", curr_time);
+        //     if (i % 50 == 49) {
+        //         let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
+        //             .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+        //             .unwrap()
+        //             .get_sample_sum();
+        //         info!(
+        //             "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
+        //             self.shard_id,
+        //             (cumulative_txns as f64 / exe_time),
+        //             cumulative_txns,
+        //             exe_time
+        //         );
+        //     }
+        //     i = i + 1;
+        // }
+        //
+        // let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
+        //     .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+        //     .unwrap()
+        //     .get_sample_sum();
+        // info!(
+        //     "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
+        //     self.shard_id,
+        //     (cumulative_txns as f64 / exe_time),
+        //     cumulative_txns,
+        //     exe_time
+        // );
     }
 }
 
