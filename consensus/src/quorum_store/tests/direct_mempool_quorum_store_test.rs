@@ -4,7 +4,7 @@
 use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
 use aptos_consensus_types::{
     common::PayloadFilter,
-    request_response::{GetPayloadCommand, GetPayloadResponse},
+    request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse, PayloadTxnsSize},
 };
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use futures::{
@@ -29,18 +29,17 @@ async fn test_block_request_no_txns() {
 
     let (consensus_callback, consensus_callback_rcv) = oneshot::channel();
     consensus_to_quorum_store_sender
-        .try_send(GetPayloadCommand::GetPayloadRequest(
-            100,
-            100,
-            100,
-            1000,
-            50,
-            500,
-            true,
-            PayloadFilter::DirectMempool(vec![]),
-            consensus_callback,
-            aptos_infallible::duration_since_epoch(),
-        ))
+        .try_send(GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
+            max_txns: PayloadTxnsSize::new(100, 1000),
+            max_txns_after_filtering: 100,
+            soft_max_txns_after_filtering: 100,
+            max_inline_txns: PayloadTxnsSize::new(50, 500),
+            opt_batch_txns_pct: 0,
+            return_non_full: true,
+            filter: PayloadFilter::DirectMempool(vec![]),
+            callback: consensus_callback,
+            block_timestamp: aptos_infallible::duration_since_epoch(),
+        }))
         .unwrap();
 
     if let QuorumStoreRequest::GetBatchRequest(

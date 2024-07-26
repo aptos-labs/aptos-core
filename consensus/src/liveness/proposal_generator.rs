@@ -12,7 +12,7 @@ use crate::{
         PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
-    payload_client::PayloadClient,
+    payload_client::{PayloadClient, PayloadPullParameters},
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
@@ -25,6 +25,7 @@ use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter, Round},
     pipelined_block::ExecutionSummary,
     quorum_cert::QuorumCert,
+    utils::PayloadTxnsSize,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
@@ -454,21 +455,28 @@ impl ProposalGenerator {
             let (validator_txns, mut payload) = self
                 .payload_client
                 .pull_payload(
-                    self.quorum_store_poll_time.saturating_sub(proposal_delay),
-                    self.max_block_txns,
-                    max_block_txns_after_filtering,
-                    max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering),
-                    max_block_bytes,
-                    // TODO: Set max_inline_txns and max_inline_bytes correctly
-                    self.max_inline_txns,
-                    self.max_inline_bytes,
+                    PayloadPullParameters {
+                        max_poll_time: self.quorum_store_poll_time.saturating_sub(proposal_delay),
+                        max_txns: PayloadTxnsSize {
+                            count: self.max_block_txns,
+                            bytes: self.max_block_bytes,
+                        },
+                        max_txns_after_filtering: self.max_block_txns_after_filtering,
+                        soft_max_txns_after_filtering: max_txns_from_block_to_execute
+                            .unwrap_or(max_block_txns_after_filtering),
+                        max_inline_txns: PayloadTxnsSize {
+                            count: self.max_inline_txns,
+                            bytes: self.max_inline_bytes,
+                        },
+                        opt_batch_txns_pct: 0,
+                        user_txn_filter: payload_filter,
+                        pending_ordering,
+                        pending_uncommitted_blocks: pending_blocks.len(),
+                        recent_max_fill_fraction: max_fill_fraction,
+                        block_timestamp: timestamp,
+                    },
                     validator_txn_filter,
-                    payload_filter,
                     wait_callback,
-                    pending_ordering,
-                    pending_blocks.len(),
-                    max_fill_fraction,
-                    timestamp,
                 )
                 .await
                 .context("Fail to retrieve payload")?;
