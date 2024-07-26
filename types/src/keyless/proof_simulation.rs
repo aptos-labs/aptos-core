@@ -102,6 +102,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         let delta = Self::generate_random_scalar(rng);
 
         let g1_generator = Self::generate_random_g1_elem(rng);
+        // TODO (michael): Generating the `g2_generator` with this function causes verification to later fail. This only occurs with this element - not `g1_generator` or any of the scalar elements for the associated `generate_random_g1_elem` or `generate_random_scalar` functions. We should figure out why, seems like an obscure arkworks bug
         let g2_generator = Self::generate_random_g2_elem(rng);
 
         let alpha_g1 = g1_generator * alpha;
