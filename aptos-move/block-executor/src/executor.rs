@@ -883,6 +883,7 @@ where
                                 "finished finish execution in fallback, idx={}",
                                 last_commit_idx
                             );
+                            continue;
                         }
                     }
                 }
