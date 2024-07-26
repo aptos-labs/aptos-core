@@ -74,6 +74,18 @@ where
     }
 }
 
+impl<T> From<Vec<T>> for BatchPointer<T>
+where
+    T: TDataInfo,
+{
+    fn from(value: Vec<T>) -> Self {
+        Self {
+            batch_summary: value,
+            status: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
 impl<T: PartialEq> PartialEq for BatchPointer<T> {
     fn eq(&self, other: &Self) -> bool {
         self.batch_summary == other.batch_summary
@@ -125,6 +137,15 @@ pub struct InlineBatch {
     transactions: Vec<SignedTransaction>,
 }
 
+impl InlineBatch {
+    pub fn new(batch_info: BatchInfo, transactions: Vec<SignedTransaction>) -> Self {
+        Self {
+            batch_info,
+            transactions,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct InlineBatches(Vec<InlineBatch>);
 
@@ -159,6 +180,12 @@ impl InlineBatches {
             .iter()
             .map(|inline_batch| inline_batch.batch_info.clone())
             .collect()
+    }
+}
+
+impl From<Vec<InlineBatch>> for InlineBatches {
+    fn from(value: Vec<InlineBatch>) -> Self {
+        Self(value)
     }
 }
 
@@ -215,6 +242,19 @@ pub enum OptQuorumStorePayload {
 }
 
 impl OptQuorumStorePayload {
+    pub fn new(
+        inline_batches: InlineBatches,
+        opt_batches: BatchPointer<BatchInfo>,
+        proofs: BatchPointer<ProofOfStore>,
+    ) -> Self {
+        Self::V1(OptQuorumStorePayloadV1 {
+            inline_batches,
+            opt_batches,
+            proofs,
+            execution_limits: PayloadExecutionLimit::None,
+        })
+    }
+
     pub(crate) fn num_txns(&self) -> usize {
         self.opt_batches.num_txns() + self.proofs.num_txns() + self.inline_batches.num_txns()
     }
@@ -252,6 +292,10 @@ impl OptQuorumStorePayload {
 
     pub fn opt_batches(&self) -> &BatchPointer<BatchInfo> {
         &self.opt_batches
+    }
+
+    pub fn set_execution_limit(&mut self, execution_limits: PayloadExecutionLimit) {
+        self.execution_limits = execution_limits;
     }
 }
 

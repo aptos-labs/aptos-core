@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    payload::OptQuorumStorePayload,
+    payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
 use anyhow::bail;
@@ -282,8 +282,15 @@ impl Payload {
             Payload::DirectMempool(_) => {
                 panic!("Payload is in direct mempool format");
             },
-            Payload::OptQuorumStore(_) => {
-                unreachable!("OptQuorumStore Payload is incompatible with QuorumStoreV2");
+            Payload::OptQuorumStore(mut opt_qs_payload) => {
+                let execution_limits = match max_txns_to_execute {
+                    Some(max_txns_to_execute) => {
+                        PayloadExecutionLimit::MaxTransactionsToExecute(max_txns_to_execute)
+                    },
+                    None => PayloadExecutionLimit::None,
+                };
+                opt_qs_payload.set_execution_limit(execution_limits);
+                Payload::OptQuorumStore(opt_qs_payload)
             },
         }
     }
