@@ -851,7 +851,6 @@ where
                     //need to process next task
                     last_commit_idx += 1;
                     if let Some(incarnation) = scheduler.try_fallback(last_commit_idx) {
-                        println!("got into fallback, txn={}", last_commit_idx);
                         if let Some(validation_mode) = Self::execute(
                             last_commit_idx,
                             incarnation,
@@ -870,19 +869,12 @@ where
                             ),
                         )? {
                             //if we are in fallback and won write => no need to validate
-                            println!(
-                                "started finish execution in fallback, idx={}",
-                                last_commit_idx
-                            );
                             scheduler.finish_execution(
                                 last_commit_idx,
                                 incarnation,
                                 validation_mode,
                             )?;
-                            println!(
-                                "finished finish execution in fallback, idx={}",
-                                last_commit_idx
-                            );
+                            drain_commit_queue()?;
                             continue;
                         }
                     }

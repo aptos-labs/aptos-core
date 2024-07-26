@@ -565,8 +565,6 @@ impl Scheduler {
         let mut validation_status = self.txn_status[txn_idx as usize].1.write();
         self.set_executed_status(txn_idx, incarnation)?;
 
-        println!("set executed status, idx={}", txn_idx);
-
         self.wake_dependencies_after_execution(txn_idx)?;
 
         let (cur_val_idx, mut cur_wave) =
