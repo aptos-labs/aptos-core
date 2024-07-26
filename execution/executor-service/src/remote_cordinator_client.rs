@@ -356,16 +356,17 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         info!("Testing network started on shard {} with #requests: {}", self.shard_id, num_requests);
 
         let mut send_timestamps = vec![];
-        let receive_timestamps = Arc::new(Mutex::new(vec![Default::default(), num_requests]));
+        let receive_timestamps = Arc::new(Mutex::new( vec![Default::default(), num_requests]));
         let (test_finished_tx, test_finished_rx) = crossbeam_channel::bounded(1);
         let kv_req_rx_clone = self.kv_req_rx.clone();
         let receive_timestamps_clone = receive_timestamps.clone();
         rayon::spawn(move || {
             let mut lock = receive_timestamps_clone.lock().unwrap();
             let mut received = 0;
-            while let msg = kv_req_rx_clone.recv() {
+            while let Ok(msg) = kv_req_rx_clone.recv() {
                 let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-                lock[msg.unwrap().seq_num.unwrap() as usize] = curr_time;
+                info!("Vector len {}, msg idx", lock.len(), msg.seq_num.unwrap());
+                lock[msg.seq_num.unwrap() as usize] = curr_time;
                 received += 1;
                 if received == num_requests {
                    break;
