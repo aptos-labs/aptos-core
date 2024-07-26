@@ -103,7 +103,7 @@ impl RemoteStateViewClient {
                 .build()
                 .unwrap(),
         );
-        let kv_response_type = "remote_kv_response";
+        let kv_response_type = "remote_kv_response_dummy";
         let result_rx = controller.create_inbound_channel(kv_response_type.to_string());
         let mut command_tx = vec![];
         for _ in 0..num_kv_req_threads {
