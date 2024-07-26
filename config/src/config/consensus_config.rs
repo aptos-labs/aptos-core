@@ -324,7 +324,7 @@ impl Default for ConsensusConfig {
                 backoff_policy_max_delay_ms: 10000,
                 rpc_timeout_ms: 10000,
             },
-            num_bounded_executor_tasks: 8,
+            num_bounded_executor_tasks: 16,
         }
     }
 }
