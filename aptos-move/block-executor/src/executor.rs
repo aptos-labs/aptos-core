@@ -874,6 +874,7 @@ where
                                 incarnation,
                                 validation_mode,
                             )?;
+                            println!("critical path, finished execution, txn={}", last_commit_idx);
                             drain_commit_queue()?;
                             continue;
                         }
@@ -919,7 +920,12 @@ where
                             shared_counter,
                         ),
                     )? {
-                        scheduler.finish_execution(txn_idx, incarnation, validation_mode)?
+                        let temp =
+                            scheduler.finish_execution(txn_idx, incarnation, validation_mode)?;
+                        if matches!(temp, SchedulerTask::Retry) {
+                            println!("critical path, finished execution, txn={}", txn_idx);
+                        }
+                        temp
                     } else {
                         println!("failed to get write lock, idx={}", txn_idx);
                         SchedulerTask::Retry
