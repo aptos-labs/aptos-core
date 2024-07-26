@@ -229,6 +229,15 @@ module aptos_framework::fungible_asset {
         amount: u64,
     }
 
+    #[event]
+    /// Emitted when a fungible store is removed/deleted.
+    struct BurnStore has drop, store {
+        store: address,
+        owner: address,
+        metadata: address,
+        frozen: bool,
+    }
+
     inline fun default_to_concurrent_fungible_supply(): bool {
         features::concurrent_fungible_assets_enabled()
     }
@@ -770,7 +779,8 @@ module aptos_framework::fungible_asset {
     public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents, ConcurrentFungibleBalance {
         let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
         let addr = object::object_address(store);
-        let FungibleStore { metadata: _, balance, frozen: _ }
+        let owner = object::owner(*store);
+        let FungibleStore { metadata, balance, frozen }
             = move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
 
@@ -790,6 +800,13 @@ module aptos_framework::fungible_asset {
             event::destroy_handle(withdraw_events);
             event::destroy_handle(frozen_events);
         };
+
+        event::emit(BurnStore {
+            store: addr,
+            owner,
+            metadata: object::object_address(&metadata),
+            frozen,
+        });
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.

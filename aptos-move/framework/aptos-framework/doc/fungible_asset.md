@@ -25,6 +25,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `Frozen`](#0x1_fungible_asset_Frozen)
 -  [Struct `Mint`](#0x1_fungible_asset_Mint)
 -  [Struct `Burn`](#0x1_fungible_asset_Burn)
+-  [Struct `BurnStore`](#0x1_fungible_asset_BurnStore)
 -  [Resource `FungibleAssetEvents`](#0x1_fungible_asset_FungibleAssetEvents)
 -  [Struct `DepositEvent`](#0x1_fungible_asset_DepositEvent)
 -  [Struct `WithdrawEvent`](#0x1_fungible_asset_WithdrawEvent)
@@ -727,6 +728,53 @@ Emitted when fungible assets are burned.
 </dd>
 <dt>
 <code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_BurnStore"></a>
+
+## Struct `BurnStore`
+
+Emitted when a fungible store is removed/deleted.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_BurnStore">BurnStore</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>store: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>metadata: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>frozen: bool</code>
 </dt>
 <dd>
 
@@ -2698,7 +2746,8 @@ Used to delete a store.  Requires the store to be completely empty prior to remo
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_remove_store">remove_store</a>(delete_ref: &DeleteRef) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
     <b>let</b> store = &<a href="object.md#0x1_object_object_from_delete_ref">object::object_from_delete_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(delete_ref);
     <b>let</b> addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(store);
-    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> { metadata: _, balance, frozen: _ }
+    <b>let</b> owner = <a href="object.md#0x1_object_owner">object::owner</a>(*store);
+    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> { metadata, balance, frozen }
         = <b>move_from</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(addr);
     <b>assert</b>!(balance == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EBALANCE_IS_NOT_ZERO">EBALANCE_IS_NOT_ZERO</a>));
 
@@ -2718,6 +2767,13 @@ Used to delete a store.  Requires the store to be completely empty prior to remo
         <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(withdraw_events);
         <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(frozen_events);
     };
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_BurnStore">BurnStore</a> {
+        store: addr,
+        owner,
+        metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
+        frozen,
+    });
 }
 </code></pre>
 
