@@ -164,7 +164,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                     {
                         let (lock, cvar) = &*recv_condition_clone;
                         let _lg = lock.lock().unwrap();
-                        kv_unprocessed_pq_clone.push(message, 0);
+                        kv_unprocessed_pq_clone.push(message, priority as u64);
                         recv_condition_clone.1.notify_one();
                     }
                     REMOTE_EXECUTOR_TIMER

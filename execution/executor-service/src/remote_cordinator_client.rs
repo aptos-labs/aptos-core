@@ -13,10 +13,12 @@ use aptos_vm::sharded_block_executor::{coordinator_client::CoordinatorClient, Ex
 use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc, thread};
+use std::cmp::Ordering;
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 use std::sync::Mutex;
-use std::time::SystemTime;
+use std::thread::sleep;
+use std::time::{Duration, SystemTime};
 use aptos_logger::info;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
@@ -352,57 +354,68 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     }
     fn test_network(&mut self) {
         self.command_finished_rx.recv().unwrap();
-        let num_requests = 500000;
+        let num_epochs = 50;
+        let num_requests = 30;
+        let mut total_deltas = vec![];
         info!("Testing network started on shard {} with #requests: {}", self.shard_id, num_requests);
+        for epoch_id in 0..num_epochs {
+            info!("Testing epoch {}", epoch_id);
+            let mut send_timestamps = vec![];
+            let receive_timestamps = Arc::new(Mutex::new(vec![Default::default(); num_requests]));
+            let (test_finished_tx, test_finished_rx) = crossbeam_channel::bounded(1);
+            let kv_req_rx_clone = self.kv_req_rx.clone();
+            let receive_timestamps_clone = receive_timestamps.clone();
+            rayon::spawn(move || {
+                let mut lock = receive_timestamps_clone.lock().unwrap();
+                let mut received = 0;
+                while let Ok(msg) = kv_req_rx_clone.recv() {
+                    let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                    lock[msg.seq_num.unwrap() as usize] = curr_time;
+                    received += 1;
+                    if received == num_requests {
+                        break;
+                    }
+                }
+                test_finished_tx.send(()).unwrap();
+            });
 
-        let mut send_timestamps = vec![];
-        let receive_timestamps = Arc::new(Mutex::new( vec![Default::default(); num_requests]));
-        let (test_finished_tx, test_finished_rx) = crossbeam_channel::bounded(1);
-        let kv_req_rx_clone = self.kv_req_rx.clone();
-        let receive_timestamps_clone = receive_timestamps.clone();
-        rayon::spawn(move || {
-            let mut lock = receive_timestamps_clone.lock().unwrap();
-            let mut received = 0;
-            while let Ok(msg) = kv_req_rx_clone.recv() {
+            for request_id in 0..num_requests {
                 let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-                lock[msg.seq_num.unwrap() as usize] = curr_time;
-                received += 1;
-                if received == num_requests {
-                   break;
-               }
+                let message = Message::create_with_metadata(vec![], 0, request_id as u64, self.shard_id as u64);
+                self.kv_req_tx[0].lock().unwrap().send(message, &MessageType::new(format!("remote_kv_request_{}", self.shard_id as u64)));
+                send_timestamps.push(curr_time);
             }
-            test_finished_tx.send(()).unwrap();
-        });
 
-        for request_id in 0..num_requests {
-            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            let message = Message::create_with_metadata(vec![], 0, request_id as u64, self.shard_id as u64);
-            self.kv_req_tx[0].lock().unwrap().send(message, &MessageType::new(format!("remote_kv_request_{}", self.shard_id as u64)));
-            send_timestamps.push(curr_time);
-        }
 
-        test_finished_rx.recv().unwrap();
+            test_finished_rx.recv().unwrap();
 
-        let mut sum = 0;
-        let mut max_delta = 0;
-        let mut obs = 0;
-        for i in 0..num_requests {
-            let send_time = send_timestamps[i as usize];
-            let recv_time = receive_timestamps.lock().unwrap()[i as usize];
-            let delta = recv_time - send_time;
-            if delta > 0 {
-                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["7_kv_req_rnd_trp"]).observe(delta as f64);
-                sum += delta;
-                obs += 1;
+            let mut sum = 0;
+            let mut max_delta = 0;
+            let mut obs = 0;
+            let mut deltas = vec![];
+            for i in 0..num_requests {
+                let send_time = send_timestamps[i as usize];
+                let recv_time = receive_timestamps.lock().unwrap()[i as usize];
+                let delta = recv_time - send_time;
+                if delta > 0 {
+                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                        .with_label_values(&["7_kv_req_rnd_trp"]).observe(delta as f64);
+                    sum += delta;
+                    obs += 1;
+                    deltas.push(delta);
+                }
+                max_delta = max_delta.max(delta);
             }
-            max_delta = max_delta.max(delta);
+            print_stats(deltas.clone());
+            total_deltas.append(&mut deltas);
+            info!("");
         }
-        let avg_delta = sum as f64 / obs as f64;
-        info!("Testing network finished on shard {} with #requests: {}, avg_delta: {}, max_delta: {}", self.shard_id, num_requests, avg_delta, max_delta);
+        let total_max = total_deltas.iter().max().unwrap().clone();
+        info!("Testing network finished on shard {}", self.shard_id);
+        print_stats(total_deltas);
         self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
         let execute_result_type = format!("execute_result_{}", self.shard_id);
-        self.result_tx.send(Message::create_with_metadata(vec![], avg_delta as u64, max_delta, self.shard_id as u64), &MessageType::new(execute_result_type));
+        self.result_tx.send(Message::create_with_metadata(vec![], 0, total_max, self.shard_id as u64), &MessageType::new(execute_result_type));
     }
 
     fn reset_block_init(&self) {
@@ -445,4 +458,25 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn reset_state_view(&self) {
         self.state_view_client.init_for_block();
     }
+}
+
+fn print_stats(deltas: Vec<u64>) {
+    fn calculate_percentile(mut data: Vec<u64>, percentile: f64) -> f64 {
+        data.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+
+        let rank = percentile / 100.0 * (data.len() - 1) as f64;
+        let lower_index = rank.floor() as usize;
+        let upper_index = rank.ceil() as usize;
+
+        if lower_index == upper_index {
+            data[lower_index] as f64
+        } else {
+            let lower_value = data[lower_index];
+            let upper_value = data[upper_index];
+            lower_value as f64 + (upper_value - lower_value) as f64 * (rank - lower_index as f64)
+        }
+    }
+    info!("The average is: {}", deltas.iter().sum::<u64>() as f64 / deltas.len() as f64);
+    info!("The p50 is: {}, p90 is: {}, p99 is: {}", calculate_percentile(deltas.clone(), 50.0), calculate_percentile(deltas.clone(), 90.0), calculate_percentile(deltas.clone(), 99.0));
+    info!("The max is {}", deltas.iter().max().unwrap());
 }
