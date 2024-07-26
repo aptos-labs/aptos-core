@@ -506,7 +506,7 @@ where
             last_commit_idx = Some(txn_idx);
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
-
+                assert!(false, "failed validation on commitready");
                 Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
