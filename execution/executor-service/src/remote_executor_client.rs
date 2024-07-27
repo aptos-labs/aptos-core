@@ -302,19 +302,22 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             info!("Starting next block");
             for shard_id in 0..self.num_shards() {
                 let rand_send_thread_idx = rng.gen_range(0, self.command_txs[shard_id].len());
-                self.command_txs[shard_id][rand_send_thread_idx]
-                    .lock()
-                    .unwrap()
-                    .send(Message::new(vec![]), &MessageType::new("cmd_completed".to_string()));
+                let command_txs_clone = self.command_txs.clone();
+                self.cmd_tx_thread_pool.spawn(move || {
+                    command_txs_clone[shard_id][rand_send_thread_idx]
+                        .lock()
+                        .unwrap()
+                        .send(Message::new(vec![]), &MessageType::new("cmd_completed".to_string()));
+                });
             }
 
-            let mut shard_with_kv_completed = 0;
-            while let Ok(msg) = self.kv_finished.recv() {
-                shard_with_kv_completed += 1;
-                if shard_with_kv_completed == self.num_shards() {
-                    break;
-                }
-            }
+            // let mut shard_with_kv_completed = 0;
+            // while let Ok(msg) = self.kv_finished.recv() {
+            //     shard_with_kv_completed += 1;
+            //     if shard_with_kv_completed == self.num_shards() {
+            //         break;
+            //     }
+            // }
 
             let results = self.get_streamed_output_from_shards(vec![], duration_since_epoch);
             sleep(Duration::from_millis(200));
