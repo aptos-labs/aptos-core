@@ -7,7 +7,7 @@ module 0x42::test {
 
     enum E1 {
         V1,
-        V2,
+        V2(),
         V3(u8, bool)
     }
 
