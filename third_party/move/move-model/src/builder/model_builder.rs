@@ -133,6 +133,7 @@ pub(crate) struct StructEntry {
 
 #[derive(Debug, Clone)]
 pub(crate) enum StructLayout {
+    /// The second bool is true iff the struct has positional fields
     Singleton(BTreeMap<Symbol, FieldData>, bool),
     Variants(Vec<StructVariant>),
     None,
