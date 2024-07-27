@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{BatchArgument, BatchedFunctionCallBuilder};
+use crate::{BatchArgumentWASM, BatchedFunctionCallBuilder};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionStatus},
@@ -35,20 +35,23 @@ fn simple_builder() {
             "transfer".to_string(),
             vec![],
             vec![
-                BatchArgument::new_signer(0),
-                BatchArgument::new_bytes(
+                BatchArgumentWASM::new_signer(0),
+                BatchArgumentWASM::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
                 ),
-                BatchArgument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+                BatchArgumentWASM::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
 
+    let expected_calls = builder.calls().to_vec();
+    let script = builder.generate_batched_calls().unwrap();
+
     let txn = alice
         .transaction()
-        .script(bcs::from_bytes(&builder.generate_batched_calls().unwrap()).unwrap())
+        .script(bcs::from_bytes(&script).unwrap())
         .sequence_number(10)
         .sign();
     assert_eq!(
@@ -57,6 +60,11 @@ fn simple_builder() {
     );
 
     assert_eq!(h.read_aptos_balance(bob.address()), 1_000_000_000_000_010);
+
+    assert_eq!(
+        crate::generate_intent_payload(script).unwrap(),
+        expected_calls
+    );
 }
 
 #[test]
@@ -74,8 +82,8 @@ fn chained_deposit() {
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
             vec![
-                BatchArgument::new_signer(0),
-                BatchArgument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+                BatchArgumentWASM::new_signer(0),
+                BatchArgumentWASM::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -93,7 +101,7 @@ fn chained_deposit() {
             "deposit".to_string(),
             vec![],
             vec![
-                BatchArgument::new_bytes(
+                BatchArgumentWASM::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
@@ -103,9 +111,12 @@ fn chained_deposit() {
         )
         .unwrap();
 
+    let expected_calls = builder.calls().to_vec();
+    let script = builder.generate_batched_calls().unwrap();
+
     let txn = alice
         .transaction()
-        .script(bcs::from_bytes(&builder.generate_batched_calls().unwrap()).unwrap())
+        .script(bcs::from_bytes(&script).unwrap())
         .sequence_number(10)
         .sign();
 
@@ -115,6 +126,10 @@ fn chained_deposit() {
     );
 
     assert_eq!(h.read_aptos_balance(bob.address()), 1_000_000_000_000_010);
+    assert_eq!(
+        crate::generate_intent_payload(script).unwrap(),
+        expected_calls
+    );
 }
 
 #[test]
@@ -131,8 +146,8 @@ fn chained_deposit_mismatch() {
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
             vec![
-                BatchArgument::new_signer(0),
-                BatchArgument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+                BatchArgumentWASM::new_signer(0),
+                BatchArgumentWASM::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -142,7 +157,7 @@ fn chained_deposit_mismatch() {
             "deposit".to_string(),
             vec![],
             vec![
-                BatchArgument::new_bytes(
+                BatchArgumentWASM::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
@@ -168,8 +183,8 @@ fn chained_deposit_invalid_copy() {
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
             vec![
-                BatchArgument::new_signer(0),
-                BatchArgument::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+                BatchArgumentWASM::new_signer(0),
+                BatchArgumentWASM::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
             ],
         )
         .unwrap();
@@ -188,7 +203,7 @@ fn chained_deposit_invalid_copy() {
             "deposit".to_string(),
             vec![],
             vec![
-                BatchArgument::new_bytes(
+                BatchArgumentWASM::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
@@ -205,7 +220,7 @@ fn chained_deposit_invalid_copy() {
             "deposit".to_string(),
             vec![],
             vec![
-                BatchArgument::new_bytes(
+                BatchArgumentWASM::new_bytes(
                     MoveValue::Address(*bob.address())
                         .simple_serialize()
                         .unwrap(),
