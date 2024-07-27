@@ -2671,7 +2671,7 @@ fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Bo
 //      StructDecl =
 //          native struct <StructDefName> <Abilities>? ";"
 //        | "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}"
-//        | "struct" <StructDefName> <Abilities>? "(" Comma<Type> ")" ";"
+//        | "struct" <StructDefName> "(" Comma<Type> ")" <Abilities>?";"
 //        | "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}"
 //      StructDefName =
 //          <Identifier> <OptionalTypeParameters>
