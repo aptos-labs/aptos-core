@@ -8,4 +8,3 @@ error: unexpected token
   │           │
   │           Unexpected '0x42'
   │           Expected an identifier or a positional field `0`, `1`, ...
-a
