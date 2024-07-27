@@ -754,7 +754,7 @@ fn parse_bind_field(context: &mut Context) -> Result<(Field, Bind), Box<Diagnost
 //      Bind =
 //          <Var>
 //          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindField> "}"
-//          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<Bind> "," "}"
+//          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<Bind> "," ")"
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     if context.tokens.peek() == Tok::Identifier {
