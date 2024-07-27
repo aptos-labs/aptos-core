@@ -312,7 +312,7 @@ fn parse_identifier(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
 
 // Parse an identifier or an positional field
 //     <Identifier> | (0-9)*
-fn parse_identifier_or_anonymous_field(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
+fn parse_identifier_or_positional_field(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let id: Symbol = context.tokens.content().into();
     if (context.tokens.peek() != Tok::Identifier && context.tokens.peek() != Tok::NumValue)
@@ -1950,7 +1950,7 @@ fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic
         let exp = match context.tokens.peek() {
             Tok::Period => {
                 context.tokens.advance()?;
-                let n = parse_identifier_or_anonymous_field(context)?;
+                let n = parse_identifier_or_positional_field(context)?;
                 let ahead = context.tokens.peek();
                 if matches!(ahead, Tok::LParen | Tok::ColonColon) {
                     let generics = if ahead == Tok::ColonColon {
