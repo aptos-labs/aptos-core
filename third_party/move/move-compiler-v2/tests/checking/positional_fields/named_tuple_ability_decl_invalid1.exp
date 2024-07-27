@@ -1,6 +1,10 @@
-// -- Model dump before bytecode pipeline
-module 0x42::test {
-    struct S {
-        dummy_field: bool,
-    }
-} // end 0x42::test
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/positional_fields/named_tuple_ability_decl_invalid1.move:2:23
+  │
+2 │     struct S has copy ();
+  │                       ^
+  │                       │
+  │                       Unexpected '('
+  │                       Expected one of: ',', '{', or ';'
