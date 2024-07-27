@@ -334,7 +334,7 @@ async fn update_account_recovery_db(input: &PepperInput) -> Result<(), Processin
             // better than using read-compute-write pattern that requires 2 RTTs.
             //
             // This strategy does not work directly:
-            // in firestore, the default value of a number field is 0, and we do not know a way to customize it.
+            // in firestore, the default value of a number field is 0, and we do not know a way to customize it for op 4.
             // The workaround here is apply an offset so 0 becomes a legitimate default value.
             // So we work with `first_request_unix_ms_minus_1q` instead,
             // which is defined as `first_request_unix_ms - 1_000_000_000_000_000`,
