@@ -2787,6 +2787,9 @@ fn parse_struct_decl(
     })
 }
 
+/// Parse ability declarations:
+///
+///    Abilities = "has" <Ability> (, <Ability>)+
 fn parse_abilities(context: &mut Context) -> Result<Vec<Ability>, Box<Diagnostic>> {
     if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "has" {
         context.tokens.advance()?;
@@ -2869,7 +2872,7 @@ fn parse_field_annot(context: &mut Context) -> Result<(Field, Type), Box<Diagnos
 }
 
 /// Parse a comma list of types surrounded by parenthesis into a vector of `(Field, Type)` pairs
-/// where the fields are named "0", "1", ... with location the location of the type in the second field
+/// where the fields are named "0", "1", ... with location of the type in the second field
 fn parse_anonymous_fields(context: &mut Context) -> Result<Vec<(Field, Type)>, Box<Diagnostic>> {
     let field_types = parse_comma_list(
         context,
