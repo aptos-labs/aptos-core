@@ -13,4 +13,6 @@ module 0x42::test {
     }
 
     struct S5<T: copy + key>(T, S3<T>) has key;
+
+    struct S6<phantom T: store>();
 }
