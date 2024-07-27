@@ -65,7 +65,9 @@ impl TShare for Share {
             WVUF::verify_share(
                 &rand_config.vuf_pp,
                 apk,
-                bcs::to_bytes(&rand_metadata).unwrap().as_slice(),
+                bcs::to_bytes(&rand_metadata)
+                    .map_err(|e| anyhow!("Serialization failed: {}", e))?
+                    .as_slice(),
                 &self.share,
             )?;
         } else {
@@ -78,6 +80,7 @@ impl TShare for Share {
         Ok(())
     }
 
+    #[allow(clippy::unwrap_used)]
     fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
     where
         Self: Sized,
@@ -629,7 +632,7 @@ impl RandConfig {
             .validator
             .address_to_validator_index()
             .get(peer)
-            .unwrap()
+            .expect("Peer should be in the index!")
     }
 
     pub fn get_certified_apk(&self, peer: &Author) -> Option<&APK> {

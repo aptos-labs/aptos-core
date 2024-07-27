@@ -87,6 +87,10 @@ pub enum FeatureFlag {
     LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
     DISALLOW_USER_NATIVES = 71,
+    ALLOW_SERIALIZED_SCRIPT_ARGS = 72,
+    USE_COMPATIBILITY_CHECKER_V2 = 73,
+    ENABLE_ENUM_TYPES = 74,
+    ENABLE_RESOURCE_ACCESS_CONTROL = 75,
 }
 
 impl FeatureFlag {
@@ -96,7 +100,10 @@ impl FeatureFlag {
             FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
             FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
+            // Feature flag V6 is used to enable metadata v1 format and needs to stay on, even
+            // if we enable a higher version.
             FeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::VM_BINARY_FORMAT_V7,
             FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
             FeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::RESOURCE_GROUPS,
@@ -154,6 +161,10 @@ impl FeatureFlag {
             FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
             FeatureFlag::DISALLOW_USER_NATIVES,
+            FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
+            FeatureFlag::USE_COMPATIBILITY_CHECKER_V2,
+            FeatureFlag::ENABLE_ENUM_TYPES,
+            FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
         ]
     }
 }

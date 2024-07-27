@@ -911,6 +911,7 @@ impl TxnEmitter {
     }
 }
 
+#[allow(dead_code)]
 fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
@@ -924,7 +925,7 @@ fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
 /// we were able to fetch last.
 async fn wait_for_accounts_sequence(
     start_time: Instant,
-    clients: &Vec<RestClient>,
+    client: &RestClient,
     account_seqs: &HashMap<AccountAddress, (u64, u64)>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
@@ -934,7 +935,6 @@ async fn wait_for_accounts_sequence(
 
     let mut sum_of_completion_timestamps_millis = 0u128;
     loop {
-        let client = pick_client(clients);
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();

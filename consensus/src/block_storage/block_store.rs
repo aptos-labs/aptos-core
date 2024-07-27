@@ -575,7 +575,7 @@ impl BlockReader for BlockStore {
                 // latency not known without non-genesis blocks
                 Duration::ZERO
             } else {
-                proposal_timestamp.checked_sub(timestamp).unwrap()
+                proposal_timestamp.saturating_sub(timestamp)
             }
         }
 

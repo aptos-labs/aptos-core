@@ -2664,7 +2664,7 @@ fn parse_struct_decl(
     }
 
     if is_enum {
-        require_move_2_and_advance(context, "struct variants")?;
+        require_move_2_and_advance(context, "enum types")?;
     } else {
         consume_token(context.tokens, Tok::Struct)?;
     }

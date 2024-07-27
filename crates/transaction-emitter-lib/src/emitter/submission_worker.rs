@@ -249,7 +249,7 @@ impl SubmissionWorker {
         let (latest_fetched_counts, sum_of_completion_timestamps_millis) =
             wait_for_accounts_sequence(
                 start_time,
-                &self.clients,
+                self.client(),
                 &account_to_start_and_end_seq_num,
                 txn_expiration_ts_secs,
                 check_account_sleep_duration,

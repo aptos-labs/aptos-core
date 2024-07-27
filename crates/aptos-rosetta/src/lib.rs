@@ -114,6 +114,8 @@ pub async fn bootstrap_async(
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
         let rest_client = rest_client.map(Arc::new);
+
+        // TODO: The BlockRetriever has no cache, and should probably be renamed from block_cache
         let block_cache = rest_client.as_ref().map(|rest_client| {
             Arc::new(BlockRetriever::new(
                 api_config.max_transactions_page_size,

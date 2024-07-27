@@ -471,6 +471,11 @@ pub fn read_uleb128_as_u64(cursor: &mut Cursor<&[u8]>) -> Result<u64> {
 // Bytecode evolution
 //
 
+/// From bytecode version 7 onwards, Aptos distinguishes from
+/// other Move flavors by masking the version with the highest
+/// byte 0xA.
+pub const APTOS_BYTECODE_VERSION_MASK: u32 = 0x0A000000;
+
 /// Version 1: the initial version
 pub const VERSION_1: u32 = 1;
 
@@ -500,24 +505,26 @@ pub const VERSION_6: u32 = 6;
 
 /// Version 7: changes compare to version 6
 /// + access specifiers (read/write set)
+/// + enum types
 pub const VERSION_7: u32 = 7;
 
-/// Mark which version is the default version
-pub const VERSION_DEFAULT: u32 = VERSION_6;
+/// Version 8: changes compared to version 7
+/// + TBD
+pub const VERSION_8: u32 = 8;
 
-/// Mark which version is the latest version
+/// Mark which version is the latest version. Should be set to v8 once features
+/// are added.
 pub const VERSION_MAX: u32 = VERSION_7;
 
-/// A version value which is used for experimental code which is not allowed in
-/// production. The bytecode deserializer accepts modules with this version only when the
-/// cargo feature `testing` is enabled.
-///
-/// This is currently set to VERSION_7, the next major version, and should be updated once
-/// this version is ready for production.
-pub const VERSION_NEXT: u32 = VERSION_7;
+/// Mark which version is the default version. This is the version used by default by tools like
+/// the compiler. Notice that this version might be different than the one supported on nodes.
+/// The node's max version is determined by the on-chain config for that node.
+pub const VERSION_DEFAULT: u32 = VERSION_6;
+
+/// Mark which version is the default version if compiling Move 2.
+pub const VERSION_DEFAULT_LANG_V2: u32 = VERSION_7;
 
 // Mark which oldest version is supported.
-// TODO(#145): finish v4 compatibility; as of now, only metadata is implemented
 pub const VERSION_MIN: u32 = VERSION_5;
 
 pub(crate) mod versioned_data {
@@ -554,33 +561,25 @@ pub(crate) mod versioned_data {
                     .with_message("Bad binary header".to_string()));
             }
             let version = match read_u32(&mut cursor) {
-                Ok(v) => v,
+                Ok(v) => v & !APTOS_BYTECODE_VERSION_MASK,
                 Err(_) => {
                     return Err(PartialVMError::new(StatusCode::MALFORMED)
                         .with_message("Bad binary header".to_string()));
                 },
             };
             if version == 0 || version > u32::min(max_version, VERSION_MAX) {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION)
-                    .with_message(format!("bytecode version {} unsupported", version)));
-            } else if version == VERSION_NEXT
-                && !cfg!(any(test, feature = "testing", feature = "fuzzing"))
-            {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_VERSION).with_message(format!(
-                        "bytecode version {} only allowed in test code",
-                        VERSION_NEXT
-                    )),
-                );
+                Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION)
+                    .with_message(format!("bytecode version {} unsupported", version)))
+            } else {
+                Ok((
+                    Self {
+                        version,
+                        max_identifier_size,
+                        binary,
+                    },
+                    cursor,
+                ))
             }
-            Ok((
-                Self {
-                    version,
-                    max_identifier_size,
-                    binary,
-                },
-                cursor,
-            ))
         }
 
         #[allow(dead_code)]

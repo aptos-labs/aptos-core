@@ -117,14 +117,7 @@ impl Environment {
         chain_id: ChainId,
         ty_builder: TypeBuilder,
     ) -> Self {
-        let pseudo_meter_vector_ty_to_ty_tag_construction = true;
-
-        let vm_config = aptos_prod_vm_config(
-            &features,
-            &timed_features,
-            pseudo_meter_vector_ty_to_ty_tag_construction,
-            ty_builder,
-        );
+        let vm_config = aptos_prod_vm_config(&features, &timed_features, ty_builder);
 
         Self {
             chain_id,

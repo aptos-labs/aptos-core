@@ -70,7 +70,9 @@ impl TransactionShuffler for SenderAwareShuffler {
 
             // If we can't find any candidate in above steps, then lastly
             // add pending transactions in the order if we can't find any other candidate
-            pending_txns.remove_first_pending().unwrap()
+            pending_txns
+                .remove_first_pending()
+                .expect("Pending should return a transaction")
         };
         while sliding_window.num_txns() < num_transactions {
             let txn = next_to_add(&mut sliding_window);
@@ -131,11 +133,10 @@ impl PendingTransactions {
     pub fn remove_first_pending(&mut self) -> Option<SignedTransaction> {
         while let Some(txn) = self.ordered_txns.pop_front() {
             let sender = txn.sender();
-            // We don't remove the txns from ordered_txns when remove_pending_from_sender is called.
-            // So it is possible that the ordered_txns has some transactions that are not pending
-            // anymore.
-            if Some(txn).as_ref() == self.txns_by_senders.get(&sender).unwrap().front() {
-                return self.remove_pending_from_sender(sender);
+            if let Some(sender_queue) = self.txns_by_senders.get(&sender) {
+                if Some(txn).as_ref() == sender_queue.front() {
+                    return self.remove_pending_from_sender(sender);
+                }
             }
         }
         None
@@ -197,11 +198,18 @@ impl SlidingWindowState {
 
     /// Returns the sender which was dropped off of the conflict window in previous iteration.
     pub fn last_dropped_sender(&self) -> Option<AccountAddress> {
-        let prev_start_index = self.start_index - 1;
-        if prev_start_index >= 0 {
-            let last_sender = self.txns.get(prev_start_index as usize).unwrap().sender();
-            if *self.senders_in_window.get(&last_sender).unwrap() == 0 {
-                return Some(last_sender);
+        if self.start_index > 0 {
+            let prev_start_index = self.start_index - 1;
+            if let Some(last_sender) = self
+                .txns
+                .get(prev_start_index as usize)
+                .map(|txn| txn.sender())
+            {
+                if let Some(&count) = self.senders_in_window.get(&last_sender) {
+                    if count == 0 {
+                        return Some(last_sender);
+                    }
+                }
             }
         }
         None
