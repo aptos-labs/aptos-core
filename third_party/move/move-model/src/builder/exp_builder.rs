@@ -2440,7 +2440,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ))
                 .expect("unique field names");
                 let unpack_ = EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields);
-                let unpack = Spanned::new(lv.loc.clone(), unpack_);
+                let unpack = Spanned::new(lv.loc, unpack_);
                 self.translate_lvalue(
                     &unpack,
                     expected_type,
