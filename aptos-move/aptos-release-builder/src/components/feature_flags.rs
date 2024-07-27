@@ -123,6 +123,9 @@ pub enum FeatureFlag {
     AbortIfMultisigPayloadMismatch,
     DisallowUserNative,
     AllowSerializedScriptArgs,
+    UseCompatibilityCheckerV2,
+    EnableEnumTypes,
+    EnableResourceAccessControl,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -322,6 +325,13 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AllowSerializedScriptArgs => {
                 AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS
             },
+            FeatureFlag::UseCompatibilityCheckerV2 => {
+                AptosFeatureFlag::USE_COMPATIBILITY_CHECKER_V2
+            },
+            FeatureFlag::EnableEnumTypes => AptosFeatureFlag::ENABLE_ENUM_TYPES,
+            FeatureFlag::EnableResourceAccessControl => {
+                AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL
+            },
         }
     }
 }
@@ -449,6 +459,13 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DISALLOW_USER_NATIVES => FeatureFlag::DisallowUserNative,
             AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS => {
                 FeatureFlag::AllowSerializedScriptArgs
+            },
+            AptosFeatureFlag::USE_COMPATIBILITY_CHECKER_V2 => {
+                FeatureFlag::UseCompatibilityCheckerV2
+            },
+            AptosFeatureFlag::ENABLE_ENUM_TYPES => FeatureFlag::EnableEnumTypes,
+            AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL => {
+                FeatureFlag::EnableResourceAccessControl
             },
         }
     }

@@ -323,9 +323,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     })
                     .collect::<anyhow::Result<_>>()?,
             }),
-            StructFieldInformation::DeclaredVariants(..) => Err(anyhow!(
-                "Struct variants not yet supported by resource viewer"
-            )),
+            StructFieldInformation::DeclaredVariants(..) => {
+                Err(anyhow!("Enum types not yet supported by resource viewer"))
+            },
         }
     }
 
@@ -467,9 +467,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 .iter()
                 .map(|field_def| module.identifier_at(field_def.name).to_owned())
                 .collect()),
-            StructFieldInformation::DeclaredVariants(..) => Err(anyhow!(
-                "Struct variants not yet supported by resource viewer"
-            )),
+            StructFieldInformation::DeclaredVariants(..) => {
+                Err(anyhow!("Enum types not yet supported by resource viewer"))
+            },
         }
     }
 

@@ -995,7 +995,7 @@ impl StructRef {
         } else {
             Err(
                 PartialVMError::new(StatusCode::STRUCT_VARIANT_MISMATCH).with_message(format!(
-                    "expected struct variant {}, found `{}`",
+                    "expected enum variant {}, found `{}`",
                     allowed.iter().cloned().map(variant_to_str).join(" or "),
                     variant_to_str(tag)
                 )),
@@ -2540,7 +2540,7 @@ impl Struct {
         if fields.is_empty() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("invalid empty struct variant".to_string()),
+                    .with_message("invalid empty enum variant".to_string()),
             );
         }
         let mut values = fields.into_iter();
@@ -2551,7 +2551,7 @@ impl Struct {
         } else {
             Err(
                 PartialVMError::new(StatusCode::STRUCT_VARIANT_MISMATCH).with_message(format!(
-                    "expected struct variant {}, found {}",
+                    "expected enum variant {}, found {}",
                     variant_to_str(variant),
                     variant_to_str(tag)
                 )),

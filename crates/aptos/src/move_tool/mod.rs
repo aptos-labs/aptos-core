@@ -621,6 +621,7 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
+                &[],
             )
         })
         .await
@@ -673,6 +674,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
+            experiments: vec![],
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
