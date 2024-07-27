@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Identity, IdentityFromConfig, IdentitySource, IndexerGrpcConfig};
+use super::{
+    ConsensusObserverConfig, Identity, IdentityFromConfig, IdentitySource, IndexerGrpcConfig,
+};
 use crate::{
     config::{
         node_config_loader::NodeType, utils::get_config_name, AdminServiceConfig, Error,
@@ -105,6 +107,12 @@ impl ConfigOptimizer for NodeConfig {
 
         // Optimize only the relevant sub-configs
         let mut optimizers_with_modifications = vec![];
+        if AdminServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(AdminServiceConfig::get_optimizer_name());
+        }
+        if ConsensusObserverConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(ConsensusObserverConfig::get_optimizer_name());
+        }
         if ExecutionConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(ExecutionConfig::get_optimizer_name());
         }
@@ -113,9 +121,6 @@ impl ConfigOptimizer for NodeConfig {
         }
         if IndexerGrpcConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(IndexerGrpcConfig::get_optimizer_name());
-        }
-        if AdminServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
-            optimizers_with_modifications.push(AdminServiceConfig::get_optimizer_name());
         }
         if InspectionServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(InspectionServiceConfig::get_optimizer_name());

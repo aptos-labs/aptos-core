@@ -19,8 +19,10 @@ use aptos_storage_interface::{
 };
 use aptos_temppath::TempPath;
 use aptos_types::{
-    access_path::AccessPath, account_address::AccountAddress, nibble::nibble_path::NibblePath,
-    state_store::state_key::StateKeyTag,
+    account_address::AccountAddress,
+    account_config::{AccountResource, ChainIdResource, CoinInfoResource, CoinStoreResource},
+    nibble::nibble_path::NibblePath,
+    state_store::state_key::inner::StateKeyTag,
 };
 use arr_macro::arr;
 use proptest::{collection::hash_map, prelude::*};
@@ -56,7 +58,6 @@ fn put_value_set(
             None,
             &ledger_batch,
             &sharded_state_kv_batches,
-            &state_kv_metadata_batch,
             /*put_state_value_indices=*/ false,
             /*skip_usage=*/ false,
             /*last_checkpoint_index=*/ None,
@@ -114,7 +115,7 @@ fn test_empty_store() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let key = StateKey::raw(String::from("test_key").into_bytes());
+    let key = StateKey::raw(b"test_key");
     assert!(store
         .get_state_value_with_proof_by_version(&key, 0)
         .is_err());
@@ -125,9 +126,9 @@ fn test_state_store_reader_writer() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let key1 = StateKey::raw(String::from("test_key1").into_bytes());
-    let key2 = StateKey::raw(String::from("test_key2").into_bytes());
-    let key3 = StateKey::raw(String::from("test_key3").into_bytes());
+    let key1 = StateKey::raw(b"test_key1");
+    let key2 = StateKey::raw(b"test_key2");
+    let key3 = StateKey::raw(b"test_key3");
 
     let value1 = StateValue::from(String::from("test_val1").into_bytes());
     let value1_update = StateValue::from(String::from("test_val1_update").into_bytes());
@@ -193,13 +194,13 @@ fn test_get_values_by_key_prefix() {
     let store = &db.state_store;
     let address = AccountAddress::new([12u8; AccountAddress::LENGTH]);
 
-    let key1 = StateKey::access_path(AccessPath::new(address, b"state_key1".to_vec()));
-    let key2 = StateKey::access_path(AccessPath::new(address, b"state_key2".to_vec()));
+    let key1 = StateKey::resource_typed::<AccountResource>(&address).unwrap();
+    let key2 = StateKey::resource_typed::<ChainIdResource>(&address).unwrap();
 
     let value1_v0 = StateValue::from(String::from("value1_v0").into_bytes());
     let value2_v0 = StateValue::from(String::from("value2_v0").into_bytes());
 
-    let account_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address.to_vec());
+    let account_key_prefix = StateKeyPrefix::new(StateKeyTag::AccessPath, address.to_vec());
 
     put_value_set(
         store,
@@ -211,12 +212,12 @@ fn test_get_values_by_key_prefix() {
         None,
     );
 
-    let key_value_map = traverse_values(store, &account_key_prefx, 0);
+    let key_value_map = traverse_values(store, &account_key_prefix, 0);
     assert_eq!(key_value_map.len(), 2);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
 
-    let key4 = StateKey::access_path(AccessPath::new(address, b"state_key4".to_vec()));
+    let key4 = StateKey::resource_typed::<CoinInfoResource>(&address).unwrap();
 
     let value2_v1 = StateValue::from(String::from("value2_v1").into_bytes());
     let value4_v1 = StateValue::from(String::from("value4_v1").into_bytes());
@@ -232,13 +233,13 @@ fn test_get_values_by_key_prefix() {
     );
 
     // Ensure that we still get only values for key1 and key2 for version 0 after the update
-    let key_value_map = traverse_values(store, &account_key_prefx, 0);
+    let key_value_map = traverse_values(store, &account_key_prefix, 0);
     assert_eq!(key_value_map.len(), 2);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
 
     // Ensure that key value map for version 1 returns value for key1 at version 0.
-    let key_value_map = traverse_values(store, &account_key_prefx, 1);
+    let key_value_map = traverse_values(store, &account_key_prefix, 1);
     assert_eq!(key_value_map.len(), 3);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v1);
@@ -246,21 +247,21 @@ fn test_get_values_by_key_prefix() {
 
     // Add values for one more account and verify the state
     let address1 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
-    let key5 = StateKey::access_path(AccessPath::new(address1, b"state_key5".to_vec()));
+    let key5 = StateKey::resource_typed::<CoinStoreResource>(&address1).unwrap();
     let value5_v2 = StateValue::from(String::from("value5_v2").into_bytes());
 
-    let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
+    let account1_key_prefix = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
 
     put_value_set(store, vec![(key5.clone(), value5_v2.clone())], 2, Some(1));
 
     // address1 did not exist in version 0 and 1.
-    let key_value_map = traverse_values(store, &account1_key_prefx, 0);
+    let key_value_map = traverse_values(store, &account1_key_prefix, 0);
     assert_eq!(key_value_map.len(), 0);
 
-    let key_value_map = traverse_values(store, &account1_key_prefx, 1);
+    let key_value_map = traverse_values(store, &account1_key_prefix, 1);
     assert_eq!(key_value_map.len(), 0);
 
-    let key_value_map = traverse_values(store, &account1_key_prefx, 2);
+    let key_value_map = traverse_values(store, &account1_key_prefix, 2);
     assert_eq!(key_value_map.len(), 1);
     assert_eq!(*key_value_map.get(&key5).unwrap(), value5_v2);
 }
@@ -275,10 +276,7 @@ pub fn test_get_state_snapshot_before() {
     assert_eq!(store.get_state_snapshot_before(0).unwrap(), None,);
 
     // put in genesis
-    let kv = vec![(
-        StateKey::raw(b"key".to_vec()),
-        StateValue::from(b"value".to_vec()),
-    )];
+    let kv = vec![(StateKey::raw(b"key"), StateValue::from(b"value".to_vec()))];
     let hash = put_value_set(store, kv.clone(), 0, None);
     assert_eq!(store.get_state_snapshot_before(0).unwrap(), None);
     assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
@@ -355,7 +353,7 @@ proptest! {
         for i in 0..kvs.len() {
             let actual_values = db
                 .get_backup_handler()
-                .get_account_iter(i as Version)
+                .get_state_item_iter(i as Version, 0, usize::MAX)
                 .unwrap()
                 .collect::<Result<Vec<_>>>()
                 .unwrap();
@@ -489,7 +487,7 @@ proptest! {
         let mut restore =
             StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
 
-        let dummy_state_key = StateKey::raw(vec![]);
+        let dummy_state_key = StateKey::raw(&[]);
         let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], 0, None, None).unwrap();
         store2.state_merkle_db.commit(version, top_levels_batch, sharded_batches).unwrap();
         assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
@@ -532,7 +530,7 @@ proptest! {
             let last_version = next_version - 1;
             let snapshot = db
                 .get_backup_handler()
-                .get_account_iter(last_version)
+                .get_state_item_iter(last_version, 0, usize::MAX)
                 .unwrap()
                 .collect::<Result<Vec<_>>>()
                 .unwrap();

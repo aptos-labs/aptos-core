@@ -3,8 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::{
-    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
+    pipelined_block::{ExecutionSummary, PipelinedBlock},
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 pub use block_store::{sync_manager::BlockRetriever, BlockStore};
@@ -12,6 +15,7 @@ use std::{sync::Arc, time::Duration};
 
 mod block_store;
 mod block_tree;
+pub mod pending_blocks;
 pub mod tracing;
 
 pub trait BlockReader: Send + Sync {
@@ -46,14 +50,14 @@ pub trait BlockReader: Send + Sync {
     /// Return the quorum certificate with the highest round
     fn highest_quorum_cert(&self) -> Arc<QuorumCert>;
 
-    /// Return the quorum certificate that carries ledger info with the highest round
-    fn highest_ordered_cert(&self) -> Arc<QuorumCert>;
+    /// Return the wrapped ledger info that carries ledger info with the highest round
+    fn highest_ordered_cert(&self) -> Arc<WrappedLedgerInfo>;
 
     /// Return the highest timeout certificate if available.
     fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>>;
 
-    /// Return the highest commit decision quorum certificate.
-    fn highest_commit_cert(&self) -> Arc<QuorumCert>;
+    /// Return the highest commit decision wrapped ledger info.
+    fn highest_commit_cert(&self) -> Arc<WrappedLedgerInfo>;
 
     /// Return the combination of highest quorum cert, timeout cert and commit cert.
     fn sync_info(&self) -> SyncInfo;
@@ -63,4 +67,6 @@ pub trait BlockReader: Send + Sync {
 
     // Return time difference between last committed block and new proposal
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration;
+
+    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<ExecutionSummary>;
 }

@@ -60,6 +60,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
@@ -67,6 +68,7 @@ use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
     num::NonZeroUsize,
+    ops::DerefMut,
     path::{Path, PathBuf},
     process,
     sync::{
@@ -664,9 +666,14 @@ fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
         "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
         "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
         "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
-        "pfn_performance" => pfn_performance(duration, false, false, true),
-        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
-        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
+        "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
+        "pfn_performance_with_network_chaos" => {
+            pfn_performance(duration, false, true, false, 7, 1, false)
+        },
+        "pfn_performance_with_realistic_env" => {
+            pfn_performance(duration, true, true, false, 7, 1, false)
+        },
+        "pfn_spam_duplicates" => pfn_performance(duration, true, true, true, 7, 7, true),
         _ => return None, // The test name does not match a PFN test
     };
     Some(test)
@@ -822,7 +829,11 @@ fn optimize_for_maximum_throughput(
 ) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_txns_after_filtering = max_txns_per_block as u64;
+    config.consensus.max_sending_block_txns = config
+        .consensus
+        .max_sending_block_txns
+        .max(max_txns_per_block as u64);
     config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
@@ -1107,10 +1118,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (5500, 100, 0.3, 0.3, 0.8, 0.65),
-            (4500, 100, 0.3, 0.4, 1.0, 2.0),
-            (2000, 300, 0.3, 0.8, 0.8, 2.0),
-            (600, 500, 0.3, 0.3, 0.8, 2.0),
+            (7700, 100, 0.3, 0.5, 0.5, 0.5),
+            (7000, 100, 0.3, 0.5, 0.5, 0.5),
+            (2000, 300, 0.3, 1.0, 0.6, 1.0),
+            (3200, 500, 0.3, 1.5, 0.7, 0.7),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
@@ -1420,10 +1431,7 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 15000 })
                 .init_gas_price_multiplier(20),
-            // Additionally - we are not really gracefully handling overlaods,
-            // setting limits based on current reality, to make sure they
-            // don't regress, but something to investigate
-            inner_success_criteria: SuccessCriteria::new(3400),
+            inner_success_criteria: SuccessCriteria::new(7500),
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
@@ -1443,10 +1451,10 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_wait_for_catchup_s(180) // 3 minutes
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
-                    // Check that we don't use more than 18 CPU cores for 30% of the time.
-                    MetricsThreshold::new(18.0, 40),
-                    // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new_gb(5.0, 30),
+                    // Check that we don't use more than 24 CPU cores for 20% of the time.
+                    MetricsThreshold::new(24.0, 20),
+                    // Check that we don't use more than 7.5 GB of memory for more than 10% of the time.
+                    MetricsThreshold::new_gb(7.5, 10),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1944,15 +1952,60 @@ fn realistic_env_max_load_test(
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
 
+    // resource override for long_running tests
+    let resource_override = if long_running {
+        NodeResourceOverride {
+            storage_gib: Some(1000), // long running tests need more storage
+            ..NodeResourceOverride::default()
+        }
+    } else {
+        NodeResourceOverride::default() // no overrides
+    };
+
+    let mut success_criteria = SuccessCriteria::new(95)
+        .add_system_metrics_threshold(SystemMetricsThreshold::new(
+            // Check that we don't use more than 18 CPU cores for 15% of the time.
+            MetricsThreshold::new(18.0, 15),
+            // Memory starts around 3.5GB, and grows around 1.4GB/hr in this test.
+            // Check that we don't use more than final expected memory for more than 10% of the time.
+            MetricsThreshold::new_gb(3.5 + 1.4 * (duration_secs as f64 / 3600.0), 10),
+        ))
+        .add_no_restarts()
+        .add_wait_for_catchup_s(
+            // Give at least 60s for catchup, give 10% of the run for longer durations.
+            (duration.as_secs() / 10).max(60),
+        )
+        .add_latency_threshold(3.4, LatencyType::P50)
+        .add_latency_threshold(4.5, LatencyType::P90)
+        .add_chain_progress(StateProgressThreshold {
+            max_no_progress_secs: 15.0,
+            max_round_gap: 4,
+        });
+    if !ha_proxy {
+        success_criteria = success_criteria.add_latency_breakdown_threshold(
+            LatencyBreakdownThreshold::new_with_breach_pct(
+                vec![
+                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                    // quorum store backpressure is relaxed, so queueing happens here
+                    (LatencyBreakdownSlice::QsPosToProposal, 2.5),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.75),
+                ],
+                5,
+            ),
+        )
+    }
+
     // Create the test
+    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
-                })
+                .mode(EmitJobMode::MaxLoad { mempool_backlog })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
@@ -1984,38 +2037,9 @@ fn realistic_env_max_load_test(
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
-        .with_success_criteria(
-            SuccessCriteria::new(95)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(
-                    // Give at least 60s for catchup, give 10% of the run for longer durations.
-                    (duration.as_secs() / 10).max(60),
-                )
-                .add_latency_threshold(3.4, LatencyType::P50)
-                .add_latency_threshold(4.5, LatencyType::P90)
-                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
-                    vec![
-                        (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                        // only reaches close to threshold during epoch change
-                        (
-                            LatencyBreakdownSlice::QsPosToProposal,
-                            if ha_proxy { 0.7 } else { 0.6 },
-                        ),
-                        // can be adjusted down if less backpressure
-                        (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
-                        // can be adjusted down if less backpressure
-                        (
-                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
-                            if ha_proxy { 1.3 } else { 0.75 },
-                        ),
-                    ],
-                    5,
-                ))
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 15.0,
-                    max_round_gap: 4,
-                }),
-        )
+        .with_success_criteria(success_criteria)
+        .with_validator_resource_override(resource_override)
+        .with_fullnode_resource_override(resource_override)
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
@@ -2073,11 +2097,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                    config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
-                        sender_conflict_window_size: 256,
-                        module_conflict_window_size: 2,
-                        entry_fun_conflict_window_size: 3,
-                    };
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -2106,10 +2126,12 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_validator_resource_override(NodeResourceOverride {
                 cpu_cores: Some(58),
                 memory_gib: Some(200),
+                storage_gib: Some(500), // assuming we're using these large marchines for long-running or expensive tests which need more disk
             })
             .with_fullnode_resource_override(NodeResourceOverride {
                 cpu_cores: Some(58),
                 memory_gib: Some(200),
+                storage_gib: Some(500),
             })
             .with_success_criteria(
                 SuccessCriteria::new(25000)
@@ -2231,9 +2253,10 @@ pub fn changing_working_quorum_test_helper(
             } else {
                 for (i, item) in chain_health_backoff.iter_mut().enumerate() {
                     // as we have lower TPS, make limits smaller
-                    item.max_sending_block_txns_override =
+                    item.max_sending_block_txns_after_filtering_override =
                         (block_size / 2_u64.pow(i as u32 + 1)).max(2);
-                    min_block_txns = min_block_txns.min(item.max_sending_block_txns_override);
+                    min_block_txns =
+                        min_block_txns.min(item.max_sending_block_txns_after_filtering_override);
                     // as we have fewer nodes, make backoff triggered earlier:
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
@@ -2439,13 +2462,18 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+        .add_network_test(PFNPerformance::new(
+            7,
+            add_cpu_chaos,
+            add_network_emulation,
+            None,
+        ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(95)
+            SuccessCriteria::new(4500)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)
@@ -2475,20 +2503,40 @@ fn pfn_performance(
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     epoch_changes: bool,
+    num_validators: usize,
+    num_pfns: usize,
+    broadcast_to_all_vfns: bool,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
-    let min_expected_tps = 4500;
+    let min_expected_tps = if broadcast_to_all_vfns { 2500 } else { 4500 };
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
     } else {
         60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
     };
 
+    let config_override_fn = if broadcast_to_all_vfns {
+        let f: OverrideNodeConfigFn = Arc::new(move |pfn_config: &mut NodeConfig, _| {
+            pfn_config.mempool.default_failovers = num_validators;
+            for network in &mut pfn_config.full_node_networks {
+                network.max_outbound_connections = num_validators;
+            }
+        });
+        Some(f)
+    } else {
+        None
+    };
+
     // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .with_initial_fullnode_count(7)
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_validators)
+        .add_network_test(PFNPerformance::new(
+            num_pfns as u64,
+            add_cpu_chaos,
+            add_network_emulation,
+            config_override_fn,
+        ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
@@ -2629,18 +2677,19 @@ impl Test for RestartValidator {
     }
 }
 
+#[async_trait]
 impl NetworkTest for RestartValidator {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        let runtime = Runtime::new()?;
-        runtime.block_on(async {
-            let node = ctx.swarm().validators_mut().next().unwrap();
-            node.health_check().await.expect("node health check failed");
-            node.stop().await.unwrap();
-            println!("Restarting node {}", node.peer_id());
-            node.start().await.unwrap();
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            node.health_check().await.expect("node health check failed");
-        });
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let swarm = ctx.swarm.read().await;
+        let node = swarm.validators().next().unwrap();
+        node.health_check().await.expect("node health check failed");
+        node.stop().await.unwrap();
+        println!("Restarting node {}", node.peer_id());
+        node.start().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        node.health_check().await.expect("node health check failed");
         Ok(())
     }
 }
@@ -2654,17 +2703,23 @@ impl Test for EmitTransaction {
     }
 }
 
+#[async_trait]
 impl NetworkTest for EmitTransaction {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
         let duration = Duration::from_secs(10);
         let all_validators = ctx
-            .swarm()
+            .swarm
+            .read()
+            .await
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration).unwrap();
+        let stats = generate_traffic(ctx, &all_validators, duration)
+            .await
+            .unwrap();
         ctx.report.report_txn_stats(self.name().to_string(), &stats);
-
         Ok(())
     }
 }
@@ -2686,10 +2741,11 @@ impl Test for Delay {
     }
 }
 
+#[async_trait]
 impl NetworkTest for Delay {
-    fn run(&self, _ctx: &mut NetworkContext<'_>) -> Result<()> {
+    async fn run<'a>(&self, _ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         info!("forge sleep {}", self.seconds);
-        std::thread::sleep(Duration::from_secs(self.seconds));
+        tokio::time::sleep(Duration::from_secs(self.seconds)).await;
         Ok(())
     }
 }
@@ -2703,10 +2759,12 @@ impl Test for GatherMetrics {
     }
 }
 
+#[async_trait]
 impl NetworkTest for GatherMetrics {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        let runtime = ctx.runtime.handle();
-        runtime.block_on(gather_metrics_one(ctx));
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        gather_metrics_one(ctx).await;
         Ok(())
     }
 }
@@ -2718,14 +2776,17 @@ async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
     let now = chrono::prelude::Utc::now()
         .format("%Y%m%d_%H%M%S")
         .to_string();
-    for val in ctx.swarm.validators() {
-        let mut url = val.inspection_service_endpoint();
-        let valname = val.peer_id().to_string();
-        url.set_path("metrics");
-        let fname = format!("{}.{}.metrics", now, valname);
-        let outpath: PathBuf = outdir.join(fname);
-        let th = handle.spawn(gather_metrics_to_file(url, outpath));
-        gets.push(th);
+    {
+        let swarm = ctx.swarm.read().await;
+        for val in swarm.validators() {
+            let mut url = val.inspection_service_endpoint();
+            let valname = val.peer_id().to_string();
+            url.set_path("metrics");
+            let fname = format!("{}.{}.metrics", now, valname);
+            let outpath: PathBuf = outdir.join(fname);
+            let th = handle.spawn(gather_metrics_to_file(url, outpath));
+            gets.push(th);
+        }
     }
     // join all the join handles
     while !gets.is_empty() {

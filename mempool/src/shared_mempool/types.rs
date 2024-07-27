@@ -6,6 +6,7 @@
 use crate::{
     core_mempool::CoreMempool,
     network::{MempoolNetworkInterface, MempoolSyncMsg},
+    shared_mempool::use_case_history::UseCaseHistory,
 };
 use anyhow::Result;
 use aptos_config::{
@@ -50,6 +51,7 @@ pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub validator: Arc<RwLock<TransactionValidator>>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     pub broadcast_within_validator_network: Arc<RwLock<bool>>,
+    pub use_case_history: Arc<Mutex<UseCaseHistory>>,
 }
 
 impl<
@@ -67,6 +69,10 @@ impl<
         role: RoleType,
     ) -> Self {
         let network_interface = MempoolNetworkInterface::new(network_client, role, config.clone());
+        let use_case_history = UseCaseHistory::new(
+            config.usecase_stats_num_blocks_to_track,
+            config.usecase_stats_num_top_to_track,
+        );
         SharedMempool {
             mempool,
             config,
@@ -75,6 +81,7 @@ impl<
             validator,
             subscribers,
             broadcast_within_validator_network: Arc::new(RwLock::new(true)),
+            use_case_history: Arc::new(Mutex::new(use_case_history)),
         }
     }
 
@@ -167,8 +174,6 @@ pub enum QuorumStoreRequest {
         u64,
         // return non full
         bool,
-        // include gas upgraded
-        bool,
         // transactions to exclude from the requested batch
         BTreeMap<TransactionSummary, TransactionInProgress>,
         // callback to respond to
@@ -191,16 +196,14 @@ impl fmt::Display for QuorumStoreRequest {
                 max_txns,
                 max_bytes,
                 return_non_full,
-                include_gas_upgraded,
                 excluded_txns,
                 _,
             ) => {
                 format!(
-                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, include_gas_upgraded: {}, excluded_txns_length: {}]",
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, excluded_txns_length: {}]",
                     max_txns,
                     max_bytes,
                     return_non_full,
-                    include_gas_upgraded,
                     excluded_txns.len()
                 )
             },

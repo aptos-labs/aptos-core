@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   prover-inconsistency-test:
-    runs-on: high-perf-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     timeout-minutes: ${{ github.event_name == 'pull_request' && 10 || 480}}
     steps:
       - uses: actions/checkout@v3

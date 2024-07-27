@@ -34,6 +34,12 @@ impl<T: AsMoveValue> AsMoveValue for Vec<T> {
     }
 }
 
+impl AsMoveValue for bool {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Bool(*self)
+    }
+}
+
 impl AsMoveValue for u8 {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::U8(*self)

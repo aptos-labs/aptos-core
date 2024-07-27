@@ -9,9 +9,11 @@ use aptos_logger::{
     prelude::{sample, SampleRate},
     warn, Schema,
 };
-use hyper::Method;
 use once_cell::sync::Lazy;
-use poem::{http::header, Endpoint, Request, Response, Result};
+use poem::{
+    http::{header, Method},
+    Endpoint, Request, Response, Result,
+};
 use poem_openapi::OperationId;
 use regex::Regex;
 use std::time::Duration;
@@ -77,7 +79,7 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
     let operation_id = response
         .data::<OperationId>()
         .map(|operation_id| operation_id.0)
-        .unwrap_or(&log.path);
+        .unwrap_or("operation_id_not_set");
 
     // Log response status per-endpoint + method.
     HISTOGRAM

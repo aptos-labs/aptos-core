@@ -11,11 +11,12 @@ use move_binary_format::{
     control_flow_graph::ControlFlowGraph,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet, Bytecode, CodeOffset, FieldHandleIndex, FunctionDefinitionIndex,
-        FunctionHandle, LocalIndex, Signature, SignatureToken, SignatureToken as ST,
-        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
+        AbilitySet, Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, LocalIndex,
+        Signature, SignatureToken, SignatureToken as ST, StructDefinition, StructDefinitionIndex,
+        StructFieldInformation, StructHandleIndex, VariantIndex,
     },
     safe_unwrap,
+    views::FieldOrVariantIndex,
 };
 use move_core_types::vm_status::StatusCode;
 
@@ -131,7 +132,7 @@ fn borrow_field(
     meter: &mut impl Meter,
     offset: CodeOffset,
     mut_: bool,
-    field_handle_index: FieldHandleIndex,
+    field_handle_index: FieldOrVariantIndex,
     type_args: &Signature,
 ) -> PartialVMResult<()> {
     // load operand and check mutability constraints
@@ -143,34 +144,80 @@ fn borrow_field(
     // check the reference on the stack is the expected type.
     // Load the type that owns the field according to the instruction.
     // For generic fields access, this step materializes that type
-    let field_handle = verifier.resolver.field_handle_at(field_handle_index)?;
-    let struct_def = verifier.resolver.struct_def_at(field_handle.owner)?;
+    let (struct_def_index, variants, field_idx) = match field_handle_index {
+        FieldOrVariantIndex::FieldIndex(idx) => {
+            let field_handle = verifier.resolver.field_handle_at(idx)?;
+            (field_handle.owner, None, field_handle.field as usize)
+        },
+        FieldOrVariantIndex::VariantFieldIndex(idx) => {
+            let field_handle = verifier.resolver.variant_field_handle_at(idx)?;
+            (
+                field_handle.struct_index,
+                Some(field_handle.variants.clone()),
+                field_handle.field as usize,
+            )
+        },
+    };
+    let struct_def = verifier.resolver.struct_def_at(struct_def_index)?;
     let expected_type = materialize_type(struct_def.struct_handle, type_args);
     match operand {
         ST::Reference(inner) | ST::MutableReference(inner) if expected_type == *inner => (),
         _ => return Err(verifier.error(StatusCode::BORROWFIELD_TYPE_MISMATCH_ERROR, offset)),
     }
 
-    let field_def = match &struct_def.field_information {
-        StructFieldInformation::Native => {
-            return Err(verifier.error(StatusCode::BORROWFIELD_BAD_FIELD_ERROR, offset));
-        },
-        StructFieldInformation::Declared(fields) => {
-            // TODO: review the whole error story here, way too much is left to chances...
-            // definition of a more proper OM for the verifier could work around the problem
-            // (maybe, maybe not..)
-            &fields[field_handle.field as usize]
-        },
+    // Check and determine the type loaded onto the stack
+    let field_ty = if let Some(variants) = variants {
+        if variants.is_empty() {
+            // It is not allowed to have no variants provided here, otherwise we cannot
+            // determine the type.
+            return Err(verifier.error(StatusCode::ZERO_VARIANTS_ERROR, offset));
+        }
+        // For all provided variants, the field type must be the same.
+        let mut field_ty = None;
+        for variant in variants {
+            if let Some(field_def) = struct_def
+                .field_information
+                .fields(Some(variant))
+                .get(field_idx)
+            {
+                let ty = instantiate(&field_def.signature.0, type_args);
+                if let Some(field_ty) = &field_ty {
+                    // More than one field possible, compare types.
+                    if &ty != field_ty {
+                        return Err(
+                            verifier.error(StatusCode::BORROWFIELD_TYPE_MISMATCH_ERROR, offset)
+                        );
+                    }
+                } else {
+                    field_ty = Some(ty)
+                }
+            } else {
+                // If the struct variant has no field at this idx, this is an error
+                return Err(verifier.error(StatusCode::BORROWFIELD_BAD_FIELD_ERROR, offset));
+            }
+        }
+        field_ty
+    } else {
+        struct_def
+            .field_information
+            .fields(None)
+            .get(field_idx)
+            .map(|field_def| instantiate(&field_def.signature.0, type_args))
     };
-    let field_type = Box::new(instantiate(&field_def.signature.0, type_args));
-    verifier.push(
-        meter,
-        if mut_ {
-            ST::MutableReference(field_type)
-        } else {
-            ST::Reference(field_type)
-        },
-    )?;
+    if let Some(field_ty) = field_ty {
+        verifier.push(
+            meter,
+            if mut_ {
+                ST::MutableReference(Box::new(field_ty))
+            } else {
+                ST::Reference(Box::new(field_ty))
+            },
+        )?;
+    } else {
+        // If the field is not defined, we are reporting an error in `instruction_consistency`.
+        // Here push a dummy type to keep the abstract stack happy
+        verifier.push(meter, ST::Bool)?;
+    }
     Ok(())
 }
 
@@ -258,19 +305,30 @@ fn type_fields_signature(
     _meter: &mut impl Meter, // TODO: metering
     offset: CodeOffset,
     struct_def: &StructDefinition,
+    variant: Option<VariantIndex>,
     type_args: &Signature,
 ) -> PartialVMResult<Signature> {
-    match &struct_def.field_information {
-        StructFieldInformation::Native => {
+    match (&struct_def.field_information, variant) {
+        (StructFieldInformation::Declared(fields), None) => Ok(Signature(
+            fields
+                .iter()
+                .map(|field_def| instantiate(&field_def.signature.0, type_args))
+                .collect(),
+        )),
+        (StructFieldInformation::DeclaredVariants(variants), Some(variant))
+            if (variant as usize) < variants.len() =>
+        {
+            Ok(Signature(
+                variants[variant as usize]
+                    .fields
+                    .iter()
+                    .map(|field_def| instantiate(&field_def.signature.0, type_args))
+                    .collect(),
+            ))
+        },
+        _ => {
             // TODO: this is more of "unreachable"
             Err(verifier.error(StatusCode::PACK_TYPE_MISMATCH_ERROR, offset))
-        },
-        StructFieldInformation::Declared(fields) => {
-            let mut field_sig = vec![];
-            for field_def in fields.iter() {
-                field_sig.push(instantiate(&field_def.signature.0, type_args));
-            }
-            Ok(Signature(field_sig))
         },
     }
 }
@@ -280,10 +338,11 @@ fn pack(
     meter: &mut impl Meter,
     offset: CodeOffset,
     struct_def: &StructDefinition,
+    variant: Option<VariantIndex>,
     type_args: &Signature,
 ) -> PartialVMResult<()> {
     let struct_type = materialize_type(struct_def.struct_handle, type_args);
-    let field_sig = type_fields_signature(verifier, meter, offset, struct_def, type_args)?;
+    let field_sig = type_fields_signature(verifier, meter, offset, struct_def, variant, type_args)?;
     for sig in field_sig.0.iter().rev() {
         let arg = safe_unwrap!(verifier.stack.pop());
         if &arg != sig {
@@ -300,6 +359,7 @@ fn unpack(
     meter: &mut impl Meter,
     offset: CodeOffset,
     struct_def: &StructDefinition,
+    variant: Option<VariantIndex>,
     type_args: &Signature,
 ) -> PartialVMResult<()> {
     let struct_type = materialize_type(struct_def.struct_handle, type_args);
@@ -311,11 +371,27 @@ fn unpack(
         return Err(verifier.error(StatusCode::UNPACK_TYPE_MISMATCH_ERROR, offset));
     }
 
-    let field_sig = type_fields_signature(verifier, meter, offset, struct_def, type_args)?;
+    let field_sig = type_fields_signature(verifier, meter, offset, struct_def, variant, type_args)?;
     for sig in field_sig.0 {
         verifier.push(meter, sig)?
     }
     Ok(())
+}
+
+fn test_variant(
+    verifier: &mut TypeSafetyChecker,
+    meter: &mut impl Meter,
+    offset: CodeOffset,
+    struct_def: &StructDefinition,
+    type_args: &Signature,
+) -> PartialVMResult<()> {
+    let struct_type = materialize_type(struct_def.struct_handle, type_args);
+    let arg = safe_unwrap!(verifier.stack.pop());
+    match arg {
+        ST::Reference(inner) | ST::MutableReference(inner) if struct_type == *inner => (),
+        _ => return Err(verifier.error(StatusCode::TEST_VARIANT_TYPE_MISMATCH_ERROR, offset)),
+    }
+    verifier.push(meter, ST::Bool)
 }
 
 fn exists(
@@ -487,7 +563,7 @@ fn verify_instr(
             meter,
             offset,
             true,
-            *field_handle_index,
+            FieldOrVariantIndex::FieldIndex(*field_handle_index),
             &Signature(vec![]),
         )?,
 
@@ -497,7 +573,14 @@ fn verify_instr(
                 .field_instantiation_at(*field_inst_index)?;
             let type_inst = verifier.resolver.signature_at(field_inst.type_parameters);
             verifier.charge_tys(meter, &type_inst.0)?;
-            borrow_field(verifier, meter, offset, true, field_inst.handle, type_inst)?
+            borrow_field(
+                verifier,
+                meter,
+                offset,
+                true,
+                FieldOrVariantIndex::FieldIndex(field_inst.handle),
+                type_inst,
+            )?
         },
 
         Bytecode::ImmBorrowField(field_handle_index) => borrow_field(
@@ -505,7 +588,7 @@ fn verify_instr(
             meter,
             offset,
             false,
-            *field_handle_index,
+            FieldOrVariantIndex::FieldIndex(*field_handle_index),
             &Signature(vec![]),
         )?,
 
@@ -515,7 +598,64 @@ fn verify_instr(
                 .field_instantiation_at(*field_inst_index)?;
             let type_inst = verifier.resolver.signature_at(field_inst.type_parameters);
             verifier.charge_tys(meter, &type_inst.0)?;
-            borrow_field(verifier, meter, offset, false, field_inst.handle, type_inst)?
+            borrow_field(
+                verifier,
+                meter,
+                offset,
+                false,
+                FieldOrVariantIndex::FieldIndex(field_inst.handle),
+                type_inst,
+            )?
+        },
+
+        Bytecode::MutBorrowVariantField(field_handle_index) => borrow_field(
+            verifier,
+            meter,
+            offset,
+            true,
+            FieldOrVariantIndex::VariantFieldIndex(*field_handle_index),
+            &Signature(vec![]),
+        )?,
+
+        Bytecode::MutBorrowVariantFieldGeneric(field_inst_index) => {
+            let field_inst = verifier
+                .resolver
+                .variant_field_instantiation_at(*field_inst_index)?;
+            let type_inst = verifier.resolver.signature_at(field_inst.type_parameters);
+            verifier.charge_tys(meter, &type_inst.0)?;
+            borrow_field(
+                verifier,
+                meter,
+                offset,
+                true,
+                FieldOrVariantIndex::VariantFieldIndex(field_inst.handle),
+                type_inst,
+            )?
+        },
+
+        Bytecode::ImmBorrowVariantField(field_handle_index) => borrow_field(
+            verifier,
+            meter,
+            offset,
+            false,
+            FieldOrVariantIndex::VariantFieldIndex(*field_handle_index),
+            &Signature(vec![]),
+        )?,
+
+        Bytecode::ImmBorrowVariantFieldGeneric(field_inst_index) => {
+            let field_inst = verifier
+                .resolver
+                .variant_field_instantiation_at(*field_inst_index)?;
+            let type_inst = verifier.resolver.signature_at(field_inst.type_parameters);
+            verifier.charge_tys(meter, &type_inst.0)?;
+            borrow_field(
+                verifier,
+                meter,
+                offset,
+                false,
+                FieldOrVariantIndex::VariantFieldIndex(field_inst.handle),
+                type_inst,
+            )?
         },
 
         Bytecode::LdU8(_) => {
@@ -592,18 +732,17 @@ fn verify_instr(
                 meter,
                 offset,
                 struct_definition,
+                None,
                 &Signature(vec![]),
             )?
         },
-
         Bytecode::PackGeneric(idx) => {
             let struct_inst = verifier.resolver.struct_instantiation_at(*idx)?;
             let struct_def = verifier.resolver.struct_def_at(struct_inst.def)?;
             let type_args = verifier.resolver.signature_at(struct_inst.type_parameters);
             verifier.charge_tys(meter, &type_args.0)?;
-            pack(verifier, meter, offset, struct_def, type_args)?
+            pack(verifier, meter, offset, struct_def, None, type_args)?
         },
-
         Bytecode::Unpack(idx) => {
             let struct_definition = verifier.resolver.struct_def_at(*idx)?;
             unpack(
@@ -611,16 +750,84 @@ fn verify_instr(
                 meter,
                 offset,
                 struct_definition,
+                None,
                 &Signature(vec![]),
             )?
         },
-
         Bytecode::UnpackGeneric(idx) => {
             let struct_inst = verifier.resolver.struct_instantiation_at(*idx)?;
             let struct_def = verifier.resolver.struct_def_at(struct_inst.def)?;
             let type_args = verifier.resolver.signature_at(struct_inst.type_parameters);
             verifier.charge_tys(meter, &type_args.0)?;
-            unpack(verifier, meter, offset, struct_def, type_args)?
+            unpack(verifier, meter, offset, struct_def, None, type_args)?
+        },
+
+        Bytecode::PackVariant(idx) => {
+            let handle = verifier.resolver.struct_variant_handle_at(*idx)?;
+            let struct_definition = verifier.resolver.struct_def_at(handle.struct_index)?;
+            pack(
+                verifier,
+                meter,
+                offset,
+                struct_definition,
+                Some(handle.variant),
+                &Signature(vec![]),
+            )?
+        },
+        Bytecode::PackVariantGeneric(idx) => {
+            let inst = verifier.resolver.struct_variant_instantiation_at(*idx)?;
+            let handle = verifier.resolver.struct_variant_handle_at(inst.handle)?;
+            let struct_def = verifier.resolver.struct_def_at(handle.struct_index)?;
+            let type_args = verifier.resolver.signature_at(inst.type_parameters);
+            verifier.charge_tys(meter, &type_args.0)?;
+            pack(
+                verifier,
+                meter,
+                offset,
+                struct_def,
+                Some(handle.variant),
+                type_args,
+            )?
+        },
+        Bytecode::UnpackVariant(idx) => {
+            let handle = verifier.resolver.struct_variant_handle_at(*idx)?;
+            let struct_definition = verifier.resolver.struct_def_at(handle.struct_index)?;
+            unpack(
+                verifier,
+                meter,
+                offset,
+                struct_definition,
+                Some(handle.variant),
+                &Signature(vec![]),
+            )?
+        },
+        Bytecode::UnpackVariantGeneric(idx) => {
+            let inst = verifier.resolver.struct_variant_instantiation_at(*idx)?;
+            let handle = verifier.resolver.struct_variant_handle_at(inst.handle)?;
+            let struct_def = verifier.resolver.struct_def_at(handle.struct_index)?;
+            let type_args = verifier.resolver.signature_at(inst.type_parameters);
+            verifier.charge_tys(meter, &type_args.0)?;
+            unpack(
+                verifier,
+                meter,
+                offset,
+                struct_def,
+                Some(handle.variant),
+                type_args,
+            )?
+        },
+
+        Bytecode::TestVariant(idx) => {
+            let handle = verifier.resolver.struct_variant_handle_at(*idx)?;
+            let struct_def = verifier.resolver.struct_def_at(handle.struct_index)?;
+            test_variant(verifier, meter, offset, struct_def, &Signature(vec![]))?
+        },
+        Bytecode::TestVariantGeneric(idx) => {
+            let inst = verifier.resolver.struct_variant_instantiation_at(*idx)?;
+            let handle = verifier.resolver.struct_variant_handle_at(inst.handle)?;
+            let struct_def = verifier.resolver.struct_def_at(handle.struct_index)?;
+            let type_args = verifier.resolver.signature_at(inst.type_parameters);
+            test_variant(verifier, meter, offset, struct_def, type_args)?
         },
 
         Bytecode::ReadRef => {

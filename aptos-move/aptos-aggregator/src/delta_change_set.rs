@@ -476,7 +476,7 @@ mod test {
         assert_eq!(b.update, Negative(1));
     }
 
-    static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(String::from("test-key").into_bytes()));
+    static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(b"test-key"));
 
     #[test]
     fn test_failed_write_op_conversion_because_of_empty_storage() {
@@ -512,10 +512,6 @@ mod test {
         type Identifier = ();
         type ResourceGroupTag = ();
         type ResourceKey = ();
-
-        fn is_delayed_field_optimization_capable(&self) -> bool {
-            unimplemented!("Irrelevant for the test")
-        }
 
         fn get_delayed_field_value(
             &self,

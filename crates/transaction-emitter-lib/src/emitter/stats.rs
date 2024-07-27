@@ -17,23 +17,23 @@ pub struct TxnStats {
     pub committed: u64,
     pub expired: u64,
     pub failed_submission: u64,
-    pub latency: u64,
-    pub latency_samples: u64,
-    pub latency_buckets: AtomicHistogramSnapshot,
+    pub latency: u64,         // total milliseconds across all latency measurements
+    pub latency_samples: u64, // number of events with latency measured
+    pub latency_buckets: AtomicHistogramSnapshot, // millisecond snapshot buckets
     pub lasted: Duration,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct TxnStatsRate {
-    pub submitted: u64,
-    pub committed: u64,
-    pub expired: u64,
-    pub failed_submission: u64,
-    pub latency: u64,
-    pub latency_samples: u64,
-    pub p50_latency: u64,
-    pub p90_latency: u64,
-    pub p99_latency: u64,
+    pub submitted: f64,         // per second
+    pub committed: f64,         // per second
+    pub expired: f64,           // per second
+    pub failed_submission: f64, // per second
+    pub latency: f64,           // mean latency (milliseconds)
+    pub latency_samples: u64,   // number latency-measured events
+    pub p50_latency: u64,       // milliseconds, 50% this or better
+    pub p90_latency: u64,       // milliseconds, 90% this or better
+    pub p99_latency: u64,       // milliseconds, 99% this or better
 }
 
 impl fmt::Display for TxnStatsRate {
@@ -43,8 +43,8 @@ impl fmt::Display for TxnStatsRate {
             "committed: {} txn/s{}{}{}, latency: {} ms, (p50: {} ms, p90: {} ms, p99: {} ms), latency samples: {}",
             self.committed,
             if self.submitted != self.committed { format!(", submitted: {} txn/s", self.submitted) } else { "".to_string()},
-            if self.failed_submission != 0 { format!(", failed submission: {} txn/s", self.failed_submission) } else { "".to_string()},
-            if self.expired != 0 { format!(", expired: {} txn/s", self.expired) } else { "".to_string()},
+            if self.failed_submission != 0.0 { format!(", failed submission: {} txn/s", self.failed_submission) } else { "".to_string()},
+            if self.expired != 0.0 { format!(", expired: {} txn/s", self.expired) } else { "".to_string()},
             self.latency, self.p50_latency, self.p90_latency, self.p99_latency, self.latency_samples,
         )
     }
@@ -52,19 +52,16 @@ impl fmt::Display for TxnStatsRate {
 
 impl TxnStats {
     pub fn rate(&self) -> TxnStatsRate {
-        let mut window_secs = self.lasted.as_secs();
-        if window_secs < 1 {
-            window_secs = 1;
-        }
+        let window_secs = self.lasted.as_secs_f64();
         TxnStatsRate {
-            submitted: self.submitted / window_secs,
-            committed: self.committed / window_secs,
-            expired: self.expired / window_secs,
-            failed_submission: self.failed_submission / window_secs,
+            submitted: (self.submitted as f64) / window_secs,
+            committed: (self.committed as f64) / window_secs,
+            expired: (self.expired as f64) / window_secs,
+            failed_submission: (self.failed_submission as f64) / window_secs,
             latency: if self.latency_samples == 0 {
-                0u64
+                0.0
             } else {
-                self.latency / self.latency_samples
+                (self.latency as f64) / (self.latency_samples as f64)
             },
             latency_samples: self.latency_samples,
             p50_latency: self.latency_buckets.percentile(50, 100),
@@ -124,9 +121,9 @@ pub struct StatsAccumulator {
     pub committed: AtomicU64,
     pub expired: AtomicU64,
     pub failed_submission: AtomicU64,
-    pub latency: AtomicU64,
-    pub latency_samples: AtomicU64,
-    pub latencies: Arc<AtomicHistogramAccumulator>,
+    pub latency: AtomicU64, // total milliseconds across all latency measurements
+    pub latency_samples: AtomicU64, // number of events with latency measured
+    pub latencies: Arc<AtomicHistogramAccumulator>, // millisecond histogram buckets
 }
 
 impl StatsAccumulator {

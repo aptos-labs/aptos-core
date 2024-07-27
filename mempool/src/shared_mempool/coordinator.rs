@@ -8,17 +8,19 @@ use crate::{
     core_mempool::{CoreMempool, TimelineState},
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
-    network::MempoolSyncMsg,
+    network::{BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{
-        tasks,
-        tasks::process_committed_transactions,
-        types::{notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification},
+        tasks::{self, process_committed_transactions},
+        types::{
+            notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
+            SharedMempoolNotification,
+        },
+        use_case_history::UseCaseHistory,
     },
     MempoolEventsReceiver, QuorumStoreRequest,
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_consensus_types::common::TransactionSummary;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -30,7 +32,11 @@ use aptos_network::{
     },
     protocols::network::Event,
 };
-use aptos_types::on_chain_config::{OnChainConfigPayload, OnChainConfigProvider};
+use aptos_types::{
+    on_chain_config::{OnChainConfigPayload, OnChainConfigProvider},
+    transaction::SignedTransaction,
+    PeerId,
+};
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
@@ -135,10 +141,16 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
 {
     let mempool = smp.mempool.clone();
     let mempool_validator = smp.validator.clone();
+    let use_case_history = smp.use_case_history.clone();
 
     tokio::spawn(async move {
         while let Some(commit_notification) = mempool_listener.next().await {
-            handle_commit_notification(&mempool, &mempool_validator, commit_notification);
+            handle_commit_notification(
+                &mempool,
+                &mempool_validator,
+                &use_case_history,
+                commit_notification,
+            );
         }
     });
 }
@@ -203,6 +215,7 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
 fn handle_commit_notification<TransactionValidator>(
     mempool: &Arc<Mutex<CoreMempool>>,
     mempool_validator: &Arc<RwLock<TransactionValidator>>,
+    use_case_history: &Arc<Mutex<UseCaseHistory>>,
     msg: MempoolCommitNotification,
 ) where
     TransactionValidator: TransactionValidation,
@@ -221,13 +234,8 @@ fn handle_commit_notification<TransactionValidator>(
     );
     process_committed_transactions(
         mempool,
-        msg.transactions
-            .iter()
-            .map(|txn| TransactionSummary {
-                sender: txn.sender,
-                sequence_number: txn.sequence_number,
-            })
-            .collect(),
+        use_case_history,
+        msg.transactions,
         msg.block_timestamp_usecs,
     );
     mempool_validator.write().notify_commit();
@@ -265,6 +273,53 @@ async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator, Conf
         .await;
 }
 
+async fn process_received_txns<NetworkClient, TransactionValidator>(
+    bounded_executor: &BoundedExecutor,
+    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
+    network_id: NetworkId,
+    request_id: MultiBatchId,
+    transactions: Vec<(SignedTransaction, Option<u64>)>,
+    peer_id: PeerId,
+    priority: BroadcastPeerPriority,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    TransactionValidator: TransactionValidation + 'static,
+{
+    let smp_clone = smp.clone();
+    let peer = PeerNetworkId::new(network_id, peer_id);
+    let ineligible_for_broadcast = (smp.network_interface.is_validator()
+        && !smp.broadcast_within_validator_network())
+        || smp.network_interface.is_upstream_peer(&peer, None);
+    let timeline_state = if ineligible_for_broadcast {
+        TimelineState::NonQualified
+    } else {
+        TimelineState::NotReady
+    };
+    // This timer measures how long it took for the bounded executor to
+    // *schedule* the task.
+    let _timer = counters::task_spawn_latency_timer(
+        counters::PEER_BROADCAST_EVENT_LABEL,
+        counters::SPAWN_LABEL,
+    );
+    // This timer measures how long it took for the task to go from scheduled
+    // to started.
+    let task_start_timer = counters::task_spawn_latency_timer(
+        counters::PEER_BROADCAST_EVENT_LABEL,
+        counters::START_LABEL,
+    );
+    bounded_executor
+        .spawn(tasks::process_transaction_broadcast(
+            smp_clone,
+            transactions,
+            request_id,
+            timeline_state,
+            peer,
+            task_start_timer,
+            priority,
+        ))
+        .await;
+}
+
 /// Handles all network messages.
 /// - Network messages follow a simple Request/Response framework to accept new transactions
 /// TODO: Move to RPC off of DirectSend
@@ -285,38 +340,32 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                     request_id,
                     transactions,
                 } => {
-                    let smp_clone = smp.clone();
-                    let peer = PeerNetworkId::new(network_id, peer_id);
-                    let ineligible_for_broadcast = (smp.network_interface.is_validator()
-                        && !smp.broadcast_within_validator_network())
-                        || smp.network_interface.is_upstream_peer(&peer, None);
-                    let timeline_state = if ineligible_for_broadcast {
-                        TimelineState::NonQualified
-                    } else {
-                        TimelineState::NotReady
-                    };
-                    // This timer measures how long it took for the bounded executor to
-                    // *schedule* the task.
-                    let _timer = counters::task_spawn_latency_timer(
-                        counters::PEER_BROADCAST_EVENT_LABEL,
-                        counters::SPAWN_LABEL,
-                    );
-                    // This timer measures how long it took for the task to go from scheduled
-                    // to started.
-                    let task_start_timer = counters::task_spawn_latency_timer(
-                        counters::PEER_BROADCAST_EVENT_LABEL,
-                        counters::START_LABEL,
-                    );
-                    bounded_executor
-                        .spawn(tasks::process_transaction_broadcast(
-                            smp_clone,
-                            transactions,
-                            request_id,
-                            timeline_state,
-                            peer,
-                            task_start_timer,
-                        ))
-                        .await;
+                    process_received_txns(
+                        bounded_executor,
+                        smp,
+                        network_id,
+                        request_id,
+                        transactions.into_iter().map(|t| (t, None)).collect(),
+                        peer_id,
+                        BroadcastPeerPriority::Primary,
+                    )
+                    .await;
+                },
+                MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
+                    request_id,
+                    transactions,
+                    priority,
+                } => {
+                    process_received_txns(
+                        bounded_executor,
+                        smp,
+                        network_id,
+                        request_id,
+                        transactions.into_iter().map(|t| (t.0, Some(t.1))).collect(),
+                        peer_id,
+                        priority,
+                    )
+                    .await;
                 },
                 MempoolSyncMsg::BroadcastTransactionsResponse {
                     request_id,

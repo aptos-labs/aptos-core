@@ -29,6 +29,9 @@ ingress:
   gce_security_policy:
   # -- Enable HTTP/2 on the backends shards
   backend_http2: false
+  # -- The maximum number of seconds that a PFN is allowed to be behind
+  # to be considered healthy and be allowed to serve traffic
+  health_check_duration_secs:
 
 load_test:
   # -- Whether to enable the load test CronJob

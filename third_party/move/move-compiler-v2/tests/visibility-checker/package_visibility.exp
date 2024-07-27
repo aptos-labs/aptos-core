@@ -1,0 +1,33 @@
+// -- Model dump before bytecode pipeline
+module 0x42::A {
+    friend fun bar() {
+        Tuple()
+    }
+    private fun foo() {
+        Tuple()
+    }
+} // end 0x42::A
+module 0x42::B {
+    use 0x42::A; // resolved as: 0x42::A
+    public fun bar() {
+        A::bar()
+    }
+    friend fun foo() {
+        A::bar()
+    }
+    private fun baz() {
+        A::bar()
+    }
+} // end 0x42::B
+module 0x42::C {
+    use 0x42::B; // resolved as: 0x42::B
+    public fun bar() {
+        B::foo()
+    }
+    friend fun foo() {
+        B::foo()
+    }
+    private fun baz() {
+        B::foo()
+    }
+} // end 0x42::C

@@ -106,7 +106,7 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
         } = TestExecutor::new();
         execute_and_commit_chunks(chunks, ledger_info.clone(), &db, &executor);
 
-        let ledger_version = db.reader.get_latest_version().unwrap();
+        let ledger_version = db.reader.get_synced_version().unwrap();
         let output1 = db
             .reader
             .get_transaction_outputs(first_batch_start, first_batch_size, ledger_version)

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::fund_account;
+use super::utils::{explorer_transaction_link, fund_account};
 use crate::{
     common::{
         init::Network,
@@ -19,6 +19,7 @@ use crate::{
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
 use anyhow::Context;
+use aptos_api_types::ViewFunction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     encoding_type::{EncodingError, EncodingType},
@@ -52,6 +53,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -230,6 +232,7 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
+    /// Name of network being used, if setup from aptos init
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
@@ -1047,6 +1050,10 @@ pub struct MovePackageDir {
     #[clap(long, value_parser = crate::common::utils::parse_map::<String, AccountAddressWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 
+    /// Override the standard library version by mainnet/testnet/devnet
+    #[clap(long, value_parser)]
+    pub override_std: Option<StdVersion>,
+
     /// Skip pulling the latest git dependencies
     ///
     /// If you don't have a network connection, the compiler may fail due
@@ -1060,15 +1067,13 @@ pub struct MovePackageDir {
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
-    ///
-    /// Currently hidden until the official launch of Compiler V2
-    #[clap(long, hide = true, value_parser = clap::value_parser!(CompilerVersion))]
+    /// Currently, default to `v1`
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Specify the language version to be supported.
-    ///
-    /// Currently hidden until the official launch of Compiler V2
-    #[clap(long, hide = true, value_parser = clap::value_parser!(LanguageVersion))]
+    /// Currently, default to `v1`
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
 
     /// Do not complain about unknown attributes in Move code.
@@ -1089,6 +1094,7 @@ impl MovePackageDir {
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
+            override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
@@ -1347,17 +1353,29 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
             },
-            Transaction::ValidatorTransaction(txn) => TransactionSummary {
+            Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
+            Transaction::ValidatorTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.transaction_info().hash,
                 gas_used: None,
                 gas_unit_price: None,
                 pending: None,
                 sender: None,
                 sequence_number: None,
-                success: Some(txn.info.success),
-                timestamp_us: Some(txn.timestamp.0),
-                version: Some(txn.info.version.0),
-                vm_status: Some(txn.info.vm_status.clone()),
+                success: Some(txn.transaction_info().success),
+                timestamp_us: Some(txn.timestamp().0),
+                version: Some(txn.transaction_info().version.0),
+                vm_status: Some(txn.transaction_info().vm_status.clone()),
             },
         }
     }
@@ -1595,9 +1613,12 @@ impl TransactionOptions {
         get_sequence_number(&client, sender_address).await
     }
 
-    pub async fn view(&self, payload: ViewRequest) -> CliTypedResult<Vec<serde_json::Value>> {
+    pub async fn view(&self, payload: ViewFunction) -> CliTypedResult<Vec<serde_json::Value>> {
         let client = self.rest_client()?;
-        Ok(client.view(&payload, None).await?.into_inner())
+        Ok(client
+            .view_bcs_with_json_response(&payload, None)
+            .await?
+            .into_inner())
     }
 
     /// Submit a transaction
@@ -1696,25 +1717,19 @@ impl TransactionOptions {
             adjusted_max_gas
         };
 
-        // Sign and submit transaction
+        // Build a transaction
         let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
             .with_transaction_expiration_time(self.gas_options.expiration_secs);
 
-        match self.get_transaction_account_type() {
+        // Sign it with the appropriate signer
+        let transaction = match self.get_transaction_account_type() {
             Ok(AccountType::Local) => {
                 let (private_key, _) = self.get_key_and_address()?;
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
-                let transaction = sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload));
-                let response = client
-                    .submit_and_wait(&transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-                Ok(response.into_inner())
+                sender_account.sign_with_transaction_builder(transaction_factory.payload(payload))
             },
             Ok(AccountType::HardwareWallet) => {
                 let sender_account = &mut HardwareWalletAccount::new(
@@ -1727,17 +1742,33 @@ impl TransactionOptions {
                     HardwareWalletType::Ledger,
                     sequence_number,
                 );
-                let transaction = sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload))?;
-                let response = client
-                    .submit_and_wait(&transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-                Ok(response.into_inner())
+                sender_account
+                    .sign_with_transaction_builder(transaction_factory.payload(payload))?
             },
-            Err(err) => Err(err),
-        }
+            Err(err) => return Err(err),
+        };
+
+        // Submit the transaction, printing out a useful transaction link
+        client
+            .submit_bcs(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+        let transaction_hash = transaction.clone().committed_hash();
+        let network = self
+            .profile_options
+            .profile()
+            .ok()
+            .and_then(|profile| profile.network);
+        eprintln!(
+            "Transaction submitted: {}",
+            explorer_transaction_link(transaction_hash, network)
+        );
+        let response = client
+            .wait_for_signed_transaction(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+        Ok(response.into_inner())
     }
 
     /// Simulates a transaction locally, using the debugger to fetch required data from remote.
@@ -1792,7 +1823,7 @@ impl TransactionOptions {
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-        let hash = transaction.clone().committed_hash();
+        let hash = transaction.committed_hash();
 
         let debugger = AptosDebugger::rest_client(client).unwrap();
         let (vm_status, vm_output) = execute(&debugger, version, transaction, hash)?;
@@ -2059,6 +2090,21 @@ impl TryInto<EntryFunction> for EntryFunctionArguments {
             entry_function_args.type_arg_vec.try_into()?,
             entry_function_args.arg_vec.try_into()?,
         ))
+    }
+}
+
+impl TryInto<ViewFunction> for EntryFunctionArguments {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<ViewFunction, Self::Error> {
+        let view_function_args = self.check_input_style()?;
+        let function_id: MemberId = (&view_function_args).try_into()?;
+        Ok(ViewFunction {
+            module: function_id.module_id,
+            function: function_id.member_id,
+            ty_args: view_function_args.type_arg_vec.try_into()?,
+            args: view_function_args.arg_vec.try_into()?,
+        })
     }
 }
 

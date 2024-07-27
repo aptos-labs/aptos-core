@@ -15,16 +15,16 @@ move-prover-boogie-backend = { path = "../boogie-backend" }
 move-prover-bytecode-pipeline = { path = "../bytecode-pipeline" }
 
 # FB external dependencies
-z3tracer = "0.8.0"
+z3tracer = { workspace = true }
 
 # external dependencies
-anyhow = "1.0.52"
-chrono = "0.4.19"
-clap = { version = "4.3.9", features = ["derive"] }
-codespan-reporting = "0.11.1"
-itertools = "0.10.0"
-log = { version = "0.4.14", features = ["serde"] }
-plotters = { version = "0.3.5", default_features = false, features = [
+anyhow = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+codespan-reporting = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true, features = ["serde"] }
+plotters = { workspace = true, features = [
     "evcxr",
     "line_series",
     "histogram",

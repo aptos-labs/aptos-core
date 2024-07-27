@@ -4,12 +4,9 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_types::{
-    access_path::AccessPath,
-    state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, TStateView,
-    },
+use aptos_types::state_store::{
+    errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+    state_value::StateValue, TStateView,
 };
 use bytes::Bytes;
 use move_core_types::language_storage::ModuleId;
@@ -30,10 +27,8 @@ impl GenesisStateView {
     }
 
     pub(crate) fn add_module(&mut self, module_id: &ModuleId, blob: &[u8]) {
-        self.state_data.insert(
-            StateKey::access_path(AccessPath::from(module_id)),
-            blob.to_vec(),
-        );
+        self.state_data
+            .insert(StateKey::module_id(module_id), blob.to_vec());
     }
 }
 

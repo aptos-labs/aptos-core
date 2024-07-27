@@ -70,14 +70,15 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             lifetime_guard,
         } = req;
 
-        if ordered_blocks.is_empty() {
-            return ExecutionWaitRequest {
-                block_id: HashValue::zero(),
-                fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
-            };
-        }
-
-        let block_id = ordered_blocks.last().unwrap().id();
+        let block_id = match ordered_blocks.last() {
+            Some(block) => block.id(),
+            None => {
+                return ExecutionWaitRequest {
+                    block_id: HashValue::zero(),
+                    fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
+                }
+            },
+        };
 
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.
@@ -107,8 +108,12 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             for block in ordered_blocks {
                 debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 if let Some((_, fut)) = execution_futures.remove(&block.id()) {
-                    let PipelineExecutionResult { input_txns, result } = fut.await?;
-                    results.push(block.set_execution_result(input_txns, result));
+                    let PipelineExecutionResult {
+                    input_txns,
+                    result,
+                    execution_time,
+                } = fut.await?;
+                    results.push(block.set_execution_result(input_txns, result, execution_time));
                 } else {
                     return Err(ExecutorError::internal_err(format!(
                         "Failed to find compute result for block {}",

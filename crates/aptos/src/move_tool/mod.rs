@@ -50,7 +50,10 @@ use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
-use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
+use move_package::{
+    source_package::{layout::SourcePackageLayout, std_lib::StdVersion},
+    BuildConfig, CompilerConfig,
+};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
@@ -73,7 +76,11 @@ pub mod package_hooks;
 mod show;
 pub mod stored_package;
 
-/// Tool for Move related operations
+const HELLO_BLOCKCHAIN_EXAMPLE: &str = include_str!(
+    "../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain.move"
+);
+
+/// Tool for Move smart contract related operations
 ///
 /// This tool lets you compile, test, and publish Move code, in addition
 /// to run any other tools that help run, verify, or provide information
@@ -82,7 +89,9 @@ pub mod stored_package;
 pub enum MoveTool {
     BuildPublishPayload(BuildPublishPayload),
     Clean(CleanPackage),
+    #[clap(alias = "build")]
     Compile(CompilePackage),
+    #[clap(alias = "build-script")]
     CompileScript(CompileScript),
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
@@ -91,11 +100,13 @@ pub enum MoveTool {
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
     Disassemble(Disassemble),
     Decompile(Decompile),
+    #[clap(alias = "doc")]
     Document(DocumentPackage),
     Download(DownloadPackage),
     Init(InitPackage),
     List(ListPackage),
     Prove(ProvePackage),
+    #[clap(alias = "deploy")]
     Publish(PublishPackage),
     Run(RunFunction),
     RunScript(RunScript),
@@ -241,6 +252,11 @@ impl FrameworkPackageArgs {
     }
 }
 
+#[derive(ValueEnum, Clone, Copy, Debug)]
+pub enum Template {
+    HelloBlockchain,
+}
+
 /// Creates a new Move package at the given location
 ///
 /// This will create a directory for a Move package and a corresponding
@@ -269,6 +285,10 @@ pub struct InitPackage {
     )]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
+    /// Template name for initialization
+    #[clap(long)]
+    pub(crate) template: Option<Template>,
+
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 
@@ -284,18 +304,48 @@ impl CliCommand<()> for InitPackage {
 
     async fn execute(self) -> CliTypedResult<()> {
         let package_dir = dir_default_to_current(self.package_dir.clone())?;
-        let addresses = self
+        let mut addresses: BTreeMap<String, ManifestNamedAddress> = self
             .named_addresses
             .into_iter()
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
 
-        self.framework_package_args.init_move_dir(
-            package_dir.as_path(),
-            &self.name,
-            addresses,
-            self.prompt_options,
-        )
+        // Add in any template associated
+        match self.template {
+            None => {
+                // Initialize move directory
+                // TODO: Communicate this breaking change before filling in the template as default
+                let package_dir_path = package_dir.as_path();
+                self.framework_package_args.init_move_dir(
+                    package_dir_path,
+                    &self.name,
+                    addresses,
+                    self.prompt_options,
+                )
+            },
+            Some(Template::HelloBlockchain) => {
+                // Setup the Hello blockchain template
+                // Note: We have to override the addresses
+                addresses.insert("hello_blockchain".to_string(), None.into());
+
+                // Initialize move directory
+                let package_dir_path = package_dir.as_path();
+                self.framework_package_args.init_move_dir(
+                    package_dir_path,
+                    "HelloBlockchainExample",
+                    addresses,
+                    self.prompt_options,
+                )?;
+
+                write_to_file(
+                    package_dir_path
+                        .join("sources/hello_blockchain.move")
+                        .as_path(),
+                    "hello_blockchain.move",
+                    HELLO_BLOCKCHAIN_EXAMPLE.as_bytes(),
+                )
+            },
+        }
     }
 }
 
@@ -331,6 +381,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.dev,
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
+                    self.move_options.override_std.clone(),
                     self.move_options.bytecode_version,
                     self.move_options.compiler_version,
                     self.move_options.language_version,
@@ -394,6 +445,7 @@ impl CompileScript {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
+                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -483,6 +535,7 @@ impl CliCommand<&'static str> for TestPackage {
                 known_attributes: known_attributes.clone(),
                 skip_attribute_checks: self.move_options.skip_attribute_checks,
                 compiler_version: self.move_options.compiler_version,
+                language_version: self.move_options.language_version,
                 ..Default::default()
             },
             ..Default::default()
@@ -611,6 +664,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             with_docs: true,
             install_dir: None,
             named_addresses: move_options.named_addresses(),
+            override_std: move_options.override_std.clone(),
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
             bytecode_version: move_options.bytecode_version,
@@ -682,6 +736,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
+                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -753,6 +808,7 @@ impl IncludedArtifacts {
         dev: bool,
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
+        override_std: Option<StdVersion>,
         bytecode_version: Option<u32>,
         compiler_version: Option<CompilerVersion>,
         language_version: Option<LanguageVersion>,
@@ -769,6 +825,7 @@ impl IncludedArtifacts {
                 // Always enable error map bytecode injection
                 with_error_map: true,
                 named_addresses,
+                override_std,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
@@ -785,6 +842,7 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses,
+                override_std,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
@@ -801,6 +859,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
+                override_std,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
@@ -923,6 +982,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
+                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -1000,6 +1060,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
+                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -1125,6 +1186,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.dev,
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
+            move_options.override_std,
             move_options.bytecode_version,
             move_options.compiler_version,
             move_options.language_version,
@@ -1277,6 +1339,7 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
+                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -1588,7 +1651,7 @@ impl CliCommand<TransactionSummary> for Replay {
             },
         };
 
-        let hash = txn.clone().committed_hash();
+        let hash = txn.committed_hash();
 
         // Execute the transaction.
         let (vm_status, vm_output) = if self.profile_gas {
@@ -1643,7 +1706,7 @@ impl CliCommand<TransactionSummary> for Replay {
         };
 
         let summary = TransactionSummary {
-            transaction_hash: txn.clone().committed_hash().into(),
+            transaction_hash: txn.committed_hash().into(),
             gas_used: Some(txn_output.gas_used()),
             gas_unit_price: Some(txn.gas_unit_price()),
             pending: None,

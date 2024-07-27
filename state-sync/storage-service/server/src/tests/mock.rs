@@ -9,16 +9,17 @@ use anyhow::Result;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{StateSyncConfig, StorageServiceConfig},
-    network_id::NetworkId,
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::HashValue;
 use aptos_network::{
     application::{interface::NetworkServiceEvents, storage::PeersAndMetadata},
-    peer_manager::PeerManagerNotification,
     protocols::{
-        network::{NetworkEvents, NewNetworkEvents},
-        rpc::InboundRpcRequest,
-        wire::handshake::v1::ProtocolId,
+        network::{NetworkEvents, NewNetworkEvents, ReceivedMessage},
+        wire::{
+            handshake::v1::ProtocolId,
+            messaging::v1::{NetworkMessage, RpcRequest},
+        },
     },
 };
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
@@ -59,7 +60,7 @@ const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
 /// mock client requests to a [`StorageServiceServer`].
 pub struct MockClient {
     peer_manager_notifiers:
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 }
 
 impl MockClient {
@@ -98,7 +99,7 @@ impl MockClient {
             .counters(&metrics::PENDING_STORAGE_SERVER_NETWORK_EVENTS);
             let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
 
-            let network_events = NetworkEvents::new(peer_manager_notification_receiver, None);
+            let network_events = NetworkEvents::new(peer_manager_notification_receiver, None, true);
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);
         }
@@ -161,12 +162,17 @@ impl MockClient {
             .to_bytes(&StorageServiceMessage::Request(request))
             .unwrap();
         let (res_tx, res_rx) = oneshot::channel();
-        let inbound_rpc = InboundRpcRequest {
-            protocol_id,
-            data: data.into(),
-            res_tx,
+        let notification = ReceivedMessage {
+            message: NetworkMessage::RpcRequest(RpcRequest {
+                protocol_id,
+                request_id: 0,
+                priority: 0,
+                raw_request: data,
+            }),
+            sender: PeerNetworkId::new(network_id, peer_id),
+            receive_timestamp_micros: 0,
+            rpc_replier: Some(Arc::new(res_tx)),
         };
-        let notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Push the request up to the storage service
         self.peer_manager_notifiers
@@ -282,7 +288,9 @@ mock! {
 
         fn get_latest_ledger_info(&self) -> aptos_storage_interface::Result<LedgerInfoWithSignatures>;
 
-        fn get_latest_version(&self) -> aptos_storage_interface::Result<Version>;
+        fn get_synced_version(&self) -> aptos_storage_interface::Result<Version>;
+
+        fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> aptos_storage_interface::Result<(Version, u64)>;
 

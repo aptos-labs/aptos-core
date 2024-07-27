@@ -59,21 +59,21 @@ module 0x42::M {
         M::s<vector<bool>>();
         M::cds<vector<address>>();
         {
-          let M::Sc<u64>{ dummy_field: _ }: M::Sc<u64> = pack M::Sc<u64>(false);
+          let M::Sc<u64>{ dummy_field: _ } = pack M::Sc<u64>(false);
           {
-            let M::Sd<signer>{ dummy_field: _ }: M::Sd<signer> = pack M::Sd<signer>(false);
+            let M::Sd<signer>{ dummy_field: _ } = pack M::Sd<signer>(false);
             {
-              let M::Ss<bool>{ dummy_field: _ }: M::Ss<bool> = pack M::Ss<bool>(false);
+              let M::Ss<bool>{ dummy_field: _ } = pack M::Ss<bool>(false);
               {
-                let M::Scds<address>{ dummy_field: _ }: M::Scds<address> = pack M::Scds<address>(false);
+                let M::Scds<address>{ dummy_field: _ } = pack M::Scds<address>(false);
                 {
-                  let M::Sc<vector<u64>>{ dummy_field: _ }: M::Sc<vector<u64>> = pack M::Sc<vector<u64>>(false);
+                  let M::Sc<vector<u64>>{ dummy_field: _ } = pack M::Sc<vector<u64>>(false);
                   {
-                    let M::Sd<vector<signer>>{ dummy_field: _ }: M::Sd<vector<signer>> = pack M::Sd<vector<signer>>(false);
+                    let M::Sd<vector<signer>>{ dummy_field: _ } = pack M::Sd<vector<signer>>(false);
                     {
-                      let M::Ss<vector<bool>>{ dummy_field: _ }: M::Ss<vector<bool>> = pack M::Ss<vector<bool>>(false);
+                      let M::Ss<vector<bool>>{ dummy_field: _ } = pack M::Ss<vector<bool>>(false);
                       {
-                        let M::Scds<vector<address>>{ dummy_field: _ }: M::Scds<vector<address>> = pack M::Scds<vector<address>>(false);
+                        let M::Scds<vector<address>>{ dummy_field: _ } = pack M::Scds<vector<address>>(false);
                         M::c<Tc>();
                         M::c<Tcd>();
                         M::c<Tcs>();
@@ -92,39 +92,39 @@ module 0x42::M {
                         M::sk<Tsk>();
                         M::cds<Tcds>();
                         {
-                          let M::Sc<Tc>{ dummy_field: _ }: M::Sc<Tc> = pack M::Sc<Tc>(false);
+                          let M::Sc<Tc>{ dummy_field: _ } = pack M::Sc<Tc>(false);
                           {
-                            let M::Sc<Tcd>{ dummy_field: _ }: M::Sc<Tcd> = pack M::Sc<Tcd>(false);
+                            let M::Sc<Tcd>{ dummy_field: _ } = pack M::Sc<Tcd>(false);
                             {
-                              let M::Sc<Tcs>{ dummy_field: _ }: M::Sc<Tcs> = pack M::Sc<Tcs>(false);
+                              let M::Sc<Tcs>{ dummy_field: _ } = pack M::Sc<Tcs>(false);
                               {
-                                let M::Sc<Tcds>{ dummy_field: _ }: M::Sc<Tcds> = pack M::Sc<Tcds>(false);
+                                let M::Sc<Tcds>{ dummy_field: _ } = pack M::Sc<Tcds>(false);
                                 {
-                                  let M::Sd<Td>{ dummy_field: _ }: M::Sd<Td> = pack M::Sd<Td>(false);
+                                  let M::Sd<Td>{ dummy_field: _ } = pack M::Sd<Td>(false);
                                   {
-                                    let M::Sd<Tcd>{ dummy_field: _ }: M::Sd<Tcd> = pack M::Sd<Tcd>(false);
+                                    let M::Sd<Tcd>{ dummy_field: _ } = pack M::Sd<Tcd>(false);
                                     {
-                                      let M::Sd<Tds>{ dummy_field: _ }: M::Sd<Tds> = pack M::Sd<Tds>(false);
+                                      let M::Sd<Tds>{ dummy_field: _ } = pack M::Sd<Tds>(false);
                                       {
-                                        let M::Sd<Tcds>{ dummy_field: _ }: M::Sd<Tcds> = pack M::Sd<Tcds>(false);
+                                        let M::Sd<Tcds>{ dummy_field: _ } = pack M::Sd<Tcds>(false);
                                         {
-                                          let M::Ss<Ts>{ dummy_field: _ }: M::Ss<Ts> = pack M::Ss<Ts>(false);
+                                          let M::Ss<Ts>{ dummy_field: _ } = pack M::Ss<Ts>(false);
                                           {
-                                            let M::Ss<Tcs>{ dummy_field: _ }: M::Ss<Tcs> = pack M::Ss<Tcs>(false);
+                                            let M::Ss<Tcs>{ dummy_field: _ } = pack M::Ss<Tcs>(false);
                                             {
-                                              let M::Ss<Tds>{ dummy_field: _ }: M::Ss<Tds> = pack M::Ss<Tds>(false);
+                                              let M::Ss<Tds>{ dummy_field: _ } = pack M::Ss<Tds>(false);
                                               {
-                                                let M::Ss<Tsk>{ dummy_field: _ }: M::Ss<Tsk> = pack M::Ss<Tsk>(false);
+                                                let M::Ss<Tsk>{ dummy_field: _ } = pack M::Ss<Tsk>(false);
                                                 {
-                                                  let M::Ss<Tcds>{ dummy_field: _ }: M::Ss<Tcds> = pack M::Ss<Tcds>(false);
+                                                  let M::Ss<Tcds>{ dummy_field: _ } = pack M::Ss<Tcds>(false);
                                                   {
-                                                    let M::Sk<Tk>{ dummy_field: _ }: M::Sk<Tk> = pack M::Sk<Tk>(false);
+                                                    let M::Sk<Tk>{ dummy_field: _ } = pack M::Sk<Tk>(false);
                                                     {
-                                                      let M::Sk<Tsk>{ dummy_field: _ }: M::Sk<Tsk> = pack M::Sk<Tsk>(false);
+                                                      let M::Sk<Tsk>{ dummy_field: _ } = pack M::Sk<Tsk>(false);
                                                       {
-                                                        let M::Ssk<Tsk>{ dummy_field: _ }: M::Ssk<Tsk> = pack M::Ssk<Tsk>(false);
+                                                        let M::Ssk<Tsk>{ dummy_field: _ } = pack M::Ssk<Tsk>(false);
                                                         {
-                                                          let M::Scds<Tcds>{ dummy_field: _ }: M::Scds<Tcds> = pack M::Scds<Tcds>(false);
+                                                          let M::Scds<Tcds>{ dummy_field: _ } = pack M::Scds<Tcds>(false);
                                                           M::c<M::S>();
                                                           M::c<M::Box<M::S>>();
                                                           M::c<M::Pair<M::Box<M::S>, M::S>>();
@@ -149,51 +149,51 @@ module 0x42::M {
                                                           M::cds<M::Box<M::S>>();
                                                           M::cds<M::Pair<M::Box<M::S>, M::S>>();
                                                           {
-                                                            let M::Sc<M::S>{ dummy_field: _ }: M::Sc<M::S> = pack M::Sc<M::S>(false);
+                                                            let M::Sc<M::S>{ dummy_field: _ } = pack M::Sc<M::S>(false);
                                                             {
-                                                              let M::Sc<M::Box<M::S>>{ dummy_field: _ }: M::Sc<M::Box<M::S>> = pack M::Sc<M::Box<M::S>>(false);
+                                                              let M::Sc<M::Box<M::S>>{ dummy_field: _ } = pack M::Sc<M::Box<M::S>>(false);
                                                               {
-                                                                let M::Sc<M::Pair<M::Box<M::S>, M::S>>{ dummy_field: _ }: M::Sc<M::Pair<M::Box<M::S>, M::S>> = pack M::Sc<M::Pair<M::Box<M::S>, M::S>>(false);
+                                                                let M::Sc<M::Pair<M::Box<M::S>, M::S>>{ dummy_field: _ } = pack M::Sc<M::Pair<M::Box<M::S>, M::S>>(false);
                                                                 {
-                                                                  let M::Sd<M::S>{ dummy_field: _ }: M::Sd<M::S> = pack M::Sd<M::S>(false);
+                                                                  let M::Sd<M::S>{ dummy_field: _ } = pack M::Sd<M::S>(false);
                                                                   {
-                                                                    let M::Sd<M::Box<M::S>>{ dummy_field: _ }: M::Sd<M::Box<M::S>> = pack M::Sd<M::Box<M::S>>(false);
+                                                                    let M::Sd<M::Box<M::S>>{ dummy_field: _ } = pack M::Sd<M::Box<M::S>>(false);
                                                                     {
-                                                                      let M::Sd<M::Pair<M::Box<M::S>, M::S>>{ dummy_field: _ }: M::Sd<M::Pair<M::Box<M::S>, M::S>> = pack M::Sd<M::Pair<M::Box<M::S>, M::S>>(false);
+                                                                      let M::Sd<M::Pair<M::Box<M::S>, M::S>>{ dummy_field: _ } = pack M::Sd<M::Pair<M::Box<M::S>, M::S>>(false);
                                                                       {
-                                                                        let M::Ss<M::S>{ dummy_field: _ }: M::Ss<M::S> = pack M::Ss<M::S>(false);
+                                                                        let M::Ss<M::S>{ dummy_field: _ } = pack M::Ss<M::S>(false);
                                                                         {
-                                                                          let M::Ss<M::R>{ dummy_field: _ }: M::Ss<M::R> = pack M::Ss<M::R>(false);
+                                                                          let M::Ss<M::R>{ dummy_field: _ } = pack M::Ss<M::R>(false);
                                                                           {
-                                                                            let M::Ss<M::Box<M::S>>{ dummy_field: _ }: M::Ss<M::Box<M::S>> = pack M::Ss<M::Box<M::S>>(false);
+                                                                            let M::Ss<M::Box<M::S>>{ dummy_field: _ } = pack M::Ss<M::Box<M::S>>(false);
                                                                             {
-                                                                              let M::Ss<M::Box<M::R>>{ dummy_field: _ }: M::Ss<M::Box<M::R>> = pack M::Ss<M::Box<M::R>>(false);
+                                                                              let M::Ss<M::Box<M::R>>{ dummy_field: _ } = pack M::Ss<M::Box<M::R>>(false);
                                                                               {
-                                                                                let M::Ss<M::Pair<M::Box<M::S>, M::S>>{ dummy_field: _ }: M::Ss<M::Pair<M::Box<M::S>, M::S>> = pack M::Ss<M::Pair<M::Box<M::S>, M::S>>(false);
+                                                                                let M::Ss<M::Pair<M::Box<M::S>, M::S>>{ dummy_field: _ } = pack M::Ss<M::Pair<M::Box<M::S>, M::S>>(false);
                                                                                 {
-                                                                                  let M::Ss<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>{ dummy_field: _ }: M::Ss<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>> = pack M::Ss<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>(false);
+                                                                                  let M::Ss<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>{ dummy_field: _ } = pack M::Ss<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>(false);
                                                                                   {
-                                                                                    let M::Sk<M::R>{ dummy_field: _ }: M::Sk<M::R> = pack M::Sk<M::R>(false);
+                                                                                    let M::Sk<M::R>{ dummy_field: _ } = pack M::Sk<M::R>(false);
                                                                                     {
-                                                                                      let M::Sk<M::Box<M::R>>{ dummy_field: _ }: M::Sk<M::Box<M::R>> = pack M::Sk<M::Box<M::R>>(false);
+                                                                                      let M::Sk<M::Box<M::R>>{ dummy_field: _ } = pack M::Sk<M::Box<M::R>>(false);
                                                                                       {
-                                                                                        let M::Sk<M::Pair<M::R, M::Box<M::R>>>{ dummy_field: _ }: M::Sk<M::Pair<M::R, M::Box<M::R>>> = pack M::Sk<M::Pair<M::R, M::Box<M::R>>>(false);
+                                                                                        let M::Sk<M::Pair<M::R, M::Box<M::R>>>{ dummy_field: _ } = pack M::Sk<M::Pair<M::R, M::Box<M::R>>>(false);
                                                                                         {
-                                                                                          let M::Sk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>{ dummy_field: _ }: M::Sk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>> = pack M::Sk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>(false);
+                                                                                          let M::Sk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>{ dummy_field: _ } = pack M::Sk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>(false);
                                                                                           {
-                                                                                            let M::Ssk<M::R>{ dummy_field: _ }: M::Ssk<M::R> = pack M::Ssk<M::R>(false);
+                                                                                            let M::Ssk<M::R>{ dummy_field: _ } = pack M::Ssk<M::R>(false);
                                                                                             {
-                                                                                              let M::Ssk<M::Box<M::R>>{ dummy_field: _ }: M::Ssk<M::Box<M::R>> = pack M::Ssk<M::Box<M::R>>(false);
+                                                                                              let M::Ssk<M::Box<M::R>>{ dummy_field: _ } = pack M::Ssk<M::Box<M::R>>(false);
                                                                                               {
-                                                                                                let M::Ssk<M::Pair<M::R, M::Box<M::R>>>{ dummy_field: _ }: M::Ssk<M::Pair<M::R, M::Box<M::R>>> = pack M::Ssk<M::Pair<M::R, M::Box<M::R>>>(false);
+                                                                                                let M::Ssk<M::Pair<M::R, M::Box<M::R>>>{ dummy_field: _ } = pack M::Ssk<M::Pair<M::R, M::Box<M::R>>>(false);
                                                                                                 {
-                                                                                                  let M::Ssk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>{ dummy_field: _ }: M::Ssk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>> = pack M::Ssk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>(false);
+                                                                                                  let M::Ssk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>{ dummy_field: _ } = pack M::Ssk<M::Pair<M::R, M::Box<M::Pair<M::R, M::S>>>>(false);
                                                                                                   {
-                                                                                                    let M::Scds<M::S>{ dummy_field: _ }: M::Scds<M::S> = pack M::Scds<M::S>(false);
+                                                                                                    let M::Scds<M::S>{ dummy_field: _ } = pack M::Scds<M::S>(false);
                                                                                                     {
-                                                                                                      let M::Scds<M::Box<M::S>>{ dummy_field: _ }: M::Scds<M::Box<M::S>> = pack M::Scds<M::Box<M::S>>(false);
+                                                                                                      let M::Scds<M::Box<M::S>>{ dummy_field: _ } = pack M::Scds<M::Box<M::S>>(false);
                                                                                                       {
-                                                                                                        let M::Scds<M::Pair<M::Box<M::S>, M::S>>{ dummy_field: _ }: M::Scds<M::Pair<M::Box<M::S>, M::S>> = pack M::Scds<M::Pair<M::Box<M::S>, M::S>>(false);
+                                                                                                        let M::Scds<M::Pair<M::Box<M::S>, M::S>>{ dummy_field: _ } = pack M::Scds<M::Pair<M::Box<M::S>, M::S>>(false);
                                                                                                         Tuple()
                                                                                                       }
                                                                                                     }

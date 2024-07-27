@@ -32,18 +32,50 @@ pub type Author = AccountAddress;
 pub struct TransactionSummary {
     pub sender: AccountAddress,
     pub sequence_number: u64,
+    pub hash: HashValue,
 }
 
 impl TransactionSummary {
-    pub fn new(sender: AccountAddress, sequence_number: u64) -> Self {
+    pub fn new(sender: AccountAddress, sequence_number: u64, hash: HashValue) -> Self {
         Self {
             sender,
             sequence_number,
+            hash,
         }
     }
 }
 
 impl fmt::Display for TransactionSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.sender, self.sequence_number,)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
+pub struct TxnSummaryWithExpiration {
+    pub sender: AccountAddress,
+    pub sequence_number: u64,
+    pub expiration_timestamp_secs: u64,
+    pub hash: HashValue,
+}
+
+impl TxnSummaryWithExpiration {
+    pub fn new(
+        sender: AccountAddress,
+        sequence_number: u64,
+        expiration_timestamp_secs: u64,
+        hash: HashValue,
+    ) -> Self {
+        Self {
+            sender,
+            sequence_number,
+            expiration_timestamp_secs,
+            hash,
+        }
+    }
+}
+
+impl fmt::Display for TxnSummaryWithExpiration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.sender, self.sequence_number,)
     }
@@ -133,6 +165,11 @@ impl ProofWithData {
         }
     }
 
+    pub fn empty() -> Self {
+        Self::new(vec![])
+    }
+
+    #[allow(clippy::unwrap_used)]
     pub fn extend(&mut self, other: ProofWithData) {
         let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);
@@ -166,7 +203,7 @@ impl ProofWithData {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ProofWithDataWithTxnLimit {
     pub proof_with_data: ProofWithData,
-    pub max_txns_to_execute: Option<usize>,
+    pub max_txns_to_execute: Option<u64>,
 }
 
 impl PartialEq for ProofWithDataWithTxnLimit {
@@ -179,7 +216,7 @@ impl PartialEq for ProofWithDataWithTxnLimit {
 impl Eq for ProofWithDataWithTxnLimit {}
 
 impl ProofWithDataWithTxnLimit {
-    pub fn new(proof_with_data: ProofWithData, max_txns_to_execute: Option<usize>) -> Self {
+    pub fn new(proof_with_data: ProofWithData, max_txns_to_execute: Option<u64>) -> Self {
         Self {
             proof_with_data,
             max_txns_to_execute,
@@ -195,7 +232,7 @@ impl ProofWithDataWithTxnLimit {
     }
 }
 
-fn sum_max_txns_to_execute(m1: Option<usize>, m2: Option<usize>) -> Option<usize> {
+fn sum_max_txns_to_execute(m1: Option<u64>, m2: Option<u64>) -> Option<u64> {
     match (m1, m2) {
         (None, _) => m2,
         (_, None) => m1,
@@ -212,12 +249,12 @@ pub enum Payload {
     QuorumStoreInlineHybrid(
         Vec<(BatchInfo, Vec<SignedTransaction>)>,
         ProofWithData,
-        Option<usize>,
+        Option<u64>,
     ),
 }
 
 impl Payload {
-    pub fn transform_to_quorum_store_v2(self, max_txns_to_execute: Option<usize>) -> Self {
+    pub fn transform_to_quorum_store_v2(self, max_txns_to_execute: Option<u64>) -> Self {
         match self {
             Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
                 ProofWithDataWithTxnLimit::new(proof_with_status, max_txns_to_execute),
@@ -266,6 +303,29 @@ impl Payload {
                         .map(|(_, txns)| txns.len())
                         .sum::<usize>()
             },
+        }
+    }
+
+    pub fn len_for_execution(&self) -> u64 {
+        match self {
+            Payload::DirectMempool(txns) => txns.len() as u64,
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.len() as u64,
+            Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                // here we return the actual length of the payload; limit is considered at the stage
+                // where we prepare the block from the payload
+                (proof_with_status.proof_with_data.len() as u64)
+                    .min(proof_with_status.max_txns_to_execute.unwrap_or(u64::MAX))
+            },
+            Payload::QuorumStoreInlineHybrid(
+                inline_batches,
+                proof_with_data,
+                max_txns_to_execute,
+            ) => ((proof_with_data.len()
+                + inline_batches
+                    .iter()
+                    .map(|(_, txns)| txns.len())
+                    .sum::<usize>()) as u64)
+                .min(max_txns_to_execute.unwrap_or(u64::MAX)),
         }
     }
 
@@ -530,6 +590,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         exclude_txns.push(TransactionSummary {
                             sender: txn.sender(),
                             sequence_number: txn.sequence_number(),
+                            hash: txn.committed_hash(),
                         });
                     }
                 }

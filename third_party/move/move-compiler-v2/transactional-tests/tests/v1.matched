@@ -1,5 +1,7 @@
 move-compiler/transactional-tests/tests/constants/by_reference.exp   move-compiler-v2/transactional-tests/tests/constants/by_reference.exp
 move-compiler/transactional-tests/tests/constants/default_int_size.exp   move-compiler-v2/transactional-tests/tests/constants/default_int_size.exp
+move-compiler/transactional-tests/tests/constants/empty_vectors.exp   move-compiler-v2/transactional-tests/tests/constants/empty_vectors.exp
+move-compiler/transactional-tests/tests/constants/empty_vectors2.exp   move-compiler-v2/transactional-tests/tests/constants/empty_vectors2.exp
 move-compiler/transactional-tests/tests/constants/folding_boolean.exp   move-compiler-v2/transactional-tests/tests/constants/folding_boolean.exp
 move-compiler/transactional-tests/tests/constants/folding_complex.exp   move-compiler-v2/transactional-tests/tests/constants/folding_complex.exp
 move-compiler/transactional-tests/tests/constants/folding_equality.exp   move-compiler-v2/transactional-tests/tests/constants/folding_equality.exp
@@ -8,8 +10,9 @@ move-compiler/transactional-tests/tests/constants/folding_values.exp   move-comp
 move-compiler/transactional-tests/tests/constants/folding_vector.exp   move-compiler-v2/transactional-tests/tests/constants/folding_vector.exp
 move-compiler/transactional-tests/tests/constants/folding_vector_large.exp   move-compiler-v2/transactional-tests/tests/constants/folding_vector_large.exp
 move-compiler/transactional-tests/tests/constants/non_constant_empty_vec.exp   move-compiler-v2/transactional-tests/tests/constants/non_constant_empty_vec.exp
+move-compiler/transactional-tests/tests/constants/nonempty_vectors.exp   move-compiler-v2/transactional-tests/tests/constants/nonempty_vectors.exp
 move-compiler/transactional-tests/tests/control_flow/assert_in_while.exp   move-compiler-v2/transactional-tests/tests/control_flow/assert_in_while.exp
-move-compiler/transactional-tests/tests/control_flow/binop_eval_order.exp   move-compiler-v2/transactional-tests/tests/control_flow/binop_eval_order.exp
+move-compiler/transactional-tests/tests/control_flow/binop_eval_order.exp   move-compiler-v2/transactional-tests/tests/operator_eval/control_flow/binop_eval_order.exp
 move-compiler/transactional-tests/tests/control_flow/branch_assigns_then_moves_then_assigns.exp   move-compiler-v2/transactional-tests/tests/control_flow/branch_assigns_then_moves_then_assigns.exp
 move-compiler/transactional-tests/tests/control_flow/break_accumulator.exp   move-compiler-v2/transactional-tests/tests/control_flow/break_accumulator.exp
 move-compiler/transactional-tests/tests/control_flow/break_continue_for_loop.exp   move-compiler-v2/transactional-tests/tests/control_flow/break_continue_for_loop.exp

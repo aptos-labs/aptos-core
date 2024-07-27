@@ -21,10 +21,17 @@ struct Args {
 // List of additional packages (beyond those in testsuite/module-publish/src/packages) to include
 fn additional_packages() -> Vec<(&'static str, &'static str)> {
     // Pairs of (package_name, package_path)
-    vec![(
-        "ambassador_token",
-        "../../aptos-move/move-examples/token_objects/ambassador",
-    )]
+    vec![
+        (
+            "ambassador_token",
+            "../../aptos-move/move-examples/token_objects/ambassador",
+        ),
+        (
+            "aggregator_examples",
+            "../../aptos-move/move-examples/aggregator_examples",
+        ),
+        ("bcs_stream", "../../aptos-move/move-examples/bcs-stream"),
+    ]
 }
 
 // Run "cargo run -p module-publish" to generate the file `raw_module_data.rs`.

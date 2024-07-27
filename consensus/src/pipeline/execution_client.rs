@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    consensus_observer::publisher::ConsensusPublisher,
     counters,
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     pipeline::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
@@ -27,7 +28,7 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::ConsensusConfig;
+use aptos_config::config::{ConsensusConfig, ConsensusObserverConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
     pipelined_block::PipelinedBlock,
@@ -61,14 +62,14 @@ pub trait TExecutionClient: Send + Sync {
         &self,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        highest_ordered_round: Round,
+        highest_committed_round: Round,
         execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     );
 
@@ -93,6 +94,9 @@ pub trait TExecutionClient: Send + Sync {
 
     /// Synchronize to a commit that not present locally.
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
+
+    /// Resets the internal state of the rand and buffer managers.
+    async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()>;
 
     /// Shutdown the current processor at the end of the epoch.
     async fn end_epoch(&self);
@@ -157,6 +161,8 @@ pub struct ExecutionProxyClient {
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+    consensus_observer_config: ConsensusObserverConfig,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
@@ -169,6 +175,8 @@ impl ExecutionProxyClient {
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+        consensus_observer_config: ConsensusObserverConfig,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         Self {
             consensus_config,
@@ -179,6 +187,8 @@ impl ExecutionProxyClient {
             bounded_executor,
             handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
             rand_storage,
+            consensus_observer_config,
+            consensus_publisher,
             execution_futures: Arc::new(DashMap::new()),
         }
     }
@@ -189,8 +199,11 @@ impl ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        highest_ordered_round: Round,
+        highest_committed_round: Round,
+        consensus_observer_config: ConsensusObserverConfig,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
         execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
         let network_sender = NetworkSender::new(
@@ -238,7 +251,7 @@ impl ExecutionProxyClient {
                     rand_msg_rx,
                     reset_rand_manager_rx,
                     self.bounded_executor.clone(),
-                    highest_ordered_round,
+                    highest_committed_round,
                 ));
 
                 (
@@ -280,6 +293,9 @@ impl ExecutionProxyClient {
             reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
+            onchain_consensus_config.order_vote_enabled(),
+            consensus_observer_config,
+            consensus_publisher,
             execution_futures,
         );
 
@@ -298,14 +314,14 @@ impl TExecutionClient for ExecutionProxyClient {
         &self,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        highest_ordered_round: Round,
+        highest_committed_round: Round,
         execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
@@ -313,8 +329,11 @@ impl TExecutionClient for ExecutionProxyClient {
             epoch_state.clone(),
             rand_config,
             fast_rand_config,
+            onchain_consensus_config,
             rand_msg_rx,
-            highest_ordered_round,
+            highest_committed_round,
+            self.consensus_observer_config,
+            self.consensus_publisher.clone(),
             execution_futures,
         );
 
@@ -370,19 +389,19 @@ impl TExecutionClient for ExecutionProxyClient {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
-        let execute_tx = self.handle.read().execute_tx.clone();
-
-        if execute_tx.is_none() {
-            debug!("Failed to send to buffer manager, maybe epoch ends");
-            return Ok(());
-        }
+        let mut execute_tx = match self.handle.read().execute_tx.clone() {
+            Some(tx) => tx,
+            None => {
+                debug!("Failed to send to buffer manager, maybe epoch ends");
+                return Ok(());
+            },
+        };
 
         for block in blocks {
             block.set_insertion_time();
         }
 
         if execute_tx
-            .unwrap()
             .send(OrderedBlocks {
                 ordered_blocks: blocks
                     .iter()
@@ -420,6 +439,16 @@ impl TExecutionClient for ExecutionProxyClient {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
 
+        // Reset the rand and buffer managers to the target round
+        self.reset(&target).await?;
+
+        // TODO: handle the sync error, should re-push the ordered blocks to buffer manager
+        // when it's reset but sync fails.
+        self.execution_proxy.sync_to(target).await?;
+        Ok(())
+    }
+
+    async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()> {
         let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
             let handle = self.handle.read();
             (
@@ -453,9 +482,6 @@ impl TExecutionClient for ExecutionProxyClient {
             rx.await.map_err(|_| Error::ResetDropped)?;
         }
 
-        // TODO: handle the sync error, should re-push the ordered blocks to buffer manager
-        // when it's reset but sync fails.
-        self.execution_proxy.sync_to(target).await?;
         Ok(())
     }
 
@@ -502,14 +528,14 @@ impl TExecutionClient for DummyExecutionClient {
         &self,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        _payload_manager: Arc<PayloadManager>,
+        _payload_manager: Arc<dyn TPayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
-        _highest_ordered_round: Round,
+        _highest_committed_round: Round,
         _execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
     }
@@ -534,6 +560,10 @@ impl TExecutionClient for DummyExecutionClient {
     }
 
     async fn sync_to(&self, _: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        Ok(())
+    }
+
+    async fn reset(&self, _: &LedgerInfoWithSignatures) -> Result<()> {
         Ok(())
     }
 

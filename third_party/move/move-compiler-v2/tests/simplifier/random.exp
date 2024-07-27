@@ -18,6 +18,20 @@ module 0x8675::M {
     private fun id_mut<T>(r: &mut #0): &mut #0 {
         r
     }
+    private inline fun iterloop(x: u64,y: &u64): u64 {
+        {
+          let r: u64 = Add<u64>(x, 3);
+          loop {
+            if Gt<u64>(x, 0) {
+              x: u64 = Sub<u64>(x, Deref(y));
+              Tuple()
+            } else {
+              break
+            }
+          };
+          Add<u64>(r, x)
+        }
+    }
     private fun t0() {
         {
           let v: u64 = 0;
@@ -128,6 +142,14 @@ module 0x8675::M {
         }
     }
 } // end 0x8675::M
+
+
+Diagnostics:
+warning: Unused assignment to `q`. Consider removing or prefixing with an underscore: `_q`
+   ┌─ tests/simplifier/random.move:48:17
+   │
+48 │         let q = v;
+   │                 ^
 
 
 Diagnostics:

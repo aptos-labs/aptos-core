@@ -9,20 +9,18 @@ edition = "2021"
 publish = false
 
 [dependencies]
-better_any = "0.1.1"
-bytes = "1.4.0"
+better_any = { workspace = true }
+bytes = { workspace = true }
 move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
 move-vm-types = { path = "../../move-vm/types" }
-sha3 = "0.9.1"
-smallvec = "1.6.1"
+sha3 = { workspace = true }
+smallvec = { workspace = true }
 
 [dev-dependencies]
-#dir-diff = "0.3.2"
-#file_diff = "1.0.0"
 move-cli = { path = "../../tools/move-cli" }
 move-package = { path = "../../tools/move-package" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-unit-test = { path = "../../tools/move-unit-test", features = ["table-extension"] }
-tempfile = "3.2.0"
+tempfile = { workspace = true }

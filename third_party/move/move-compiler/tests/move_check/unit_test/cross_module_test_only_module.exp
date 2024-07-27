@@ -8,5 +8,5 @@ error[E03002]: unbound module
    ┌─ tests/move_check/unit_test/cross_module_test_only_module.move:13:9
    │
 13 │         M::foo()
-   │         ^ Unbound module alias 'M'
+   │         ^ Unbound module or type alias 'M'
 

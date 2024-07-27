@@ -38,6 +38,7 @@ ordered-float = { workspace = true }
 # it's not trivial to update rand on the workspace because of several dependency
 # issues (e.g., other outdated crate versions). This is why we fix the version here.
 # Eventually we'll need to update the workspace to use the latest version of rand.
+# See also https://github.com/aptos-labs/aptos-core/issues/13031
 rand = "0.8.5"
 serde = { workspace = true }
 thiserror = { workspace = true }

@@ -166,6 +166,7 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
 
     let subscriber = tracing_subscriber::fmt()
         .json()
+        .flatten_event(true)
         .with_file(true)
         .with_line_number(true)
         .with_thread_ids(true)

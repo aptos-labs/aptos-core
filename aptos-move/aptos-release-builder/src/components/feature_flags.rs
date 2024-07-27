@@ -112,6 +112,17 @@ pub enum FeatureFlag {
     TransactionContextExtension,
     CoinToFungibleAssetMigration,
     PrimaryAPTFungibleStoreAtUserAddress,
+    ObjectNativeDerivedAddress,
+    DispatchableFungibleAsset,
+    NewAccountsDefaultToFaAptStore,
+    OperationsDefaultToFaAptStore,
+    AggregatorV2IsAtLeastApi,
+    ConcurrentFungibleBalance,
+    DefaultToConcurrentFungibleBalance,
+    LimitVMTypeSize,
+    AbortIfMultisigPayloadMismatch,
+    DisallowUserNative,
+    AllowSerializedScriptArgs,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -286,6 +297,31 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress => {
                 AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS
             },
+            FeatureFlag::ObjectNativeDerivedAddress => {
+                AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS
+            },
+            FeatureFlag::DispatchableFungibleAsset => AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
+            FeatureFlag::NewAccountsDefaultToFaAptStore => {
+                AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE
+            },
+            FeatureFlag::OperationsDefaultToFaAptStore => {
+                AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE
+            },
+            FeatureFlag::AggregatorV2IsAtLeastApi => {
+                AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API
+            },
+            FeatureFlag::ConcurrentFungibleBalance => AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
+            FeatureFlag::DefaultToConcurrentFungibleBalance => {
+                AptosFeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE
+            },
+            FeatureFlag::LimitVMTypeSize => AptosFeatureFlag::LIMIT_VM_TYPE_SIZE,
+            FeatureFlag::AbortIfMultisigPayloadMismatch => {
+                AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
+            },
+            FeatureFlag::DisallowUserNative => AptosFeatureFlag::DISALLOW_USER_NATIVES,
+            FeatureFlag::AllowSerializedScriptArgs => {
+                AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS
+            },
         }
     }
 }
@@ -388,6 +424,31 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS => {
                 FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress
+            },
+            AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS => {
+                FeatureFlag::ObjectNativeDerivedAddress
+            },
+            AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET => FeatureFlag::DispatchableFungibleAsset,
+            AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE => {
+                FeatureFlag::NewAccountsDefaultToFaAptStore
+            },
+            AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE => {
+                FeatureFlag::OperationsDefaultToFaAptStore
+            },
+            AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API => {
+                FeatureFlag::AggregatorV2IsAtLeastApi
+            },
+            AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE => FeatureFlag::ConcurrentFungibleBalance,
+            AptosFeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE => {
+                FeatureFlag::DefaultToConcurrentFungibleBalance
+            },
+            AptosFeatureFlag::LIMIT_VM_TYPE_SIZE => FeatureFlag::LimitVMTypeSize,
+            AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH => {
+                FeatureFlag::AbortIfMultisigPayloadMismatch
+            },
+            AptosFeatureFlag::DISALLOW_USER_NATIVES => FeatureFlag::DisallowUserNative,
+            AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS => {
+                FeatureFlag::AllowSerializedScriptArgs
             },
         }
     }

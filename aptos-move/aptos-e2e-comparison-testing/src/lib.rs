@@ -72,11 +72,7 @@ impl IndexWriter {
             let file = if !path.exists() {
                 File::create(path).expect("Error encountered while creating file!")
             } else {
-                OpenOptions::new()
-                    .write(true)
-                    .append(true)
-                    .open(path)
-                    .unwrap()
+                OpenOptions::new().append(true).open(path).unwrap()
             };
             file
         };

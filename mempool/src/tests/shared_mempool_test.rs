@@ -4,6 +4,7 @@
 
 use crate::{
     mocks::MockSharedMempool,
+    network::BroadcastPeerPriority,
     tests::common::{batch_add_signed_txn, TestTransaction},
     QuorumStoreRequest,
 };
@@ -48,9 +49,14 @@ async fn test_consensus_events_rejected_txns() {
 
     let pool = smp.mempool.lock();
     // TODO: make less brittle to broadcast buckets changes
-    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10);
+    let (timeline, _) = pool.read_timeline(
+        &vec![0; 10].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
     assert_eq!(timeline.len(), 2);
-    assert_eq!(timeline.first().unwrap(), &kept_txn);
+    assert_eq!(timeline.first().unwrap().0, kept_txn);
 }
 
 #[allow(clippy::await_holding_lock)] // This appears to be a false positive!
@@ -89,8 +95,13 @@ async fn test_mempool_notify_committed_txns() {
     let wait_for_commit = async {
         let pool = smp.mempool.lock();
         // TODO: make less brittle to broadcast buckets changes
-        let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10);
-        if timeline.len() == 10 && timeline.first().unwrap() == &kept_txn {
+        let (timeline, _) = pool.read_timeline(
+            &vec![0; 10].into(),
+            10,
+            None,
+            BroadcastPeerPriority::Primary,
+        );
+        if timeline.len() == 10 && timeline.first().unwrap().0 == kept_txn {
             return; // Mempool handled the commit notification
         }
         drop(pool);

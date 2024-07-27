@@ -84,7 +84,7 @@ impl TChainHealth for ChainHealthBackoff {
 
         chain_health_backoff.map(|value| {
             (
-                value.max_sending_block_txns_override,
+                value.max_sending_block_txns_after_filtering_override,
                 value.max_sending_block_bytes_override,
             )
         })

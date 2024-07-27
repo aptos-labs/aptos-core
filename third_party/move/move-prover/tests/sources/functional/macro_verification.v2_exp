@@ -82,7 +82,7 @@ error: post-condition does not hold
    =         <redacted> = <redacted>
    =     at tests/sources/functional/macro_verification.move:43: reduce
    =     at tests/sources/functional/macro_verification.move:52: reduce
-   =         return = <redacted>
+   =         <redacted> = <redacted>
    =     at tests/sources/functional/macro_verification.move:40: reduce
    =         result = <redacted>
    =     at tests/sources/functional/macro_verification.move:55: reduce (spec)
@@ -134,7 +134,7 @@ error: post-condition does not hold
    =         <redacted> = <redacted>
    =     at tests/sources/functional/macro_verification.move:43: reduce
    =     at tests/sources/functional/macro_verification.move:52: reduce
-   =         return = <redacted>
+   =         <redacted> = <redacted>
    =     at tests/sources/functional/macro_verification.move:40: reduce
    =         result = <redacted>
    =     at tests/sources/functional/macro_verification.move:53: reduce

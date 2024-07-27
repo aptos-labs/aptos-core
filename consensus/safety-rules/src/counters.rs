@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
     HistogramVec, IntCounterVec, IntGaugeVec,
@@ -10,6 +12,7 @@ use once_cell::sync::Lazy;
 
 pub const EPOCH: &str = "epoch";
 pub const LAST_VOTED_ROUND: &str = "last_voted_round";
+pub const HIGHEST_TIMEOUT_ROUND: &str = "highest_timeout_round";
 pub const PREFERRED_ROUND: &str = "preferred_round";
 pub const WAYPOINT_VERSION: &str = "waypoint_version";
 

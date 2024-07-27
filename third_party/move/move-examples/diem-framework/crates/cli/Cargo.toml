@@ -8,8 +8,8 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
-clap = { version = "4.3.9", features = ["derive"] }
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 
 move-cli = { path = "../../../../../tools/move-cli" }
 move-core-types = { path = "../../../../../move-core/types" }
@@ -20,4 +20,4 @@ move-vm-test-utils = { path = "../../../../../move-vm/test-utils" }
 diem-framework-natives = { path = "../natives" }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
+datatest-stable = { workspace = true }

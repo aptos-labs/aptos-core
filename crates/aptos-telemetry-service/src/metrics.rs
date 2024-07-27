@@ -11,7 +11,8 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, HistogramVec,
+    IntCounter, IntCounterVec,
 };
 use flate2::{write::GzEncoder, Compression};
 use once_cell::sync::Lazy;
@@ -53,6 +54,22 @@ pub(crate) static BIG_QUERY_BACKEND_REQUEST_DURATION: Lazy<HistogramVec> = Lazy:
         "telemetry_web_service_big_query_backend_request_duration",
         "Number of big query backend requests by response kind",
         &["kind"]
+    )
+    .unwrap()
+});
+
+pub(crate) static BIG_QUERY_REQUEST_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "big_query_request_total",
+        "Total number of big query requests"
+    )
+    .unwrap()
+});
+
+pub(crate) static BIG_QUERY_REQUEST_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "big_query_request_failures_total",
+        "Total number of big query request failures"
     )
     .unwrap()
 });

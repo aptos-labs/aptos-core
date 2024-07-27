@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
+use crate::change_set::ChangeSetInterface;
 use aptos_gas_schedule::AptosGasParameters;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::vm_status::StatusCode;
+use move_binary_format::errors::{Location, PartialVMError};
+use move_core_types::vm_status::{StatusCode, VMStatus};
 
 #[derive(Clone, Debug)]
 pub struct ChangeSetConfigs {
@@ -82,15 +82,20 @@ impl ChangeSetConfigs {
             params.max_write_ops_per_transaction.into(),
         )
     }
-}
 
-impl CheckChangeSet for ChangeSetConfigs {
-    fn check_change_set(&self, change_set: &VMChangeSet) -> PartialVMResult<()> {
+    pub fn check_change_set(&self, change_set: &impl ChangeSetInterface) -> Result<(), VMStatus> {
+        let storage_write_limit_reached = |maybe_message: Option<&str>| {
+            let mut err = PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED);
+            if let Some(message) = maybe_message {
+                err = err.with_message(message.to_string())
+            }
+            Err(err.finish(Location::Undefined).into_vm_status())
+        };
+
         if self.max_write_ops_per_transaction != 0
             && change_set.num_write_ops() as u64 > self.max_write_ops_per_transaction
         {
-            return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED)
-                .with_message("Too many write ops.".to_string()));
+            return storage_write_limit_reached(Some("Too many write ops."));
         }
 
         let mut write_set_size = 0;
@@ -98,24 +103,24 @@ impl CheckChangeSet for ChangeSetConfigs {
             if let Some(len) = op_size.write_len() {
                 let write_op_size = len + (key.size() as u64);
                 if write_op_size > self.max_bytes_per_write_op {
-                    return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));
+                    return storage_write_limit_reached(None);
                 }
                 write_set_size += write_op_size;
             }
             if write_set_size > self.max_bytes_all_write_ops_per_transaction {
-                return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));
+                return storage_write_limit_reached(None);
             }
         }
 
         let mut total_event_size = 0;
-        for (event, _) in change_set.events() {
+        for event in change_set.events_iter() {
             let size = event.event_data().len() as u64;
             if size > self.max_bytes_per_event {
-                return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));
+                return storage_write_limit_reached(None);
             }
             total_event_size += size;
             if total_event_size > self.max_bytes_all_events_per_transaction {
-                return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));
+                return storage_write_limit_reached(None);
             }
         }
 

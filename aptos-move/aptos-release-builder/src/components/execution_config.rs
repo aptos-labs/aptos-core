@@ -30,7 +30,7 @@ pub fn generate_execution_config_upgrade_proposal(
             assert!(execution_config_blob.len() < 65536);
 
             emit!(writer, "let execution_blob: vector<u8> = ");
-            generate_blob(writer, &execution_config_blob);
+            generate_blob_as_hex_string(writer, &execution_config_blob);
             emitln!(writer, ";\n");
 
             emitln!(

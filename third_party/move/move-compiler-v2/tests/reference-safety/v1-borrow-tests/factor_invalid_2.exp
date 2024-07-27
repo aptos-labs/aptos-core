@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: cannot mutably borrow field of local `root` since references derived from a call exist
+  ┌─ tests/reference-safety/v1-borrow-tests/factor_invalid_2.move:8:9
+  │
+6 │         let eps = if (cond) bar(root) else &x1;
+  │                             --------- previous call result
+7 │         // Error: root has weak empty borrow and hence a field cannot be borrowed mutably
+8 │         &mut root.g;
+  │         ^^^^^^^^^^^
+  │         │
+  │         mutable borrow attempted here
+  │         previous mutable field borrow
+9 │         eps;
+  │         --- conflicting reference `eps` used here

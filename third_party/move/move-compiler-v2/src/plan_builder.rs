@@ -49,7 +49,7 @@ pub fn construct_test_plan(
     Some(
         env.get_modules()
             .filter_map(|module| {
-                if module.is_target() {
+                if module.is_primary_target() {
                     construct_module_test_plan(env, package_filter, module)
                 } else {
                     None
@@ -442,6 +442,7 @@ fn parse_failure_attribute(
                 status_code,
                 sub_status_code,
                 move_binary_format::errors::Location::Module(location),
+                None,
             )))
         },
     }

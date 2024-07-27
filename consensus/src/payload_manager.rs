@@ -2,40 +2,110 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    consensus_observer::{
+        network_message::{BlockTransactionPayload, ConsensusObserverMessage},
+        payload_store::BlockPayloadStatus,
+        publisher::ConsensusPublisher,
+    },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_consensus_types::{
     block::Block,
-    common::{DataStatus, Payload, ProofWithData},
+    common::{DataStatus, Payload, ProofWithData, Round},
     proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutorError::DataNotFound, *};
+use aptos_executor_types::{
+    ExecutorError::{DataNotFound, InternalError},
+    *,
+};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
+use async_trait::async_trait;
 use futures::channel::mpsc::Sender;
-use std::sync::Arc;
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    sync::Arc,
+};
 use tokio::sync::oneshot;
 
+/// A trait that defines the interface for a payload manager. The payload manager is responsible for
+/// resolving the transactions in a block's payload.
+#[async_trait]
 pub trait TPayloadManager: Send + Sync {
+    /// Notify the payload manager that a block has been committed. This indicates that the
+    /// transactions in the block's payload are no longer required for consensus.
+    fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>);
+
+    /// Prefetch the data for a payload. This is used to ensure that the data for a payload is
+    /// available when block is executed.
     fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
+
+    /// Get the transactions in a block's payload. This function returns a vector of transactions.
+    async fn get_transactions(
+        &self,
+        block: &Block,
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)>;
 }
 
-/// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
-/// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
-pub enum PayloadManager {
-    DirectMempool,
-    InQuorumStore(Arc<dyn BatchReader>, Sender<CoordinatorCommand>),
-}
+/// A payload manager that directly returns the transactions in a block's payload.
+pub struct DirectMempoolPayloadManager {}
 
-impl TPayloadManager for PayloadManager {
-    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
-        self.prefetch_payload_data(payload, timestamp);
+impl DirectMempoolPayloadManager {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
-impl PayloadManager {
+#[async_trait]
+impl TPayloadManager for DirectMempoolPayloadManager {
+    fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
+
+    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+
+    async fn get_transactions(
+        &self,
+        block: &Block,
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+        let Some(payload) = block.payload() else {
+            return Ok((Vec::new(), None));
+        };
+
+        match payload {
+            Payload::DirectMempool(txns) => Ok((txns.clone(), None)),
+            _ => unreachable!(
+                "DirectMempoolPayloadManager: Unacceptable payload type {}. Epoch: {}, Round: {}, Block: {}",
+                payload,
+                block.block_data().epoch(),
+                block.block_data().round(),
+                block.id()
+            ),
+        }
+    }
+}
+
+/// A payload manager that resolves the transactions in a block's payload from the quorum store.
+pub struct QuorumStorePayloadManager {
+    batch_reader: Arc<dyn BatchReader>,
+    coordinator_tx: Sender<CoordinatorCommand>,
+    maybe_consensus_publisher: Option<Arc<ConsensusPublisher>>,
+}
+
+impl QuorumStorePayloadManager {
+    pub fn new(
+        batch_reader: Arc<dyn BatchReader>,
+        coordinator_tx: Sender<CoordinatorCommand>,
+        maybe_consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    ) -> Self {
+        Self {
+            batch_reader,
+            coordinator_tx,
+            maybe_consensus_publisher,
+        }
+    }
+
     fn request_transactions(
         proofs: Vec<ProofOfStore>,
         block_timestamp: u64,
@@ -60,69 +130,69 @@ impl PayloadManager {
         }
         receivers
     }
+}
 
-    ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
-    pub fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
-        match self {
-            PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, coordinator_tx) => {
-                batch_reader.update_certified_timestamp(block_timestamp);
+#[async_trait]
+impl TPayloadManager for QuorumStorePayloadManager {
+    fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
+        self.batch_reader
+            .update_certified_timestamp(block_timestamp);
 
-                let batches: Vec<_> = payloads
-                    .into_iter()
-                    .flat_map(|payload| match payload {
-                        Payload::DirectMempool(_) => {
-                            unreachable!("InQuorumStore should be used");
-                        },
-                        Payload::InQuorumStore(proof_with_status) => proof_with_status
-                            .proofs
-                            .iter()
-                            .map(|proof| proof.info().clone())
-                            .collect::<Vec<_>>(),
-                        Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
-                            .proof_with_data
-                            .proofs
-                            .iter()
-                            .map(|proof| proof.info().clone())
-                            .collect::<Vec<_>>(),
-                        Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
-                            inline_batches
+        let batches: Vec<_> = payloads
+            .into_iter()
+            .flat_map(|payload| match payload {
+                Payload::DirectMempool(_) => {
+                    unreachable!("InQuorumStore should be used");
+                },
+                Payload::InQuorumStore(proof_with_status) => proof_with_status
+                    .proofs
+                    .iter()
+                    .map(|proof| proof.info().clone())
+                    .collect::<Vec<_>>(),
+                Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
+                    .proof_with_data
+                    .proofs
+                    .iter()
+                    .map(|proof| proof.info().clone())
+                    .collect::<Vec<_>>(),
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                    inline_batches
+                        .iter()
+                        .map(|(batch_info, _)| batch_info.clone())
+                        .chain(
+                            proof_with_data
+                                .proofs
                                 .iter()
-                                .map(|(batch_info, _)| batch_info.clone())
-                                .chain(
-                                    proof_with_data
-                                        .proofs
-                                        .iter()
-                                        .map(|proof| proof.info().clone()),
-                                )
-                                .collect::<Vec<_>>()
-                        },
-                    })
-                    .collect();
+                                .map(|proof| proof.info().clone()),
+                        )
+                        .collect::<Vec<_>>()
+                },
+            })
+            .collect();
 
-                let mut tx = coordinator_tx.clone();
+        let mut tx = self.coordinator_tx.clone();
 
-                if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
-                    block_timestamp,
-                    batches,
-                )) {
-                    warn!(
-                        "CommitNotification failed. Is the epoch shutting down? error: {}",
-                        e
-                    );
-                }
-            },
+        if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
+            block_timestamp,
+            batches,
+        )) {
+            warn!(
+                "CommitNotification failed. Is the epoch shutting down? error: {}",
+                e
+            );
         }
     }
 
-    /// Called from consensus to pre-fetch the transaction behind the batches in the block.
-    pub fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
+    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
         let request_txns_and_update_status =
             move |proof_with_status: &ProofWithData, batch_reader: Arc<dyn BatchReader>| {
-                let receivers = PayloadManager::request_transactions(
+                if proof_with_status.status.lock().is_some() {
+                    return;
+                }
+                let receivers = Self::request_transactions(
                     proof_with_status.proofs.clone(),
                     timestamp,
-                    batch_reader.clone(),
+                    batch_reader,
                 );
                 proof_with_status
                     .status
@@ -130,147 +200,63 @@ impl PayloadManager {
                     .replace(DataStatus::Requested(receivers));
             };
 
-        match self {
-            PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, _) => match payload {
-                Payload::InQuorumStore(proof_with_status) => {
-                    request_txns_and_update_status(proof_with_status, batch_reader.clone());
-                },
-                Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                    request_txns_and_update_status(
-                        &proof_with_data.proof_with_data,
-                        batch_reader.clone(),
-                    );
-                },
-                Payload::QuorumStoreInlineHybrid(_, proof_with_data, _) => {
-                    request_txns_and_update_status(proof_with_data, batch_reader.clone());
-                },
-                Payload::DirectMempool(_) => {
-                    unreachable!()
-                },
+        match payload {
+            Payload::InQuorumStore(proof_with_status) => {
+                request_txns_and_update_status(proof_with_status, self.batch_reader.clone());
             },
-        }
+            Payload::InQuorumStoreWithLimit(proof_with_data) => {
+                request_txns_and_update_status(
+                    &proof_with_data.proof_with_data,
+                    self.batch_reader.clone(),
+                );
+            },
+            Payload::QuorumStoreInlineHybrid(_, proof_with_data, _) => {
+                request_txns_and_update_status(proof_with_data, self.batch_reader.clone());
+            },
+            Payload::DirectMempool(_) => {
+                unreachable!()
+            },
+        };
     }
 
-    /// Extract transaction from a given block
-    /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
-    pub async fn get_transactions(
+    async fn get_transactions(
         &self,
         block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<usize>)> {
-        let payload = match block.payload() {
-            Some(p) => p,
-            None => return Ok((Vec::new(), None)),
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+        let Some(payload) = block.payload() else {
+            return Ok((Vec::new(), None));
         };
 
-        async fn process_payload(
-            proof_with_data: &ProofWithData,
-            batch_reader: Arc<dyn BatchReader>,
-            block: &Block,
-        ) -> ExecutorResult<Vec<SignedTransaction>> {
-            let status = proof_with_data.status.lock().take();
-            match status.expect("Should have been updated before.") {
-                DataStatus::Cached(data) => {
-                    counters::QUORUM_BATCH_READY_COUNT.inc();
-                    proof_with_data
-                        .status
-                        .lock()
-                        .replace(DataStatus::Cached(data.clone()));
-                    Ok(data)
-                },
-                DataStatus::Requested(receivers) => {
-                    let _timer = counters::BATCH_WAIT_DURATION.start_timer();
-                    let mut vec_ret = Vec::new();
-                    if !receivers.is_empty() {
-                        debug!(
-                            "QSE: waiting for data on {} receivers, block_round {}",
-                            receivers.len(),
-                            block.round()
-                        );
-                    }
-                    for (digest, rx) in receivers {
-                        match rx.await {
-                            Err(e) => {
-                                // We probably advanced epoch already.
-                                warn!(
-                                    "Oneshot channel to get a batch was dropped with error {:?}",
-                                    e
-                                );
-                                let new_receivers = PayloadManager::request_transactions(
-                                    proof_with_data.proofs.clone(),
-                                    block.timestamp_usecs(),
-                                    batch_reader.clone(),
-                                );
-                                // Could not get all data so requested again
-                                proof_with_data
-                                    .status
-                                    .lock()
-                                    .replace(DataStatus::Requested(new_receivers));
-                                return Err(DataNotFound(digest));
-                            },
-                            Ok(Ok(data)) => {
-                                vec_ret.push(data);
-                            },
-                            Ok(Err(e)) => {
-                                let new_receivers = PayloadManager::request_transactions(
-                                    proof_with_data.proofs.clone(),
-                                    block.timestamp_usecs(),
-                                    batch_reader.clone(),
-                                );
-                                // Could not get all data so requested again
-                                proof_with_data
-                                    .status
-                                    .lock()
-                                    .replace(DataStatus::Requested(new_receivers));
-                                return Err(e);
-                            },
-                        }
-                    }
-                    let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
-                    // execution asks for the data twice, so data is cached here for the second time.
-                    proof_with_data
-                        .status
-                        .lock()
-                        .replace(DataStatus::Cached(ret.clone()));
-                    Ok(ret)
-                },
-            }
-        }
-
-        match (self, payload) {
-            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => {
-                Ok((txns.clone(), None))
+        let transaction_payload = match payload {
+            Payload::InQuorumStore(proof_with_data) => {
+                let transactions =
+                    process_payload(proof_with_data, self.batch_reader.clone(), block).await?;
+                BlockTransactionPayload::new_in_quorum_store(
+                    transactions,
+                    proof_with_data.proofs.clone(),
+                )
             },
-            (
-                PayloadManager::InQuorumStore(batch_reader, _),
-                Payload::InQuorumStore(proof_with_data),
-            ) => Ok((
-                process_payload(proof_with_data, batch_reader.clone(), block).await?,
-                None,
-            )),
-            (
-                PayloadManager::InQuorumStore(batch_reader, _),
-                Payload::InQuorumStoreWithLimit(proof_with_data),
-            ) => Ok((
-                process_payload(
+            Payload::InQuorumStoreWithLimit(proof_with_data) => {
+                let transactions = process_payload(
                     &proof_with_data.proof_with_data,
-                    batch_reader.clone(),
+                    self.batch_reader.clone(),
                     block,
                 )
-                .await?,
-                proof_with_data.max_txns_to_execute,
-            )),
-            (
-                PayloadManager::InQuorumStore(batch_reader, _),
-                Payload::QuorumStoreInlineHybrid(
-                    inline_batches,
-                    proof_with_data,
-                    max_txns_to_execute,
-                ),
-            ) => Ok((
-                {
+                .await?;
+                BlockTransactionPayload::new_in_quorum_store_with_limit(
+                    transactions,
+                    proof_with_data.proof_with_data.proofs.clone(),
+                    proof_with_data.max_txns_to_execute,
+                )
+            },
+            Payload::QuorumStoreInlineHybrid(
+                inline_batches,
+                proof_with_data,
+                max_txns_to_execute,
+            ) => {
+                let all_transactions = {
                     let mut all_txns =
-                        process_payload(proof_with_data, batch_reader.clone(), block).await?;
+                        process_payload(proof_with_data, self.batch_reader.clone(), block).await?;
                     all_txns.append(
                         &mut inline_batches
                             .iter()
@@ -279,16 +265,197 @@ impl PayloadManager {
                             .collect(),
                     );
                     all_txns
-                },
-                *max_txns_to_execute,
-            )),
-            (_, _) => unreachable!(
+                };
+                let inline_batches = inline_batches
+                    .iter()
+                    .map(|(batch_info, _)| batch_info.clone())
+                    .collect();
+                BlockTransactionPayload::new_quorum_store_inline_hybrid(
+                    all_transactions,
+                    proof_with_data.proofs.clone(),
+                    *max_txns_to_execute,
+                    inline_batches,
+                )
+            },
+            _ => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,
                 block.block_data().epoch(),
                 block.block_data().round(),
                 block.id()
             ),
+        };
+
+        if let Some(consensus_publisher) = &self.maybe_consensus_publisher {
+            let message = ConsensusObserverMessage::new_block_payload_message(
+                block.gen_block_info(HashValue::zero(), 0, None),
+                transaction_payload.clone(),
+            );
+            consensus_publisher.publish_message(message).await;
         }
+
+        Ok((
+            transaction_payload.transactions(),
+            transaction_payload.limit(),
+        ))
+    }
+}
+
+/// Returns the transactions for the consensus observer payload manager
+async fn get_transactions_for_observer(
+    block: &Block,
+    block_payloads: &Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
+    consensus_publisher: &Option<Arc<ConsensusPublisher>>,
+) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    // The data should already be available (as consensus observer will only ever
+    // forward a block to the executor once the data has been received and verified).
+    let block_payload = match block_payloads.lock().entry((block.epoch(), block.round())) {
+        Entry::Occupied(mut value) => match value.get_mut() {
+            BlockPayloadStatus::AvailableAndVerified(block_payload) => block_payload.clone(),
+            BlockPayloadStatus::AvailableAndUnverified(_) => {
+                // This shouldn't happen (the payload should already be verified)
+                let error = format!(
+                    "Payload data for block epoch {}, round {} is unverified!",
+                    block.epoch(),
+                    block.round()
+                );
+                return Err(InternalError { error });
+            },
+        },
+        Entry::Vacant(_) => {
+            // This shouldn't happen (the payload should already be present)
+            let error = format!(
+                "Missing payload data for block epoch {}, round {}!",
+                block.epoch(),
+                block.round()
+            );
+            return Err(InternalError { error });
+        },
+    };
+
+    // If the payload is valid, publish it to any downstream observers
+    let transaction_payload = block_payload.transaction_payload;
+    if let Some(consensus_publisher) = consensus_publisher {
+        let message = ConsensusObserverMessage::new_block_payload_message(
+            block.gen_block_info(HashValue::zero(), 0, None),
+            transaction_payload.clone(),
+        );
+        consensus_publisher.publish_message(message).await;
+    }
+
+    // Return the transactions and the transaction limit
+    Ok((
+        transaction_payload.transactions(),
+        transaction_payload.limit(),
+    ))
+}
+
+async fn process_payload(
+    proof_with_data: &ProofWithData,
+    batch_reader: Arc<dyn BatchReader>,
+    block: &Block,
+) -> ExecutorResult<Vec<SignedTransaction>> {
+    let status = proof_with_data.status.lock().take();
+    match status.expect("Should have been updated before.") {
+        DataStatus::Cached(data) => {
+            counters::QUORUM_BATCH_READY_COUNT.inc();
+            proof_with_data
+                .status
+                .lock()
+                .replace(DataStatus::Cached(data.clone()));
+            Ok(data)
+        },
+        DataStatus::Requested(receivers) => {
+            let _timer = counters::BATCH_WAIT_DURATION.start_timer();
+            let mut vec_ret = Vec::new();
+            if !receivers.is_empty() {
+                debug!(
+                    "QSE: waiting for data on {} receivers, block_round {}",
+                    receivers.len(),
+                    block.round()
+                );
+            }
+            for (digest, rx) in receivers {
+                match rx.await {
+                    Err(e) => {
+                        // We probably advanced epoch already.
+                        warn!(
+                            "Oneshot channel to get a batch was dropped with error {:?}",
+                            e
+                        );
+                        let new_receivers = QuorumStorePayloadManager::request_transactions(
+                            proof_with_data.proofs.clone(),
+                            block.timestamp_usecs(),
+                            batch_reader.clone(),
+                        );
+                        // Could not get all data so requested again
+                        proof_with_data
+                            .status
+                            .lock()
+                            .replace(DataStatus::Requested(new_receivers));
+                        return Err(DataNotFound(digest));
+                    },
+                    Ok(Ok(data)) => {
+                        vec_ret.push(data);
+                    },
+                    Ok(Err(e)) => {
+                        let new_receivers = QuorumStorePayloadManager::request_transactions(
+                            proof_with_data.proofs.clone(),
+                            block.timestamp_usecs(),
+                            batch_reader.clone(),
+                        );
+                        // Could not get all data so requested again
+                        proof_with_data
+                            .status
+                            .lock()
+                            .replace(DataStatus::Requested(new_receivers));
+                        return Err(e);
+                    },
+                }
+            }
+            let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
+            // execution asks for the data twice, so data is cached here for the second time.
+            proof_with_data
+                .status
+                .lock()
+                .replace(DataStatus::Cached(ret.clone()));
+            Ok(ret)
+        },
+    }
+}
+
+pub struct ConsensusObserverPayloadManager {
+    txns_pool: Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
+}
+
+impl ConsensusObserverPayloadManager {
+    pub fn new(
+        txns_pool: Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    ) -> Self {
+        Self {
+            txns_pool,
+            consensus_publisher,
+        }
+    }
+}
+
+#[async_trait]
+impl TPayloadManager for ConsensusObserverPayloadManager {
+    fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {
+        // noop
+    }
+
+    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {
+        // noop
+    }
+
+    async fn get_transactions(
+        &self,
+        block: &Block,
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+        return get_transactions_for_observer(block, &self.txns_pool, &self.consensus_publisher)
+            .await;
     }
 }

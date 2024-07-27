@@ -11,10 +11,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/serialize_model.move:28: bcs_test1_incorrect
    =     at tests/sources/functional/serialize_model.move:29: bcs_test1_incorrect
    =     at tests/sources/functional/serialize_model.move:30: bcs_test1_incorrect
-   =         s2 = <redacted>
-   =         s1 = <redacted>
-   =         return[0] = <redacted>
-   =         return[1] = <redacted>
    =         result_1 = <redacted>
    =         result_2 = <redacted>
    =     at tests/sources/functional/serialize_model.move:31: bcs_test1_incorrect

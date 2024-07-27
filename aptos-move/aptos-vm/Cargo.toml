@@ -36,6 +36,8 @@ aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-groth16 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
@@ -45,7 +47,6 @@ fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 move-binary-format = { workspace = true }
-move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-unit-test = { workspace = true, optional = true }
 move-vm-runtime = { workspace = true }

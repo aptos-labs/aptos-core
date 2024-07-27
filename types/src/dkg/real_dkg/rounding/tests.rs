@@ -7,7 +7,7 @@ use crate::dkg::real_dkg::rounding::{
     DEFAULT_SECRECY_THRESHOLD,
 };
 use aptos_dkg::pvss::WeightedConfig;
-use claims::assert_lt;
+use claims::assert_le;
 use fixed::types::U64F64;
 use rand::{thread_rng, Rng};
 use std::ops::Deref;
@@ -363,8 +363,8 @@ fn test_infallible_rounding_brute_force() {
             let num_subsets: u64 = 1 << n;
             let weight_total = U64F64::from_num(profile.validator_weights.iter().sum::<u64>());
 
-            // With default thresholds, weight_total <= (n/2 + 2)/(recon_threshod - secrecy_threshold) + rounding_weight_gain_total <= ceil((n/2 + 2)/(recon_threshod - secrecy_threshold)) + n/2
-            assert_lt!(
+            // With default thresholds, weight_total <= (n/2 + 2)/(recon_threshold - secrecy_threshold) + rounding_weight_gain_total <= ceil((n/2 + 2)/(recon_threshold - secrecy_threshold)) + n/2
+            assert_le!(
                 weight_total,
                 ((n_halved + two) / (*DEFAULT_RECONSTRUCT_THRESHOLD - *DEFAULT_SECRECY_THRESHOLD))
                     .ceil()

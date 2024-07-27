@@ -7,7 +7,7 @@ use crate::{
     network::{IncomingDAGRequest, NetworkSender, RpcResponder},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     pipeline::{buffer_manager::OrderedBlocks, execution_client::DummyExecutionClient},
     test_utils::{consensus_runtime, MockPayloadManager, MockStorage},
 };
@@ -78,7 +78,7 @@ impl DagBootstrapUnit {
         let network = Arc::new(network);
 
         let payload_client = Arc::new(MockPayloadManager::new(None));
-        let payload_manager = Arc::new(PayloadManager::DirectMempool);
+        let payload_manager = Arc::new(DirectMempoolPayloadManager::new());
 
         let execution_client = Arc::new(DummyExecutionClient);
 
@@ -158,7 +158,7 @@ fn create_network(
         playground.peer_protocols(),
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let network_events = NetworkEvents::new(consensus_rx, None);
+    let network_events = NetworkEvents::new(consensus_rx, None, true);
 
     let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);

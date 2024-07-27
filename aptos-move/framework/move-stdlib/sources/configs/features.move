@@ -29,6 +29,8 @@ module std::features {
 
     const EINVALID_FEATURE: u64 = 1;
     const EAPI_DISABLED: u64 = 2;
+    /// Deployed to production, and disabling is deprecated.
+    const EFEATURE_CANNOT_BE_DISABLED: u64 = 3;
 
     // --------------------------------------------------------------------------------------------
     // Code Publishing
@@ -222,10 +224,12 @@ module std::features {
     /// Lifetime: transient
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
 
-    public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
+    public fun get_auids(): u64 {
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+     }
 
-    public fun auids_enabled(): bool acquires Features {
-        is_enabled(APTOS_UNIQUE_IDENTIFIERS)
+    public fun auids_enabled(): bool {
+        true
     }
 
     /// Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
@@ -264,15 +268,12 @@ module std::features {
     /// Lifetime: transient
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
 
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_API: u64 = 30;
+    public fun get_aggregator_v2_api_feature(): u64 {
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
 
-    public fun get_aggregator_v2_api_feature(): u64 { AGGREGATOR_V2_API }
-
-    public fun aggregator_v2_api_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_V2_API)
+    public fun aggregator_v2_api_enabled(): bool {
+        true
     }
 
     #[deprecated]
@@ -303,31 +304,22 @@ module std::features {
 
     const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
 
-    /// Whether the Aggregator V2 delayed fields feature is enabled.
-    /// Once enabled, Aggregator V2 functions become parallel.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_DELAYED_FIELDS: u64 = 36;
+    public fun get_concurrent_token_v2_feature(): u64 {
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
 
-    /// Whether enable TokenV2 collection creation and Fungible Asset creation
-    /// to create higher throughput concurrent variants.
-    /// Lifetime: transient
-    const CONCURRENT_TOKEN_V2: u64 = 37;
-
-    public fun get_concurrent_token_v2_feature(): u64 { CONCURRENT_TOKEN_V2 }
-
-    public fun concurrent_token_v2_enabled(): bool acquires Features {
-        // concurrent token v2 cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_TOKEN_V2) && aggregator_v2_api_enabled()
+    public fun concurrent_token_v2_enabled(): bool {
+        true
     }
 
     #[deprecated]
     public fun get_concurrent_assets_feature(): u64 {
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     #[deprecated]
     public fun concurrent_assets_enabled(): bool {
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
@@ -415,8 +407,7 @@ module std::features {
     public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
 
     public fun concurrent_fungible_assets_enabled(): bool acquires Features {
-        // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
+        is_enabled(CONCURRENT_FUNGIBLE_ASSETS)
     }
 
     /// Whether deploying to objects is enabled.
@@ -503,11 +494,92 @@ module std::features {
 
     const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
 
+    #[deprecated]
     public fun get_primary_apt_fungible_store_at_user_address_feature(
-    ): u64 { PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS }
+    ): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
 
+    #[deprecated]
     public fun primary_apt_fungible_store_at_user_address_enabled(): bool acquires Features {
         is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
+    }
+
+    const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
+
+    public fun aggregator_v2_is_at_least_api_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_V2_IS_AT_LEAST_API)
+    }
+
+    /// Whether we use more efficient native implementation of computing object derived address
+    const OBJECT_NATIVE_DERIVED_ADDRESS: u64 = 62;
+
+    public fun get_object_native_derived_address_feature(): u64 { OBJECT_NATIVE_DERIVED_ADDRESS }
+
+    public fun object_native_derived_address_enabled(): bool acquires Features {
+        is_enabled(OBJECT_NATIVE_DERIVED_ADDRESS)
+    }
+
+    /// Whether the dispatchable fungible asset standard feature is enabled.
+    ///
+    /// Lifetime: transient
+    const DISPATCHABLE_FUNGIBLE_ASSET: u64 = 63;
+
+    public fun get_dispatchable_fungible_asset_feature(): u64 { DISPATCHABLE_FUNGIBLE_ASSET }
+
+    public fun dispatchable_fungible_asset_enabled(): bool acquires Features {
+        is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
+    }
+
+    /// Lifetime: transient
+    const NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE: u64 = 64;
+
+    public fun get_new_accounts_default_to_fa_apt_store_feature(): u64 { NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE }
+
+    public fun new_accounts_default_to_fa_apt_store_enabled(): bool acquires Features {
+        is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
+    }
+
+    /// Lifetime: transient
+    const OPERATIONS_DEFAULT_TO_FA_APT_STORE: u64 = 65;
+
+    public fun get_operations_default_to_fa_apt_store_feature(): u64 { OPERATIONS_DEFAULT_TO_FA_APT_STORE }
+
+    public fun operations_default_to_fa_apt_store_enabled(): bool acquires Features {
+        is_enabled(OPERATIONS_DEFAULT_TO_FA_APT_STORE)
+    }
+
+    /// Whether enable concurent Fungible Balance
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_FUNGIBLE_BALANCE: u64 = 67;
+
+    public fun get_concurrent_fungible_balance_feature(): u64 { CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether to default new Fungible Store to the concurrent variant.
+    /// Lifetime: transient
+    const DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 68;
+
+    public fun get_default_to_concurrent_fungible_balance_feature(): u64 { DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun default_to_concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether the multisig v2 fix is enabled. Once enabled, the multisig transaction execution will explicitly
+    /// abort if the provided payload does not match the payload stored on-chain.
+    ///
+    /// Lifetime: transient
+    const ABORT_IF_MULTISIG_PAYLOAD_MISMATCH: u64 = 70;
+
+    public fun get_abort_if_multisig_payload_mismatch_feature(): u64 { ABORT_IF_MULTISIG_PAYLOAD_MISMATCH }
+
+    public fun abort_if_multisig_payload_mismatch_enabled(): bool acquires Features {
+        is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
     // ============================================================================================
@@ -581,11 +653,15 @@ module std::features {
     ///
     /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
     /// who have permission to set the flag that's checked in `extract()`.
-    public fun on_new_epoch(vm_or_framework: &signer) acquires Features, PendingFeatures {
-        ensure_vm_or_framework_signer(vm_or_framework);
+    public fun on_new_epoch(framework: &signer) acquires Features, PendingFeatures {
+        ensure_framework_signer(framework);
         if (exists<PendingFeatures>(@std)) {
             let PendingFeatures { features } = move_from<PendingFeatures>(@std);
-            borrow_global_mut<Features>(@std).features = features;
+            if (exists<Features>(@std)) {
+                borrow_global_mut<Features>(@std).features = features;
+            } else {
+                move_to(framework, Features { features })
+            }
         }
     }
 
@@ -626,9 +702,9 @@ module std::features {
         });
     }
 
-    fun ensure_vm_or_framework_signer(account: &signer) {
+    fun ensure_framework_signer(account: &signer) {
         let addr = signer::address_of(account);
-        assert!(addr == @std || addr == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+        assert!(addr == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
     }
 
     #[verify_only]

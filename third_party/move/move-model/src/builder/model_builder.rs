@@ -8,18 +8,19 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Address, Attribute, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Address, Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId, TypeParameter,
+        FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
+        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
     ty::{Constraint, Type, TypeDisplayContext},
     well_known,
 };
 use codespan_reporting::diagnostic::Severity;
+use itertools::Itertools;
 use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
@@ -119,11 +120,30 @@ pub(crate) struct StructEntry {
     pub struct_id: StructId,
     pub type_params: Vec<TypeParameter>,
     pub abilities: AbilitySet,
-    pub fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+    pub layout: StructLayout,
     pub attributes: Vec<Attribute>,
     /// Maps simple function names to the qualified symbols of receiver functions. The
     /// symbol can be used to index the global function table.
     pub receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
+    /// Whether the struct is originally empty
+    /// always false when it is enum
+    pub is_empty_struct: bool,
+    pub is_native: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum StructLayout {
+    Singleton(BTreeMap<Symbol, FieldData>),
+    Variants(Vec<StructVariant>),
+    None,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct StructVariant {
+    pub loc: Loc,
+    pub name: Symbol,
+    pub attributes: Vec<Attribute>,
+    pub fields: BTreeMap<Symbol, FieldData>,
 }
 
 /// A declaration of a function.
@@ -335,7 +355,8 @@ impl<'env> ModelBuilder<'env> {
         struct_id: StructId,
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
-        fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+        layout: StructLayout,
+        is_native: bool,
     ) {
         let entry = StructEntry {
             loc,
@@ -344,8 +365,10 @@ impl<'env> ModelBuilder<'env> {
             struct_id,
             abilities,
             type_params,
-            fields,
+            layout,
             receiver_functions: BTreeMap::new(),
+            is_empty_struct: false,
+            is_native,
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
@@ -452,6 +475,37 @@ impl<'env> ModelBuilder<'env> {
         self.const_table.insert(name, entry);
     }
 
+    /// Adds friend declarations for package visibility.
+    /// This should only be called when all modules are loaded.
+    pub fn add_friend_decl_for_package_visibility(&mut self) {
+        let target_modules = self
+            .env
+            .get_modules()
+            .filter(|module_env| module_env.is_primary_target() && !module_env.is_script_module())
+            .map(|module_env| module_env.get_id())
+            .collect_vec();
+        for cur_mod in target_modules {
+            let cur_mod_env = self.env.get_module(cur_mod);
+            let cur_mod_name = cur_mod_env.get_name().clone();
+            for need_to_be_friended_by in cur_mod_env.need_to_be_friended_by() {
+                let need_to_be_friend_with = self.env.get_module_data_mut(need_to_be_friended_by);
+                let already_friended = need_to_be_friend_with
+                    .friend_decls
+                    .iter()
+                    .any(|friend_decl| friend_decl.module_name == cur_mod_name);
+                if !already_friended {
+                    let loc = need_to_be_friend_with.loc.clone();
+                    let friend_decl = FriendDecl {
+                        loc,
+                        module_name: cur_mod_name.clone(),
+                        module_id: Some(cur_mod),
+                    };
+                    need_to_be_friend_with.friend_decls.push(friend_decl);
+                }
+            }
+        }
+    }
+
     pub fn resolve_address(&self, loc: &Loc, addr: &EA::Address) -> NumericalAddress {
         match addr {
             EA::Address::Numerical(_, bytes) => bytes.value,
@@ -483,18 +537,37 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
-    /// Looks up the fields of a structure, with instantiated field types.
-    pub fn lookup_struct_fields(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+    /// Looks up the fields of a structure, with instantiated field types. Returns empty
+    /// map if the struct has variants.
+    pub fn lookup_struct_fields(
+        &self,
+        id: &QualifiedInstId<StructId>,
+    ) -> (BTreeMap<Symbol, Type>, bool) {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        entry
-            .fields
-            .as_ref()
-            .map(|f| {
-                f.iter()
-                    .map(|(n, (_, _, field_ty))| (*n, field_ty.instantiate(&id.inst)))
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .unwrap_or_default()
+        let instantiate_fields = |fields: &BTreeMap<Symbol, FieldData>, common_only: bool| {
+            fields
+                .values()
+                .filter_map(|f| {
+                    if !common_only || f.common_for_variants {
+                        Some((f.name, f.ty.instantiate(&id.inst)))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+        match &entry.layout {
+            StructLayout::Singleton(fields) => (instantiate_fields(fields, false), false),
+            StructLayout::Variants(variants) => (
+                if variants.is_empty() {
+                    BTreeMap::new()
+                } else {
+                    instantiate_fields(&variants[0].fields, true)
+                },
+                true,
+            ),
+            _ => (BTreeMap::new(), false),
+        }
     }
 
     /// Looks up a receiver function for a given type.
@@ -513,6 +586,11 @@ impl<'env> ModelBuilder<'env> {
     /// Looks up the StructEntry for a qualified id.
     pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
         let struct_name = self.get_struct_name(id);
+        self.lookup_struct_entry_by_name(struct_name)
+    }
+
+    /// Looks up the StructEntry by `struct_name`
+    pub fn lookup_struct_entry_by_name(&self, struct_name: &QualifiedSymbol) -> &StructEntry {
         self.struct_table
             .get(struct_name)
             .expect("invalid Type::Struct")

@@ -122,7 +122,7 @@ impl NativeFunctions {
             let fun_sig = format!("{}", sig);
             let function_selector =
                 format!("0x{:x}", Keccak256::digest(fun_sig.as_bytes()))[..10].to_string();
-            let para_vec = vec![function_selector, "224".to_string()];
+            let para_vec = [function_selector, "224".to_string()];
             let shl224 =
                 gen.parent
                     .call_builtin_str(ctx, YulFunction::Shl, para_vec.iter().cloned());

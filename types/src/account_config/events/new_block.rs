@@ -21,15 +21,15 @@ use serde::{Deserialize, Serialize};
 /// Should be kept in-sync with NewBlockEvent move struct in block.move.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NewBlockEvent {
-    hash: AccountAddress,
-    epoch: u64,
-    round: u64,
-    height: u64,
-    previous_block_votes_bitvec: Vec<u8>,
-    proposer: AccountAddress,
-    failed_proposer_indices: Vec<u64>,
+    pub hash: AccountAddress,
+    pub epoch: u64,
+    pub round: u64,
+    pub height: u64,
+    pub previous_block_votes_bitvec: Vec<u8>,
+    pub proposer: AccountAddress,
+    pub failed_proposer_indices: Vec<u64>,
     // usecs (microseconds)
-    timestamp: u64,
+    pub timestamp: u64,
 }
 
 impl NewBlockEvent {

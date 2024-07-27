@@ -2,43 +2,44 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    fat_type::{FatStructType, FatType},
-    resolver::Resolver,
-};
-use anyhow::{anyhow, Result};
+use crate::fat_type::{FatStructType, FatType, WrappedAbilitySet};
+use anyhow::{anyhow, bail};
 pub use limit::Limiter;
 use move_binary_format::{
+    access::{ModuleAccess, ScriptAccess},
+    binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError},
-    file_format::{Ability, AbilitySet},
+    file_format::{
+        Ability, AbilitySet, CompiledScript, SignatureToken, StructDefinitionIndex,
+        StructFieldInformation, StructHandleIndex,
+    },
+    views::FunctionHandleView,
     CompiledModule,
 };
-use move_bytecode_utils::layout::TypeLayoutBuilder;
+use move_bytecode_utils::{compiled_module_viewer::CompiledModuleView, layout::TypeLayoutBuilder};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::ModuleResolver,
+    transaction_argument::{convert_txn_args, TransactionArgument},
     u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
 };
 use serde::ser::{SerializeMap, SerializeSeq};
 use std::{
+    borrow::Borrow,
     convert::{TryFrom, TryInto},
     fmt::{Display, Formatter},
-    rc::Rc,
 };
 
 mod fat_type;
 mod limit;
-mod module_cache;
-mod resolver;
 
 #[derive(Clone, Debug)]
 pub struct AnnotatedMoveStruct {
     pub abilities: AbilitySet,
-    pub type_: StructTag,
+    pub ty_tag: StructTag,
     pub value: Vec<(Identifier, AnnotatedMoveValue)>,
 }
 
@@ -63,7 +64,7 @@ pub enum AnnotatedMoveValue {
 }
 
 impl AnnotatedMoveValue {
-    pub fn get_type(&self) -> TypeTag {
+    pub fn ty_tag(&self) -> TypeTag {
         use AnnotatedMoveValue::*;
         match self {
             U8(_) => TypeTag::U8,
@@ -76,42 +77,65 @@ impl AnnotatedMoveValue {
             Address(_) => TypeTag::Address,
             Vector(t, _) => t.clone(),
             Bytes(_) => TypeTag::Vector(Box::new(TypeTag::U8)),
-            Struct(s) => TypeTag::Struct(Box::new(s.type_.clone())),
+            Struct(s) => TypeTag::Struct(Box::new(s.ty_tag.clone())),
         }
     }
 }
 
-pub struct MoveValueAnnotator<'a, T: ?Sized> {
-    cache: Resolver<'a, T>,
+pub struct MoveValueAnnotator<V> {
+    module_viewer: V,
 }
 
-impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
-    pub fn new(view: &'a T) -> Self {
-        Self {
-            cache: Resolver::new(view),
+impl<V: CompiledModuleView> MoveValueAnnotator<V> {
+    pub fn new(module_viewer: V) -> Self {
+        Self { module_viewer }
+    }
+
+    pub fn get_type_layout_runtime(&self, type_tag: &TypeTag) -> anyhow::Result<MoveTypeLayout> {
+        TypeLayoutBuilder::build_runtime(type_tag, &self.module_viewer)
+    }
+
+    pub fn get_type_layout_with_fields(
+        &self,
+        type_tag: &TypeTag,
+    ) -> anyhow::Result<MoveTypeLayout> {
+        TypeLayoutBuilder::build_with_fields(type_tag, &self.module_viewer)
+    }
+
+    pub fn get_type_layout_with_types(&self, type_tag: &TypeTag) -> anyhow::Result<MoveTypeLayout> {
+        TypeLayoutBuilder::build_with_types(type_tag, &self.module_viewer)
+    }
+
+    pub fn view_module(&self, id: &ModuleId) -> anyhow::Result<Option<V::Item>> {
+        self.module_viewer.view_compiled_module(id)
+    }
+
+    pub fn view_existing_module(&self, id: &ModuleId) -> anyhow::Result<V::Item> {
+        match self.view_module(id)? {
+            Some(module) => Ok(module),
+            None => bail!("Module {:?} can't be found", id),
         }
     }
 
-    pub fn new_with_max_bytecode_version(view: &'a T, max_bytecode_version: u32) -> Self {
-        Self {
-            cache: Resolver::new_with_max_bytecode_version(view, max_bytecode_version),
-        }
-    }
-
-    pub fn get_module(&self, module: &ModuleId) -> Result<Rc<CompiledModule>> {
-        self.cache.get_module_by_id_or_err(module)
-    }
-
-    pub fn get_type_layout_runtime(&self, type_tag: &TypeTag) -> Result<MoveTypeLayout> {
-        TypeLayoutBuilder::build_runtime(type_tag, &self.cache)
-    }
-
-    pub fn get_type_layout_with_fields(&self, type_tag: &TypeTag) -> Result<MoveTypeLayout> {
-        TypeLayoutBuilder::build_with_fields(type_tag, &self.cache)
-    }
-
-    pub fn get_type_layout_with_types(&self, type_tag: &TypeTag) -> Result<MoveTypeLayout> {
-        TypeLayoutBuilder::build_with_types(type_tag, &self.cache)
+    pub fn view_script_arguments(
+        &self,
+        script_bytes: &[u8],
+        args: &[TransactionArgument],
+        ty_args: &[TypeTag],
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        let mut limit = Limiter::default();
+        let compiled_script = CompiledScript::deserialize(script_bytes)
+            .map_err(|err| anyhow!("Failed to deserialzie script: {:?}", err))?;
+        let param_tys = compiled_script
+            .signature_at(compiled_script.parameters)
+            .0
+            .iter()
+            .map(|tok| {
+                self.resolve_signature(BinaryIndexedView::Script(&compiled_script), tok, &mut limit)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let args_bytes = convert_txn_args(args);
+        self.view_arguments_impl(&param_tys, ty_args, &args_bytes, &mut limit)
     }
 
     pub fn view_function_arguments(
@@ -120,12 +144,21 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         function: &IdentStr,
         ty_args: &[TypeTag],
         args: &[Vec<u8>],
-    ) -> Result<Vec<AnnotatedMoveValue>> {
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
         let mut limit = Limiter::default();
-        let types: Vec<FatType> = self
-            .cache
-            .resolve_function_arguments(module, function)?
-            .into_iter()
+        let param_tys = self.resolve_function_arguments(module, function, &mut limit)?;
+        self.view_arguments_impl(&param_tys, ty_args, args, &mut limit)
+    }
+
+    fn view_arguments_impl(
+        &self,
+        param_tys: &[FatType],
+        ty_args: &[TypeTag],
+        args: &[Vec<u8>],
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        let types: Vec<&FatType> = param_tys
+            .iter()
             .filter(|t| match t {
                 FatType::Signer => false,
                 FatType::Reference(inner) => !matches!(&**inner, FatType::Signer),
@@ -157,16 +190,43 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
             .iter()
             .enumerate()
             .map(|(i, ty)| {
-                ty.subst(&ty_args, &mut limit)
+                ty.subst(&ty_args, limit)
                     .map_err(anyhow::Error::from)
-                    .and_then(|fat_type| {
-                        self.view_value_by_fat_type(&fat_type, &args[i], &mut limit)
-                    })
+                    .and_then(|fat_type| self.view_value_by_fat_type(&fat_type, &args[i], limit))
             })
-            .collect::<Result<Vec<AnnotatedMoveValue>>>()
+            .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
     }
 
-    pub fn view_resource(&self, tag: &StructTag, blob: &[u8]) -> Result<AnnotatedMoveStruct> {
+    fn resolve_function_arguments(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<FatType>> {
+        let m = self.view_existing_module(module)?;
+        let m = m.borrow();
+        for def in m.function_defs.iter() {
+            let fhandle = m.function_handle_at(def.function);
+            let fhandle_view = FunctionHandleView::new(m, fhandle);
+            if fhandle_view.name() == function {
+                return fhandle_view
+                    .parameters()
+                    .0
+                    .iter()
+                    .map(|signature| {
+                        self.resolve_signature(BinaryIndexedView::Module(m), signature, limit)
+                    })
+                    .collect::<anyhow::Result<_>>();
+            }
+        }
+        Err(anyhow!("Function {:?} not found in {:?}", function, module))
+    }
+
+    pub fn view_resource(
+        &self,
+        tag: &StructTag,
+        blob: &[u8],
+    ) -> anyhow::Result<AnnotatedMoveStruct> {
         self.view_resource_with_limit(tag, blob, &mut Limiter::default())
     }
 
@@ -175,8 +235,8 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         tag: &StructTag,
         blob: &[u8],
         limit: &mut Limiter,
-    ) -> Result<AnnotatedMoveStruct> {
-        let ty = self.cache.resolve_struct(tag)?;
+    ) -> anyhow::Result<AnnotatedMoveStruct> {
+        let ty = self.resolve_struct(tag)?;
         let struct_def = (&ty).try_into().map_err(into_vm_status)?;
         let move_struct = MoveStruct::simple_deserialize(blob, &struct_def)?;
         self.annotate_struct(&move_struct, &ty, limit)
@@ -186,12 +246,11 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         &self,
         tag: &StructTag,
         blob: &[u8],
-    ) -> Result<Vec<(Identifier, MoveValue)>> {
-        let ty = self.cache.resolve_struct(tag)?;
+    ) -> anyhow::Result<Vec<(Identifier, MoveValue)>> {
+        let ty = self.resolve_struct(tag)?;
         let struct_def = (&ty).try_into().map_err(into_vm_status)?;
         Ok(match MoveStruct::simple_deserialize(blob, &struct_def)? {
             MoveStruct::Runtime(runtime) => self
-                .cache
                 .get_field_names(&ty)?
                 .into_iter()
                 .zip(runtime)
@@ -200,9 +259,163 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         })
     }
 
-    pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> Result<AnnotatedMoveValue> {
+    fn resolve_struct(&self, struct_tag: &StructTag) -> anyhow::Result<FatStructType> {
+        self.resolve_struct_impl(struct_tag, &mut Limiter::default())
+    }
+
+    fn resolve_struct_impl(
+        &self,
+        struct_tag: &StructTag,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<FatStructType> {
+        let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
+        let module = self.view_existing_module(&module_id)?;
+        let module = module.borrow();
+
+        let struct_def = find_struct_def_in_module(module, struct_tag.name.as_ident_str())?;
+        let ty_args = struct_tag
+            .type_args
+            .iter()
+            .map(|ty| self.resolve_type_impl(ty, limit))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let ty_body = self.resolve_struct_definition(module, struct_def, limit)?;
+        ty_body.subst(&ty_args, limit).map_err(|e: PartialVMError| {
+            anyhow!("StructTag {:?} cannot be resolved: {:?}", struct_tag, e)
+        })
+    }
+
+    fn resolve_struct_definition(
+        &self,
+        module: &CompiledModule,
+        idx: StructDefinitionIndex,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<FatStructType> {
+        let struct_def = module.struct_def_at(idx);
+        let struct_handle = module.struct_handle_at(struct_def.struct_handle);
+        let address = *module.address();
+        let module_name = module.name().to_owned();
+        let name = module.identifier_at(struct_handle.name).to_owned();
+        let abilities = struct_handle.abilities;
+        let ty_args = (0..struct_handle.type_parameters.len())
+            .map(FatType::TyParam)
+            .collect();
+
+        limit.charge(std::mem::size_of::<AccountAddress>())?;
+        limit.charge(module_name.as_bytes().len())?;
+        limit.charge(name.as_bytes().len())?;
+
+        match &struct_def.field_information {
+            StructFieldInformation::Native => Err(anyhow!("Unexpected Native Struct")),
+            StructFieldInformation::Declared(defs) => Ok(FatStructType {
+                address,
+                module: module_name,
+                name,
+                abilities: WrappedAbilitySet(abilities),
+                ty_args,
+                layout: defs
+                    .iter()
+                    .map(|field_def| {
+                        self.resolve_signature(
+                            BinaryIndexedView::Module(module),
+                            &field_def.signature.0,
+                            limit,
+                        )
+                    })
+                    .collect::<anyhow::Result<_>>()?,
+            }),
+            StructFieldInformation::DeclaredVariants(..) => Err(anyhow!(
+                "Struct variants not yet supported by resource viewer"
+            )),
+        }
+    }
+
+    fn resolve_signature(
+        &self,
+        module: BinaryIndexedView,
+        sig: &SignatureToken,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<FatType> {
+        Ok(match sig {
+            SignatureToken::Bool => FatType::Bool,
+            SignatureToken::U8 => FatType::U8,
+            SignatureToken::U16 => FatType::U16,
+            SignatureToken::U32 => FatType::U32,
+            SignatureToken::U64 => FatType::U64,
+            SignatureToken::U128 => FatType::U128,
+            SignatureToken::U256 => FatType::U256,
+            SignatureToken::Address => FatType::Address,
+            SignatureToken::Signer => FatType::Signer,
+            SignatureToken::Vector(ty) => {
+                FatType::Vector(Box::new(self.resolve_signature(module, ty, limit)?))
+            },
+            SignatureToken::Struct(idx) => {
+                FatType::Struct(Box::new(self.resolve_struct_handle(module, *idx, limit)?))
+            },
+            SignatureToken::StructInstantiation(idx, toks) => {
+                let struct_ty = self.resolve_struct_handle(module, *idx, limit)?;
+                let args = toks
+                    .iter()
+                    .map(|tok| self.resolve_signature(module, tok, limit))
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                FatType::Struct(Box::new(
+                    struct_ty
+                        .subst(&args, limit)
+                        .map_err(|status| anyhow!("Substitution failure: {:?}", status))?,
+                ))
+            },
+            SignatureToken::TypeParameter(idx) => FatType::TyParam(*idx as usize),
+            SignatureToken::MutableReference(_) => return Err(anyhow!("Unexpected Reference")),
+            SignatureToken::Reference(inner) => match **inner {
+                SignatureToken::Signer => FatType::Reference(Box::new(FatType::Signer)),
+                _ => return Err(anyhow!("Unexpected Reference")),
+            },
+        })
+    }
+
+    fn resolve_struct_handle(
+        &self,
+        module: BinaryIndexedView,
+        idx: StructHandleIndex,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<FatStructType> {
+        let struct_handle = module.struct_handle_at(idx);
+        let target_module = {
+            let module_handle = module.module_handle_at(struct_handle.module);
+            let module_id = ModuleId::new(
+                *module.address_identifier_at(module_handle.address),
+                module.identifier_at(module_handle.name).to_owned(),
+            );
+            self.view_existing_module(&module_id)?
+        };
+        let target_module = target_module.borrow();
+        let target_idx =
+            find_struct_def_in_module(target_module, module.identifier_at(struct_handle.name))?;
+        self.resolve_struct_definition(target_module, target_idx, limit)
+    }
+
+    fn resolve_type_impl(
+        &self,
+        type_tag: &TypeTag,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<FatType> {
+        Ok(match type_tag {
+            TypeTag::Address => FatType::Address,
+            TypeTag::Signer => FatType::Signer,
+            TypeTag::Bool => FatType::Bool,
+            TypeTag::Struct(st) => FatType::Struct(Box::new(self.resolve_struct_impl(st, limit)?)),
+            TypeTag::U8 => FatType::U8,
+            TypeTag::U16 => FatType::U16,
+            TypeTag::U32 => FatType::U32,
+            TypeTag::U64 => FatType::U64,
+            TypeTag::U256 => FatType::U256,
+            TypeTag::U128 => FatType::U128,
+            TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
+        })
+    }
+
+    pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {
         let mut limit = Limiter::default();
-        let ty = self.cache.resolve_type_impl(ty_tag, &mut limit)?;
+        let ty = self.resolve_type_impl(ty_tag, &mut limit)?;
         self.view_value_by_fat_type(&ty, blob, &mut limit)
     }
 
@@ -211,7 +424,7 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         ty: &FatType,
         blob: &[u8],
         limit: &mut Limiter,
-    ) -> Result<AnnotatedMoveValue> {
+    ) -> anyhow::Result<AnnotatedMoveValue> {
         let layout = ty.try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
         self.annotate_value(&move_value, ty, limit)
@@ -222,11 +435,11 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         move_struct: &MoveStruct,
         ty: &FatStructType,
         limit: &mut Limiter,
-    ) -> Result<AnnotatedMoveStruct> {
+    ) -> anyhow::Result<AnnotatedMoveStruct> {
         let struct_tag = ty
             .struct_tag(limit)
             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let field_names = self.cache.get_field_names(ty)?;
+        let field_names = self.get_field_names(ty)?;
         for names in field_names.iter() {
             limit.charge(names.as_bytes().len())?;
         }
@@ -236,9 +449,28 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         }
         Ok(AnnotatedMoveStruct {
             abilities: ty.abilities.0,
-            type_: struct_tag,
+            ty_tag: struct_tag,
             value: field_names.into_iter().zip(annotated_fields).collect(),
         })
+    }
+
+    fn get_field_names(&self, ty: &FatStructType) -> anyhow::Result<Vec<Identifier>> {
+        let module_id = ModuleId::new(ty.address, ty.module.clone());
+        let module = self.view_existing_module(&module_id)?;
+        let module = module.borrow();
+        let struct_def_idx = find_struct_def_in_module(module, ty.name.as_ident_str())?;
+        let struct_def = module.struct_def_at(struct_def_idx);
+
+        match &struct_def.field_information {
+            StructFieldInformation::Native => Err(anyhow!("Unexpected Native Struct")),
+            StructFieldInformation::Declared(defs) => Ok(defs
+                .iter()
+                .map(|field_def| module.identifier_at(field_def.name).to_owned())
+                .collect()),
+            StructFieldInformation::DeclaredVariants(..) => Err(anyhow!(
+                "Struct variants not yet supported by resource viewer"
+            )),
+        }
     }
 
     fn annotate_value(
@@ -246,7 +478,7 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         value: &MoveValue,
         ty: &FatType,
         limit: &mut Limiter,
-    ) -> Result<AnnotatedMoveValue> {
+    ) -> anyhow::Result<AnnotatedMoveValue> {
         Ok(match (value, ty) {
             (MoveValue::Bool(b), FatType::Bool) => AnnotatedMoveValue::Bool(*b),
             (MoveValue::U8(i), FatType::U8) => AnnotatedMoveValue::U8(*i),
@@ -263,13 +495,13 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
                             MoveValue::U8(i) => Ok(*i),
                             _ => Err(anyhow!("unexpected value type")),
                         })
-                        .collect::<Result<_>>()?,
+                        .collect::<anyhow::Result<_>>()?,
                 ),
                 _ => AnnotatedMoveValue::Vector(
                     ty.type_tag(limit).unwrap(),
                     a.iter()
                         .map(|v| self.annotate_value(v, ty.as_ref(), limit))
-                        .collect::<Result<_>>()?,
+                        .collect::<anyhow::Result<_>>()?,
                 ),
             },
             (MoveValue::Struct(s), FatType::Struct(ty)) => {
@@ -294,6 +526,23 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
             },
         })
     }
+}
+
+fn find_struct_def_in_module(
+    module: &CompiledModule,
+    name: &IdentStr,
+) -> anyhow::Result<StructDefinitionIndex> {
+    for (i, defs) in module.struct_defs().iter().enumerate() {
+        let st_handle = module.struct_handle_at(defs.struct_handle);
+        if module.identifier_at(st_handle.name) == name {
+            return Ok(StructDefinitionIndex::new(i as u16));
+        }
+    }
+    Err(anyhow!(
+        "Struct {:?} not found in {:?}",
+        name,
+        module.self_id()
+    ))
 }
 
 fn into_vm_status(e: PartialVMError) -> VMStatus {
@@ -342,7 +591,7 @@ fn pretty_print_struct(
     indent: u64,
 ) -> std::fmt::Result {
     pretty_print_ability_modifiers(f, value.abilities)?;
-    writeln!(f, "{} {{", value.type_)?;
+    writeln!(f, "{} {{", value.ty_tag)?;
     for (field_name, v) in value.value.iter() {
         write_indent(f, indent + 4)?;
         write!(f, "{}: ", field_name)?;

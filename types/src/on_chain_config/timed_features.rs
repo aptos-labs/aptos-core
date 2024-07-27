@@ -10,10 +10,11 @@ use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 const NOT_YET_SPECIFIED: u64 = END_OF_TIME; /* Thursday, December 31, 2099 11:59:59 PM */
 
 pub const END_OF_TIME: u64 = 4102444799000; /* Thursday, December 31, 2099 11:59:59 PM */
-#[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy)]
+#[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy, Eq, PartialEq)]
 pub enum TimedFeatureFlag {
     DisableInvariantViolationCheckInSwapLoc,
     LimitTypeTagSize,
+    ModuleComplexityCheck,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -41,6 +42,7 @@ impl TimedFeatureOverride {
         Some(match self {
             Replay => match flag {
                 LimitTypeTagSize => true,
+                ModuleComplexityCheck => true,
                 // Add overrides for replay here.
                 _ => return None,
             },
@@ -57,6 +59,9 @@ impl TimedFeatureFlag {
         match (self, chain_id) {
             (DisableInvariantViolationCheckInSwapLoc, TESTNET) => NOT_YET_SPECIFIED,
             (DisableInvariantViolationCheckInSwapLoc, MAINNET) => NOT_YET_SPECIFIED,
+
+            (ModuleComplexityCheck, TESTNET) => 1719356400000, /* Tuesday, June 21, 2024 16:00:00 AM GMT-07:00 */
+            (ModuleComplexityCheck, MAINNET) => 1720033200000, /* Wednesday, July 3, 2024 12:00:00 AM GMT-07:00 */
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
@@ -128,7 +133,7 @@ impl TimedFeaturesBuilder {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Eq, PartialEq)]
 pub struct TimedFeatures([bool; TimedFeatureFlag::COUNT]);
 
 impl TimedFeatures {

@@ -171,7 +171,7 @@ fn create_missing_data_request_state_values() {
     // Create the partial response payload
     let last_response_index = end_index - 1;
     let raw_values = (start_index..last_response_index + 1)
-        .map(|_| (StateKey::raw(vec![]), StateValue::new_legacy(vec![].into())))
+        .map(|_| (StateKey::raw(&[]), StateValue::new_legacy(vec![].into())))
         .collect::<Vec<_>>();
     let response_payload = ResponsePayload::StateValuesWithProof(StateValueChunkWithProof {
         first_index: start_index,
@@ -197,7 +197,7 @@ fn create_missing_data_request_state_values() {
     // Create a complete response payload
     let last_response_index = end_index;
     let raw_values = (start_index..last_response_index + 1)
-        .map(|_| (StateKey::raw(vec![]), StateValue::new_legacy(vec![].into())))
+        .map(|_| (StateKey::raw(&[]), StateValue::new_legacy(vec![].into())))
         .collect::<Vec<_>>();
     let response_payload = ResponsePayload::StateValuesWithProof(StateValueChunkWithProof {
         first_index: start_index,
@@ -869,7 +869,7 @@ fn create_state_value_chunk(
 ) -> StateValueChunkWithProof {
     // Create the raw values
     let raw_values = (0..num_values)
-        .map(|_| (StateKey::raw(vec![]), StateValue::new_legacy(vec![].into())))
+        .map(|_| (StateKey::raw(&[]), StateValue::new_legacy(vec![].into())))
         .collect::<Vec<_>>();
 
     // Create the chunk of state values

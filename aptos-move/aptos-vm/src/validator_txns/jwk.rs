@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_vm::get_or_vm_startup_failure,
+    aptos_vm::{get_or_vm_startup_failure, get_system_transaction_output},
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, SessionId},
     system_module_names::{JWKS_MODULE, UPSERT_INTO_OBSERVED_JWKS},
@@ -17,12 +17,11 @@ use crate::{
 };
 use aptos_logger::debug;
 use aptos_types::{
-    fee_statement::FeeStatement,
     jwks,
     jwks::{Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate},
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{OnChainConfig, ValidatorSet},
-    transaction::{ExecutionStatus, TransactionStatus},
+    transaction::TransactionStatus,
     validator_verifier::ValidatorVerifier,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -32,6 +31,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::collections::HashMap;
 
@@ -135,6 +135,7 @@ impl AptosVM {
             vec![observed].as_move_value(),
         ];
 
+        let module_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 &JWKS_MODULE,
@@ -142,16 +143,15 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
+                &mut TraversalContext::new(&module_storage),
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, UPSERT_INTO_OBSERVED_JWKS.as_str(), log_context)
             })
             .map_err(|r| Unexpected(r.unwrap_err()))?;
 
-        let output = crate::aptos_vm::get_system_transaction_output(
+        let output = get_system_transaction_output(
             session,
-            FeeStatement::zero(),
-            ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)
                 .map_err(Unexpected)?
                 .change_set_configs,

@@ -3,7 +3,7 @@
 
 use anyhow::ensure;
 use aptos_consensus_types::{
-    common::BatchPayload,
+    common::{BatchPayload, TxnSummaryWithExpiration},
     proof_of_store::{BatchId, BatchInfo},
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -45,6 +45,7 @@ impl PersistedValue {
         self.maybe_payload.take()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn remove_payload(&mut self) {
         self.maybe_payload = None;
     }
@@ -55,6 +56,27 @@ impl PersistedValue {
 
     pub fn payload(&self) -> &Option<Vec<SignedTransaction>> {
         &self.maybe_payload
+    }
+
+    pub fn summary(&self) -> Vec<TxnSummaryWithExpiration> {
+        if let Some(payload) = &self.maybe_payload {
+            return payload
+                .iter()
+                .map(|txn| {
+                    TxnSummaryWithExpiration::new(
+                        txn.sender(),
+                        txn.sequence_number(),
+                        txn.expiration_timestamp_secs(),
+                        txn.committed_hash(),
+                    )
+                })
+                .collect();
+        }
+        vec![]
+    }
+
+    pub fn unpack(self) -> (BatchInfo, Option<Vec<SignedTransaction>>) {
+        (self.info, self.maybe_payload)
     }
 }
 

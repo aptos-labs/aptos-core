@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::driver::DriverConfiguration;
-use aptos_config::config::{RoleType, StateSyncDriverConfig};
+use aptos_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, Uniform,
@@ -31,9 +31,10 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionPayload, TransactionStatus, Version,
+        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, Script,
+        SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionPayload, TransactionStatus, Version,
     },
     validator_verifier::ValidatorVerifier,
     waypoint::Waypoint,
@@ -84,11 +85,13 @@ pub fn create_event(event_key: Option<EventKey>) -> ContractEvent {
 /// Creates a test driver configuration for full nodes
 pub fn create_full_node_driver_configuration() -> DriverConfiguration {
     let config = StateSyncDriverConfig::default();
+    let consensus_observer_config = ConsensusObserverConfig::default();
     let role = RoleType::FullNode;
     let waypoint = Waypoint::default();
 
     DriverConfiguration {
         config,
+        consensus_observer_config,
         role,
         waypoint,
     }
@@ -276,9 +279,13 @@ pub async fn verify_commit_notification(
     let mempool_notification = mempool_notification_listener.select_next_some().await;
     let committed_transactions: Vec<CommittedTransaction> = expected_transactions
         .into_iter()
-        .map(|txn| CommittedTransaction {
-            sender: txn.try_as_signed_user_txn().unwrap().sender(),
-            sequence_number: 0,
+        .map(|txn| {
+            let signed = txn.try_as_signed_user_txn().unwrap();
+            CommittedTransaction {
+                sender: signed.sender(),
+                sequence_number: 0,
+                use_case: signed.parse_use_case(),
+            }
         })
         .collect();
     assert_eq!(mempool_notification.transactions, committed_transactions);

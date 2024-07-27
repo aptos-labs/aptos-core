@@ -125,6 +125,16 @@ pub(super) fn state_kv_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME,
+        STATE_VALUE_BY_KEY_HASH_CF_NAME,
+        STATE_VALUE_INDEX_CF_NAME, // we still need this cf before deleting all the write callsites
+    ]
+}
+
 fn gen_cfds<F>(
     rocksdb_config: &RocksdbConfig,
     cfs: Vec<ColumnFamilyName>,
@@ -150,7 +160,7 @@ where
 }
 
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
-    if cf_name == STATE_VALUE_CF_NAME {
+    if cf_name == STATE_VALUE_CF_NAME || cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME {
         let prefix_extractor =
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
         cf_opts.set_prefix_extractor(prefix_extractor);
@@ -209,8 +219,15 @@ pub(super) fn gen_state_merkle_cfds(rocksdb_config: &RocksdbConfig) -> Vec<Colum
     gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
 
-pub(super) fn gen_state_kv_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
-    let cfs = state_kv_db_column_families();
+pub(super) fn gen_state_kv_cfds(
+    rocksdb_config: &RocksdbConfig,
+    enable_sharding: bool,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = if enable_sharding {
+        state_kv_db_new_key_column_families()
+    } else {
+        state_kv_db_column_families()
+    };
     gen_cfds(rocksdb_config, cfs, with_state_key_extractor_processor)
 }
 

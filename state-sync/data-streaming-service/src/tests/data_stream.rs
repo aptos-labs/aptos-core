@@ -3700,7 +3700,7 @@ fn set_state_value_response_in_queue(
             last_index: last_state_value_index,
             first_key: Default::default(),
             last_key: Default::default(),
-            raw_values: vec![(StateKey::raw(vec![]), StateValue::new_legacy(vec![].into()))],
+            raw_values: vec![(StateKey::raw(&[]), StateValue::new_legacy(vec![].into()))],
             proof: SparseMerkleRangeProof::new(vec![]),
             root_hash: Default::default(),
         }),

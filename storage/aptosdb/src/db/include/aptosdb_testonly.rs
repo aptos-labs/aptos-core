@@ -18,6 +18,7 @@ impl AptosDB {
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false, /* indexer */
+            false,
         )
     }
 
@@ -38,23 +39,25 @@ impl AptosDB {
             false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             max_node_cache,
+            None,
         )
         .expect("Unable to open AptosDB")
     }
 
     /// This opens db in non-readonly mode, without the pruner and cache.
     pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS, 0, false)
+        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS, 0, false, false)
     }
 
     /// This opens db in non-readonly mode, without the pruner, and with the indexer
-    pub fn new_for_test_with_indexer<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
+    pub fn new_for_test_with_indexer<P: AsRef<Path> + Clone>(db_root_path: P, enable_sharding: bool) -> Self {
         Self::new_without_pruner(
             db_root_path,
             false,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             true, /* indexer */
+            enable_sharding,
         )
     }
 
@@ -69,6 +72,7 @@ impl AptosDB {
             buffered_state_target_items,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false, /* indexer */
+            false,
         )
     }
 
@@ -80,6 +84,7 @@ impl AptosDB {
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false, /* indexer */
+            false,
         )
     }
 
@@ -102,7 +107,7 @@ pub fn gather_state_updates_until_last_checkpoint(
         if latest_checkpoint_version >= first_version {
             let idx = (latest_checkpoint_version - first_version) as usize;
             assert!(
-                    txns_to_commit[idx].is_state_checkpoint(),
+                    txns_to_commit[idx].has_state_checkpoint_hash(),
                     "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                     latest_checkpoint_version,
                     first_version + idx as u64

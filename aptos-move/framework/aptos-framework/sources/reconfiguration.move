@@ -156,13 +156,6 @@ module aptos_framework::reconfiguration {
         };
         config_ref.epoch = config_ref.epoch + 1;
 
-        event::emit_event<NewEpochEvent>(
-            &mut config_ref.events,
-            NewEpochEvent {
-                epoch: config_ref.epoch,
-            },
-        );
-
         if (std::features::module_event_migration_enabled()) {
             event::emit(
                 NewEpoch {
@@ -170,6 +163,12 @@ module aptos_framework::reconfiguration {
                 },
             );
         };
+        event::emit_event<NewEpochEvent>(
+            &mut config_ref.events,
+            NewEpochEvent {
+                epoch: config_ref.epoch,
+            },
+        );
 
         reconfiguration_state::on_reconfig_finish();
     }

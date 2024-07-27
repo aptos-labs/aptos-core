@@ -23,7 +23,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, warn};
+use aptos_logger::{error, info, spawn_named, trace, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -86,6 +86,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
         let reliable_broadcast = Arc::new(ReliableBroadcast::new(
+            author,
             epoch_state.verifier.get_ordered_account_addresses(),
             network_sender.clone(),
             rb_backoff_policy,
@@ -211,7 +212,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         message: RandMessage<S, D>,
     ) {
         let msg = message.into_network_message();
-        let _ = sender.send(Ok(protocol.to_bytes(&msg).unwrap().into()));
+        let _ = sender.send(Ok(protocol
+            .to_bytes(&msg)
+            .expect("Message should be serializable into protocol")
+            .into()));
     }
 
     async fn verification_task(
@@ -283,7 +287,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     "[RandManager] Start broadcasting share request for {}",
                     targets.len(),
                 );
-                rb.multicast(request, aggregate_state, targets).await;
+                rb.multicast(request, aggregate_state, targets)
+                    .await
+                    .expect("Broadcast cannot fail");
                 info!(
                     epoch = epoch,
                     round = round,
@@ -319,7 +325,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             info!(LogSchema::new(LogEvent::BroadcastAugData)
                 .author(*data.author())
                 .epoch(data.epoch()));
-            let certified_data = rb.broadcast(data, aug_ack).await;
+            let certified_data = rb.broadcast(data, aug_ack).await.expect("cannot fail");
             info!("[RandManager] Finish broadcasting aug data");
             certified_data
         };
@@ -329,7 +335,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 .author(*certified_data.author())
                 .epoch(certified_data.epoch()));
             info!("[RandManager] Start broadcasting certified aug data");
-            rb2.broadcast(certified_data, ack_state).await;
+            rb2.broadcast(certified_data, ack_state)
+                .await
+                .expect("Broadcast cannot fail");
             info!("[RandManager] Finish broadcasting certified aug data");
         });
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -343,7 +351,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         mut reset_rx: Receiver<ResetRequest>,
         bounded_executor: BoundedExecutor,
-        highest_ordered_round: Round,
+        highest_known_round: Round,
     ) {
         info!("RandManager started");
         let (verified_msg_tx, mut verified_msg_rx) = unbounded();
@@ -352,7 +360,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let fast_rand_config = self.fast_config.clone();
         self.rand_store
             .lock()
-            .update_highest_known_round(highest_ordered_round);
+            .update_highest_known_round(highest_known_round);
         spawn_named!(
             "rand manager verification",
             Self::verification_task(
@@ -404,7 +412,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             }
                         }
                         RandMessage::Share(share) => {
-                            info!(LogSchema::new(LogEvent::ReceiveProactiveRandShare)
+                            trace!(LogSchema::new(LogEvent::ReceiveProactiveRandShare)
                                 .author(self.author)
                                 .epoch(share.epoch())
                                 .round(share.metadata().round)
@@ -415,7 +423,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             }
                         }
                         RandMessage::FastShare(share) => {
-                            info!(LogSchema::new(LogEvent::ReceiveRandShareFastPath)
+                            trace!(LogSchema::new(LogEvent::ReceiveRandShareFastPath)
                                 .author(self.author)
                                 .epoch(share.epoch())
                                 .round(share.metadata().round)

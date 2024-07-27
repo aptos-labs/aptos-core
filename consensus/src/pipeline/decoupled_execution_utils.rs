@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    network::{IncomingCommitRequest, NetworkSender}, pipeline::{
+    consensus_observer::publisher::ConsensusPublisher,
+    network::{IncomingCommitRequest, NetworkSender},
+    pipeline::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
         execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest},
@@ -14,6 +16,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel::Receiver;
+use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, epoch_state::EpochState};
@@ -39,6 +42,9 @@ pub fn prepare_phases_and_buffer_manager(
     sync_rx: UnboundedReceiver<ResetRequest>,
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
+    order_vote_enabled: bool,
+    consensus_observer_config: ConsensusObserverConfig,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 ) -> (
     PipelinePhase<PreExecutionPhase>,
@@ -138,6 +144,9 @@ pub fn prepare_phases_and_buffer_manager(
             ongoing_tasks,
             reset_flag.clone(),
             bounded_executor,
+            order_vote_enabled,
+            consensus_observer_config,
+            consensus_publisher,
         ),
     )
 }

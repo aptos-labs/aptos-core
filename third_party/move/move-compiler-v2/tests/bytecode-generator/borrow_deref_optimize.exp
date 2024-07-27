@@ -1,0 +1,117 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    struct X {
+        value: bool,
+    }
+    private fun no_optimize_resource(): bool
+        acquires test::X(*)
+     {
+        {
+          let x: &mut test::X = Borrow(Mutable)(Deref(BorrowGlobal(Immutable)<test::X>(0x1)));
+          select test::X.value<&mut test::X>(x)
+        }
+    }
+    private fun no_optimize_vector() {
+        {
+          let _: &mut u64 = vector::borrow_mut<u64>(Borrow(Mutable)(Deref(vector::borrow<vector<u64>>(Borrow(Immutable)([Vector([Number(1), Number(2)])]), 0))), 1);
+          Tuple()
+        }
+    }
+    private fun optimize_resource(): bool
+        acquires test::X(*)
+     {
+        {
+          let x: &test::X = Borrow(Immutable)(Deref(BorrowGlobal(Immutable)<test::X>(0x1)));
+          select test::X.value<&test::X>(x)
+        }
+    }
+    private fun optimize_vector() {
+        {
+          let x: vector<vector<u64>> = [Vector([Number(1), Number(2)])];
+          {
+            let _: &mut u64 = vector::borrow_mut<u64>(Borrow(Mutable)(Deref(vector::borrow_mut<vector<u64>>(Borrow(Mutable)(x), 0))), 1);
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::test
+
+============ initial bytecode ================
+
+[variant baseline]
+fun test::no_optimize_resource(): bool {
+     var $t0: bool
+     var $t1: &mut test::X
+     var $t2: test::X
+     var $t3: &test::X
+     var $t4: address
+     var $t5: &bool
+  0: $t4 := 0x1
+  1: $t3 := borrow_global<test::X>($t4)
+  2: $t2 := read_ref($t3)
+  3: $t1 := borrow_local($t2)
+  4: $t5 := borrow_field<test::X>.value($t1)
+  5: $t0 := read_ref($t5)
+  6: return $t0
+}
+
+
+[variant baseline]
+fun test::no_optimize_vector() {
+     var $t0: &mut u64
+     var $t1: &mut vector<u64>
+     var $t2: vector<u64>
+     var $t3: &vector<u64>
+     var $t4: &vector<vector<u64>>
+     var $t5: vector<vector<u64>>
+     var $t6: u64
+     var $t7: u64
+     var $t8: &mut u64
+  0: $t5 := ["[\"1\", \"2\"]"]
+  1: $t4 := borrow_local($t5)
+  2: $t6 := 0
+  3: $t3 := vector::borrow<vector<u64>>($t4, $t6)
+  4: $t2 := read_ref($t3)
+  5: $t1 := borrow_local($t2)
+  6: $t7 := 1
+  7: $t0 := vector::borrow_mut<u64>($t1, $t7)
+  8: $t8 := infer($t0)
+  9: return ()
+}
+
+
+[variant baseline]
+fun test::optimize_resource(): bool {
+     var $t0: bool
+     var $t1: &test::X
+     var $t2: address
+     var $t3: &bool
+  0: $t2 := 0x1
+  1: $t1 := borrow_global<test::X>($t2)
+  2: $t3 := borrow_field<test::X>.value($t1)
+  3: $t0 := read_ref($t3)
+  4: return $t0
+}
+
+
+[variant baseline]
+fun test::optimize_vector() {
+     var $t0: vector<vector<u64>>
+     var $t1: &mut u64
+     var $t2: &mut vector<u64>
+     var $t3: &mut vector<vector<u64>>
+     var $t4: u64
+     var $t5: u64
+     var $t6: &mut u64
+  0: $t0 := ["[\"1\", \"2\"]"]
+  1: $t3 := borrow_local($t0)
+  2: $t4 := 0
+  3: $t2 := vector::borrow_mut<vector<u64>>($t3, $t4)
+  4: $t5 := 1
+  5: $t1 := vector::borrow_mut<u64>($t2, $t5)
+  6: $t6 := infer($t1)
+  7: return ()
+}
+
+
+============ bytecode verification succeeded ========

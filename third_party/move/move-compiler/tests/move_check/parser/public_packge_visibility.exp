@@ -1,0 +1,12 @@
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/public_packge_visibility.move:2:5
+  │
+2 │     public(package) fun foo() {}
+  │     ^^^^^^^^^^^^^^^ Move 2 language construct is not enabled: public(package) visibility
+
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/public_packge_visibility.move:6:5
+  │
+6 │     public(package) fun main() {}
+  │     ^^^^^^^^^^^^^^^ Move 2 language construct is not enabled: public(package) visibility
+

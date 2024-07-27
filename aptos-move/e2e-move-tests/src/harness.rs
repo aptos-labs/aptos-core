@@ -13,7 +13,6 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{
         fungible_store::FungibleStoreResource, object::ObjectGroupResource, AccountResource,
@@ -33,7 +32,6 @@ use aptos_types::{
         ViewFunctionOutput,
     },
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use claims::assert_ok;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
@@ -81,7 +79,7 @@ pub struct MoveHarness {
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
     pub default_gas_unit_price: u64,
-    max_gas_per_txn: u64,
+    pub max_gas_per_txn: u64,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -195,11 +193,12 @@ impl MoveHarness {
 
     /// Runs a signed transaction. On success, applies the write set.
     pub fn run_raw(&mut self, txn: SignedTransaction) -> TransactionOutput {
-        let output = self.executor.execute_transaction(txn);
+        let mut output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
             self.executor.append_events(output.events().to_vec());
         }
+        output.fill_error_status();
         output
     }
 
@@ -237,11 +236,12 @@ impl MoveHarness {
         &mut self,
         txn_block: Vec<SignedTransaction>,
     ) -> Vec<TransactionOutput> {
-        let result = assert_ok!(self.executor.execute_block(txn_block));
-        for output in &result {
+        let mut result = assert_ok!(self.executor.execute_block(txn_block));
+        for output in &mut result {
             if matches!(output.status(), TransactionStatus::Keep(_)) {
                 self.executor.apply_write_set(output.write_set());
             }
+            output.fill_error_status();
         }
         result
     }
@@ -717,9 +717,7 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
-        let path =
-            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test");
-        self.read_state_value_bytes(&StateKey::access_path(path))
+        self.read_state_value_bytes(&StateKey::resource(addr, &struct_tag).unwrap())
     }
 
     /// Reads the resource data `T`.
@@ -741,10 +739,8 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<StateValueMetadata> {
-        self.read_state_value(&StateKey::access_path(
-            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test"),
-        ))
-        .map(StateValue::into_metadata)
+        self.read_state_value(&StateKey::resource(addr, &struct_tag).unwrap())
+            .map(StateValue::into_metadata)
     }
 
     pub fn read_resource_group_metadata(
@@ -752,10 +748,8 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<StateValueMetadata> {
-        self.read_state_value(&StateKey::access_path(
-            AccessPath::resource_group_access_path(*addr, struct_tag),
-        ))
-        .map(StateValue::into_metadata)
+        self.read_state_value(&StateKey::resource_group(addr, &struct_tag))
+            .map(StateValue::into_metadata)
     }
 
     pub fn read_resource_group(
@@ -763,8 +757,7 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
-        let path = AccessPath::resource_group_access_path(*addr, struct_tag);
-        self.read_state_value_bytes(&StateKey::access_path(path))
+        self.read_state_value_bytes(&StateKey::resource_group(addr, &struct_tag))
             .map(|data| bcs::from_bytes(&data).unwrap())
     }
 
@@ -809,8 +802,7 @@ impl MoveHarness {
         struct_tag: StructTag,
         data: &T,
     ) {
-        let path = AccessPath::resource_access_path(addr, struct_tag).expect("access path in test");
-        let state_key = StateKey::access_path(path);
+        let state_key = StateKey::resource(&addr, &struct_tag).unwrap();
         self.executor
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());
     }
@@ -915,7 +907,7 @@ impl MoveHarness {
         let gas_schedule: GasScheduleV2 = self.get_gas_schedule();
         let feature_version = gas_schedule.feature_version;
         let params = AptosGasParameters::from_on_chain_gas_schedule(
-            &gas_schedule.to_btree_map(),
+            &gas_schedule.into_btree_map(),
             feature_version,
         )
         .unwrap();
@@ -925,13 +917,6 @@ impl MoveHarness {
     pub fn get_gas_schedule(&self) -> GasScheduleV2 {
         self.read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
             .unwrap()
-    }
-
-    pub fn new_vm(&self) -> AptosVM {
-        AptosVM::new(
-            &self.executor.data_store().as_move_resolver(),
-            /*override_is_delayed_field_optimization_capable=*/ None,
-        )
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {
@@ -976,7 +961,11 @@ impl MoveHarness {
                 offset,
                 txns.len()
             );
-            let outputs = harness.run_block_get_output(txns);
+            let mut outputs = harness.run_block_get_output(txns);
+            let _ = outputs
+                .iter_mut()
+                .map(|t| t.fill_error_status())
+                .collect::<Vec<_>>();
             for (idx, (error, output)) in errors.into_iter().zip(outputs.iter()).enumerate() {
                 if error == SUCCESS {
                     assert_success!(

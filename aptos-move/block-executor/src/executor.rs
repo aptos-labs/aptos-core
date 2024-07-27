@@ -38,7 +38,9 @@ use aptos_types::{
     executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
-    transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
+    transaction::{
+        block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
+    },
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
@@ -64,7 +66,7 @@ pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
-    executor_thread_pool: Arc<ThreadPool>,
+    executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
@@ -105,13 +107,13 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
         base_view: &S,
-        latest_view: ParallelState<T, X>,
+        parallel_state: ParallelState<T, X>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
-        let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
+        let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
@@ -124,8 +126,11 @@ where
 
         let mut read_set = sync_view.take_parallel_reads();
 
-        // For tracking whether the recent execution wrote outside of the previous write/delta set.
-        let mut updates_outside = false;
+        // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
+        // May happen, for instance, when the recent execution wrote outside of the previous write/delta
+        // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
+        // (since those resource group validations rely on estimates).
+        let mut needs_suffix_validation = false;
         let mut apply_updates = |output: &E::Output| -> Result<
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
             PanicError,
@@ -135,25 +140,24 @@ where
             {
                 if prev_modified_keys.remove(&group_key).is_none() {
                     // Previously no write to the group at all.
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
 
-                versioned_cache.data().write(
+                if versioned_cache.data().write_metadata(
                     group_key.clone(),
                     idx_to_execute,
                     incarnation,
-                    // Group metadata op needs no layout (individual resources in groups do).
-                    Arc::new(group_metadata_op),
-                    None,
-                );
+                    group_metadata_op,
+                ) {
+                    needs_suffix_validation = true;
+                }
                 if versioned_cache.group_data().write(
                     group_key,
                     idx_to_execute,
                     incarnation,
                     group_ops.into_iter(),
                 ) {
-                    // Should return true if writes outside.
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
             }
 
@@ -167,7 +171,7 @@ where
                     .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
             ) {
                 if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
                 versioned_cache
                     .data()
@@ -176,7 +180,7 @@ where
 
             for (k, v) in output.module_write_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
                 versioned_cache.modules().write(k, idx_to_execute, v);
             }
@@ -184,7 +188,7 @@ where
             // Then, apply deltas.
             for (k, d) in output.aggregator_v1_delta_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
@@ -208,7 +212,7 @@ where
 
                 let entry = change.into_entry_no_additional_history();
 
-                // TODO[agg_v2](optimize): figure out if it is useful for change to update updates_outside
+                // TODO[agg_v2](optimize): figure out if it is useful for change to update needs_suffix_validation
                 if let Err(e) =
                     versioned_cache
                         .delayed_fields()
@@ -279,6 +283,19 @@ where
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
                 Module => versioned_cache.modules().remove(&k, idx_to_execute),
                 Group => {
+                    // A change in state observable during speculative execution
+                    // (which includes group metadata and size) changes, suffix
+                    // re-validation is needed. For resources where speculative
+                    // execution waits on estimates, having a write that was there
+                    // but not anymore does not qualify, as it can only cause
+                    // additional waiting but not an incorrect speculation result.
+                    // However, a group size or metadata might be read, and then
+                    // speculative group update might be removed below. Without
+                    // triggering suffix re-validation, a later transaction might
+                    // end up with the incorrect read result (corresponding to the
+                    // removed group information from an incorrect speculative state).
+                    needs_suffix_validation = true;
+
                     versioned_cache.data().remove(&k, idx_to_execute);
                     versioned_cache.group_data().remove(&k, idx_to_execute);
                 },
@@ -297,7 +314,7 @@ where
                 ParallelBlockExecutionError::ModulePathReadWriteError,
             ));
         }
-        Ok(updates_outside)
+        Ok(needs_suffix_validation)
     }
 
     fn validate(
@@ -348,8 +365,15 @@ where
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
                     Module => versioned_cache.modules().mark_estimate(&k, txn_idx),
                     Group => {
-                        versioned_cache.data().mark_estimate(&k, txn_idx);
+                        // Validation for both group size and metadata is based on values.
+                        // Execution may wait for estimates.
                         versioned_cache.group_data().mark_estimate(&k, txn_idx);
+
+                        // Group metadata lives in same versioned cache as data / resources.
+                        // We are not marking metadata change as estimate, but after
+                        // a transaction execution changes metadata, suffix validation
+                        // is guaranteed to be triggered. Estimation affecting execution
+                        // behavior is left to size, which uses a heuristic approach.
                     },
                 };
             }
@@ -440,6 +464,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
+        num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
@@ -451,8 +476,8 @@ where
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
-                // Because of that, we can also ignore _updates_outside result.
-                let _updates_outside = Self::execute(
+                // Because of that, we can also ignore _needs_suffix_validation result.
+                let _needs_suffix_validation = Self::execute(
                     txn_idx,
                     incarnation + 1,
                     block,
@@ -568,6 +593,7 @@ where
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
+                        num_workers,
                     );
 
                     // failpoint triggering error at the last committed transaction,
@@ -721,7 +747,7 @@ where
 
     fn worker_loop(
         &self,
-        executor_arguments: &E::Argument,
+        env: &E::Environment,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
@@ -732,10 +758,11 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(*executor_arguments);
+        let executor = E::init(env.clone(), base_view);
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -771,6 +798,7 @@ where
                     shared_counter,
                     &executor,
                     block,
+                    num_workers,
                 )?;
                 scheduler.queueing_commits_mark_done();
             }
@@ -795,7 +823,7 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    let updates_outside = Self::execute(
+                    let needs_suffix_validation = Self::execute(
                         txn_idx,
                         incarnation,
                         block,
@@ -810,7 +838,7 @@ where
                             shared_counter,
                         ),
                     )?;
-                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)?
+                    scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     {
@@ -836,7 +864,7 @@ where
 
     pub(crate) fn execute_transactions_parallel(
         &self,
-        executor_initial_arguments: E::Argument,
+        env: &E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<BlockOutput<E::Output>, ()> {
@@ -855,10 +883,11 @@ where
         let shared_counter = AtomicU32::new(start_shared_counter);
 
         if signature_verified_block.is_empty() {
-            return Ok(BlockOutput::new(vec![]));
+            return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
         }
 
         let num_txns = signature_verified_block.len();
+        let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -881,10 +910,10 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..self.config.local.concurrency_level {
+            for _ in 0..num_workers {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
-                        &executor_initial_arguments,
+                        env,
                         signature_verified_block,
                         &last_input_output,
                         &versioned_cache,
@@ -894,9 +923,10 @@ where
                         &shared_counter,
                         &shared_commit_state,
                         &final_results,
+                        num_workers,
                     ) {
                         // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
+                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
                         // and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
@@ -916,11 +946,19 @@ where
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        // TODO add block end info to output.
-        // block_limit_processor.is_block_limit_reached();
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(shared_commit_state.into_inner().get_block_end_info())
+        } else {
+            None
+        };
 
         (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(final_results.into_inner()))
+            .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
             .ok_or(())
     }
 
@@ -1000,14 +1038,14 @@ where
 
     pub(crate) fn execute_transactions_sequential(
         &self,
-        executor_arguments: E::Argument,
+        env: E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(executor_arguments);
+        let executor = E::init(env, base_view);
         drop(init_timer);
 
         let start_counter = gen_id_start_value(true);
@@ -1277,24 +1315,47 @@ where
 
         counters::update_state_counters(unsync_map.stats(), false);
 
-        // TODO add block end info to output.
-        // block_limit_processor.is_block_limit_reached();
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(block_limit_processor.get_block_end_info())
+        } else {
+            None
+        };
 
-        Ok(BlockOutput::new(ret))
+        Ok(BlockOutput::new(ret, block_end_info))
+    }
+
+    fn empty_block_end_info(&self) -> Option<BlockEndInfo> {
+        if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(BlockEndInfo::V0 {
+                block_gas_limit_reached: false,
+                block_output_limit_reached: false,
+                block_effective_block_gas_units: 0,
+                block_approx_output_size: 0,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn execute_block(
         &self,
-        executor_arguments: E::Argument,
+        env: E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         if self.config.local.concurrency_level > 1 {
-            let parallel_result = self.execute_transactions_parallel(
-                executor_arguments,
-                signature_verified_block,
-                base_view,
-            );
+            let parallel_result =
+                self.execute_transactions_parallel(&env, signature_verified_block, base_view);
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
@@ -1312,9 +1373,9 @@ where
             info!("parallel execution requiring fallback");
         }
 
-        // If we didn't run parallel or it didn't finish successfully - run sequential
+        // If we didn't run parallel, or it didn't finish successfully - run sequential
         let sequential_result = self.execute_transactions_sequential(
-            executor_arguments,
+            env.clone(),
             signature_verified_block,
             base_view,
             false,
@@ -1337,7 +1398,7 @@ where
                 init_speculative_logs(signature_verified_block.len());
 
                 let sequential_result = self.execute_transactions_sequential(
-                    executor_arguments,
+                    env,
                     signature_verified_block,
                     base_view,
                     true,
@@ -1375,7 +1436,7 @@ where
                 .iter()
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret));
+            return Ok(BlockOutput::new(ret, self.empty_block_end_info()));
         }
 
         Err(sequential_error)

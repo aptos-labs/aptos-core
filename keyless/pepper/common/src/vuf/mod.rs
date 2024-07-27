@@ -27,3 +27,4 @@ pub trait VUF {
 ///
 /// TODO: better name?
 pub mod bls12381_g1_bls;
+pub mod slip_10;

@@ -394,10 +394,10 @@ impl DbBackedOnChainConfig {
 }
 
 impl OnChainConfigProvider for DbBackedOnChainConfig {
-    fn get<T: OnChainConfig>(&self) -> anyhow::Result<T> {
+    fn get<T: OnChainConfig>(&self) -> Result<T> {
         let bytes = self
             .reader
-            .get_state_value_by_version(&StateKey::on_chain_config::<T>(), self.version)?
+            .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, self.version)?
             .ok_or_else(|| {
                 anyhow!(
                     "no config {} found in aptos root account state",

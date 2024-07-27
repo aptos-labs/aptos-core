@@ -5,18 +5,24 @@
 use crate::{
     block::Block,
     common::{Payload, Round},
+    order_vote_proposal::OrderVoteProposal,
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_types::{
-    block_info::BlockInfo, contract_event::ContractEvent, randomness::Randomness,
-    transaction::SignedTransaction, validator_txn::ValidatorTransaction,
+    block_info::BlockInfo,
+    contract_event::ContractEvent,
+    randomness::Randomness,
+    transaction::{SignedTransaction, TransactionStatus},
+    validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{Debug, Display, Formatter},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -35,6 +41,67 @@ pub struct PipelinedBlock {
     state_compute_result: StateComputeResult,
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,
+    execution_summary: Arc<OnceCell<ExecutionSummary>>,
+}
+
+impl Serialize for PipelinedBlock {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename = "PipelineBlock")]
+        struct SerializedBlock<'a> {
+            block: &'a Block,
+            input_transactions: &'a Vec<SignedTransaction>,
+            state_compute_result: &'a StateComputeResult,
+            randomness: Option<&'a Randomness>,
+        }
+
+        let serialized = SerializedBlock {
+            block: &self.block,
+            input_transactions: &self.input_transactions,
+            state_compute_result: &self.state_compute_result,
+            randomness: self.randomness.get(),
+        };
+        serialized.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for PipelinedBlock {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename = "PipelineBlock")]
+        struct SerializedBlock {
+            block: Block,
+            input_transactions: Vec<SignedTransaction>,
+            state_compute_result: StateComputeResult,
+            randomness: Option<Randomness>,
+        }
+
+        let SerializedBlock {
+            block,
+            input_transactions,
+            state_compute_result,
+            randomness,
+        } = SerializedBlock::deserialize(deserializer)?;
+
+        let block = PipelinedBlock {
+            block,
+            input_transactions,
+            state_compute_result,
+            randomness: OnceCell::new(),
+            pipeline_insertion_time: OnceCell::new(),
+            execution_summary: Arc::new(OnceCell::new()),
+        };
+        if let Some(r) = randomness {
+            block.set_randomness(r);
+        }
+        Ok(block)
+    }
 }
 
 impl PipelinedBlock {
@@ -42,9 +109,34 @@ impl PipelinedBlock {
         mut self,
         input_transactions: Vec<SignedTransaction>,
         result: StateComputeResult,
+        execution_time: Duration,
     ) -> Self {
         self.state_compute_result = result;
         self.input_transactions = input_transactions;
+
+        let mut to_commit = 0;
+        let mut to_retry = 0;
+        for txn in self.state_compute_result.compute_status_for_input_txns() {
+            match txn {
+                TransactionStatus::Keep(_) => to_commit += 1,
+                TransactionStatus::Retry => to_retry += 1,
+                _ => {},
+            }
+        }
+
+        assert!(self
+            .execution_summary
+            .set(ExecutionSummary {
+                payload_len: self
+                    .block
+                    .payload()
+                    .map_or(0, |payload| payload.len_for_execution()),
+                to_commit,
+                to_retry,
+                execution_time,
+            })
+            .is_ok());
+
         self
     }
 
@@ -81,6 +173,7 @@ impl PipelinedBlock {
             state_compute_result,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
+            execution_summary: Arc::new(OnceCell::new()),
         }
     }
 
@@ -91,6 +184,7 @@ impl PipelinedBlock {
             state_compute_result: StateComputeResult::new_dummy(),
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
+            execution_summary: Arc::new(OnceCell::new()),
         }
     }
 
@@ -163,6 +257,10 @@ impl PipelinedBlock {
         )
     }
 
+    pub fn order_vote_proposal(&self, quorum_cert: Arc<QuorumCert>) -> OrderVoteProposal {
+        OrderVoteProposal::new(self.block.clone(), self.block_info(), quorum_cert)
+    }
+
     pub fn subscribable_events(&self) -> Vec<ContractEvent> {
         // reconfiguration suffix don't count, the state compute result is carried over from parents
         if self.is_reconfiguration_suffix() {
@@ -184,4 +282,16 @@ impl PipelinedBlock {
     pub fn elapsed_in_pipeline(&self) -> Option<Duration> {
         self.pipeline_insertion_time.get().map(|t| t.elapsed())
     }
+
+    pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
+        self.execution_summary.get().cloned()
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ExecutionSummary {
+    pub payload_len: u64,
+    pub to_commit: u64,
+    pub to_retry: u64,
+    pub execution_time: Duration,
 }

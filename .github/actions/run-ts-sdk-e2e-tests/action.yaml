@@ -38,7 +38,7 @@ runs:
     # Run a local testnet. This installs node and pnpm too.
     - uses: aptos-labs/actions/run-local-testnet@main
       with:
-        PNPM_VERSION: 8.15.6
+        PNPM_VERSION: 8.3.1
         DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
         CLI_GIT_REF: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
 

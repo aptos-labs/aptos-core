@@ -214,11 +214,11 @@ fn test_update_256_siblings_in_proof() {
             .take(255)
             .collect();
     siblings.push(leaf2.into());
-    siblings.reverse();
     let proof_of_key1 = SparseMerkleProofExt::new(Some(leaf1), siblings.clone());
 
     let old_root_hash = siblings
         .iter()
+        .rev()
         .fold(leaf1.hash(), |previous_hash, node_in_proof| {
             hash_internal(previous_hash, node_in_proof.hash())
         });
@@ -237,6 +237,7 @@ fn test_update_256_siblings_in_proof() {
     let new_leaf1_hash = hash_leaf(key1, new_value1_hash);
     let new_root_hash = siblings
         .iter()
+        .rev()
         .fold(new_leaf1_hash, |previous_hash, node_in_proof| {
             hash_internal(previous_hash, node_in_proof.hash())
         });
@@ -246,7 +247,7 @@ fn test_update_256_siblings_in_proof() {
         new_smt.get(key1),
         StateStoreStatus::ExistsInScratchPad(new_value1)
     );
-    assert_eq!(new_smt.get(key2), StateStoreStatus::ExistsInDB);
+    assert_eq!(new_smt.get(key2), StateStoreStatus::UnknownValue);
 }
 
 #[test]
@@ -300,8 +301,8 @@ fn test_update() {
     let y_hash = hash_internal(x_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH);
     let old_root_hash = hash_internal(y_hash, leaf3.hash());
     let proof = SparseMerkleProofExt::new(None, vec![
-        NodeInProof::Other(x_hash),
         NodeInProof::Leaf(leaf3),
+        NodeInProof::Other(x_hash),
     ]);
     assert!(proof
         .verify::<StateValue>(old_root_hash, key4, None)
@@ -319,9 +320,15 @@ fn test_update() {
     //           y      key3 (unknown)
     //          / \
     //         x   key4
-    assert_eq!(smt1.get(key1), StateStoreStatus::Unknown);
-    assert_eq!(smt1.get(key2), StateStoreStatus::Unknown);
-    assert_eq!(smt1.get(key3), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt1.get(key1), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt1.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt1.get(key3), StateStoreStatus::UnknownValue);
     assert_eq!(
         smt1.get(key4),
         StateStoreStatus::ExistsInScratchPad(value4.clone())
@@ -340,9 +347,9 @@ fn test_update() {
 
     // Next, we are going to delete key1. Create a proof for key1.
     let proof = SparseMerkleProofExt::new(Some(leaf1), vec![
-        leaf2.into(),
-        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
         leaf3.into(),
+        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+        leaf2.into(),
     ]);
     assert!(proof.verify(old_root_hash, key1, Some(&value1)).is_ok());
 
@@ -358,8 +365,8 @@ fn test_update() {
     //             / \
     //    key2(indb)  key4 (weak data)
     assert_eq!(smt2.get(key1), StateStoreStatus::DoesNotExist,);
-    assert_eq!(smt2.get(key2), StateStoreStatus::ExistsInDB);
-    assert_eq!(smt2.get(key3), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt2.get(key2), StateStoreStatus::UnknownValue);
+    assert_eq!(smt2.get(key3), StateStoreStatus::UnknownValue);
     assert_eq!(smt2.get(key4), StateStoreStatus::ExistsInScratchPad(value4));
 
     // Verify root hash.
@@ -382,8 +389,11 @@ fn test_update() {
     //           y'      key3 (indb, weak)
     //          / \
     // (weak) x   key4
-    assert_eq!(smt22.get(key2), StateStoreStatus::Unknown);
-    assert_eq!(smt22.get(key3), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt22.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt22.get(key3), StateStoreStatus::UnknownValue);
     assert_eq!(
         smt22.get(key4),
         StateStoreStatus::ExistsInScratchPad(value4.clone())
@@ -395,15 +405,21 @@ fn test_update() {
 
     // For smt2, no key should be available since smt2 was constructed by deleting key1.
     assert_eq!(smt2.get(key1), StateStoreStatus::DoesNotExist);
-    assert_eq!(smt2.get(key2), StateStoreStatus::ExistsInDB);
-    assert_eq!(smt2.get(key3), StateStoreStatus::ExistsInDB);
-    assert_eq!(smt2.get(key4), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt2.get(key2), StateStoreStatus::UnknownValue);
+    assert_eq!(smt2.get(key3), StateStoreStatus::UnknownValue);
+    assert_eq!(smt2.get(key4), StateStoreStatus::UnknownValue);
 
     // For smt22, only key4 should be available since smt22 was constructed by updating smt1 with
     // key4.
-    assert_eq!(smt22.get(key1), StateStoreStatus::Unknown);
-    assert_eq!(smt22.get(key2), StateStoreStatus::Unknown);
-    assert_eq!(smt22.get(key3), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt22.get(key1), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt22.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt22.get(key3), StateStoreStatus::UnknownValue);
     assert_eq!(
         smt22.get(key4),
         StateStoreStatus::ExistsInScratchPad(value4)

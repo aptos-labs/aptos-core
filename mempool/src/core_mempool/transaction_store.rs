@@ -10,11 +10,10 @@ use crate::{
         },
         mempool::Mempool,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
-        TxnPointer,
     },
-    counters,
-    counters::{BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
+    counters::{self, BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
+    network::BroadcastPeerPriority,
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
@@ -30,7 +29,7 @@ use std::{
     collections::HashMap,
     mem::size_of,
     ops::Bound,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 /// Estimated per-txn overhead of indexes. Needs to be updated if additional indexes are added.
@@ -67,8 +66,6 @@ pub struct TransactionStore {
     hash_index: HashMap<HashValue, (AccountAddress, u64)>,
     // estimated size in bytes
     size_bytes: usize,
-    // keeps track of txns that were resubmitted with higher gas
-    gas_upgraded_index: HashMap<TxnPointer, u64>,
 
     // configuration
     capacity: usize,
@@ -100,7 +97,6 @@ impl TransactionStore {
             hash_index: HashMap::new(),
             // estimated size in bytes
             size_bytes: 0,
-            gas_upgraded_index: HashMap::new(),
 
             // configuration
             capacity: config.capacity,
@@ -160,9 +156,13 @@ impl TransactionStore {
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<(&InsertionInfo, &str)> {
+    ) -> Option<(&InsertionInfo, &str, &BroadcastPeerPriority)> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
-            return Some((&txn.insertion_info, self.get_bucket(txn.ranking_score)));
+            return Some((
+                &txn.insertion_info,
+                self.get_bucket(txn.ranking_score),
+                &txn.priority_of_sender,
+            ));
         }
         None
     }
@@ -187,16 +187,11 @@ impl TransactionStore {
         self.sequence_numbers.get(address)
     }
 
-    pub(crate) fn get_gas_upgraded_txns(&self) -> &HashMap<TxnPointer, u64> {
-        &self.gas_upgraded_index
-    }
-
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
         let txn_seq_num = txn.sequence_info.transaction_sequence_number;
         let acc_seq_num = txn.sequence_info.account_sequence_number;
-        let mut gas_upgraded = false;
 
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
@@ -226,7 +221,7 @@ impl TransactionStore {
                     if let Some(txn) = txns.remove(&txn_seq_num) {
                         self.index_remove(&txn);
                     };
-                    gas_upgraded = true;
+                    counters::CORE_MEMPOOL_GAS_UPGRADED_TXNS.inc();
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
                         "Transaction already in mempool with a higher gas price".to_string(),
@@ -271,10 +266,6 @@ impl TransactionStore {
                 .insert(txn.get_committed_hash(), (txn.get_sender(), txn_seq_num));
             self.sequence_numbers.insert(txn.get_sender(), acc_seq_num);
             self.size_bytes += txn.get_estimated_bytes();
-            if gas_upgraded {
-                self.gas_upgraded_index
-                    .insert(TxnPointer::from(&txn), txn.get_gas_price());
-            }
             txns.insert(txn_seq_num, txn);
             self.track_indices();
         }
@@ -309,10 +300,6 @@ impl TransactionStore {
             self.hash_index.len(),
         );
         counters::core_mempool_index_size(counters::SIZE_BYTES_LABEL, self.size_bytes);
-        counters::core_mempool_index_size(
-            counters::GAS_UPGRADED_INDEX_LABEL,
-            self.gas_upgraded_index.len(),
-        );
     }
 
     /// Checks if Mempool is full.
@@ -379,6 +366,7 @@ impl TransactionStore {
         bucket: &str,
         insertion_info: &mut InsertionInfo,
         broadcast_ready: bool,
+        priority: &str,
     ) {
         insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
@@ -389,12 +377,14 @@ impl TransactionStore {
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority,
                 );
                 counters::core_mempool_txn_commit_latency(
                     BROADCAST_READY_LABEL,
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority,
                 );
             } else {
                 counters::core_mempool_txn_commit_latency(
@@ -402,6 +392,7 @@ impl TransactionStore {
                     submitted_by,
                     bucket,
                     time_delta,
+                    priority,
                 );
             }
         }
@@ -446,6 +437,7 @@ impl TransactionStore {
                         self.timeline_index.get_bucket(txn.ranking_score),
                         &mut txn.insertion_info,
                         process_broadcast_ready,
+                        txn.priority_of_sender.to_string().as_str(),
                     );
                 }
 
@@ -557,7 +549,6 @@ impl TransactionStore {
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
-        self.gas_upgraded_index.remove(&TxnPointer::from(txn));
 
         // Remove account datastructures if there are no more transactions for the account.
         let address = &txn.get_sender();
@@ -573,12 +564,16 @@ impl TransactionStore {
 
     /// Read at most `count` transactions from timeline since `timeline_id`.
     /// This method takes into account the max number of bytes per transaction batch.
-    /// Returns block of transactions and new last_timeline_id.
+    /// Returns block of transactions along with their transaction ready times
+    /// and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
+        before: Option<Instant>,
+        // The priority of the receipient of the transactions
+        priority_of_receiver: BroadcastPeerPriority,
+    ) -> (Vec<(SignedTransaction, u64)>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
         let mut last_timeline_id = timeline_id.id_per_bucket.clone();
@@ -586,7 +581,7 @@ impl TransactionStore {
         // Add as many transactions to the batch as possible
         for (i, bucket) in self
             .timeline_index
-            .read_timeline(timeline_id, count)
+            .read_timeline(timeline_id, count, before)
             .iter()
             .enumerate()
             .rev()
@@ -597,7 +592,13 @@ impl TransactionStore {
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
                         break; // The batch is full
                     } else {
-                        batch.push(txn.txn.clone());
+                        batch.push((
+                            txn.txn.clone(),
+                            aptos_infallible::duration_since_epoch_at(
+                                &txn.insertion_info.ready_time,
+                            )
+                            .as_millis() as u64,
+                        ));
                         batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
                         if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                             last_timeline_id[i] = timeline_id;
@@ -607,6 +608,7 @@ impl TransactionStore {
                             &txn.insertion_info,
                             bucket,
                             BROADCAST_BATCHED_LABEL,
+                            priority_of_receiver.to_string().as_str(),
                         );
                         counters::core_mempool_txn_ranking_score(
                             BROADCAST_BATCHED_LABEL,
@@ -624,8 +626,8 @@ impl TransactionStore {
 
     pub(crate) fn timeline_range(
         &self,
-        start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+        start_end_pairs: &[(u64, u64)],
+    ) -> Vec<(SignedTransaction, u64)> {
         self.timeline_index
             .timeline_range(start_end_pairs)
             .iter()
@@ -633,7 +635,15 @@ impl TransactionStore {
                 self.transactions
                     .get(account)
                     .and_then(|txns| txns.get(sequence_number))
-                    .map(|txn| txn.txn.clone())
+                    .map(|txn| {
+                        (
+                            txn.txn.clone(),
+                            aptos_infallible::duration_since_epoch_at(
+                                &txn.insertion_info.ready_time,
+                            )
+                            .as_millis() as u64,
+                        )
+                    })
             })
             .collect()
     }
@@ -764,11 +774,15 @@ impl TransactionStore {
         let mut txns_log = TxnsLog::new();
         for (account, txns) in self.transactions.iter() {
             for (seq_num, txn) in txns.iter() {
-                let status = if self.parking_lot_index.contains(account, seq_num) {
-                    "parked"
-                } else {
-                    "ready"
-                };
+                let status =
+                    if self
+                        .parking_lot_index
+                        .contains(account, *seq_num, txn.get_committed_hash())
+                    {
+                        "parked"
+                    } else {
+                        "ready"
+                    };
                 txns_log.add_full_metadata(
                     *account,
                     *seq_num,

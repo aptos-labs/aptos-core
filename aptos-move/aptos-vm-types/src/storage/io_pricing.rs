@@ -61,12 +61,7 @@ impl IoPricingV1 {
         let mut cost = self.write_data_per_op * NumArgs::new(1);
 
         if self.write_data_per_byte_in_key > 0.into() {
-            cost += self.write_data_per_byte_in_key
-                * NumBytes::new(
-                    key.encode()
-                        .expect("Should be able to serialize state key")
-                        .len() as u64,
-                );
+            cost += self.write_data_per_byte_in_key * NumBytes::new(key.encoded().len() as u64);
         }
 
         match op_size {
@@ -135,11 +130,7 @@ impl IoPricingV2 {
                 .checked_sub(self.free_write_bytes_quota)
                 .unwrap_or(NumBytes::zero())
         } else {
-            let key_size = NumBytes::new(
-                key.encode()
-                    .expect("Should be able to serialize state key")
-                    .len() as u64,
-            );
+            let key_size = NumBytes::new(key.encoded().len() as u64);
             key_size + value_size
         }
     }

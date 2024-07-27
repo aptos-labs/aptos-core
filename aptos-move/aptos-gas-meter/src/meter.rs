@@ -3,7 +3,10 @@
 
 use crate::traits::{AptosGasMeter, GasAlgebra};
 use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
-use aptos_gas_schedule::gas_params::{instr::*, txn::*};
+use aptos_gas_schedule::{
+    gas_feature_versions::*,
+    gas_params::{instr::*, txn::*},
+};
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
@@ -98,6 +101,13 @@ where
             MutBorrowField => MUT_BORROW_FIELD,
             ImmBorrowFieldGeneric => IMM_BORROW_FIELD_GENERIC,
             MutBorrowFieldGeneric => MUT_BORROW_FIELD_GENERIC,
+            ImmBorrowVariantField => IMM_BORROW_VARIANT_FIELD,
+            MutBorrowVariantField => MUT_BORROW_VARIANT_FIELD,
+            ImmBorrowVariantFieldGeneric => IMM_BORROW_VARIANT_FIELD_GENERIC,
+            MutBorrowVariantFieldGeneric => MUT_BORROW_VARIANT_FIELD_GENERIC,
+            TestVariant => TEST_VARIANT,
+            TestVariantGeneric => TEST_VARIANT_GENERIC,
+
             FreezeRef => FREEZE_REF,
 
             CastU8 => CAST_U8,
@@ -556,6 +566,10 @@ where
     }
 
     fn charge_keyless(&mut self) -> VMResult<()> {
+        if self.feature_version() < RELEASE_V1_12 {
+            return Ok(());
+        }
+
         self.algebra
             .charge_execution(KEYLESS_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))

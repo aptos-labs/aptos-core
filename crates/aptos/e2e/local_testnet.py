@@ -69,12 +69,13 @@ def run_node(network: Network, image_repo_with_project: str, pull=True):
     ]
 
     # Run the container.
+    LOG.debug("Running command: %s", " ".join(args))
     subprocess.run(
         args,
         **kwargs,
     )
 
-    LOG.info(f"Running aptos CLI localnet from image: {image_name}")
+    LOG.info(f"Running aptos CLI localnet from image: {image_name}. Container name: {container_name}")
     return container_name
 
 

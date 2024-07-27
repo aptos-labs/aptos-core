@@ -41,7 +41,7 @@ pub async fn create_grpc_client(address: Url) -> GrpcClientType {
                 Ok(client
                     .max_decoding_message_size(usize::MAX)
                     .max_encoding_message_size(usize::MAX)
-                    .send_compressed(CompressionEncoding::Gzip)
+                    .send_compressed(CompressionEncoding::Zstd)
                     .accept_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Zstd))
             },
@@ -116,6 +116,7 @@ pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
 }
 
 pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
+    #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }

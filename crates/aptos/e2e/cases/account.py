@@ -10,7 +10,7 @@ from test_results import test_case
 
 
 @test_case
-def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
+async def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
     amount_in_octa = 100000000000
 
     # Fund the account.
@@ -29,7 +29,7 @@ def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
 
     # Assert it has the requested balance.
     balance = int(
-        run_helper.api_client.account_balance(
+        await run_helper.api_client.account_balance(
             run_helper.get_account_info().account_address
         )
     )
@@ -40,7 +40,7 @@ def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
 
 
 @test_case
-def test_account_create_and_transfer(run_helper: RunHelper, test_name=None):
+async def test_account_create_and_transfer(run_helper: RunHelper, test_name=None):
     # Create the new account.
     run_helper.run_command(
         test_name,
@@ -56,7 +56,7 @@ def test_account_create_and_transfer(run_helper: RunHelper, test_name=None):
 
     # Assert it exists and has zero balance.
     balance = int(
-        run_helper.api_client.account_balance(OTHER_ACCOUNT_ONE.account_address)
+        await run_helper.api_client.account_balance(OTHER_ACCOUNT_ONE.account_address)
     )
     if balance != 0:
         raise TestError(
@@ -80,7 +80,7 @@ def test_account_create_and_transfer(run_helper: RunHelper, test_name=None):
     )
 
     balance = int(
-        run_helper.api_client.account_balance(OTHER_ACCOUNT_ONE.account_address)
+        await run_helper.api_client.account_balance(OTHER_ACCOUNT_ONE.account_address)
     )
 
     if balance != transfer_amount:

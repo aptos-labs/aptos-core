@@ -23,6 +23,9 @@ pub fn acquires_checker(env: &GlobalEnv) {
             let acquires = analyzer.analyze();
             for (fun_id, acquires) in acquires.into_iter() {
                 let fun_env = module.get_function(fun_id);
+                if fun_env.is_inline() {
+                    continue;
+                }
                 let mut declared_acquires = get_acquired_resources(&fun_env);
                 for (sid, acquired) in acquires.0 {
                     if declared_acquires.remove(&sid).is_none() {

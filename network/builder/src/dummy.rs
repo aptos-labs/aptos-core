@@ -112,7 +112,7 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (listener_sender, listener_events) = network_builder
-        .add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config(), None);
+        .add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config(), None, true);
     network_builder.build(runtime.handle().clone()).start();
     let listener_network_client = NetworkClient::new(
         vec![TEST_DIRECT_SEND_PROTOCOL],
@@ -147,7 +147,7 @@ pub fn setup_network() -> DummyNetwork {
     let mut connection_events = peers_and_metadata.subscribe();
 
     let (dialer_sender, dialer_events) = network_builder
-        .add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config(), None);
+        .add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config(), None, true);
     network_builder.build(runtime.handle().clone()).start();
     let dialer_network_client = NetworkClient::new(
         vec![TEST_DIRECT_SEND_PROTOCOL],

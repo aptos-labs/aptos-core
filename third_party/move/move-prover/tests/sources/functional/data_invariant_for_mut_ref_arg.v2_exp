@@ -27,7 +27,6 @@ error: data invariant does not hold
   =         s = <redacted>
   =     at tests/sources/functional/data_invariant_for_mut_ref_arg.move:27: push_2
   =     at tests/sources/functional/data_invariant_for_mut_ref_arg.move:28: push_2
-  =         <redacted> = <redacted>
   =     at tests/sources/functional/data_invariant_for_mut_ref_arg.move:22: push_2
   =         s = <redacted>
   =     at tests/sources/functional/data_invariant_for_mut_ref_arg.move:8

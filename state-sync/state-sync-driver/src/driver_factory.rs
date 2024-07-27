@@ -158,6 +158,7 @@ impl DriverFactory {
         // Create the driver configuration
         let driver_configuration = DriverConfiguration::new(
             node_config.state_sync.state_sync_driver,
+            node_config.consensus_observer,
             node_config.base.role,
             waypoint,
         );
