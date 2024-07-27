@@ -1,3 +1,3 @@
 module 0x42::test {
-    struct S has copy {}
+    struct S has copy ();
 }
