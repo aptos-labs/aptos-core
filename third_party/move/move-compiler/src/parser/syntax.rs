@@ -1941,7 +1941,7 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 // Parse an expression term optionally followed by a chain of dot or index accesses:
 //      DotOrIndexChain =
 //          <DotOrIndexChain> "." <Identifier> [  "(" Comma<Exp> ")" ]
-//          | <DotOrIndexChain> "[" <Exp> "]"                      spec only
+//          | <DotOrIndexChain> "[" <Exp> "]"
 //          | <Term>
 fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
