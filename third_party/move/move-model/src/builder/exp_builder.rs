@@ -4327,14 +4327,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let field_decls = field_decls.clone();
         if is_positional_constructor != expected_positional_constructor {
             let struct_name_display = struct_name.display(self.env());
+            let variant_name_display = variant
+                .map(|v| format!("::{}", v.display(self.symbol_pool())))
+                .unwrap_or_default();
             self.error(
                 loc,
                 &format!(
                     "expected {} for struct constructor `{}`",
                     if is_positional_constructor {
-                        format!("positional constructor `{}( ... )`", struct_name_display)
+                        format!("positional constructor `{}{}(..)`", struct_name_display, variant_name_display)
                     } else {
-                        format!("struct constructor `{}{{ ... }}`", struct_name_display)
+                        format!("struct constructor `{}{} {{ .. }}`", struct_name_display, variant_name_display)
                     },
                     struct_name_display
                 ),
