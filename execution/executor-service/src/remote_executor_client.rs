@@ -297,108 +297,28 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         onchain_config: BlockExecutorConfigFromOnchain,
         duration_since_epoch: u64
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let current_time = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-        info!("Starting executing block on a coordinator at time {}", current_time);
-        trace!("RemoteExecutorClient Sending block to shards");
-        self.state_view_service.set_state_view(state_view);
-        let (sub_blocks, global_txns) = transactions.get_ref();
-        if !global_txns.is_empty() {
-            panic!("Global transactions are not supported yet");
-        }
-
-        let cmd_tx_timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&["0", "cmd_tx_async"])
-            .start_timer();
-
-        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-            .with_label_values(&["0_cmd_tx_start"]).observe(get_delta_time(duration_since_epoch) as f64);
-
-        let cmd_timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&["0", "0_cmd_timer_coord"])
-            .start_timer();
-        let mut expected_outputs = vec![0; self.num_shards()];
-        let batch_size = 200;
-
-        for (shard_id, _) in sub_blocks.into_iter().enumerate() {
-            expected_outputs[shard_id] = transactions.get_ref().0[shard_id].num_txns() as u64;
-            // TODO: Check if the function can get Arc<BlockExecutorConfigFromOnchain> instead.
-            let onchain_config_clone = onchain_config.clone();
-            let transactions_clone = transactions.clone();
-            let senders = self.command_txs.clone();
-            self.cmd_tx_thread_pool.spawn(move || {
-                let shard_txns = &transactions_clone.get_ref().0[shard_id].sub_blocks[0].transactions;
-                let index_offset = transactions_clone.get_ref().0[shard_id].sub_blocks[0].start_index as usize;
-                let num_txns = shard_txns.len();
-
-                let _ = shard_txns
-                    .chunks(batch_size)
-                    .enumerate()
-                    .for_each(|(chunk_idx, txns)| {
-                        let analyzed_txns = txns.iter().map(|txn| {
-                            txn.txn()
-                        }).collect::<Vec<&AnalyzedTransaction>>();
-                        let execution_batch_req = CmdsAndMetaDataRef {
-                            cmds: &analyzed_txns,
-                            num_txns,
-                            shard_txns_start_index: index_offset,
-                            onchain_config: &onchain_config_clone,
-                            batch_start_index: chunk_idx * batch_size,
-                        };
-                        let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
-                            .with_label_values(&["0", "cmd_tx_bcs_ser"])
-                            .start_timer();
-                        let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, analyzed_txns.len() as u64, 0);
-                        drop(bcs_ser_timer);
-                        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                            .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
-                        let execute_command_type = format!("execute_command_{}", shard_id);
-                        // StdRng::from_entropy() is slow
-                        let mut rng = StdRng::from_entropy();
-                        let rand_send_thread_idx = rng.gen_range(0, senders[shard_id].len());
-                        let timer_1 = REMOTE_EXECUTOR_TIMER
-                            .with_label_values(&["0", "cmd_tx_lock_send"])
-                            .start_timer();
-                        senders[shard_id][rand_send_thread_idx]
-                            .lock()
-                            .unwrap()
-                            .send(msg, &MessageType::new(execute_command_type));
-                        drop(timer_1)
-                    });
-            });
-        }
         let mut rng = StdRng::from_entropy();
-        drop(cmd_tx_timer);
-        for shard_id in 0..self.num_shards() {
-            let rand_send_thread_idx = rng.gen_range(0, self.command_txs[shard_id].len());
-            self.command_txs[shard_id][rand_send_thread_idx]
-                .lock()
-                .unwrap()
-                .send(Message::new(vec![]), &MessageType::new("cmd_completed".to_string()));
-        }
-        drop(cmd_timer);
-        let kv_timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&["0", "1_kv_timer_coord"])
-            .start_timer();
-        //let execution_results = self.get_output_from_shards()?;
-        //sleep(Duration::from_millis(200));
-        let mut shard_with_kv_completed = 0;
-        while let Ok(msg) = self.kv_finished.recv() {
-            shard_with_kv_completed += 1;
-            if shard_with_kv_completed == self.num_shards() {
-                break;
+        loop {
+            info!("Starting next block");
+            for shard_id in 0..self.num_shards() {
+                let rand_send_thread_idx = rng.gen_range(0, self.command_txs[shard_id].len());
+                self.command_txs[shard_id][rand_send_thread_idx]
+                    .lock()
+                    .unwrap()
+                    .send(Message::new(vec![]), &MessageType::new("cmd_completed".to_string()));
             }
-        }
-        drop(kv_timer);
 
-        let result_timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&["0", "2_result_timer_coord"])
-            .start_timer();
-        let results = self.get_streamed_output_from_shards(expected_outputs, duration_since_epoch);
-        drop(result_timer);
-        
+            let mut shard_with_kv_completed = 0;
+            while let Ok(msg) = self.kv_finished.recv() {
+                shard_with_kv_completed += 1;
+                if shard_with_kv_completed == self.num_shards() {
+                    break;
+                }
+            }
+
+            let results = self.get_streamed_output_from_shards(vec![], duration_since_epoch);
+            sleep(Duration::from_millis(200));
+        }
         let timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "drop_state_view_finally"])
             .start_timer();
@@ -408,8 +328,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             .with_label_values(&["9_8_execute_remote_block_done"]).observe(get_delta_time(duration_since_epoch) as f64);
         //drop(transactions);
         DEFAULT_DROPPER.schedule_drop(transactions);
-        results
-        //Ok(ShardedExecutionOutput::new(execution_results, vec![]))
+        Ok(vec![])
+        //Ok(ShardedExecutionOutput::new(vec![], vec![]))
     }
 
     fn shutdown(&mut self) {

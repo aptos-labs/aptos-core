@@ -353,12 +353,12 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         }
     }
     fn test_network(&mut self) {
-        self.command_finished_rx.recv().unwrap();
-        let num_epochs = 50;
+        let num_epochs = 500;
         let num_requests = 30;
         let mut total_deltas = vec![];
         info!("Testing network started on shard {} with #requests: {}", self.shard_id, num_requests);
         for epoch_id in 0..num_epochs {
+            self.command_finished_rx.recv().unwrap();
             info!("Testing epoch {}", epoch_id);
             let mut send_timestamps = vec![];
             let receive_timestamps = Arc::new(Mutex::new(vec![Default::default(); num_requests]));
@@ -408,14 +408,15 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             }
             print_stats(deltas.clone());
             total_deltas.append(&mut deltas);
+            let local_max = deltas.iter().max().unwrap().clone();
+            self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
+            let execute_result_type = format!("execute_result_{}", self.shard_id);
+            self.result_tx.send(Message::create_with_metadata(vec![], 0, local_max, self.shard_id as u64), &MessageType::new(execute_result_type));
             info!("");
         }
         let total_max = total_deltas.iter().max().unwrap().clone();
         info!("Testing network finished on shard {}", self.shard_id);
         print_stats(total_deltas);
-        self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
-        let execute_result_type = format!("execute_result_{}", self.shard_id);
-        self.result_tx.send(Message::create_with_metadata(vec![], 0, total_max, self.shard_id as u64), &MessageType::new(execute_result_type));
     }
 
     fn reset_block_init(&self) {
