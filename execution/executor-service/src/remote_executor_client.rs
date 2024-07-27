@@ -243,6 +243,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             let send_outputs_clone = send_outputs.clone();
             let expected_outputs_clone = expected_outputs.clone();
             let result_rxs_clone = self.result_rxs[shard_id].clone();
+            info!("Waiting for results from shard {}", shard_id);
             self.thread_pool.spawn(move || {
                 let received_msg = result_rxs_clone.recv().unwrap();
                 info!("Testing network finished on shard {} with avg_delta: {}, max_delta: {}",

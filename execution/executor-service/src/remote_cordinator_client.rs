@@ -409,10 +409,10 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             print_stats(deltas.clone());
             total_deltas.append(&mut deltas);
             let local_max = deltas.iter().max().unwrap().clone();
-            //self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
+            // self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
             let execute_result_type = format!("execute_result_{}", self.shard_id);
             self.result_tx.send(Message::create_with_metadata(vec![], 0, local_max, self.shard_id as u64), &MessageType::new(execute_result_type));
-            info!("");
+            info!("Finished epoch {}", epoch_id);
         }
         let total_max = total_deltas.iter().max().unwrap().clone();
         info!("Testing network finished on shard {}", self.shard_id);
