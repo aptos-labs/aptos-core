@@ -331,11 +331,11 @@ fn parse_identifier_or_positional_field(context: &mut Context) -> Result<Name, B
             ),
         ));
     }
-    let is_anonymous_field = context.tokens.peek() == Tok::NumValue;
+    let is_positional_field = context.tokens.peek() == Tok::NumValue;
     context.tokens.advance()?;
     let end_loc = context.tokens.previous_end_loc();
     let loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
-    if is_anonymous_field {
+    if is_positional_field {
         require_move_2(context, loc, "positional field");
     }
     Ok(Spanned::new(loc, id))
