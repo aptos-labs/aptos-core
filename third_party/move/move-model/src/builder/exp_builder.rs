@@ -2773,7 +2773,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // Treat this as a call to a global function.
-        self.parent.check_no_variant(maccess);
+        if !self.parent.check_no_variant(maccess) {
+            return self.new_error_exp();
+        }
         let (module_name, name, _) = self.parent.module_access_to_parts(maccess);
 
         // Process `old(E)` scoping
@@ -2836,7 +2838,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // handles call of struct/variant with positional fields
-        if maccess.value.is_struct_or_schema_name() && self.can_resolve_to_struct(maccess) {
+        if maccess.value.is_struct_or_schema_name() && self.can_resolve_to_struct(maccess) || ModuleBuilder::is_variant(maccess) {
             self.check_language_version(loc, "positional fields", LanguageVersion::V2_0);
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =

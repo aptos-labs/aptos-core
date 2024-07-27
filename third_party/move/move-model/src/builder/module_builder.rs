@@ -255,10 +255,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         qsym
     }
 
+    pub fn is_variant(maccess: &EA::ModuleAccess) -> bool {
+        matches!(maccess.value, EA::ModuleAccess_::ModuleAccess(_, _, Some(_)))
+    }
+
     pub fn check_no_variant(&self, maccess: &EA::ModuleAccess) -> bool {
-        if let EA::ModuleAccess_::ModuleAccess(_, _, Some(n)) = &maccess.value {
+        if Self::is_variant(maccess) {
             self.parent.env.error(
-                &self.parent.to_loc(&n.loc),
+                &self.parent.to_loc(&maccess.loc),
                 "variants not allowed in this context",
             );
             false
