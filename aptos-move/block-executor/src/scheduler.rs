@@ -13,7 +13,7 @@ use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cmp::{max, min},
     sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
         Arc, Condvar,
     },
 };
@@ -297,6 +297,8 @@ pub struct Scheduler {
     /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
+    num_dep_total: AtomicUsize,
+
     /// An index i maps to the most up-to-date status of transaction i.
     txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)>>,
 
@@ -349,6 +351,7 @@ impl Scheduler {
             txn_dependency: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(Vec::new())))
                 .collect(),
+            num_dep_total: AtomicUsize::new(0),
             txn_status: (0..num_txns)
                 .map(|_| {
                     CachePadded::new((
@@ -520,6 +523,10 @@ impl Scheduler {
         );
     }
 
+    pub fn get_num_dep_total(&self) -> usize {
+        self.num_dep_total.load(Ordering::SeqCst)
+    }
+
     fn wake_dependencies_after_execution(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
         let txn_deps: Vec<TxnIndex> = {
             let mut stored_deps = self.txn_dependency[txn_idx as usize].lock();
@@ -531,6 +538,8 @@ impl Scheduler {
         let mut min_dep = None;
         for dep in txn_deps {
             self.resume(dep)?;
+
+            self.num_dep_total.fetch_add(1, Ordering::SeqCst);
 
             if min_dep.is_none() || min_dep.is_some_and(|min_dep| min_dep > dep) {
                 min_dep = Some(dep);

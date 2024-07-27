@@ -1028,6 +1028,10 @@ where
         });
         drop(timer);
 
+        println!(
+            "total number of dependencies={}",
+            scheduler.get_num_dep_total()
+        );
         counters::update_state_counters(versioned_cache.stats(), true);
 
         // Explicit async drops.
