@@ -22,7 +22,7 @@ use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
+    block::{self, Block}, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
@@ -884,6 +884,13 @@ impl RoundManager {
         self.broadcast_fast_shares(vote.ledger_info().commit_info())
             .await;
 
+        let consensus_data_hash = if self.onchain_config.order_vote_enabled() {
+            HashValue::zero()
+        } else {
+            vote.vote_data_hash()
+        };
+        self.broadcast_precommit_vote(vote.ledger_info().commit_info().clone(), consensus_data_hash).await;
+
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
             PROPOSAL_VOTE_BROADCASTED.inc();
@@ -1021,31 +1028,35 @@ impl RoundManager {
         Ok(())
     }
 
-    async fn broadcast_precommit_vote(&mut self, ledger_info: LedgerInfo) {
-        let block_id = ledger_info.consensus_block_id();
-        let author = self.proposal_generator.author();
+    async fn broadcast_precommit_vote(&mut self, block_info: BlockInfo, consensus_data_hash: HashValue) {
+        if block_info.is_empty() {
+            return;
+        }
+        let block_id = block_info.id();
         let execution_futures = self.execution_futures.clone();
+        let author = self.proposal_generator.author();
         let safety_rules = self.safety_rules.clone();
         let network = self.network.clone();
+
         let task = async move {
             if let Some((_, fut)) = execution_futures.remove(&block_id) {
                 match fut.await {
                     Ok(execution_result) => {
                         let commit_info = BlockInfo::new(
-                            ledger_info.epoch(),
-                            ledger_info.round(),
-                            ledger_info.consensus_block_id(),
+                            block_info.epoch(),
+                            block_info.round(),
+                            block_id,
                             execution_result.result.root_hash(),
                             execution_result.result.version(),
-                            ledger_info.timestamp_usecs(),
+                            block_info.timestamp_usecs(),
                             execution_result.result.epoch_state().clone(),
                         );
                         let execution_future = Box::pin(async move { Ok(execution_result) });
                         execution_futures.insert(block_id, execution_future);
     
-                        info!("[PreExecution] broadcast commit vote for block of epoch {} round {} id {}", ledger_info.epoch(), ledger_info.round(), ledger_info.consensus_block_id());
+                        info!("[PreExecution] broadcast commit vote for block of epoch {} round {} id {}", block_info.epoch(), block_info.round(), block_id);
     
-                        let commit_ledger_info = LedgerInfo::new(commit_info, ledger_info.consensus_data_hash());
+                        let commit_ledger_info = LedgerInfo::new(commit_info, consensus_data_hash);
                         let signature = safety_rules.lock().sign_pre_commit_vote(commit_ledger_info.clone());
                         match signature{
                             Ok(signature) => {
@@ -1180,7 +1191,7 @@ impl RoundManager {
                         );
                     } else {
                         self.broadcast_fast_shares(qc.certified_block()).await;
-                        self.broadcast_precommit_vote(qc.ledger_info().ledger_info().clone()).await;
+                        self.broadcast_precommit_vote(vote.vote_data().proposed().clone(), HashValue::zero()).await;
                     }
                 }
                 Ok(())
