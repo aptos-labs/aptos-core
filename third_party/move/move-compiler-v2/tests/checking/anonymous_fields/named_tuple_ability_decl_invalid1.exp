@@ -1,6 +1,0 @@
-// -- Model dump before bytecode pipeline
-module 0x42::test {
-    struct S {
-        dummy_field: bool,
-    }
-} // end 0x42::test
