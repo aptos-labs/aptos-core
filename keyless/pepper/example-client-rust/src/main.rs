@@ -213,7 +213,7 @@ async fn main() {
     let docs: Vec<AccountRecoveryDbEntry> = db
         .fluent()
         .select()
-        .fields(paths!(AccountRecoveryDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms}))
+        .fields(paths!(AccountRecoveryDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms, first_request_unix_ms_minus_1q, num_requests}))
         .from("accounts")
         .filter(|q| {
             q.for_all([
