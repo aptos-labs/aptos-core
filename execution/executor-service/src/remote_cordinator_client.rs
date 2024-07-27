@@ -407,9 +407,11 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 max_delta = max_delta.max(delta);
             }
             print_stats(deltas.clone());
-            total_deltas.append(&mut deltas);
+            info!("chk 1");
             let local_max = deltas.iter().max().unwrap().clone();
-            // self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
+            info!("chk 2");
+            total_deltas.append(&mut deltas);
+            info!("chk 3");
             let execute_result_type = format!("execute_result_{}", self.shard_id);
             self.result_tx.send(Message::create_with_metadata(vec![], 0, local_max, self.shard_id as u64), &MessageType::new(execute_result_type));
             info!("Finished epoch {}", epoch_id);
@@ -417,6 +419,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         let total_max = total_deltas.iter().max().unwrap().clone();
         info!("Testing network finished on shard {}", self.shard_id);
         print_stats(total_deltas);
+        // // self.result_tx.send(Message::new(vec![]), &MessageType::new("kv_finished".to_string()));
     }
 
     fn reset_block_init(&self) {
