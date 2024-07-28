@@ -1,8 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use log::info;
-
 // @generated
 /// Generated client implementations.
 pub mod network_message_service_client {
