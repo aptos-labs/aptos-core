@@ -232,27 +232,25 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         Ok(res)
     }
 
-    fn get_streamed_output_from_shards(&self, expected_outputs: Vec<u64>, duration_since_epoch: u64) -> Result<Vec<TransactionOutput>, VMStatus> {
+    fn get_streamed_output_from_shards(&self, expected_outputs: Vec<u64>, duration_since_epoch: u64) -> Vec<u64> {
         //info!("expected outputs {:?} ", expected_outputs);
         let (send_outputs, recv_outputs) = crossbeam_channel::unbounded();
-        let mut results: Vec<Vec<TransactionIdxAndOutput>> = Vec::with_capacity(self.num_shards());
+        let mut results = Vec::with_capacity(self.num_shards());
         for i in 0..self.num_shards() {
-            results.push(vec![]);
+            results.push(0);
         }
         (0..self.num_shards()).into_iter().for_each(|shard_id| {
             let send_outputs_clone = send_outputs.clone();
             let expected_outputs_clone = expected_outputs.clone();
             let result_rxs_clone = self.result_rxs[shard_id].clone();
-            info!("Waiting for results from shard {}", shard_id);
-            self.thread_pool.spawn(move || {
-                let received_msg = result_rxs_clone.recv().unwrap();
-                info!("Testing network finished on shard {} with avg_delta: {}, max_delta: {}",
-                    received_msg.shard_id.unwrap(),
-                    received_msg.start_ms_since_epoch.unwrap(),
-                    received_msg.seq_num.unwrap()
-                );
-                send_outputs_clone.send(()).unwrap();
-            });
+            let received_msg = result_rxs_clone.recv().unwrap();
+            info!("Testing network finished on shard {} with avg_delta: {}, max_delta: {}",
+                received_msg.shard_id.unwrap(),
+                received_msg.start_ms_since_epoch.unwrap(),
+                received_msg.seq_num.unwrap()
+            );
+            results[shard_id] = received_msg.seq_num.unwrap();
+            send_outputs_clone.send(()).unwrap();
         });
         let mut cnt = 0;
         while let Ok(msg) = recv_outputs.recv() {
@@ -262,22 +260,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 break;
             }
         }
-
-        let delta = get_delta_time(duration_since_epoch);
-        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-            .with_label_values(&["9_2_results_rx_all_shards"]).observe(delta as f64);
-
-        let _timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&["0", "result_rx_gather"])
-            .start_timer();
-        let mut aggregated_results: Vec<TransactionOutput> = vec![Default::default() ; expected_outputs.iter().sum::<u64>() as usize];
-        results.into_iter().for_each(|result| {
-            result.into_iter().for_each(|txn_output| {
-                aggregated_results[txn_output.txn_idx as usize] = txn_output.txn_output;
-            });
-        });
-
-        Ok(aggregated_results)
+        results
     }
 }
 
@@ -299,6 +282,10 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         duration_since_epoch: u64
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let mut rng = StdRng::from_entropy();
+        let mut agg_max_delta = vec![];
+        for _ in 0..self.num_shards() {
+            agg_max_delta.push(0);
+        }
         loop {
             info!("Starting next block");
             for shard_id in 0..self.num_shards() {
@@ -321,6 +308,10 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             // }
 
             let results = self.get_streamed_output_from_shards(vec![], duration_since_epoch);
+            for shard_id in 0..self.num_shards() {
+                agg_max_delta[shard_id] = std::cmp::max(agg_max_delta[shard_id], results[shard_id]);
+                info!("Shard {} finished with agg max_delta: {}", shard_id, results[shard_id]);
+            }
             sleep(Duration::from_millis(200));
         }
         let timer = REMOTE_EXECUTOR_TIMER
