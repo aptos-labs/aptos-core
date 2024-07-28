@@ -3158,6 +3158,7 @@ name = "aptos-protos"
 version = "1.3.0"
 dependencies = [
  "futures-core",
+ "log",
  "pbjson",
  "prost 0.12.3",
  "serde",

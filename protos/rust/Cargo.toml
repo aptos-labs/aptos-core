@@ -15,3 +15,4 @@ pbjson = { workspace = true }
 prost = { workspace = true }
 serde = { workspace = true }
 tonic = { workspace = true }
+log = "0.4.20"
