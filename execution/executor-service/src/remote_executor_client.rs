@@ -303,7 +303,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 agg_max_delta[shard_id] = std::cmp::max(agg_max_delta[shard_id], results[shard_id]);
                 info!("Shard {} finished with agg max_delta: {}", shard_id, agg_max_delta[shard_id]);
             }
-            sleep(Duration::from_millis(200));
+            sleep(Duration::from_millis(900));
         }
         let timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "drop_state_view_finally"])

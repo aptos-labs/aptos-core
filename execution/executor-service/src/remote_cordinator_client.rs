@@ -353,7 +353,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         }
     }
     fn test_network(&mut self) {
-        let num_epochs = 500;
+        let num_epochs = 50;
         let num_requests = 30;
         let mut total_deltas = vec![];
         info!("Testing network started on shard {} with #requests: {}", self.shard_id, num_requests);
