@@ -241,7 +241,6 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         }
         (0..self.num_shards()).into_iter().for_each(|shard_id| {
             let send_outputs_clone = send_outputs.clone();
-            let expected_outputs_clone = expected_outputs.clone();
             let result_rxs_clone = self.result_rxs[shard_id].clone();
             let received_msg = result_rxs_clone.recv().unwrap();
             info!("Testing network finished on shard {} with avg_delta: {}, max_delta: {}",
@@ -299,18 +298,10 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 });
             }
 
-            // let mut shard_with_kv_completed = 0;
-            // while let Ok(msg) = self.kv_finished.recv() {
-            //     shard_with_kv_completed += 1;
-            //     if shard_with_kv_completed == self.num_shards() {
-            //         break;
-            //     }
-            // }
-
             let results = self.get_streamed_output_from_shards(vec![], duration_since_epoch);
             for shard_id in 0..self.num_shards() {
                 agg_max_delta[shard_id] = std::cmp::max(agg_max_delta[shard_id], results[shard_id]);
-                info!("Shard {} finished with agg max_delta: {}", shard_id, results[shard_id]);
+                info!("Shard {} finished with agg max_delta: {}", shard_id, agg_max_delta[shard_id]);
             }
             sleep(Duration::from_millis(200));
         }
