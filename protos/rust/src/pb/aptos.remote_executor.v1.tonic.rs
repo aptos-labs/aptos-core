@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use log::info;
+
 // @generated
 /// Generated client implementations.
 pub mod network_message_service_client {
@@ -107,6 +109,10 @@ pub mod network_message_service_client {
                 "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
             );
             let mut req = request.into_request();
+            let message_type = req.get_ref().message_type.clone();
+            let seq_num = req.get_ref().seq_no;
+            let shard_id = req.get_ref().shard_id;
+
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
@@ -114,7 +120,15 @@ pub mod network_message_service_client {
                         "SimpleMsgExchange",
                     ),
                 );
-            self.inner.unary(req, path, codec).await
+            let threshold = 50;
+            let start_time = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            let result = self.inner.unary(req, path, codec).await;
+            let end_time = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            if end_time - start_time > threshold {
+                eprintln!("GRPC request took more {:?} ms > {:?}. The message info: message_type: {:?}, seg_num {:?}, shard_id {:?}",
+                          end_time - start_time, threshold, message_type, seq_num, shard_id);
+            }
+            result
         }
     }
 }
