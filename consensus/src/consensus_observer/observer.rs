@@ -7,7 +7,7 @@ use crate::{
         logging::{LogEntry, LogSchema},
         metrics,
         network_client::ConsensusObserverClient,
-        network_events::{ConsensusObserverNetworkEvents, NetworkMessage, ResponseSender},
+        network_handler::ConsensusObserverNetworkMessage,
         network_message::{
             BlockPayload, CommitDecision, ConsensusObserverDirectSend, ConsensusObserverMessage,
             ConsensusObserverRequest, ConsensusObserverResponse, OrderedBlock,
@@ -27,7 +27,7 @@ use crate::{
     pipeline::execution_client::TExecutionClient,
     state_replication::StateComputerCommitCallBackType,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_channels::{aptos_channel, aptos_channel::Receiver, message_queues::QueueStyle};
 use aptos_config::{config::NodeConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::{pipeline, pipelined_block::PipelinedBlock};
 use aptos_crypto::{bls12381, Genesis};
@@ -704,12 +704,11 @@ impl ConsensusObserver {
         false // The commit decision was not processed
     }
 
-    /// Processes a direct send message
-    async fn process_direct_send_message(
-        &mut self,
-        peer_network_id: PeerNetworkId,
-        message: ConsensusObserverDirectSend,
-    ) {
+    /// Processes a network message received by the consensus observer
+    async fn process_network_message(&mut self, network_message: ConsensusObserverNetworkMessage) {
+        // Unpack the network message
+        let (peer_network_id, message) = network_message.into_parts();
+
         // Verify the message is from the peer we've subscribed to
         if let Some(active_subscription) = &mut self.active_observer_subscription {
             if let Err(error) = active_subscription.verify_message_sender(&peer_network_id) {
@@ -869,37 +868,6 @@ impl ConsensusObserver {
                     "Parent block for ordered block is missing! Ignoring: {:?}",
                     ordered_block.proof_block_info()
                 ))
-            );
-        }
-    }
-
-    /// Processes a request message
-    fn process_request_message(
-        &mut self,
-        peer_network_id: PeerNetworkId,
-        request: ConsensusObserverRequest,
-        response_sender: Option<ResponseSender>,
-    ) {
-        // Ensure that the response sender is present
-        let response_sender = match response_sender {
-            Some(response_sender) => response_sender,
-            None => {
-                error!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Missing response sender for RCP request: {:?}",
-                        request
-                    ))
-                );
-                return; // Something has gone wrong!
-            },
-        };
-
-        // Forward the request to the consensus publisher
-        if let Some(consensus_publisher) = &self.consensus_publisher {
-            consensus_publisher.handle_subscription_request(
-                &peer_network_id,
-                request,
-                response_sender,
             );
         }
     }
@@ -1151,22 +1119,12 @@ impl ConsensusObserver {
     }
 
     /// Starts the consensus observer loop that processes incoming
-    /// network messages and ensures the observer is making progress.
+    /// messages and ensures the observer is making progress.
     pub async fn start(
         mut self,
-        mut network_service_events: ConsensusObserverNetworkEvents,
+        mut consensus_observer_message_receiver: Receiver<(), ConsensusObserverNetworkMessage>,
         mut sync_notification_listener: tokio::sync::mpsc::UnboundedReceiver<(u64, Round)>,
     ) {
-        // If the consensus publisher is enabled but the observer is disabled,
-        // we should only forward incoming requests to the consensus publisher.
-        if self.node_config.consensus_observer.publisher_enabled
-            && !self.node_config.consensus_observer.observer_enabled
-        {
-            self.start_publisher_forwarding(&mut network_service_events)
-                .await;
-            return; // We should never return from this function
-        }
-
         // Create a progress check ticker
         let mut progress_check_interval = IntervalStream::new(interval(Duration::from_millis(
             self.node_config
@@ -1183,28 +1141,8 @@ impl ConsensusObserver {
             .message("Starting the consensus observer loop!"));
         loop {
             tokio::select! {
-                Some(network_message) = network_service_events.next() => {
-                    // Unpack the network message
-                    let NetworkMessage {
-                        peer_network_id,
-                        protocol_id: _,
-                        consensus_observer_message,
-                        response_sender,
-                    } = network_message;
-
-                    // Process the consensus observer message
-                    match consensus_observer_message {
-                        ConsensusObserverMessage::DirectSend(message) => {
-                            self.process_direct_send_message(peer_network_id, message).await;
-                        },
-                        ConsensusObserverMessage::Request(request) => {
-                            self.process_request_message(peer_network_id, request, response_sender);
-                        },
-                        _ => {
-                            error!(LogSchema::new(LogEntry::ConsensusObserver)
-                                .message(&format!("Received unexpected message from peer: {}", peer_network_id)));
-                        },
-                    }
+                Some(network_message) = consensus_observer_message_receiver.next() => {
+                    self.process_network_message(network_message).await;
                 }
                 Some((epoch, round)) = sync_notification_listener.recv() => {
                     self.process_sync_notification(epoch, round).await;
@@ -1219,44 +1157,6 @@ impl ConsensusObserver {
         // Log the exit of the consensus observer loop
         error!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("The consensus observer loop exited unexpectedly!"));
-    }
-
-    /// Starts the publisher forwarding loop that forwards incoming
-    /// requests to the consensus publisher. The rest of the consensus
-    /// observer functionality is disabled.
-    async fn start_publisher_forwarding(
-        &mut self,
-        network_service_events: &mut ConsensusObserverNetworkEvents,
-    ) {
-        // TODO: identify if there's a cleaner way to handle this!
-
-        // Start the consensus publisher forwarding loop
-        info!(LogSchema::new(LogEntry::ConsensusObserver)
-            .message("Starting the consensus publisher forwarding loop!"));
-        loop {
-            tokio::select! {
-                Some(network_message) = network_service_events.next() => {
-                    // Unpack the network message
-                    let NetworkMessage {
-                        peer_network_id,
-                        protocol_id: _,
-                        consensus_observer_message,
-                        response_sender,
-                    } = network_message;
-
-                    // Process the consensus observer message
-                    match consensus_observer_message {
-                        ConsensusObserverMessage::Request(request) => {
-                            self.process_request_message(peer_network_id, request, response_sender);
-                        },
-                        _ => {
-                            error!(LogSchema::new(LogEntry::ConsensusObserver)
-                                .message(&format!("Received unexpected message from peer: {}", peer_network_id)));
-                        },
-                    }
-                }
-            }
-        }
     }
 }
 
