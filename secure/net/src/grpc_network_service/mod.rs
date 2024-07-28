@@ -99,11 +99,16 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
         &self,
         request: Request<NetworkMessage>,
     ) -> Result<Response<Empty>, Status> {
+        let start_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         let _timer = NETWORK_HANDLER_TIMER
             .with_label_values(&[&self.self_addr.to_string(), "inbound_msgs"])
             .start_timer();
         let remote_addr = request.remote_addr();
         let network_message = request.into_inner();
+        let message_type = network_message.message_type.clone();
+        let seq_num = network_message.seq_no;
+        let shard_id = network_message.shard_id;
+
         let msg = match network_message.ms_since_epoch {
             Some(ms_since_epoch) => Message::create_with_metadata(
                 network_message.message,
@@ -162,6 +167,12 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
                 "No handler registered for sender: {:?} and msg type {:?}",
                 remote_addr, message_type
             );
+        }
+        let end_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        let threshold = 50;
+        if end_time - start_time > threshold {
+            info!("GRPC request processed in {} > {} ms. The message info: message_type: {:?}, seg_num {:?}, shard_id {:?}",
+                          end_time - start_time, threshold, message_type, seq_num, shard_id);
         }
         Ok(Response::new(Empty {}))
     }
