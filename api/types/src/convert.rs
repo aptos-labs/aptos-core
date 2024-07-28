@@ -155,7 +155,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         &self,
         typ: &StructTag,
         bytes: &'_ [u8],
-    ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>> {
+    ) -> Result<(
+        Option<Identifier>,
+        Vec<(Identifier, move_core_types::value::MoveValue)>,
+    )> {
         self.inner.view_struct_fields(typ, bytes)
     }
 
