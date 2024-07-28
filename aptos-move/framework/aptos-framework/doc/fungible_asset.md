@@ -2768,12 +2768,14 @@ Used to delete a store.  Requires the store to be completely empty prior to remo
         <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(frozen_events);
     };
 
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_BurnStore">BurnStore</a> {
-        store: addr,
-        owner,
-        metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
-        frozen,
-    });
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_fa_mint_burn_events_enabled">features::is_fa_mint_burn_events_enabled</a>()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_BurnStore">BurnStore</a> {
+            store: addr,
+            owner,
+            metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
+            frozen,
+        });
+    }
 }
 </code></pre>
 
@@ -2952,10 +2954,12 @@ CAN ONLY BE CALLED BY coin.move for migration.
     amount: u64
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_increase_supply">increase_supply</a>(&metadata, amount);
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Mint">Mint</a> {
-        metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
-        amount
-    });
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_fa_mint_burn_events_enabled">features::is_fa_mint_burn_events_enabled</a>()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Mint">Mint</a> {
+            metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
+            amount
+        });
+    };
     <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
         metadata,
         amount
@@ -3109,10 +3113,12 @@ CAN ONLY BE CALLED BY coin.move for migration.
         metadata,
         amount
     } = fa;
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Burn">Burn</a> {
-        metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
-        amount
-    });
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_fa_mint_burn_events_enabled">features::is_fa_mint_burn_events_enabled</a>()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Burn">Burn</a> {
+            metadata: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata),
+            amount
+        });
+    };
     <a href="fungible_asset.md#0x1_fungible_asset_decrease_supply">decrease_supply</a>(&metadata, amount);
     amount
 }

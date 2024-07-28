@@ -801,12 +801,14 @@ module aptos_framework::fungible_asset {
             event::destroy_handle(frozen_events);
         };
 
-        event::emit(BurnStore {
-            store: addr,
-            owner,
-            metadata: object::object_address(&metadata),
-            frozen,
-        });
+        if (features::is_fa_mint_burn_events_enabled()) {
+            event::emit(BurnStore {
+                store: addr,
+                owner,
+                metadata: object::object_address(&metadata),
+                frozen,
+            });
+        }
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
@@ -865,10 +867,12 @@ module aptos_framework::fungible_asset {
         amount: u64
     ): FungibleAsset acquires Supply, ConcurrentSupply {
         increase_supply(&metadata, amount);
-        event::emit(Mint {
-            metadata: object::object_address(&metadata),
-            amount
-        });
+        if (features::is_fa_mint_burn_events_enabled()) {
+            event::emit(Mint {
+                metadata: object::object_address(&metadata),
+                amount
+            });
+        };
         FungibleAsset {
             metadata,
             amount
@@ -922,10 +926,12 @@ module aptos_framework::fungible_asset {
             metadata,
             amount
         } = fa;
-        event::emit(Burn {
-            metadata: object::object_address(&metadata),
-            amount
-        });
+        if (features::is_fa_mint_burn_events_enabled()) {
+            event::emit(Burn {
+                metadata: object::object_address(&metadata),
+                amount
+            });
+        };
         decrease_supply(&metadata, amount);
         amount
     }
