@@ -5,12 +5,13 @@ use crate::consensus_observer::{
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
     network_client::ConsensusObserverClient,
-    network_events::ResponseSender,
+    network_handler::ConsensusPublisherNetworkMessage,
     network_message::{
         ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
         ConsensusObserverResponse,
     },
 };
+use aptos_channels::aptos_channel::Receiver;
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_infallible::RwLock;
 use aptos_logger::{info, warn};
@@ -40,8 +41,10 @@ pub struct ConsensusPublisher {
 
 impl ConsensusPublisher {
     pub fn new(
-        network_client: NetworkClient<ConsensusObserverMessage>,
         consensus_observer_config: ConsensusObserverConfig,
+        consensus_observer_client: Arc<
+            ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+        >,
     ) -> (
         Self,
         mpsc::Receiver<(PeerNetworkId, ConsensusObserverDirectSend)>,
@@ -53,7 +56,7 @@ impl ConsensusPublisher {
 
         // Create the consensus publisher
         let consensus_publisher = Self {
-            consensus_observer_client: Arc::new(ConsensusObserverClient::new(network_client)),
+            consensus_observer_client,
             consensus_observer_config,
             active_subscribers: Arc::new(RwLock::new(HashSet::new())),
             outbound_message_sender,
@@ -127,32 +130,23 @@ impl ConsensusPublisher {
         self.active_subscribers.read().clone()
     }
 
-    /// Returns a copy of the consensus observer client
-    pub fn get_consensus_observer_client(
-        &self,
-    ) -> Arc<ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>> {
-        self.consensus_observer_client.clone()
-    }
+    /// Processes a network message received by the consensus publisher
+    fn process_network_message(&self, network_message: ConsensusPublisherNetworkMessage) {
+        // Unpack the network message
+        let (peer_network_id, message, response_sender) = network_message.into_parts();
 
-    /// Handles a subscription message from a peer
-    pub fn handle_subscription_request(
-        &self,
-        peer_network_id: &PeerNetworkId,
-        request: ConsensusObserverRequest,
-        response_sender: ResponseSender,
-    ) {
         // Update the RPC request counter
         metrics::increment_request_counter(
             &metrics::PUBLISHER_RECEIVED_REQUESTS,
-            request.get_label(),
-            peer_network_id,
+            message.get_label(),
+            &peer_network_id,
         );
 
-        // Handle the request
-        match request {
+        // Handle the message
+        match message {
             ConsensusObserverRequest::Subscribe => {
                 // Add the peer to the set of active subscribers
-                self.active_subscribers.write().insert(*peer_network_id);
+                self.active_subscribers.write().insert(peer_network_id);
                 info!(LogSchema::new(LogEntry::ConsensusPublisher)
                     .event(LogEvent::Subscription)
                     .message(&format!(
@@ -165,7 +159,7 @@ impl ConsensusPublisher {
             },
             ConsensusObserverRequest::Unsubscribe => {
                 // Remove the peer from the set of active subscribers
-                self.active_subscribers.write().remove(peer_network_id);
+                self.active_subscribers.write().remove(&peer_network_id);
                 info!(LogSchema::new(LogEntry::ConsensusPublisher)
                     .event(LogEvent::Subscription)
                     .message(&format!(
@@ -207,6 +201,7 @@ impl ConsensusPublisher {
     pub async fn start(
         self,
         outbound_message_receiver: mpsc::Receiver<(PeerNetworkId, ConsensusObserverDirectSend)>,
+        mut publisher_message_receiver: Receiver<(), ConsensusPublisherNetworkMessage>,
     ) {
         // Spawn the message serializer and sender
         spawn_message_serializer_and_sender(
@@ -227,8 +222,10 @@ impl ConsensusPublisher {
             .message("Starting the consensus publisher garbage collection loop!"));
         loop {
             tokio::select! {
+                Some(network_message) = publisher_message_receiver.next() => {
+                    self.process_network_message(network_message);
+                },
                 _ = garbage_collection_interval.select_next_some() => {
-                    // Perform garbage collection
                     self.garbage_collect_subscriptions();
                 },
             }
@@ -314,7 +311,9 @@ fn spawn_message_serializer_and_sender(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::consensus_observer::network_message::BlockTransactionPayload;
+    use crate::consensus_observer::{
+        network_events::ResponseSender, network_message::BlockTransactionPayload,
+    };
     use aptos_config::network_id::NetworkId;
     use aptos_crypto::HashValue;
     use aptos_network::{
@@ -338,10 +337,13 @@ mod test {
         let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
         let network_client =
             NetworkClient::new(vec![], vec![], hashmap![], peers_and_metadata.clone());
+        let consensus_observer_client = Arc::new(ConsensusObserverClient::new(network_client));
 
         // Create a consensus publisher
-        let (consensus_publisher, _) =
-            ConsensusPublisher::new(network_client, ConsensusObserverConfig::default());
+        let (consensus_publisher, _) = ConsensusPublisher::new(
+            ConsensusObserverConfig::default(),
+            consensus_observer_client,
+        );
 
         // Add a peer to the peers and metadata
         let peer_network_id_1 = PeerNetworkId::new(network_id, PeerId::random());
@@ -406,10 +408,13 @@ mod test {
         let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
         let network_client =
             NetworkClient::new(vec![], vec![], hashmap![], peers_and_metadata.clone());
+        let consensus_observer_client = Arc::new(ConsensusObserverClient::new(network_client));
 
         // Create a consensus publisher
-        let (consensus_publisher, _) =
-            ConsensusPublisher::new(network_client, ConsensusObserverConfig::default());
+        let (consensus_publisher, _) = ConsensusPublisher::new(
+            ConsensusObserverConfig::default(),
+            consensus_observer_client,
+        );
 
         // Subscribe a new peer to consensus updates and verify the subscription
         let peer_network_id_1 = PeerNetworkId::new(network_id, PeerId::random());
@@ -457,10 +462,13 @@ mod test {
         let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
         let network_client =
             NetworkClient::new(vec![], vec![], hashmap![], peers_and_metadata.clone());
+        let consensus_observer_client = Arc::new(ConsensusObserverClient::new(network_client));
 
         // Create a consensus publisher
-        let (consensus_publisher, mut outbound_message_receiver) =
-            ConsensusPublisher::new(network_client, ConsensusObserverConfig::default());
+        let (consensus_publisher, mut outbound_message_receiver) = ConsensusPublisher::new(
+            ConsensusObserverConfig::default(),
+            consensus_observer_client,
+        );
 
         // Subscribe a new peer to consensus updates
         let peer_network_id_1 = PeerNetworkId::new(network_id, PeerId::random());
@@ -560,11 +568,15 @@ mod test {
         consensus_publisher: &ConsensusPublisher,
         peer_network_id: &PeerNetworkId,
     ) {
-        consensus_publisher.handle_subscription_request(
-            peer_network_id,
+        // Create the subscribe message
+        let network_message = ConsensusPublisherNetworkMessage::new(
+            *peer_network_id,
             ConsensusObserverRequest::Subscribe,
             ResponseSender::new_for_test(),
         );
+
+        // Process the subscription request
+        consensus_publisher.process_network_message(network_message);
     }
 
     /// Processes an unsubscription request for the given peer
@@ -572,11 +584,15 @@ mod test {
         consensus_publisher: &ConsensusPublisher,
         peer_network_id: &PeerNetworkId,
     ) {
-        consensus_publisher.handle_subscription_request(
-            peer_network_id,
+        // Create the unsubscribe message
+        let network_message = ConsensusPublisherNetworkMessage::new(
+            *peer_network_id,
             ConsensusObserverRequest::Unsubscribe,
             ResponseSender::new_for_test(),
         );
+
+        // Process the unsubscription request
+        consensus_publisher.process_network_message(network_message);
     }
 
     /// Verifies the active subscribers has the expected size and contains the expected peers
