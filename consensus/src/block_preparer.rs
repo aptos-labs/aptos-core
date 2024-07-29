@@ -45,7 +45,7 @@ impl BlockPreparer {
             thread::sleep(Duration::from_millis(10));
             Err(ExecutorError::CouldNotGetData)
         });
-        let (txns, max_txns_from_block_to_execute) =
+        let (mut txns, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
@@ -54,21 +54,19 @@ impl BlockPreparer {
         let block_timestamp_usecs = block.timestamp_usecs();
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         tokio::task::spawn_blocking(move || {
-            let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
-            let mut deduped_txns = txn_deduper.dedup(filtered_txns);
-            let num_txns_before = deduped_txns.len();
-            deduped_txns.retain(|txn| {
+            let num_txns_before = txns.len();
+            txns.retain(|txn| {
                 Duration::from_micros(block_timestamp_usecs).as_secs()
                     < txn.expiration_timestamp_secs()
             });
-            NUM_EXPIRED_TXNS_IN_BLOCK_PREPARER
-                .observe((num_txns_before - deduped_txns.len()) as f64);
+            NUM_EXPIRED_TXNS_IN_BLOCK_PREPARER.observe((num_txns_before - txns.len()) as f64);
+            let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
+            let deduped_txns = txn_deduper.dedup(filtered_txns);
             let mut shuffled_txns = {
                 let _timer = TXN_SHUFFLE_SECONDS.start_timer();
 
                 txn_shuffler.shuffle(deduped_txns)
             };
-
             if let Some(max_txns_from_block_to_execute) = max_txns_from_block_to_execute {
                 shuffled_txns.truncate(max_txns_from_block_to_execute as usize);
             }
