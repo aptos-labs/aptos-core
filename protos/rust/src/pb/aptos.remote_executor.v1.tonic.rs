@@ -118,12 +118,14 @@ pub mod network_message_service_client {
                         "SimpleMsgExchange",
                     ),
                 );
-            let threshold = 50;
+            let threshold = 30;
             let start_time = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let result = self.inner.unary(req, path, codec).await;
             let end_time = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             if end_time - start_time > threshold {
                 eprintln!("GRPC request took more {:?} ms > {:?}. The message info: message_type: {:?}, seg_num {:?}, shard_id {:?}",
+                          end_time - start_time, threshold, message_type, seq_num, shard_id);
+                println!("GRPC request took more {:?} ms > {:?}. The message info: message_type: {:?}, seg_num {:?}, shard_id {:?}",
                           end_time - start_time, threshold, message_type, seq_num, shard_id);
             }
             result
