@@ -37,6 +37,8 @@ use futures::executor::block_on;
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::AtomicBool;
+#[cfg(any(test, feature = "fuzzing"))]
+use std::sync::atomic::Ordering;
 use std::{sync::Arc, time::Duration};
 
 #[cfg(test)]
@@ -469,7 +471,11 @@ impl BlockStore {
     }
 
     pub async fn wait_for_payload(&self, block: &Block) -> anyhow::Result<()> {
-        self.payload_manager.get_transactions(block).await?;
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            self.payload_manager.get_transactions(block),
+        )
+        .await??;
         Ok(())
     }
 

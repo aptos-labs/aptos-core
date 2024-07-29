@@ -52,7 +52,6 @@ use aptos_consensus_types::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
@@ -66,7 +65,6 @@ use aptos_types::{
         ValidatorTxnConfig,
     },
     randomness::RandMetadata,
-    transaction::SignedTransaction,
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
@@ -78,7 +76,7 @@ use serde::Serialize;
 use std::{mem::Discriminant, pin::Pin, sync::Arc, time::Duration};
 use tokio::{
     sync::oneshot as TokioOneshot,
-    time::{error::Elapsed, sleep, Instant},
+    time::{sleep, Instant},
 };
 
 #[derive(Serialize, Clone)]
