@@ -2022,7 +2022,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                         );
                     },
                     ReadRef => step.read_ref(dests[0], srcs[0]),
-                    WriteRef => step.write_ref(srcs[0], srcs[1]),
+                    WriteRef => step.write_ref(srcs[1], srcs[0]),
                     FreezeRef(explicit) => {
                         step.freeze_ref(code_offset, *explicit, dests[0], srcs[0])
                     },

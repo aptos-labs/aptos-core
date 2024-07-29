@@ -1,0 +1,383 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # deps: {1}, dfs: [Some(0)]
+  0: $t0 := 1
+     # deps: {}, dfs: [Some(1)]
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # deps: {1, 2}, dfs: [Some(0)]
+  0: touch($t0)
+     # deps: {1, 2}, dfs: [Some(1)]
+  1: $t2 := 1
+     # deps: {2}, dfs: [Some(2)]
+  2: $t0 := +($t0, $t2)
+     # deps: {}, dfs: [Some(3)]
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun m::test10($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # deps: {2, 3, 4, 5}, dfs: [Some(0)]
+  0: $t3 := borrow_local($t0)
+     # deps: {3, 4, 5}, dfs: [Some(1)]
+  1: $t5 := read_ref($t3)
+     # deps: {3, 4, 5}, dfs: [Some(2)]
+  2: $t4 := borrow_local($t1)
+     # deps: {4, 5}, dfs: [Some(3)]
+  3: $t6 := read_ref($t4)
+     # deps: {5}, dfs: [Some(4)]
+  4: $t5 := +($t5, $t6)
+     # deps: {}, dfs: [Some(5)]
+  5: return $t5
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # deps: {1, 2, 3, 4, 5}, dfs: [Some(0)]
+  0: touch($t0)
+     # deps: {1, 2, 3, 4, 5}, dfs: [Some(1)]
+  1: $t4 := 1
+     # deps: {2, 3, 4, 5}, dfs: [Some(2)]
+  2: $t0 := +($t0, $t4)
+     # deps: {3, 4, 5}, dfs: [Some(3)]
+  3: touch($t1)
+     # deps: {3, 4, 5}, dfs: [Some(4)]
+  4: $t4 := 1
+     # deps: {4, 5}, dfs: [Some(5)]
+  5: $t1 := +($t1, $t4)
+     # deps: {5}, dfs: [Some(6)]
+  6: $t0 := +($t0, $t1)
+     # deps: {}, dfs: [Some(7)]
+  7: return $t0
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64, $t1: u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: u64 [unused]
+     var $t14: u64 [unused]
+     # deps: {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, dfs: [None, Some(0)]
+  0: $t6 := 1
+     # deps: {2, 3, 4, 5, 6, 7, 8, 9, 10}, dfs: [None, Some(1)]
+  1: $t0 := +($t6, $t0)
+     # deps: {3, 4, 5, 6, 7, 8, 9, 10}, dfs: [None, Some(2)]
+  2: $t6 := 1
+     # deps: {4, 5, 6, 7, 8, 9, 10}, dfs: [None, Some(3)]
+  3: $t1 := +($t6, $t1)
+     # deps: {5, 6, 7, 8, 9, 10}, dfs: [Some(0), None]
+  4: $t6 := 1
+     # deps: {6, 7, 8, 9, 10}, dfs: [Some(1), None]
+  5: $t2 := +($t6, $t2)
+     # deps: {7, 8, 9, 10}, dfs: [Some(2), None]
+  6: $t6 := 1
+     # deps: {8, 9, 10}, dfs: [Some(3), None]
+  7: $t3 := +($t6, $t3)
+     # deps: {9, 10}, dfs: [None, Some(4)]
+  8: $t0 := +($t0, $t1)
+     # deps: {10}, dfs: [Some(4), None]
+  9: $t1 := +($t2, $t3)
+     # deps: {}, dfs: [Some(5), None]
+ 10: return $t1
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # deps: {1, 2, 3, 4, 5}, dfs: [Some(0)]
+  0: touch($t0)
+     # deps: {1, 2, 3, 4, 5}, dfs: [Some(1)]
+  1: $t4 := 1
+     # deps: {2, 3, 4, 5}, dfs: [Some(2)]
+  2: $t0 := +($t0, $t4)
+     # deps: {3, 4, 5}, dfs: [Some(3)]
+  3: touch($t1)
+     # deps: {3, 4, 5}, dfs: [Some(4)]
+  4: $t4 := 1
+     # deps: {4, 5}, dfs: [Some(5)]
+  5: $t1 := +($t1, $t4)
+     # deps: {5}, dfs: [Some(6)]
+  6: $t0 := +($t0, $t1)
+     # deps: {}, dfs: [Some(7)]
+  7: return $t0
+}
+
+
+[variant baseline]
+public fun m::test5(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     # deps: {3, 4, 5, 6}, dfs: [Some(0)]
+  0: $t3 := 2
+     # deps: {1, 3, 4, 5, 6}, dfs: [Some(3)]
+  1: $t1 := 1
+     # deps: {3, 4, 5, 6}, dfs: [Some(4)]
+  2: $t2 := move($t1)
+     # deps: {4, 5, 6}, dfs: [Some(1)]
+  3: $t1 := move($t3)
+     # deps: {4, 5}, dfs: [Some(2)]
+  4: touch($t1)
+     # deps: {5}, dfs: [Some(5)]
+  5: $t1 := +($t1, $t2)
+     # deps: {}, dfs: [Some(6)]
+  6: return $t1
+}
+
+
+[variant baseline]
+public fun m::test6(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     # deps: {1, 3, 4, 5, 6}, dfs: [Some(0)]
+  0: $t1 := 1
+     # deps: {3, 4, 5, 6}, dfs: [Some(1)]
+  1: $t2 := move($t1)
+     # deps: {4, 5}, dfs: [Some(2)]
+  2: touch($t2)
+     # deps: {3, 4, 5}, dfs: [Some(3)]
+  3: $t3 := 2
+     # deps: {4, 5}, dfs: [Some(4)]
+  4: $t1 := move($t3)
+     # deps: {5}, dfs: [Some(5)]
+  5: $t1 := +($t2, $t1)
+     # deps: {}, dfs: [Some(6)]
+  6: return $t1
+}
+
+
+[variant baseline]
+public fun m::test7($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # deps: {1, 2, 3, 4, 5}, dfs: [Some(0)]
+  0: touch($t0)
+     # deps: {1, 2, 3, 4, 5}, dfs: [Some(1)]
+  1: $t4 := 1
+     # deps: {2, 3, 4, 5}, dfs: [Some(2)]
+  2: $t0 := +($t0, $t4)
+     # deps: {3, 4, 5}, dfs: [Some(3)]
+  3: touch($t1)
+     # deps: {3, 4, 5}, dfs: [Some(4)]
+  4: $t4 := 1
+     # deps: {4, 5}, dfs: [Some(5)]
+  5: $t1 := +($t1, $t4)
+     # deps: {5}, dfs: [Some(6)]
+  6: $t0 := +($t0, $t1)
+     # deps: {}, dfs: [Some(7)]
+  7: return $t0
+}
+
+
+[variant baseline]
+public fun m::test8($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # deps: {1, 2}, dfs: [Some(0)]
+  0: touch($t0)
+     # deps: {1, 2}, dfs: [Some(1)]
+  1: $t3 := m::one()
+     # deps: {2}, dfs: [Some(2)]
+  2: $t0 := +($t0, $t3)
+     # deps: {}, dfs: [Some(3)]
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun m::test9($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # deps: {2, 3, 4, 5}, dfs: [Some(0)]
+  0: $t4 := borrow_local($t1)
+     # deps: {3, 4, 5}, dfs: [Some(1)]
+  1: $t5 := read_ref($t4)
+     # deps: {3, 4, 5}, dfs: [Some(2)]
+  2: $t3 := borrow_local($t0)
+     # deps: {4, 5}, dfs: [Some(3)]
+  3: $t6 := read_ref($t3)
+     # deps: {5}, dfs: [Some(4)]
+  4: $t5 := +($t5, $t6)
+     # deps: {}, dfs: [Some(5)]
+  5: return $t5
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+one(): u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+public test1(Arg0: u64): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
+}
+public test10(Arg0: u64, Arg1: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: u64)
+	1: ReadRef
+	2: ImmBorrowLoc[1](Arg1: u64)
+	3: ReadRef
+	4: Add
+	5: Ret
+}
+public test2(Arg0: u64, Arg1: u64): u64 /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: MoveLoc[1](Arg1: u64)
+	4: LdU64(1)
+	5: Add
+	6: Add
+	7: Ret
+}
+public test3(Arg0: u64, Arg1: u64, Arg2: u64, Arg3: u64): u64 /* def_idx: 4 */ {
+B0:
+	0: LdU64(1)
+	1: MoveLoc[0](Arg0: u64)
+	2: Add
+	3: LdU64(1)
+	4: MoveLoc[1](Arg1: u64)
+	5: Add
+	6: LdU64(1)
+	7: MoveLoc[2](Arg2: u64)
+	8: Add
+	9: LdU64(1)
+	10: MoveLoc[3](Arg3: u64)
+	11: Add
+	12: StLoc[3](Arg3: u64)
+	13: StLoc[2](Arg2: u64)
+	14: StLoc[1](Arg1: u64)
+	15: StLoc[0](Arg0: u64)
+	16: MoveLoc[0](Arg0: u64)
+	17: MoveLoc[1](Arg1: u64)
+	18: Add
+	19: MoveLoc[2](Arg2: u64)
+	20: MoveLoc[3](Arg3: u64)
+	21: Add
+	22: StLoc[1](Arg1: u64)
+	23: Pop
+	24: MoveLoc[1](Arg1: u64)
+	25: Ret
+}
+public test4(Arg0: u64, Arg1: u64): u64 /* def_idx: 5 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: MoveLoc[1](Arg1: u64)
+	4: LdU64(1)
+	5: Add
+	6: Add
+	7: Ret
+}
+public test5(): u64 /* def_idx: 6 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: LdU64(2)
+	1: LdU64(1)
+	2: StLoc[0](loc0: u64)
+	3: StLoc[1](loc1: u64)
+	4: MoveLoc[1](loc1: u64)
+	5: MoveLoc[0](loc0: u64)
+	6: Add
+	7: Ret
+}
+public test6(): u64 /* def_idx: 7 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: LdU64(1)
+	1: StLoc[0](loc0: u64)
+	2: MoveLoc[0](loc0: u64)
+	3: LdU64(2)
+	4: StLoc[1](loc1: u64)
+	5: MoveLoc[1](loc1: u64)
+	6: Add
+	7: Ret
+}
+public test7(Arg0: u64, Arg1: u64): u64 /* def_idx: 8 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: MoveLoc[1](Arg1: u64)
+	4: LdU64(1)
+	5: Add
+	6: Add
+	7: Ret
+}
+public test8(Arg0: u64): u64 /* def_idx: 9 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Call one(): u64
+	2: Add
+	3: Ret
+}
+public test9(Arg0: u64, Arg1: u64): u64 /* def_idx: 10 */ {
+B0:
+	0: ImmBorrowLoc[1](Arg1: u64)
+	1: ReadRef
+	2: ImmBorrowLoc[0](Arg0: u64)
+	3: ReadRef
+	4: Add
+	5: Ret
+}
+}
+============ bytecode verification succeeded ========

@@ -1,0 +1,198 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+fun m::consume($t0: u64, $t1: u64) {
+     # deps: {}, dfs: []
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::multi_consume($t0: u64, $t1: u64, $t2: u64, $t3: u64) {
+     # deps: {}, dfs: []
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # deps: {1}, dfs: [Some(0)]
+  0: $t0 := 1
+     # deps: {}, dfs: [Some(1)]
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     # deps: {3, 4, 5, 6}, dfs: [Some(0)]
+  0: $t0 := m::one()
+     # deps: {3, 4}, dfs: [Some(1)]
+  1: touch($t0)
+     # deps: {3, 4}, dfs: [Some(2)]
+  2: $t1 := 2
+     # deps: {3, 4}, dfs: [Some(3)]
+  3: touch($t0)
+     # deps: {3, 4}, dfs: [Some(4)]
+  4: $t2 := 1
+     # deps: {4}, dfs: [Some(5)]
+  5: m::multi_consume($t0, $t1, $t0, $t2)
+     # deps: {}, dfs: [None]
+  6: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64) {
+     var $t1: u64
+     var $t2: u64
+     # deps: {2, 3}, dfs: [Some(0)]
+  0: touch($t0)
+     # deps: {2, 3}, dfs: [Some(1)]
+  1: $t1 := 2
+     # deps: {2, 3}, dfs: [Some(2)]
+  2: touch($t0)
+     # deps: {2, 3}, dfs: [Some(3)]
+  3: $t2 := 1
+     # deps: {3}, dfs: [Some(4)]
+  4: m::multi_consume($t0, $t1, $t0, $t2)
+     # deps: {}, dfs: [None]
+  5: return ()
+}
+
+
+[variant baseline]
+public fun m::test3() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64 [unused]
+     # deps: {2, 3, 4, 5, 6, 7}, dfs: [Some(0), Some(0)]
+  0: $t0 := m::one()
+     # deps: {2, 3, 4, 5}, dfs: [None, Some(1)]
+  1: touch($t0)
+     # deps: {2, 3, 4, 5}, dfs: [None, Some(2)]
+  2: $t1 := 2
+     # deps: {3, 4, 5}, dfs: [None, Some(3)]
+  3: m::consume($t0, $t1)
+     # deps: {4, 5}, dfs: [Some(1), None]
+  4: touch($t0)
+     # deps: {4, 5}, dfs: [Some(2), None]
+  5: $t1 := 1
+     # deps: {5}, dfs: [Some(3), None]
+  6: m::consume($t0, $t1)
+     # deps: {}, dfs: [None, None]
+  7: return ()
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64) {
+     var $t1: u64
+     var $t2: u64 [unused]
+     # deps: {1, 2, 3, 4}, dfs: [None, Some(0)]
+  0: touch($t0)
+     # deps: {1, 2, 3, 4}, dfs: [None, Some(1)]
+  1: $t1 := 2
+     # deps: {2, 3, 4}, dfs: [None, Some(2)]
+  2: m::consume($t0, $t1)
+     # deps: {3, 4}, dfs: [Some(0), None]
+  3: touch($t0)
+     # deps: {3, 4}, dfs: [Some(1), None]
+  4: $t1 := 1
+     # deps: {4}, dfs: [Some(2), None]
+  5: m::consume($t0, $t1)
+     # deps: {}, dfs: [None, None]
+  6: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+consume(Arg0: u64, Arg1: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+multi_consume(Arg0: u64, Arg1: u64, Arg2: u64, Arg3: u64) /* def_idx: 1 */ {
+B0:
+	0: Ret
+}
+one(): u64 /* def_idx: 2 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+public test1() /* def_idx: 3 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+B0:
+	0: Call one(): u64
+	1: LdU64(2)
+	2: LdU64(1)
+	3: StLoc[1](loc1: u64)
+	4: StLoc[2](loc2: u64)
+	5: StLoc[0](loc0: u64)
+	6: CopyLoc[0](loc0: u64)
+	7: MoveLoc[2](loc2: u64)
+	8: MoveLoc[0](loc0: u64)
+	9: MoveLoc[1](loc1: u64)
+	10: Call multi_consume(u64, u64, u64, u64)
+	11: Ret
+}
+public test2(Arg0: u64) /* def_idx: 4 */ {
+L1:	loc0: u64
+L2:	loc1: u64
+B0:
+	0: LdU64(2)
+	1: LdU64(1)
+	2: StLoc[1](loc0: u64)
+	3: StLoc[2](loc1: u64)
+	4: CopyLoc[0](Arg0: u64)
+	5: MoveLoc[2](loc1: u64)
+	6: MoveLoc[0](Arg0: u64)
+	7: MoveLoc[1](loc0: u64)
+	8: Call multi_consume(u64, u64, u64, u64)
+	9: Ret
+}
+public test3() /* def_idx: 5 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: Call one(): u64
+	1: LdU64(2)
+	2: StLoc[1](loc1: u64)
+	3: StLoc[0](loc0: u64)
+	4: CopyLoc[0](loc0: u64)
+	5: MoveLoc[1](loc1: u64)
+	6: Call consume(u64, u64)
+	7: LdU64(1)
+	8: StLoc[1](loc1: u64)
+	9: MoveLoc[0](loc0: u64)
+	10: MoveLoc[1](loc1: u64)
+	11: Call consume(u64, u64)
+	12: Ret
+}
+public test4(Arg0: u64) /* def_idx: 6 */ {
+L1:	loc0: u64
+B0:
+	0: LdU64(2)
+	1: StLoc[1](loc0: u64)
+	2: CopyLoc[0](Arg0: u64)
+	3: MoveLoc[1](loc0: u64)
+	4: Call consume(u64, u64)
+	5: LdU64(1)
+	6: StLoc[1](loc0: u64)
+	7: MoveLoc[0](Arg0: u64)
+	8: MoveLoc[1](loc0: u64)
+	9: Call consume(u64, u64)
+	10: Ret
+}
+}
+============ bytecode verification succeeded ========

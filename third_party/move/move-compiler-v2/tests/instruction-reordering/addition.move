@@ -1,4 +1,5 @@
 module 0xc0ffee::m {
+
     public fun test1(x: u64): u64 {
         x + 1
     }
@@ -23,7 +24,7 @@ module 0xc0ffee::m {
         let y = q + 1;
         x + y
     }
-    
+
     public fun test5(): u64 {
         let x = 1;
         let y = x;
@@ -44,5 +45,25 @@ module 0xc0ffee::m {
         let x = p + 1;
         let y = q + 1;
         x + y
+    }
+
+    fun one(): u64 {
+        1
+    }
+
+    public fun test8(x: u64): u64 {
+        x + one()
+    }
+
+    public fun test9(p: u64, q: u64): u64 {
+        let x = &p;
+        let y = &q;
+        *y + *x
+    }
+
+    public fun test10(p: u64, q: u64): u64 {
+        let x = &p;
+        let y = &q;
+        *x + *y
     }
 }

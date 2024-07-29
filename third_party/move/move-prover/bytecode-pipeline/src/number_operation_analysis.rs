@@ -716,7 +716,19 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             baseline_flag,
                         );
                     },
-                    WriteRef | Lt | Le | Gt | Ge | Eq | Neq => {
+                    WriteRef => {
+                        self.check_and_propagate(
+                            id,
+                            state,
+                            &srcs[1],
+                            &srcs[0],
+                            cur_mid,
+                            cur_fid,
+                            &mut global_state,
+                            baseline_flag,
+                        );
+                    },
+                    Lt | Le | Gt | Ge | Eq | Neq => {
                         self.check_and_propagate(
                             id,
                             state,

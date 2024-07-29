@@ -407,7 +407,7 @@ impl<'env> Generator<'env> {
                     );
                 }
                 self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
-                    lhs_temp, rhs_temp,
+                    rhs_temp, lhs_temp,
                 ])
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),

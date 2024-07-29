@@ -350,7 +350,7 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
             Load(_, dst, _) => {
                 state.livevars.remove(dst);
             },
-            Call(_, _, Operation::Touch, _, _) => {
+            Call(_, _, Operation::Prepare, _, _) => {
                 // Touch should be considered as a no-op for live variable analysis.
             },
             Call(id, dsts, _, srcs, _) => {

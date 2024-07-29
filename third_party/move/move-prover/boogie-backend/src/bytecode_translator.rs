@@ -1202,8 +1202,8 @@ impl<'env> FunctionTranslator<'env> {
                         );
                     },
                     WriteRef => {
-                        let reference = srcs[0];
-                        let value = srcs[1];
+                        let reference = srcs[1];
+                        let value = srcs[0];
                         emitln!(
                             writer,
                             "{} := $UpdateMutation({}, {});",
@@ -2187,7 +2187,7 @@ impl<'env> FunctionTranslator<'env> {
                     Uninit => {
                         emitln!(writer, "assume $t{}->l == $Uninitialized();", srcs[0]);
                     },
-                    Drop | Release | Touch => {},
+                    Drop | Release | Prepare => {},
                     TraceLocal(idx) => {
                         let num_oper = global_state
                             .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)

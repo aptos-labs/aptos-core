@@ -1,0 +1,49 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: &u64) {
+     # deps: {1}, dfs: [Some(0)]
+  0: drop($t0)
+     # deps: {}, dfs: [None]
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64, $t1: u64) {
+     var $t2: &u64
+     var $t3: &u64
+     # deps: {2, 3, 4}, dfs: [None, Some(0)]
+  0: $t2 := borrow_local($t0)
+     # deps: {3, 4}, dfs: [None, Some(1)]
+  1: m::foo($t2)
+     # deps: {3, 4}, dfs: [Some(0), None]
+  2: $t3 := borrow_local($t1)
+     # deps: {4}, dfs: [Some(1), None]
+  3: m::foo($t3)
+     # deps: {}, dfs: [None, None]
+  4: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+foo(Arg0: &u64) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: &u64)
+	1: Pop
+	2: Ret
+}
+public test(Arg0: u64, Arg1: u64) /* def_idx: 1 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: u64)
+	1: Call foo(&u64)
+	2: ImmBorrowLoc[1](Arg1: u64)
+	3: Call foo(&u64)
+	4: Ret
+}
+}
+============ bytecode verification succeeded ========

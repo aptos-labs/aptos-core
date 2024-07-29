@@ -164,11 +164,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
-            name: Experiment::INSTRUCTION_REORDERING.to_string(),
-            description: "Whether to run instruction reordering transformation".to_string(),
-            default: Given(false),
-        },
-        Experiment {
             name: Experiment::KEEP_INLINE_FUNS.to_string(),
             description: "Whether to keep functions after inlining \
             or remove them from the model"
@@ -198,6 +193,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Whether to attach the compiled module to the global env.".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::INSTRUCTION_REORDERING.to_string(),
+            description: "Whether to run instruction reordering transformation".to_string(),
+            default: Inherited(Experiment::OPTIMIZE.to_string()),
+        },
     ];
     experiments
         .into_iter()
@@ -219,7 +219,6 @@ impl Experiment {
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
-    pub const INSTRUCTION_REORDERING: &'static str = "instruction-reordering";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
@@ -237,4 +236,5 @@ impl Experiment {
     pub const USAGE_CHECK: &'static str = "usage-check";
     pub const VARIABLE_COALESCING: &'static str = "variable-coalescing";
     pub const VARIABLE_COALESCING_ANNOTATE: &'static str = "variable-coalescing-annotate";
+    pub const INSTRUCTION_REORDERING: &'static str = "instruction-reordering";
 }

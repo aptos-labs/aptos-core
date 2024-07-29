@@ -1,0 +1,130 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+public fun m::is_empty<#0>($t0: &vector<#0>): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+     # deps: {2, 3}, dfs: [Some(0)]
+  0: $t2 := vector::length<#0>($t0)
+     # deps: {2, 3}, dfs: [Some(1)]
+  1: $t3 := 0
+     # deps: {3}, dfs: [Some(2)]
+  2: $t1 := ==($t2, $t3)
+     # deps: {}, dfs: [Some(3)]
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun m::swap_remove<#0>($t0: &mut vector<#0>, $t1: u64): #0 {
+     var $t2: #0
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: &vector<#0>
+     var $t6: u64
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: &vector<#0> [unused]
+     var $t10: u64
+     var $t11: &mut vector<#0>
+     # deps: {1, 2, 3}, dfs: [Some(0)]
+  0: $t5 := freeze_ref(implicit)($t0)
+     # deps: {2, 3}, dfs: [Some(1)]
+  1: $t4 := m::is_empty<#0>($t5)
+     # deps: {3}, dfs: [Some(2)]
+  2: $t4 := !($t4)
+     # deps: {}, dfs: [Some(3)]
+  3: if ($t4) goto 4 else goto 6
+     # deps: {1}, dfs: []
+  4: label L0
+     # deps: {}, dfs: []
+  5: goto 10
+     # deps: {1, 3}, dfs: [None, None]
+  6: label L1
+     # deps: {3}, dfs: [None, Some(0)]
+  7: drop($t0)
+     # deps: {3}, dfs: [Some(0), None]
+  8: $t6 := 0
+     # deps: {}, dfs: [Some(1), None]
+  9: abort($t6)
+     # deps: {1, 2, 4, 5, 6, 7, 8, 9}, dfs: [None, None]
+ 10: label L2
+     # deps: {2, 4, 5, 6, 7, 8, 9}, dfs: [None, Some(3)]
+ 11: $t5 := freeze_ref(implicit)($t0)
+     # deps: {6, 7, 8, 9}, dfs: [None, Some(0)]
+ 12: $t11 := copy($t0)
+     # deps: {6, 7, 8}, dfs: [None, Some(1)]
+ 13: touch($t11)
+     # deps: {6, 7, 8}, dfs: [None, Some(2)]
+ 14: touch($t1)
+     # deps: {4, 6, 7, 8}, dfs: [None, Some(4)]
+ 15: $t6 := vector::length<#0>($t5)
+     # deps: {4, 6, 7, 8}, dfs: [None, Some(5)]
+ 16: $t10 := 1
+     # deps: {6, 7, 8}, dfs: [None, Some(6)]
+ 17: $t6 := -($t6, $t10)
+     # deps: {7, 8}, dfs: [None, Some(7)]
+ 18: vector::swap<#0>($t11, $t1, $t6)
+     # deps: {8}, dfs: [Some(0), None]
+ 19: $t2 := vector::pop_back<#0>($t0)
+     # deps: {}, dfs: [Some(1), None]
+ 20: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+public is_empty<Ty0>(Arg0: &vector<Ty0>): bool /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: &vector<Ty0>)
+	1: VecLen(2)
+	2: LdU64(0)
+	3: Eq
+	4: Ret
+}
+public swap_remove<Ty0>(Arg0: &mut vector<Ty0>, Arg1: u64): Ty0 /* def_idx: 1 */ {
+L2:	loc0: &mut vector<Ty0>
+L3:	loc1: &vector<Ty0>
+L4:	loc2: u64
+B0:
+	0: CopyLoc[0](Arg0: &mut vector<Ty0>)
+	1: FreezeRef
+	2: Call is_empty<Ty0>(&vector<Ty0>): bool
+	3: Not
+	4: BrFalse(6)
+B1:
+	5: Branch(10)
+B2:
+	6: MoveLoc[0](Arg0: &mut vector<Ty0>)
+	7: Pop
+	8: LdU64(0)
+	9: Abort
+B3:
+	10: CopyLoc[0](Arg0: &mut vector<Ty0>)
+	11: FreezeRef
+	12: CopyLoc[0](Arg0: &mut vector<Ty0>)
+	13: StLoc[2](loc0: &mut vector<Ty0>)
+	14: MoveLoc[2](loc0: &mut vector<Ty0>)
+	15: MoveLoc[1](Arg1: u64)
+	16: StLoc[1](Arg1: u64)
+	17: StLoc[2](loc0: &mut vector<Ty0>)
+	18: StLoc[3](loc1: &vector<Ty0>)
+	19: MoveLoc[3](loc1: &vector<Ty0>)
+	20: VecLen(2)
+	21: LdU64(1)
+	22: Sub
+	23: StLoc[4](loc2: u64)
+	24: MoveLoc[2](loc0: &mut vector<Ty0>)
+	25: MoveLoc[1](Arg1: u64)
+	26: MoveLoc[4](loc2: u64)
+	27: VecSwap(2)
+	28: MoveLoc[0](Arg0: &mut vector<Ty0>)
+	29: VecPopBack(2)
+	30: Ret
+}
+}
+============ bytecode verification succeeded ========

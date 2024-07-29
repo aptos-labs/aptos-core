@@ -459,23 +459,32 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         },
         // Instruction reordering tests
         TestConfig {
-            name: "instruction-reordering",
-            runner: |p| run_test(p, get_config_by_name("instruction-reordering")),
+            name: "instruction-reordering-on",
+            runner: |p| run_test(p, get_config_by_name("instruction-reordering-on")),
             include: vec!["/instruction-reordering/"],
             exclude: vec![],
-            exp_suffix: None,
+            exp_suffix: Some("on.exp"),
             options: opts
                 .clone()
                 .set_experiment(Experiment::INSTRUCTION_REORDERING, true),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: Some(vec![
-                INITIAL_BYTECODE_STAGE,
-                "InstructionReorderingProcessor",
-                "LiveVarAnalysisProcessor",
-                FILE_FORMAT_STAGE,
-            ]),
+            dump_bytecode_filter: Some(vec!["InstructionReorderingProcessor", FILE_FORMAT_STAGE]),
+        },
+        TestConfig {
+            name: "instruction-reordering-off",
+            runner: |p| run_test(p, get_config_by_name("instruction-reordering-off")),
+            include: vec!["/instruction-reordering/"],
+            exclude: vec![],
+            exp_suffix: Some("off.exp"),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::INSTRUCTION_REORDERING, false),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec!["LiveVarAnalysisProcessor", FILE_FORMAT_STAGE]),
         },
         // Unreachable code remover
         TestConfig {

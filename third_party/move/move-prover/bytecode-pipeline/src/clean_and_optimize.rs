@@ -98,7 +98,7 @@ impl<'a> TransferFunctions for Optimizer<'a> {
         if let Call(_, _, oper, srcs, _) = instr {
             match oper {
                 WriteRef => {
-                    state.unwritten.insert(Reference(srcs[0]));
+                    state.unwritten.insert(Reference(srcs[1]));
                 },
                 WriteBack(Reference(dest), ..) => {
                     if state.unwritten.contains(&Reference(srcs[0])) {

@@ -178,11 +178,13 @@ pub enum Operation {
     Drop,
     /// Indicates that the value is no longer borrowed.
     Release,
-    /// Indicates to the code generator that the value should be moved/copied to the stack.
-    Touch,
+    /// Indicates to the code generator that the value should be moved/copied to the stack,
+    /// if it is not already on the stack.
+    /// It is preparing the value for a later operation using the value.
+    Prepare,
 
     ReadRef,
-    WriteRef,
+    WriteRef, // (value, reference)
     FreezeRef(/*explicit*/ bool),
     Vector,
 
@@ -278,7 +280,7 @@ impl Operation {
             Operation::Uninit => false,
             Operation::Drop => false,
             Operation::Release => false,
-            Operation::Touch => false,
+            Operation::Prepare => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
             Operation::FreezeRef(_) => false,
@@ -868,7 +870,7 @@ impl Bytecode {
             },
             Call(_, _, Operation::WriteRef, srcs, aa) => {
                 // write-ref only distorts the value of the reference, but not the pointer itself
-                (add_abort(vec![], aa), vec![(srcs[0], false)])
+                (add_abort(vec![], aa), vec![(srcs[1], false)])
             },
             Call(_, dests, Function(..), srcs, aa) => {
                 let mut val_targets = vec![];
@@ -1229,7 +1231,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             Release => {
                 write!(f, "release")?;
             },
-            Touch => {
+            Prepare => {
                 write!(f, "touch")?;
             },
             ReadRef => {

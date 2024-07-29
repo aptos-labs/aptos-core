@@ -1,0 +1,580 @@
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     # live vars: $t0
+  0: label L0
+     # live vars: $t0
+  1: $t1 := m::foo($t0)
+     # live vars: $t1
+  2: $t0 := infer($t1)
+     # live vars: $t0
+  3: $t3 := 10
+     # live vars: $t0, $t3
+  4: $t2 := >($t0, $t3)
+     # live vars: $t0, $t2
+  5: if ($t2) goto 6 else goto 9
+     # live vars: $t0
+  6: label L2
+     # live vars:
+  7: goto 12
+     # live vars: $t0
+  8: goto 10
+     # live vars: $t0
+  9: label L3
+     # live vars: $t0
+ 10: label L4
+     # live vars: $t0
+ 11: goto 0
+     # live vars:
+ 12: label L1
+     # live vars:
+ 13: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     # live vars: $t0, $t1, $t2
+  0: label L0
+     # live vars: $t0, $t1, $t2
+  1: $t4 := <($t1, $t2)
+     # live vars: $t0, $t1, $t2, $t4
+  2: if ($t4) goto 3 else goto 8
+     # live vars: $t0, $t1, $t2
+  3: label L2
+     # live vars: $t1, $t2
+  4: $t5 := m::foo($t1)
+     # live vars: $t2, $t5
+  5: $t0 := infer($t5)
+     # live vars: $t0, $t2
+  6: $t1 := infer($t0)
+     # live vars: $t0, $t1, $t2
+  7: goto 10
+     # live vars: $t0, $t1, $t2
+  8: label L3
+     # live vars: $t0, $t1
+  9: goto 12
+     # live vars: $t0, $t1, $t2
+ 10: label L4
+     # live vars: $t0, $t1, $t2
+ 11: goto 0
+     # live vars: $t0, $t1
+ 12: label L1
+     # live vars: $t0, $t1
+ 13: $t3 := +($t0, $t1)
+     # live vars: $t3
+ 14: return $t3
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     # live vars: $t0
+  0: label L0
+     # live vars: $t0
+  1: $t1 := m::foo($t0)
+     # live vars: $t1
+  2: $t0 := infer($t1)
+     # live vars: $t0
+  3: $t3 := 10
+     # live vars: $t0, $t3
+  4: $t2 := >($t0, $t3)
+     # live vars: $t0, $t2
+  5: if ($t2) goto 6 else goto 9
+     # live vars: $t0
+  6: label L2
+     # live vars:
+  7: goto 12
+     # live vars: $t0
+  8: goto 10
+     # live vars: $t0
+  9: label L3
+     # live vars: $t0
+ 10: label L4
+     # live vars: $t0
+ 11: goto 0
+     # live vars:
+ 12: label L1
+     # live vars:
+ 13: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     # live vars: $t0, $t1, $t2
+  0: label L0
+     # live vars: $t0, $t1, $t2
+  1: $t4 := <($t1, $t2)
+     # live vars: $t0, $t1, $t2, $t4
+  2: if ($t4) goto 3 else goto 8
+     # live vars: $t0, $t1, $t2
+  3: label L2
+     # live vars: $t1, $t2
+  4: $t5 := m::foo($t1)
+     # live vars: $t2, $t5
+  5: $t0 := infer($t5)
+     # live vars: $t0, $t2
+  6: $t1 := infer($t0)
+     # live vars: $t0, $t1, $t2
+  7: goto 10
+     # live vars: $t0, $t1, $t2
+  8: label L3
+     # live vars: $t0, $t1
+  9: goto 12
+     # live vars: $t0, $t1, $t2
+ 10: label L4
+     # live vars: $t0, $t1, $t2
+ 11: goto 0
+     # live vars: $t0, $t1
+ 12: label L1
+     # live vars: $t0, $t1
+ 13: $t3 := +($t0, $t1)
+     # live vars: $t3
+ 14: return $t3
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     # live vars: $t0
+  0: label L0
+     # live vars: $t0
+  1: $t1 := m::foo($t0)
+     # live vars: $t1
+  2: $t0 := move($t1)
+     # live vars: $t0
+  3: $t3 := 10
+     # live vars: $t0, $t3
+  4: $t2 := >($t0, $t3)
+     # live vars: $t0, $t2
+  5: if ($t2) goto 6 else goto 8
+     # live vars: $t0
+  6: label L2
+     # live vars:
+  7: goto 11
+     # live vars: $t0
+  8: label L3
+     # live vars: $t0
+  9: label L4
+     # live vars: $t0
+ 10: goto 0
+     # live vars:
+ 11: label L1
+     # live vars:
+ 12: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     # live vars: $t0, $t1, $t2
+  0: label L0
+     # live vars: $t0, $t1, $t2
+  1: $t4 := <($t1, $t2)
+     # live vars: $t0, $t1, $t2, $t4
+  2: if ($t4) goto 3 else goto 8
+     # live vars: $t0, $t1, $t2
+  3: label L2
+     # live vars: $t1, $t2
+  4: $t5 := m::foo($t1)
+     # live vars: $t2, $t5
+  5: $t0 := move($t5)
+     # live vars: $t0, $t2
+  6: $t1 := copy($t0)
+     # live vars: $t0, $t1, $t2
+  7: goto 10
+     # live vars: $t0, $t1, $t2
+  8: label L3
+     # live vars: $t0, $t1
+  9: goto 12
+     # live vars: $t0, $t1, $t2
+ 10: label L4
+     # live vars: $t0, $t1, $t2
+ 11: goto 0
+     # live vars: $t0, $t1
+ 12: label L1
+     # live vars: $t0, $t1
+ 13: $t3 := +($t0, $t1)
+     # live vars: $t3
+ 14: return $t3
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     # live vars: $t0
+  0: label L0
+     # live vars: $t0
+  1: $t1 := m::foo($t0)
+     # live vars: $t1
+  2: $t0 := move($t1)
+     # live vars: $t0
+  3: $t3 := 10
+     # live vars: $t0, $t3
+  4: $t2 := >($t0, $t3)
+     # live vars: $t0, $t2
+  5: if ($t2) goto 6 else goto 8
+     # live vars: $t0
+  6: label L2
+     # live vars:
+  7: goto 11
+     # live vars: $t0
+  8: label L3
+     # live vars: $t0
+  9: label L4
+     # live vars: $t0
+ 10: goto 0
+     # live vars:
+ 11: label L1
+     # live vars:
+ 12: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     # live vars: $t0, $t1, $t2
+  0: label L0
+     # live vars: $t0, $t1, $t2
+  1: $t4 := <($t1, $t2)
+     # live vars: $t0, $t1, $t2, $t4
+  2: if ($t4) goto 3 else goto 8
+     # live vars: $t0, $t1, $t2
+  3: label L2
+     # live vars: $t1, $t2
+  4: $t5 := m::foo($t1)
+     # live vars: $t2, $t5
+  5: $t0 := move($t5)
+     # live vars: $t0, $t2
+  6: $t1 := copy($t0)
+     # live vars: $t0, $t1, $t2
+  7: goto 10
+     # live vars: $t0, $t1, $t2
+  8: label L3
+     # live vars: $t0, $t1
+  9: goto 12
+     # live vars: $t0, $t1, $t2
+ 10: label L4
+     # live vars: $t0, $t1, $t2
+ 11: goto 0
+     # live vars: $t0, $t1
+ 12: label L1
+     # live vars: $t0, $t1
+ 13: $t3 := +($t0, $t1)
+     # live vars: $t3
+ 14: return $t3
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64 [unused]
+     # live vars: $t0
+  0: label L0
+     # live vars: $t0
+  1: $t1 := m::foo($t0)
+     # live vars: $t1
+  2: $t0 := move($t1)
+     # live vars: $t0
+  3: $t1 := 10
+     # live vars: $t0, $t1
+  4: $t2 := >($t0, $t1)
+     # live vars: $t0, $t2
+  5: if ($t2) goto 6 else goto 8
+     # live vars: $t0
+  6: label L2
+     # live vars:
+  7: goto 11
+     # live vars: $t0
+  8: label L3
+     # live vars: $t0
+  9: label L4
+     # live vars: $t0
+ 10: goto 0
+     # live vars:
+ 11: label L1
+     # live vars:
+ 12: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64 [unused]
+     var $t4: bool
+     var $t5: u64
+     # live vars: $t0, $t1, $t2
+  0: label L0
+     # live vars: $t0, $t1, $t2
+  1: $t4 := <($t1, $t2)
+     # live vars: $t0, $t1, $t2, $t4
+  2: if ($t4) goto 3 else goto 8
+     # live vars: $t0, $t1, $t2
+  3: label L2
+     # live vars: $t1, $t2
+  4: $t5 := m::foo($t1)
+     # live vars: $t2, $t5
+  5: $t0 := move($t5)
+     # live vars: $t0, $t2
+  6: $t1 := copy($t0)
+     # live vars: $t0, $t1, $t2
+  7: goto 10
+     # live vars: $t0, $t1, $t2
+  8: label L3
+     # live vars: $t0, $t1
+  9: goto 12
+     # live vars: $t0, $t1, $t2
+ 10: label L4
+     # live vars: $t0, $t1, $t2
+ 11: goto 0
+     # live vars: $t0, $t1
+ 12: label L1
+     # live vars: $t0, $t1
+ 13: $t0 := +($t0, $t1)
+     # live vars: $t0
+ 14: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64 [unused]
+     # live vars: $t0
+  0: label L0
+     # live vars: $t0
+  1: $t1 := m::foo($t0)
+     # live vars: $t1
+  2: $t0 := move($t1)
+     # live vars: $t0
+  3: $t1 := 10
+     # live vars: $t0, $t1
+  4: $t2 := >($t0, $t1)
+     # live vars: $t0, $t2
+  5: if ($t2) goto 6 else goto 8
+     # live vars: $t0
+  6: label L2
+     # live vars:
+  7: goto 11
+     # live vars: $t0
+  8: label L3
+     # live vars: $t0
+  9: label L4
+     # live vars: $t0
+ 10: goto 0
+     # live vars:
+ 11: label L1
+     # live vars:
+ 12: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64 [unused]
+     var $t4: bool
+     var $t5: u64
+     # live vars: $t0, $t1, $t2
+  0: label L0
+     # live vars: $t0, $t1, $t2
+  1: $t4 := <($t1, $t2)
+     # live vars: $t0, $t1, $t2, $t4
+  2: if ($t4) goto 3 else goto 8
+     # live vars: $t0, $t1, $t2
+  3: label L2
+     # live vars: $t1, $t2
+  4: $t5 := m::foo($t1)
+     # live vars: $t2, $t5
+  5: $t0 := move($t5)
+     # live vars: $t0, $t2
+  6: $t1 := copy($t0)
+     # live vars: $t0, $t1, $t2
+  7: goto 10
+     # live vars: $t0, $t1, $t2
+  8: label L3
+     # live vars: $t0, $t1
+  9: goto 12
+     # live vars: $t0, $t1, $t2
+ 10: label L4
+     # live vars: $t0, $t1, $t2
+ 11: goto 0
+     # live vars: $t0, $t1
+ 12: label L1
+     # live vars: $t0, $t1
+ 13: $t0 := +($t0, $t1)
+     # live vars: $t0
+ 14: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+foo(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: LdU64(1)
+	1: StLoc[1](loc0: u64)
+	2: MoveLoc[0](Arg0: u64)
+	3: MoveLoc[1](loc0: u64)
+	4: Add
+	5: Ret
+}
+public test1(Arg0: u64) /* def_idx: 1 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Call foo(u64): u64
+	2: StLoc[0](Arg0: u64)
+	3: LdU64(10)
+	4: StLoc[1](loc0: u64)
+	5: CopyLoc[0](Arg0: u64)
+	6: MoveLoc[1](loc0: u64)
+	7: Gt
+	8: BrFalse(10)
+B1:
+	9: Branch(11)
+B2:
+	10: Branch(0)
+B3:
+	11: Ret
+}
+public test2(Arg0: u64, Arg1: u64, Arg2: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: CopyLoc[1](Arg1: u64)
+	1: CopyLoc[2](Arg2: u64)
+	2: Lt
+	3: BrFalse(10)
+B1:
+	4: MoveLoc[1](Arg1: u64)
+	5: Call foo(u64): u64
+	6: StLoc[0](Arg0: u64)
+	7: CopyLoc[0](Arg0: u64)
+	8: StLoc[1](Arg1: u64)
+	9: Branch(11)
+B2:
+	10: Branch(12)
+B3:
+	11: Branch(0)
+B4:
+	12: MoveLoc[0](Arg0: u64)
+	13: MoveLoc[1](Arg1: u64)
+	14: Add
+	15: Ret
+}
+}
+============ bytecode verification succeeded ========
