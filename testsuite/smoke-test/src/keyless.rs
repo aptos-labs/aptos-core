@@ -701,7 +701,7 @@ async fn rotate_vk_by_governance<'a>(
     lines.push("    use aptos_framework::aptos_governance;".to_string());
     lines.push("    use std::string::utf8;".to_string());
     lines.push("    use std::vector;".to_string());
-    lines.push("    fun main(core_resources: &signer) {{".to_string());
+    lines.push("    fun main(core_resources: &signer) {".to_string());
     lines.push("        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);".to_string());
     lines.push("        let entries = vector[];".to_string());
     for (setup_id, vk) in vks {
