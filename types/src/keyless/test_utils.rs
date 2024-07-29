@@ -124,7 +124,7 @@ pub fn get_upgraded_vk() -> PreparedVerifyingKey<Bn254> {
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
-pub fn get_groth16_sig_and_pk_for_setup_1() -> (KeylessSignature, KeylessPublicKey) {
+pub fn get_groth16_sig_and_pk_for_upgraded_vk() -> (KeylessSignature, KeylessPublicKey) {
     get_groth16_sig_and_pk_for_setup("SETUP_1".to_string())
 }
 

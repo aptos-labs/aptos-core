@@ -21,7 +21,7 @@ use aptos_types::{
     keyless::{
         get_public_inputs_hash,
         test_utils::{
-            self, get_groth16_sig_and_pk_for_setup_1, get_sample_esk,
+            self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_esk,
             get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field,
             get_sample_iss, get_sample_jwk, get_sample_openid_sig_and_pk, get_upgraded_vk,
         },
@@ -63,80 +63,78 @@ async fn test_keyless_oidc_txn_verifies() {
 #[tokio::test]
 async fn test_keyless_rotate_vk() {
     let (tw_sk, config, jwk, swarm, mut cli, root_idx) = setup_local_net().await;
+    let mut info = swarm.aptos_public_info();
 
     info!("Initial on-chain state: default_setup=SETUP_0, vk_map={{}}");
 
     info!("A keyless transaction using SETUP_0 should succeed.");
-    let mut info = swarm.aptos_public_info();
+    assert!(run_txn(&mut info, "SETUP_0", &jwk, &config, &tw_sk, 1).await.is_ok());
 
-    let (sig_0, pk_0) = get_sample_groth16_sig_and_pk();
-    let signed_txn = sign_transaction(
-        &mut info,
-        sig_0.clone(),
-        pk_0.clone(),
-        &jwk,
-        &config,
-        Some(&tw_sk),
-        1,
-    )
-    .await;
+    info!("A keyless transaction using SETUP_1/SETUP_2 should fail.");
+    assert!(run_txn(&mut info, "SETUP_1", &jwk, &config, &tw_sk, 2).await.is_err());
+    assert!(run_txn(&mut info, "SETUP_2", &jwk, &config, &tw_sk, 2).await.is_err());
 
-    let result = info
-        .client()
-        .submit_without_serializing_response(&signed_txn)
-        .await;
-    assert!(result.is_ok());
-
-    info!("A keyless transaction using SETUP_1 should fail.");
-    let (sig_1, pk_1) = get_groth16_sig_and_pk_for_setup_1();
-    let signed_txn = sign_transaction(
-        &mut info,
-        sig_1.clone(),
-        pk_1.clone(),
-        &jwk,
-        &config,
-        Some(&tw_sk),
-        2,
-    )
-    .await;
-    let result = info
-        .client()
-        .submit_without_serializing_response(&signed_txn)
-        .await;
-    assert!(result.is_err());
-
-    info!("Updating config, target state: default_setup=SETUP_0, vk_map={{SETUP_1}}");
+    info!("Config update #1, target state: default_setup=SETUP_0, vk_map={{SETUP_1}}");
     let vk = Groth16VerificationKey::from(get_upgraded_vk());
     let mut vk_map_1 = HashMap::new();
     vk_map_1.insert("SETUP_1".to_string(), vk);
     rotate_vk_by_governance(&mut cli, &mut info, vk_map_1, root_idx).await;
 
     info!("A keyless transaction using SETUP_0 should still succeed.");
-
-    let signed_txn =
-        sign_transaction(&mut info, sig_0, pk_0, &jwk, &config, Some(&tw_sk), 2).await;
-
-    let result = info
-        .client()
-        .submit_without_serializing_response(&signed_txn)
-        .await;
-
-    assert!(result.is_ok());
+    assert!(run_txn(&mut info, "SETUP_0", &jwk, &config, &tw_sk, 2).await.is_ok());
 
     info!("A keyless transaction using SETUP_1 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_1", &jwk, &config, &tw_sk, 3).await.is_ok());
+
+    info!("A keyless transaction using SETUP_2 should fail.");
+    assert!(run_txn(&mut info, "SETUP_2", &jwk, &config, &tw_sk, 4).await.is_err());
+
+    info!("Config update #2, target state: default_setup=SETUP_0, vk_map={{SETUP_1, SETUP_2}}");
+    let vk_1 = Groth16VerificationKey::from(get_upgraded_vk());
+    let vk_2 = Groth16VerificationKey::from(get_upgraded_vk());
+    let mut vk_map_1 = HashMap::new();
+    vk_map_1.insert("SETUP_1".to_string(), vk_1);
+    vk_map_1.insert("SETUP_2".to_string(), vk_2);
+    rotate_vk_by_governance(&mut cli, &mut info, vk_map_1, root_idx).await;
+
+    info!("A keyless transaction using SETUP_0 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_0", &jwk, &config, &tw_sk, 4).await.is_ok());
+
+    info!("A keyless transaction using SETUP_1 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_1", &jwk, &config, &tw_sk, 5).await.is_ok());
+
+    info!("A keyless transaction using SETUP_2 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_2", &jwk, &config, &tw_sk, 6).await.is_ok());
+
+    info!("Config update #3, target state: default_setup=SETUP_0, vk_map={{SETUP_2}}");
+    let vk_2 = Groth16VerificationKey::from(get_upgraded_vk());
+    let mut vk_map_1 = HashMap::new();
+    vk_map_1.insert("SETUP_2".to_string(), vk_2);
+    rotate_vk_by_governance(&mut cli, &mut info, vk_map_1, root_idx).await;
+
+    info!("A keyless transaction using SETUP_0 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_0", &jwk, &config, &tw_sk, 7).await.is_ok());
+
+    info!("A keyless transaction using SETUP_1 should fail.");
+    assert!(run_txn(&mut info, "SETUP_1", &jwk, &config, &tw_sk, 8).await.is_err());
+
+    info!("A keyless transaction using SETUP_2 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_2", &jwk, &config, &tw_sk, 8).await.is_ok());
+}
+
+async fn run_txn(info: &mut  AptosPublicInfo, setup_id: &str, jwk: &RSA_JWK, config: &Configuration, tw_sk: &Ed25519PrivateKey, seq_num: usize) -> anyhow::Result<()> {
+    let (sig, pk) = match setup_id {
+        "SETUP_0" => get_groth16_sig_and_pk(),
+        "SETUP_1" => get_groth16_sig_and_pk_for_upgraded_vk(),
+        "SETUP_2" => get_groth16_sig_and_pk_for_upgraded_vk(),
+        _ => unreachable!(),
+    };
     let signed_txn =
-        sign_transaction(&mut info, sig_1, pk_1, &jwk, &config, Some(&tw_sk), 3).await;
-    let result = info
+        sign_transaction(info, sig, pk, jwk, config, Some(tw_sk), seq_num).await;
+    info
         .client()
         .submit_without_serializing_response(&signed_txn)
-        .await;
-
-    assert!(result.is_ok());
-
-    info!("Updating config, target state: default_setup=SETUP_0, vk_map={{SETUP_1, SETUP_2}}");
-
-    info!("Updating config, target state: default_setup=SETUP_0, vk_map={{SETUP_2}}");
-
+        .await
 }
 
 #[tokio::test]
