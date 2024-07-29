@@ -24,6 +24,7 @@ use std::{
     cmp::min,
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
+    time::Duration,
 };
 
 #[derive(Debug)]
@@ -301,12 +302,15 @@ impl ProofManager {
         if self.remaining_total_txn_num > self.back_pressure_total_txn_limit
             || self.remaining_total_proof_num > self.back_pressure_total_proof_limit
         {
-            info!(
-                "Quorum store is back pressured with {} txns, limit: {}, proofs: {}, limit: {}",
-                self.remaining_total_txn_num,
-                self.back_pressure_total_txn_limit,
-                self.remaining_total_proof_num,
-                self.back_pressure_total_proof_limit
+            sample!(
+                SampleRate::Duration(Duration::from_millis(200)),
+                info!(
+                    "Quorum store is back pressured with {} txns, limit: {}, proofs: {}, limit: {}",
+                    self.remaining_total_txn_num,
+                    self.back_pressure_total_txn_limit,
+                    self.remaining_total_proof_num,
+                    self.back_pressure_total_proof_limit
+                );
             );
         }
 
