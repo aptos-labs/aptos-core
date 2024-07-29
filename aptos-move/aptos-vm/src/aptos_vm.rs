@@ -115,6 +115,8 @@ use std::{
     marker::Sync,
     sync::Arc,
 };
+use std::collections::HashMap;
+use crate::keyless_validation::KeylessConfig;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -211,8 +213,7 @@ pub struct AptosVM {
     pub(crate) gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
     pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
-    /// For a new chain, or even mainnet, the VK might not necessarily be set.
-    pvk: Option<PreparedVerifyingKey<Bn254>>,
+    keyless_config: KeylessConfig,
 }
 
 impl AptosVM {
@@ -251,11 +252,7 @@ impl AptosVM {
             &resolver,
         );
 
-        // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
-        // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let pvk = keyless_validation::get_groth16_vk_onchain(&resolver)
-            .ok()
-            .and_then(|vk| vk.try_into().ok());
+        let keyless_config = KeylessConfig::load(&resolver);
 
         Self {
             is_simulation: false,
@@ -263,7 +260,7 @@ impl AptosVM {
             gas_feature_version,
             gas_params,
             storage_gas_params,
-            pvk,
+            keyless_config,
         }
     }
 
@@ -1652,7 +1649,7 @@ impl AptosVM {
         // If there are keyless TXN authenticators, validate them all.
         if !keyless_authenticators.is_empty() && !self.is_simulation {
             keyless_validation::validate_authenticators(
-                &self.pvk,
+                &self.keyless_config,
                 &keyless_authenticators,
                 self.features(),
                 resolver,

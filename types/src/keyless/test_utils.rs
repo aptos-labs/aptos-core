@@ -124,7 +124,15 @@ pub fn get_upgraded_vk() -> PreparedVerifyingKey<Bn254> {
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
-pub fn get_groth16_sig_and_pk_for_upgraded_vk() -> (KeylessSignature, KeylessPublicKey) {
+pub fn get_groth16_sig_and_pk_for_setup_1() -> (KeylessSignature, KeylessPublicKey) {
+    get_groth16_sig_and_pk_for_setup("SETUP_1".to_string())
+}
+
+pub fn get_groth16_sig_and_pk_for_setup_2() -> (KeylessSignature, KeylessPublicKey) {
+    get_groth16_sig_and_pk_for_setup("SETUP_2".to_string())
+}
+
+fn get_groth16_sig_and_pk_for_setup(setup_id: String) -> (KeylessSignature, KeylessPublicKey) {
     let proof = *SAMPLE_PROOF_FOR_UPGRADED_VK;
 
     let zks = ZeroKnowledgeSig {
@@ -136,7 +144,7 @@ pub fn get_groth16_sig_and_pk_for_upgraded_vk() -> (KeylessSignature, KeylessPub
     };
 
     let sig = KeylessSignature {
-        cert: EphemeralCertificate::ZeroKnowledgeSig(zks.clone()),
+        cert: EphemeralCertificate::ZeroKnowledgeSigV2{ setup_id, zk_sig: zks.clone() },
         jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
         exp_date_secs: SAMPLE_EXP_DATE,
         ephemeral_pubkey: SAMPLE_EPK.clone(),
@@ -241,7 +249,8 @@ pub fn maul_raw_groth16_txn(
 
     // maul ephemeral signature to be over a different proof: (a, b, a) instead of (a, b, c)
     match &mut sig.cert {
-        EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+        EphemeralCertificate::ZeroKnowledgeSig(proof)
+        | EphemeralCertificate::ZeroKnowledgeSigV2 { zk_sig: proof, ..} => {
             let ZKP::Groth16(old_proof) = proof.proof;
 
             txn_and_zkp.proof = Some(

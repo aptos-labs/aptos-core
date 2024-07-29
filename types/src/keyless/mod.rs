@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
@@ -28,7 +28,7 @@ mod bn254_circom;
 mod circuit_constants;
 mod circuit_testcases;
 mod configuration;
-mod groth16_sig;
+pub mod groth16_sig;
 mod groth16_vk;
 mod openid_sig;
 pub mod test_utils;
@@ -41,7 +41,7 @@ pub use bn254_circom::{
 };
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Proof, Groth16ProofAndStatement, ZeroKnowledgeSig};
-pub use groth16_vk::Groth16VerificationKey;
+pub use groth16_vk::{Groth16VerificationKey, SetupsVKs, SetupVKEntry};
 pub use openid_sig::{Claims, OpenIdSig};
 pub use zkp_sig::ZKP;
 
@@ -80,6 +80,10 @@ macro_rules! serialize {
 pub enum EphemeralCertificate {
     ZeroKnowledgeSig(ZeroKnowledgeSig),
     OpenIdSig(OpenIdSig),
+    ZeroKnowledgeSigV2 {
+        setup_id: String,
+        zk_sig: ZeroKnowledgeSig,
+    },
 }
 
 /// NOTE: See `KeylessPublicKey` comments for why this cannot be named `Signature`.

@@ -9,9 +9,12 @@ This module is responsible for configuring keyless blockchain accounts which wer
 
 -  [Struct `Group`](#0x1_keyless_account_Group)
 -  [Resource `Groth16VerificationKey`](#0x1_keyless_account_Groth16VerificationKey)
+-  [Struct `SetupVKEntry`](#0x1_keyless_account_SetupVKEntry)
+-  [Resource `SetupsVKs`](#0x1_keyless_account_SetupsVKs)
 -  [Resource `Configuration`](#0x1_keyless_account_Configuration)
 -  [Constants](#@Constants_0)
 -  [Function `new_groth16_verification_key`](#0x1_keyless_account_new_groth16_verification_key)
+-  [Function `new_setup_vk_entry`](#0x1_keyless_account_new_setup_vk_entry)
 -  [Function `new_configuration`](#0x1_keyless_account_new_configuration)
 -  [Function `validate_groth16_vk`](#0x1_keyless_account_validate_groth16_vk)
 -  [Function `update_groth16_verification_key`](#0x1_keyless_account_update_groth16_verification_key)
@@ -21,6 +24,7 @@ This module is responsible for configuring keyless blockchain accounts which wer
 -  [Function `remove_all_override_auds`](#0x1_keyless_account_remove_all_override_auds)
 -  [Function `add_override_aud`](#0x1_keyless_account_add_override_aud)
 -  [Function `set_groth16_verification_key_for_next_epoch`](#0x1_keyless_account_set_groth16_verification_key_for_next_epoch)
+-  [Function `set_vk_map_for_next_epoch`](#0x1_keyless_account_set_vk_map_for_next_epoch)
 -  [Function `set_configuration_for_next_epoch`](#0x1_keyless_account_set_configuration_for_next_epoch)
 -  [Function `update_training_wheels_for_next_epoch`](#0x1_keyless_account_update_training_wheels_for_next_epoch)
 -  [Function `update_max_exp_horizon_for_next_epoch`](#0x1_keyless_account_update_max_exp_horizon_for_next_epoch)
@@ -75,7 +79,9 @@ This module is responsible for configuring keyless blockchain accounts which wer
 
 ## Resource `Groth16VerificationKey`
 
-The 288-byte Groth16 verification key (VK) for the ZK relation that implements keyless accounts
+The 288-byte Groth16 verification key (VK) for the ZK relation that implements keyless accounts.
+
+Deprecated by <code><a href="keyless_account.md#0x1_keyless_account_SetupsVKs">SetupsVKs</a></code>.
 
 
 <pre><code>#[resource_group_member(#[group = <a href="keyless_account.md#0x1_keyless_account_Group">0x1::keyless_account::Group</a>])]
@@ -119,6 +125,73 @@ The 288-byte Groth16 verification key (VK) for the ZK relation that implements k
 <dd>
  <code>\<b>forall</b> i \in {0, ..., \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H</code>, where
  <code>H</code> is the generator of <code>G1</code> and <code>\ell</code> is 1 for the ZK relation.
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_keyless_account_SetupVKEntry"></a>
+
+## Struct `SetupVKEntry`
+
+
+
+<pre><code><b>struct</b> <a href="keyless_account.md#0x1_keyless_account_SetupVKEntry">SetupVKEntry</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>setup_id: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>vk: <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">keyless_account::Groth16VerificationKey</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_keyless_account_SetupsVKs"></a>
+
+## Resource `SetupsVKs`
+
+Groth16 verification keys indexed by a setup ID.
+
+This is introduced to support zero-downtime VK rotation, where:
+0. a setup is done for a new circuit, yielding a new verification key (VK) and a new proving key (PK);
+1. the new VK is added to this collection;
+2. client-side proving intrastructures switch to the new PK;
+3. the old VK is removed from this collection.
+
+
+<pre><code><b>struct</b> <a href="keyless_account.md#0x1_keyless_account_SetupsVKs">SetupsVKs</a> <b>has</b> drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="keyless_account.md#0x1_keyless_account_SetupVKEntry">keyless_account::SetupVKEntry</a>&gt;</code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -260,6 +333,33 @@ The training wheels PK needs to be 32 bytes long.
         gamma_g2,
         delta_g2,
         gamma_abc_g1,
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_keyless_account_new_setup_vk_entry"></a>
+
+## Function `new_setup_vk_entry`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_new_setup_vk_entry">new_setup_vk_entry</a>(setup_id: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, vk: <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">keyless_account::Groth16VerificationKey</a>): <a href="keyless_account.md#0x1_keyless_account_SetupVKEntry">keyless_account::SetupVKEntry</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_new_setup_vk_entry">new_setup_vk_entry</a>(setup_id: String, vk: <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>): <a href="keyless_account.md#0x1_keyless_account_SetupVKEntry">SetupVKEntry</a> {
+    <a href="keyless_account.md#0x1_keyless_account_SetupVKEntry">SetupVKEntry</a> {
+        setup_id,
+        vk,
     }
 }
 </code></pre>
@@ -556,6 +656,32 @@ WARNING: If a malicious key is set, this would lead to stolen funds.
 
 </details>
 
+<a id="0x1_keyless_account_set_vk_map_for_next_epoch"></a>
+
+## Function `set_vk_map_for_next_epoch`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_set_vk_map_for_next_epoch">set_vk_map_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="keyless_account.md#0x1_keyless_account_SetupVKEntry">keyless_account::SetupVKEntry</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_set_vk_map_for_next_epoch">set_vk_map_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="keyless_account.md#0x1_keyless_account_SetupVKEntry">SetupVKEntry</a>&gt;) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <b>let</b> map = <a href="keyless_account.md#0x1_keyless_account_SetupsVKs">SetupsVKs</a> { entries };
+    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(map)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_keyless_account_set_configuration_for_next_epoch"></a>
 
 ## Function `set_configuration_for_next_epoch`
@@ -760,7 +886,7 @@ Only used in reconfigurations to apply the queued up configuration changes, if t
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_on_new_epoch">on_new_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>, <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_on_new_epoch">on_new_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>, <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>, <a href="keyless_account.md#0x1_keyless_account_SetupsVKs">SetupsVKs</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
 
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;()) {
@@ -780,6 +906,16 @@ Only used in reconfigurations to apply the queued up configuration changes, if t
             <b>move_to</b>(fx, config);
         }
     };
+
+    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_SetupsVKs">SetupsVKs</a>&gt;()) {
+        <b>let</b> vk_map = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>();
+        <b>if</b> (<b>exists</b>&lt;<a href="keyless_account.md#0x1_keyless_account_SetupsVKs">SetupsVKs</a>&gt;(@aptos_framework)) {
+            *<b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_SetupsVKs">SetupsVKs</a>&gt;(@aptos_framework) = vk_map;
+        } <b>else</b> {
+            <b>move_to</b>(fx, vk_map);
+        }
+    };
+
 }
 </code></pre>
 
