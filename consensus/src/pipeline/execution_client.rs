@@ -20,7 +20,7 @@ use crate::{
         storage::interface::RandStorage,
         types::{AugmentedData, RandConfig, Share},
     },
-    state_computer::ExecutionProxy,
+    state_computer::{ExecutionProxy, SyncStateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
@@ -33,6 +33,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     pipelined_block::PipelinedBlock,
 };
+use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -44,6 +45,7 @@ use aptos_types::{
     on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
     validator_signer::ValidatorSigner,
 };
+use dashmap::DashMap;
 use fail::fail_point;
 use futures::{
     channel::{mpsc::UnboundedSender, oneshot},
@@ -68,10 +70,13 @@ pub trait TExecutionClient: Send + Sync {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>>;
+
+    async fn pre_execute(&self, block: &Arc<PipelinedBlock>);
 
     /// Send ordered blocks to the real execution phase through the channel.
     async fn finalize_order(
@@ -98,6 +103,7 @@ pub trait TExecutionClient: Send + Sync {
 }
 
 struct BufferManagerHandle {
+    pub pre_execute_tx: Option<UnboundedSender<PipelinedBlock>>,
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
     pub commit_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
     pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
@@ -107,6 +113,7 @@ struct BufferManagerHandle {
 impl BufferManagerHandle {
     pub fn new() -> Self {
         Self {
+            pre_execute_tx: None,
             execute_tx: None,
             commit_tx: None,
             reset_tx_to_buffer_manager: None,
@@ -116,11 +123,13 @@ impl BufferManagerHandle {
 
     pub fn init(
         &mut self,
+        pre_execute_tx: UnboundedSender<PipelinedBlock>,
         execute_tx: UnboundedSender<OrderedBlocks>,
         commit_tx: aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
         reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
         reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
+        self.pre_execute_tx = Some(pre_execute_tx);
         self.execute_tx = Some(execute_tx);
         self.commit_tx = Some(commit_tx);
         self.reset_tx_to_buffer_manager = Some(reset_tx_to_buffer_manager);
@@ -135,6 +144,7 @@ impl BufferManagerHandle {
     ) {
         let reset_tx_to_rand_manager = self.reset_tx_to_rand_manager.take();
         let reset_tx_to_buffer_manager = self.reset_tx_to_buffer_manager.take();
+        self.pre_execute_tx = None;
         self.execute_tx = None;
         self.commit_tx = None;
         (reset_tx_to_rand_manager, reset_tx_to_buffer_manager)
@@ -153,6 +163,7 @@ pub struct ExecutionProxyClient {
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl ExecutionProxyClient {
@@ -178,6 +189,7 @@ impl ExecutionProxyClient {
             rand_storage,
             consensus_observer_config,
             consensus_publisher,
+            execution_futures: Arc::new(DashMap::new()),
         }
     }
 
@@ -192,6 +204,7 @@ impl ExecutionProxyClient {
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -251,7 +264,10 @@ impl ExecutionProxyClient {
                 (ordered_block_tx, ordered_block_rx, None)
             };
 
+        let (pre_execute_block_tx, pre_execute_block_rx) = unbounded();
+
         self.handle.write().init(
+            pre_execute_block_tx,
             execution_ready_block_tx,
             commit_msg_tx,
             reset_buffer_manager_tx,
@@ -259,6 +275,7 @@ impl ExecutionProxyClient {
         );
 
         let (
+            pre_execution_phase,
             execution_schedule_phase,
             execution_wait_phase,
             signing_phase,
@@ -271,6 +288,7 @@ impl ExecutionProxyClient {
             network_sender,
             commit_msg_rx,
             self.execution_proxy.clone(),
+            pre_execute_block_rx,
             execution_ready_block_rx,
             reset_buffer_manager_rx,
             epoch_state,
@@ -278,8 +296,10 @@ impl ExecutionProxyClient {
             onchain_consensus_config.order_vote_enabled(),
             consensus_observer_config,
             consensus_publisher,
+            execution_futures,
         );
 
+        tokio::spawn(pre_execution_phase.start());
         tokio::spawn(execution_schedule_phase.start());
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
@@ -302,6 +322,7 @@ impl TExecutionClient for ExecutionProxyClient {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             commit_signer_provider,
@@ -313,6 +334,7 @@ impl TExecutionClient for ExecutionProxyClient {
             highest_committed_round,
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
+            execution_futures,
         );
 
         let transaction_shuffler =
@@ -337,6 +359,27 @@ impl TExecutionClient for ExecutionProxyClient {
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
         self.handle.read().execute_tx.clone()
+    }
+
+    async fn pre_execute(
+        &self,
+        block: &Arc<PipelinedBlock>,
+    ) {
+        let pre_execute_tx = self.handle.read().pre_execute_tx.clone();
+
+        if pre_execute_tx.is_none() {
+            debug!("Failed to send to buffer manager, maybe epoch ends");
+            return;
+        }
+
+        if pre_execute_tx
+            .unwrap()
+            .send((**block).clone())
+            .await
+            .is_err()
+        {
+            debug!("Failed to send to buffer manager, maybe epoch ends");
+        }
     }
 
     async fn finalize_order(
@@ -493,12 +536,15 @@ impl TExecutionClient for DummyExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
+        _execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
         None
     }
+
+    async fn pre_execute(&self, _block: &Arc<PipelinedBlock>) {}
 
     async fn finalize_order(
         &self,

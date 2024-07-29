@@ -149,6 +149,18 @@ impl TSafetyRules for MetricsSafetyRules {
             )
         })
     }
+
+    fn sign_pre_commit_vote(
+        &mut self,
+        ledger_info: LedgerInfo,
+    ) -> Result<bls12381::Signature, Error> {
+        self.retry(|inner| {
+            monitor!(
+                "safety_rules",
+                inner.sign_pre_commit_vote(ledger_info.clone())
+            )
+        })
+    }
 }
 
 impl CommitSignerProvider for Mutex<MetricsSafetyRules> {
@@ -255,6 +267,10 @@ mod tests {
             _: LedgerInfoWithSignatures,
             _: LedgerInfo,
         ) -> Result<bls12381::Signature, Error> {
+            unimplemented!()
+        }
+
+        fn sign_pre_commit_vote(&mut self, _: LedgerInfo) -> Result<bls12381::Signature, Error> {
             unimplemented!()
         }
     }

@@ -51,6 +51,7 @@ use aptos_types::{
     },
     validator_signer::ValidatorSigner,
 };
+use dashmap::DashMap;
 use futures::{
     future::{AbortHandle, Abortable},
     StreamExt,
@@ -1146,6 +1147,7 @@ impl ConsensusObserver {
                 None,
                 rand_msg_rx,
                 0,
+                Arc::new(DashMap::new()),
             )
             .await;
     }
