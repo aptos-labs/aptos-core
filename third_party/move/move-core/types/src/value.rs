@@ -464,7 +464,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for StructVariantVisitor<'a> {
                 } else {
                     // This shouldn't happen but be robust and produce an error
                     return Err(A::Error::invalid_value(
-                        Unexpected::Other("not a valid struct variant tag"),
+                        Unexpected::Other("not a valid enum variant tag"),
                         &self,
                     ));
                 };

@@ -932,7 +932,7 @@ impl<'a> BytecodeGenerator<'a> {
                     StructFieldInformation::Native => panic!("Can't inhabit native structs"),
                     StructFieldInformation::DeclaredVariants(..) => {
                         // TODO(#13806): consider implementing for variants
-                        panic!("Can't work with struct variants")
+                        panic!("Can't work with enum variants")
                     },
                     StructFieldInformation::Declared(fields) => fields.clone(),
                 };
@@ -964,7 +964,7 @@ impl<'a> BytecodeGenerator<'a> {
                     StructFieldInformation::Native => panic!("Can't inhabit native structs"),
                     StructFieldInformation::DeclaredVariants(..) => {
                         // TODO(#13806): consider adding support for variants
-                        panic!("Can't work with struct variants")
+                        panic!("Can't work with enum variants")
                     },
                     StructFieldInformation::Declared(fields) => fields.clone(),
                 };

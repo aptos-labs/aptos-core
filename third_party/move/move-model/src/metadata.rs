@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use move_command_line_common::env::{get_move_compiler_v2_from_env, read_bool_env_var};
+use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2};
+use move_command_line_common::{
+    env,
+    env::{get_move_compiler_v2_from_env, read_bool_env_var},
+};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -219,6 +223,15 @@ impl LanguageVersion {
     /// Whether the language version is equal to greater than `ver`
     pub fn is_at_least(&self, ver: LanguageVersion) -> bool {
         *self >= ver
+    }
+
+    /// If the bytecode version is not specified, infer it from the language version. For
+    /// debugging purposes, respects the MOVE_BYTECODE_VERSION env var as an override.
+    pub fn infer_bytecode_version(&self, version: Option<u32>) -> u32 {
+        env::get_bytecode_version_from_env(version).unwrap_or(match self {
+            LanguageVersion::V1 => VERSION_DEFAULT,
+            LanguageVersion::V2_0 => VERSION_DEFAULT_LANG_V2,
+        })
     }
 }
 
