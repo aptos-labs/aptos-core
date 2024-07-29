@@ -42,6 +42,7 @@ use rand::thread_rng;
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, time::Duration};
 use std::collections::HashMap;
+use aptos_types::keyless::test_utils::get_groth16_sig_and_pk_for_setup_2;
 // TODO(keyless): Test the override aud_val path
 
 #[tokio::test]
@@ -126,15 +127,16 @@ async fn run_txn(info: &mut  AptosPublicInfo, setup_id: &str, jwk: &RSA_JWK, con
     let (sig, pk) = match setup_id {
         "SETUP_0" => get_sample_groth16_sig_and_pk(),
         "SETUP_1" => get_groth16_sig_and_pk_for_upgraded_vk(),
-        "SETUP_2" => get_groth16_sig_and_pk_for_upgraded_vk(),
+        "SETUP_2" => get_groth16_sig_and_pk_for_setup_2(),
         _ => unreachable!(),
     };
     let signed_txn =
         sign_transaction(info, sig, pk, jwk, config, Some(tw_sk), seq_num).await;
-    info
+    let result = info
         .client()
         .submit_without_serializing_response(&signed_txn)
-        .await
+        .await;
+    result
 }
 
 #[tokio::test]
