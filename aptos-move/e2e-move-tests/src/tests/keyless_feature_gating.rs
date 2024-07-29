@@ -242,7 +242,8 @@ fn spend_keyless_account(
     let esk = get_sample_esk();
 
     match &mut sig.cert {
-        EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+        EphemeralCertificate::ZeroKnowledgeSig(proof)
+        | EphemeralCertificate::ZeroKnowledgeSigV2 { zk_sig: proof, .. } => {
             // Training wheels should be disabled.
             proof.training_wheels_signature = None;
             txn_and_zkp.proof = Some(proof.proof);

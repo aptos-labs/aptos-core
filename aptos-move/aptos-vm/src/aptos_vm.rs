@@ -9,6 +9,7 @@ use crate::{
     errors::{discarded_output, expect_only_successful_execution},
     gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
+    keyless_validation::KeylessConfig,
     move_vm_ext::{
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession,
@@ -81,8 +82,6 @@ use aptos_vm_types::{
     resolver::{ExecutorView, ResourceGroupView},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
-use ark_bn254::Bn254;
-use ark_groth16::PreparedVerifyingKey;
 use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
@@ -115,8 +114,6 @@ use std::{
     marker::Sync,
     sync::Arc,
 };
-use std::collections::HashMap;
-use crate::keyless_validation::KeylessConfig;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();

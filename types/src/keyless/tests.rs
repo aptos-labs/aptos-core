@@ -62,7 +62,8 @@ fn test_keyless_groth16_proof_verification() {
 
     let (zk_sig, zk_pk) = get_sample_groth16_sig_and_pk();
     let proof = match &zk_sig.cert {
-        EphemeralCertificate::ZeroKnowledgeSig(proof) => proof.clone(),
+        EphemeralCertificate::ZeroKnowledgeSig(proof)
+        | EphemeralCertificate::ZeroKnowledgeSigV2 { zk_sig: proof, .. } => proof.clone(),
         EphemeralCertificate::OpenIdSig(_) => panic!("Internal inconsistency"),
     };
 
@@ -85,7 +86,8 @@ fn test_keyless_oidc_sig_verifies() {
     let (sig, pk) = get_sample_openid_sig_and_pk();
 
     let oidc_sig = match &sig.cert {
-        EphemeralCertificate::ZeroKnowledgeSig(_) => panic!("Internal inconsistency"),
+        EphemeralCertificate::ZeroKnowledgeSig(_)
+        | EphemeralCertificate::ZeroKnowledgeSigV2 { .. } => panic!("Internal inconsistency"),
         EphemeralCertificate::OpenIdSig(oidc_sig) => oidc_sig.clone(),
     };
 

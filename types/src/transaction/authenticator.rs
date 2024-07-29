@@ -1039,7 +1039,7 @@ impl AnySignature {
                 // Add the ZK proof into the `txn_and_zkp` struct, if we are in the ZK path
                 match &signature.cert {
                     EphemeralCertificate::ZeroKnowledgeSig(proof)
-                    | EphemeralCertificate::ZeroKnowledgeSigV2 {zk_sig: proof, .. } => {
+                    | EphemeralCertificate::ZeroKnowledgeSigV2 { zk_sig: proof, .. } => {
                         txn_and_zkp.proof = Some(proof.proof)
                     },
                     EphemeralCertificate::OpenIdSig(_) => {},
@@ -1832,7 +1832,8 @@ mod tests {
             proof: None,
         };
         match &mut sig.cert {
-            EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+            EphemeralCertificate::ZeroKnowledgeSig(proof)
+            | EphemeralCertificate::ZeroKnowledgeSigV2 { zk_sig: proof, .. } => {
                 txn_and_zkp.proof = Some(proof.proof);
             },
             EphemeralCertificate::OpenIdSig(_) => panic!("Internal inconsistency"),

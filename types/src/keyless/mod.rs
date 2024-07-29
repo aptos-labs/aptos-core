@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial, HashValue};
+use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
@@ -41,7 +41,7 @@ pub use bn254_circom::{
 };
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Proof, Groth16ProofAndStatement, ZeroKnowledgeSig};
-pub use groth16_vk::{Groth16VerificationKey, SetupsVKs, SetupVKEntry};
+pub use groth16_vk::{Groth16VerificationKey, SetupVKEntry, SetupsVKs};
 pub use openid_sig::{Claims, OpenIdSig};
 pub use zkp_sig::ZKP;
 

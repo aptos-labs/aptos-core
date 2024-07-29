@@ -366,7 +366,7 @@ pub fn get_public_inputs_hash(
         },
         EphemeralCertificate::OpenIdSig(_) => {
             bail!("Can only call `get_public_inputs_hash` on keyless::Signature with Groth16 ZK proof")
-        }
+        },
     }
 }
 

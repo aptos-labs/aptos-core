@@ -12,7 +12,7 @@ use crate::{
     transaction::authenticator::EphemeralSignature,
 };
 use anyhow::bail;
-use aptos_crypto::{CryptoMaterialError, HashValue};
+use aptos_crypto::CryptoMaterialError;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::{Bn254, Fr};
 use ark_ff::{BigInteger, PrimeField};
