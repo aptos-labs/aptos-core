@@ -482,7 +482,7 @@ pub fn generate_script_from_batched_calls(
         args: context
             .args
             .into_iter()
-            .map(TransactionArgument::Raw)
+            .map(TransactionArgument::Serialized)
             .collect(),
     })
     .unwrap())
