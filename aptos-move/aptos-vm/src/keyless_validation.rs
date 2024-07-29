@@ -233,16 +233,20 @@ pub(crate) fn validate_authenticators(
                 )?;
             },
             EphemeralCertificate::ZeroKnowledgeSigV2 { setup_id, zk_sig } => {
-                let pvk = keyless_config.pvks_by_setup.get(setup_id).or(default_pvk);
-                verify_zk_sig(
-                    &jwk,
-                    zk_sig,
-                    sig,
-                    pk,
-                    config,
-                    training_wheels_pk.as_ref(),
-                    pvk,
-                )?;
+                let pvk = keyless_config.pvks_by_setup.get(setup_id);
+                if pvk.is_some() {
+                    verify_zk_sig(
+                        &jwk,
+                        zk_sig,
+                        sig,
+                        pk,
+                        config,
+                        training_wheels_pk.as_ref(),
+                        pvk,
+                    )?;
+                } else {
+                    return Err(invalid_signature!("Unknown setup ID"));
+                }
             },
             EphemeralCertificate::OpenIdSig(openid_sig) => {
                 match jwk {
