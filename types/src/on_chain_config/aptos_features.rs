@@ -91,6 +91,7 @@ pub enum FeatureFlag {
     USE_COMPATIBILITY_CHECKER_V2 = 73,
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
+    REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
 }
 
 impl FeatureFlag {
@@ -165,6 +166,7 @@ impl FeatureFlag {
             FeatureFlag::USE_COMPATIBILITY_CHECKER_V2,
             FeatureFlag::ENABLE_ENUM_TYPES,
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
+            FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
         ]
     }
 }
