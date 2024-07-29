@@ -17,7 +17,6 @@ module 0x42::test {
     fun simple(x: S1) {
         x.0 = 42;
         x.1 = true;
-
     }
 
     fun simple_ref(x: &mut S1) {
