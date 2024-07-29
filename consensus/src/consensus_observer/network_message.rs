@@ -365,6 +365,7 @@ pub enum BlockTransactionPayload {
     InQuorumStore(PayloadWithProof),
     InQuorumStoreWithLimit(PayloadWithProofAndLimit),
     QuorumStoreInlineHybrid(PayloadWithProofAndLimit, Vec<BatchInfo>),
+    OptQuorumStore(PayloadWithProofAndLimit, Vec<BatchInfo>),
 }
 
 impl BlockTransactionPayload {
@@ -400,6 +401,17 @@ impl BlockTransactionPayload {
         Self::QuorumStoreInlineHybrid(proof_with_limit, inline_batches)
     }
 
+    pub fn new_opt_quorum_store(
+        transactions: Vec<SignedTransaction>,
+        proofs: Vec<ProofOfStore>,
+        limit: Option<u64>,
+        batch_infos: Vec<BatchInfo>,
+    ) -> Self {
+        let payload_with_proof = PayloadWithProof::new(transactions, proofs);
+        let proof_with_limit = PayloadWithProofAndLimit::new(payload_with_proof, limit);
+        Self::OptQuorumStore(proof_with_limit, batch_infos)
+    }
+
     #[cfg(test)]
     /// Returns an empty transaction payload (for testing)
     pub fn empty() -> Self {
@@ -424,6 +436,7 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.transaction_limit
             },
+            BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
         }
     }
 
@@ -437,6 +450,9 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.payload_with_proof.proofs.clone()
             },
+            BlockTransactionPayload::OptQuorumStore(payload, _) => {
+                payload.payload_with_proof.proofs.clone()
+            },
         }
     }
 
@@ -448,6 +464,9 @@ impl BlockTransactionPayload {
                 payload.payload_with_proof.transactions.clone()
             },
             BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
+                payload.payload_with_proof.transactions.clone()
+            },
+            BlockTransactionPayload::OptQuorumStore(payload, _) => {
                 payload.payload_with_proof.transactions.clone()
             },
         }
@@ -488,6 +507,16 @@ impl BlockTransactionPayload {
 
                 // Verify the transaction limit
                 self.verify_transaction_limit(*max_txns_to_execute)?;
+            },
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                // Verify the batches in the requested block
+                self.verify_batches(opt_qs_payload.proof_with_data())?;
+
+                // Verify the inline batches
+                self.verify_opt_batches(opt_qs_payload.opt_batches())?;
+
+                // Verify the transaction limit
+                self.verify_transaction_limit(opt_qs_payload.max_txns_to_execute())?;
             },
         }
 
@@ -545,6 +574,25 @@ impl BlockTransactionPayload {
             )));
         }
 
+        Ok(())
+    }
+
+    fn verify_opt_batches(&self, expected_opt_batches: &Vec<BatchInfo>) -> Result<(), Error> {
+        let opt_batches: &Vec<BatchInfo> = match self {
+            BlockTransactionPayload::OptQuorumStore(_, opt_batches) => opt_batches,
+            _ => {
+                return Err(Error::InvalidMessageError(
+                    "Transaction payload is not an OptQS Payload".to_string(),
+                ))
+            },
+        };
+
+        if expected_opt_batches != opt_batches {
+            return Err(Error::InvalidMessageError(format!(
+                "Transaction payload failed optimistic batch verification! Expected optimistic batches {:?} but found {:?}",
+                expected_opt_batches, opt_batches
+            )));
+        }
         Ok(())
     }
 
