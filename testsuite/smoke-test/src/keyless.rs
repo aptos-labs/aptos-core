@@ -748,7 +748,7 @@ async fn rotate_vk_by_governance<'a>(
 
     let script = lines.join("\n");
 
-    debug!("Move script for changing VK follows below:\n{:?}", script);
+    println!("Move script for changing VK follows below:\n{:?}", script);
 
     let gas_options = GasOptions {
         gas_unit_price: Some(100),
