@@ -375,13 +375,15 @@ async fn sign_transaction<'a>(
     let esk = get_sample_esk();
 
     let public_inputs_hash: Option<[u8; 32]> =
-        if let EphemeralCertificate::ZeroKnowledgeSig(_) = &sig.cert {
-            // This will only calculate the hash if it's needed, avoiding unnecessary computation.
-            Some(fr_to_bytes_le(
-                &get_public_inputs_hash(&sig, &pk, jwk, config).unwrap(),
-            ))
-        } else {
-            None
+        match &sig.cert {
+            EphemeralCertificate::ZeroKnowledgeSig(_)
+            | EphemeralCertificate::ZeroKnowledgeSigV2 { .. } => {
+                // This will only calculate the hash if it's needed, avoiding unnecessary computation.
+                Some(fr_to_bytes_le(
+                    &get_public_inputs_hash(&sig, &pk, jwk, config).unwrap(),
+                ))
+            },
+            EphemeralCertificate::OpenIdSig(_) => None,
         };
 
     let mut txn_and_zkp = TransactionAndProof {
