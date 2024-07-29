@@ -469,6 +469,7 @@ impl ProofQueue {
         let mut cur_bytes = 0;
         let mut cur_unique_txns = 0;
         let mut cur_all_txns = 0;
+        let mut cur_expired_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
         // Set of all the excluded transactions and all the transactions included in the result
@@ -537,6 +538,18 @@ impl ProofQueue {
                                     .count() as u64
                             },
                         );
+                        cur_expired_txns += self.batch_summaries.get(&sort_key.batch_key).map_or(
+                            0,
+                            |(summaries, _, _)| {
+                                summaries
+                                    .iter()
+                                    .filter(|summary| {
+                                        block_timestamp.as_secs()
+                                            >= summary.expiration_timestamp_secs
+                                    })
+                                    .count() as u64
+                            },
+                        );
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
@@ -573,6 +586,7 @@ impl ProofQueue {
             counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns as f64);
             counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
                 .observe((cur_all_txns.saturating_sub(cur_unique_txns)) as f64);
+            counters::NUM_EXPIRED_TXNS_WHEN_PULL.observe(cur_expired_txns as f64);
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
