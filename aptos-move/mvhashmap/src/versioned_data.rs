@@ -206,7 +206,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
         // deltas the actual written value has not been seen yet (i.e.
         // it is not added as an entry to the data-structure).
         match accumulator {
-            Some(Ok(accumulator)) => Err(Unresolved(accumulator)),
+            Some(Ok(accumulator)) => Err(Unresolved(Box::new(accumulator))),
             Some(Err(_)) => Err(DeltaApplicationFailure),
             None => Err(Uninitialized),
         }
@@ -402,7 +402,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     /// transaction has indeed produced a delta recorded at the given key.
     ///
     /// If the result is Err(op), it means the base value to apply DeltaOp op hadn't been set.
-    pub fn materialize_delta(&self, key: &K, txn_idx: TxnIndex) -> Result<u128, DeltaOp> {
+    pub fn materialize_delta(&self, key: &K, txn_idx: TxnIndex) -> Result<u128, Box<DeltaOp>> {
         let mut v = self.values.get_mut(key).expect("Path must exist");
 
         // +1 makes sure we include the delta from txn_idx.

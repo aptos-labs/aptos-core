@@ -165,7 +165,7 @@ impl From<(AptosError, Option<State>, StatusCode)> for RestError {
     fn from((error, state, status_code): (AptosError, Option<State>, StatusCode)) -> Self {
         Self::Api(AptosErrorResponse {
             error,
-            state,
+            state: state.map(Box::new),
             status_code,
         })
     }
@@ -208,7 +208,7 @@ impl From<reqwest::Error> for RestError {
 #[derive(Debug)]
 pub struct AptosErrorResponse {
     pub error: AptosError,
-    pub state: Option<State>,
+    pub state: Option<Box<State>>,
     pub status_code: StatusCode,
 }
 

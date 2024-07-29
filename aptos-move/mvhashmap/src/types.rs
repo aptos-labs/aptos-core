@@ -55,7 +55,7 @@ pub enum MVDataError {
     /// No prior entry is found.
     Uninitialized,
     /// Read resulted in an unresolved delta value.
-    Unresolved(DeltaOp),
+    Unresolved(Box<DeltaOp>),
     /// A dependency on other transaction has been found during the read.
     Dependency(TxnIndex),
     /// Delta application failed, txn execution should fail.
