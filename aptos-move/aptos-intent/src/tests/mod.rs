@@ -62,7 +62,7 @@ fn simple_builder() {
     assert_eq!(h.read_aptos_balance(bob.address()), 1_000_000_000_000_010);
 
     assert_eq!(
-        crate::generate_intent_payload(script).unwrap(),
+        crate::decompiler::generate_intent_payload_serialized(&script).unwrap(),
         expected_calls
     );
 }
@@ -127,7 +127,7 @@ fn chained_deposit() {
 
     assert_eq!(h.read_aptos_balance(bob.address()), 1_000_000_000_000_010);
     assert_eq!(
-        crate::generate_intent_payload(script).unwrap(),
+        crate::decompiler::generate_intent_payload_serialized(&script).unwrap(),
         expected_calls
     );
 }

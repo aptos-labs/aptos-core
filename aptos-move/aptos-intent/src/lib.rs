@@ -19,6 +19,9 @@ mod decompiler;
 #[cfg(test)]
 pub mod tests;
 
+// CompiledScript generated from intents will have this key in its metadata to distinguish from other scripts.
+pub static APTOS_INTENT_KEY: &[u8] = "aptos::intent".as_bytes();
+
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreviousResult {
     call_idx: u16,

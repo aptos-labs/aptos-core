@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ArgumentOperation, BatchArgument, BatchedFunctionCall, PreviousResult};
+use crate::{
+    ArgumentOperation, BatchArgument, BatchedFunctionCall, PreviousResult, APTOS_INTENT_KEY,
+};
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{PartialVMError, PartialVMResult},
@@ -11,6 +13,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
     transaction_argument::TransactionArgument,
     vm_status::StatusCode,
 };
@@ -464,6 +467,10 @@ pub fn generate_script_from_batched_calls(
         err.to_partial()
             .with_message(format!("{:?}", context.script))
     })?;
+    context.script.metadata.push(Metadata {
+        key: APTOS_INTENT_KEY.to_owned(),
+        value: vec![],
+    });
     let mut bytes = vec![];
     context
         .script
