@@ -134,7 +134,7 @@ pub mod network_message_service_client {
                         ),
                     );
 
-                req.set_timeout(std::time::Duration::from_millis(2));
+                req.set_timeout(std::time::Duration::from_millis(5));
                 result = self.inner.unary(req, path, codec).await;
                 if result.is_ok() {
                     break;
