@@ -124,7 +124,7 @@ async fn test_keyless_rotate_vk() {
 
 async fn run_txn(info: &mut  AptosPublicInfo, setup_id: &str, jwk: &RSA_JWK, config: &Configuration, tw_sk: &Ed25519PrivateKey, seq_num: usize) -> anyhow::Result<()> {
     let (sig, pk) = match setup_id {
-        "SETUP_0" => get_groth16_sig_and_pk(),
+        "SETUP_0" => get_sample_groth16_sig_and_pk(),
         "SETUP_1" => get_groth16_sig_and_pk_for_upgraded_vk(),
         "SETUP_2" => get_groth16_sig_and_pk_for_upgraded_vk(),
         _ => unreachable!(),
