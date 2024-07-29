@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: field `1` not declared in all variants of `Foo`
+  ┌─ tests/checking/positional_fields/invalid_common_access.move:8:9
+  │
+8 │         x.1
+  │         ^
+  │
+  = field must be declared in all variants of `Foo` to be accessible without match expression
