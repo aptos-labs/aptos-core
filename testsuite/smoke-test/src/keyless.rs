@@ -664,7 +664,7 @@ async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
 
 async fn rotate_vk_by_governance<'a>(
     cli: &mut CliTestFramework,
-    _info: &mut AptosPublicInfo,
+    info: &mut AptosPublicInfo,
     vks: HashMap<String, Groth16VerificationKey>,
     root_idx: usize,
 ) {
