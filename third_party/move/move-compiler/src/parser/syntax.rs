@@ -2746,6 +2746,7 @@ fn parse_struct_decl(
                     list.push(variant)
                 }
                 consume_token(context.tokens, Tok::RBrace)?;
+                parse_postfix_abilities(context, &mut abilities)?;
                 StructLayout::Variants(list)
             } else {
                 let (list, is_positional) = if context.tokens.peek() == Tok::LParen {
@@ -2756,16 +2757,15 @@ fn parse_struct_decl(
                     consume_token(context.tokens, Tok::Semicolon)?;
                     (list, true)
                 } else {
-                    (
-                        parse_comma_list(
-                            context,
-                            Tok::LBrace,
-                            Tok::RBrace,
-                            parse_field_annot,
-                            "a field",
-                        )?,
-                        false,
-                    )
+                    let list = parse_comma_list(
+                        context,
+                        Tok::LBrace,
+                        Tok::RBrace,
+                        parse_field_annot,
+                        "a field",
+                    )?;
+                    parse_postfix_abilities(context, &mut abilities)?;
+                    (list, false)
                 };
                 StructLayout::Singleton(list, is_positional)
             }
@@ -2816,6 +2816,27 @@ fn parse_abilities(context: &mut Context) -> Result<Vec<Ability>, Box<Diagnostic
     } else {
         Ok(vec![])
     }
+}
+
+/// Parse postfix ability declarations:
+///   PostfixAbilities = (<Abilities> ";")?
+fn parse_postfix_abilities(context: &mut Context, prefix_abilities: &mut Vec<Ability>) -> Result<(), Box<Diagnostic>> {
+    let postfix_abilities = parse_abilities(context)?;
+    if !postfix_abilities.is_empty() {
+        consume_token(context.tokens, Tok::Semicolon)?;
+    }
+    if let (Some(sp!(_l1, _)), Some(sp!(l2, _))) = (prefix_abilities.first(), postfix_abilities.first()) {
+        let msg = format!(
+            "Conflicting ability declarations. Abilities must be declared either before or after \
+             the variant list, not both."
+        );
+        context.env.add_diag(diag!(Syntax::InvalidModifier, (*l2, msg)));
+    } else {
+        if !postfix_abilities.is_empty() {
+            *prefix_abilities = postfix_abilities;
+        }
+    }
+    Ok(())
 }
 
 // Parse a struct variant. The returned boolean indicates whether the variant has a braced (`{..}`)
