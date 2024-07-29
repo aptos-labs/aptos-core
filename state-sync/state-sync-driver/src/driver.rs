@@ -20,7 +20,7 @@ use crate::{
     utils,
     utils::{OutputFallbackHandler, PENDING_DATA_LOG_FREQ_SECS},
 };
-use aptos_config::config::{RoleType, StateSyncDriverConfig};
+use aptos_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
@@ -32,6 +32,7 @@ use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_schemadb::DB;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -53,6 +54,9 @@ pub struct DriverConfiguration {
     // The config file of the driver
     pub config: StateSyncDriverConfig,
 
+    // The config for consensus observer
+    pub consensus_observer_config: ConsensusObserverConfig,
+
     // The role of the node
     pub role: RoleType,
 
@@ -61,9 +65,15 @@ pub struct DriverConfiguration {
 }
 
 impl DriverConfiguration {
-    pub fn new(config: StateSyncDriverConfig, role: RoleType, waypoint: Waypoint) -> Self {
+    pub fn new(
+        config: StateSyncDriverConfig,
+        consensus_observer_config: ConsensusObserverConfig,
+        role: RoleType,
+        waypoint: Waypoint,
+    ) -> Self {
         Self {
             config,
+            consensus_observer_config,
             role,
             waypoint,
         }
@@ -142,6 +152,7 @@ impl<
         StreamingClient,
     >
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_notification_listener: ClientNotificationListener,
         commit_notification_listener: CommitNotificationListener,
@@ -159,6 +170,7 @@ impl<
         streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
         time_service: TimeService,
+        internal_indexer_db: Option<Arc<DB>>,
     ) -> Self {
         let output_fallback_handler =
             OutputFallbackHandler::new(driver_configuration.clone(), time_service.clone());
@@ -169,6 +181,7 @@ impl<
             streaming_client.clone(),
             storage.clone(),
             storage_synchronizer.clone(),
+            internal_indexer_db,
         );
         let continuous_syncer = ContinuousSyncer::new(
             driver_configuration.clone(),
@@ -234,7 +247,7 @@ impl<
     async fn handle_consensus_notification(&mut self, notification: ConsensusNotification) {
         // Verify the notification: full nodes shouldn't receive notifications
         // and consensus should only send notifications after bootstrapping!
-        let result = if self.driver_configuration.role == RoleType::FullNode {
+        let result = if !self.is_consensus_enabled() {
             Err(Error::FullNodeConsensusNotification(format!(
                 "Received consensus notification: {:?}",
                 notification
@@ -535,14 +548,20 @@ impl<
         self.consensus_notification_handler.active_sync_request()
     }
 
-    /// Returns true iff this node is a validator
-    fn is_validator(&self) -> bool {
+    /// Returns true iff this node enables consensus
+    fn is_consensus_enabled(&self) -> bool {
         self.driver_configuration.role == RoleType::Validator
+            || self
+                .driver_configuration
+                .consensus_observer_config
+                .observer_enabled
     }
 
     /// Returns true iff consensus is currently executing
     fn check_if_consensus_executing(&self) -> bool {
-        self.is_validator() && self.bootstrapper.is_bootstrapped() && !self.active_sync_request()
+        self.is_consensus_enabled()
+            && self.bootstrapper.is_bootstrapped()
+            && !self.active_sync_request()
     }
 
     /// Checks if the connection deadline has passed. If so, validators with
@@ -551,7 +570,7 @@ impl<
     /// and state sync is trivial.
     async fn check_auto_bootstrapping(&mut self) {
         if !self.bootstrapper.is_bootstrapped()
-            && self.is_validator()
+            && self.is_consensus_enabled()
             && self.driver_configuration.config.enable_auto_bootstrapping
             && self.driver_configuration.waypoint.version() == 0
         {

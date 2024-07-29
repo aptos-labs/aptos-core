@@ -60,7 +60,7 @@ pub trait AptosErrorResponse {
     fn inner_mut(&mut self) -> &mut AptosError;
 }
 
-/// This macro defines traits for all of the given status codes. In eahc trait
+/// This macro defines traits for all of the given status codes. In each trait
 /// there is a function that defines a helper for building an instance of the
 /// error type using that code. These traits are helpful for defining what
 /// error types an internal function can return. For example, the failpoint
@@ -77,6 +77,7 @@ macro_rules! generate_error_traits {
         $(
         pub trait [<$trait_name Error>]: AptosErrorResponse {
             // With ledger info and an error code
+            #[allow(unused)]
             fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(
                 err: Err,
                 error_code: aptos_api_types::AptosErrorCode,
@@ -84,11 +85,13 @@ macro_rules! generate_error_traits {
             ) -> Self where Self: Sized;
 
             // With an error code and no ledger info headers (special case)
+            #[allow(unused)]
             fn [<$trait_name:snake _with_code_no_info>]<Err: std::fmt::Display>(
                 err: Err,
                 error_code: aptos_api_types::AptosErrorCode,
             ) -> Self where Self: Sized;
 
+            #[allow(unused)]
             fn [<$trait_name:snake _with_vm_status>]<Err: std::fmt::Display>(
                 err: Err,
                 error_code: aptos_api_types::AptosErrorCode,
@@ -96,6 +99,7 @@ macro_rules! generate_error_traits {
                 ledger_info: &aptos_api_types::LedgerInfo
             ) -> Self where Self: Sized;
 
+            #[allow(unused)]
             fn [<$trait_name:snake _from_aptos_error>](
                 aptos_error: aptos_api_types::AptosError,
                 ledger_info: &aptos_api_types::LedgerInfo
@@ -115,7 +119,7 @@ macro_rules! generate_error_traits {
 #[macro_export]
 macro_rules! generate_error_response {
     ($enum_name:ident, $(($status:literal, $name:ident)),*) => {
-        // We use the paste crate to allows us to generate the name of the code
+        // We use the paste crate to allow us to generate the name of the code
         // enum, more on that in the comment above that enum.
         paste::paste! {
 
@@ -143,6 +147,8 @@ macro_rules! generate_error_response {
                 #[oai(header = "X-Aptos-Block-Height")] Option<u64>,
                 /// Oldest non-pruned block height of the chain
                 #[oai(header = "X-Aptos-Oldest-Block-Height")] Option<u64>,
+                /// The cost of the call in terms of gas
+                #[oai(header = "X-Aptos-Gas-Used")] Option<u64>,
             ),
             )*
         }
@@ -170,6 +176,7 @@ macro_rules! generate_error_response {
                     Some(ledger_info.epoch.into()),
                     Some(ledger_info.block_height.into()),
                     Some(ledger_info.oldest_block_height.into()),
+                    None,
                 ))
             }
 
@@ -182,6 +189,7 @@ macro_rules! generate_error_response {
 
                 Self::from($enum_name::$name(
                     payload,
+                    None,
                     None,
                     None,
                     None,
@@ -209,6 +217,7 @@ macro_rules! generate_error_response {
                     Some(ledger_info.epoch.into()),
                     Some(ledger_info.block_height.into()),
                     Some(ledger_info.oldest_block_height.into()),
+                    None,
                 ))
             }
 
@@ -226,6 +235,7 @@ macro_rules! generate_error_response {
                     Some(ledger_info.epoch.into()),
                     Some(ledger_info.block_height.into()),
                     Some(ledger_info.oldest_block_height.into()),
+                    None,
                 ))
             }
         }
@@ -245,6 +255,7 @@ macro_rules! generate_error_response {
                         _epoch,
                         _block_height,
                         _oldest_block_height,
+                        _gas_used,
                     ) => &mut *inner,
                     )*
                 }
@@ -297,6 +308,8 @@ macro_rules! generate_success_response {
                 #[oai(header = "X-Aptos-Block-Height")] u64,
                 /// Oldest non-pruned block height of the chain
                 #[oai(header = "X-Aptos-Oldest-Block-Height")] u64,
+                /// The cost of the call in terms of gas
+                #[oai(header = "X-Aptos-Gas-Used")] Option<u64>,
                 /// Cursor to be used for endpoints that support cursor-based
                 /// pagination. Pass this to the `start` field of the endpoint
                 /// on the next call to get the next page of results.
@@ -340,6 +353,7 @@ macro_rules! generate_success_response {
                             ledger_info.epoch.into(),
                             ledger_info.block_height.into(),
                             ledger_info.oldest_block_height.into(),
+                            None,
                             None,
                         )
                     },
@@ -464,8 +478,19 @@ macro_rules! generate_success_response {
             pub fn with_cursor(mut self, new_cursor: Option<aptos_types::state_store::state_key::StateKey>) -> Self {
                 match self {
                     $(
-                    [<$enum_name>]::$name(_, _, _, _, _, _, _, _, ref mut cursor) => {
+                    [<$enum_name>]::$name(_, _, _, _, _, _, _, _, _, ref mut cursor) => {
                         *cursor = new_cursor.map(|c| aptos_api_types::StateKeyWrapper::from(c).to_string());
+                    }
+                    )*
+                }
+                self
+            }
+
+            pub fn with_gas_used(mut self, new_gas_used: Option<u64>) -> Self {
+                match self {
+                    $(
+                    [<$enum_name>]::$name(_, _, _, _, _, _, _, _, ref mut gas_used, _) => {
+                        *gas_used = new_gas_used;
                     }
                     )*
                 }

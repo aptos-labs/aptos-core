@@ -175,9 +175,7 @@ fn test_schema_put_get() {
 }
 
 fn collect_values<S: Schema>(db: &TestDB) -> Vec<(S::Key, S::Value)> {
-    let mut iter = db
-        .iter::<S>(Default::default())
-        .expect("Failed to create iterator.");
+    let mut iter = db.iter::<S>().expect("Failed to create iterator.");
     iter.seek_to_first();
     iter.collect::<Result<Vec<_>, AptosDbError>>().unwrap()
 }
@@ -388,4 +386,18 @@ fn test_checkpoint() {
         );
         assert_eq!(db.get::<TestSchema1>(&TestField(1)).unwrap(), None);
     }
+}
+
+#[test]
+fn test_unrecognised_column_family() {
+    let tmpdir = aptos_temppath::TempPath::new();
+
+    let mut opts = rocksdb::Options::default();
+    opts.create_if_missing(true);
+    opts.create_missing_column_families(true);
+
+    let db = DB::open(tmpdir.path(), "test", vec!["cf1", "cf2"], &opts).unwrap();
+    drop(db);
+
+    DB::open(tmpdir.path(), "test", vec!["cf1"], &opts).unwrap();
 }

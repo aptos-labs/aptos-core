@@ -177,7 +177,7 @@ async fn warn_detailed_error(
     let balance = rest_client
         .get_account_balance(sender)
         .await
-        .map_or(-1, |v| v.into_inner().get() as i64);
+        .map_or(-1, |v| v.into_inner().get() as i128);
 
     warn!(
         "[{:?}] Failed {} transaction: {:?}, seq num: {}, gas: unit {} and max {}, for account {}, last seq_num {:?}, balance of {} and last transaction for account: {:?}",
@@ -218,7 +218,7 @@ async fn submit_and_check(
     }
     match rest_client
         .wait_for_transaction_by_hash_bcs(
-            txn.clone().committed_hash(),
+            txn.committed_hash(),
             txn.expiration_timestamp_secs(),
             None,
             Some(wait_duration.saturating_sub(start.elapsed())),

@@ -193,6 +193,9 @@ impl PeerState {
         let average_latency_ping_secs = latency_info_state.get_average_latency_ping_secs();
         peer_monitoring_metadata.average_ping_latency_secs = average_latency_ping_secs;
 
+        let latest_ping_latency_secs = latency_info_state.get_latest_latency_ping_secs();
+        peer_monitoring_metadata.latest_ping_latency_secs = latest_ping_latency_secs;
+
         // Get and store the detailed monitoring metadata
         let internal_client_state = self.get_internal_client_state()?;
         peer_monitoring_metadata.internal_client_state = internal_client_state;
@@ -264,24 +267,6 @@ impl PeerState {
             PeerStateValue::NodeInfoState(node_info_state) => Ok(node_info_state),
             peer_state_value => Err(Error::UnexpectedError(format!(
                 "Invalid peer state value found! Expected node_info_state but got: {:?}",
-                peer_state_value
-            ))),
-        }
-    }
-
-    /// Returns a copy of the performance monitoring state
-    #[cfg(feature = "network-perf-test")] // Disabled by default
-    pub(crate) fn get_performance_monitoring_state(
-        &self,
-    ) -> Result<crate::peer_states::performance_monitoring::PerformanceMonitoringState, Error> {
-        let peer_state_value = self
-            .get_peer_state_value(&PeerStateKey::PerformanceMonitoring)?
-            .read()
-            .clone();
-        match peer_state_value {
-            PeerStateValue::PerformanceMonitoringState(performance_monitoring_state) => Ok(performance_monitoring_state),
-            peer_state_value => Err(Error::UnexpectedError(format!(
-                "Invalid peer state value found! Expected performance_monitoring_state but got: {:?}",
                 peer_state_value
             ))),
         }

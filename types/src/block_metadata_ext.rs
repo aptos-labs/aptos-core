@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{block_metadata::BlockMetadata, randomness::Randomness};
 use aptos_crypto::HashValue;
-use move_core_types::{account_address::AccountAddress, value::MoveValue};
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
 /// The extended block metadata.
@@ -21,15 +22,15 @@ pub enum BlockMetadataExt {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockMetadataWithRandomness {
-    id: HashValue,
-    epoch: u64,
-    round: u64,
-    proposer: AccountAddress,
+    pub id: HashValue,
+    pub epoch: u64,
+    pub round: u64,
+    pub proposer: AccountAddress,
     #[serde(with = "serde_bytes")]
-    previous_block_votes_bitvec: Vec<u8>,
-    failed_proposer_indices: Vec<u32>,
-    timestamp_usecs: u64,
-    randomness: Option<Randomness>,
+    pub previous_block_votes_bitvec: Vec<u8>,
+    pub failed_proposer_indices: Vec<u32>,
+    pub timestamp_usecs: u64,
+    pub randomness: Option<Randomness>,
 }
 
 impl BlockMetadataExt {
@@ -60,47 +61,6 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.id(),
             BlockMetadataExt::V1(obj) => obj.id,
         }
-    }
-
-    pub fn get_prologue_ext_move_args(self) -> Vec<MoveValue> {
-        let mut ret = vec![
-            MoveValue::Signer(AccountAddress::ONE),
-            MoveValue::Address(AccountAddress::from_bytes(self.id().to_vec()).unwrap()),
-            MoveValue::U64(self.epoch()),
-            MoveValue::U64(self.round()),
-            MoveValue::Address(self.proposer()),
-            MoveValue::Vector(
-                self.failed_proposer_indices()
-                    .iter()
-                    .map(|x| MoveValue::U64((*x) as u64))
-                    .collect(),
-            ),
-            MoveValue::Vector(
-                self.previous_block_votes_bitvec()
-                    .iter()
-                    .map(|x| MoveValue::U8(*x))
-                    .collect(),
-            ),
-            MoveValue::U64(self.timestamp_usecs()),
-        ];
-
-        match self.randomness() {
-            None => {
-                ret.push(MoveValue::Bool(false));
-                ret.push(MoveValue::Vector(vec![]));
-            },
-            Some(randomness) => {
-                let move_bytes = randomness
-                    .randomness()
-                    .iter()
-                    .copied()
-                    .map(MoveValue::U8)
-                    .collect();
-                ret.push(MoveValue::Bool(true));
-                ret.push(MoveValue::Vector(move_bytes));
-            },
-        }
-        ret
     }
 
     pub fn timestamp_usecs(&self) -> u64 {
@@ -142,13 +102,6 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(obj) => obj.round(),
             BlockMetadataExt::V1(obj) => obj.round,
-        }
-    }
-
-    pub fn randomness(&self) -> &Option<Randomness> {
-        match self {
-            BlockMetadataExt::V0(_) => unreachable!(),
-            BlockMetadataExt::V1(obj) => &obj.randomness,
         }
     }
 }

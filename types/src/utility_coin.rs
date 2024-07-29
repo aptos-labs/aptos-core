@@ -21,6 +21,6 @@ pub static SUPRA_COIN_TYPE: Lazy<TypeTag> = Lazy::new(|| {
         address: AccountAddress::ONE,
         module: ident_str!("supra_coin").to_owned(),
         name: ident_str!("SupraCoin").to_owned(),
-        type_params: vec![],
+        type_args: vec![],
     }))
 });

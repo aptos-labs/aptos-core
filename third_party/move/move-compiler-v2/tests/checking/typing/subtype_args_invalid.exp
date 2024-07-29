@@ -1,36 +1,36 @@
 
 Diagnostics:
-error: invalid call of `M::mut`: mutability mismatch (&mut != &) for argument 1
+error: the function takes `&mut` but `&` was provided
    ┌─ tests/checking/typing/subtype_args_invalid.move:10:18
    │
 10 │         mut<u64>(&0);
    │                  ^^
 
-error: invalid call of `M::mut`: expected `u64` but found `M::S` for argument 1
+error: cannot pass `&S` to a function which expects argument of type `&mut u64`
    ┌─ tests/checking/typing/subtype_args_invalid.move:11:18
    │
 11 │         mut<u64>(&S{});
    │                  ^^^^
 
-error: invalid call of `M::imm_mut`: mutability mismatch (&mut != &) for argument 2
+error: the function takes `&mut` but `&` was provided
    ┌─ tests/checking/typing/subtype_args_invalid.move:15:26
    │
 15 │         imm_mut<u64>(&0, &0);
    │                          ^^
 
-error: invalid call of `M::mut_imm`: mutability mismatch (&mut != &) for argument 1
+error: the function takes `&mut` but `&` was provided
    ┌─ tests/checking/typing/subtype_args_invalid.move:16:22
    │
 16 │         mut_imm<u64>(&0, &0);
    │                      ^^
 
-error: invalid call of `M::mut_mut`: mutability mismatch (&mut != &) for argument 1
+error: the function takes `&mut` but `&` was provided
    ┌─ tests/checking/typing/subtype_args_invalid.move:17:22
    │
 17 │         mut_mut<u64>(&0, &0);
    │                      ^^
 
-error: mutability mismatch (&mut != &)
+error: expected `&mut` but `&` was provided
    ┌─ tests/checking/typing/subtype_args_invalid.move:21:9
    │
 21 │         f(&0, &0); // not okay

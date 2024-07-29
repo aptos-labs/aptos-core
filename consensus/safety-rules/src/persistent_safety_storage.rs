@@ -43,7 +43,7 @@ impl PersistentSafetyStorage {
             .expect("Unable to initialize keys and accounts in storage");
 
         // Create the new persistent safety storage
-        let safety_data = SafetyData::new(1, 0, 0, 0, None);
+        let safety_data = SafetyData::new(1, 0, 0, 0, None, 0);
         let mut persisent_safety_storage = Self {
             enable_cached_safety_data,
             cached_safety_data: Some(safety_data.clone()),
@@ -131,6 +131,10 @@ impl PersistentSafetyStorage {
         let _timer = counters::start_timer("set", SAFETY_DATA);
         counters::set_state(counters::EPOCH, data.epoch as i64);
         counters::set_state(counters::LAST_VOTED_ROUND, data.last_voted_round as i64);
+        counters::set_state(
+            counters::HIGHEST_TIMEOUT_ROUND,
+            data.highest_timeout_round as i64,
+        );
         counters::set_state(counters::PREFERRED_ROUND, data.preferred_round as i64);
 
         match self.internal_store.set(SAFETY_DATA, data.clone()) {
@@ -208,7 +212,7 @@ mod tests {
         assert_eq!(counters::get_state(counters::PREFERRED_ROUND), 0);
 
         safety_storage
-            .set_safety_data(SafetyData::new(9, 8, 1, 0, None))
+            .set_safety_data(SafetyData::new(9, 8, 1, 0, None, 0))
             .unwrap();
 
         let safety_data = safety_storage.safety_data().unwrap();

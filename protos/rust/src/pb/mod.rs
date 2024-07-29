@@ -1,16 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 // @generated
 pub mod aptos {
-    pub mod bigquery_schema {
-        pub mod transaction {
-            // @@protoc_insertion_point(attribute:aptos.bigquery_schema.transaction.v1)
-            pub mod v1 {
-                include!("aptos.bigquery_schema.transaction.v1.rs");
-                // @@protoc_insertion_point(aptos.bigquery_schema.transaction.v1)
-            }
-        }
-    }
     pub mod indexer {
         // @@protoc_insertion_point(attribute:aptos.indexer.v1)
         pub mod v1 {

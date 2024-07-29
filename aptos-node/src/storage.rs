@@ -73,7 +73,6 @@ pub(crate) fn bootstrap_db(
 
                 let db_backup_service =
                     start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
-
                 (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
             },
         };
@@ -87,10 +86,10 @@ pub(crate) fn bootstrap_db(
 pub(crate) fn bootstrap_db(
     node_config: &NodeConfig,
 ) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
-    use aptos_db::fake_aptosdb::FakeAptosDB;
+    use aptos_db::db::fake_aptosdb::FakeAptosDB;
 
     let aptos_db = AptosDB::open(
-        &node_config.storage.dir(),
+        node_config.storage.get_dir_paths(),
         false, /* readonly */
         node_config.storage.storage_pruner_config,
         node_config.storage.rocksdb_configs,

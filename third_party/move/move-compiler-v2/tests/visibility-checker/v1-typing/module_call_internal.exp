@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: function `0x2::X::foo` cannot be called from function `0x2::M::foo` because it is private to module `0x2::X`
+   ┌─ tests/visibility-checker/v1-typing/module_call_internal.move:4:9
+   │
+ 4 │     fun foo() {}
+   │         ^^^ callee
+   ·
+10 │         X::foo()
+   │         -------- called here

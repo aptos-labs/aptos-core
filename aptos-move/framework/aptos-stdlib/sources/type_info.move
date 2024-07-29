@@ -91,7 +91,7 @@ module aptos_std::type_info {
     #[test(fx = @std)]
     fun test_chain_id(fx: signer) {
         // We need to enable the feature in order for the native call to be allowed.
-        features::change_feature_flags(&fx, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
 
         // The testing environment chain ID is 4u8.
         assert!(chain_id() == 4u8, 1);

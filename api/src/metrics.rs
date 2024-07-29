@@ -4,8 +4,8 @@
 
 use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
-    IntCounterVec,
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
+    HistogramVec, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -84,6 +84,24 @@ pub static GAS_USED: Lazy<HistogramVec> = Lazy::new(|| {
         "Amount of gas used by each API operation",
         &["operation_id"],
         BYTE_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
+pub static WAIT_TRANSACTION_GAUGE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_api_wait_transaction",
+        "Number of transactions waiting to be processed"
+    )
+    .unwrap()
+});
+
+pub static WAIT_TRANSACTION_POLL_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_api_wait_transaction_poll_time",
+        "Time spent on long poll for transactions, or 0 on short poll",
+        &["poll_type"],
+        SUB_MS_BUCKETS.to_vec()
     )
     .unwrap()
 });

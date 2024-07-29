@@ -107,13 +107,16 @@ fn aptos_framework_path() -> PathBuf {
 pub struct GenArgs {
     #[clap(short, long)]
     pub output: Option<String>,
+
+    #[clap(short, long)]
+    pub gas_feature_version: Option<u64>,
 }
 
 /// Constructs the current gas schedule in on-chain format.
-pub fn current_gas_schedule() -> GasScheduleV2 {
+pub fn current_gas_schedule(feature_version: u64) -> GasScheduleV2 {
     GasScheduleV2 {
-        feature_version: LATEST_GAS_FEATURE_VERSION,
-        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION),
+        feature_version,
+        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(feature_version),
     }
 }
 
@@ -121,9 +124,13 @@ pub fn current_gas_schedule() -> GasScheduleV2 {
 pub fn generate_update_proposal(args: &GenArgs) -> Result<()> {
     let mut pack = PackageBuilder::new("GasScheduleUpdate");
 
+    let feature_version = args
+        .gas_feature_version
+        .unwrap_or(LATEST_GAS_FEATURE_VERSION);
+
     pack.add_source(
         "update_gas_schedule.move",
-        &generate_script(&current_gas_schedule())?,
+        &generate_script(&current_gas_schedule(feature_version))?,
     );
     // TODO: use relative path here
     pack.add_local_dep("AptosFramework", &aptos_framework_path().to_string_lossy());

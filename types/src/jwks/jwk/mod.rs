@@ -1,4 +1,7 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+#![allow(clippy::match_result_ok)]
 
 use crate::{
     jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK},
@@ -8,6 +11,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::value::{MoveStruct, MoveValue};
+use poem_openapi_derive::Union;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -39,8 +43,14 @@ impl AsMoveValue for JWKMoveStruct {
     }
 }
 
+impl From<RSA_JWK> for JWKMoveStruct {
+    fn from(rsa_jwk: RSA_JWK) -> Self {
+        JWKMoveStruct::from(JWK::RSA(rsa_jwk))
+    }
+}
+
 /// The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 pub enum JWK {
     RSA(RSA_JWK),
     Unsupported(UnsupportedJWK),

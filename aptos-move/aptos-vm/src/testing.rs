@@ -1,7 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::AptosVM;
+#[cfg(any(test, feature = "testing"))]
+use crate::{
+    aptos_vm::get_or_vm_startup_failure, data_cache::AsMoveResolver,
+    transaction_metadata::TransactionMetadata,
+};
+#[cfg(any(test, feature = "testing"))]
+use aptos_types::{state_store::StateView, transaction::SignedTransaction};
+#[cfg(any(test, feature = "testing"))]
+use aptos_vm_logging::log_schema::AdapterLogSchema;
+#[cfg(any(test, feature = "testing"))]
+use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput};
 use move_binary_format::errors::VMResult;
+#[cfg(any(test, feature = "testing"))]
+use move_core_types::vm_status::VMStatus;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum InjectedError {
@@ -45,5 +59,58 @@ pub mod testing_only {
         INJECTED_ERRORS.with(|injected_errors| {
             injected_errors.borrow_mut().insert(error_type);
         })
+    }
+}
+
+impl AptosVM {
+    #[cfg(any(test, feature = "testing"))]
+    pub fn test_failed_transaction_cleanup(
+        &self,
+        error_vm_status: VMStatus,
+        txn: &SignedTransaction,
+        state_view: &impl StateView,
+        gas_meter_balance: u64,
+    ) -> (VMStatus, VMOutput) {
+        use crate::gas::make_prod_gas_meter;
+        use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+
+        let txn_data = TransactionMetadata::new(txn);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
+        let vm_gas_params = self
+            .gas_params()
+            .expect("should be able to get gas params")
+            .vm
+            .clone();
+        let storage_gas_params = self
+            .storage_gas_params
+            .as_ref()
+            .expect("should be able to get storage gas params")
+            .clone();
+
+        let mut gas_meter = make_prod_gas_meter(
+            self.gas_feature_version,
+            vm_gas_params,
+            storage_gas_params,
+            false,
+            gas_meter_balance.into(),
+        );
+
+        let change_set_configs = &get_or_vm_startup_failure(&self.storage_gas_params, &log_context)
+            .expect("Storage gas parameters should exist for tests")
+            .change_set_configs;
+
+        let resolver = state_view.as_move_resolver();
+        let storage = TraversalStorage::new();
+        self.failed_transaction_cleanup(
+            VMChangeSet::empty(),
+            error_vm_status,
+            &mut gas_meter,
+            &txn_data,
+            &resolver,
+            &log_context,
+            change_set_configs,
+            &mut TraversalContext::new(&storage),
+        )
     }
 }

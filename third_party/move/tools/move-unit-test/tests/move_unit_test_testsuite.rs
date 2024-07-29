@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_command_line_common::testing::{
-    add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT,
+    add_update_baseline_fix, format_diff, get_compiler_exp_extension, read_env_update_baseline,
 };
 use move_unit_test::{self, UnitTestingConfig};
 use regex::RegexBuilder;
@@ -37,8 +37,9 @@ fn run_test_with_modifiers(
 ) -> anyhow::Result<Vec<((Vec<u8>, bool), PathBuf)>> {
     let mut results = Vec::new();
 
+    let exp_ext = get_compiler_exp_extension();
     for modifier in TEST_MODIFIER_STRS.iter() {
-        let modified_exp_path = path.with_extension(format!("{}.{}", modifier, EXP_EXT));
+        let modified_exp_path = path.with_extension(format!("{}.{}", modifier, exp_ext));
         if let (Some(test_config), true) = (
             modify(unit_test_config.clone(), modifier),
             modified_exp_path.exists(),
@@ -54,7 +55,13 @@ fn run_test_with_modifiers(
             }
 
             results.push((
-                test_config.run_and_report_unit_tests(test_plan.unwrap(), None, None, buffer)?,
+                test_config.run_and_report_unit_tests(
+                    test_plan.unwrap(),
+                    None,
+                    None,
+                    None,
+                    buffer,
+                )?,
                 modified_exp_path,
             ))
         }
@@ -68,8 +75,8 @@ fn run_test_with_modifiers(
     }
 
     results.push((
-        unit_test_config.run_and_report_unit_tests(test_plan.unwrap(), None, None, buffer)?,
-        path.with_extension(EXP_EXT),
+        unit_test_config.run_and_report_unit_tests(test_plan.unwrap(), None, None, None, buffer)?,
+        path.with_extension(exp_ext),
     ));
 
     Ok(results)

@@ -6,7 +6,7 @@
   "state_checkpoint_hash": null,
   "gas_used": "1",
   "success": false,
-  "vm_status": "Transaction Executed and Committed with Error MALFORMED",
+  "vm_status": "MALFORMED",
   "accumulator_root_hash": "",
   "changes": [
     {

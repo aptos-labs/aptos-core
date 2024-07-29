@@ -18,7 +18,9 @@ spec:
             {{- include "backup.selectorLabels" . | nindent 12 }}
             app.kubernetes.io/name: backup-compaction
           annotations:
-            seccomp.security.alpha.kubernetes.io/pod: runtime/default
+            {{- if $.Values.metrics.destination }}
+            aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+            {{- end}}
         spec:
           restartPolicy: Never
           terminationGracePeriodSeconds: 0
@@ -79,6 +81,8 @@ spec:
             runAsUser: 6180
             runAsGroup: 6180
             fsGroup: 6180
+            seccompProfile:
+              type: RuntimeDefault
           {{- with .nodeSelector }}
           nodeSelector:
             {{- toYaml . | nindent 12 }}

@@ -1,4 +1,5 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 // @generated
 #[allow(clippy::derive_partial_eq_without_eq)]

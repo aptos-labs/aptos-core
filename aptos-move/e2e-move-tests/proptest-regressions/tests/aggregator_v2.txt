@@ -4,4 +4,4 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc c747aee8b6f372bd6d4cadd677224caefa43450f23b53ff781d2664f4438c400 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: BothComparison, block_split: Whole }, element_type = U64, use_type = UseResourceType
+cc a8f570394fd4cd6dccbec4f0f8a866f365ac76eac32cb0e8a1665f3d09f06c80 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: DisabledOnly, block_split: Whole }

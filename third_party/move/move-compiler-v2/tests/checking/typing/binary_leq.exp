@@ -1,24 +1,23 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0(x: u64,r: M::R) {
-        Le<u64>(0, 0);
-        Le<u64>(1, 0);
-        Le<u64>(0, 1);
-        Le<u8>(0, 1);
-        Le<u8>(0, 1);
-        Le<u128>(0, 1);
-        Le<u128>(0, 1);
-        Le<u64>(0, 1);
+        true;
+        false;
+        true;
+        true;
+        true;
+        true;
+        true;
+        true;
         Le<u64>(Copy(x), Move(x));
-        Le<u64>(select M::R.f(r), select M::R.f(r));
-        And(Le<u64>(1, select M::R.f(r)), Le<u64>(select M::R.f(r), 0));
+        Le<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        And(Le<u64>(1, select M::R.f<M::R>(r)), Le<u64>(select M::R.f<M::R>(r), 0));
         {
           let M::R{ f: _ } = r;
           Tuple()
         }
     }
-    spec fun $t0(x: u64,r: M::R);
 } // end 0x8675309::M

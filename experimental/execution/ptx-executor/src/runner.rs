@@ -19,7 +19,7 @@ use aptos_types::{
     transaction::signature_verified_transaction::SignatureVerifiedTransaction,
     write_set::TransactionWrite,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::AptosVM;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -235,10 +235,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new(
-                &self.base_view.as_move_resolver(),
-                /*override_is_delayed_field_optimization_capable=*/ None,
-            )
+            AptosVM::new(&self.base_view)
         };
 
         loop {
@@ -273,7 +270,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     };
                     let _post = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_post_vm"]);
                     // TODO(ptx): error handling
-                    let (_vm_status, vm_output, _msg) = vm_output.expect("VM execution failed.");
+                    let (_vm_status, vm_output) = vm_output.expect("VM execution failed.");
 
                     // inform output state values to the manager
                     // TODO use try_into_storage_change_set() instead, and ChangeSet it returns, instead of VMOutput.

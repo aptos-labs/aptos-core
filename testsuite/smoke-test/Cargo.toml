@@ -21,6 +21,9 @@ aptos-config = { workspace = true }
 aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
+aptos-db-indexer-schemas = { workspace = true }
+aptos-debugger = { workspace = true }
+aptos-dkg = { workspace = true }
 aptos-faucet-core = { workspace = true }
 aptos-forge = { workspace = true }
 aptos-framework = { workspace = true }
@@ -28,19 +31,19 @@ aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-global-constants = { workspace = true }
 aptos-indexer = { workspace = true }
+aptos-indexer-grpc-table-info = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-release-builder = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-rosetta = { workspace = true }
+aptos-schemadb = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptos-vm-genesis = { workspace = true }
-async-trait = { workspace = true }
 bcs = { workspace = true }
 diesel = { workspace = true, features = [
     "chrono",
@@ -49,11 +52,12 @@ diesel = { workspace = true, features = [
     "numeric",
     "serde_json",
 ] }
+digest = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 move-core-types = { workspace = true }
-proptest = { workspace = true }
 reqwest = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
@@ -75,3 +79,5 @@ rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 serde_yaml = { workspace = true }
+tempfile = { workspace = true }
+

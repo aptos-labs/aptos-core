@@ -21,7 +21,7 @@ use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
-        Nibble,
+        ExpectNibble, Nibble,
     },
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleRangeProof},
     transaction::Version,
@@ -107,17 +107,20 @@ where
     /// Converts `self` to an internal node, assuming all of its children are already known and
     /// fully initialized.
     fn into_internal_node(mut self, version: Version) -> (NodeKey, InternalNode) {
-        let mut children = Children::new();
+        let mut children = Vec::with_capacity(self.children.len());
 
         // Calling `into_iter` on an array is equivalent to calling `iter`:
         // https://github.com/rust-lang/rust/issues/25725. So we use `iter_mut` and `take`.
         for (index, child_info_option) in self.children.iter_mut().enumerate() {
             if let Some(child_info) = child_info_option.take() {
-                children.insert((index as u8).into(), child_info.into_child(version));
+                children.push((index.expect_nibble(), child_info.into_child(version)));
             }
         }
 
-        (self.node_key, InternalNode::new(children))
+        (
+            self.node_key,
+            InternalNode::new(Children::from_sorted(children)),
+        )
     }
 }
 

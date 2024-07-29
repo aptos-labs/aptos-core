@@ -14,18 +14,19 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-ledger = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
+base64 = { workspace = true }
 bcs = { workspace = true }
 ed25519-dalek-bip32 = { workspace = true }
+hex = { workspace = true }
 move-core-types = { workspace = true }
 rand_core = { workspace = true }
-serde = { workspace = true }
+serde_json = { workspace = true }
 tiny-bip39 = { workspace = true }
 
 [dev-dependencies]
@@ -33,3 +34,6 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["tiny-bip39"]

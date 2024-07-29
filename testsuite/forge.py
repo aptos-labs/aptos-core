@@ -18,10 +18,10 @@ from enum import Enum
 from typing import (
     Any,
     Callable,
-    Iterator,
-    Mapping,
     Generator,
+    Iterator,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -29,15 +29,16 @@ from typing import (
     TypedDict,
     Union,
 )
-from urllib.parse import ParseResult, urlunparse, urlencode, quote as urlquote
-from test_framework.logging import init_logging, log
+from urllib.parse import ParseResult, urlencode, urlunparse
+from urllib.parse import quote as urlquote
+
+from test_framework.cluster import Cloud, ForgeCluster, ForgeJob, find_forge_cluster
 from test_framework.filesystem import Filesystem, LocalFilesystem
 from test_framework.git import Git
+from test_framework.logging import init_logging, log
 from test_framework.process import Processes, SystemProcesses
-
 from test_framework.shell import LocalShell, Shell
 from test_framework.time import SystemTime, Time
-from test_framework.cluster import Cloud, ForgeCluster, ForgeJob, find_forge_cluster
 
 # map of build variant (e.g. cargo profile and feature flags)
 BUILD_VARIANT_TAG_PREFIX_MAP = {
@@ -59,7 +60,7 @@ FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 
 MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig"
 MULTIREGION_KUBECONFIG_PATH = f"{MULTIREGION_KUBECONFIG_DIR}/kubeconfig"
-GAR_REPO_NAME = "us-west1-docker.pkg.dev/aptos-global/aptos-internal"
+GAR_REPO_NAME = "us-docker.pkg.dev/aptos-registry/docker"
 
 
 @dataclass
@@ -365,6 +366,32 @@ def get_dashboard_link(
     )
 
 
+class ContainerName(str, Enum):
+    Validator = "validator"
+    FullNode = "fullnode"
+
+
+def get_cpu_profile_link(
+    container_name: ContainerName,
+    forge_namespace: str,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> str:
+    base_url = "https://aptoslabs.grafana.net/a/grafana-pyroscope-app/single"
+    start_timestamp = str(int(start_time.timestamp())) if start_time else "now-1h"
+    end_timestamp = str(int(end_time.timestamp())) if end_time else "now"
+
+    query_params = {
+        "query": f'process_cpu:cpu:nanoseconds:cpu:nanoseconds{{service_name="ebpf/{forge_namespace}/{container_name.value}"}}',
+        "from": start_timestamp,
+        "until": end_timestamp,
+        "maxNodes": "16384",
+    }
+    encoded_params = urlencode(query_params)
+
+    return f"{base_url}?{encoded_params}"
+
+
 def milliseconds(timestamp: datetime) -> int:
     return int(timestamp.timestamp()) * 1000
 
@@ -578,6 +605,14 @@ def format_pre_comment(context: ForgeContext) -> str:
         context.forge_namespace,
         True,
     )
+    validator_cpu_profile_link = get_cpu_profile_link(
+        ContainerName.Validator,
+        context.forge_namespace,
+    )
+    fullnode_cpu_profile_link = get_cpu_profile_link(
+        ContainerName.FullNode,
+        context.forge_namespace,
+    )
 
     return (
         textwrap.dedent(
@@ -586,6 +621,8 @@ def format_pre_comment(context: ForgeContext) -> str:
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
             * [Axiom Logs]({axiom_logs_link})
+            * [Validator CPU Profile]({validator_cpu_profile_link})
+            * [Fullnode CPU Profile]({fullnode_cpu_profile_link})
             """
         ).lstrip()
         + format_github_info(context)
@@ -605,6 +642,18 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
     axiom_logs_link = get_axiom_link_for_node_logs(
         context.forge_namespace,
         (result.start_time, result.end_time),
+    )
+    validator_cpu_profile_link = get_cpu_profile_link(
+        ContainerName.Validator,
+        context.forge_namespace,
+        result.start_time,
+        result.end_time,
+    )
+    fullnode_cpu_profile_link = get_cpu_profile_link(
+        ContainerName.FullNode,
+        context.forge_namespace,
+        result.start_time,
+        result.end_time,
     )
 
     if result.state == ForgeState.PASS:
@@ -630,6 +679,8 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         * [Grafana dashboard]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
         * [Axiom Logs]({axiom_logs_link})
+        * [Validator CPU Profile]({validator_cpu_profile_link})
+        * [Fullnode CPU Profile]({fullnode_cpu_profile_link})
         """
         )
         + format_github_info(context)
@@ -1249,6 +1300,11 @@ async def run_multiple(
             )
 
 
+def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
+    random.seed(namespace)
+    return random.choice(cluster_names)
+
+
 @main.command()
 # output files
 @envoption("FORGE_OUTPUT")
@@ -1366,6 +1422,7 @@ def test(
         forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
 
     assert forge_namespace is not None, "Forge namespace is required"
+    assert len(forge_namespace) <= 63, "Forge namespace must be 63 characters or less"
 
     forge_namespace = sanitize_forge_resource_name(forge_namespace)
 
@@ -1418,7 +1475,7 @@ def test(
     # Perform cluster selection
     if not forge_cluster_name or balance_clusters:
         cluster_names = config.get("enabled_clusters")
-        forge_cluster_name = random.choice(cluster_names)
+        forge_cluster_name = seeded_random_choice(forge_namespace, cluster_names)
 
     assert forge_cluster_name, "Forge cluster name is required"
 
@@ -1565,9 +1622,11 @@ def test(
         forge_username=forge_username,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
-        github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}"
-        if github_run_id
-        else None,
+        github_job_url=(
+            f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}"
+            if github_run_id
+            else None
+        ),
         forge_args=forge_args,
     )
     forge_runner_mapping = {

@@ -1,0 +1,68 @@
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    use std::bcs;
+    use std::string::{Self};
+    use std::vector;
+    public entry fun init() {
+        {
+          let _: vector<string::String> = {
+            let result: vector<string::String> = Vector<string::String>();
+            {
+              let (v: vector<vector<u8>>): (vector<vector<u8>>) = Tuple([]);
+              vector::reverse<vector<u8>>(Borrow(Mutable)(v));
+              loop {
+                if Not(vector::is_empty<vector<u8>>(Borrow(Immutable)(v))) {
+                  {
+                    let e: vector<u8> = vector::pop_back<vector<u8>>(Borrow(Mutable)(v));
+                    {
+                      let (elem: vector<u8>): (vector<u8>) = Tuple(e);
+                      vector::push_back<string::String>(Borrow(Mutable)(result), {
+                        let (key: vector<u8>): (vector<u8>) = Tuple(elem);
+                        string::utf8(key)
+                      })
+                    };
+                    Tuple()
+                  }
+                } else {
+                  break
+                }
+              };
+              Tuple()
+            };
+            result
+          };
+          {
+            let _: vector<vector<u8>> = {
+              let result: vector<vector<u8>> = Vector<vector<u8>>();
+              {
+                let (v: vector<u64>): (vector<u64>) = Tuple([]);
+                vector::reverse<u64>(Borrow(Mutable)(v));
+                loop {
+                  if Not(vector::is_empty<u64>(Borrow(Immutable)(v))) {
+                    {
+                      let e: u64 = vector::pop_back<u64>(Borrow(Mutable)(v));
+                      {
+                        let (elem: u64): (u64) = Tuple(e);
+                        vector::push_back<vector<u8>>(Borrow(Mutable)(result), {
+                          let (v: u64): (u64) = Tuple(elem);
+                          bcs::to_bytes<u64>(Borrow(Immutable)(v))
+                        })
+                      };
+                      Tuple()
+                    }
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              };
+              result
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::m
+
+
+============ bytecode verification succeeded ========

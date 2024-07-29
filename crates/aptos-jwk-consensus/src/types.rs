@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::ed25519::Signature;
 use aptos_enum_conversion_derive::EnumConversion;

@@ -1,0 +1,28 @@
+name: Test Release Images
+on:
+  pull_request:
+    paths:
+      - "docker/release-images.mjs"
+      - "docker/__tests__/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "docker/release-images.mjs"
+      - "docker/__tests__/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test-copy-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v2
+      - run: pnpm install
+      - name: Test Release Images
+        run: ./docker/test.sh

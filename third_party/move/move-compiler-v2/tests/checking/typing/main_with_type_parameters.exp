@@ -1,9 +1,6 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main<T1,T2,T3>() {
-        Tuple()
-    }
-    spec fun $main<T1,T2,T3>() {
         Tuple()
     }
 } // end <SELF>_0

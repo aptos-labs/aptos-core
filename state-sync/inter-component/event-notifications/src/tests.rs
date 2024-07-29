@@ -436,7 +436,7 @@ fn count_event_notifications_and_ensure_ordering(listener: &mut EventNotificatio
             notification_count += 1;
             assert_lt!(
                 last_version_received,
-                event_notification.version.try_into().unwrap()
+                std::convert::TryInto::<i64>::try_into(event_notification.version).unwrap()
             );
             last_version_received = event_notification.version.try_into().unwrap();
         } else {

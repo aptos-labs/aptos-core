@@ -19,19 +19,20 @@ use crate::{
     ast::{
         AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
         FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier,
-        Spec, SpecBlockInfo, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
     intrinsics::IntrinsicsAnnotation,
+    metadata::LanguageVersion,
     pragmas::{
         DELEGATE_INVARIANTS_TO_CALLER_PRAGMA, DISABLE_INVARIANTS_IN_BODY_PRAGMA, FRIEND_PRAGMA,
         INTRINSIC_PRAGMA, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        gen_get_ty_param_kinds, infer_abilities, NoUnificationContext, PrimitiveType,
-        ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, PrimitiveType, ReferenceKind, Type,
+        TypeDisplayContext, TypeUnificationAdapter, Variance,
     },
     well_known,
 };
@@ -44,6 +45,8 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{info, warn};
 pub use move_binary_format::file_format::{AbilitySet, Visibility};
+#[allow(deprecated)]
+use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
@@ -52,7 +55,6 @@ use move_binary_format::{
         FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
         StructDefinitionIndex,
     },
-    normalized::Type as MType,
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
 };
@@ -330,6 +332,16 @@ impl FieldId {
     pub fn symbol(self) -> Symbol {
         self.0
     }
+
+    /// Makes a variant field name unique to a given struct.
+    /// TODO: Consider making FieldId containing two symbols, but this can be a breaking change
+    ///   to public APIs.
+    pub fn make_variant_field_id_str(
+        variant_name: impl AsRef<str>,
+        field_name: impl AsRef<str>,
+    ) -> String {
+        format!("{}.{}", variant_name.as_ref(), field_name.as_ref())
+    }
 }
 
 impl SpecFunId {
@@ -504,6 +516,8 @@ impl VerificationScope {
 /// Global environment for a set of modules.
 #[derive(Debug)]
 pub struct GlobalEnv {
+    /// The language version for which this model is build.
+    pub(crate) language_version: LanguageVersion,
     /// A Files database for the codespan crate which supports diagnostics.
     pub(crate) source_files: Files<String>,
     /// A map of FileId in the Files database to information about documentation comments in a file.
@@ -514,15 +528,15 @@ pub struct GlobalEnv {
     pub(crate) file_hash_map: BTreeMap<FileHash, (String, FileId)>,
     /// Reverse of the above mapping, mapping FileId to hash.
     pub(crate) reverse_file_hash_map: BTreeMap<FileId, FileHash>,
-    /// A mapping from file id to associated alias map.
-    pub(crate) file_alias_map: BTreeMap<FileId, Rc<BTreeMap<Symbol, NumericalAddress>>>,
     /// Bijective mapping between FileId and a plain int. FileId's are themselves wrappers around
     /// ints, but the inner representation is opaque and cannot be accessed. This is used so we
     /// can emit FileId's to generated code and read them back.
     pub(crate) file_id_to_idx: BTreeMap<FileId, u16>,
     pub(crate) file_idx_to_id: BTreeMap<u16, FileId>,
-    /// A set indicating whether a file id is a target or a dependency.
-    pub(crate) file_id_is_dep: BTreeSet<FileId>,
+    /// A set indicating whether a file id is a compilation target.
+    pub(crate) file_id_is_target: BTreeSet<FileId>,
+    /// A set indicating whether a file id is a test/docgen/warning/prover target.
+    pub(crate) file_id_is_primary_target: BTreeSet<FileId>,
     /// A special constant location representing an unknown location.
     /// This uses a pseudo entry in `source_files` to be safely represented.
     pub(crate) unknown_loc: Loc,
@@ -563,6 +577,12 @@ pub struct GlobalEnv {
     pub(crate) extlib_address: Option<Address>,
     /// Address alias map
     pub(crate) address_alias_map: BTreeMap<Symbol, AccountAddress>,
+    /// A flag which allows to indicate that the whole program including
+    /// dependencies should be built.
+    pub(crate) everything_is_target: RefCell<bool>,
+    /// Whether the v2 compiler has generated this model.
+    /// TODO: replace with a proper version number once we have this in file format
+    pub(crate) generated_by_v2: bool,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -596,6 +616,7 @@ impl GlobalEnv {
         let unknown_move_ir_loc = MoveIrLoc::new(FileHash::new("<unknown>"), 0, 0);
         let internal_loc = fake_loc("<internal>");
         GlobalEnv {
+            language_version: LanguageVersion::default(),
             source_files,
             doc_comments: Default::default(),
             unknown_loc,
@@ -603,10 +624,10 @@ impl GlobalEnv {
             internal_loc,
             file_hash_map,
             reverse_file_hash_map,
-            file_alias_map: BTreeMap::new(),
             file_id_to_idx,
             file_idx_to_id,
-            file_id_is_dep: BTreeSet::new(),
+            file_id_is_target: BTreeSet::new(),
+            file_id_is_primary_target: BTreeSet::new(),
             diags: RefCell::new(vec![]),
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
@@ -621,7 +642,29 @@ impl GlobalEnv {
             stdlib_address: None,
             extlib_address: None,
             address_alias_map: Default::default(),
+            everything_is_target: Default::default(),
+            generated_by_v2: false,
         }
+    }
+
+    /// Sets whether this is generated by the v2 compiler.
+    pub fn set_compiler_v2(&mut self, yes: bool) {
+        self.generated_by_v2 = yes
+    }
+
+    /// Returns true if this is generated by v2.
+    pub fn generated_by_v2(&self) -> bool {
+        self.generated_by_v2
+    }
+
+    /// Sets the language version.
+    pub fn set_language_version(&mut self, version: LanguageVersion) {
+        self.language_version = version
+    }
+
+    /// Returns the language version
+    pub fn language_version(&self) -> LanguageVersion {
+        self.language_version
     }
 
     /// Creates a display container for the given value. There must be an implementation
@@ -633,6 +676,17 @@ impl GlobalEnv {
     /// Sets the global address alias map
     pub fn set_address_alias_map(&mut self, map: BTreeMap<Symbol, AccountAddress>) {
         self.address_alias_map = map
+    }
+
+    /// Indicates that all modules in the environment should be treated as
+    /// target modules, i.e. `module.is_target()` returns true. This can be
+    /// used to temporarily override the default which distinguishes
+    /// between dependencies and target modules, and is used for tools like
+    /// the prover which need to compile all code, while still maintaining
+    /// the difference between targets and dependencies for verification.
+    /// Those tools can temporarily set this to true.
+    pub fn treat_everything_as_target(&self, on: bool) {
+        *self.everything_is_target.borrow_mut() = on
     }
 
     /// Attempts to resolve address alias.
@@ -731,9 +785,10 @@ impl GlobalEnv {
         address_aliases: Rc<BTreeMap<Symbol, NumericalAddress>>,
         file_name: &str,
         source: &str,
-        is_dep: bool,
+        is_target: bool,
+        is_primary_target: bool,
     ) -> FileId {
-        let file_id = self.source_files.add(file_name, source.to_string());
+        // Check for address alias conflicts.
         self.stdlib_address =
             self.resolve_std_address_alias(self.stdlib_address.clone(), "std", &address_aliases);
         self.extlib_address = self.resolve_std_address_alias(
@@ -741,17 +796,33 @@ impl GlobalEnv {
             "Extensions",
             &address_aliases,
         );
-        self.file_alias_map.insert(file_id, address_aliases);
-        self.file_hash_map
-            .insert(file_hash, (file_name.to_string(), file_id));
-        self.reverse_file_hash_map.insert(file_id, file_hash);
-        let file_idx = self.file_id_to_idx.len() as u16;
-        self.file_id_to_idx.insert(file_id, file_idx);
-        self.file_idx_to_id.insert(file_idx, file_id);
-        if is_dep {
-            self.file_id_is_dep.insert(file_id);
+        if let Some((_filename, file_id)) = self.file_hash_map.get(&file_hash) {
+            // This is a duplicate source, make sure it is marked as a target
+            // and/or a primary_target if any instance marks it as such.
+            if is_target && !self.file_id_is_target.contains(file_id) {
+                self.file_id_is_target.insert(*file_id);
+            }
+            if is_primary_target && !self.file_id_is_primary_target.contains(file_id) {
+                self.file_id_is_primary_target.insert(*file_id);
+            }
+            *file_id
+        } else {
+            // Record new source file and properties
+            let file_id = self.source_files.add(file_name, source.to_string());
+            self.file_hash_map
+                .insert(file_hash, (file_name.to_string(), file_id));
+            self.reverse_file_hash_map.insert(file_id, file_hash);
+            let file_idx = self.file_id_to_idx.len() as u16;
+            self.file_id_to_idx.insert(file_id, file_idx);
+            self.file_idx_to_id.insert(file_idx, file_id);
+            if is_target {
+                self.file_id_is_target.insert(file_id);
+            }
+            if is_primary_target {
+                self.file_id_is_primary_target.insert(file_id);
+            }
+            file_id
         }
-        file_id
     }
 
     fn resolve_std_address_alias(
@@ -792,10 +863,14 @@ impl GlobalEnv {
         target_modules
     }
 
-    fn add_backtrace(msg: &str, is_bug: bool) -> String {
-        static DEBUG_COMPILER: Lazy<bool> =
-            Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
-        if is_bug || *DEBUG_COMPILER {
+    fn add_backtrace(msg: &str, _is_bug: bool) -> String {
+        // Note that you need both MOVE_COMPILER_BACKTRACE=1 and RUST_BACKTRACE=1 for this to
+        // actually generate a backtrace.
+        static DUMP_BACKTRACE: Lazy<bool> = Lazy::new(|| {
+            read_bool_env_var(cli::MOVE_COMPILER_BACKTRACE_ENV_VAR)
+                | read_bool_env_var(cli::MVC_BACKTRACE_ENV_VAR)
+        });
+        if *DUMP_BACKTRACE {
             let bt = Backtrace::capture();
             if BacktraceStatus::Captured == bt.status() {
                 format!("{}\nBacktrace: {:#?}", msg, bt)
@@ -847,25 +922,12 @@ impl GlobalEnv {
 
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
-        let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
-        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
-        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
-        let diag = Diagnostic::new(severity)
-            .with_message(new_msg)
-            .with_labels(labels);
-        self.add_diag(diag);
+        self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], vec![])
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
     pub fn diag_with_notes(&self, severity: Severity, loc: &Loc, msg: &str, notes: Vec<String>) {
-        let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
-        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
-        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
-        let diag = Diagnostic::new(severity)
-            .with_message(new_msg)
-            .with_labels(labels);
-        let diag = diag.with_notes(notes);
-        self.add_diag(diag);
+        self.diag_with_primary_notes_and_labels(severity, loc, msg, "", notes, vec![])
     }
 
     /// Adds a diagnostic of given severity to this environment, with labels.
@@ -876,7 +938,7 @@ impl GlobalEnv {
         msg: &str,
         labels: Vec<(Loc, String)>,
     ) {
-        self.diag_with_primary_and_labels(severity, loc, msg, "", labels);
+        self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], labels)
     }
 
     /// Adds a diagnostic of given severity to this environment, with primary and primary labels.
@@ -888,14 +950,27 @@ impl GlobalEnv {
         primary: &str,
         labels: Vec<(Loc, String)>,
     ) {
+        self.diag_with_primary_notes_and_labels(severity, loc, msg, primary, vec![], labels)
+    }
+
+    /// Adds a diagnostic of given severity to this environment, with notes and labels.
+    pub fn diag_with_primary_notes_and_labels(
+        &self,
+        severity: Severity,
+        loc: &Loc,
+        msg: &str,
+        primary: &str,
+        notes: Vec<String>,
+        labels: Vec<(Loc, String)>,
+    ) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
 
-        // primary
-        let diag = Diagnostic::new(severity).with_message(new_msg);
-        // if primary loc is inlined, add qualifiers
-        let mut primary_labels = vec![Label::primary(loc.file_id, loc.span).with_message(primary)];
+        let mut primary_label = Label::primary(loc.file_id, loc.span);
+        if !primary.is_empty() {
+            primary_label = primary_label.with_message(primary)
+        }
+        let mut primary_labels = vec![primary_label];
         GlobalEnv::add_inlined_from_labels(&mut primary_labels, &loc.inlined_from_loc);
-        let diag = diag.with_labels(primary_labels);
 
         // add "inlined from" qualifiers to secondary labels as needed
         let labels = labels
@@ -907,8 +982,14 @@ impl GlobalEnv {
                 expanded_labels
             })
             .concat();
-        let diag = diag.with_labels(labels);
-        self.add_diag(diag);
+
+        self.add_diag(
+            Diagnostic::new(severity)
+                .with_message(new_msg)
+                .with_labels(primary_labels)
+                .with_labels(labels)
+                .with_notes(notes),
+        )
     }
 
     /// Checks whether any of the diagnostics contains string.
@@ -1179,12 +1260,14 @@ impl GlobalEnv {
                 reported_ordering
             }
         });
-        for (diag, reported) in self
-            .diags
-            .borrow_mut()
-            .iter_mut()
-            .filter(|(d, reported)| !reported && filter(d))
-        {
+        for (diag, reported) in self.diags.borrow_mut().iter_mut().filter(|(d, reported)| {
+            !reported
+                && filter(d)
+                && (d.severity >= Severity::Error
+                    || d.labels
+                        .iter()
+                        .any(|label| self.file_id_is_primary_target.contains(&label.file_id)))
+        }) {
             if !*reported {
                 // Avoid showing the same message twice. This can happen e.g. because of
                 // duplication of expressions via schema inclusion.
@@ -1226,7 +1309,7 @@ impl GlobalEnv {
             }
             assert_eq!(key.inst.len(), memory.inst.len());
             let adapter = TypeUnificationAdapter::new_vec(&memory.inst, &key.inst, true, true);
-            let rel = adapter.unify(&NoUnificationContext, Variance::SpecVariance, true);
+            let rel = adapter.unify(&mut NoUnificationContext, Variance::SpecVariance, true);
             if rel.is_some() {
                 inv_ids.extend(val.clone());
             }
@@ -1255,6 +1338,11 @@ impl GlobalEnv {
         self.used_spec_funs.contains(&id)
     }
 
+    /// Marks a spec fun to be used
+    pub fn add_used_spec_fun(&mut self, id: QualifiedId<SpecFunId>) {
+        self.used_spec_funs.insert(id);
+    }
+
     /// Determines whether the given spec fun is recursive.
     pub fn is_spec_fun_recursive(&self, id: QualifiedId<SpecFunId>) -> bool {
         fn is_caller(
@@ -1268,11 +1356,10 @@ impl GlobalEnv {
             }
             let module = env.get_module(caller.module_id);
             let decl = module.get_spec_fun(caller.id);
-            decl.callees.contains(&fun)
-                || decl
-                    .callees
-                    .iter()
-                    .any(|trans_caller| is_caller(env, visited, *trans_caller, fun))
+            decl.callees.iter().any(|c| c.to_qualified_id() == fun)
+                || decl.callees.iter().any(|trans_caller| {
+                    is_caller(env, visited, trans_caller.to_qualified_id(), fun)
+                })
         }
         let module = self.get_module(id.module_id);
         let is_recursive = *module.get_spec_fun(id.id).is_recursive.borrow();
@@ -1301,11 +1388,7 @@ impl GlobalEnv {
 
     /// Computes the abilities associated with the given type.
     pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
-        infer_abilities(
-            ty,
-            gen_get_ty_param_kinds(ty_params),
-            self.gen_get_struct_sig(),
-        )
+        AbilityInferer::new(self, ty_params).infer_abilities(ty).1
     }
 
     /// Returns associated intrinsics.
@@ -1366,7 +1449,7 @@ impl GlobalEnv {
             function_idx_to_id: Default::default(),
             spec_vars,
             spec_funs,
-            module_spec,
+            module_spec: RefCell::new(module_spec),
             loc,
             attributes,
             use_decls,
@@ -1415,7 +1498,7 @@ impl GlobalEnv {
             let handle = module.function_handle_at(handle_idx);
             let view = FunctionHandleView::new(&module, handle);
             let name_str = view.name().as_str();
-            let fun_id = if name_str == SCRIPT_BYTECODE_FUN_NAME {
+            let fun_id = if name_str.starts_with(SCRIPT_BYTECODE_FUN_NAME) {
                 // This is a pseudo script module, which has exactly one function. Determine
                 // the name of this function.
                 let mod_data = &self.module_data[module_id.0 as usize];
@@ -1452,7 +1535,6 @@ impl GlobalEnv {
                 panic!("attaching mismatching bytecode module")
             }
         }
-
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
         let mod_data = &mut self.module_data[module_id.0 as usize];
@@ -1492,6 +1574,7 @@ impl GlobalEnv {
         called_funs
     }
 
+    #[allow(unused)]
     fn get_used_modules_from_bytecode(
         &self,
         compiled_module: &CompiledModule,
@@ -1505,6 +1588,7 @@ impl GlobalEnv {
             .collect()
     }
 
+    #[allow(unused)]
     fn get_friend_modules_from_bytecode(
         &self,
         compiled_module: &CompiledModule,
@@ -1543,6 +1627,8 @@ impl GlobalEnv {
             name: field_name,
             loc: loc.clone(),
             offset: 0,
+            variant: None,
+            common_for_variants: false,
             ty,
         });
         StructData {
@@ -1554,7 +1640,8 @@ impl GlobalEnv {
             abilities: AbilitySet::ALL,
             spec_var_opt: Some(var_id),
             field_data,
-            spec: Spec::default(),
+            variants: None,
+            spec: RefCell::new(Spec::default()),
         }
     }
 
@@ -1675,30 +1762,139 @@ impl GlobalEnv {
         data.def = Some(def);
     }
 
-    /// Return the `StructEnv` for `str`
-    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
-        self.get_module(str.module_id).into_struct(str.id)
+    /// Adds a new function definition.
+    pub fn add_function_def(
+        &mut self,
+        module_id: ModuleId,
+        name: Symbol,
+        loc: Loc,
+        visibility: Visibility,
+        type_params: Vec<TypeParameter>,
+        params: Vec<Parameter>,
+        result_type: Type,
+        def: Exp,
+    ) {
+        let called_funs = def.called_funs();
+        let data = FunctionData {
+            name,
+            loc: loc.clone(),
+            id_loc: loc,
+            def_idx: None,
+            handle_idx: None,
+            visibility,
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params,
+            params,
+            result_type,
+            access_specifiers: None,
+            spec: RefCell::new(Default::default()),
+            def: Some(def),
+            called_funs: Some(called_funs),
+            calling_funs: RefCell::new(None),
+            transitive_closure_of_called_funs: RefCell::new(None),
+        };
+        assert!(self
+            .module_data
+            .get_mut(module_id.to_usize())
+            .expect("module defined")
+            .function_data
+            .insert(FunId::new(name), data)
+            .is_none())
     }
 
-    /// Generates a function that given module id, struct id,
-    /// returns the struct signature
-    pub fn gen_get_struct_sig(
-        &self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
-        |mid, sid| {
-            let qid = QualifiedId {
-                module_id: mid,
-                id: sid,
-            };
-            let struct_env = self.get_struct(qid);
-            let struct_abilities = struct_env.get_abilities();
-            let ty_param_kinds = struct_env
-                .get_type_parameters()
-                .iter()
-                .map(|tp| tp.1.clone())
-                .collect_vec();
-            (ty_param_kinds, struct_abilities)
+    /// Returns a reference to the declaration of a spec fun.
+    pub fn get_spec_fun(&self, fun: QualifiedId<SpecFunId>) -> &SpecFunDecl {
+        self.module_data
+            .get(fun.module_id.to_usize())
+            .unwrap()
+            .spec_funs
+            .get(&fun.id)
+            .unwrap()
+    }
+
+    /// Returns a mutable reference to the declaration of a spec fun.
+    pub fn get_spec_fun_mut(&mut self, fun: QualifiedId<SpecFunId>) -> &mut SpecFunDecl {
+        self.module_data
+            .get_mut(fun.module_id.to_usize())
+            .unwrap()
+            .spec_funs
+            .get_mut(&fun.id)
+            .unwrap()
+    }
+
+    /// Adds a new specification function and returns id of it.
+    pub fn add_spec_function_def(
+        &mut self,
+        module_id: ModuleId,
+        decl: SpecFunDecl,
+    ) -> QualifiedId<SpecFunId> {
+        let spec_funs = &mut self
+            .module_data
+            .get_mut(module_id.to_usize())
+            .unwrap()
+            .spec_funs;
+        let id = SpecFunId::new(spec_funs.len());
+        assert!(spec_funs.insert(id, decl).is_none());
+        module_id.qualified(id)
+    }
+
+    /// Gets the spec block associated with the spec block target. Only
+    /// module, struct, and function specs are supported.
+    pub fn get_spec_block(&self, target: &SpecBlockTarget) -> Ref<Spec> {
+        use SpecBlockTarget::*;
+        match target {
+            Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow(),
+            Struct(mid, sid) => self.module_data[mid.to_usize()]
+                .struct_data
+                .get(sid)
+                .unwrap()
+                .spec
+                .borrow(),
+            Function(mid, fid) => self.module_data[mid.to_usize()]
+                .function_data
+                .get(fid)
+                .unwrap()
+                .spec
+                .borrow(),
+            FunctionCode(..) | Schema(_, _, _) | Inline => {
+                // Schemas are expanded, inline spec blocks are part of the AST,
+                // and function code is nested inside of a function spec block
+                panic!("spec not available for schema or inline blocks")
+            },
         }
+    }
+
+    /// Gets the spec block associated with the spec block target. Only
+    /// module, struct, and function specs are supported.
+    pub fn get_spec_block_mut(&self, target: &SpecBlockTarget) -> RefMut<Spec> {
+        use SpecBlockTarget::*;
+        match target {
+            Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow_mut(),
+            Struct(mid, sid) => self.module_data[mid.to_usize()]
+                .struct_data
+                .get(sid)
+                .unwrap()
+                .spec
+                .borrow_mut(),
+            Function(mid, fid) => self.module_data[mid.to_usize()]
+                .function_data
+                .get(fid)
+                .unwrap()
+                .spec
+                .borrow_mut(),
+            FunctionCode(..) | Schema(_, _, _) | Inline => {
+                // Schemas are expanded, inline spec blocks are part of the AST,
+                // and function code is nested inside of a function spec block
+                panic!("spec not available for schema or inline blocks")
+            },
+        }
+    }
+
+    /// Return the `StructEnv` for `str`
+    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv {
+        self.get_module(str.module_id).into_struct(str.id)
     }
 
     // Gets the number of modules in this environment.
@@ -1802,6 +1998,7 @@ impl GlobalEnv {
     }
 
     /// Attempt to compute a struct type for (`mid`, `sid`, `ts`).
+    #[allow(deprecated)]
     pub fn get_struct_type(&self, mid: ModuleId, sid: StructId, ts: &[Type]) -> Option<MType> {
         let menv = self.get_module(mid);
         Some(MType::Struct {
@@ -1867,6 +2064,16 @@ impl GlobalEnv {
     pub fn new_node(&self, loc: Loc, ty: Type) -> NodeId {
         let id = self.new_node_id();
         self.exp_info.borrow_mut().insert(id, ExpInfo::new(loc, ty));
+        id
+    }
+
+    /// Allocates a new node id with same info as original.
+    pub fn clone_node(&self, node_id: NodeId) -> NodeId {
+        let id = self.new_node_id();
+        let opt_info = self.exp_info.borrow().get(&node_id).cloned();
+        if let Some(info) = opt_info {
+            self.exp_info.borrow_mut().insert(id, info.clone());
+        }
         id
     }
 
@@ -1951,7 +2158,7 @@ impl GlobalEnv {
             .unwrap_or_else(|_| {
                 panic!("Expect one and only one module for {:?}", mid);
             });
-        module_data.module_spec = spec;
+        *module_data.module_spec.borrow_mut() = spec;
     }
 
     /// Override the specification for a given function
@@ -2031,16 +2238,16 @@ impl GlobalEnv {
             let module_id = module_data.id;
             module_data
                 .function_data
-                .retain(|fun_id, _| !predicate(&module_id.qualified(*fun_id)));
+                .retain(|fun_id, _| predicate(&module_id.qualified(*fun_id)));
             module_data
                 .function_idx_to_id
-                .retain(|_, fun_id| !predicate(&module_id.qualified(*fun_id)));
+                .retain(|_, fun_id| predicate(&module_id.qualified(*fun_id)));
             module_data.function_data.values_mut().for_each(|fun_data| {
                 if let Some(called_funs) = fun_data.called_funs.as_mut() {
-                    called_funs.retain(|qfun_id| !predicate(qfun_id))
+                    called_funs.retain(|qfun_id| predicate(qfun_id))
                 }
                 if let Some(calling_funs) = &mut *fun_data.calling_funs.borrow_mut() {
-                    calling_funs.retain(|qfun_id| !predicate(qfun_id))
+                    calling_funs.retain(|qfun_id| predicate(qfun_id))
                 }
             });
         }
@@ -2055,11 +2262,19 @@ impl Default for GlobalEnv {
 
 impl GlobalEnv {
     pub fn dump_env(&self) -> String {
+        self.internal_dump_env(false)
+    }
+
+    pub fn dump_env_all(&self) -> String {
+        self.internal_dump_env(true)
+    }
+
+    pub fn internal_dump_env(&self, all: bool) -> String {
         let spool = self.symbol_pool();
         let tctx = &self.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         for module in self.get_modules() {
-            if !module.is_target() {
+            if !all && !module.is_target() {
                 continue;
             }
             emitln!(writer, "module {} {{", module.get_full_name_str());
@@ -2105,22 +2320,41 @@ impl GlobalEnv {
                     },
                 )
             }
+            let module_spec = module.get_spec();
+            if !module_spec.is_empty() {
+                emitln!(writer, "{}", self.display(&*module_spec));
+            }
             for str in module.get_structs() {
-                emitln!(writer, "struct {} {{", str.get_name().display(spool));
-                writer.indent();
-                for fld in str.get_fields() {
-                    emitln!(
-                        writer,
-                        "{}: {},",
-                        fld.get_name().display(spool),
-                        fld.get_type().display(tctx)
-                    );
+                if str.has_variants() {
+                    emitln!(writer, "enum {} {{", str.get_name().display(spool));
+                    writer.indent();
+                    for variant in str.get_variants() {
+                        emit!(writer, "{}", variant.display(spool));
+                        let fields = str.get_fields_of_variant(variant).collect_vec();
+                        if !fields.is_empty() {
+                            emitln!(writer, " {");
+                            writer.indent();
+                            for fld in fields {
+                                emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                            }
+                            writer.unindent();
+                            emitln!(writer, "}")
+                        } else {
+                            emitln!(writer, ",")
+                        }
+                    }
+                } else {
+                    emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                    writer.indent();
+                    for fld in str.get_fields() {
+                        emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                    }
                 }
                 writer.unindent();
                 emitln!(writer, "}");
                 let spec = str.get_spec();
-                if !spec.conditions.is_empty() {
-                    emitln!(writer, "{}", self.display(spec))
+                if !spec.is_empty() {
+                    emitln!(writer, "{}", self.display(&*spec))
                 }
             }
             for fun in module.get_functions() {
@@ -2143,10 +2377,21 @@ impl GlobalEnv {
                     emitln!(writer, ";");
                 }
             }
+            if module.get_verified_module().is_some() {
+                emitln!(writer, "// bytecode attached");
+            }
             writer.unindent();
             emitln!(writer, "}} // end {}", module.get_full_name_str())
         }
         writer.extract_result()
+    }
+
+    fn dump_field(&self, tctx: &TypeDisplayContext, fld: &FieldEnv) -> String {
+        format!(
+            "{}: {}",
+            fld.get_name().display(tctx.env.symbol_pool()),
+            fld.get_type().display(tctx)
+        )
     }
 
     pub fn dump_fun(&self, fun: &FunctionEnv) -> String {
@@ -2217,7 +2462,7 @@ impl GlobalEnv {
             emitln!(writer, ";");
         }
         let spec = fun.get_spec();
-        if !spec.conditions.is_empty() {
+        if !spec.is_empty() {
             emitln!(writer, "{}", self.display(&*spec))
         }
     }
@@ -2305,7 +2550,7 @@ pub struct ModuleData {
     pub(crate) spec_funs: BTreeMap<SpecFunId, SpecFunDecl>,
 
     /// Module level specification.
-    pub(crate) module_spec: Spec,
+    pub(crate) module_spec: RefCell<Spec>,
 
     /// The location of this module.
     pub(crate) loc: Loc,
@@ -2418,7 +2663,13 @@ impl<'env> ModuleEnv<'env> {
     /// a dependency only but not explicitly requested to process.
     pub fn is_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
-        !self.env.file_id_is_dep.contains(&file_id)
+        *self.env.everything_is_target.borrow() || self.env.file_id_is_target.contains(&file_id)
+    }
+
+    /// Returns true of this module is a primary (test/docgen/warning/prover) target.
+    pub fn is_primary_target(&self) -> bool {
+        let file_id = self.data.loc.file_id;
+        self.env.file_id_is_primary_target.contains(&file_id)
     }
 
     /// Returns the path to source file of this module.
@@ -2467,9 +2718,9 @@ impl<'env> ModuleEnv<'env> {
                     add_usage_of_exp(usage, &cond.exp);
                 }
             };
-            add_usage_of_spec(&mut usage, self.get_spec());
+            add_usage_of_spec(&mut usage, &self.get_spec());
             for struct_env in self.get_structs() {
-                add_usage_of_spec(&mut usage, struct_env.get_spec())
+                add_usage_of_spec(&mut usage, &struct_env.get_spec())
             }
             for func_env in self.get_functions() {
                 add_usage_of_spec(&mut usage, &func_env.get_spec())
@@ -2874,8 +3125,8 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Gets module specification.
-    pub fn get_spec(&self) -> &Spec {
-        &self.data.module_spec
+    pub fn get_spec(&self) -> Ref<Spec> {
+        self.data.module_spec.borrow()
     }
 
     /// Returns whether a spec fun is ever called or not.
@@ -2898,18 +3149,14 @@ impl<'env> ModuleEnv<'env> {
 
     /// Disassemble the module bytecode, if it is available.
     pub fn disassemble(&self) -> Option<String> {
-        let disas = Disassembler::new(
-            SourceMapping::new(
-                self.data.source_map.clone()?,
-                BinaryIndexedView::Module(self.get_verified_module()?),
-            ),
-            DisassemblerOptions {
-                only_externally_visible: false,
-                print_code: true,
-                print_basic_blocks: true,
-                print_locals: true,
-            },
-        );
+        let view = BinaryIndexedView::Module(self.get_verified_module()?);
+        let smap = self.data.source_map.as_ref().expect("source map").clone();
+        let disas = Disassembler::new(SourceMapping::new(smap, view), DisassemblerOptions {
+            only_externally_visible: false,
+            print_code: true,
+            print_basic_blocks: true,
+            print_locals: true,
+        });
         Some(
             disas
                 .disassemble()
@@ -3004,8 +3251,19 @@ pub struct StructData {
     /// Field definitions.
     pub(crate) field_data: BTreeMap<FieldId, FieldData>,
 
+    /// If this structure has variants (i.e. is an `enum`), information about the
+    /// names of the variants and the location of their declaration. The fields
+    /// of variants can be identified via the variant name in `FieldData`.
+    pub(crate) variants: Option<BTreeMap<Symbol, StructVariant>>,
+
     /// Associated specification.
-    pub(crate) spec: Spec,
+    pub(crate) spec: RefCell<Spec>,
+}
+
+#[derive(Debug)]
+pub(crate) struct StructVariant {
+    pub(crate) loc: Loc,
+    pub(crate) attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, Clone)]
@@ -3025,11 +3283,22 @@ impl<'env> StructEnv<'env> {
 
     /// Gets full name as string.
     pub fn get_full_name_str(&self) -> String {
-        format!(
-            "{}::{}",
-            self.module_env.get_name().display(self.module_env.env),
-            self.get_name().display(self.symbol_pool())
-        )
+        let module_name = self.module_env.get_name().display(self.module_env.env);
+        if self.is_ghost_memory() {
+            let spec_var = self.get_ghost_memory_spec_var().expect("spec var");
+            let spec_var_name = self.module_env.get_spec_var(spec_var.id);
+            format!(
+                "{}::{}",
+                module_name,
+                spec_var_name.name.display(self.symbol_pool())
+            )
+        } else {
+            format!(
+                "{}::{}",
+                module_name,
+                self.get_name().display(self.symbol_pool())
+            )
+        }
     }
 
     /// Gets full name with module address as string.
@@ -3088,8 +3357,8 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Returns properties from pragmas.
-    pub fn get_properties(&self) -> &PropertyBag {
-        &self.data.spec.properties
+    pub fn get_properties(&self) -> PropertyBag {
+        self.data.spec.borrow().properties.clone()
     }
 
     /// Gets the id associated with this struct.
@@ -3144,11 +3413,62 @@ impl<'env> StructEnv<'env> {
         self.get_abilities().has_key()
     }
 
-    /// Get an iterator for the fields, ordered by offset.
+    /// Returns true if the struct has variants.
+    pub fn has_variants(&self) -> bool {
+        self.data.variants.is_some()
+    }
+
+    /// Returns an iteration of the variant names in the struct.
+    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env {
+        self.data
+            .variants
+            .as_ref()
+            .expect("struct has variants")
+            .keys()
+            .cloned()
+    }
+
+    /// Returns the location of the variant.
+    pub fn get_variant_loc(&self, variant: Symbol) -> &Loc {
+        self.data
+            .variants
+            .as_ref()
+            .and_then(|vars| vars.get(&variant).map(|v| &v.loc))
+            .expect("variant defined")
+    }
+
+    /// Returns the attributes of the variant.
+    pub fn get_variant_attributes(&self, variant: Symbol) -> &[Attribute] {
+        self.data
+            .variants
+            .as_ref()
+            .and_then(|vars| vars.get(&variant).map(|v| v.attributes.as_slice()))
+            .expect("variant defined")
+    }
+
+    /// Get an iterator for the fields, ordered by offset. Notice if the struct has
+    /// variants, all fields of all variants are returned.
     pub fn get_fields(&'env self) -> impl Iterator<Item = FieldEnv<'env>> {
+        self.get_fields_optional_variant(None)
+    }
+
+    /// Get fields of a particular variant.
+    pub fn get_fields_of_variant(
+        &'env self,
+        variant: Symbol,
+    ) -> impl Iterator<Item = FieldEnv<'env>> {
+        self.get_fields_optional_variant(Some(variant))
+    }
+
+    /// Get fields of a particular variant.
+    pub fn get_fields_optional_variant(
+        &'env self,
+        variant: Option<Symbol>,
+    ) -> impl Iterator<Item = FieldEnv<'env>> {
         self.data
             .field_data
             .values()
+            .filter(|data| data.common_for_variants || variant.is_none() || data.variant == variant)
             .sorted_by_key(|data| data.offset)
             .map(move |data| FieldEnv {
                 struct_env: self.clone(),
@@ -3156,7 +3476,8 @@ impl<'env> StructEnv<'env> {
             })
     }
 
-    /// Return the number of fields in the struct.
+    /// Return the number of fields in the struct. Notice of the struct has variants, this
+    /// includes the sum of all fields in all variants.
     pub fn get_field_count(&self) -> usize {
         self.data.field_data.len()
     }
@@ -3208,12 +3529,12 @@ impl<'env> StructEnv<'env> {
 
     /// Returns true if this struct has specification conditions.
     pub fn has_conditions(&self) -> bool {
-        !self.data.spec.conditions.is_empty()
+        !self.data.spec.borrow().conditions.is_empty()
     }
 
     /// Returns the data invariants associated with this struct.
-    pub fn get_spec(&'env self) -> &'env Spec {
-        &self.data.spec
+    pub fn get_spec(&self) -> Ref<Spec> {
+        self.data.spec.borrow()
     }
 
     /// Returns the value of a boolean pragma for this struct. This first looks up a
@@ -3229,12 +3550,22 @@ impl<'env> StructEnv<'env> {
         }
         default()
     }
+
+    /// Produce a TypeDisplayContext to print types within the scope of this env
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
+        let type_param_names = self
+            .get_type_parameters()
+            .iter()
+            .map(|param| param.0)
+            .collect();
+        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+    }
 }
 
 // =================================================================================================
 /// # Field Environment
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FieldData {
     /// The name of this field.
     pub name: Symbol,
@@ -3244,6 +3575,12 @@ pub struct FieldData {
 
     /// The offset of this field.
     pub offset: usize,
+
+    /// If the field is associated with a variant, the name of that variant.
+    pub variant: Option<Symbol>,
+
+    /// Whether the field is common between all variants
+    pub common_for_variants: bool,
 
     /// The type of this field.
     pub ty: Type,
@@ -3647,7 +3984,8 @@ impl<'env> FunctionEnv<'env> {
         let source_map = self.module_env.data.source_map.as_ref()?;
         if let Ok(fmap) = source_map.get_function_source_map(self.data.def_idx?) {
             if let Some(loc) = fmap.get_code_location(offset) {
-                return Some(self.module_env.env.to_loc(&loc));
+                let loc = self.module_env.env.to_loc(&loc);
+                return Some(loc);
             }
         }
         Some(self.get_loc())
@@ -3665,8 +4003,8 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns the value of a boolean pragma for this function. This first looks up a
-    /// pragma in this function, then the enclosing module, and finally uses the provided default.
-    /// value
+    /// pragma in this function, then the enclosing module, and finally uses the provided default
+    /// value.
     pub fn is_pragma_true(&self, name: &str, default: impl FnOnce() -> bool) -> bool {
         let env = self.module_env.env;
         if let Some(b) = env.is_property_true(&self.get_spec().properties, name) {
@@ -3800,6 +4138,11 @@ impl<'env> FunctionEnv<'env> {
         self.data.kind == FunctionKind::Inline
     }
 
+    /// Returns kind of this function.
+    pub fn get_kind(&self) -> FunctionKind {
+        self.data.kind
+    }
+
     /// Return the visibility string for this function. Useful for formatted printing.
     pub fn visibility_str(&self) -> &str {
         match self.visibility() {
@@ -3889,6 +4232,10 @@ impl<'env> FunctionEnv<'env> {
         self.data.type_params.clone()
     }
 
+    pub fn get_type_parameters_ref(&self) -> &[TypeParameter] {
+        &self.data.type_params
+    }
+
     pub fn get_parameter_count(&self) -> usize {
         self.data.params.len()
     }
@@ -3923,6 +4270,11 @@ impl<'env> FunctionEnv<'env> {
         self.data.params.clone()
     }
 
+    /// Returns the regular parameters associated with this function.
+    pub fn get_parameters_ref(&self) -> &[Parameter] {
+        &self.data.params
+    }
+
     /// Returns the result type of this function, which is a tuple for multiple results.
     pub fn get_result_type(&self) -> Type {
         self.data.result_type.clone()
@@ -3955,11 +4307,11 @@ impl<'env> FunctionEnv<'env> {
     /// Get the name to be used for a local by index, if available.
     /// Otherwise generate a unique name.
     pub fn get_local_name(&self, idx: usize) -> Symbol {
+        if idx < self.data.params.len() {
+            return self.data.params[idx].0;
+        }
         if let Some(source_map) = &self.module_env.data.source_map {
             // Try to obtain user name from source map
-            if idx < self.data.params.len() {
-                return self.data.params[idx].0;
-            }
             if let Some(fmap) = self
                 .data
                 .def_idx
@@ -4134,12 +4486,11 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Get the transitive closure of the called functions. This requires that all functions
-    /// in the closure have `get_called_functions` available; if one of them not, None is returned.
-    pub fn get_transitive_closure_of_called_functions(
-        &self,
-    ) -> Option<BTreeSet<QualifiedId<FunId>>> {
+    /// in the closure have `get_called_functions` available; if one of them not, this
+    /// function panics.
+    pub fn get_transitive_closure_of_called_functions(&self) -> BTreeSet<QualifiedId<FunId>> {
         if let Some(trans_called) = &*self.data.transitive_closure_of_called_funs.borrow() {
-            return Some(trans_called.clone());
+            return trans_called.clone();
         }
 
         let mut set = BTreeSet::new();
@@ -4149,21 +4500,16 @@ impl<'env> FunctionEnv<'env> {
         // BFS in reachable_funcs to collect all reachable functions
         while !reachable_funcs.is_empty() {
             let fnc = reachable_funcs.pop_front().unwrap();
-            if let Some(callees) = fnc.get_called_functions() {
-                for callee in callees {
-                    let f = self.module_env.env.get_function(*callee);
-                    let qualified_id = f.get_qualified_id();
-                    if !set.contains(&qualified_id) {
-                        set.insert(qualified_id);
-                        reachable_funcs.push_back(f.clone());
-                    }
+            for callee in fnc.get_called_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                let qualified_id = f.get_qualified_id();
+                if set.insert(qualified_id) {
+                    reachable_funcs.push_back(f.clone());
                 }
-            } else {
-                return None;
             }
         }
         *self.data.transitive_closure_of_called_funs.borrow_mut() = Some(set.clone());
-        Some(set)
+        set
     }
 
     /// Returns the function name excluding the address and the module name

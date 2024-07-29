@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: Expected no assigned value, e.g. `vector_error`, for expected failure attribute
+  ┌─ tests/unit_test/test/other_failures_invalid_assignment.move:9:24
+  │
+9 │     #[expected_failure(vector_error=0, location=std::vector)]
+  │                        ^^^^^^^^^^^^^^
+
+error: Invalid attribute value: only u64 literal values permitted
+   ┌─ tests/unit_test/test/other_failures_invalid_assignment.move:13:51
+   │
+13 │     #[expected_failure(vector_error, minor_status=x"", location=std::vector)]
+   │                                                   ^^^
+
+error: Expected no assigned value, e.g. `arithmetic_error`, for expected failure attribute
+   ┌─ tests/unit_test/test/other_failures_invalid_assignment.move:17:24
+   │
+17 │     #[expected_failure(arithmetic_error=@0, location=n)]
+   │                        ^^^^^^^^^^^^^^^^^^^
+
+error: Expected no assigned value, e.g. `out_of_gas`, for expected failure attribute
+   ┌─ tests/unit_test/test/other_failures_invalid_assignment.move:21:24
+   │
+21 │     #[expected_failure(out_of_gas=bool, location=Self)]
+   │                        ^^^^^^^^^^^^^^^
+
+error: Invalid attribute value: only u64 literal values permitted
+   ┌─ tests/unit_test/test/other_failures_invalid_assignment.move:29:56
+   │
+29 │     #[expected_failure(major_status=4016, minor_status=b"", location=Self)]
+   │                                                        ^^^

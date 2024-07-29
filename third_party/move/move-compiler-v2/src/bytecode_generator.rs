@@ -4,14 +4,18 @@
 
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
+use itertools::Itertools;
+use move_binary_format::file_format::Ability;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, TempIndex, Value},
+    ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
+    well_known,
 };
 use move_stackless_bytecode::{
     function_target::FunctionData,
@@ -21,7 +25,10 @@ use move_stackless_bytecode::{
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
 use num::ToPrimitive;
-use std::collections::BTreeMap;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 // ======================================================================================
 // Entry
@@ -223,18 +230,6 @@ impl<'env> Generator<'env> {
         next_idx
     }
 
-    /// Create a new temporary and check whether it has a valid type.
-    fn new_temp_with_valid_type(&mut self, id: NodeId, ty: Type) -> TempIndex {
-        if matches!(ty, Type::Tuple(..)) {
-            self.error(
-                id,
-                format!("cannot assign tuple type `{}` to single variable (use `(a, b, ..) = ..` instead)",
-                        ty.display(&self.env().get_type_display_ctx()))
-            )
-        }
-        self.new_temp(ty)
-    }
-
     /// Release a temporary.
     fn release_temp(&mut self, _temp: TempIndex) {
         // Nop for now
@@ -254,7 +249,7 @@ impl<'env> Generator<'env> {
             self.label_counter += 1;
             Label::new(n as usize)
         } else {
-            self.internal_error(id, "too many labels");
+            self.internal_error(id, format!("too many labels: {}", self.label_counter));
             Label::new(0)
         }
     }
@@ -262,7 +257,13 @@ impl<'env> Generator<'env> {
     /// Require unary target.
     fn require_unary_target(&mut self, id: NodeId, target: Vec<TempIndex>) -> TempIndex {
         if target.len() != 1 {
-            self.internal_error(id, "inconsistent expression target arity");
+            self.internal_error(
+                id,
+                format!(
+                    "inconsistent expression target arity: {} and 1",
+                    target.len()
+                ),
+            );
             0
         } else {
             target[0]
@@ -273,7 +274,13 @@ impl<'env> Generator<'env> {
     /// interning.
     fn require_unary_arg(&self, id: NodeId, args: &[Exp]) -> Exp {
         if args.len() != 1 {
-            self.internal_error(id, "inconsistent expression argument arity");
+            self.internal_error(
+                id,
+                format!(
+                    "inconsistent expression argument arity: {} and 1",
+                    args.len()
+                ),
+            );
             ExpData::Invalid(self.env().new_node_id()).into_exp()
         } else {
             args[0].to_owned()
@@ -354,13 +361,21 @@ impl<'env> Generator<'env> {
                 let mut scope = BTreeMap::new();
                 for (id, sym) in pat.vars() {
                     let ty = self.get_node_type(id);
-                    let temp = self.new_temp_with_valid_type(id, ty);
+                    let temp = self.new_temp(ty);
                     scope.insert(sym, temp);
                     self.local_names.insert(temp, sym);
                 }
                 // If there is a binding, assign the pattern
                 if let Some(binding) = opt_binding {
-                    self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
+                    if let Pattern::Var(var_id, sym) = pat {
+                        // For the common case `let x = binding; ...` avoid introducing a
+                        // temporary for `binding` and directly pass the temp for `x` into
+                        // translation.
+                        let local = self.find_local_for_pattern(*var_id, *sym, Some(&scope));
+                        self.without_reference_mode(|s| s.gen(vec![local], binding))
+                    } else {
+                        self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
+                    }
                 }
                 // Compile the body
                 self.scopes.push(scope);
@@ -373,13 +388,21 @@ impl<'env> Generator<'env> {
                 // appear where references are processed.
                 let rhs_temp = self.gen_arg(rhs, false);
                 let lhs_temp = self.gen_auto_ref_arg(lhs, ReferenceKind::Mutable);
-                if !self.temp_type(lhs_temp).is_mutable_reference() {
+                let lhs_type = self.get_node_type(lhs.node_id());
+
+                // For the case: `fun f(p: &mut S) { *(p :&S) =... },
+                // we need to check whether p (with explicit type annotation) is an immutable ref
+                let source_type = if lhs_type.is_immutable_reference() {
+                    &lhs_type
+                } else {
+                    self.temp_type(lhs_temp)
+                };
+                if !source_type.is_mutable_reference() {
                     self.error(
                         lhs.node_id(),
                         format!(
                             "expected `&mut` but found `{}`",
-                            self.temp_type(lhs_temp)
-                                .display(&self.env().get_type_display_ctx()),
+                            source_type.display(&self.func_env.get_type_display_ctx()),
                         ),
                     );
                 }
@@ -410,6 +433,7 @@ impl<'env> Generator<'env> {
                 self.gen(targets, else_exp);
                 self.emit_with(else_id, |attr| Bytecode::Label(attr, end_label));
             },
+            ExpData::Match(id, exp, arms) => self.gen_match(targets, *id, exp, arms),
             ExpData::Loop(id, body) => {
                 let continue_label = self.new_label(*id);
                 let break_label = self.new_label(*id);
@@ -439,13 +463,18 @@ impl<'env> Generator<'env> {
                     self.error(*id, "missing enclosing loop statement")
                 }
             },
-            ExpData::SpecBlock(_, spec) => {
-                let (mut code, mut update_map) = self.context.generate_spec(&self.func_env, spec);
-                self.code.append(&mut code);
-                self.func_env
-                    .get_mut_spec()
-                    .update_map
-                    .append(&mut update_map)
+            ExpData::SpecBlock(id, spec) => {
+                // Map locals in spec to assigned temporaries.
+                let mut replacer = |id, target| {
+                    if let RewriteTarget::LocalVar(sym) = target {
+                        Some(ExpData::Temporary(id, self.find_local(id, sym)).into_exp())
+                    } else {
+                        None
+                    }
+                };
+                let (_, spec) = ExpRewriter::new(self.env(), &mut replacer)
+                    .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
+                self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             ExpData::Invoke(id, _, _) | ExpData::Lambda(id, _, _) => {
                 self.internal_error(*id, format!("not yet implemented: {:?}", exp))
@@ -501,6 +530,18 @@ impl<'env> Generator<'env> {
             Value::Bool(x) => Constant::Bool(*x),
             Value::ByteArray(x) => Constant::ByteArray(x.clone()),
             Value::AddressArray(x) => Constant::AddressArray(x.clone()),
+            Value::Tuple(x) => {
+                if let Some(inner_ty) = ty.get_vector_element_type() {
+                    Constant::Vector(
+                        x.iter()
+                            .map(|v| self.to_constant(id, inner_ty.clone(), v))
+                            .collect(),
+                    )
+                } else {
+                    self.internal_error(id, format!("inconsistent tuple type: {:?}", ty));
+                    Constant::Bool(false)
+                }
+            },
             Value::Vector(x) => {
                 if let Some(inner_ty) = ty.get_vector_element_type() {
                     Constant::Vector(
@@ -543,19 +584,33 @@ impl<'env> Generator<'env> {
     fn gen_call(&mut self, targets: Vec<TempIndex>, id: NodeId, op: &Operation, args: &[Exp]) {
         match op {
             Operation::Vector => self.gen_op_call(targets, id, BytecodeOperation::Vector, args),
-            Operation::Freeze => self.gen_op_call(targets, id, BytecodeOperation::FreezeRef, args),
+            Operation::Freeze(explicit) => {
+                self.gen_op_call(targets, id, BytecodeOperation::FreezeRef(*explicit), args)
+            },
             Operation::Tuple => {
                 if targets.len() != args.len() {
-                    self.internal_error(id, "inconsistent tuple arity")
+                    self.internal_error(
+                        id,
+                        format!(
+                            "inconsistent tuple arity: {} and {}",
+                            targets.len(),
+                            args.len()
+                        ),
+                    )
                 } else {
                     for (target, arg) in targets.into_iter().zip(args.iter()) {
                         self.gen(vec![target], arg)
                     }
                 }
             },
-            Operation::Pack(mid, sid) => {
+            Operation::Pack(mid, sid, variant) => {
                 let inst = self.env().get_node_instantiation(id);
-                self.gen_op_call(targets, id, BytecodeOperation::Pack(*mid, *sid, inst), args)
+                let oper = if let Some(variant) = variant {
+                    BytecodeOperation::PackVariant(*mid, *sid, *variant, inst)
+                } else {
+                    BytecodeOperation::Pack(*mid, *sid, inst)
+                };
+                self.gen_op_call(targets, id, oper, args)
             },
             Operation::Select(mid, sid, fid) => {
                 let target = self.require_unary_target(id, targets);
@@ -588,12 +643,15 @@ impl<'env> Generator<'env> {
             {
                 let err_loc = self.env().get_node_loc(id);
                 let mut reasons: Vec<(Loc, String)> = Vec::new();
-                let reason_msg = format!("Invalid call to {}.", op.display(self.env(), id));
+                let reason_msg = format!(
+                    "Invalid call to {}.",
+                    op.display_with_fun_env(self.env(), &self.func_env, id)
+                );
                 reasons.push((err_loc.clone(), reason_msg.clone()));
                 let err_msg  = format!(
                             "Expected a struct type. Global storage operations are restricted to struct types declared in the current module. \
                             Found: '{}'",
-                            self.env().get_node_instantiation(id)[0].display(&self.env().get_type_display_ctx())
+                            self.env().get_node_instantiation(id)[0].display(&self.func_env.get_type_display_ctx())
                 );
                 self.env()
                     .diag_with_labels(Severity::Error, &err_loc, &err_msg, reasons)
@@ -651,6 +709,14 @@ impl<'env> Generator<'env> {
             Operation::Borrow(kind) => {
                 let target = self.require_unary_target(id, targets);
                 let arg = self.require_unary_arg(id, args);
+                // When the target of this borrow is of type immutable ref, while kind is mutable ref
+                // we need to change the type of target to mutable ref,
+                // code example:
+                // 1) `let x: &T = &mut y;`
+                // 2) `let x: u64 = 3; *(&mut x: &u64) = 5;`
+                if let Type::Reference(ReferenceKind::Immutable, ty) = self.temp_type(target) {
+                    self.temps[target] = Type::Reference(*kind, ty.clone());
+                }
                 self.gen_borrow(target, id, *kind, &arg)
             },
             Operation::Abort => {
@@ -658,7 +724,7 @@ impl<'env> Generator<'env> {
                 let temp = self.gen_escape_auto_ref_arg(&arg, false);
                 self.emit_with(id, |attr| Bytecode::Abort(attr, temp))
             },
-            Operation::Deref => self.gen_op_call(targets, id, BytecodeOperation::ReadRef, args),
+            Operation::Deref => self.gen_deref(targets, id, args),
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
@@ -684,6 +750,8 @@ impl<'env> Generator<'env> {
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
+
+            Operation::Closure(..) => self.internal_error(id, "closure not yet implemented"),
 
             // Non-supported specification related operations
             Operation::Exists(Some(_))
@@ -760,10 +828,22 @@ impl<'env> Generator<'env> {
         op: BytecodeOperation,
         args: &[Exp],
     ) {
-        let arg_temps = self.gen_arg_list(args, false);
+        let arg_temps = self.gen_arg_list(args);
         self.emit_with(id, |attr| {
             Bytecode::Call(attr, targets, op, arg_temps, None)
         })
+    }
+
+    fn gen_deref(&mut self, targets: Vec<TempIndex>, id: NodeId, args: &[Exp]) {
+        // Optimize case of `Deref(Borrow(x)) => x`.
+        // This is safe and supports generation for matches, where rewriting of code may result
+        // in such expressions.
+        match args[0].as_ref() {
+            ExpData::Call(_, Operation::Borrow(_), borrow_args) => {
+                self.gen(targets, &borrow_args[0])
+            },
+            _ => self.gen_op_call(targets, id, BytecodeOperation::ReadRef, args),
+        }
     }
 
     fn gen_logical_shortcut(
@@ -830,7 +910,7 @@ impl<'env> Generator<'env> {
             .zip(param_types)
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
-        let args = self.gen_arg_list(&args, true);
+        let args = self.gen_arg_list(&args);
         self.emit_with(id, |attr| {
             Bytecode::Call(
                 attr,
@@ -857,22 +937,18 @@ impl<'env> Generator<'env> {
                 .new_node(self.env().get_node_loc(id), expected_ty.clone());
             self.env()
                 .set_node_instantiation(freeze_id, vec![et.as_ref().clone()]);
-            ExpData::Call(freeze_id, Operation::Freeze, vec![exp.clone()]).into_exp()
+            ExpData::Call(freeze_id, Operation::Freeze(false), vec![exp.clone()]).into_exp()
         } else {
             exp.clone()
         }
     }
 
     /// Generate the code for a list of arguments.
-    /// If `force_l2r_eval` is true, the arguments are forced to be evaluated in left-to-right order.
-    fn gen_arg_list(&mut self, exps: &[Exp], force_l2r_eval: bool) -> Vec<TempIndex> {
+    /// Note that the arguments are evaluated in left-to-right order.
+    fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
         // If all args are side-effect free, we don't need to force temporary generation
         // to get left-to-right evaluation.
-        let with_forced_temp = if exps.iter().all(is_definitely_pure) {
-            false
-        } else {
-            force_l2r_eval
-        };
+        let with_forced_temp = !exps.iter().all(is_definitely_pure);
         let len = exps.len();
         // Generate code with (potentially) forced creation of temporaries for all except last arg.
         let mut args = exps
@@ -920,6 +996,31 @@ impl<'env> Generator<'env> {
                 self.gen(vec![temp], exp);
                 temp
             },
+        }
+    }
+
+    // Generates code for an expression which can represent a tuple. This flattens
+    // the tuple if explicit or introduces temporaries to hold the tuple value. If
+    // the expression is not a tuple, a singleton vector will be returned. This
+    // reflects the current special semantics of tuples in Move which cannot be
+    // nested.
+    fn gen_tuple(&mut self, exp: &Exp, with_forced_temp: bool) -> Vec<TempIndex> {
+        if let ExpData::Call(_, Operation::Tuple, args) = exp.as_ref() {
+            args.iter().map(|arg| self.gen_arg(arg, false)).collect()
+        } else {
+            let exp_ty = self.env().get_node_type(exp.node_id());
+            if exp_ty.is_tuple() {
+                // Need to allocate new temps to store the tuple elements.
+                let temps = exp_ty
+                    .flatten()
+                    .into_iter()
+                    .map(|ty| self.new_temp(ty))
+                    .collect::<Vec<_>>();
+                self.gen(temps.clone(), exp);
+                temps
+            } else {
+                vec![self.gen_arg(exp, with_forced_temp)]
+            }
         }
     }
 
@@ -975,6 +1076,10 @@ impl<'env> Generator<'env> {
                     *fid,
                     &self.require_unary_arg(id, args),
                 )
+            },
+            ExpData::Call(_arg_id, Operation::Deref, args) => {
+                // Optimize `Borrow(Deref(x)) => x`
+                return self.gen(vec![target], &args[0]);
             },
             ExpData::LocalVar(_arg_id, sym) => return self.gen_borrow_local(target, id, *sym),
             ExpData::Temporary(_arg_id, temp) => return self.gen_borrow_temp(target, id, *temp),
@@ -1055,19 +1160,24 @@ impl<'env> Generator<'env> {
 
         // Compile operand in reference mode, defaulting to immutable mode.
         let oper_temp = self.gen_auto_ref_arg(oper, ReferenceKind::Immutable);
+        let oper_type = self.get_node_type(oper.node_id());
 
         // If we are in reference mode and a &mut is requested, the operand also needs to be
         // &mut.
+        let source_type = if oper_type.is_immutable_reference() {
+            &oper_type // To check the corner case `&mut x...; (x:&T). = ...`, we need this condition
+        } else {
+            self.temp_type(oper_temp)
+        };
         if self.reference_mode()
             && self.reference_mode_kind == ReferenceKind::Mutable
-            && !self.temp_type(oper_temp).is_mutable_reference()
+            && !source_type.is_mutable_reference()
         {
             self.error(
                 oper.node_id(),
                 format!(
                     "expected `&mut` but found `{}`",
-                    self.temp_type(oper_temp)
-                        .display(&self.env().get_type_display_ctx())
+                    source_type.display(&self.func_env.get_type_display_ctx())
                 ),
             )
         }
@@ -1101,6 +1211,72 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Pattern matching
 
+/// Translation of patterns, both for irrefutable matches as in `let p = e`, and
+/// refutable matches as in `match (e) { p1 => e1, p2 => e2, ..}`.
+///
+/// The challenge with refutable match translation is to deal with consuming matches.
+/// Consider `let s = S{x: C{y}}; match (s) { S{C{y}}} if p(&y) => y, t => t }`. In order
+/// to check whether the match is true, the value in `s` must not be moved until the match
+/// is decided, while still being able to look at sub-fields and evaluate predicates.
+/// Therefore, the match needs to evaluated first using a reference to `s`. We call this
+/// _probing_ of a match.
+///
+/// The type `MatchMode` is used to describe in which mode matching is performed.
+/// In irrefutable mode, it is expected that the pattern succeeds to match. In
+/// refutable mode, on match failure an exit branch is taken. Refutable mode
+/// can be furthermore characterized to be probing.
+enum MatchMode {
+    /// A match which cannot be refuted
+    Irrefutable,
+    /// A refutable match as in the match arm of the `match` expression
+    Refutable {
+        /// A temporary where to store the result of variant tests
+        bool_temp: TempIndex,
+        /// A branch to the exit point of the match fails
+        exit_path: Label,
+        /// Set if this is a probing match, and if so, the set of vars which need to
+        /// be bound for the match condition. In probing mode, we only need to
+        /// bind certain variables. For example, in `S{x, y} if p(y)` we do not need
+        /// to bind `x`.
+        probing_vars: Option<BTreeSet<Symbol>>,
+    },
+}
+
+impl MatchMode {
+    /// Whether this match is in probing mode.
+    fn is_probing(&self) -> bool {
+        matches!(self, MatchMode::Refutable {
+            probing_vars: Some(_),
+            ..
+        })
+    }
+
+    /// Whether a variable appearing in the pattern should be bound to a temporary.
+    /// In probing mode, only selected variables which appear in the optional guard of
+    /// a match arm need to be bound.
+    fn shall_bind_var(&self, var: Symbol) -> bool {
+        if let MatchMode::Refutable {
+            probing_vars: Some(vars),
+            ..
+        } = self
+        {
+            vars.contains(&var)
+        } else {
+            true
+        }
+    }
+
+    /// Returns the effective type. In probing mode, all non-reference types
+    /// are lifted to references.
+    fn effective_var_type(&self, ty: Type) -> Type {
+        if self.is_probing() && !ty.is_reference() {
+            Type::Reference(ReferenceKind::Immutable, Box::new(ty))
+        } else {
+            ty
+        }
+    }
+}
+
 impl<'env> Generator<'env> {
     /// Generate code for assignment of an expression to a pattern. This involves
     /// flattening nested patterns as needed. The optional `next_scope` is a
@@ -1110,7 +1286,7 @@ impl<'env> Generator<'env> {
             self.gen_tuple_assign(id, pat_args, exp, next_scope)
         } else {
             let arg = self.gen_escape_auto_ref_arg(exp, false);
-            self.gen_assign_from_temp(id, pat, arg, next_scope)
+            self.gen_match_from_temp(id, pat, &[arg], &MatchMode::Irrefutable, next_scope)
         }
     }
 
@@ -1129,107 +1305,471 @@ impl<'env> Generator<'env> {
                 if args.len() != pats.len() {
                     // Type checker should have complained already
                     self.internal_error(id, "inconsistent tuple arity")
+                } else if next_scope.is_none() // assignment, not declaration
+                    && args.len() != 1
+                    && self.have_overlapping_vars(pats, exp)
+                {
+                    // We want to simulate the semantics for "simultaneous" assignment with
+                    // overlapping variables, eg., `(x, y) = (y, x)`.
+                    // To do so, we save each tuple arg (from rhs) into a temporary.
+                    // Then, point-wise assign the temporaries.
+                    let temps = args
+                        .iter()
+                        .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
+                        .collect::<Vec<_>>();
+                    for (pat, temp) in pats.iter().zip(temps.into_iter()) {
+                        self.gen_match_from_temp(
+                            id,
+                            pat,
+                            &[temp],
+                            &MatchMode::Irrefutable,
+                            next_scope,
+                        )
+                    }
                 } else {
-                    // Map this to point-wise assignment
+                    // No overlap, a 1-tuple, or not an assignment: just do point-wise match.
                     for (pat, exp) in pats.iter().zip(args.iter()) {
                         self.gen_assign(id, pat, exp, next_scope)
                     }
                 }
             },
             _ => {
-                // The type checker has ensured that this expression represents  tuple
-                let (temps, cont_assigns) = self.flatten_patterns(pats, next_scope);
-                self.gen(temps, exp);
-                for (cont_id, cont_pat, cont_temp) in cont_assigns {
-                    self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
+                // The type checker has ensured that this expression represents a function call
+                // resulting in a tuple. Collect the sub-matches to determine the targets to which
+                // assign the call results.
+                let match_mode = &MatchMode::Irrefutable;
+                let sub_matches = self.collect_sub_matches(true, pats, match_mode, next_scope);
+                self.gen(sub_matches.values().map(|(temp, _)| *temp).collect(), exp);
+                for (_, (temp, cont_opt)) in sub_matches.into_iter() {
+                    if let Some(cont_pat) = cont_opt {
+                        self.gen_match_from_temp(
+                            cont_pat.node_id(),
+                            &cont_pat,
+                            &[temp],
+                            match_mode,
+                            next_scope,
+                        )
+                    }
                 }
             },
         }
     }
 
-    fn gen_assign_from_temp(
+    /// Generates code for a match expression.
+    fn gen_match(&mut self, targets: Vec<TempIndex>, id: NodeId, exp: &Exp, arms: &[MatchArm]) {
+        // Generate temps for the exp we are matching over. The exp can be a tuple, so
+        // we have a vector of temps.
+        let values: Vec<TempIndex> = self.gen_tuple(exp, false);
+        // For each temp not a reference, create one, so we can match it without consuming it.
+        // Also set `needs_probing` to true if there are any non-references. This indicates
+        // that we need to generate a specialized, non-consuming 'probing' match.
+        let mut needs_probing = false;
+        let value_refs: Vec<TempIndex> = values
+            .iter()
+            .cloned()
+            .map(|value| {
+                let value_ty = self.temp_type(value);
+                if value_ty.is_reference() {
+                    value
+                } else {
+                    let value_ref = self.new_temp(Type::Reference(
+                        ReferenceKind::Immutable,
+                        Box::new(value_ty.clone()),
+                    ));
+                    self.emit_call(id, vec![value_ref], BytecodeOperation::BorrowLoc, vec![
+                        value,
+                    ]);
+                    needs_probing = true;
+                    value_ref
+                }
+            })
+            .collect();
+        // Label to jump to on success of a match arm
+        let success_path = self.new_label(id);
+        // Boolean temporary to store match results.
+        let bool_temp = self.new_temp(Type::new_prim(PrimitiveType::Bool));
+        for arm in arms {
+            let pat_id = arm.pattern.node_id();
+            let exit_path = self.new_label(pat_id);
+            let match_mode = if needs_probing {
+                // If we needed to create a reference (i.e. we match against a value)
+                // we need to evaluate whether the pattern matches in
+                // probe mode, without consuming the matched value.
+                self.gen_match_probe(pat_id, &value_refs, bool_temp, exit_path, arm);
+                // On success of the probe, matching the pattern will be irrefutable
+                MatchMode::Irrefutable
+            } else {
+                // Otherwise we perform a directly refutable match.
+                MatchMode::Refutable {
+                    exit_path,
+                    bool_temp,
+                    probing_vars: None,
+                }
+            };
+            // Declare all variables bound by the pattern
+            let scope = self.create_scope(arm.pattern.vars().into_iter(), false);
+            // Match the pattern, potentially branching to exit_path
+            self.gen_match_from_temp(id, &arm.pattern, &values, &match_mode, Some(&scope));
+            // If we have not yet executed the condition during probing, execute it now.
+            self.scopes.push(scope);
+            if let Some(cond) = arm.condition.as_ref().filter(|_| !needs_probing) {
+                self.gen(vec![bool_temp], cond);
+                self.branch_to_exit_if_false(cond.node_id(), bool_temp, exit_path)
+            }
+            // Translate the body
+            self.gen(targets.clone(), &arm.body);
+            self.scopes.pop().expect("scope stack balanced");
+            // Exit match with success
+            self.emit_with(id, |attr| Bytecode::Jump(attr, success_path));
+            // Point to continue if match failed
+            self.emit_with(id, |attr| Bytecode::Label(attr, exit_path))
+        }
+        // At last, emit an abort that no arm matched
+        let abort_code = self.new_temp(Type::new_prim(PrimitiveType::U64));
+        self.emit_with(id, |attr| {
+            Bytecode::Load(
+                attr,
+                abort_code,
+                Constant::U64(well_known::INCOMPLETE_MATCH_ABORT_CODE),
+            )
+        });
+        self.emit_with(id, |attr| Bytecode::Abort(attr, abort_code));
+        // Here we end if some path was successful
+        self.emit_with(id, |attr| Bytecode::Label(attr, success_path));
+        // Finally check exhaustiveness of match
+        ValueShape::analyze_match_coverage(
+            self.env(),
+            exp.node_id(),
+            arms.iter().filter_map(|arm| {
+                if arm.condition.is_none() {
+                    Some(&arm.pattern)
+                } else {
+                    None
+                }
+            }),
+        );
+    }
+
+    // Generates a probing match for a given match arm. The probing match doesn't consume
+    // the value which is expected to be a reference.
+    fn gen_match_probe(
+        &mut self,
+        id: NodeId,
+        value_refs: &[TempIndex],
+        bool_temp: TempIndex,
+        exit_path: Label,
+        arm: &MatchArm,
+    ) {
+        // Compute the set of vars we need to bind during the match.
+        let probing_vars = if let Some(exp) = &arm.condition {
+            // Include all vars in the condition
+            exp.free_vars()
+        } else {
+            // No condition, probing does not need to bind anything
+            BTreeSet::new()
+        };
+        let mode = MatchMode::Refutable {
+            bool_temp,
+            exit_path,
+            probing_vars: Some(probing_vars.clone()),
+        };
+        // Create a scope with variables bound by the pattern and needed for probing. All
+        // vars are lifted to be references to the original type.
+        let needed_vars = arm
+            .pattern
+            .vars()
+            .into_iter()
+            .filter(|(_, var)| probing_vars.contains(var))
+            .collect_vec();
+        let probe_scope = self.create_scope(needed_vars.clone().into_iter(), true);
+        // Match the pattern, potentially branching to exit_path
+        self.gen_match_from_temp(id, &arm.pattern, value_refs, &mode, Some(&probe_scope));
+        if let Some(exp) = &arm.condition {
+            // Evaluate matching condition, by rewriting the expression, such that
+            // references to `x` are replaced by references to `*x`. This is needed
+            // because in the original pattern, `x` is bound to a value, not a reference.
+            let env = self.env();
+            let rewritten_exp = ExpRewriter::new(env, &mut |id, target| {
+                if let RewriteTarget::LocalVar(var) = target {
+                    if probe_scope.contains_key(&var) {
+                        let new_id = env.new_node(
+                            env.get_node_loc(id),
+                            Type::Reference(
+                                ReferenceKind::Immutable,
+                                Box::new(env.get_node_type(id)),
+                            ),
+                        );
+                        return Some(
+                            ExpData::Call(id, Operation::Deref, vec![ExpData::LocalVar(
+                                new_id, var,
+                            )
+                            .into_exp()])
+                            .into_exp(),
+                        );
+                    }
+                }
+                None
+            })
+            .rewrite_exp(exp.clone());
+            self.scopes.push(probe_scope);
+            self.gen(vec![bool_temp], &rewritten_exp);
+            self.branch_to_exit_if_false(id, bool_temp, exit_path);
+            self.scopes.pop();
+        }
+    }
+
+    /// Generate match of values against pattern.
+    fn gen_match_from_temp(
         &mut self,
         id: NodeId,
         pat: &Pattern,
-        arg: TempIndex,
+        values: &[TempIndex],
+        match_mode: &MatchMode,
         next_scope: Option<&Scope>,
     ) {
+        if !matches!(pat, Pattern::Tuple(..)) && values.len() != 1 {
+            self.internal_error(id, "inconsistent tuple value in match");
+            return;
+        }
         match pat {
-            Pattern::Wildcard(_) => {
-                // Nothing to do
-            },
-            Pattern::Var(var_id, sym) => {
-                let local = self.find_local_for_pattern(*var_id, *sym, next_scope);
-                self.emit_with(id, |attr| {
-                    Bytecode::Assign(attr, local, arg, AssignKind::Inferred)
-                })
-            },
-            Pattern::Struct(id, str, args) => {
-                let (temps, cont_assigns) = self.flatten_patterns(args, next_scope);
-                self.emit_call(
-                    *id,
-                    temps,
-                    BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned()),
-                    vec![arg],
-                );
-                for (cont_id, cont_pat, cont_temp) in cont_assigns {
-                    self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
+            Pattern::Wildcard(id) => {
+                let pat_ty = self.env().get_node_type(*id);
+                if !match_mode.is_probing() {
+                    let temp = self.new_temp(pat_ty);
+                    self.emit_with(*id, |attr| {
+                        Bytecode::Assign(attr, temp, values[0], AssignKind::Inferred)
+                    })
                 }
             },
-            Pattern::Tuple(id, _) => self.error(*id, "tuple not allowed here"),
+            Pattern::Var(var_id, sym) => {
+                if match_mode.shall_bind_var(*sym) {
+                    let local = self.find_local_for_pattern(*var_id, *sym, next_scope);
+                    self.emit_with(id, |attr| {
+                        Bytecode::Assign(attr, local, values[0], AssignKind::Inferred)
+                    })
+                }
+            },
+            Pattern::Struct(id, str, variant, args) => {
+                // If this is a variant, and we are doing a refutable match,
+                // insert a test and exit if it fails.
+                let value = values[0];
+                if let (
+                    Some(variant),
+                    MatchMode::Refutable {
+                        bool_temp,
+                        exit_path,
+                        ..
+                    },
+                ) = (variant, match_mode)
+                {
+                    self.emit_call(
+                        *id,
+                        vec![*bool_temp],
+                        BytecodeOperation::TestVariant(
+                            str.module_id,
+                            str.id,
+                            *variant,
+                            str.inst.clone(),
+                        ),
+                        vec![value],
+                    );
+                    self.branch_to_exit_if_false(*id, *bool_temp, *exit_path);
+                }
+                let ref_kind = self.temp_type(value).ref_kind();
+                let uses_unpack = ref_kind.is_none();
+                let sub_matches = self.collect_sub_matches(
+                    uses_unpack, // need all sub-patterns if unpack is used
+                    args,
+                    match_mode,
+                    next_scope,
+                );
+                if !uses_unpack {
+                    self.gen_borrow_field_for_unpack_ref(
+                        id,
+                        str,
+                        *variant,
+                        value,
+                        &sub_matches,
+                        ref_kind.expect("type is reference"),
+                    )
+                } else {
+                    assert_eq!(
+                        args.len(),
+                        sub_matches.len(),
+                        "contiguous allocation of temps for unpack"
+                    );
+                    self.emit_call(
+                        *id,
+                        sub_matches.values().map(|(temp, ..)| *temp).collect(),
+                        if let Some(variant) = variant {
+                            BytecodeOperation::UnpackVariant(
+                                str.module_id,
+                                str.id,
+                                *variant,
+                                str.inst.to_owned(),
+                            )
+                        } else {
+                            BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned())
+                        },
+                        vec![values[0]],
+                    );
+                }
+                for (_, (temp, cont_opt)) in sub_matches.into_iter() {
+                    if let Some(cont_pat) = cont_opt {
+                        self.gen_match_from_temp(
+                            cont_pat.node_id(),
+                            &cont_pat,
+                            &[temp],
+                            match_mode,
+                            next_scope,
+                        )
+                    }
+                }
+            },
+            Pattern::Tuple(id, pats) => {
+                if values.len() != pats.len() {
+                    self.internal_error(*id, "inconsistent pattern tuple");
+                    return;
+                }
+                for (elem, sub_pat) in values.iter().zip(pats.iter()) {
+                    self.gen_match_from_temp(
+                        sub_pat.node_id(),
+                        sub_pat,
+                        &[*elem],
+                        match_mode,
+                        next_scope,
+                    )
+                }
+            },
             Pattern::Error(_) => self.internal_error(id, "unexpected error pattern"),
         }
     }
 
-    /// Flatten a pattern, returning a temporary to receive the value being matched against,
-    /// and an optional continuation assignment to match the sub-pattern. The optional
-    /// `next_scope` is used to lookup locals which are introduced by this binding
+    /// Generate borrow_field when unpacking a reference to a struct
+    /// e.g. `let s = &S; let S(a, b, c) = &s`, a, b, and c are references
+    fn gen_borrow_field_for_unpack_ref(
+        &mut self,
+        id: &NodeId,
+        str: &QualifiedInstId<StructId>,
+        variant: Option<Symbol>,
+        arg: TempIndex,
+        sub_matches: &BTreeMap<usize, (TempIndex, Option<Pattern>)>,
+        ref_kind: ReferenceKind,
+    ) {
+        let struct_env = self.env().get_struct(str.to_qualified_id());
+        let fields = struct_env
+            .get_fields_optional_variant(variant)
+            .map(|f| f.get_offset())
+            .collect_vec();
+        for (pos, (temp, _)) in sub_matches {
+            let field_offset = fields[*pos];
+            self.with_reference_mode(|gen, entering| {
+                if entering {
+                    gen.reference_mode_kind = ref_kind
+                }
+                if !gen.temp_type(*temp).is_reference() {
+                    gen.env().diag(
+                        Severity::Bug,
+                        &gen.env().get_node_loc(*id),
+                        "Unpacking a reference to a struct must return the references of fields",
+                    );
+                }
+                gen.emit_call(
+                    *id,
+                    vec![*temp],
+                    if let Some(var) = variant {
+                        BytecodeOperation::BorrowFieldVariant(
+                            str.module_id,
+                            str.id,
+                            var,
+                            str.inst.to_owned(),
+                            field_offset,
+                        )
+                    } else {
+                        BytecodeOperation::BorrowField(
+                            str.module_id,
+                            str.id,
+                            str.inst.to_owned(),
+                            field_offset,
+                        )
+                    },
+                    vec![arg],
+                );
+            })
+        }
+    }
+
+    /// Collect a sub-match for a given pattern `pat` at argument position `pos`.
+    /// This returns a temporary in which to store the matched argument at `pos`, and
+    /// an optional continuation pattern to match on that value. For example,
+    /// for `S{x}`, this will insert `(temp, Some(S{x})` at `pos` in the accumulated
+    /// `sub_matches` map. In turn, for a pattern `x`, this will insert `(x, None)`.
+    /// Depending on the mode, obsolete sub-matches will not be produced. (See code
+    /// comments.)
+    ///
+    /// The optional `next_scope` is used to lookup locals which are introduced by this binding
     /// but are not yet in scope; this is needed to deal with assignments of the form
     /// `let x = f(x)` where the 2nd x refers to a variable in the current scope, but the first
     /// to one which we introduce right now.
-    fn flatten_pattern(
+    fn collect_sub_match(
         &mut self,
+        include_all: bool,
+        sub_matches: &mut BTreeMap<usize, (TempIndex, Option<Pattern>)>,
+        pos: usize,
         pat: &Pattern,
+        match_mode: &MatchMode,
         next_scope: Option<&Scope>,
-    ) -> (TempIndex, Option<(NodeId, Pattern, TempIndex)>) {
+    ) {
         match pat {
             Pattern::Wildcard(id) => {
-                // Wildcard pattern: we need to create a temporary to receive the value, even
-                // if its dropped afterwards.
-                let temp = self.new_temp(self.get_node_type(*id));
-                (temp, None)
+                let pat_ty = self.env().get_node_type(*id);
+                // If inclusion is not required, we can skip wildcards if either
+                // we are probing or the type is a reference.
+                if include_all || !match_mode.is_probing() && self.ty_requires_binding(&pat_ty) {
+                    let temp = self.new_temp(self.get_node_type(*id));
+                    sub_matches.insert(pos, (temp, None));
+                }
             },
             Pattern::Var(id, sym) => {
-                // Variable pattern: no continuation assignment needed as it is already in
-                // the expected form.
-                (self.find_local_for_pattern(*id, *sym, next_scope), None)
+                // If inclusion is not required, we only include variables as determined
+                // by matching mode.
+                if include_all || match_mode.shall_bind_var(*sym) {
+                    sub_matches.insert(
+                        pos,
+                        (self.find_local_for_pattern(*id, *sym, next_scope), None),
+                    );
+                }
             },
             _ => {
-                // Pattern is not flat: create a new temporary and an Assignment of this
+                // Pattern is not flat: create a new temporary and an assignment of this
                 // temporary to the pattern.
                 let id = pat.node_id();
-                let ty = self.get_node_type(id);
-                let temp = self.new_temp_with_valid_type(id, ty);
-                (temp, Some((id, pat.clone(), temp)))
+                let ty = match_mode.effective_var_type(self.get_node_type(id));
+                let temp = self.new_temp(ty);
+                sub_matches.insert(pos, (temp, Some(pat.clone())));
             },
         }
     }
 
-    fn flatten_patterns(
+    fn collect_sub_matches(
         &mut self,
-        pats: &[Pattern],
+        include_all: bool,
+        args: &[Pattern],
+        match_mode: &MatchMode,
         next_scope: Option<&Scope>,
-    ) -> (Vec<TempIndex>, Vec<(NodeId, Pattern, TempIndex)>) {
-        let mut temps = vec![];
-        let mut cont_assigns = vec![];
-        for pat in pats {
-            let (temp, opt_cont) = self.flatten_pattern(pat, next_scope);
-            temps.push(temp);
-            if let Some(cont) = opt_cont {
-                cont_assigns.push(cont)
-            }
+    ) -> BTreeMap<usize, (TempIndex, Option<Pattern>)> {
+        let mut sub_matches = BTreeMap::new();
+        for (pos, pat) in args.iter().enumerate() {
+            self.collect_sub_match(
+                include_all,
+                &mut sub_matches,
+                pos,
+                pat,
+                match_mode,
+                next_scope,
+            )
         }
-        (temps, cont_assigns)
+        sub_matches
     }
 
     fn find_local_for_pattern(
@@ -1242,6 +1782,341 @@ impl<'env> Generator<'env> {
             *temp
         } else {
             self.find_local(id, sym)
+        }
+    }
+
+    // Do the variables in `lhs` and `rhs` overlap?
+    fn have_overlapping_vars(&self, lhs: &[Pattern], rhs: &Exp) -> bool {
+        let lhs_vars = lhs
+            .iter()
+            .flat_map(|p| p.vars().into_iter().map(|t| t.1))
+            .collect::<BTreeSet<_>>();
+        // Compute the rhs expression's free locals and params used.
+        // We can likely just use free variables in the expression once #12317 is addressed.
+        let param_symbols = self
+            .func_env
+            .get_parameters()
+            .into_iter()
+            .map(|p| p.0)
+            .collect::<Vec<_>>();
+        let rhs_vars = rhs.free_vars_and_used_params(&param_symbols);
+        lhs_vars.intersection(&rhs_vars).next().is_some()
+    }
+
+    fn branch_to_exit_if_false(&mut self, id: NodeId, cond: TempIndex, exit_path: Label) {
+        let fall_through = self.new_label(id);
+        self.emit_with(id, |attr| {
+            Bytecode::Branch(attr, fall_through, exit_path, cond)
+        });
+        self.emit_with(id, |attr| Bytecode::Label(attr, fall_through))
+    }
+
+    fn create_scope(
+        &mut self,
+        vars: impl Iterator<Item = (NodeId, Symbol)>,
+        as_ref: bool,
+    ) -> BTreeMap<Symbol, TempIndex> {
+        let mut scope = BTreeMap::new();
+        for (id, sym) in vars {
+            let mut ty = self.get_node_type(id);
+            if as_ref {
+                ty = Type::Reference(ReferenceKind::Immutable, Box::new(ty))
+            }
+            let temp = self.new_temp(ty);
+            scope.insert(sym, temp);
+            self.local_names.insert(temp, sym);
+        }
+        scope
+    }
+
+    /// Returns true if a value of given type need to be bound to a temporary, even if unused,
+    /// so it can be properly processed. Types which are known to be droppable
+    /// return false here.
+    fn ty_requires_binding(&self, ty: &Type) -> bool {
+        !self
+            .env()
+            .type_abilities(ty, &[])
+            .has_ability(Ability::Drop)
+    }
+}
+
+// ======================================================================================
+// Pattern coverage analysis
+
+/// Pattern coverage analysis is complicated by that patterns are
+/// matched sequentially (in contrast to so-called 'best fit' pattern matching).
+/// Consider the sequence of patterns from a match, `S{R{p}, q1}` and `S{_, q2}`.
+/// `R{p}` is only matched under the condition that `q1` is also matched. On
+/// the other hand, any arbitrary other value for the first parameter of `S` depends
+/// on that `q2` matches as well. These dependencies between patterns make it
+/// hard to decompose the analysis of completeness into independent sub-problems,
+/// and to apply some kind of algebraic simplification on patterns (e.g. something
+/// like `S{_, q1 | q2}` is _not_ equivalent to the above two patterns).
+///
+/// Another challenge in pattern coverage analysis is to produce useful error messages
+/// which show the counterexamples of missed patterns, but only up to the shape as the user
+/// has inspected values via patterns. For example, if the user has written `R{S{_}, _}`
+/// the counter example should not contain irrelevant other parts of the value (as e.g.
+/// in `R{T{x:_}, S}`). Moreover, patterns which can never be matched because there is
+/// a previous pattern which captures all covered values, should
+/// be reported, as dead code analysis will not determine this without flow dependent
+/// analysis.
+///
+/// The solution to those problems performs some kind of 'abstract interpretation'
+/// of what happens during matching at runtime.
+///
+/// 1. The type `ValueShape` represents both patterns, as partial,
+///    _abstract_ values to be matched against.
+/// 2. All patterns are translated to a list of pattern shapes.
+/// 3. The list of abstract values which are needed to explore coverage of the
+///    shapes in (2) is computed. Those values are only as detailed
+///    as needed to fully explore the pattern shapes.
+/// 4. For each abstract value, at least one matching pattern shape must exist,
+///    otherwise the value (its shape) is reported as missing. Also, a pattern must
+///    match at least one value to be reachable.
+///
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum ValueShape {
+    Any,
+    Tuple(Vec<ValueShape>),
+    // Struct(struct_id, optional_variant, argument_shapes)
+    Struct(QualifiedId<StructId>, Option<Symbol>, Vec<ValueShape>),
+}
+
+struct ValueShapeDisplay<'a> {
+    env: &'a GlobalEnv,
+    shape: &'a ValueShape,
+}
+
+impl ValueShape {
+    /// Main entrypoint for analyzing match coverage.
+    fn analyze_match_coverage<'a>(
+        env: &GlobalEnv,
+        value_exp_id: NodeId,
+        patterns: impl Iterator<Item = &'a Pattern>,
+    ) {
+        // Translate patterns into shapes
+        let pattern_shapes: Vec<(NodeId, ValueShape)> = patterns
+            .map(|p| (p.node_id(), ValueShape::for_pattern(p)))
+            .collect();
+        // Compute the set of abstract values which need to be matched.
+        let mut values = BTreeSet::new();
+        for (_, shape) in &pattern_shapes {
+            for partial_value in shape.possible_values(env) {
+                Self::join_value_shape(&mut values, partial_value)
+            }
+        }
+        // Now go over all patterns in sequence and incrementally remove matched
+        // values. If a pattern doesn't match any values, report it as unreachable.
+        for (pat_id, pattern_shape) in pattern_shapes {
+            let mut matched = false;
+            let mut remaining_values = BTreeSet::new();
+            while let Some(value) = values.pop_first() {
+                if value.instance_of(&pattern_shape) {
+                    matched = true;
+                } else {
+                    remaining_values.insert(value);
+                }
+            }
+            if !matched {
+                env.error(&env.get_node_loc(pat_id), "unreachable pattern");
+            }
+            values = remaining_values
+        }
+        // Finally, report any unmatched value shapes
+        if !values.is_empty() {
+            env.error_with_notes(
+                &env.get_node_loc(value_exp_id),
+                "match not exhaustive",
+                values
+                    .into_iter()
+                    .map(|s| format!("missing `{}`", s.display(env)))
+                    .collect(),
+            )
+        }
+    }
+
+    /// Creates a value shape from a pattern.
+    fn for_pattern(pat: &Pattern) -> ValueShape {
+        use Pattern::*;
+        match pat {
+            Var(_, _) | Wildcard(_) => ValueShape::Any,
+            Tuple(_, pats) => ValueShape::Tuple(pats.iter().map(Self::for_pattern).collect()),
+            Struct(_, sid, variant, pats) => ValueShape::Struct(
+                sid.to_qualified_id(),
+                *variant,
+                pats.iter().map(Self::for_pattern).collect(),
+            ),
+            Error(_) => ValueShape::Any,
+        }
+    }
+
+    /// Creates all value shapes needed to explore the given pattern shape's completeness.
+    fn possible_values(&self, env: &GlobalEnv) -> Vec<ValueShape> {
+        use ValueShape::*;
+        match self {
+            Any => vec![Any],
+            Tuple(args) => Self::possible_values_product(env, args)
+                .map(Tuple)
+                .collect(),
+            Struct(sid, variant, args) => {
+                let derived = if args.is_empty() {
+                    vec![Struct(*sid, *variant, vec![])]
+                } else {
+                    Self::possible_values_product(env, args)
+                        .map(|new_args| Struct(*sid, *variant, new_args))
+                        .collect_vec()
+                };
+                if let Some(v) = variant {
+                    // If this is a variant pattern, need to add all _other_ variants to
+                    // explore for completeness.
+                    let struct_env = env.get_struct(*sid);
+                    derived
+                        .into_iter()
+                        .chain(
+                            struct_env
+                                .get_variants()
+                                .filter(|other_variant| v != other_variant)
+                                .map(|other_variant| {
+                                    let field_count =
+                                        struct_env.get_fields_of_variant(other_variant).count();
+                                    Struct(
+                                        *sid,
+                                        Some(other_variant),
+                                        (0..field_count).map(|_| Any).collect(),
+                                    )
+                                }),
+                        )
+                        .collect()
+                } else {
+                    derived
+                }
+            },
+        }
+    }
+
+    /// From a slice of pattern shapes, construct all value shapes needed to explore completeness
+    /// of the slice. The cartesian product of all value shapes for each individual pattern is
+    /// returned. Note that this can lead to some computational complexity, but because of
+    /// the sequential character matching as discussed at the top of this section, this is
+    /// currently not known how to avoid.
+    fn possible_values_product(
+        env: &GlobalEnv,
+        shapes: &[ValueShape],
+    ) -> impl Iterator<Item = Vec<ValueShape>> {
+        shapes
+            .iter()
+            .map(|shape| shape.possible_values(env))
+            .multi_cartesian_product()
+    }
+
+    /// Attempt to join two shapes. If the join exists, it can be used in place of the others
+    /// to explore pattern completeness. For example, `join(R{v, _}, R{_, w}) == R{v,w}`.
+    fn try_join(&self, other: &ValueShape) -> Option<ValueShape> {
+        use ValueShape::*;
+        let unify_n = |shapes1: &[ValueShape], shapes2: &[ValueShape]| -> Option<Vec<ValueShape>> {
+            let mut result = vec![];
+            for (s1, s2) in shapes1.iter().zip(shapes2) {
+                if let Some(s) = s1.try_join(s2) {
+                    result.push(s);
+                    break;
+                }
+            }
+            if result.len() == shapes1.len() {
+                Some(result)
+            } else {
+                None
+            }
+        };
+        match (self, other) {
+            (Any, _) => Some(other.clone()),
+            (_, Any) => Some(self.clone()),
+            (Struct(sid1, var1, args1), Struct(sid2, var2, args2))
+                if sid1 == sid2 && var1 == var2 =>
+            {
+                unify_n(args1, args2).map(|args| Struct(*sid1, *var1, args))
+            },
+            (Tuple(args1), Tuple(args2)) => unify_n(args1, args2).map(Tuple),
+            _ => None,
+        }
+    }
+
+    /// Given a list of value shapes, join a new one. This attempts specializing existing shapes
+    /// via the join operator in order to keep the list minimal.
+    fn join_value_shape(set: &mut BTreeSet<ValueShape>, value: ValueShape) {
+        for v in set.iter() {
+            if let Some(unified) = v.try_join(&value) {
+                let v = v.clone(); // to free set
+                set.remove(&v);
+                set.insert(unified);
+                return;
+            }
+        }
+        set.insert(value);
+    }
+
+    /// Checks whether one shape is instance of another. It holds that
+    /// `s1.instance_of(s2) <==> s1.unify(s2) == Some(s1)`.
+    fn instance_of(&self, other: &ValueShape) -> bool {
+        use ValueShape::*;
+        match (self, other) {
+            (_, Any) => true,
+            (Tuple(args1), Tuple(args2)) => {
+                args1.iter().zip(args2).all(|(a1, a2)| a1.instance_of(a2))
+            },
+            (Struct(str1, variant1, args1), Struct(str2, variant2, args2))
+                if str1 == str2 && variant1 == variant2 =>
+            {
+                args1.iter().zip(args2).all(|(a1, a2)| a1.instance_of(a2))
+            },
+            _ => false,
+        }
+    }
+
+    fn display<'a>(&'a self, env: &'a GlobalEnv) -> ValueShapeDisplay<'a> {
+        ValueShapeDisplay { env, shape: self }
+    }
+}
+
+impl<'a> fmt::Display for ValueShapeDisplay<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use ValueShape::*;
+        let fmt_list = |list: &[ValueShape], sep: &str| {
+            list.iter()
+                .map(|s| s.display(self.env).to_string())
+                .join(sep)
+        };
+        match self.shape {
+            Any => write!(f, "_"),
+            Tuple(elems) => write!(f, "({})", fmt_list(elems, ",")),
+            Struct(sid, var, args) => {
+                let struct_env = self.env.get_struct(*sid);
+                write!(
+                    f,
+                    "{}",
+                    struct_env.get_name().display(self.env.symbol_pool())
+                )?;
+                if let Some(v) = var {
+                    write!(f, "::{}", v.display(self.env.symbol_pool()))?
+                }
+                if var.is_none() || !args.is_empty() {
+                    if args.iter().all(|a| matches!(a, Any)) {
+                        write!(f, "{{..}}")?
+                    } else {
+                        write!(
+                            f,
+                            "{{{}}}",
+                            struct_env
+                                .get_fields_optional_variant(*var)
+                                .map(|f| f.get_name().display(self.env.symbol_pool()).to_string())
+                                .zip(args.iter())
+                                .map(|(f, e)| format!("{}: {}", f, e.display(self.env)))
+                                .join(", ")
+                        )?
+                    }
+                }
+                Ok(())
+            },
         }
     }
 }

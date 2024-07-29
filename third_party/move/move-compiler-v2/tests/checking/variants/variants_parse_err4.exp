@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/checking/variants/variants_parse_err4.move:11:15
+   │
+11 │         match self {
+   │               ^^^^
+   │               │
+   │               Unexpected 'self'
+   │               Expected '('

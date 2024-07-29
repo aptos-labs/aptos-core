@@ -1,23 +1,16 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0() {
+        0;
         {
-          let () = Tuple();
-          {
-            let x: u64 = 0;
-            x;
-            {
-              let (x: u64, b: bool, M::R{ f: f: u64 }) = Tuple(0, false, pack M::R(0));
-              x;
-              b;
-              f;
-              Tuple()
-            }
-          }
+          let (x: u64, b: bool, M::R{ f }): (u64, bool, M::R) = Tuple(0, false, pack M::R(0));
+          0;
+          false;
+          0;
+          Tuple()
         }
     }
-    spec fun $t0();
 } // end 0x8675309::M

@@ -11,7 +11,7 @@ use aptos_types::{
 
 async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     local_account: &LocalAccount,
-    info: &mut AptosPublicInfo<'_>,
+    info: &mut AptosPublicInfo,
     f: F,
     expected: &str,
 ) {
@@ -34,7 +34,7 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
 
 #[tokio::test]
 async fn test_error_report() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     let local_account = info.random_account();

@@ -1,0 +1,18 @@
+
+Diagnostics:
+error: reference type `&mut u64` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/pack_reference_2.move:5:9
+  │
+2 │     struct Box<T> has drop { f: T }
+  │                - declaration of type parameter `T`
+  ·
+5 │         Box { f: r_mut };
+  │         ^^^
+  │
+  = required by instantiating type parameter `T` of struct `Box`
+
+error: cannot assign `bool` to left-hand side of type `u64`
+  ┌─ tests/checking/typing/pack_reference_2.move:7:9
+  │
+7 │         x = false
+  │         ^

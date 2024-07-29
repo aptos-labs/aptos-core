@@ -111,7 +111,6 @@ impl MempoolProxy {
             max_items,
             max_bytes,
             true,
-            true,
             exclude_transactions,
             callback,
         );
@@ -142,7 +141,7 @@ impl MempoolProxy {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-struct BatchKey {
+pub struct BatchKey {
     author: PeerId,
     batch_id: BatchId,
 }
@@ -157,7 +156,7 @@ impl BatchKey {
 }
 
 #[derive(PartialEq, Eq, Clone, Hash)]
-struct BatchSortKey {
+pub struct BatchSortKey {
     batch_key: BatchKey,
     gas_bucket_start: u64,
 }
@@ -249,7 +248,7 @@ impl ProofQueue {
             return;
         }
         let batch_key = BatchKey::from_info(proof.info());
-        if self.batch_to_proof.get(&batch_key).is_some() {
+        if self.batch_to_proof.contains_key(&batch_key) {
             counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
             return;
         }
@@ -277,13 +276,16 @@ impl ProofQueue {
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
     // return the vector of pulled PoS, and the size of the remaining PoS
+    // The flag in the second return argument is true iff the entire proof queue is fully utilized
+    // when pulling the proofs. If any proof from proof queue cannot be included due to size limits,
+    // this flag is set false.
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
-    ) -> Vec<ProofOfStore> {
+    ) -> (Vec<ProofOfStore>, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
@@ -298,22 +300,21 @@ impl ProofQueue {
         while !iters.is_empty() {
             iters.shuffle(&mut thread_rng());
             iters.retain_mut(|iter| {
-                if full {
-                    return false;
-                }
                 if let Some((sort_key, batch)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
                     } else if let Some(Some((proof, insertion_time))) =
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
-                        cur_bytes += batch.num_bytes();
-                        cur_txns += batch.num_txns();
-                        if cur_bytes > max_bytes || cur_txns > max_txns {
+                        if cur_bytes + batch.num_bytes() > max_bytes
+                            || cur_txns + batch.num_txns() > max_txns
+                        {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
+                        cur_bytes += batch.num_bytes();
+                        cur_txns += batch.num_txns();
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
@@ -346,9 +347,9 @@ impl ProofQueue {
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            ret
+            (ret, !full)
         } else {
-            Vec::new()
+            (Vec::new(), !full)
         }
     }
 

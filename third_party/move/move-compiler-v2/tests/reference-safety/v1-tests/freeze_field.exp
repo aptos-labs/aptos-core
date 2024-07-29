@@ -1,9 +1,2 @@
 
-Diagnostics:
-error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
-   ┌─ tests/reference-safety/v1-tests/freeze_field.move:18:9
-   │
-17 │         let f = &s.f;
-   │                 ---- previous field borrow
-18 │         freeze(s); // error in v2 since it doesn't matter whether s is read
-   │         ^^^^^^^^^ passed here
+============ bytecode verification succeeded ========

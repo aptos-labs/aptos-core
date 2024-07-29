@@ -1,7 +1,2 @@
 
-Diagnostics:
-warning: Function `0x42::m::borrow_wrong_type` is unused: it has no current callers and is private to its module.
-   ┌─ tests/reference-safety/v1-tests/unused_ref.move:23:5
-   │
-23 │ fun borrow_wrong_type() {
-   │     ^^^^^^^^^^^^^^^^^
+============ bytecode verification succeeded ========

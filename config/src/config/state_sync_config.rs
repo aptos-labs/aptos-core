@@ -136,7 +136,7 @@ impl Default for StateSyncDriverConfig {
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
-            max_pending_data_chunks: 100,
+            max_pending_data_chunks: 50,
             max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
@@ -147,8 +147,6 @@ impl Default for StateSyncDriverConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
-    /// Maximum number of concurrent storage server tasks
-    pub max_concurrent_requests: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of invalid requests per peer
@@ -182,7 +180,6 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
-            max_concurrent_requests: 4000,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
@@ -204,21 +201,22 @@ impl Default for StorageServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
+    /// The dynamic prefetching config for the data streaming service
+    pub dynamic_prefetching: DynamicPrefetchingConfig,
+
     /// Whether or not to enable data subscription streaming.
     pub enable_subscription_streaming: bool,
 
     /// The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,
 
-    /// Maximum number of concurrent data client requests (per stream).
+    /// Maximum number of in-flight data client requests (per stream).
     pub max_concurrent_requests: u64,
 
-    /// Maximum number of concurrent data client requests (per stream) for state keys/values.
+    /// Maximum number of in-flight data client requests (per stream) for state keys/values.
     pub max_concurrent_state_requests: u64,
 
-    /// Maximum channel sizes for each data stream listener. If messages are not
-    /// consumed, they will be dropped (oldest messages first). The remaining
-    /// messages will be retrieved using FIFO ordering.
+    /// Maximum channel sizes for each data stream listener (per stream).
     pub max_data_stream_channel_sizes: u64,
 
     /// Maximum number of notification ID to response context mappings held in
@@ -248,17 +246,61 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
+            dynamic_prefetching: DynamicPrefetchingConfig::default(),
             enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
-            max_data_stream_channel_sizes: 300,
+            max_data_stream_channel_sizes: 50,
             max_notification_id_mappings: 300,
-            max_num_consecutive_subscriptions: 40, // At ~4 blocks per second, this should last 10 seconds
+            max_num_consecutive_subscriptions: 45, // At ~3 blocks per second, this should last ~15 seconds
             max_pending_requests: 50,
             max_request_retry: 5,
-            max_subscription_stream_lag_secs: 15, // 15 seconds
+            max_subscription_stream_lag_secs: 10, // 10 seconds
             progress_check_interval_ms: 50,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DynamicPrefetchingConfig {
+    /// Whether or not to enable dynamic prefetching
+    pub enable_dynamic_prefetching: bool,
+
+    /// The initial number of concurrent prefetching requests
+    pub initial_prefetching_value: u64,
+
+    /// Maximum number of in-flight subscription requests
+    pub max_in_flight_subscription_requests: u64,
+
+    /// The maximum number of concurrent prefetching requests
+    pub max_prefetching_value: u64,
+
+    /// The minimum number of concurrent prefetching requests
+    pub min_prefetching_value: u64,
+
+    /// The amount by which to increase the concurrent prefetching value (i.e., on a successful response)
+    pub prefetching_value_increase: u64,
+
+    /// The amount by which to decrease the concurrent prefetching value (i.e., on a timeout)
+    pub prefetching_value_decrease: u64,
+
+    /// The duration by which to freeze the prefetching value on a timeout
+    pub timeout_freeze_duration_secs: u64,
+}
+
+impl Default for DynamicPrefetchingConfig {
+    fn default() -> Self {
+        Self {
+            enable_dynamic_prefetching: true,
+            initial_prefetching_value: 3,
+            max_in_flight_subscription_requests: 9, // At ~3 blocks per second, this should last ~3 seconds
+            max_prefetching_value: 30,
+            min_prefetching_value: 3,
+            prefetching_value_increase: 1,
+            prefetching_value_decrease: 2,
+            timeout_freeze_duration_secs: 30,
         }
     }
 }
@@ -320,7 +362,7 @@ impl Default for AptosDataMultiFetchConfig {
             enable_multi_fetch: true,
             additional_requests_per_peer_bucket: 1,
             min_peers_for_multi_fetch: 2,
-            max_peers_for_multi_fetch: 5,
+            max_peers_for_multi_fetch: 3,
             multi_fetch_peer_bucket_size: 10,
         }
     }
@@ -354,6 +396,8 @@ pub struct AptosDataClientConfig {
     pub data_poller_config: AptosDataPollerConfig,
     /// The aptos data multi-fetch config for the data client
     pub data_multi_fetch_config: AptosDataMultiFetchConfig,
+    /// Whether or not to ignore peers with low peer scores
+    pub ignore_low_score_peers: bool,
     /// The aptos latency filtering config for the data client
     pub latency_filtering_config: AptosLatencyFilteringConfig,
     /// The interval (milliseconds) at which to refresh the latency monitor
@@ -389,19 +433,20 @@ impl Default for AptosDataClientConfig {
         Self {
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
+            ignore_low_score_peers: true,
             latency_filtering_config: AptosLatencyFilteringConfig::default(),
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
-            max_optimistic_fetch_lag_secs: 30, // 30 seconds
+            max_optimistic_fetch_lag_secs: 20, // 20 seconds
             max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_lag_secs: 30, // 30 seconds
+            max_subscription_lag_secs: 20, // 20 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000,        // 5 seconds
             response_timeout_ms: 10_000,              // 10 seconds
-            subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
+            subscription_response_timeout_ms: 15_000, // 15 seconds (longer than a regular timeout because of prefetching)
             use_compression: true,
         }
     }

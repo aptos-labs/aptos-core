@@ -180,6 +180,18 @@ variable "workspace_name_override" {
 
 ### GKE cluster config
 
+variable "router_nat_ip_allocate_option" {
+  description = "The method of NAT IP allocation for the cluster. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#router_nat_ip_allocate_option"
+  type        = string
+  default     = "MANUAL_ONLY"
+}
+
+variable "enable_endpoint_independent_mapping" {
+  description = "Enable endpoint independent mapping for the NAT router"
+  type        = bool
+  default     = false
+}
+
 variable "enable_clouddns" {
   description = "Enable CloudDNS (Google-managed cluster DNS)"
   type        = bool
@@ -307,4 +319,28 @@ variable "tls_sans" {
   description = "List of Subject Alternate Names to include in TLS certificate"
   type        = list(string)
   default     = []
+}
+
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  type        = bool
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  type        = bool
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  type        = bool
+  default     = false
 }

@@ -59,7 +59,7 @@ module veiled_coin::veiled_coin_tests {
         // Initialize the `veiled_coin` module & enable the feature
         veiled_coin::init_module_for_testing(veiled_coin);
         println(b"Initialized module.");
-        features::change_feature_flags(&aptos_fx, vector[features::get_bulletproofs_feature()], vector[]);
+        features::change_feature_flags_for_testing(&aptos_fx, vector[features::get_bulletproofs_feature()], vector[]);
         println(b"Enabled feature flags.");
 
         // Set up an account for the framework address

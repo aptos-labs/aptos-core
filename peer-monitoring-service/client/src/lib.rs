@@ -227,16 +227,7 @@ pub(crate) fn spawn_peer_metadata_updater(
             metadata_update_loop_ticker.next().await;
 
             // Get all peers
-            let all_peers = match peers_and_metadata.get_all_peers() {
-                Ok(all_peers) => all_peers,
-                Err(error) => {
-                    warn!(LogSchema::new(LogEntry::MetadataUpdateLoop)
-                        .event(LogEvent::UnexpectedErrorEncountered)
-                        .error(&error.into())
-                        .message("Failed to get all peers!"));
-                    continue; // Move to the next loop iteration
-                },
-            };
+            let all_peers = peers_and_metadata.get_all_peers();
 
             // Update the latest peer monitoring metadata
             for peer_network_id in all_peers {

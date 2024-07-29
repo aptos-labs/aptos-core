@@ -7,6 +7,6 @@ script {
         stake::remove_validators(&framework_signer, &vector[addr]);
 
         // Make sure to trigger a reconfiguration!
-        supra_governance::reconfigure(&framework_signer);
+        supra_governance::force_end_epoch(&framework_signer);
     }
 }

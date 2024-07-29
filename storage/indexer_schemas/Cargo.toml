@@ -1,0 +1,36 @@
+[package]
+name = "aptos-db-indexer-schemas"
+description = "AptosDB Internal Indexer DB schemas"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-schemadb = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+byteorder = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+aptos-proptest-helpers = { workspace = true }
+aptos-schemadb = { workspace = true, features = ["fuzzing"] }
+aptos-types = { workspace = true, features = ["fuzzing"] }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+rand = { workspace = true }
+
+[features]
+default = []
+fuzzing = ["proptest", "proptest-derive", "aptos-types/fuzzing", "aptos-schemadb/fuzzing"]

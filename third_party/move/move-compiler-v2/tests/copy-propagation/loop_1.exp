@@ -5,126 +5,29 @@ fun m::test($t0: u64): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
+     var $t4: bool
      var $t5: u64
-     var $t6: bool
+     var $t6: u64
      var $t7: u64
-     var $t8: u64
-     var $t9: u64
-  0: $t3 := 0
-  1: $t2 := infer($t3)
-  2: $t5 := 0
-  3: $t4 := infer($t5)
-  4: label L0
-  5: $t7 := 10
-  6: $t6 := <($t4, $t7)
-  7: if ($t6) goto 8 else goto 14
-  8: label L2
-  9: $t2 := infer($t0)
- 10: $t9 := 1
- 11: $t8 := +($t4, $t9)
- 12: $t4 := infer($t8)
+  0: $t2 := 0
+  1: $t3 := 0
+  2: label L0
+  3: $t5 := 10
+  4: $t4 := <($t3, $t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L2
+  7: $t2 := infer($t0)
+  8: $t7 := 1
+  9: $t6 := +($t3, $t7)
+ 10: $t3 := infer($t6)
+ 11: goto 14
+ 12: label L3
  13: goto 16
- 14: label L3
- 15: goto 18
- 16: label L4
- 17: goto 4
- 18: label L1
- 19: $t1 := infer($t2)
- 20: return $t1
-}
-
-============ after AvailableCopiesAnalysisProcessor: ================
-
-[variant baseline]
-fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: bool
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     # before: {}, after: {}
-  0: $t3 := 0
-     # before: {}, after: {$t2 := $t3}
-  1: $t2 := infer($t3)
-     # before: {$t2 := $t3}, after: {$t2 := $t3}
-  2: $t5 := 0
-     # before: {$t2 := $t3}, after: {$t2 := $t3, $t4 := $t5}
-  3: $t4 := infer($t5)
-     # before: {}, after: {}
-  4: label L0
-     # before: {}, after: {}
-  5: $t7 := 10
-     # before: {}, after: {}
-  6: $t6 := <($t4, $t7)
-     # before: {}, after: {}
-  7: if ($t6) goto 8 else goto 14
-     # before: {}, after: {}
-  8: label L2
-     # before: {}, after: {$t2 := $t0}
-  9: $t2 := infer($t0)
-     # before: {$t2 := $t0}, after: {$t2 := $t0}
- 10: $t9 := 1
-     # before: {$t2 := $t0}, after: {$t2 := $t0}
- 11: $t8 := +($t4, $t9)
-     # before: {$t2 := $t0}, after: {$t2 := $t0, $t4 := $t8}
- 12: $t4 := infer($t8)
-     # before: {$t2 := $t0, $t4 := $t8}, after: {$t2 := $t0, $t4 := $t8}
- 13: goto 16
-     # before: {}, after: {}
- 14: label L3
-     # before: {}, after: {}
- 15: goto 18
-     # before: {$t2 := $t0, $t4 := $t8}, after: {$t2 := $t0, $t4 := $t8}
- 16: label L4
-     # before: {$t2 := $t0, $t4 := $t8}, after: {$t2 := $t0, $t4 := $t8}
- 17: goto 4
-     # before: {}, after: {}
- 18: label L1
-     # before: {}, after: {$t1 := $t2}
- 19: $t1 := infer($t2)
-     # before: {$t1 := $t2}, after: {$t1 := $t2}
- 20: return $t1
-}
-
-============ after CopyPropagation: ================
-
-[variant baseline]
-fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: bool
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-  0: $t3 := 0
-  1: $t2 := infer($t3)
-  2: $t5 := 0
-  3: $t4 := infer($t5)
-  4: label L0
-  5: $t7 := 10
-  6: $t6 := <($t4, $t7)
-  7: if ($t6) goto 8 else goto 14
-  8: label L2
-  9: $t2 := infer($t0)
- 10: $t9 := 1
- 11: $t8 := +($t4, $t9)
- 12: $t4 := infer($t8)
- 13: goto 16
- 14: label L3
- 15: goto 18
- 16: label L4
- 17: goto 4
- 18: label L1
- 19: $t1 := infer($t2)
- 20: return $t2
+ 14: label L4
+ 15: goto 2
+ 16: label L1
+ 17: $t1 := infer($t2)
+ 18: return $t1
 }
 
 ============ after DeadStoreElimination: ================
@@ -134,30 +37,27 @@ fun m::test($t0: u64): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
+     var $t4: bool
      var $t5: u64
-     var $t6: bool
+     var $t6: u64
      var $t7: u64
-     var $t8: u64
-     var $t9: u64
-  0: $t3 := 0
-  1: $t2 := infer($t3)
-  2: $t5 := 0
-  3: $t4 := infer($t5)
-  4: label L0
-  5: $t7 := 10
-  6: $t6 := <($t4, $t7)
-  7: if ($t6) goto 8 else goto 14
-  8: label L2
-  9: $t2 := infer($t0)
- 10: $t9 := 1
- 11: $t8 := +($t4, $t9)
- 12: $t4 := infer($t8)
+  0: $t2 := 0
+  1: $t3 := 0
+  2: label L0
+  3: $t5 := 10
+  4: $t4 := <($t3, $t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L2
+  7: $t2 := copy($t0)
+  8: $t7 := 1
+  9: $t6 := +($t3, $t7)
+ 10: $t3 := move($t6)
+ 11: goto 14
+ 12: label L3
  13: goto 16
- 14: label L3
- 15: goto 18
- 16: label L4
- 17: goto 4
- 18: label L1
- 19: return $t2
+ 14: label L4
+ 15: goto 2
+ 16: label L1
+ 17: $t1 := move($t2)
+ 18: return $t1
 }

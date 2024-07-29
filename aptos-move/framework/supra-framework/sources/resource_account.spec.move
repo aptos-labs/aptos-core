@@ -80,6 +80,8 @@ spec supra_framework::resource_account {
         fund_amount: u64,
     ) {
         use supra_framework::aptos_account;
+        // TODO(fa_migration)
+        pragma verify = false;
         let source_addr = signer::address_of(origin);
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
         let coin_store_resource = global<coin::CoinStore<SupraCoin>>(resource_addr);
@@ -89,7 +91,7 @@ spec supra_framework::resource_account {
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit;
 
         //coin property
-        aborts_if coin::is_account_registered<SupraCoin>(resource_addr) && coin_store_resource.frozen;
+        aborts_if coin::spec_is_account_registered<SupraCoin>(resource_addr) && coin_store_resource.frozen;
         /// [high-level-req-3]
         ensures exists<supra_framework::coin::CoinStore<SupraCoin>>(resource_addr);
     }

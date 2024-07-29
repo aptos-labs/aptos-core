@@ -8,6 +8,7 @@ use crate::{
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
     shared_mempool::{
+        priority::PrioritizedPeersState,
         tasks,
         types::{
             notify_subscribers, MultiBatchId, PeerSyncState, SharedMempool,
@@ -16,25 +17,23 @@ use crate::{
     },
 };
 use aptos_config::{
-    config::{MempoolConfig, PeerRole, RoleType},
+    config::{MempoolConfig, RoleType},
     network_id::PeerNetworkId,
 };
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface, metadata::PeerMetadata},
     transport::ConnectionMetadata,
 };
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_time_service::TimeService;
+use aptos_types::transaction::SignedTransaction;
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use fail::fail_point;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
-    cmp::Ordering,
-    collections::{hash_map::RandomState, BTreeMap, BTreeSet, HashMap},
-    hash::{BuildHasher, Hasher},
+    collections::{BTreeMap, BTreeSet, HashMap},
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -77,14 +76,18 @@ pub enum BroadcastError {
     TooManyPendingBroadcasts(PeerNetworkId),
 }
 
+pub enum BroadcastPeerPriority {
+    Primary,
+    Failover,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct MempoolNetworkInterface<NetworkClient> {
     network_client: NetworkClient,
     sync_states: Arc<RwLock<HashMap<PeerNetworkId, PeerSyncState>>>,
-    prioritized_peers: Arc<Mutex<Vec<PeerNetworkId>>>,
     role: RoleType,
     mempool_config: MempoolConfig,
-    prioritized_peers_comparator: PrioritizedPeersComparator,
+    prioritized_peers_state: PrioritizedPeersState,
 }
 
 impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterface<NetworkClient> {
@@ -93,13 +96,14 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         role: RoleType,
         mempool_config: MempoolConfig,
     ) -> MempoolNetworkInterface<NetworkClient> {
+        let prioritized_peers_state =
+            PrioritizedPeersState::new(mempool_config.clone(), TimeService::real());
         Self {
             network_client,
             sync_states: Arc::new(RwLock::new(HashMap::new())),
-            prioritized_peers: Arc::new(Mutex::new(Vec::new())),
             role,
             mempool_config,
-            prioritized_peers_comparator: PrioritizedPeersComparator::new(),
+            prioritized_peers_state,
         }
     }
 
@@ -129,12 +133,18 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         to_add: &[(PeerNetworkId, ConnectionMetadata)],
         to_disable: &[PeerNetworkId],
     ) {
+        // Return early if there are no updates
+        if to_add.is_empty() && to_disable.is_empty() {
+            return;
+        }
+
+        // Otherwise, update the sync states
         let mut sync_states = self.sync_states.write();
-        for (peer, metadata) in to_add.iter().cloned() {
+        for (peer, _) in to_add.iter().cloned() {
             counters::active_upstream_peers(&peer.network_id()).inc();
             sync_states.insert(
                 peer,
-                PeerSyncState::new(metadata, self.mempool_config.broadcast_buckets.len()),
+                PeerSyncState::new(self.mempool_config.broadcast_buckets.len()),
             );
         }
         for peer in to_disable {
@@ -148,46 +158,58 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     /// Update peers based on updated view of connected peers. Return (peers newly added that need
     /// to start broadcasts, peers that will be disabled from broadcasts).
     pub fn update_peers(
-        &self,
+        &mut self,
         all_connected_peers: &HashMap<PeerNetworkId, PeerMetadata>,
     ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
         // Get the upstream peers to add or disable, using a read lock
         let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
-        if to_add.is_empty() && to_disable.is_empty() {
-            return (vec![], vec![]);
-        }
+
         // If there are updates, apply using a write lock
         self.add_and_disable_upstream_peers(&to_add, &to_disable);
-        self.update_prioritized_peers();
+
+        // Update the prioritized peers list using the prioritized peer comparator.
+        // This should be called even if there are no changes to the peers, as the
+        // peer metadata may have changed (e.g., ping latencies).
+        let peers_changed = !to_add.is_empty() || !to_disable.is_empty();
+        self.update_prioritized_peers(all_connected_peers, peers_changed);
 
         (to_add.iter().map(|(peer, _)| *peer).collect(), to_disable)
     }
 
-    fn update_prioritized_peers(&self) {
-        // Only do this if it's not a validator
+    /// Updates the prioritized peers list
+    fn update_prioritized_peers(
+        &mut self,
+        all_connected_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+        peers_changed: bool,
+    ) {
+        // Only fullnodes should prioritize peers (e.g., VFNs and PFNs)
         if self.role.is_validator() {
             return;
         }
 
-        // Retrieve just what's needed for the peer ordering
-        let peers: Vec<_> = {
-            self.sync_states
-                .read()
-                .iter()
-                .map(|(peer, state)| (*peer, state.metadata.role))
-                .collect()
-        };
+        // If the prioritized peers list is not ready for an update, return early
+        if !self.prioritized_peers_state.ready_for_update(peers_changed) {
+            return;
+        }
 
-        // Order peers by network and by type
-        // Origin doesn't matter at this point, only inserted ones into peer_states are upstream
-        // Validators will always have the full set
-        let mut prioritized_peers = self.prioritized_peers.lock();
-        let peers: Vec<_> = peers
+        // Fetch the peers and monitoring metadata
+        let peer_network_ids: Vec<_> = self.sync_states.read().keys().cloned().collect();
+        let peers_and_metadata: Vec<_> = peer_network_ids
             .iter()
-            .sorted_by(|peer_a, peer_b| self.prioritized_peers_comparator.compare(peer_a, peer_b))
-            .map(|(peer, _)| *peer)
+            .map(|peer| {
+                // Get the peer monitoring metadata for the peer
+                let monitoring_metadata = all_connected_peers
+                    .get(peer)
+                    .map(|metadata| metadata.get_peer_monitoring_metadata());
+
+                // Return the peer and monitoring metadata
+                (*peer, monitoring_metadata)
+            })
             .collect();
-        let _ = std::mem::replace(&mut *prioritized_peers, peers);
+
+        // Update the prioritized peers list
+        self.prioritized_peers_state
+            .update_prioritized_peers(peers_and_metadata);
     }
 
     pub fn is_validator(&self) -> bool {
@@ -282,19 +304,22 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
     /// Peers are prioritized when the local is a validator, or it's within the default failovers.
     /// One is added for the primary peer
-    fn check_peer_prioritized(&self, peer: PeerNetworkId) -> Result<(), BroadcastError> {
-        if !self.role.is_validator() {
-            let priority = self
-                .prioritized_peers
-                .lock()
-                .iter()
-                .find_position(|peer_network_id| *peer_network_id == &peer)
-                .map_or(usize::MAX, |(pos, _)| pos);
-            if priority > self.mempool_config.default_failovers {
-                return Err(BroadcastError::PeerNotPrioritized(peer, priority));
-            }
+    fn check_peer_prioritized(
+        &self,
+        peer: PeerNetworkId,
+    ) -> Result<BroadcastPeerPriority, BroadcastError> {
+        if self.role.is_validator() {
+            return Ok(BroadcastPeerPriority::Primary);
         }
-        Ok(())
+
+        let peer_priority = self.prioritized_peers_state.get_peer_priority(&peer);
+        if peer_priority == 0 {
+            Ok(BroadcastPeerPriority::Primary)
+        } else if peer_priority <= self.mempool_config.default_failovers {
+            Ok(BroadcastPeerPriority::Failover)
+        } else {
+            Err(BroadcastError::PeerNotPrioritized(peer, peer_priority))
+        }
     }
 
     /// Determines the broadcast batch.  There are three types of batches:
@@ -314,7 +339,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             .ok_or(BroadcastError::PeerNotFound(peer))?;
 
         // If the peer isn't prioritized, lets not broadcast
-        self.check_peer_prioritized(peer)?;
+        let peer_priority = self.check_peer_prioritized(peer)?;
 
         // If backoff mode is on for this peer, only execute broadcasts that were scheduled as a backoff broadcast.
         // This is to ensure the backoff mode is actually honored (there is a chance a broadcast was scheduled
@@ -385,9 +410,19 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                 },
                 None => {
                     // Fresh broadcast
+                    let before = match peer_priority {
+                        BroadcastPeerPriority::Primary => None,
+                        BroadcastPeerPriority::Failover => Some(
+                            Instant::now()
+                                - Duration::from_millis(
+                                    self.mempool_config.shared_mempool_failover_delay_ms,
+                                ),
+                        ),
+                    };
                     let (txns, new_timeline_id) = mempool.read_timeline(
                         &state.timeline_id,
                         self.mempool_config.shared_mempool_batch_size,
+                        before,
                     );
                     (
                         MultiBatchId::from_timeline_ids(&state.timeline_id, &new_timeline_id),
@@ -507,107 +542,5 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
     pub fn sync_states_exists(&self, peer: &PeerNetworkId) -> bool {
         self.sync_states.read().get(peer).is_some()
-    }
-}
-
-#[derive(Clone, Debug)]
-struct PrioritizedPeersComparator {
-    random_state: RandomState,
-}
-
-impl PrioritizedPeersComparator {
-    fn new() -> Self {
-        Self {
-            random_state: RandomState::new(),
-        }
-    }
-
-    /// Provides ordering for peers to send transactions to
-    fn compare(
-        &self,
-        peer_a: &(PeerNetworkId, PeerRole),
-        peer_b: &(PeerNetworkId, PeerRole),
-    ) -> Ordering {
-        let peer_network_id_a = peer_a.0;
-        let peer_network_id_b = peer_b.0;
-
-        // Sort by NetworkId
-        match peer_network_id_a
-            .network_id()
-            .cmp(&peer_network_id_b.network_id())
-        {
-            Ordering::Equal => {
-                // Then sort by Role
-                let role_a = peer_a.1;
-                let role_b = peer_b.1;
-                match role_a.cmp(&role_b) {
-                    // Tiebreak by hash_peer_id.
-                    Ordering::Equal => {
-                        let hash_a = self.hash_peer_id(&peer_network_id_a.peer_id());
-                        let hash_b = self.hash_peer_id(&peer_network_id_b.peer_id());
-
-                        hash_a.cmp(&hash_b)
-                    },
-                    ordering => ordering,
-                }
-            },
-            ordering => ordering,
-        }
-    }
-
-    /// Stable within a mempool instance but random between instances.
-    fn hash_peer_id(&self, peer_id: &PeerId) -> u64 {
-        let mut hasher = self.random_state.build_hasher();
-        hasher.write(peer_id.as_ref());
-        hasher.finish()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use aptos_config::network_id::NetworkId;
-    use aptos_types::PeerId;
-
-    #[test]
-    fn check_peer_prioritization() {
-        let comparator = PrioritizedPeersComparator::new();
-
-        let peer_id_1 = PeerId::from_hex_literal("0x1").unwrap();
-        let peer_id_2 = PeerId::from_hex_literal("0x2").unwrap();
-        let val_1 = (
-            PeerNetworkId::new(NetworkId::Vfn, peer_id_1),
-            PeerRole::Validator,
-        );
-        let val_2 = (
-            PeerNetworkId::new(NetworkId::Vfn, peer_id_2),
-            PeerRole::Validator,
-        );
-        let vfn_1 = (
-            PeerNetworkId::new(NetworkId::Public, peer_id_1),
-            PeerRole::ValidatorFullNode,
-        );
-        let preferred_1 = (
-            PeerNetworkId::new(NetworkId::Public, peer_id_1),
-            PeerRole::PreferredUpstream,
-        );
-
-        // NetworkId ordering
-        assert_eq!(Ordering::Greater, comparator.compare(&vfn_1, &val_1));
-        assert_eq!(Ordering::Less, comparator.compare(&val_1, &vfn_1));
-
-        // PeerRole ordering
-        assert_eq!(Ordering::Greater, comparator.compare(&vfn_1, &preferred_1));
-        assert_eq!(Ordering::Less, comparator.compare(&preferred_1, &vfn_1));
-
-        // Tiebreaker on peer_id
-        let hash_1 = comparator.hash_peer_id(&val_1.0.peer_id());
-        let hash_2 = comparator.hash_peer_id(&val_2.0.peer_id());
-
-        assert_eq!(hash_2.cmp(&hash_1), comparator.compare(&val_2, &val_1));
-        assert_eq!(hash_1.cmp(&hash_2), comparator.compare(&val_1, &val_2));
-
-        // Same the only equal case
-        assert_eq!(Ordering::Equal, comparator.compare(&val_1, &val_1));
     }
 }

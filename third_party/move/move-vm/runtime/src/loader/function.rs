@@ -2,18 +2,24 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ModuleStorageAdapter;
 use crate::{
-    loader::{Loader, Module, Resolver, ScriptHash},
+    loader::{
+        access_specifier_loader::load_access_specifier, Loader, ModuleStorageAdapter, Resolver,
+        ScriptHash,
+    },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
 };
 use move_binary_format::{
     access::ModuleAccess,
+    binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
     file_format::{AbilitySet, Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::runtime_types::Type;
+use move_vm_types::loaded_data::{
+    runtime_access_specifier::AccessSpecifier,
+    runtime_types::{StructIdentifier, Type},
+};
 use std::{fmt::Debug, sync::Arc};
 
 // A simple wrapper for the "owner" of the function (Module or Script)
@@ -23,34 +29,63 @@ pub(crate) enum Scope {
     Script(ScriptHash),
 }
 
-// A runtime function
-// #[derive(Debug)]
-// https://github.com/rust-lang/rust/issues/70263
-pub(crate) struct Function {
+// A runtime function representation.
+pub struct Function {
     #[allow(unused)]
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub(crate) type_parameters: Vec<AbilitySet>,
+    pub(crate) ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
-    pub(crate) def_is_native: bool,
-    pub(crate) def_is_friend_or_private: bool,
+    pub(crate) is_native: bool,
+    pub(crate) is_friend_or_private: bool,
+    pub(crate) is_entry: bool,
     pub(crate) scope: Scope,
     pub(crate) name: Identifier,
-    pub(crate) return_types: Vec<Type>,
-    pub(crate) local_types: Vec<Type>,
-    pub(crate) parameter_types: Vec<Type>,
+    pub(crate) return_tys: Vec<Type>,
+    pub(crate) local_tys: Vec<Type>,
+    pub(crate) param_tys: Vec<Type>,
+    pub(crate) access_specifier: AccessSpecifier,
 }
 
-// This struct must be treated as an identifier for a function and not somehow relying on
-// the internal implementation.
+// An instantiated and loaded runtime function representation.
 pub struct LoadedFunction {
-    pub(crate) module: Arc<Module>,
+    pub(crate) ty_args: Vec<Type>,
     pub(crate) function: Arc<Function>,
 }
 
-impl std::fmt::Debug for Function {
+impl LoadedFunction {
+    pub fn ty_args(&self) -> &[Type] {
+        &self.ty_args
+    }
+
+    pub fn module_id(&self) -> Option<ModuleId> {
+        self.function.module_id().cloned()
+    }
+
+    pub fn is_friend_or_private(&self) -> bool {
+        self.function.is_friend_or_private()
+    }
+
+    pub(crate) fn is_entry(&self) -> bool {
+        self.function.is_entry()
+    }
+
+    pub fn param_tys(&self) -> &[Type] {
+        self.function.param_tys()
+    }
+
+    pub fn return_tys(&self) -> &[Type] {
+        self.function.return_tys()
+    }
+
+    pub fn ty_param_abilities(&self) -> &[AbilitySet] {
+        self.function.ty_param_abilities()
+    }
+}
+
+impl Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("Function")
             .field("scope", &self.scope)
@@ -65,24 +100,26 @@ impl Function {
         index: FunctionDefinitionIndex,
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
-    ) -> Self {
+        struct_names: &[StructIdentifier],
+    ) -> PartialVMResult<Self> {
         let def = module.function_def_at(index);
         let handle = module.function_handle_at(def.function);
         let name = module.identifier_at(handle.name).to_owned();
         let module_id = module.self_id();
-        let def_is_friend_or_private = match def.visibility {
+
+        let is_friend_or_private = match def.visibility {
             Visibility::Friend | Visibility::Private => true,
             Visibility::Public => false,
         };
-        let (native, def_is_native) = if def.is_native() {
-            (
-                natives.resolve(
-                    module_id.address(),
-                    module_id.name().as_str(),
-                    name.as_str(),
-                ),
-                true,
-            )
+        let is_entry = def.is_entry;
+
+        let (native, is_native) = if def.is_native() {
+            let native = natives.resolve(
+                module_id.address(),
+                module_id.name().as_str(),
+                name.as_str(),
+            );
+            (native, true)
         } else {
             (None, false)
         };
@@ -92,32 +129,40 @@ impl Function {
             Some(code) => code.code.clone(),
             None => vec![],
         };
-        let type_parameters = handle.type_parameters.clone();
-        let return_types = signature_table[handle.return_.0 as usize].clone();
-        let local_types = if let Some(code) = &def.code {
-            let mut locals = signature_table[handle.parameters.0 as usize].clone();
-            locals.append(&mut signature_table[code.locals.0 as usize].clone());
-            locals
+        let ty_param_abilities = handle.type_parameters.clone();
+        let return_tys = signature_table[handle.return_.0 as usize].clone();
+        let local_tys = if let Some(code) = &def.code {
+            let mut local_tys = signature_table[handle.parameters.0 as usize].clone();
+            local_tys.append(&mut signature_table[code.locals.0 as usize].clone());
+            local_tys
         } else {
             vec![]
         };
+        let param_tys = signature_table[handle.parameters.0 as usize].clone();
 
-        let parameter_types = signature_table[handle.parameters.0 as usize].clone();
+        let access_specifier = load_access_specifier(
+            BinaryIndexedView::Module(module),
+            signature_table,
+            struct_names,
+            &handle.access_specifiers,
+        )?;
 
-        Self {
+        Ok(Self {
             file_format_version: module.version(),
             index,
             code,
-            type_parameters,
+            ty_param_abilities,
             native,
-            def_is_native,
-            def_is_friend_or_private,
+            is_native,
+            is_friend_or_private,
+            is_entry,
             scope,
             name,
-            local_types,
-            return_types,
-            parameter_types,
-        }
+            local_tys,
+            return_tys,
+            param_tys,
+            access_specifier,
+        })
     }
 
     #[allow(unused)]
@@ -156,15 +201,11 @@ impl Function {
     }
 
     pub(crate) fn local_count(&self) -> usize {
-        self.local_types.len()
+        self.local_tys.len()
     }
 
-    pub(crate) fn arg_count(&self) -> usize {
-        self.parameter_types.len()
-    }
-
-    pub(crate) fn return_type_count(&self) -> usize {
-        self.return_types.len()
+    pub fn param_count(&self) -> usize {
+        self.param_tys.len()
     }
 
     pub(crate) fn name(&self) -> &str {
@@ -175,20 +216,20 @@ impl Function {
         &self.code
     }
 
-    pub(crate) fn type_parameters(&self) -> &[AbilitySet] {
-        &self.type_parameters
+    pub fn ty_param_abilities(&self) -> &[AbilitySet] {
+        &self.ty_param_abilities
     }
 
-    pub(crate) fn local_types(&self) -> &[Type] {
-        &self.local_types
+    pub(crate) fn local_tys(&self) -> &[Type] {
+        &self.local_tys
     }
 
-    pub(crate) fn return_types(&self) -> &[Type] {
-        &self.return_types
+    pub fn return_tys(&self) -> &[Type] {
+        &self.return_tys
     }
 
-    pub(crate) fn parameter_types(&self) -> &[Type] {
-        &self.parameter_types
+    pub fn param_tys(&self) -> &[Type] {
+        &self.param_tys
     }
 
     pub(crate) fn pretty_string(&self) -> String {
@@ -204,11 +245,15 @@ impl Function {
     }
 
     pub(crate) fn is_native(&self) -> bool {
-        self.def_is_native
+        self.is_native
     }
 
-    pub(crate) fn is_friend_or_private(&self) -> bool {
-        self.def_is_friend_or_private
+    pub fn is_friend_or_private(&self) -> bool {
+        self.is_friend_or_private
+    }
+
+    pub(crate) fn is_entry(&self) -> bool {
+        self.is_entry
     }
 
     pub(crate) fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use move_core_types::value::{MoveStruct, MoveValue};
 
@@ -30,6 +31,12 @@ impl AsMoveValue for String {
 impl<T: AsMoveValue> AsMoveValue for Vec<T> {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::Vector(self.iter().map(T::as_move_value).collect())
+    }
+}
+
+impl AsMoveValue for bool {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Bool(*self)
     }
 }
 

@@ -1,0 +1,123 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t1 := 1
+  1: $t2 := 2
+  2: $t3 := 3
+  3: $t4 := +($t1, $t2)
+  4: $t0 := +($t4, $t3)
+  5: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t1 := 1
+  1: $t2 := 2
+  2: $t3 := 3
+  3: $t4 := +($t1, $t2)
+  4: $t0 := +($t4, $t3)
+  5: return $t0
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+     # events: b:$t1
+  0: $t1 := 1
+     # live vars: $t1
+     # events: b:$t2
+  1: $t2 := 2
+     # live vars: $t1, $t2
+     # events: b:$t3
+  2: $t3 := 3
+     # live vars: $t1, $t2, $t3
+     # events: e:$t1, e:$t2, b:$t4
+  3: $t4 := +($t1, $t2)
+     # live vars: $t3, $t4
+     # events: e:$t3, e:$t4, b:$t0
+  4: $t0 := +($t4, $t3)
+     # live vars: $t0
+     # events: e:$t0
+  5: return $t0
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+  0: $t1 := 1
+  1: $t2 := 2
+  2: $t3 := 3
+  3: $t1 := +($t1, $t2)
+  4: $t1 := +($t1, $t3)
+  5: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+  0: $t1 := 1
+  1: $t2 := 2
+  2: $t3 := 3
+  3: $t1 := +($t1, $t2)
+  4: $t1 := +($t1, $t3)
+  5: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(): u64 /* def_idx: 0 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+B0:
+	0: LdU64(1)
+	1: LdU64(2)
+	2: LdU64(3)
+	3: StLoc[0](loc0: u64)
+	4: StLoc[1](loc1: u64)
+	5: StLoc[2](loc2: u64)
+	6: MoveLoc[2](loc2: u64)
+	7: MoveLoc[1](loc1: u64)
+	8: Add
+	9: MoveLoc[0](loc0: u64)
+	10: Add
+	11: Ret
+}
+}
+============ bytecode verification succeeded ========

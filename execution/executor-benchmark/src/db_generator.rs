@@ -16,6 +16,7 @@ use aptos_executor::{
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
 use aptos_storage_interface::DbReaderWriter;
+use aptos_types::on_chain_config::Features;
 use aptos_vm::AptosVM;
 use std::{fs, path::Path};
 
@@ -28,6 +29,7 @@ pub fn create_db_with_accounts<V>(
     verify_sequence_numbers: bool,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
+    init_features: Features,
 ) where
     V: TransactionBlockExecutor + 'static,
 {
@@ -39,7 +41,7 @@ pub fn create_db_with_accounts<V>(
     // create if not exists
     fs::create_dir_all(db_dir.as_ref()).unwrap();
 
-    bootstrap_with_genesis(&db_dir, enable_storage_sharding);
+    bootstrap_with_genesis(&db_dir, enable_storage_sharding, init_features.clone());
 
     println!(
         "Finished empty DB creation, DB dir: {}. Creating accounts now...",
@@ -56,11 +58,17 @@ pub fn create_db_with_accounts<V>(
         verify_sequence_numbers,
         enable_storage_sharding,
         pipeline_config,
+        init_features,
     );
 }
 
-fn bootstrap_with_genesis(db_dir: impl AsRef<Path>, enable_storage_sharding: bool) {
-    let (config, _genesis_key) = aptos_genesis::test_utils::test_config();
+fn bootstrap_with_genesis(
+    db_dir: impl AsRef<Path>,
+    enable_storage_sharding: bool,
+    init_features: Features,
+) {
+    let (config, _genesis_key) =
+        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
 
     let mut rocksdb_configs = RocksdbConfigs::default();
     rocksdb_configs.state_merkle_db_config.max_open_files = -1;

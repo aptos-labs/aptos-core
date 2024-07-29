@@ -12,16 +12,43 @@ pub mod victoria_metrics_api {
     use url::Url;
     use warp::hyper::body::Bytes;
 
+    #[derive(Clone)]
+    pub enum AuthToken {
+        Bearer(String),
+        Basic(String, String),
+    }
+
+    impl From<&String> for AuthToken {
+        fn from(token: &String) -> Self {
+            // TODO(ibalajiarun): Auth type must be read from config
+            if token.split(':').count() == 2 {
+                let mut parts = token.split(':');
+                AuthToken::Basic(
+                    parts.next().unwrap().to_string(),
+                    parts.next().unwrap().to_string(),
+                )
+            } else {
+                AuthToken::Bearer(token.to_string())
+            }
+        }
+    }
+
+    impl From<&str> for AuthToken {
+        fn from(token: &str) -> Self {
+            AuthToken::from(&token.to_string())
+        }
+    }
+
     /// Client implementation to export metrics to Victoria Metrics
     #[derive(Clone)]
     pub struct Client {
         inner: ClientWithMiddleware,
         base_url: Url,
-        auth_token: String,
+        auth_token: AuthToken,
     }
 
     impl Client {
-        pub fn new(base_url: Url, auth_token: String) -> Self {
+        pub fn new(base_url: Url, auth_token: AuthToken) -> Self {
             let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
             let inner = ClientBuilder::new(ReqwestClient::new())
                 .with(RetryTransientMiddleware::new_with_policy(retry_policy))
@@ -44,10 +71,17 @@ pub mod victoria_metrics_api {
                 .map(|label| ("extra_label".into(), label.into()))
                 .collect();
 
-            self.inner
-                .post(format!("{}api/v1/import/prometheus", self.base_url))
-                .bearer_auth(self.auth_token.clone())
-                .header(CONTENT_ENCODING, encoding)
+            let req = self
+                .inner
+                .post(format!("{}api/v1/import/prometheus", self.base_url));
+            let req = match &self.auth_token {
+                AuthToken::Bearer(token) => req.bearer_auth(token.clone()),
+                AuthToken::Basic(username, password) => {
+                    req.basic_auth(username.clone(), Some(password.clone()))
+                },
+            };
+
+            req.header(CONTENT_ENCODING, encoding)
                 .query(&labels)
                 .body(raw_metrics_body)
                 .send()

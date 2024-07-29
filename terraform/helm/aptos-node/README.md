@@ -17,20 +17,22 @@ Aptos blockchain node deployment
 | chain.chain_id | int | `4` | Chain ID |
 | chain.era | int | `1` | Bump this number to wipe the underlying storage |
 | chain.name | string | `"testnet"` | Internal: name of the testnet to connect to |
+| cluster_name | string | `"unknown"` |  |
 | enablePrivilegedMode | bool | `false` | TEST ONLY: Enable running as root for profiling |
 | fullnode.affinity | object | `{}` |  |
 | fullnode.config | object | `{"full_node_networks":[{"network_id":"public","seeds":{}}]}` | Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
 | fullnode.force_enable_telemetry | bool | `false` | Flag to force enable telemetry service (useful for forge tests) |
-| fullnode.groups | list | `[{"name":"fullnode","replicas":1}]` | Specify fullnode groups by `name` and number of `replicas` |
+| fullnode.groups | list | `[{"dns_name":"vfn","name":"fullnode","replicas":1}]` | Specify fullnode groups by `name` and number of `replicas` |
 | fullnode.nodeSelector | object | `{}` |  |
-| fullnode.resources.limits.cpu | float | `15.5` |  |
-| fullnode.resources.limits.memory | string | `"26Gi"` |  |
-| fullnode.resources.requests.cpu | int | `15` |  |
-| fullnode.resources.requests.memory | string | `"26Gi"` |  |
+| fullnode.resources.limits.cpu | int | `14` |  |
+| fullnode.resources.limits.memory | string | `"56Gi"` |  |
+| fullnode.resources.requests.cpu | int | `14` |  |
+| fullnode.resources.requests.memory | string | `"56Gi"` |  |
 | fullnode.rust_log | string | `"info"` | Log level for the fullnode |
 | fullnode.storage.class | string | `nil` | Kubernetes storage class to use for fullnode persistent storage |
 | fullnode.storage.size | string | `"2048Gi"` | Size of fullnode persistent storage |
 | fullnode.tolerations | list | `[]` |  |
+| genesis_blob_upload_url | string | `"https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url"` |  |
 | haproxy.affinity | object | `{}` |  |
 | haproxy.config.send_proxy_protocol | bool | `false` | Whether to send Proxy Protocol v2 |
 | haproxy.enabled | bool | `true` | Enable HAProxy deployment in front of validator and fullnodes |
@@ -43,21 +45,23 @@ Aptos blockchain node deployment
 | haproxy.limits.validator.tcpBufSize | int | `524288` |  |
 | haproxy.nodeSelector | object | `{}` |  |
 | haproxy.replicas | int | `1` | Number of HAProxy replicas |
-| haproxy.resources.limits.cpu | int | `4` |  |
-| haproxy.resources.limits.memory | string | `"8Gi"` |  |
-| haproxy.resources.requests.cpu | int | `4` |  |
-| haproxy.resources.requests.memory | string | `"8Gi"` |  |
+| haproxy.resources.limits.cpu | int | `3` |  |
+| haproxy.resources.limits.memory | string | `"6Gi"` |  |
+| haproxy.resources.requests.cpu | int | `3` |  |
+| haproxy.resources.requests.memory | string | `"6Gi"` |  |
 | haproxy.tls_secret | string | `nil` | Name of the Kubernetes TLS secret to use for HAProxy |
 | haproxy.tolerations | list | `[]` |  |
 | imageTag | string | `"devnet"` | Default image tag to use for all validator and fullnode images |
 | labels | string | `nil` |  |
 | loadTestGenesis | bool | `false` | Load test-data for starting a test network |
 | manageImages | bool | `true` | If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout) |
+| migrations.enable_vfn_explicit_pvc | bool | `false` | See templates/fullnode.yaml |
 | multicluster | object | `{"enabled":false,"targetClusters":["forge-multiregion-1","forge-multiregion-2","forge-multiregion-3"]}` | Options for multicluster mode. This is *experimental only*. |
 | numFullnodeGroups | int | `1` | Total number of fullnode groups to deploy |
 | numValidators | int | `1` | Number of validators to deploy |
 | overrideNodeConfig | bool | `false` | Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart. |
 | service.domain | string | `nil` | If set, the base domain name to use for External DNS |
+| service.fullnode.enableAdminPort | bool | `false` | Enable the admin port on fullnodes |
 | service.fullnode.enableMetricsPort | bool | `false` | Enable the metrics port on fullnodes |
 | service.fullnode.enableRestApi | bool | `true` | Enable the REST API on fullnodes |
 | service.fullnode.external.type | string | `"LoadBalancer"` | The Kubernetes ServiceType to use for fullnodes' HAProxy |
@@ -65,6 +69,7 @@ Aptos blockchain node deployment
 | service.fullnode.internal.headless | bool | `false` |  |
 | service.fullnode.internal.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for fullnodes |
 | service.fullnode.loadBalancerSourceRanges | string | `nil` | If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs |
+| service.validator.enableAdminPort | bool | `false` | Enable the admin port on the validator |
 | service.validator.enableMetricsPort | bool | `false` | Enable the metrics port on the validator |
 | service.validator.enableRestApi | bool | `true` | Enable the REST API on the validator |
 | service.validator.external.type | string | `"LoadBalancer"` | The Kubernetes ServiceType to use for validator's HAProxy |
@@ -83,10 +88,10 @@ Aptos blockchain node deployment
 | validator.image.tag | string | `nil` | Image tag to use for validator images. If set, overrides `imageTag` |
 | validator.name | string | `nil` | Internal: name of your validator for use in labels |
 | validator.nodeSelector | object | `{}` |  |
-| validator.resources.limits.cpu | float | `15.5` |  |
-| validator.resources.limits.memory | string | `"26Gi"` |  |
-| validator.resources.requests.cpu | int | `15` |  |
-| validator.resources.requests.memory | string | `"26Gi"` |  |
+| validator.resources.limits.cpu | int | `14` |  |
+| validator.resources.limits.memory | string | `"56Gi"` |  |
+| validator.resources.requests.cpu | int | `14` |  |
+| validator.resources.requests.memory | string | `"56Gi"` |  |
 | validator.rust_log | string | `"info"` | Log level for the validator |
 | validator.storage.class | string | `nil` | Kubernetes storage class to use for validator persistent storage |
 | validator.storage.size | string | `"2048Gi"` | Size of validator persistent storage |

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun foo<T,U>(_x: #0,_y: #1) {
         Tuple()
@@ -15,9 +15,4 @@ module 0x8675309::M {
         M::foo<U, V>(u, v);
         Tuple()
     }
-    spec fun $foo<T,U>(_x: #0,_y: #1) {
-        Tuple()
-    }
-    spec fun $t1();
-    spec fun $t2<T,U,V>(t: #0,u: #1,v: #2);
 } // end 0x8675309::M

@@ -597,7 +597,7 @@ impl<T: Transaction> CapturedReads<T> {
         self.group_reads.iter().all(|(key, group)| {
             let mut ret = true;
             if let Some(size) = group.collected_size {
-                ret &= Ok(size) == group_map.get_group_size(key, idx_to_validate);
+                ret &= group_map.validate_group_size(key, idx_to_validate, size);
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
@@ -756,9 +756,9 @@ impl<T: Transaction> UnsyncReadSet<T> {
 mod test {
     use super::*;
     use crate::proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType};
-    use aptos_aggregator::types::DelayedFieldID;
     use aptos_mvhashmap::types::StorageVersion;
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
+    use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use test_case::test_case;
 
     #[test]
@@ -1204,7 +1204,7 @@ mod test {
         let with_metadata_reads = with_metadata_reads_by_kind();
 
         let resolved = DataRead::Resolved::<ValueType>(200);
-        let mixed_reads = vec![
+        let mixed_reads = [
             deletion_reads[0].clone(),
             with_metadata_reads[1].clone(),
             resolved,

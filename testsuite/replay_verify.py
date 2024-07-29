@@ -14,60 +14,50 @@ from collections import deque
 
 from verify_core.common import clear_artifacts, query_backup_latest_version
 
-# This script runs the replay-verify from the root of aptos-core
-# It assumes the aptos-debugger binary is already built with the release profile
-
-
-# The key is the runner's number and the value is the range of txns that the runner is responsible for
-# This mapping is generated in 3 steps:
-# (1) allocate the txns to runners based on how much time the runners in past takes to finish evenly distributed txns, example script https://gist.github.com/areshand/d00ce302d3bafe0f7b97c311113eba1b
-# (2) rerun the flow with new ranges and check the time each runner takes to finish again
-# (3) manual adjust the range based on times each takes to finish the work to make sure each runner takes similar time to finish
-
-#  Note: this range needs to be updated when the last range's time is over 2 hrs. (we will send a low pri alert once the time is over 2 hrs)
-#  Oncall should
-#  1. seal the last range with the latest txn version and start a new range with the [latest_txn_version + 1, sys.maxsize]
-#  2. meanwhile, the oncall should delete the old ranges that are beyond 300M window that we want to scan
-#
 
 TESTNET_RANGES = [
-    [250000000, 255584106],
-    [255584107, 271874718],
-    [271874719, 300009463],
-    [300009464, 324904819],
-    [324904820, 347234877],
-    [347234878, 366973577],
-    [366973578, 399489396],
-    [399489397, 430909965],
-    [430909966, 449999999],
-    [450000000, 462114510],
-    [462114511, 478825432],
-    [478825433, 483500000],
-    [483500001, 516281795],
-    [516281796, 551052675],
-    [551052676, 582481398],
-    [582481399, 640_000_000],
-    [640_000_001, sys.maxsize],
+    (962_000_000, 978_000_000),
+    (978_000_000, 994_000_000),
+    (994_000_000, 1_009_000_000),
+    (1_009_000_000, 1_025_000_000),
+    (1_025_000_000, 1_041_000_000),
+    (1_041_000_000, 1_057_000_000),
+    (1_057_000_000, 1_073_000_000),
+    (1_073_000_000, 1_088_000_000),
+    (1_088_000_000, 1_104_000_000),
+    (1_104_000_000, 1_120_000_000),
+    (1_120_000_000, 1_136_000_000),
+    (1_136_000_000, 1_151_000_000),
+    (1_151_000_000, 1_167_000_000),
+    (1_167_000_000, 1_183_000_000),
+    (1_183_000_000, 1_199_000_000),
+    (1_199_000_000, 1_215_000_000),
+    (1_215_000_000, 1_230_000_000),
+    (1_230_000_000, 1_246_000_000),
+    (1_246_000_000, 1_262_000_000),
 ]
 
 MAINNET_RANGES = [
-    [45_000_001, 100_000_000],
-    [100_000_001, 116_000_000],
-    [116_000_001, 155_000_000],
-    [155_000_001, 180_000_000],
-    [180_000_001, 190_000_000],
-    [190_000_001, 200_000_000],
-    [200_000_001, 215_000_000],
-    [215_000_001, 225_000_000],
-    [225_000_001, 235_000_000],
-    [235_000_001, 246_000_000],
-    [246_000_001, 270_000_000],
-    [270_000_001, 295_000_000],
-    [295_000_001, 321_000_000],
-    [321_000_001, 331_000_000],
-    [331_000_001, 354_000_000],
-    [354_000_001, 400_000_000],
-    [400_000_001, sys.maxsize],
+    (392_000_000, 408_000_000),
+    (408_000_000, 424_000_000),
+    (424_000_000, 439_000_000),
+    (439_000_000, 455_000_000),
+    (455_000_000, 471_000_000),
+    (471_000_000, 487_000_000),
+    (487_000_000, 503_000_000),
+    (503_000_000, 518_000_000),
+    (518_000_000, 534_000_000),
+    (534_000_000, 550_000_000),
+    (550_000_000, 566_000_000),
+    (566_000_000, 581_000_000),
+    (581_000_000, 597_000_000),
+    (597_000_000, 613_000_000),
+    (613_000_000, 629_000_000),
+    (629_000_000, 640_000_000),
+    # Skip tapos range
+    (949_000_000, 954_000_000),
+    (954_000_000, 969_000_000),
+    (969_000_000, sys.maxsize),
 ]
 
 
@@ -125,6 +115,7 @@ def replay_verify_partition(
             "target/release/aptos-debugger",
             "aptos-db",
             "replay-verify",
+            # "--enable-storage-sharding",
             *txns_to_skip_args,
             "--concurrent-downloads",
             "8",

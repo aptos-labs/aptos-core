@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::pack_unpack {
     struct T {
         h: u64,
@@ -12,16 +12,7 @@ module 0x42::pack_unpack {
     }
     private fun unpack(s: pack_unpack::S): (u64, u64) {
         {
-          let pack_unpack::S{ f: f: u64, g: pack_unpack::T{ h: h: u64 } } = s;
-          Tuple(f, h)
-        }
-    }
-    spec fun $pack(x: u64,y: u64): pack_unpack::S {
-        pack pack_unpack::S(x, pack pack_unpack::T(y))
-    }
-    spec fun $unpack(s: pack_unpack::S): (u64, u64) {
-        {
-          let pack_unpack::S{ f: f: u64, g: pack_unpack::T{ h: h: u64 } } = s;
+          let pack_unpack::S{ f, g: pack_unpack::T{ h } } = s;
           Tuple(f, h)
         }
     }
@@ -52,3 +43,6 @@ fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
   3: $t2 := infer($t4)
   4: return ($t1, $t2)
 }
+
+
+============ bytecode verification succeeded ========

@@ -112,12 +112,16 @@ spec supra_framework::genesis {
         pragma verify_duration_estimate = 120;
 
         include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         include CompareTimeRequires;
         include supra_coin::ExistsSupraCoin;
     }
 
     spec create_initialize_validators {
+        pragma verify_duration_estimate = 120;
+
         include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         include CompareTimeRequires;
         include supra_coin::ExistsSupraCoin;
     }

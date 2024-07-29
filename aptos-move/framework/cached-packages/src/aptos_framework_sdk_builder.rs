@@ -291,6 +291,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Allowlist a delegator as the pool owner.
+    DelegationPoolAllowlistDelegator {
+        delegator_address: AccountAddress,
+    },
+
     /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
     /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
     /// `supra_governance.move`.
@@ -309,10 +314,21 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
+    /// Disable delegators allowlisting as the pool owner. The existing allowlist will be emptied.
+    DelegationPoolDisableDelegatorsAllowlisting {},
+
+    /// Enable delegators allowlisting as the pool owner.
+    DelegationPoolEnableDelegatorsAllowlisting {},
+
     /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-    /// THe existing voter will be replaced. The function is permissionless.
+    /// The existing voter will be replaced. The function is permissionless.
     DelegationPoolEnablePartialGovernanceVoting {
         pool_address: AccountAddress,
+    },
+
+    /// Evict a delegator that is not allowlisted by unlocking their entire stake.
+    DelegationPoolEvictDelegator {
+        delegator_address: AccountAddress,
     },
 
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
@@ -330,8 +346,13 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Remove a delegator from the allowlist as the pool owner, but do not unlock their stake.
+    DelegationPoolRemoveDelegatorFromAllowlist {
+        delegator_address: AccountAddress,
+    },
+
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-    /// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+    /// beneficiary. To ensure payment to the current beneficiary, one should first call `synchronize_delegation_pool`
     /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
     /// one for each pool.
     DelegationPoolSetBeneficiaryForOperator {
@@ -531,6 +552,12 @@ pub enum EntryFunctionCall {
         multisig_account: AccountAddress,
     },
 
+    /// Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
+    MultisigAccountExecuteRejectedTransactions {
+        multisig_account: AccountAddress,
+        final_sequence_number: u64,
+    },
+
     /// Reject a multisig transaction.
     MultisigAccountRejectTransaction {
         multisig_account: AccountAddress,
@@ -600,6 +627,23 @@ pub enum EntryFunctionCall {
     },
 
     /// Generic function that can be used to either approve or reject a multisig transaction
+    MultisigAccountVoteTransaction {
+        multisig_account: AccountAddress,
+        sequence_number: u64,
+        approved: bool,
+    },
+
+    /// Generic function that can be used to either approve or reject a batch of transactions within a specified range.
+    MultisigAccountVoteTransactions {
+        multisig_account: AccountAddress,
+        starting_sequence_number: u64,
+        final_sequence_number: u64,
+        approved: bool,
+    },
+
+    /// Generic function that can be used to either approve or reject a multisig transaction
+    /// Retained for backward compatibility: the function with the typographical error in its name
+    /// will continue to be an accessible entry point.
     MultisigAccountVoteTransanction {
         multisig_account: AccountAddress,
         sequence_number: u64,
@@ -1227,6 +1271,9 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => code_publish_package_txn(metadata_serialized, code),
+            CoinCreateCoinConversionMap {} => coin_create_coin_conversion_map(),
+            CoinCreatePairing { coin_type } => coin_create_pairing(coin_type),
+            CoinMigrateToFungibleStore { coin_type } => coin_migrate_to_fungible_store(coin_type),
             CoinTransfer {
                 coin_type,
                 to,
@@ -1342,6 +1389,9 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_add_stake(pool_address, amount),
+            DelegationPoolAllowlistDelegator { delegator_address } => {
+                delegation_pool_allowlist_delegator(delegator_address)
+            },
             DelegationPoolCreateProposal {
                 pool_address,
                 execution_hash,
@@ -1359,8 +1409,17 @@ impl EntryFunctionCall {
                 pool_address,
                 new_voter,
             } => delegation_pool_delegate_voting_power(pool_address, new_voter),
+            DelegationPoolDisableDelegatorsAllowlisting {} => {
+                delegation_pool_disable_delegators_allowlisting()
+            },
+            DelegationPoolEnableDelegatorsAllowlisting {} => {
+                delegation_pool_enable_delegators_allowlisting()
+            },
             DelegationPoolEnablePartialGovernanceVoting { pool_address } => {
                 delegation_pool_enable_partial_governance_voting(pool_address)
+            },
+            DelegationPoolEvictDelegator { delegator_address } => {
+                delegation_pool_evict_delegator(delegator_address)
             },
             DelegationPoolInitializeDelegationPool {
                 operator_commission_percentage,
@@ -1373,6 +1432,9 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_reactivate_stake(pool_address, amount),
+            DelegationPoolRemoveDelegatorFromAllowlist { delegator_address } => {
+                delegation_pool_remove_delegator_from_allowlist(delegator_address)
+            },
             DelegationPoolSetBeneficiaryForOperator { new_beneficiary } => {
                 delegation_pool_set_beneficiary_for_operator(new_beneficiary)
             },
@@ -1519,6 +1581,13 @@ impl EntryFunctionCall {
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
             },
+            MultisigAccountExecuteRejectedTransactions {
+                multisig_account,
+                final_sequence_number,
+            } => multisig_account_execute_rejected_transactions(
+                multisig_account,
+                final_sequence_number,
+            ),
             MultisigAccountRejectTransaction {
                 multisig_account,
                 sequence_number,
@@ -2589,6 +2658,24 @@ pub fn delegation_pool_add_stake(pool_address: AccountAddress, amount: u64) -> T
     ))
 }
 
+/// Allowlist a delegator as the pool owner.
+pub fn delegation_pool_allowlist_delegator(
+    delegator_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("allowlist_delegator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&delegator_address).unwrap()],
+    ))
+}
+
 /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
 /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
 /// `supra_governance.move`.
@@ -2642,8 +2729,40 @@ pub fn delegation_pool_delegate_voting_power(
     ))
 }
 
+/// Disable delegators allowlisting as the pool owner. The existing allowlist will be emptied.
+pub fn delegation_pool_disable_delegators_allowlisting() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("disable_delegators_allowlisting").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Enable delegators allowlisting as the pool owner.
+pub fn delegation_pool_enable_delegators_allowlisting() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("enable_delegators_allowlisting").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-/// THe existing voter will be replaced. The function is permissionless.
+/// The existing voter will be replaced. The function is permissionless.
 pub fn delegation_pool_enable_partial_governance_voting(
     pool_address: AccountAddress,
 ) -> TransactionPayload {
@@ -2658,6 +2777,22 @@ pub fn delegation_pool_enable_partial_governance_voting(
         ident_str!("enable_partial_governance_voting").to_owned(),
         vec![],
         vec![bcs::to_bytes(&pool_address).unwrap()],
+    ))
+}
+
+/// Evict a delegator that is not allowlisted by unlocking their entire stake.
+pub fn delegation_pool_evict_delegator(delegator_address: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("evict_delegator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&delegator_address).unwrap()],
     ))
 }
 
@@ -2708,8 +2843,26 @@ pub fn delegation_pool_reactivate_stake(
     ))
 }
 
+/// Remove a delegator from the allowlist as the pool owner, but do not unlock their stake.
+pub fn delegation_pool_remove_delegator_from_allowlist(
+    delegator_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("remove_delegator_from_allowlist").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&delegator_address).unwrap()],
+    ))
+}
+
 /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-/// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+/// beneficiary. To ensure payment to the current beneficiary, one should first call `synchronize_delegation_pool`
 /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
 /// one for each pool.
 pub fn delegation_pool_set_beneficiary_for_operator(
@@ -3270,6 +3423,28 @@ pub fn multisig_account_execute_rejected_transaction(
     ))
 }
 
+/// Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
+pub fn multisig_account_execute_rejected_transactions(
+    multisig_account: AccountAddress,
+    final_sequence_number: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("execute_rejected_transactions").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&final_sequence_number).unwrap(),
+        ],
+    ))
+}
+
 /// Reject a multisig transaction.
 pub fn multisig_account_reject_transaction(
     multisig_account: AccountAddress,
@@ -3449,6 +3624,56 @@ pub fn multisig_account_update_signatures_required(
     ))
 }
 
+/// Generic function that can be used to either approve or reject a multisig transaction
+pub fn multisig_account_vote_transaction(
+    multisig_account: AccountAddress,
+    sequence_number: u64,
+    approved: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("vote_transaction").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&sequence_number).unwrap(),
+            bcs::to_bytes(&approved).unwrap(),
+        ],
+    ))
+}
+
+/// Generic function that can be used to either approve or reject a batch of transactions within a specified range.
+pub fn multisig_account_vote_transactions(
+    multisig_account: AccountAddress,
+    starting_sequence_number: u64,
+    final_sequence_number: u64,
+    approved: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("vote_transactions").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&starting_sequence_number).unwrap(),
+            bcs::to_bytes(&final_sequence_number).unwrap(),
+            bcs::to_bytes(&approved).unwrap(),
+        ],
+    ))
+}
+
 /// Update the timeout duration for the multisig account.
 pub fn multisig_account_update_timeout_duration(timeout_duration: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -3466,6 +3691,8 @@ pub fn multisig_account_update_timeout_duration(timeout_duration: u64) -> Transa
 }
 
 /// Generic function that can be used to either approve or reject a multisig transaction
+/// Retained for backward compatibility: the function with the typographical error in its name
+/// will continue to be an accessible entry point.
 pub fn multisig_account_vote_transanction(
     multisig_account: AccountAddress,
     sequence_number: u64,
@@ -5611,6 +5838,18 @@ mod decoder {
         }
     }
 
+    pub fn delegation_pool_allowlist_delegator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolAllowlistDelegator {
+                delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_create_proposal(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5640,6 +5879,26 @@ mod decoder {
         }
     }
 
+    pub fn delegation_pool_disable_delegators_allowlisting(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::DelegationPoolDisableDelegatorsAllowlisting {})
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_enable_delegators_allowlisting(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::DelegationPoolEnableDelegatorsAllowlisting {})
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_enable_partial_governance_voting(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5649,6 +5908,18 @@ mod decoder {
                     pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 },
             )
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_evict_delegator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolEvictDelegator {
+                delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
         } else {
             None
         }
@@ -5675,6 +5946,20 @@ mod decoder {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_remove_delegator_from_allowlist(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::DelegationPoolRemoveDelegatorFromAllowlist {
+                    delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -5998,6 +6283,21 @@ mod decoder {
             Some(
                 EntryFunctionCall::MultisigAccountExecuteRejectedTransaction {
                     multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_execute_rejected_transactions(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountExecuteRejectedTransactions {
+                    multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    final_sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
                 },
             )
         } else {
@@ -7305,6 +7605,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::delegation_pool_add_stake),
         );
         map.insert(
+            "delegation_pool_allowlist_delegator".to_string(),
+            Box::new(decoder::delegation_pool_allowlist_delegator),
+        );
+        map.insert(
             "delegation_pool_create_proposal".to_string(),
             Box::new(decoder::delegation_pool_create_proposal),
         );
@@ -7313,8 +7617,20 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::delegation_pool_delegate_voting_power),
         );
         map.insert(
+            "delegation_pool_disable_delegators_allowlisting".to_string(),
+            Box::new(decoder::delegation_pool_disable_delegators_allowlisting),
+        );
+        map.insert(
+            "delegation_pool_enable_delegators_allowlisting".to_string(),
+            Box::new(decoder::delegation_pool_enable_delegators_allowlisting),
+        );
+        map.insert(
             "delegation_pool_enable_partial_governance_voting".to_string(),
             Box::new(decoder::delegation_pool_enable_partial_governance_voting),
+        );
+        map.insert(
+            "delegation_pool_evict_delegator".to_string(),
+            Box::new(decoder::delegation_pool_evict_delegator),
         );
         map.insert(
             "delegation_pool_initialize_delegation_pool".to_string(),
@@ -7323,6 +7639,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_reactivate_stake".to_string(),
             Box::new(decoder::delegation_pool_reactivate_stake),
+        );
+        map.insert(
+            "delegation_pool_remove_delegator_from_allowlist".to_string(),
+            Box::new(decoder::delegation_pool_remove_delegator_from_allowlist),
         );
         map.insert(
             "delegation_pool_set_beneficiary_for_operator".to_string(),
@@ -7419,6 +7739,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_execute_rejected_transaction".to_string(),
             Box::new(decoder::multisig_account_execute_rejected_transaction),
+        );
+        map.insert(
+            "multisig_account_execute_rejected_transactions".to_string(),
+            Box::new(decoder::multisig_account_execute_rejected_transactions),
         );
         map.insert(
             "multisig_account_reject_transaction".to_string(),

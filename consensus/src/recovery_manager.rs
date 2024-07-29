@@ -2,21 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{BlockRetriever, BlockStore},
+    block_storage::{pending_blocks::PendingBlocks, BlockRetriever, BlockStore},
     counters,
     error::error_kind,
     monitor,
     network::NetworkSender,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
+    pipeline::execution_client::TExecutionClient,
     round_manager::VerifiedEvent,
-    state_replication::StateComputer,
 };
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
     common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::VoteMsg,
 };
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{FutureExt, StreamExt};
@@ -27,32 +28,38 @@ use std::{mem::Discriminant, process, sync::Arc};
 /// for processing the events carrying sync info and use the info to retrieve blocks from peers
 pub struct RecoveryManager {
     epoch_state: Arc<EpochState>,
-    network: NetworkSender,
+    network: Arc<NetworkSender>,
     storage: Arc<dyn PersistentLivenessStorage>,
-    state_computer: Arc<dyn StateComputer>,
+    execution_client: Arc<dyn TExecutionClient>,
     last_committed_round: Round,
     max_blocks_to_request: u64,
     payload_manager: Arc<PayloadManager>,
+    order_vote_enabled: bool,
+    pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
 impl RecoveryManager {
     pub fn new(
         epoch_state: Arc<EpochState>,
-        network: NetworkSender,
+        network: Arc<NetworkSender>,
         storage: Arc<dyn PersistentLivenessStorage>,
-        state_computer: Arc<dyn StateComputer>,
+        execution_client: Arc<dyn TExecutionClient>,
         last_committed_round: Round,
         max_blocks_to_request: u64,
         payload_manager: Arc<PayloadManager>,
+        order_vote_enabled: bool,
+        pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         RecoveryManager {
             epoch_state,
             network,
             storage,
-            state_computer,
+            execution_client,
             last_committed_round,
             max_blocks_to_request,
             payload_manager,
+            order_vote_enabled,
+            pending_blocks,
         }
     }
 
@@ -89,14 +96,16 @@ impl RecoveryManager {
                 .get_ordered_account_addresses_iter()
                 .collect(),
             self.max_blocks_to_request,
+            self.pending_blocks.clone(),
         );
         let recovery_data = BlockStore::fast_forward_sync(
-            sync_info.highest_ordered_cert(),
+            sync_info.highest_quorum_cert(),
             sync_info.highest_commit_cert(),
             &mut retriever,
             self.storage.clone(),
-            self.state_computer.clone(),
+            self.execution_client.clone(),
             self.payload_manager.clone(),
+            self.order_vote_enabled,
         )
         .await?;
 

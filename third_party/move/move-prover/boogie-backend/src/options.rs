@@ -178,7 +178,7 @@ impl Default for BoogieOptions {
             vector_using_sequences: false,
             random_seed: 1,
             proc_cores: 4,
-            vc_timeout: 40,
+            vc_timeout: 80,
             global_timeout_overwrite: true,
             keep_artifacts: false,
             eager_threshold: 100,

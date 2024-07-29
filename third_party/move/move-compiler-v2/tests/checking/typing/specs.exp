@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: expected `bool` but found `u256`
+error: expected `bool` but found a value of type `u256`
   ┌─ tests/checking/typing/specs.move:5:20
   │
 5 │             assert 1;
   │                    ^
 
-error: invalid call of `+`: expected `num` but found `bool` for argument 2
+error: cannot use `bool` with an operator which expects a value of type `num`
    ┌─ tests/checking/typing/specs.move:10:31
    │
 10 │         ensures result == x + true;

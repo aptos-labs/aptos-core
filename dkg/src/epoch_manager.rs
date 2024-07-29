@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     agg_trx_producer::AggTranscriptProducer,
@@ -10,11 +11,12 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::config::ReliableBroadcastConfig;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info, warn};
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
@@ -22,7 +24,8 @@ use aptos_types::{
     dkg::{DKGStartEvent, DKGState, DKGTrait, DefaultDKG},
     epoch_state::EpochState,
     on_chain_config::{
-        FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
+        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -45,12 +48,16 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dkg_rpc_msg_tx:
         Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
-    dkg_start_event_tx: Option<oneshot::Sender<DKGStartEvent>>,
+    dkg_start_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
     vtxn_pool: VTxnPoolState,
 
     // Network utils
     self_sender: aptos_channels::Sender<Event<DKGMessage>>,
     network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
+    rb_config: ReliableBroadcastConfig,
+
+    // Randomness overriding.
+    randomness_override_seq_num: u64,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -62,6 +69,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
         vtxn_pool: VTxnPoolState,
+        rb_config: ReliableBroadcastConfig,
+        randomness_override_seq_num: u64,
     ) -> Self {
         Self {
             dkg_dealer_sk: Arc::new(dkg_dealer_sk),
@@ -75,6 +84,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             network_sender,
             vtxn_pool,
             dkg_start_event_tx: None,
+            rb_config,
+            randomness_override_seq_num,
         }
     }
 
@@ -93,13 +104,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn on_dkg_start_notification(&mut self, notification: EventNotification) -> Result<()> {
-        if let Some(tx) = self.dkg_start_event_tx.take() {
+        if let Some(tx) = self.dkg_start_event_tx.as_ref() {
             let EventNotification {
                 subscribed_events, ..
             } = notification;
             for event in subscribed_events {
                 if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
-                    let _ = tx.send(dkg_start_event);
+                    let _ = tx.push((), dkg_start_event);
                     return Ok(());
                 } else {
                     debug!("[DKG] on_dkg_start_notification: failed in converting a contract event to a dkg start event!");
@@ -156,12 +167,38 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get(&self.my_addr)
             .copied();
 
-        let features = payload.get::<Features>().unwrap_or_default();
+        let onchain_randomness_config_seq_num = payload
+            .get::<RandomnessConfigSeqNum>()
+            .unwrap_or_else(|_| RandomnessConfigSeqNum::default_if_missing());
 
-        if let (true, Some(my_index)) = (
-            features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
-            my_index,
-        ) {
+        let randomness_config_move_struct = payload.get::<RandomnessConfigMoveStruct>();
+
+        info!(
+            epoch = epoch_state.epoch,
+            local = self.randomness_override_seq_num,
+            onchain = onchain_randomness_config_seq_num.seq_num,
+            "Checking randomness config override."
+        );
+        if self.randomness_override_seq_num > onchain_randomness_config_seq_num.seq_num {
+            warn!("Randomness will be force-disabled by local config!");
+        }
+
+        let onchain_randomness_config = OnChainRandomnessConfig::from_configs(
+            self.randomness_override_seq_num,
+            onchain_randomness_config_seq_num.seq_num,
+            randomness_config_move_struct.ok(),
+        );
+
+        let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
+        if let Err(error) = &onchain_consensus_config {
+            error!("Failed to read on-chain consensus config {}", error);
+        }
+        let consensus_config = onchain_consensus_config.unwrap_or_default();
+
+        // Check both validator txn and randomness features are enabled
+        let randomness_enabled =
+            consensus_config.is_vtxn_enabled() && onchain_randomness_config.randomness_enabled();
+        if let (true, Some(my_index)) = (randomness_enabled, my_index) {
             let DKGState {
                 in_progress: in_progress_session,
                 ..
@@ -169,16 +206,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             let network_sender = self.create_network_sender();
             let rb = ReliableBroadcast::new(
+                self.my_addr,
                 epoch_state.verifier.get_ordered_account_addresses(),
                 Arc::new(network_sender),
-                ExponentialBackoff::from_millis(5),
+                ExponentialBackoff::from_millis(self.rb_config.backoff_policy_base_ms)
+                    .factor(self.rb_config.backoff_policy_factor)
+                    .max_delay(Duration::from_millis(
+                        self.rb_config.backoff_policy_max_delay_ms,
+                    )),
                 aptos_time_service::TimeService::real(),
-                Duration::from_millis(1000),
+                Duration::from_millis(self.rb_config.rpc_timeout_ms),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
             let agg_trx_producer = AggTranscriptProducer::new(rb);
 
-            let (dkg_start_event_tx, dkg_start_event_rx) = oneshot::channel();
+            let (dkg_start_event_tx, dkg_start_event_rx) =
+                aptos_channel::new(QueueStyle::KLAST, 1, None);
             self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<

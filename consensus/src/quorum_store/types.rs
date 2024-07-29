@@ -45,6 +45,7 @@ impl PersistedValue {
         self.maybe_payload.take()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn remove_payload(&mut self) {
         self.maybe_payload = None;
     }

@@ -228,7 +228,7 @@ impl RestoreCoordinator {
             None
         };
 
-        // Restore the the state kv between lhs and rs
+        // Restore the state kv between lhs and rs
         if do_phase_1 {
             info!(
                 "Start restoring DB from version {} to tree snapshot version {}",

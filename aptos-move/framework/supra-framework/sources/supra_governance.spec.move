@@ -139,11 +139,13 @@ spec supra_framework::supra_governance {
         use supra_framework::coin::CoinInfo;
         use supra_framework::supra_coin::SupraCoin;
         use supra_framework::transaction_fee;
-
-        pragma verify_duration_estimate = 200;
+        pragma verify = false; // TODO: set because of timeout (property proved).
         let addr = signer::address_of(supra_framework);
         aborts_if addr != @supra_framework;
-
+        include reconfiguration_with_dkg::FinishRequirement {
+            framework: supra_framework
+        };
+        include stake::GetReconfigStartTimeRequirement;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         requires chain_status::is_operating();
         requires exists<stake::ValidatorFees>(@supra_framework);
@@ -577,9 +579,12 @@ spec supra_framework::supra_governance {
         use supra_framework::coin::CoinInfo;
         use supra_framework::supra_coin::SupraCoin;
         use supra_framework::transaction_fee;
-
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
+        pragma verify = false; // TODO: set because of timeout (property proved).
         aborts_if !system_addresses::is_supra_framework_address(signer::address_of(supra_framework));
+        include reconfiguration_with_dkg::FinishRequirement {
+            framework: supra_framework
+        };
+        include stake::GetReconfigStartTimeRequirement;
 
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         requires chain_status::is_operating();
@@ -829,7 +834,42 @@ spec supra_framework::supra_governance {
         include VotingInitializationAbortIfs;
     }
 
+    spec force_end_epoch(supra_framework: &signer) {
+        use supra_framework::reconfiguration_with_dkg;
+        use std::signer;
+        pragma verify = false; // TODO: set because of timeout (property proved).
+        let address = signer::address_of(supra_framework);
+        include reconfiguration_with_dkg::FinishRequirement {
+            framework: supra_framework
+        };
+    }
+
     spec schema VotingInitializationAbortIfs {
         aborts_if features::spec_partial_governance_voting_enabled() && !exists<VotingRecordsV2>(@supra_framework);
+    }
+
+    spec force_end_epoch_test_only {
+        pragma verify = false;
+    }
+
+    spec batch_vote(
+        voter: &signer,
+        stake_pools: vector<address>,
+        proposal_id: u64,
+        should_pass: bool,
+    ) {
+        // TODO: Temporary mockup. Specify the `for_each` statement.
+        pragma verify = false;
+    }
+
+    spec batch_partial_vote(
+        voter: &signer,
+        stake_pools: vector<address>,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    ) {
+        // TODO: Temporary mockup. Specify the `for_each` statement.
+        pragma verify = false;
     }
 }

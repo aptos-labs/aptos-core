@@ -13,18 +13,22 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-rocksdb-options = { workspace = true }
-base64 = { workspace = true }
-bytes = { workspace = true }
-chrono = { workspace = true }
-fail = { workspace = true }
+aptos-api = { workspace = true }
+aptos-api-types = { workspace = true }
+aptos-config = { workspace = true }
+aptos-db-indexer  = { workspace = true }
+aptos-indexer-grpc-fullnode = { workspace = true }
+aptos-indexer-grpc-utils = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-mempool = { workspace = true }
+aptos-runtimes = { workspace = true }
+aptos-schemadb = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-types = { workspace = true }
 flate2 = { workspace = true }
 futures = { workspace = true }
 google-cloud-storage = { workspace = true }
-hex = { workspace = true }
 hyper = { workspace = true }
-move-resource-viewer = { workspace = true }
-once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tar = { workspace = true }
@@ -32,28 +36,7 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 tonic = { workspace = true }
-tonic-reflection = { workspace = true }
-
-aptos-api = { workspace = true }
-aptos-api-types = { workspace = true }
-aptos-bitvec = { workspace = true }
-aptos-config = { workspace = true }
-aptos-db = { workspace = true }
-aptos-db-indexer  = { workspace = true }
-aptos-indexer-grpc-fullnode = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-mempool = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-protos = { workspace = true }
-aptos-runtimes = { workspace = true }
-aptos-schemadb  = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
 
 [dev-dependencies]
 rocksdb = { workspace = true }
 tempfile = { workspace = true }
-
-[features]
-failpoints = ["fail/failpoints"]

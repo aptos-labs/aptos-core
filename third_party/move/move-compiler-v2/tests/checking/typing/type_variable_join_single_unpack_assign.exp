@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct Box {
         f1: #0,
@@ -12,14 +12,14 @@ module 0x8675309::M {
           let f1: u64;
           {
             let f2: u64;
-            M::Box<u64>{ f1: f1: u64, f2: f2: u64 } = M::new<u64>();
+            M::Box<u64>{ f1, f2 } = M::new<u64>();
             f1;
             f2;
             {
               let f1: M::Box<u64>;
               {
                 let f2: M::Box<u64>;
-                M::Box<M::Box<u64>>{ f1: f1: M::Box<u64>, f2: f2: M::Box<u64> } = M::new<M::Box<u64>>();
+                M::Box<M::Box<u64>>{ f1, f2 } = M::new<M::Box<u64>>();
                 f1;
                 f2;
                 Tuple()
@@ -28,8 +28,4 @@ module 0x8675309::M {
           }
         }
     }
-    spec fun $new<T>(): M::Box<#0> {
-        Abort(0)
-    }
-    spec fun $t0();
 } // end 0x8675309::M

@@ -22,7 +22,7 @@ use aptos_network::application::{
 };
 use aptos_storage_interface::DbReader;
 use aptos_types::on_chain_config::OnChainConfigProvider;
-use aptos_vm_validator::vm_validator::{TransactionValidation, VMValidator};
+use aptos_vm_validator::vm_validator::{PooledVMValidator, TransactionValidation};
 use futures::channel::mpsc::{Receiver, UnboundedSender};
 use std::sync::Arc;
 use tokio::runtime::{Handle, Runtime};
@@ -99,7 +99,10 @@ pub fn bootstrap(
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
-    let vm_validator = Arc::new(RwLock::new(VMValidator::new(Arc::clone(&db))));
+    let vm_validator = Arc::new(RwLock::new(PooledVMValidator::new(
+        Arc::clone(&db),
+        num_cpus::get(),
+    )));
     start_shared_mempool(
         runtime.handle(),
         config,

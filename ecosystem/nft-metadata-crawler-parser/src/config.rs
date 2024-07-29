@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     utils::{
+        constants::{
+            DEFAULT_IMAGE_QUALITY, DEFAULT_MAX_FILE_SIZE_BYTES, DEFAULT_MAX_IMAGE_DIMENSIONS,
+            DEFAULT_MAX_NUM_PARSE_RETRIES,
+        },
         counters::{
             GOT_CONNECTION_COUNT, PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT,
             PUBSUB_ACK_SUCCESS_COUNT, SKIP_URI_COUNT, UNABLE_TO_GET_CONNECTION_COUNT,
@@ -32,12 +37,37 @@ pub struct ParserConfig {
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
     pub ipfs_auth_key: Option<String>,
-    pub max_file_size_bytes: Option<u32>,
-    pub image_quality: Option<u8>, // Quality up to 100
-    pub max_image_dimensions: Option<u32>,
-    pub ack_parsed_uris: Option<bool>,
-    pub uri_blacklist: Option<Vec<String>>,
+    #[serde(default = "ParserConfig::default_max_file_size_bytes")]
+    pub max_file_size_bytes: u32,
+    #[serde(default = "ParserConfig::default_image_quality")]
+    pub image_quality: u8, // Quality up to 100
+    #[serde(default = "ParserConfig::default_max_image_dimensions")]
+    pub max_image_dimensions: u32,
+    #[serde(default = "ParserConfig::default_max_num_parse_retries")]
+    pub max_num_parse_retries: i32,
+    #[serde(default)]
+    pub ack_parsed_uris: bool,
+    #[serde(default)]
+    pub uri_blacklist: Vec<String>,
     pub server_port: u16,
+}
+
+impl ParserConfig {
+    pub const fn default_max_file_size_bytes() -> u32 {
+        DEFAULT_MAX_FILE_SIZE_BYTES
+    }
+
+    pub const fn default_image_quality() -> u8 {
+        DEFAULT_IMAGE_QUALITY
+    }
+
+    pub const fn default_max_image_dimensions() -> u32 {
+        DEFAULT_MAX_IMAGE_DIMENSIONS
+    }
+
+    pub const fn default_max_num_parse_retries() -> i32 {
+        DEFAULT_MAX_NUM_PARSE_RETRIES
+    }
 }
 
 #[async_trait::async_trait]
@@ -119,13 +149,16 @@ async fn spawn_parser(
     gcs_client: Arc<GCSClient>,
 ) {
     PARSER_INVOCATIONS_COUNT.inc();
-    let pubsub_message = String::from_utf8(msg_base64.to_vec()).unwrap_or_else(|e| {
-        error!(
-            error = ?e,
-            "[NFT Metadata Crawler] Failed to parse PubSub message"
-        );
-        panic!();
-    });
+    let pubsub_message = String::from_utf8(msg_base64.to_vec())
+        .unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to parse PubSub message"
+            );
+            panic!();
+        })
+        .replace('\u{0000}', "")
+        .replace("\\u0000", "");
 
     info!(
         pubsub_message = pubsub_message,
@@ -225,8 +258,6 @@ async fn handle_root(
     msg: Bytes,
     context: Arc<ServerContext>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let to_ack = context.parser_config.ack_parsed_uris.unwrap_or(false);
-
     // Use spawn_blocking to run the function on a separate thread.
     let _ = tokio::spawn(spawn_parser(
         context.parser_config.clone(),
@@ -236,7 +267,7 @@ async fn handle_root(
     ))
     .await;
 
-    if !to_ack {
+    if !context.parser_config.ack_parsed_uris {
         return Ok(warp::reply::with_status(
             warp::reply(),
             warp::http::StatusCode::BAD_REQUEST,

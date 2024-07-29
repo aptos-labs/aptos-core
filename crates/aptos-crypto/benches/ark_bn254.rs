@@ -1,6 +1,4 @@
 // Copyright © Aptos Foundation
-
-// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 #[macro_use]
@@ -13,12 +11,13 @@ use crate::bench_utils::{
     bench_function_pow_u256, bench_function_serialize_uncomp, bench_function_square,
     bench_function_sub,
 };
-use ark_bn254::{Fq, Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use ark_bn254::{Bn254, Fq, Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup, Group};
 use ark_ff::{UniformRand, Zero};
+use ark_groth16::Groth16;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
-use criterion::{BenchmarkId, Criterion};
+use criterion::{Bencher, BenchmarkId, Criterion};
 use std::ops::{Mul, Neg};
 
 mod bench_utils;
@@ -49,6 +48,8 @@ macro_rules! serialize {
 
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("ark_bn254");
+
+    group.bench_function("groth16/verify", bench_groth16_verify);
 
     group.bench_function("fr_add", bench_function_add::<Fr>);
     group.bench_function("fr_clone", bench_function_clone::<Fr>);
@@ -515,6 +516,33 @@ fn bench_group(c: &mut Criterion) {
     }
 
     group.finish();
+}
+
+fn bench_groth16_verify(b: &mut Bencher) {
+    let pvk = ark_groth16::PreparedVerifyingKey {
+        vk: ark_groth16::VerifyingKey {
+            alpha_g1: rand!(G1Affine),
+            beta_g2: rand!(G2Affine),
+            gamma_g2: rand!(G2Affine),
+            delta_g2: rand!(G2Affine),
+            gamma_abc_g1: vec![rand!(G1Affine), rand!(G1Affine)],
+        },
+        alpha_g1_beta_g2: rand!(ark_bn254::Fq12),
+        gamma_g2_neg_pc: rand!(G2Affine).into(),
+        delta_g2_neg_pc: rand!(G2Affine).into(),
+    };
+
+    b.iter_with_setup(
+        || ark_groth16::Proof {
+            a: rand!(G1Affine),
+            b: rand!(G2Affine),
+            c: rand!(G1Affine),
+        },
+        |proof| {
+            let result = Groth16::<Bn254>::verify_proof(&pvk, &proof, &[rand!(Fr)]);
+            assert!(matches!(result, Ok(false)))
+        },
+    )
 }
 
 criterion_group!(

@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: cannot adapt `bool` to annotated type `u64`
+  ┌─ tests/checking/error_context/type_annotation.move:4:10
+  │
+4 │         (true : u64);
+  │          ^^^^
+
+error: cannot adapt `(integer, bool)` to annotated type `u64`
+  ┌─ tests/checking/error_context/type_annotation.move:8:10
+  │
+8 │         ((1, true) : u64);
+  │          ^^^^^^^^^
+
+error: cannot adapt `(address, bool)` to annotated type `address`
+   ┌─ tests/checking/error_context/type_annotation.move:12:10
+   │
+12 │         ((@0x1, true) : address);
+   │          ^^^^^^^^^^^^

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod access_path_test;
+mod account;
 mod aggregator;
 mod aggregator_v2;
 mod aggregator_v2_events;
@@ -34,6 +35,7 @@ mod object_code_deployment;
 mod offer_rotation_capability;
 mod offer_signer_capability;
 mod per_category_gas_limits;
+mod randomness_test_and_abort;
 mod resource_groups;
 mod rotate_auth_key;
 mod scripts;
@@ -45,7 +47,9 @@ mod storage_refund;
 mod string_args;
 mod token_event_store;
 mod token_objects;
+mod transaction_context;
 mod transaction_fee;
 mod type_too_large;
 mod vector_numeric_address;
+mod vm;
 mod vote;

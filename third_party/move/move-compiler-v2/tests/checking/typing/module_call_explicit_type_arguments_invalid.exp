@@ -1,36 +1,36 @@
 
 Diagnostics:
-error: invalid call of `M::foo`: expected `u64` but found `bool` for argument 1
+error: cannot pass `bool` to a function which expects argument of type `u64`
   ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:6:23
   │
 6 │         foo<u64, u64>(false, false);
   │                       ^^^^^
 
-error: invalid call of `M::foo`: expected `bool` but found `integer` for argument 1
+error: cannot pass `integer` to a function which expects argument of type `bool`
   ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:7:25
   │
 7 │         foo<bool, bool>(0, false);
   │                         ^
 
-error: invalid call of `M::foo`: expected `bool` but found `integer` for argument 2
+error: cannot pass `integer` to a function which expects argument of type `bool`
   ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:8:32
   │
 8 │         foo<bool, bool>(false, 0);
   │                                ^
 
-error: invalid call of `M::foo`: expected `bool` but found `integer` for argument 1
+error: cannot pass `integer` to a function which expects argument of type `bool`
   ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:9:25
   │
 9 │         foo<bool, bool>(0, 0);
   │                         ^
 
-error: invalid call of `M::foo`: expected `U` but found `T` for argument 1
+error: cannot pass `T` to a function which expects argument of type `U`
    ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:13:21
    │
 13 │         foo<U, u64>(t, 0);
    │                     ^
 
-error: invalid call of `M::foo`: expected `V` but found `U` for argument 1
+error: cannot pass `U` to a function which expects argument of type `V`
    ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:14:19
    │
 14 │         foo<V, T>(u, v);

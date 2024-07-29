@@ -1,0 +1,174 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.operators {
+
+
+arithm(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
+L2:	loc0: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: CopyLoc[1](Arg1: u64)
+	2: Sub
+	3: StLoc[2](loc0: u64)
+	4: CopyLoc[1](Arg1: u64)
+	5: MoveLoc[2](loc0: u64)
+	6: Div
+	7: MoveLoc[1](Arg1: u64)
+	8: Mul
+	9: CopyLoc[0](Arg0: u64)
+	10: Mod
+	11: StLoc[1](Arg1: u64)
+	12: MoveLoc[0](Arg0: u64)
+	13: MoveLoc[1](Arg1: u64)
+	14: Add
+	15: Ret
+}
+bits(Arg0: u64, Arg1: u8): u64 /* def_idx: 1 */ {
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: CopyLoc[1](Arg1: u8)
+	2: Shl
+	3: CopyLoc[0](Arg0: u64)
+	4: BitAnd
+	5: CopyLoc[0](Arg0: u64)
+	6: MoveLoc[1](Arg1: u8)
+	7: Shr
+	8: MoveLoc[0](Arg0: u64)
+	9: Xor
+	10: BitOr
+	11: Ret
+}
+bools(Arg0: bool, Arg1: bool): bool /* def_idx: 2 */ {
+L2:	loc0: bool
+B0:
+	0: CopyLoc[0](Arg0: bool)
+	1: BrFalse(5)
+B1:
+	2: CopyLoc[1](Arg1: bool)
+	3: StLoc[2](loc0: bool)
+	4: Branch(7)
+B2:
+	5: LdFalse
+	6: StLoc[2](loc0: bool)
+B3:
+	7: MoveLoc[2](loc0: bool)
+	8: BrFalse(12)
+B4:
+	9: LdTrue
+	10: StLoc[2](loc0: bool)
+	11: Branch(20)
+B5:
+	12: CopyLoc[0](Arg0: bool)
+	13: BrFalse(18)
+B6:
+	14: CopyLoc[1](Arg1: bool)
+	15: Not
+	16: StLoc[2](loc0: bool)
+	17: Branch(20)
+B7:
+	18: LdFalse
+	19: StLoc[2](loc0: bool)
+B8:
+	20: MoveLoc[2](loc0: bool)
+	21: BrFalse(25)
+B9:
+	22: LdTrue
+	23: StLoc[2](loc0: bool)
+	24: Branch(33)
+B10:
+	25: CopyLoc[0](Arg0: bool)
+	26: Not
+	27: BrFalse(31)
+B11:
+	28: CopyLoc[1](Arg1: bool)
+	29: StLoc[2](loc0: bool)
+	30: Branch(33)
+B12:
+	31: LdFalse
+	32: StLoc[2](loc0: bool)
+B13:
+	33: MoveLoc[2](loc0: bool)
+	34: BrFalse(38)
+B14:
+	35: LdTrue
+	36: StLoc[2](loc0: bool)
+	37: Branch(47)
+B15:
+	38: MoveLoc[0](Arg0: bool)
+	39: Not
+	40: BrFalse(45)
+B16:
+	41: MoveLoc[1](Arg1: bool)
+	42: Not
+	43: StLoc[2](loc0: bool)
+	44: Branch(47)
+B17:
+	45: LdFalse
+	46: StLoc[2](loc0: bool)
+B18:
+	47: MoveLoc[2](loc0: bool)
+	48: Ret
+}
+equality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0](Arg0: Ty0)
+	1: MoveLoc[1](Arg1: Ty0)
+	2: Eq
+	3: Ret
+}
+inequality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 4 */ {
+B0:
+	0: MoveLoc[0](Arg0: Ty0)
+	1: MoveLoc[1](Arg1: Ty0)
+	2: Neq
+	3: Ret
+}
+order(Arg0: u64, Arg1: u64): bool /* def_idx: 5 */ {
+L2:	loc0: bool
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: CopyLoc[1](Arg1: u64)
+	2: Lt
+	3: BrFalse(9)
+B1:
+	4: CopyLoc[0](Arg0: u64)
+	5: CopyLoc[1](Arg1: u64)
+	6: Le
+	7: StLoc[2](loc0: bool)
+	8: Branch(11)
+B2:
+	9: LdFalse
+	10: StLoc[2](loc0: bool)
+B3:
+	11: MoveLoc[2](loc0: bool)
+	12: BrFalse(19)
+B4:
+	13: CopyLoc[0](Arg0: u64)
+	14: CopyLoc[1](Arg1: u64)
+	15: Gt
+	16: Not
+	17: StLoc[2](loc0: bool)
+	18: Branch(21)
+B5:
+	19: LdFalse
+	20: StLoc[2](loc0: bool)
+B6:
+	21: MoveLoc[2](loc0: bool)
+	22: BrFalse(29)
+B7:
+	23: MoveLoc[0](Arg0: u64)
+	24: MoveLoc[1](Arg1: u64)
+	25: Ge
+	26: Not
+	27: StLoc[2](loc0: bool)
+	28: Branch(31)
+B8:
+	29: LdFalse
+	30: StLoc[2](loc0: bool)
+B9:
+	31: MoveLoc[2](loc0: bool)
+	32: Ret
+}
+}
+============ bytecode verification succeeded ========

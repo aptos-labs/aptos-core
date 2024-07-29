@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::*;
+use crate::{components::get_signer_arg, utils::*};
 use anyhow::Result;
 use aptos_types::on_chain_config::OnChainExecutionConfig;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
@@ -11,6 +11,7 @@ pub fn generate_execution_config_upgrade_proposal(
     is_testnet: bool,
     next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
+    let signer_arg = get_signer_arg(is_testnet, &next_execution_hash);
     let mut result = vec![];
 
     let writer = CodeWriter::new(Loc::default());
@@ -29,20 +30,15 @@ pub fn generate_execution_config_upgrade_proposal(
             assert!(execution_config_blob.len() < 65536);
 
             emit!(writer, "let execution_blob: vector<u8> = ");
-            generate_blob(writer, &execution_config_blob);
+            generate_blob_as_hex_string(writer, &execution_config_blob);
             emitln!(writer, ";\n");
 
-            if is_testnet && next_execution_hash.is_empty() {
-                emitln!(
-                    writer,
-                    "execution_config::set(framework_signer, execution_blob);"
-                );
-            } else {
-                emitln!(
-                    writer,
-                    "execution_config::set(&framework_signer, execution_blob);"
-                );
-            }
+            emitln!(
+                writer,
+                "execution_config::set_for_next_epoch({}, execution_blob);",
+                signer_arg
+            );
+            emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
         },
     );
 

@@ -39,7 +39,6 @@ impl VoteData {
         Self { proposed, parent }
     }
 
-    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Self {
             proposed: BlockInfo::empty(),

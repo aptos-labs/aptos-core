@@ -152,7 +152,7 @@ module DiemFramework::DiemAccount {
     const EROLE_CANT_STORE_BALANCE: u64 = 4;
     /// The account does not hold a large enough balance in the specified currency
     const EINSUFFICIENT_BALANCE: u64 = 5;
-    /// The withdrawal of funds would have exceeded the the account's limits
+    /// The withdrawal of funds would have exceeded the account's limits
     const EWITHDRAWAL_EXCEEDS_LIMITS: u64 = 6;
     /// The `WithdrawCapability` for this account has already been extracted
     const EWITHDRAW_CAPABILITY_ALREADY_EXTRACTED: u64 = 7;

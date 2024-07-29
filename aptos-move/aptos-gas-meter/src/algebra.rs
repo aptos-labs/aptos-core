@@ -3,7 +3,7 @@
 
 use crate::traits::GasAlgebra;
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, NumBytes, NumModules, Octa};
-use aptos_gas_schedule::VMGasParameters;
+use aptos_gas_schedule::{gas_feature_versions, VMGasParameters};
 use aptos_logger::error;
 use aptos_vm_types::storage::{
     io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
@@ -26,8 +26,13 @@ pub struct StandardGasAlgebra {
     initial_balance: InternalGas,
     balance: InternalGas,
 
+    max_execution_gas: InternalGas,
     execution_gas_used: InternalGas,
+
+    max_io_gas: InternalGas,
     io_gas_used: InternalGas,
+
+    max_storage_fee: Fee,
     // The gas consumed by the storage operations.
     storage_fee_in_internal_units: InternalGas,
     // The storage fee consumed by the storage operations.
@@ -42,9 +47,26 @@ impl StandardGasAlgebra {
         gas_feature_version: u64,
         vm_gas_params: VMGasParameters,
         storage_gas_params: StorageGasParameters,
+        is_approved_gov_script: bool,
         balance: impl Into<Gas>,
     ) -> Self {
         let balance = balance.into().to_unit_with_params(&vm_gas_params.txn);
+
+        let (max_execution_gas, max_io_gas, max_storage_fee) = if is_approved_gov_script
+            && gas_feature_version >= gas_feature_versions::RELEASE_V1_13
+        {
+            (
+                vm_gas_params.txn.max_execution_gas_gov,
+                vm_gas_params.txn.max_io_gas_gov,
+                vm_gas_params.txn.max_storage_fee_gov,
+            )
+        } else {
+            (
+                vm_gas_params.txn.max_execution_gas,
+                vm_gas_params.txn.max_io_gas,
+                vm_gas_params.txn.max_storage_fee,
+            )
+        };
 
         Self {
             feature_version: gas_feature_version,
@@ -52,8 +74,11 @@ impl StandardGasAlgebra {
             storage_gas_params,
             initial_balance: balance,
             balance,
+            max_execution_gas,
             execution_gas_used: 0.into(),
+            max_io_gas,
             io_gas_used: 0.into(),
+            max_storage_fee,
             storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
             num_dependencies: 0.into(),
@@ -151,9 +176,7 @@ impl GasAlgebra for StandardGasAlgebra {
         if self.feature_version < 12 {
             self.execution_gas_used += amount;
         }
-        if self.feature_version >= 7
-            && self.execution_gas_used > self.vm_gas_params.txn.max_execution_gas
-        {
+        if self.feature_version >= 7 && self.execution_gas_used > self.max_execution_gas {
             Err(PartialVMError::new(StatusCode::EXECUTION_LIMIT_REACHED))
         } else {
             Ok(())
@@ -175,7 +198,7 @@ impl GasAlgebra for StandardGasAlgebra {
         if self.feature_version < 12 {
             self.io_gas_used += amount;
         }
-        if self.feature_version >= 7 && self.io_gas_used > self.vm_gas_params.txn.max_io_gas {
+        if self.feature_version >= 7 && self.io_gas_used > self.max_io_gas {
             Err(PartialVMError::new(StatusCode::IO_LIMIT_REACHED))
         } else {
             Ok(())
@@ -230,9 +253,7 @@ impl GasAlgebra for StandardGasAlgebra {
             self.storage_fee_in_internal_units += gas_consumed_internal;
             self.storage_fee_used += amount;
         }
-        if self.feature_version >= 7
-            && self.storage_fee_used > self.vm_gas_params.txn.max_storage_fee
-        {
+        if self.feature_version >= 7 && self.storage_fee_used > self.max_storage_fee {
             return Err(PartialVMError::new(StatusCode::STORAGE_LIMIT_REACHED));
         }
 

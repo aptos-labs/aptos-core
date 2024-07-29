@@ -424,22 +424,28 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
         proof: ProofOfStore,
     ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
         let (tx, rx) = oneshot::channel();
-
-        if let Ok(mut value) = self.batch_store.get_batch_from_local(proof.digest()) {
-            tx.send(Ok(value.take_payload().expect("Must have payload")))
-                .unwrap();
-        } else {
-            // Quorum store metrics
-            counters::MISSED_BATCHES_COUNT.inc();
-            let batch_store = self.batch_store.clone();
-            let batch_requester = self.batch_requester.clone();
-            tokio::spawn(async move {
+        let batch_store = self.batch_store.clone();
+        let batch_requester = self.batch_requester.clone();
+        tokio::spawn(async move {
+            if let Ok(mut value) = batch_store.get_batch_from_local(proof.digest()) {
+                if tx
+                    .send(Ok(value.take_payload().expect("Must have payload")))
+                    .is_err()
+                {
+                    debug!(
+                        "Receiver of local batch not available for digest {}",
+                        proof.digest()
+                    )
+                };
+            } else {
+                // Quorum store metrics
+                counters::MISSED_BATCHES_COUNT.inc();
                 if let Some((batch_info, payload)) = batch_requester.request_batch(proof, tx).await
                 {
                     batch_store.persist(vec![PersistedValue::new(batch_info, Some(payload))]);
                 }
-            });
-        }
+            }
+        });
         rx
     }
 

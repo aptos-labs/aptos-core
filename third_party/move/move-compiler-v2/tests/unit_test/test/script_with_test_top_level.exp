@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unable to generate test
+  ┌─ tests/unit_test/test/script_with_test_top_level.move:2:3
+  │
+2 │ #[test_only]
+  │   ^^^^^^^^^ Testing attributes are not allowed in scripts.
+
+
+============ bytecode verification succeeded ========

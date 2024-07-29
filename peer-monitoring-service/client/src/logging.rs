@@ -46,9 +46,6 @@ pub enum LogEntry {
     NodeInfoRequest,
     PeerMonitorLoop,
     SendRequest,
-
-    #[cfg(feature = "network-perf-test")] // Disabled by default
-    PerformanceMonitoringRequest,
 }
 
 #[derive(Clone, Copy, Serialize)]

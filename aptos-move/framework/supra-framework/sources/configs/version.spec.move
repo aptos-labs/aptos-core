@@ -37,7 +37,7 @@ spec supra_framework::version {
         pragma verify_duration_estimate = 120;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
-        requires chain_status::is_operating();
+        requires chain_status::is_genesis();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
         requires exists<stake::ValidatorFees>(@supra_framework);
         requires exists<CoinInfo<SupraCoin>>(@supra_framework);
@@ -64,6 +64,19 @@ spec supra_framework::version {
         ensures exists<SetVersionCapability>(@supra_framework);
         ensures global<Version>(@supra_framework) == Version { major: initial_version };
         ensures global<SetVersionCapability>(@supra_framework) == SetVersionCapability {};
+    }
+
+    spec set_for_next_epoch(account: &signer, major: u64) {
+        aborts_if !exists<SetVersionCapability>(signer::address_of(account));
+        aborts_if !exists<Version>(@supra_framework);
+        aborts_if global<Version>(@supra_framework).major >= major;
+        aborts_if !exists<config_buffer::PendingConfigs>(@supra_framework);
+    }
+
+    spec on_new_epoch(framework: &signer) {
+        requires @supra_framework == std::signer::address_of(framework);
+        include config_buffer::OnNewEpochRequirement<Version>;
+        aborts_if false;
     }
 
     /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.

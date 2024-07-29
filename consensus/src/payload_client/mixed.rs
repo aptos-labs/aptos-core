@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
 use crate::payload_client::user;
@@ -10,15 +11,10 @@ use crate::{
 };
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use aptos_logger::debug;
-use aptos_types::{
-    dkg::{DKGTranscript, DKGTranscriptMetadata},
-    on_chain_config::ValidatorTxnConfig,
-    validator_txn::ValidatorTransaction,
-};
+use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
 use futures::future::BoxFuture;
-use move_core_types::account_address::AccountAddress;
 #[cfg(test)]
 use std::collections::HashSet;
 use std::{
@@ -50,15 +46,18 @@ impl MixedPayloadClient {
 
     /// When enabled in smoke tests, generate 2 random validator transactions, 1 valid, 1 invalid.
     fn extra_test_only_vtxns(&self) -> Vec<ValidatorTransaction> {
-        fail_point!("mixed_payload_client::extra_test_only_vtxns", |_| vec![
-            ValidatorTransaction::DKGResult(DKGTranscript {
+        fail_point!("mixed_payload_client::extra_test_only_vtxns", |_| {
+            use aptos_types::dkg::{DKGTranscript, DKGTranscriptMetadata};
+            use move_core_types::account_address::AccountAddress;
+
+            vec![ValidatorTransaction::DKGResult(DKGTranscript {
                 metadata: DKGTranscriptMetadata {
                     epoch: 999,
                     author: AccountAddress::ZERO,
                 },
                 transcript_bytes: vec![],
-            }),
-        ]);
+            })]
+        });
         vec![]
     }
 }

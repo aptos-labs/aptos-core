@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: field `b` not declared in `Test::T`
+   ┌─ tests/checking/typing/v1-commands/unpack_extra_binding.move:11:23
+   │
+11 │         let T { i, x, b: flag } = t;
+   │                       ^
+
+error: undeclared `i`
+   ┌─ tests/checking/typing/v1-commands/unpack_extra_binding.move:12:10
+   │
+12 │         (i, x, flag)
+   │          ^
+
+error: undeclared `x`
+   ┌─ tests/checking/typing/v1-commands/unpack_extra_binding.move:12:13
+   │
+12 │         (i, x, flag)
+   │             ^
+
+error: undeclared `flag`
+   ┌─ tests/checking/typing/v1-commands/unpack_extra_binding.move:12:16
+   │
+12 │         (i, x, flag)
+   │                ^^^^

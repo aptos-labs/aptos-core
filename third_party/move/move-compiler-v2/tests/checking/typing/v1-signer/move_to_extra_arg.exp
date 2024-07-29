@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: the function takes 2 arguments but 3 were provided
+  ┌─ tests/checking/typing/v1-signer/move_to_extra_arg.move:5:9
+  │
+5 │         move_to<R>(s, R { f: false }, a);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: the function takes 2 arguments but 4 were provided
+   ┌─ tests/checking/typing/v1-signer/move_to_extra_arg.move:15:9
+   │
+15 │         move_to<R<bool>>(a, s, a, R<bool> { f: false });
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

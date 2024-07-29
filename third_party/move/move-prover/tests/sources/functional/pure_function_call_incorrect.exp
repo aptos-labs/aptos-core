@@ -1,24 +1,15 @@
 Move prover returns: exiting with model building errors
-error: calling impure function `TestPureFun::init` is not allowed
+error: specification expression cannot call impure Move function `init`
    ┌─ tests/sources/functional/pure_function_call_incorrect.move:32:20
    │
+11 │             return true
+   │             ----------- in `init`: return not allowed in specifications
+   ·
 32 │         aborts_if !init(account);
-   │                    ^^^^^^^^^^^^^
-   │
-   = impure function `TestPureFun::init(&signer): bool`
+   │                    ^^^^^^^^^^^^^ called here
 
-error: calling impure function `vector::pop_back` is not allowed
+error: specification expression cannot use impure construct
    ┌─ tests/sources/functional/pure_function_call_incorrect.move:56:27
    │
 56 │         ensures result == vector::pop_back(old(v));
-   │                           ^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = impure function `vector::pop_back(&mut vector<#0>): #0`
-
-error: calling impure function `TestPureFun::impure_f_2` is not allowed
-   ┌─ tests/sources/functional/pure_function_call_incorrect.move:62:13
-   │
-62 │             impure_f_2()
-   │             ^^^^^^^^^^^^
-   │
-   = impure function `TestPureFun::impure_f_2(): u64`
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^ calls a function which modifies state

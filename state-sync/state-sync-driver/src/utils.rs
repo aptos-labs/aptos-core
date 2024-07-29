@@ -279,7 +279,7 @@ pub fn fetch_latest_synced_ledger_info(
 
 /// Fetches the latest synced version from the specified storage
 pub fn fetch_latest_synced_version(storage: Arc<dyn DbReader>) -> Result<Version, Error> {
-    storage.get_latest_version().map_err(|e| {
+    storage.get_synced_version().map_err(|e| {
         Error::StorageError(format!("Failed to get latest version from storage: {e:?}"))
     })
 }

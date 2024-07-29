@@ -38,6 +38,7 @@ module supra_framework::stake {
     friend supra_framework::block;
     friend supra_framework::genesis;
     friend supra_framework::reconfiguration;
+    friend supra_framework::reconfiguration_with_dkg;
     friend supra_framework::transaction_fee;
 
     /// Validator Config not published.
@@ -78,6 +79,8 @@ module supra_framework::stake {
     const EINVALID_LOCKUP: u64 = 18;
     /// Table to store collected transaction fees for each validator already exists.
     const EFEES_TABLE_ALREADY_EXISTS: u64 = 19;
+    /// Validator set change temporarily disabled because of in-progress reconfiguration.
+    const ERECONFIGURATION_IN_PROGRESS: u64 = 20;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -168,7 +171,7 @@ module supra_framework::stake {
     /// 1. join_validator_set adds to pending_active queue.
     /// 2. leave_valdiator_set moves from active to pending_inactive queue.
     /// 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
-    struct ValidatorSet has key {
+    struct ValidatorSet has copy, key, drop, store {
         consensus_scheme: u8,
         // Active validators for the current epoch.
         active_validators: vector<ValidatorInfo>,
@@ -201,7 +204,19 @@ module supra_framework::stake {
         pool_address: address,
     }
 
+    #[event]
+    struct RegisterValidatorCandidate has drop, store {
+        pool_address: address,
+    }
+
     struct SetOperatorEvent has drop, store {
+        pool_address: address,
+        old_operator: address,
+        new_operator: address,
+    }
+
+    #[event]
+    struct SetOperator has drop, store {
         pool_address: address,
         old_operator: address,
         new_operator: address,
@@ -212,12 +227,31 @@ module supra_framework::stake {
         amount_added: u64,
     }
 
+    #[event]
+    struct AddStake has drop, store {
+        pool_address: address,
+        amount_added: u64,
+    }
+
     struct ReactivateStakeEvent has drop, store {
         pool_address: address,
         amount: u64,
     }
 
+    #[event]
+    struct ReactivateStake has drop, store {
+        pool_address: address,
+        amount: u64,
+    }
+
     struct RotateConsensusKeyEvent has drop, store {
+        pool_address: address,
+        old_consensus_pubkey: vector<u8>,
+        new_consensus_pubkey: vector<u8>,
+    }
+
+    #[event]
+    struct RotateConsensusKey has drop, store {
         pool_address: address,
         old_consensus_pubkey: vector<u8>,
         new_consensus_pubkey: vector<u8>,
@@ -231,7 +265,23 @@ module supra_framework::stake {
         new_fullnode_addresses: vector<u8>,
     }
 
+    #[event]
+    struct UpdateNetworkAndFullnodeAddresses has drop, store {
+        pool_address: address,
+        old_network_addresses: vector<u8>,
+        new_network_addresses: vector<u8>,
+        old_fullnode_addresses: vector<u8>,
+        new_fullnode_addresses: vector<u8>,
+    }
+
     struct IncreaseLockupEvent has drop, store {
+        pool_address: address,
+        old_locked_until_secs: u64,
+        new_locked_until_secs: u64,
+    }
+
+    #[event]
+    struct IncreaseLockup has drop, store {
         pool_address: address,
         old_locked_until_secs: u64,
         new_locked_until_secs: u64,
@@ -241,7 +291,18 @@ module supra_framework::stake {
         pool_address: address,
     }
 
+    #[event]
+    struct JoinValidatorSet has drop, store {
+        pool_address: address,
+    }
+
     struct DistributeRewardsEvent has drop, store {
+        pool_address: address,
+        rewards_amount: u64,
+    }
+
+    #[event]
+    struct DistributeRewards has drop, store {
         pool_address: address,
         rewards_amount: u64,
     }
@@ -251,12 +312,29 @@ module supra_framework::stake {
         amount_unlocked: u64,
     }
 
+    #[event]
+    struct UnlockStake has drop, store {
+        pool_address: address,
+        amount_unlocked: u64,
+    }
+
     struct WithdrawStakeEvent has drop, store {
         pool_address: address,
         amount_withdrawn: u64,
     }
 
+    #[event]
+    struct WithdrawStake has drop, store {
+        pool_address: address,
+        amount_withdrawn: u64,
+    }
+
     struct LeaveValidatorSetEvent has drop, store {
+        pool_address: address,
+    }
+
+    #[event]
+    struct LeaveValidatorSet has drop, store {
         pool_address: address,
     }
 
@@ -390,7 +468,9 @@ module supra_framework::stake {
 
     #[view]
     /// Return the validator's config.
-    public fun get_validator_config(pool_address: address): (vector<u8>, vector<u8>, vector<u8>) acquires ValidatorConfig {
+    public fun get_validator_config(
+        pool_address: address
+    ): (vector<u8>, vector<u8>, vector<u8>) acquires ValidatorConfig {
         assert_stake_pool_exists(pool_address);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
@@ -431,29 +511,38 @@ module supra_framework::stake {
         supra_framework: &signer,
         validators: &vector<address>,
     ) acquires ValidatorSet {
+        assert_reconfig_not_in_progress();
         system_addresses::assert_supra_framework(supra_framework);
-
         let validator_set = borrow_global_mut<ValidatorSet>(@supra_framework);
         let active_validators = &mut validator_set.active_validators;
         let pending_inactive = &mut validator_set.pending_inactive;
-        let len = vector::length(validators);
+        spec {
+            update ghost_active_num = len(active_validators);
+            update ghost_pending_inactive_num = len(pending_inactive);
+        };
+        let len_validators = vector::length(validators);
         let i = 0;
         // Remove each validator from the validator set.
         while ({
             spec {
-                invariant i <= len;
+                invariant i <= len_validators;
                 invariant spec_validators_are_initialized(active_validators);
                 invariant spec_validator_indices_are_valid(active_validators);
                 invariant spec_validators_are_initialized(pending_inactive);
                 invariant spec_validator_indices_are_valid(pending_inactive);
+                invariant ghost_active_num + ghost_pending_inactive_num == len(active_validators) + len(pending_inactive);
             };
-            i < len
+            i < len_validators
         }) {
             let validator = *vector::borrow(validators, i);
             let validator_index = find_validator(active_validators, validator);
             if (option::is_some(&validator_index)) {
                 let validator_info = vector::swap_remove(active_validators, *option::borrow(&validator_index));
                 vector::push_back(pending_inactive, validator_info);
+                spec {
+                    update ghost_active_num = ghost_active_num - 1;
+                    update ghost_pending_inactive_num = ghost_pending_inactive_num + 1;
+                };
             };
             i = i + 1;
         };
@@ -529,7 +618,9 @@ module supra_framework::stake {
             add_stake_events: account::new_event_handle<AddStakeEvent>(owner),
             reactivate_stake_events: account::new_event_handle<ReactivateStakeEvent>(owner),
             rotate_consensus_key_events: account::new_event_handle<RotateConsensusKeyEvent>(owner),
-            update_network_and_fullnode_addresses_events: account::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(owner),
+            update_network_and_fullnode_addresses_events: account::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(
+                owner
+            ),
             increase_lockup_events: account::new_event_handle<IncreaseLockupEvent>(owner),
             join_validator_set_events: account::new_event_handle<JoinValidatorSetEvent>(owner),
             distribute_rewards_events: account::new_event_handle<DistributeRewardsEvent>(owner),
@@ -576,6 +667,16 @@ module supra_framework::stake {
         let old_operator = stake_pool.operator_address;
         stake_pool.operator_address = new_operator;
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                SetOperator {
+                    pool_address,
+                    old_operator,
+                    new_operator,
+                },
+            );
+        };
+
         event::emit_event(
             &mut stake_pool.set_operator_events,
             SetOperatorEvent {
@@ -612,6 +713,7 @@ module supra_framework::stake {
 
     /// Add `coins` into `pool_address`. this requires the corresponding `owner_cap` to be passed in.
     public fun add_stake_with_cap(owner_cap: &OwnerCapability, coins: Coin<SupraCoin>) acquires StakePool, ValidatorSet {
+        assert_reconfig_not_in_progress();
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
 
@@ -644,6 +746,14 @@ module supra_framework::stake {
         let voting_power = get_next_epoch_voting_power(stake_pool);
         assert!(voting_power <= maximum_stake, error::invalid_argument(ESTAKE_EXCEEDS_MAX));
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                AddStake {
+                    pool_address,
+                    amount_added: amount,
+                },
+            );
+        };
         event::emit_event(
             &mut stake_pool.add_stake_events,
             AddStakeEvent {
@@ -655,6 +765,7 @@ module supra_framework::stake {
 
     /// Move `amount` of coins from pending_inactive to active.
     public entry fun reactivate_stake(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
+        assert_reconfig_not_in_progress();
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -662,6 +773,7 @@ module supra_framework::stake {
     }
 
     public fun reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) acquires StakePool {
+        assert_reconfig_not_in_progress();
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
 
@@ -676,6 +788,14 @@ module supra_framework::stake {
         let reactivated_coins = coin::extract(&mut stake_pool.pending_inactive, amount);
         coin::merge(&mut stake_pool.active, reactivated_coins);
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                ReactivateStake {
+                    pool_address,
+                    amount,
+                },
+            );
+        };
         event::emit_event(
             &mut stake_pool.reactivate_stake_events,
             ReactivateStakeEvent {
@@ -691,7 +811,9 @@ module supra_framework::stake {
         new_consensus_pubkey: vector<u8>,
         genesis: bool,
     ) acquires StakePool, ValidatorConfig {
+        assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
+
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
 
@@ -708,6 +830,15 @@ module supra_framework::stake {
         };
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                RotateConsensusKey {
+                    pool_address,
+                    old_consensus_pubkey,
+                    new_consensus_pubkey,
+                },
+            );
+        };
         event::emit_event(
             &mut stake_pool.rotate_consensus_key_events,
             RotateConsensusKeyEvent {
@@ -745,10 +876,10 @@ module supra_framework::stake {
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
+        assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
-
         assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_network_addresses = validator_info.network_addresses;
@@ -756,6 +887,17 @@ module supra_framework::stake {
         let old_fullnode_addresses = validator_info.fullnode_addresses;
         validator_info.fullnode_addresses = new_fullnode_addresses;
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                UpdateNetworkAndFullnodeAddresses {
+                    pool_address,
+                    old_network_addresses,
+                    new_network_addresses,
+                    old_fullnode_addresses,
+                    new_fullnode_addresses,
+                },
+            );
+        };
         event::emit_event(
             &mut stake_pool.update_network_and_fullnode_addresses_events,
             UpdateNetworkAndFullnodeAddressesEvent {
@@ -766,6 +908,7 @@ module supra_framework::stake {
                 new_fullnode_addresses,
             },
         );
+
     }
 
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
@@ -789,6 +932,15 @@ module supra_framework::stake {
         assert!(old_locked_until_secs < new_locked_until_secs, error::invalid_argument(EINVALID_LOCKUP));
         stake_pool.locked_until_secs = new_locked_until_secs;
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                IncreaseLockup {
+                    pool_address,
+                    old_locked_until_secs,
+                    new_locked_until_secs,
+                },
+            );
+        };
         event::emit_event(
             &mut stake_pool.increase_lockup_events,
             IncreaseLockupEvent {
@@ -822,6 +974,7 @@ module supra_framework::stake {
         operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
+        assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
@@ -845,10 +998,18 @@ module supra_framework::stake {
 
         // Validate the current validator set size has not exceeded the limit.
         let validator_set = borrow_global_mut<ValidatorSet>(@supra_framework);
-        vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address, stake_pool, *validator_config));
-        let validator_set_size = vector::length(&validator_set.active_validators) + vector::length(&validator_set.pending_active);
+        vector::push_back(
+            &mut validator_set.pending_active,
+            generate_validator_info(pool_address, stake_pool, *validator_config)
+        );
+        let validator_set_size = vector::length(&validator_set.active_validators) + vector::length(
+            &validator_set.pending_active
+        );
         assert!(validator_set_size <= MAX_VALIDATOR_SET_SIZE, error::invalid_argument(EVALIDATOR_SET_TOO_LARGE));
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(JoinValidatorSet { pool_address });
+        };
         event::emit_event(
             &mut stake_pool.join_validator_set_events,
             JoinValidatorSetEvent { pool_address },
@@ -857,6 +1018,7 @@ module supra_framework::stake {
 
     /// Similar to unlock_with_cap but will use ownership capability from the signing account.
     public entry fun unlock(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
+        assert_reconfig_not_in_progress();
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -865,6 +1027,7 @@ module supra_framework::stake {
 
     /// Unlock `amount` from the active stake. Only possible if the lockup has expired.
     public fun unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) acquires StakePool {
+        assert_reconfig_not_in_progress();
         // Short-circuit if amount to unlock is 0 so we don't emit events.
         if (amount == 0) {
             return
@@ -880,6 +1043,14 @@ module supra_framework::stake {
         let unlocked_stake = coin::extract(&mut stake_pool.active, amount);
         coin::merge<SupraCoin>(&mut stake_pool.pending_inactive, unlocked_stake);
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                UnlockStake {
+                    pool_address,
+                    amount_unlocked: amount,
+                },
+            );
+        };
         event::emit_event(
             &mut stake_pool.unlock_stake_events,
             UnlockStakeEvent {
@@ -906,6 +1077,7 @@ module supra_framework::stake {
         owner_cap: &OwnerCapability,
         withdraw_amount: u64
     ): Coin<SupraCoin> acquires StakePool, ValidatorSet {
+        assert_reconfig_not_in_progress();
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
@@ -922,6 +1094,14 @@ module supra_framework::stake {
         withdraw_amount = min(withdraw_amount, coin::value(&stake_pool.inactive));
         if (withdraw_amount == 0) return coin::zero<SupraCoin>();
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                WithdrawStake {
+                    pool_address,
+                    amount_withdrawn: withdraw_amount,
+                },
+            );
+        };
         event::emit_event(
             &mut stake_pool.withdraw_stake_events,
             WithdrawStakeEvent {
@@ -943,6 +1123,7 @@ module supra_framework::stake {
         operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorSet {
+        assert_reconfig_not_in_progress();
         let config = staking_config::get();
         assert!(
             staking_config::get_allow_validator_set_change(&config),
@@ -982,6 +1163,9 @@ module supra_framework::stake {
             assert!(vector::length(&validator_set.active_validators) > 0, error::invalid_state(ELAST_VALIDATOR));
             vector::push_back(&mut validator_set.pending_inactive, validator_info);
 
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(LeaveValidatorSet { pool_address });
+            };
             event::emit_event(
                 &mut stake_pool.leave_validator_set_events,
                 LeaveValidatorSetEvent {
@@ -1002,7 +1186,10 @@ module supra_framework::stake {
 
     /// Update the validator performance (proposal statistics). This is only called by block::prologue().
     /// This function cannot abort.
-    public(friend) fun update_performance_statistics(proposer_index: Option<u64>, failed_proposer_indices: vector<u64>) acquires ValidatorPerformance {
+    public(friend) fun update_performance_statistics(
+        proposer_index: Option<u64>,
+        failed_proposer_indices: vector<u64>
+    ) acquires ValidatorPerformance {
         // Validator set cannot change until the end of the epoch, so the validator index in arguments should
         // match with those of the validators in ValidatorPerformance resource.
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@supra_framework);
@@ -1031,7 +1218,9 @@ module supra_framework::stake {
         while ({
             spec {
                 invariant len(validator_perf.validators) == validator_len;
-                invariant (option::spec_is_some(ghost_proposer_idx) && option::spec_borrow(ghost_proposer_idx) < validator_len) ==>
+                invariant (option::spec_is_some(ghost_proposer_idx) && option::spec_borrow(
+                    ghost_proposer_idx
+                ) < validator_len) ==>
                     (validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals ==
                         ghost_valid_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
             };
@@ -1049,7 +1238,7 @@ module supra_framework::stake {
         };
     }
 
-    /// Triggers at epoch boundary. This function shouldn't abort.
+    /// Triggered during a reconfiguration. This function shouldn't abort.
     ///
     /// 1. Distribute transaction fees and rewards to stake pools of active and pending inactive validators (requested
     /// to leave but not yet removed).
@@ -1059,7 +1248,8 @@ module supra_framework::stake {
     /// pending inactive validators so they no longer can vote.
     /// 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
     /// power.
-    public(friend) fun on_new_epoch() acquires StakePool, SupraCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+    public(friend) fun on_new_epoch(
+    ) acquires StakePool, SupraCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         let validator_set = borrow_global_mut<ValidatorSet>(@supra_framework);
         let config = staking_config::get();
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@supra_framework);
@@ -1094,6 +1284,7 @@ module supra_framework::stake {
         while ({
             spec {
                 invariant spec_validators_are_initialized(next_epoch_validators);
+                invariant i <= vlen;
             };
             i < vlen
         }) {
@@ -1132,6 +1323,8 @@ module supra_framework::stake {
                 invariant vlen == len(validator_set.active_validators);
                 invariant forall i in 0..validator_index:
                     global<ValidatorConfig>(validator_set.active_validators[i].addr).validator_index < validator_index;
+                invariant forall i in 0..validator_index:
+                    validator_set.active_validators[i].config.validator_index < validator_index;
                 invariant len(validator_perf.validators) == validator_index;
             };
             validator_index < vlen
@@ -1149,12 +1342,17 @@ module supra_framework::stake {
             // Automatically renew a validator's lockup for validators that will still be in the validator set in the
             // next epoch.
             let stake_pool = borrow_global_mut<StakePool>(validator_info.addr);
-            if (stake_pool.locked_until_secs <= timestamp::now_seconds()) {
+            let now_secs = timestamp::now_seconds();
+            let reconfig_start_secs = if (chain_status::is_operating()) {
+                get_reconfig_start_time_secs()
+            } else {
+                now_secs
+            };
+            if (stake_pool.locked_until_secs <= reconfig_start_secs) {
                 spec {
-                    assume timestamp::spec_now_seconds() + recurring_lockup_duration_secs <= MAX_U64;
+                    assume now_secs + recurring_lockup_duration_secs <= MAX_U64;
                 };
-                stake_pool.locked_until_secs =
-                    timestamp::now_seconds() + recurring_lockup_duration_secs;
+                stake_pool.locked_until_secs = now_secs + recurring_lockup_duration_secs;
             };
 
             validator_index = validator_index + 1;
@@ -1166,7 +1364,197 @@ module supra_framework::stake {
         };
     }
 
-    /// Update individual validator's stake pool
+    /// Return the `ValidatorConsensusInfo` of each current validator, sorted by current validator index.
+    public fun cur_validator_consensus_infos(): vector<ValidatorConsensusInfo> acquires ValidatorSet {
+        let validator_set = borrow_global<ValidatorSet>(@supra_framework);
+        validator_consensus_infos_from_validator_set(validator_set)
+    }
+
+
+    public fun next_validator_consensus_infos(): vector<ValidatorConsensusInfo> acquires ValidatorSet, ValidatorPerformance, StakePool, ValidatorFees, ValidatorConfig {
+        // Init.
+        let cur_validator_set = borrow_global<ValidatorSet>(@supra_framework);
+        let staking_config = staking_config::get();
+        let validator_perf = borrow_global<ValidatorPerformance>(@supra_framework);
+        let (minimum_stake, _) = staking_config::get_required_stake(&staking_config);
+        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config);
+
+        // Compute new validator set.
+        let new_active_validators = vector[];
+        let num_new_actives = 0;
+        let candidate_idx = 0;
+        let new_total_power = 0;
+        let num_cur_actives = vector::length(&cur_validator_set.active_validators);
+        let num_cur_pending_actives = vector::length(&cur_validator_set.pending_active);
+        spec {
+            assume num_cur_actives + num_cur_pending_actives <= MAX_U64;
+        };
+        let num_candidates = num_cur_actives + num_cur_pending_actives;
+        while ({
+            spec {
+                invariant candidate_idx <= num_candidates;
+                invariant spec_validators_are_initialized(new_active_validators);
+                invariant len(new_active_validators) == num_new_actives;
+                invariant forall i in 0..len(new_active_validators):
+                    new_active_validators[i].config.validator_index == i;
+                invariant num_new_actives <= candidate_idx;
+                invariant spec_validators_are_initialized(new_active_validators);
+            };
+            candidate_idx < num_candidates
+        }) {
+            let candidate_in_current_validator_set = candidate_idx < num_cur_actives;
+            let candidate = if (candidate_idx < num_cur_actives) {
+                vector::borrow(&cur_validator_set.active_validators, candidate_idx)
+            } else {
+                vector::borrow(&cur_validator_set.pending_active, candidate_idx - num_cur_actives)
+            };
+            let stake_pool = borrow_global<StakePool>(candidate.addr);
+            let cur_active = coin::value(&stake_pool.active);
+            let cur_pending_active = coin::value(&stake_pool.pending_active);
+            let cur_pending_inactive = coin::value(&stake_pool.pending_inactive);
+
+            let cur_reward = if (candidate_in_current_validator_set && cur_active > 0) {
+                spec {
+                    assert candidate.config.validator_index < len(validator_perf.validators);
+                };
+                let cur_perf = vector::borrow(&validator_perf.validators, candidate.config.validator_index);
+                spec {
+                    assume cur_perf.successful_proposals + cur_perf.failed_proposals <= MAX_U64;
+                };
+                calculate_rewards_amount(cur_active, cur_perf.successful_proposals, cur_perf.successful_proposals + cur_perf.failed_proposals, rewards_rate, rewards_rate_denominator)
+            } else {
+                0
+            };
+
+            let cur_fee = 0;
+            if (features::collect_and_distribute_gas_fees()) {
+                let fees_table = &borrow_global<ValidatorFees>(@supra_framework).fees_table;
+                if (table::contains(fees_table, candidate.addr)) {
+                    let fee_coin = table::borrow(fees_table, candidate.addr);
+                    cur_fee = coin::value(fee_coin);
+                }
+            };
+
+            let lockup_expired = get_reconfig_start_time_secs() >= stake_pool.locked_until_secs;
+            spec {
+                assume cur_active + cur_pending_active + cur_reward + cur_fee <= MAX_U64;
+                assume cur_active + cur_pending_inactive + cur_pending_active + cur_reward + cur_fee <= MAX_U64;
+            };
+            let new_voting_power =
+                cur_active
+                + if (lockup_expired) { 0 } else { cur_pending_inactive }
+                + cur_pending_active
+                + cur_reward + cur_fee;
+
+            if (new_voting_power >= minimum_stake) {
+                let config = *borrow_global<ValidatorConfig>(candidate.addr);
+                config.validator_index = num_new_actives;
+                let new_validator_info = ValidatorInfo {
+                    addr: candidate.addr,
+                    voting_power: new_voting_power,
+                    config,
+                };
+
+                // Update ValidatorSet.
+                spec {
+                    assume new_total_power + new_voting_power <= MAX_U128;
+                };
+                new_total_power = new_total_power + (new_voting_power as u128);
+                vector::push_back(&mut new_active_validators, new_validator_info);
+                num_new_actives = num_new_actives + 1;
+
+            };
+            candidate_idx = candidate_idx + 1;
+        };
+
+        let new_validator_set = ValidatorSet {
+            consensus_scheme: cur_validator_set.consensus_scheme,
+            active_validators: new_active_validators,
+            pending_inactive: vector[],
+            pending_active: vector[],
+            total_voting_power: new_total_power,
+            total_joining_power: 0,
+        };
+
+        validator_consensus_infos_from_validator_set(&new_validator_set)
+    }
+
+    fun validator_consensus_infos_from_validator_set(validator_set: &ValidatorSet): vector<ValidatorConsensusInfo> {
+        let validator_consensus_infos = vector[];
+
+        let num_active = vector::length(&validator_set.active_validators);
+        let num_pending_inactive = vector::length(&validator_set.pending_inactive);
+        spec {
+            assume num_active + num_pending_inactive <= MAX_U64;
+        };
+        let total = num_active + num_pending_inactive;
+
+        // Pre-fill the return value with dummy values.
+        let idx = 0;
+        while ({
+            spec {
+                invariant idx <= len(validator_set.active_validators) + len(validator_set.pending_inactive);
+                invariant len(validator_consensus_infos) == idx;
+                invariant len(validator_consensus_infos) <= len(validator_set.active_validators) + len(validator_set.pending_inactive);
+            };
+            idx < total
+        }) {
+            vector::push_back(&mut validator_consensus_infos, validator_consensus_info::default());
+            idx = idx + 1;
+        };
+        spec {
+            assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+            assert spec_validator_indices_are_valid_config(validator_set.active_validators,
+                len(validator_set.active_validators) + len(validator_set.pending_inactive));
+        };
+
+        vector::for_each_ref(&validator_set.active_validators, |obj| {
+            let vi: &ValidatorInfo = obj;
+            spec {
+                assume len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+                assert vi.config.validator_index < len(validator_consensus_infos);
+            };
+            let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
+            *vci = validator_consensus_info::new(
+                vi.addr,
+                vi.config.consensus_pubkey,
+                vi.voting_power
+            );
+            spec {
+                assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+            };
+        });
+
+        vector::for_each_ref(&validator_set.pending_inactive, |obj| {
+            let vi: &ValidatorInfo = obj;
+            spec {
+                assume len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+                assert vi.config.validator_index < len(validator_consensus_infos);
+            };
+            let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
+            *vci = validator_consensus_info::new(
+                vi.addr,
+                vi.config.consensus_pubkey,
+                vi.voting_power
+            );
+            spec {
+                assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+            };
+        });
+
+        validator_consensus_infos
+    }
+
+    fun addresses_from_validator_infos(infos: &vector<ValidatorInfo>): vector<address> {
+        vector::map_ref(infos, |obj| {
+            let info: &ValidatorInfo = obj;
+            info.addr
+        })
+    }
+
+    /// Calculate the stake amount of a stake pool for the next epoch.
+    /// Update individual validator's stake pool if `commit == true`.
+    ///
     /// 1. distribute transaction fees to active/pending_inactive delegations
     /// 2. distribute rewards to active/pending_inactive delegations
     /// 3. process pending_active, pending_inactive correspondingly
@@ -1219,13 +1607,16 @@ module supra_framework::stake {
 
         // Pending inactive stake is only fully unlocked and moved into inactive if the current lockup cycle has expired
         let current_lockup_expiration = stake_pool.locked_until_secs;
-        if (timestamp::now_seconds() >= current_lockup_expiration) {
+        if (get_reconfig_start_time_secs() >= current_lockup_expiration) {
             coin::merge(
                 &mut stake_pool.inactive,
                 coin::extract_all(&mut stake_pool.pending_inactive),
             );
         };
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(DistributeRewards { pool_address, rewards_amount });
+        };
         event::emit_event(
             &mut stake_pool.distribute_rewards_events,
             DistributeRewardsEvent {
@@ -1233,6 +1624,15 @@ module supra_framework::stake {
                 rewards_amount,
             },
         );
+    }
+
+    /// Assuming we are in a middle of a reconfiguration (no matter it is immediate or async), get its start time.
+    fun get_reconfig_start_time_secs(): u64 {
+        if (reconfiguration_state::is_initialized()) {
+            reconfiguration_state::start_time_secs()
+        } else {
+            timestamp::now_seconds()
+        }
     }
 
     /// Calculate the rewards amount.
@@ -1271,7 +1671,13 @@ module supra_framework::stake {
     ): u64 acquires SupraCoinCapabilities {
         let stake_amount = coin::value(stake);
         let rewards_amount = if (stake_amount > 0) {
-            calculate_rewards_amount(stake_amount, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
+            calculate_rewards_amount(
+                stake_amount,
+                num_successful_proposals,
+                num_total_proposals,
+                rewards_rate,
+                rewards_rate_denominator
+            )
         } else {
             0
         };
@@ -1352,7 +1758,10 @@ module supra_framework::stake {
         accounts: vector<address>,
     }
 
-    public fun configure_allowed_validators(supra_framework: &signer, accounts: vector<address>) acquires AllowedValidators {
+    public fun configure_allowed_validators(
+        supra_framework: &signer,
+        accounts: vector<address>
+    ) acquires AllowedValidators {
         let supra_framework_address = signer::address_of(supra_framework);
         system_addresses::assert_supra_framework(supra_framework);
         if (!exists<AllowedValidators>(supra_framework_address)) {
@@ -1376,8 +1785,15 @@ module supra_framework::stake {
         assert!(exists<OwnerCapability>(owner), error::not_found(EOWNER_CAP_NOT_FOUND));
     }
 
+    fun assert_reconfig_not_in_progress() {
+        assert!(!reconfiguration_state::is_in_progress(), error::invalid_state(ERECONFIGURATION_IN_PROGRESS));
+    }
+
     #[test_only]
     use supra_framework::supra_coin;
+    use supra_framework::reconfiguration_state;
+    use supra_framework::validator_consensus_info;
+    use supra_framework::validator_consensus_info::ValidatorConsensusInfo;
     #[test_only]
     use aptos_std::fixed_point64;
 
@@ -1389,6 +1805,7 @@ module supra_framework::stake {
 
     #[test_only]
     public fun initialize_for_test(supra_framework: &signer) {
+        reconfiguration_state::initialize(supra_framework);
         initialize_for_test_custom(supra_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
     }
 
@@ -1428,6 +1845,7 @@ module supra_framework::stake {
         voting_power_increase_limit: u64,
     ) {
         timestamp::set_time_has_started_for_testing(supra_framework);
+        reconfiguration_state::initialize(supra_framework);
         if (!exists<ValidatorSet>(@supra_framework)) {
             initialize(supra_framework);
         };
@@ -2185,11 +2603,29 @@ module supra_framework::stake {
         join_validator_set(validator_3, validator_3_address);
         // Validator 2 is not effectively removed until next epoch.
         assert!(get_validator_state(validator_2_address) == VALIDATOR_STATUS_PENDING_INACTIVE, 6);
-        assert!(vector::borrow(&borrow_global<ValidatorSet>(@supra_framework).pending_inactive, 0).addr == validator_2_address, 0);
+        assert!(
+            vector::borrow(
+                &borrow_global<ValidatorSet>(@supra_framework).pending_inactive,
+                0
+            ).addr == validator_2_address,
+            0
+        );
         // Validator 3 is not effectively added until next epoch.
         assert!(get_validator_state(validator_3_address) == VALIDATOR_STATUS_PENDING_ACTIVE, 7);
-        assert!(vector::borrow(&borrow_global<ValidatorSet>(@supra_framework).pending_active, 0).addr == validator_3_address, 0);
-        assert!(vector::borrow(&borrow_global<ValidatorSet>(@supra_framework).active_validators, 0).config.consensus_pubkey == pk_1_bytes, 0);
+        assert!(
+            vector::borrow(
+                &borrow_global<ValidatorSet>(@supra_framework).pending_active,
+                0
+            ).addr == validator_3_address,
+            0
+        );
+        assert!(
+            vector::borrow(
+                &borrow_global<ValidatorSet>(@supra_framework).active_validators,
+                0
+            ).config.consensus_pubkey == pk_1_bytes,
+            0
+        );
 
         // Changes applied after new epoch
         end_epoch();
@@ -2201,7 +2637,13 @@ module supra_framework::stake {
         assert_validator_state(validator_2_address, 101, 0, 0, 0, 1);
         assert!(get_validator_state(validator_3_address) == VALIDATOR_STATUS_ACTIVE, 10);
         assert_validator_state(validator_3_address, 100, 0, 0, 0, 1);
-        assert!(vector::borrow(&borrow_global<ValidatorSet>(@supra_framework).active_validators, 0).config.consensus_pubkey == pk_1b_bytes, 0);
+        assert!(
+            vector::borrow(
+                &borrow_global<ValidatorSet>(@supra_framework).active_validators,
+                0
+            ).config.consensus_pubkey == pk_1b_bytes,
+            0
+        );
 
         // Validators without enough stake will be removed.
         unlock(validator_1, 50);
@@ -2303,6 +2745,79 @@ module supra_framework::stake {
 
         // Leaving the validator set should fail as post genesis validator set change is not allowed.
         leave_validator_set(validator, validator_address);
+    }
+
+    #[test(
+        supra_framework = @supra_framework,
+        validator_1 = @supra_framework,
+        validator_2 = @0x2,
+        validator_3 = @0x3,
+        validator_4 = @0x4,
+        validator_5 = @0x5
+    )]
+    fun test_validator_consensus_infos_from_validator_set(
+        supra_framework: &signer,
+        validator_1: &signer,
+        validator_2: &signer,
+        validator_3: &signer,
+        validator_4: &signer,
+        validator_5: &signer,
+    ) acquires AllowedValidators, SupraCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+        let v1_addr = signer::address_of(validator_1);
+        let v2_addr = signer::address_of(validator_2);
+        let v3_addr = signer::address_of(validator_3);
+        let v4_addr = signer::address_of(validator_4);
+        let v5_addr = signer::address_of(validator_5);
+
+        initialize_for_test(supra_framework);
+
+        let (_sk_1, pk_1) = generate_identity();
+        let (_sk_2, pk_2) = generate_identity();
+        let (_sk_3, pk_3) = generate_identity();
+        let (_sk_4, pk_4) = generate_identity();
+        let (_sk_5, pk_5) = generate_identity();
+        // let pk_1_bytes = bls12381::public_key_to_bytes(&pk_1);
+        // let pk_3_bytes = bls12381::public_key_to_bytes(&pk_3);
+        // let pk_5_bytes = bls12381::public_key_to_bytes(&pk_5);
+
+        initialize_test_validator(&pk_1, validator_1, 101, false, false);
+        initialize_test_validator(&pk_2, validator_2, 102, false, false);
+        initialize_test_validator(&pk_3, validator_3, 103, false, false);
+        initialize_test_validator(&pk_4, validator_4, 104, false, false);
+        initialize_test_validator(&pk_5, validator_5, 105, false, false);
+
+        join_validator_set(validator_3, v3_addr);
+        join_validator_set(validator_1, v1_addr);
+        join_validator_set(validator_5, v5_addr);
+        end_epoch();
+        let vci_vec_0 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@supra_framework));
+        let vci_addrs = vector::map_ref(&vci_vec_0, |obj|{
+            let vci: &ValidatorConsensusInfo = obj;
+            validator_consensus_info::get_addr(vci)
+        });
+        let vci_pks = vector::map_ref(&vci_vec_0, |obj|{
+            let vci: &ValidatorConsensusInfo = obj;
+            validator_consensus_info::get_pk_bytes(vci)
+        });
+        let vci_voting_powers = vector::map_ref(&vci_vec_0, |obj|{
+            let vci: &ValidatorConsensusInfo = obj;
+            validator_consensus_info::get_voting_power(vci)
+        });
+        assert!(vector[@0x5, @supra_framework, @0x3] == vci_addrs, 1);
+        // assert!(vector[pk_5_bytes, pk_1_bytes, pk_3_bytes] == vci_pks, 2);
+        assert!(vector[105, 101, 103] == vci_voting_powers, 3);
+        leave_validator_set(validator_3, v3_addr);
+        let vci_vec_1 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@supra_framework));
+        assert!(vci_vec_0 == vci_vec_1, 11);
+        join_validator_set(validator_2, v2_addr);
+        let vci_vec_2 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@supra_framework));
+        assert!(vci_vec_0 == vci_vec_2, 12);
+        leave_validator_set(validator_1, v1_addr);
+        let vci_vec_3 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@supra_framework));
+        assert!(vci_vec_0 == vci_vec_3, 13);
+        join_validator_set(validator_4, v4_addr);
+        let vci_vec_4 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@supra_framework));
+        assert!(vci_vec_0 == vci_vec_4, 14);
     }
 
     #[test(
@@ -2455,12 +2970,12 @@ module supra_framework::stake {
         staking_config::initialize_rewards(
             supra_framework,
             fixed_point64::create_from_rational(1, 100),
-        fixed_point64::create_from_rational(3, 1000),
+            fixed_point64::create_from_rational(3, 1000),
             one_year_in_secs,
             genesis_time_in_secs,
             fixed_point64::create_from_rational(50, 100),
         );
-        features::change_feature_flags(supra_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
+        features::change_feature_flags_for_testing(supra_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
 
         // For some reason, this epoch is very long. It has been 1 year since genesis when the epoch ends.
         timestamp::fast_forward_seconds(one_year_in_secs - EPOCH_DURATION * 3);
@@ -2625,11 +3140,14 @@ module supra_framework::stake {
     }
 
     #[test_only]
-    public fun end_epoch() acquires StakePool, SupraCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+    public fun end_epoch(
+    ) acquires StakePool, SupraCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         // Set the number of blocks to 1, to give out rewards to non-failing validators.
         set_validator_perf_at_least_one_block();
         timestamp::fast_forward_seconds(EPOCH_DURATION);
+        reconfiguration_state::on_reconfig_start();
         on_new_epoch();
+        reconfiguration_state::on_reconfig_finish();
     }
 
     #[test_only]
@@ -2671,11 +3189,14 @@ module supra_framework::stake {
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
         let addr = signer::address_of(validator);
+        let (burn, mint) = supra_coin::initialize_for_test(supra_framework);
         configure_allowed_validators(supra_framework, vector[addr]);
 
         account::create_account_for_test(addr);
         coin::register<SupraCoin>(validator);
         initialize_stake_owner(validator, 0, addr, addr);
+        coin::destroy_burn_cap(burn);
+        coin::destroy_mint_cap(mint);
     }
 
     #[test(supra_framework = @0x1, validator = @0x123)]
@@ -2685,11 +3206,14 @@ module supra_framework::stake {
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
         configure_allowed_validators(supra_framework, vector[]);
+        let (burn, mint) = supra_coin::initialize_for_test(supra_framework);
 
         let addr = signer::address_of(validator);
         account::create_account_for_test(addr);
         coin::register<SupraCoin>(validator);
         initialize_stake_owner(validator, 0, addr, addr);
+        coin::destroy_burn_cap(burn);
+        coin::destroy_mint_cap(mint);
     }
 
     #[test_only]
@@ -2722,7 +3246,7 @@ module supra_framework::stake {
         validator_3: &signer,
     ) acquires AllowedValidators, SupraCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         // Make sure that fees collection and distribution is enabled.
-        features::change_feature_flags(supra_framework, vector[COLLECT_AND_DISTRIBUTE_GAS_FEES], vector[]);
+        features::change_feature_flags_for_testing(supra_framework, vector[COLLECT_AND_DISTRIBUTE_GAS_FEES], vector[]);
         assert!(features::collect_and_distribute_gas_fees(), 0);
 
         // Initialize staking and validator fees table.

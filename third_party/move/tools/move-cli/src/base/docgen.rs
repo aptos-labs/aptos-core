@@ -58,9 +58,13 @@ pub struct Docgen {
 impl Docgen {
     /// Calling the Docgen
     pub fn execute(self, path: Option<PathBuf>, config: BuildConfig) -> anyhow::Result<()> {
+        let compiler_version = config.compiler_config.compiler_version.unwrap_or_default();
+        let language_version = config.compiler_config.language_version.unwrap_or_default();
         let model = config.move_model_for_package(&reroot_path(path).unwrap(), ModelConfig {
             all_files_as_targets: false,
             target_filter: None,
+            compiler_version,
+            language_version,
         })?;
 
         let mut options = DocgenOptions::default();

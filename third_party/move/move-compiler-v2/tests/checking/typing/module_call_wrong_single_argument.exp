@@ -1,42 +1,42 @@
 
 Diagnostics:
-error: invalid call of `M::foo`: expected `M::S` but found `integer` for argument 1
+error: cannot pass `integer` to a function which expects argument of type `S`
    ┌─ tests/checking/typing/module_call_wrong_single_argument.move:24:13
    │
 24 │         foo(0);
    │             ^
 
-error: invalid call of `M::bar`: expected `u64` but found `M::S` for argument 1
+error: cannot pass `S` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/module_call_wrong_single_argument.move:25:13
    │
 25 │         bar(S{});
    │             ^^^
 
-error: invalid call of `M::bar`: expected `u64` but found `address` for argument 1
+error: cannot pass `address` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/module_call_wrong_single_argument.move:26:13
    │
 26 │         bar(@0x0);
    │             ^^^^
 
-error: invalid call of `X::foo`: expected `X::S` but found `M::S` for argument 1
+error: cannot pass `S` to a function which expects argument of type `X::S`
    ┌─ tests/checking/typing/module_call_wrong_single_argument.move:30:16
    │
 30 │         X::foo(S{});
    │                ^^^
 
-error: invalid call of `X::foo`: expected `X::S` but found `integer` for argument 1
+error: cannot pass `integer` to a function which expects argument of type `X::S`
    ┌─ tests/checking/typing/module_call_wrong_single_argument.move:31:16
    │
 31 │         X::foo(0);
    │                ^
 
-error: invalid call of `X::bar`: expected `u64` but found `M::S` for argument 1
+error: cannot pass `S` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/module_call_wrong_single_argument.move:32:16
    │
 32 │         X::bar(S{});
    │                ^^^
 
-error: invalid call of `X::bar`: expected `u64` but found `bool` for argument 1
+error: cannot pass `bool` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/module_call_wrong_single_argument.move:33:16
    │
 33 │         X::bar(false);

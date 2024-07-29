@@ -1,7 +1,34 @@
 
 Diagnostics:
-error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+error: tuple type `(integer, integer)` is not allowed as a type argument (type was inferred)
   ┌─ tests/checking/typing/pack_multiple.move:5:9
   │
+2 │     struct Box<T> has drop { f: T }
+  │                - declaration of type parameter `T`
+  ·
 5 │         Box { f: (0, 1) };
-  │         ^^^^^^^^^^^^^^^^^
+  │         ^^^
+  │
+  = required by instantiating type parameter `T` of struct `Box`
+
+error: tuple type `(integer, integer, integer)` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/pack_multiple.move:6:9
+  │
+2 │     struct Box<T> has drop { f: T }
+  │                - declaration of type parameter `T`
+  ·
+6 │         Box { f: (0, 1, 2) };
+  │         ^^^
+  │
+  = required by instantiating type parameter `T` of struct `Box`
+
+error: tuple type `(bool, Box<integer>)` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/pack_multiple.move:7:9
+  │
+2 │     struct Box<T> has drop { f: T }
+  │                - declaration of type parameter `T`
+  ·
+7 │         Box { f: (true, Box { f: 0 }) };
+  │         ^^^
+  │
+  = required by instantiating type parameter `T` of struct `Box`

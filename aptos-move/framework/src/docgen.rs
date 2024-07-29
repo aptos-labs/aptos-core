@@ -6,6 +6,7 @@ use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream},
 };
+use move_docgen::OutputFormat;
 use move_model::model::GlobalEnv;
 use std::{path::PathBuf, sync::Mutex};
 
@@ -37,7 +38,7 @@ pub struct DocgenOptions {
     /// Package-relative path to an optional markdown template which is a used to create a
     /// landing page. Placeholders in this file are substituted as follows: `> {{move-toc}}` is
     /// replaced by a table of contents of all modules; `> {{move-index}}` is replaced by an index,
-    /// and `> {{move-include NAME_OF_MODULE_OR_SCRIP}}` is replaced by the the full
+    /// and `> {{move-include NAME_OF_MODULE_OR_SCRIP}}` is replaced by the full
     /// documentation of the named entity. (The given entity will not longer be placed in
     /// its own file, so this can be used to create a single manually populated page for
     /// the package.)
@@ -48,6 +49,10 @@ pub struct DocgenOptions {
     /// This can contain common markdown references fpr this package (e.g. `[move-book]: <url>`).
     #[clap(long)]
     pub references_file: Option<String>,
+
+    /// Choose the output format
+    #[clap(long)]
+    pub output_format: Option<OutputFormat>,
 }
 
 impl DocgenOptions {
@@ -94,6 +99,7 @@ impl DocgenOptions {
             include_dep_diagrams: self.include_dep_diagram,
             include_call_diagrams: false,
             compile_relative_to_output_dir: false,
+            output_format: self.output_format,
         };
         let output = move_docgen::Docgen::new(model, &options).gen();
         if model.diag_count(Severity::Warning) > 0 {

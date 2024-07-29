@@ -163,4 +163,24 @@ pub trait DataflowAnalysis: TransferFunctions {
         }
         result
     }
+
+    /// Same as `state_per_instruction`, but ensures that any unreachable code offsets have
+    /// the default value of `A` in the resulting map.
+    fn state_per_instruction_with_default<A, F>(
+        &self,
+        state_map: StateMap<Self::State>,
+        instrs: &[Bytecode],
+        cfg: &StacklessControlFlowGraph,
+        f: F,
+    ) -> BTreeMap<CodeOffset, A>
+    where
+        F: FnMut(&Self::State, &Self::State) -> A,
+        A: Default,
+    {
+        let mut map = self.state_per_instruction(state_map, instrs, cfg, f);
+        for offset in 0..instrs.len() {
+            map.entry(offset as CodeOffset).or_default();
+        }
+        map
+    }
 }

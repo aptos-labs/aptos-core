@@ -1,0 +1,213 @@
+
+Diagnostics:
+error: type `S` is missing required ability `key` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:28:9
+   │
+15 │     fun both<R: key, C: copy>(_r: R, _c: C) {
+   │              - declaration of type parameter `R`
+   ·
+28 │         both(S{}, Coin{});
+   │         ^^^^
+   │
+   = required by instantiating type parameter `R:key` of function `both`
+
+error: type `Coin` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:29:9
+   │
+15 │     fun both<R: key, C: copy>(_r: R, _c: C) {
+   │                      - declaration of type parameter `C`
+   ·
+29 │         both(0, Coin{})
+   │         ^^^^
+   │
+   = required by instantiating type parameter `C:copy` of function `both`
+
+error: type `Box<C>` is missing required ability `key` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:33:9
+   │
+15 │     fun both<R: key, C: copy>(_r: R, _c: C) {
+   │              - declaration of type parameter `R`
+   ·
+33 │         both(new_box<C>(), new_box<R>())
+   │         ^^^^
+   │
+   = required by instantiating type parameter `R:key` of function `both`
+
+error: type `Box3<C, C, C>` is missing required ability `key` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:37:9
+   │
+23 │     fun rsrc<R: key>(_r: R) {
+   │              - declaration of type parameter `R`
+   ·
+37 │         rsrc(new_box3<C, C, C>());
+   │         ^^^^
+   │
+   = required by instantiating type parameter `R:key` of function `rsrc`
+
+error: type `R` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:39:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+39 │         cpy(new_box3<R, C, C>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `C` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:40:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+40 │         cpy(new_box3<C, R, C>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `C` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:41:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+41 │         cpy(new_box3<C, C, R>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `C` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:43:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+43 │         cpy(new_box3<C, R, R>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `R` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:44:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+44 │         cpy(new_box3<R, C, R>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `R` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:45:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+45 │         cpy(new_box3<R, R, C>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `R` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:47:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+47 │         cpy(new_box3<R, R, R>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `U` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:51:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+51 │         cpy(new_box3<U, C, C>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `C` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:52:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+52 │         cpy(new_box3<C, U, C>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `C` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:53:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+53 │         cpy(new_box3<C, C, U>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `C` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:55:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+55 │         cpy(new_box3<C, U, U>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `U` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:56:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+56 │         cpy(new_box3<U, C, U>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `U` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:57:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+57 │         cpy(new_box3<U, U, C>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`
+
+error: type `U` is missing required ability `copy` (type was inferred)
+   ┌─ tests/ability-check/v1-typing/module_call_constraints_not_satisfied.move:59:9
+   │
+19 │     fun cpy<C: copy>(_c: C) {
+   │             - declaration of type parameter `C`
+   ·
+59 │         cpy(new_box3<U, U, U>());
+   │         ^^^
+   │
+   = required by instantiating type parameter `T1` of struct `Box3`
+   = required by instantiating type parameter `C:copy` of function `cpy`

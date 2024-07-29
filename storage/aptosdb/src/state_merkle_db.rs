@@ -249,12 +249,13 @@ impl StateMerkleDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(
         Option<(HashValue, (StateKey, Version))>,
         SparseMerkleProofExt,
     )> {
         JellyfishMerkleTree::new(self)
-            .get_with_proof_ext(state_key.hash(), version)
+            .get_with_proof_ext(state_key.hash(), version, root_depth)
             .map_err(Into::into)
     }
 
@@ -305,9 +306,7 @@ impl StateMerkleDb {
     ) -> Result<Option<Version>> {
         if next_version > 0 {
             let max_possible_version = next_version - 1;
-            let mut iter = self
-                .metadata_db()
-                .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            let mut iter = self.metadata_db().rev_iter::<JellyfishMerkleNodeSchema>()?;
             iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
             if let Some((key, _node)) = iter.next().transpose()? {
                 let version = key.version();
@@ -550,6 +549,14 @@ impl StateMerkleDb {
         NUM_STATE_SHARDS as u8
     }
 
+    pub(crate) fn hack_num_real_shards(&self) -> usize {
+        if self.enable_sharding {
+            NUM_STATE_SHARDS
+        } else {
+            1
+        }
+    }
+
     fn db_by_key(&self, node_key: &NodeKey) -> &DB {
         if let Some(shard_id) = node_key.get_shard_id() {
             self.db_shard(shard_id)
@@ -678,9 +685,7 @@ impl StateMerkleDb {
         let mut ret = None;
 
         if self.enable_sharding {
-            let mut iter = self
-                .metadata_db()
-                .iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            let mut iter = self.metadata_db().iter::<JellyfishMerkleNodeSchema>()?;
             iter.seek(&(version, 0)).unwrap();
             // early exit if no node is found for the target version
             match iter.next().transpose()? {
@@ -694,15 +699,11 @@ impl StateMerkleDb {
         }
 
         // traverse all shards in a naive way
-        // if sharding is not enable, we only need to search once.
-        let shards = self
-            .enable_sharding
-            .then(|| (0..NUM_STATE_SHARDS))
-            .unwrap_or(0..1);
+        let shards = 0..self.hack_num_real_shards();
         let start_num_of_nibbles = if self.enable_sharding { 1 } else { 0 };
         for shard_id in shards.rev() {
             let shard_db = self.state_merkle_db_shards[shard_id].clone();
-            let mut shard_iter = shard_db.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            let mut shard_iter = shard_db.iter::<JellyfishMerkleNodeSchema>()?;
             // DB sharded only contain nodes with num_of_nibbles >= 1
             shard_iter.seek(&(version, start_num_of_nibbles)).unwrap();
 
@@ -757,7 +758,7 @@ impl StateMerkleDb {
         let mut ret = None;
 
         for num_nibbles in 0..=ROOT_NIBBLE_HEIGHT {
-            let mut iter = shard_db.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            let mut iter = shard_db.iter::<JellyfishMerkleNodeSchema>()?;
             // nibble_path is always non-empty except for the root, so if we use an empty nibble
             // path as the seek key, the iterator will end up pointing to the end of the previous
             // range.
@@ -831,9 +832,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
         // Since everything has the same version during restore, we seek to the first node and get
         // its version.
 
-        let mut iter = self
-            .metadata_db()
-            .iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        let mut iter = self.metadata_db().iter::<JellyfishMerkleNodeSchema>()?;
         // get the root node corresponding to the version
         iter.seek(&(version, 0))?;
         match iter.next().transpose()? {
@@ -846,11 +845,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
         };
 
         let ret = None;
-        // if sharding is not enable, we only need to search once.
-        let shards = self
-            .enable_sharding
-            .then(|| (0..NUM_STATE_SHARDS))
-            .unwrap_or(0..1);
+        let shards = 0..self.hack_num_real_shards();
 
         // Search from right to left to find the first leaf node.
         for shard_id in shards.rev() {

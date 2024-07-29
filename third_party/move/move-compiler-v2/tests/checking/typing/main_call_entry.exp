@@ -1,17 +1,11 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x2::X {
     public entry fun foo() {
-        Tuple()
-    }
-    spec fun $foo() {
         Tuple()
     }
 } // end 0x2::X
 module <SELF>_0 {
     private fun main() {
         X::foo()
-    }
-    spec fun $main() {
-        X::$foo()
     }
 } // end <SELF>_0

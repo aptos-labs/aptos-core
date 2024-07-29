@@ -8,8 +8,8 @@ use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderW
 use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter};
 use aptos_types::{
     account_address::AccountAddress,
-    account_view::AccountView,
-    state_store::account_with_state_view::AsAccountWithStateView,
+    account_config::AccountResource,
+    state_store::MoveResourceExt,
     transaction::{SignedTransaction, Transaction},
 };
 use async_trait::async_trait;
@@ -38,9 +38,7 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
 
     async fn query_sequence_number(&self, address: AccountAddress) -> Result<u64> {
         let db_state_view = self.db.reader.latest_state_checkpoint_view().unwrap();
-        let address_account_view = db_state_view.as_account_with_state_view(&address);
-        address_account_view
-            .get_account_resource()
+        AccountResource::fetch_move_resource(&db_state_view, &address)
             .unwrap()
             .map(|account| account.sequence_number())
             .context("account doesn't exist")

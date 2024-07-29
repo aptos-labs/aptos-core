@@ -52,6 +52,23 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
+    spec keys<K: store + copy + drop, V: store + copy>(table_ref: &SmartTable<K, V>): vector<K> {
+        pragma verify = false;
+    }
+
+    spec keys_paginated<K: store + copy + drop, V: store + copy>(
+        table_ref: &SmartTable<K, V>,
+        starting_bucket_index: u64,
+        starting_vector_index: u64,
+        num_keys_to_get: u64,
+    ): (
+        vector<K>,
+        Option<u64>,
+        Option<u64>,
+    ) {
+        pragma verify = false;
+    }
+
     spec add_all<K, V>(table: &mut SmartTable<K, V>, keys: vector<K>, values: vector<V>) {
         pragma verify = false;
     }

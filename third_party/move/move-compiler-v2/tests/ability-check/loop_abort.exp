@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: local `_x` of type `Test::Impotent` does not have the `drop` ability
+   ┌─ tests/ability-check/loop_abort.move:11:18
+   │
+11 │         let _x = Impotent {};
+   │                  ^^^^^^^^^^^ implicitly dropped here since it is no longer used

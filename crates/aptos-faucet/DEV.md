@@ -77,7 +77,7 @@ First, install redis 6.x (e.g. `brew install redis@6.2`) and run a local redis (
 redis-server --save 60 1 --loglevel warning
 ```
 
-Then run a local testnet:
+Then run a localnet:
 ```
 cargo run -p aptos -- node run-local-testnet --force-restart --assume-yes
 ```
@@ -95,7 +95,7 @@ curl -H 'Content-Type: application/json' -d '{"amount": 100, "address": "3c769ea
 Keep doing so and eventually you'll get rejected. See also that if you induce a 500 in the funder, the counter ultimately does not get incremented, so we don't punish users for issues on our side. I have also verified that the key does indeed get expired next day, so we don't track ratelimit information beyond when we need it. For historical investigation we can look at the application logs instead.
 
 ## Manually testing MintFunder
-Run a local testnet:
+Run a localnet:
 ```
 cargo run -p aptos -- node run-local-testnet --force-restart --assume-yes
 ```

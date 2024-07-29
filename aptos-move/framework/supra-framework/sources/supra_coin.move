@@ -1,9 +1,9 @@
 /// This module defines a minimal and generic Coin and Balance.
 /// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
 module supra_framework::supra_coin {
-    use std::string;
     use std::error;
     use std::signer;
+    use std::string;
     use std::vector;
     use std::option::{Self, Option};
 
@@ -75,6 +75,7 @@ module supra_framework::supra_coin {
 
     /// Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
     /// accounts.
+    /// Expects account and APT store to be registered before calling.
     public(friend) fun configure_accounts_for_test(
         supra_framework: &signer,
         core_resources: &signer,
@@ -83,7 +84,6 @@ module supra_framework::supra_coin {
         system_addresses::assert_supra_framework(supra_framework);
 
         // Mint the core resource account SupraCoin for gas so it can execute system transactions.
-        coin::register<SupraCoin>(core_resources);
         let coins = coin::mint<SupraCoin>(
             ((MAX_SUPRA_COIN_SUPPLY)/10 as u64),
             &mint_cap,
@@ -156,23 +156,61 @@ module supra_framework::supra_coin {
     }
 
     #[test_only]
+    use supra_framework::account;
+    #[test_only]
     use supra_framework::aggregator_factory;
+    #[test_only]
+    use supra_framework::fungible_asset::FungibleAsset;
+
+    #[test_only]
+    public fun mint_apt_fa_for_test(amount: u64): FungibleAsset acquires MintCapStore {
+        ensure_initialized_with_apt_fa_metadata_for_test();
+        coin::coin_to_fungible_asset(
+            coin::mint(
+                amount,
+                &borrow_global<MintCapStore>(@supra_framework).mint_cap
+            )
+        )
+    }
+
+    #[test_only]
+    public fun ensure_initialized_with_apt_fa_metadata_for_test() {
+        let supra_framework = account::create_signer_for_test(@supra_framework);
+        if (!exists<MintCapStore>(@supra_framework)) {
+            if (!aggregator_factory::aggregator_factory_exists_for_testing()) {
+                aggregator_factory::initialize_aggregator_factory_for_test(&supra_framework);
+            };
+            let (burn_cap, mint_cap) = initialize(&supra_framework);
+            coin::destroy_burn_cap(burn_cap);
+            coin::destroy_mint_cap(mint_cap);
+        };
+        coin::create_coin_conversion_map(&supra_framework);
+        coin::create_pairing<SupraCoin>(&supra_framework);
+    }
 
     #[test_only]
     public fun initialize_for_test(supra_framework: &signer): (BurnCapability<SupraCoin>, MintCapability<SupraCoin>) {
         aggregator_factory::initialize_aggregator_factory_for_test(supra_framework);
-        initialize(supra_framework)
+        let (burn_cap, mint_cap) = initialize(supra_framework);
+        coin::create_coin_conversion_map(supra_framework);
+        coin::create_pairing<SupraCoin>(supra_framework);
+        (burn_cap, mint_cap)
     }
 
     // This is particularly useful if the aggregator_factory is already initialized via another call path.
     #[test_only]
-    public fun initialize_for_test_without_aggregator_factory(supra_framework: &signer): (BurnCapability<SupraCoin>, MintCapability<SupraCoin>) {
-        initialize(supra_framework)
+    public fun initialize_for_test_without_aggregator_factory(
+        supra_framework: &signer
+    ): (BurnCapability<SupraCoin>, MintCapability<SupraCoin>) {
+        let (burn_cap, mint_cap) = initialize(supra_framework);
+        coin::create_coin_conversion_map(supra_framework);
+        coin::create_pairing<SupraCoin>(supra_framework);
+        (burn_cap, mint_cap)
     }
 
 
 	#[test_only]
-	use supra_framework::account;
+	use supra_framework::aptos_account;
 
 	// #[test(source = @0x1, destination = @0x2)]
     // public entry fun end_to_end(

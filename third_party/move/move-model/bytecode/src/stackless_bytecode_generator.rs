@@ -106,14 +106,14 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             | MoveBytecode::Branch(code_offset) = bytecode
             {
                 let offs = *code_offset as CodeOffset;
-                if label_map.get(&offs).is_none() {
+                if !label_map.contains_key(&offs) {
                     let label = Label::new(label_map.len());
                     label_map.insert(offs, label);
                 }
             }
             if let MoveBytecode::BrTrue(_) | MoveBytecode::BrFalse(_) = bytecode {
                 let next_offs = (pos + 1) as CodeOffset;
-                if label_map.get(&next_offs).is_none() {
+                if !label_map.contains_key(&next_offs) {
                     let fall_through_label = Label::new(label_map.len());
                     label_map.insert(next_offs, fall_through_label);
                     self.fallthrough_labels.insert(fall_through_label);
@@ -130,7 +130,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         let code = std::mem::take(&mut self.code);
         for bytecode in code.into_iter() {
             if let Bytecode::Label(attr_id, label) = bytecode {
-                if !self.code.is_empty() && !self.code[self.code.len() - 1].is_branch() {
+                if !self.code.is_empty() && !self.code[self.code.len() - 1].is_branching() {
                     self.code.push(Bytecode::Jump(attr_id, label));
                 }
             }
@@ -240,7 +240,12 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 ));
                 global_env
                     .find_module(&vec_module)
-                    .expect("unexpected reference to module not found in global env")
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "unexpected reference to module: `{}` not found in global env",
+                            vec_module.display_full(global_env)
+                        )
+                    })
                     .get_id()
             });
 
@@ -347,7 +352,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         self.local_types
                             .push(Type::Reference(ReferenceKind::Immutable, signature));
                         self.code.push(mk_call(
-                            Operation::FreezeRef,
+                            Operation::FreezeRef(true),
                             vec![immutable_ref_index],
                             vec![mutable_ref_index],
                         ));

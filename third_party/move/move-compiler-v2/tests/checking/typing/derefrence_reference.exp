@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct B {
         r: M::R,
@@ -9,16 +9,14 @@ module 0x8675309::M {
     private fun t0(r: &M::R,b: &M::B) {
         M::R{ dummy_field: _ } = Deref(r);
         M::B{ r: M::R{ dummy_field: _ } } = Deref(b);
-        M::R{ dummy_field: _ } = Deref(Borrow(Immutable)(select M::B.r(b)));
+        M::R{ dummy_field: _ } = Deref(Borrow(Immutable)(select M::B.r<&M::B>(b)));
         Tuple()
     }
     private fun t1(r: &mut M::R,b: &mut M::B) {
         M::R{ dummy_field: _ } = Deref(r);
         M::B{ r: M::R{ dummy_field: _ } } = Deref(b);
-        M::R{ dummy_field: _ } = Deref(Borrow(Immutable)(select M::B.r(b)));
-        M::R{ dummy_field: _ } = Deref(Borrow(Mutable)(select M::B.r(b)));
+        M::R{ dummy_field: _ } = Deref(Borrow(Immutable)(select M::B.r<&mut M::B>(b)));
+        M::R{ dummy_field: _ } = Deref(Borrow(Mutable)(select M::B.r<&mut M::B>(b)));
         Tuple()
     }
-    spec fun $t0(r: &M::R,b: &M::B);
-    spec fun $t1(r: &mut M::R,b: &mut M::B);
 } // end 0x8675309::M

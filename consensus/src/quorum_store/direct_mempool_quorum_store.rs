@@ -58,7 +58,6 @@ impl DirectMempoolQuorumStore {
             max_items,
             max_bytes,
             return_non_full,
-            false,
             exclude_txns,
             callback,
         );

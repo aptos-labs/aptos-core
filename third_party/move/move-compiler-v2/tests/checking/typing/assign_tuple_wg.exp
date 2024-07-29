@@ -1,8 +1,8 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::dummy1 {
     private fun bar(b: bool) {
         {
-          let () = if b {
+          let (): () = if b {
             dummy1::baz()
           } else {
             Tuple()
@@ -13,19 +13,6 @@ module 0xc0ffee::dummy1 {
     private fun baz() {
         Tuple()
     }
-    spec fun $bar(b: bool) {
-        {
-          let () = if b {
-            dummy1::$baz()
-          } else {
-            Tuple()
-          };
-          Tuple()
-        }
-    }
-    spec fun $baz() {
-        Tuple()
-    }
 } // end 0xc0ffee::dummy1
 module 0xc0ffee::dummy2 {
     struct State {
@@ -33,9 +20,8 @@ module 0xc0ffee::dummy2 {
     }
     private fun tuple_assignments(s: &signer,state: dummy2::State) {
         {
-          let () = MoveTo<dummy2::State>(s, state);
+          let (): () = MoveTo<dummy2::State>(s, state);
           Tuple()
         }
     }
-    spec fun $tuple_assignments(s: &signer,state: dummy2::State);
 } // end 0xc0ffee::dummy2

@@ -17,8 +17,6 @@ aptos-bitvec = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-executor-service = { workspace = true }
-aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }

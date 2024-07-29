@@ -95,7 +95,7 @@ impl FunctionTargetProcessor for WellFormedInstrumentationProcessor {
                     let mem_val = builder.mk_call_with_inst(
                         &mem_ty,
                         mem.inst.clone(),
-                        Operation::Pack(mem.module_id, mem.id),
+                        Operation::Pack(mem.module_id, mem.id, None),
                         vec![init.clone()],
                     );
                     let mem_access = builder.mk_call_with_inst(

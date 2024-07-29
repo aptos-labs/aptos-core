@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: generic count mismatch (expected 1 but found 0)
+error: expected 1 type argument but 0 were provided
   ┌─ tests/checking/typing/bad_type_argument_arity_struct_unpack.move:7:13
   │
 7 │         let S<> { f } = copy s;
   │             ^^^^^^^^^
 
-error: undeclared `M::f`
+error: undeclared `f`
   ┌─ tests/checking/typing/bad_type_argument_arity_struct_unpack.move:8:9
   │
 8 │         f;
   │         ^
 
-error: generic count mismatch (expected 1 but found 2)
+error: expected 1 type argument but 2 were provided
   ┌─ tests/checking/typing/bad_type_argument_arity_struct_unpack.move:9:13
   │
 9 │         let S<u64, u64> { f } = copy s;
   │             ^^^^^^^^^^^^^^^^^
 
-error: undeclared `M::f`
+error: undeclared `f`
    ┌─ tests/checking/typing/bad_type_argument_arity_struct_unpack.move:10:9
    │
 10 │         f;

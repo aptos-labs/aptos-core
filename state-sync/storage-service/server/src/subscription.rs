@@ -11,7 +11,6 @@ use crate::{
     storage::StorageReaderInterface,
     utils, LogEntry, LogSchema,
 };
-use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
@@ -40,6 +39,7 @@ use std::{
     sync::Arc,
     time::Instant,
 };
+use tokio::runtime::Handle;
 
 /// A single subscription request that is part of a stream
 pub struct SubscriptionRequest {
@@ -508,7 +508,7 @@ impl SubscriptionStreamRequests {
 
 /// Handles active and ready subscriptions
 pub(crate) async fn handle_active_subscriptions<T: StorageReaderInterface>(
-    bounded_executor: BoundedExecutor,
+    runtime: Handle,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -526,7 +526,7 @@ pub(crate) async fn handle_active_subscriptions<T: StorageReaderInterface>(
 
         // Identify the peers with ready subscriptions
         let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
-            bounded_executor.clone(),
+            runtime.clone(),
             config,
             cached_storage_server_summary.clone(),
             optimistic_fetches.clone(),
@@ -545,7 +545,7 @@ pub(crate) async fn handle_active_subscriptions<T: StorageReaderInterface>(
 
         // Remove and handle the ready subscriptions
         handle_ready_subscriptions(
-            bounded_executor.clone(),
+            runtime.clone(),
             cached_storage_server_summary.clone(),
             config,
             optimistic_fetches.clone(),
@@ -563,7 +563,7 @@ pub(crate) async fn handle_active_subscriptions<T: StorageReaderInterface>(
 /// Handles the ready subscriptions by removing them from the
 /// active map and notifying the peer of the new data.
 async fn handle_ready_subscriptions<T: StorageReaderInterface>(
-    bounded_executor: BoundedExecutor,
+    runtime: Handle,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -602,62 +602,60 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
             let time_service = time_service.clone();
 
             // Spawn a blocking task to handle the subscription
-            let active_task = bounded_executor
-                .spawn_blocking(move || {
-                    // Get the subscription start time and request
-                    let subscription_start_time = subscription_request.request_start_time;
-                    let subscription_data_request = subscription_request.request.clone();
+            let active_task = runtime.spawn_blocking(move || {
+                // Get the subscription start time and request
+                let subscription_start_time = subscription_request.request_start_time;
+                let subscription_data_request = subscription_request.request.clone();
 
-                    // Handle the subscription request and time the operation
-                    let handle_request = || {
-                        // Get the storage service request for the missing data
-                        let missing_data_request = subscription_request
-                            .get_storage_request_for_missing_data(
-                                config,
-                                known_version,
-                                &target_ledger_info,
-                            )?;
-
-                        // Notify the peer of the new data
-                        let data_response = utils::notify_peer_of_new_data(
-                            cached_storage_server_summary,
-                            optimistic_fetches,
-                            subscriptions.clone(),
-                            lru_response_cache,
-                            request_moderator,
-                            storage,
-                            time_service.clone(),
-                            &peer_network_id,
-                            missing_data_request,
-                            target_ledger_info,
-                            subscription_request.take_response_sender(),
+                // Handle the subscription request and time the operation
+                let handle_request = || {
+                    // Get the storage service request for the missing data
+                    let missing_data_request = subscription_request
+                        .get_storage_request_for_missing_data(
+                            config,
+                            known_version,
+                            &target_ledger_info,
                         )?;
 
-                        // Update the stream's known version and epoch
-                        if let Some(mut subscription_stream_requests) =
-                            subscriptions.get_mut(&peer_network_id)
-                        {
-                            subscription_stream_requests
-                                .update_known_version_and_epoch(&data_response)?;
-                        }
+                    // Notify the peer of the new data
+                    let data_response = utils::notify_peer_of_new_data(
+                        cached_storage_server_summary,
+                        optimistic_fetches,
+                        subscriptions.clone(),
+                        lru_response_cache,
+                        request_moderator,
+                        storage,
+                        time_service.clone(),
+                        &peer_network_id,
+                        missing_data_request,
+                        target_ledger_info,
+                        subscription_request.take_response_sender(),
+                    )?;
 
-                        Ok(())
-                    };
-                    let result = utils::execute_and_time_duration(
-                        &metrics::SUBSCRIPTION_LATENCIES,
-                        Some((&peer_network_id, &subscription_data_request)),
-                        None,
-                        handle_request,
-                        Some(subscription_start_time),
-                    );
-
-                    // Log an error if the handler failed
-                    if let Err(error) = result {
-                        warn!(LogSchema::new(LogEntry::SubscriptionResponse)
-                            .error(&Error::UnexpectedErrorEncountered(error.to_string())));
+                    // Update the stream's known version and epoch
+                    if let Some(mut subscription_stream_requests) =
+                        subscriptions.get_mut(&peer_network_id)
+                    {
+                        subscription_stream_requests
+                            .update_known_version_and_epoch(&data_response)?;
                     }
-                })
-                .await;
+
+                    Ok(())
+                };
+                let result = utils::execute_and_time_duration(
+                    &metrics::SUBSCRIPTION_LATENCIES,
+                    Some((&peer_network_id, &subscription_data_request)),
+                    None,
+                    handle_request,
+                    Some(subscription_start_time),
+                );
+
+                // Log an error if the handler failed
+                if let Err(error) = result {
+                    warn!(LogSchema::new(LogEntry::SubscriptionResponse)
+                        .error(&Error::UnexpectedErrorEncountered(error.to_string())));
+                }
+            });
 
             // Add the task to the list of active tasks
             active_tasks.push(active_task);
@@ -672,7 +670,7 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
 /// Returns the list of peers that made those subscriptions
 /// alongside the ledger info at the target version for the peer.
 pub(crate) async fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
-    bounded_executor: BoundedExecutor,
+    runtime: Handle,
     config: StorageServiceConfig,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -697,7 +695,7 @@ pub(crate) async fn get_peers_with_ready_subscriptions<T: StorageReaderInterface
         peers_with_invalid_subscriptions,
         peers_with_ready_subscriptions,
     ) = identify_expired_invalid_and_ready_subscriptions(
-        bounded_executor,
+        runtime.clone(),
         config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -725,7 +723,7 @@ pub(crate) async fn get_peers_with_ready_subscriptions<T: StorageReaderInterface
 /// Identifies the expired, invalid and ready subscriptions
 /// from the active map. Returns each peer list separately.
 async fn identify_expired_invalid_and_ready_subscriptions<T: StorageReaderInterface>(
-    bounded_executor: BoundedExecutor,
+    runtime: Handle,
     config: StorageServiceConfig,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -773,7 +771,7 @@ async fn identify_expired_invalid_and_ready_subscriptions<T: StorageReaderInterf
     // Identify the peers with ready and invalid subscriptions
     let (peers_with_ready_subscriptions, peers_with_invalid_subscriptions) =
         identify_ready_and_invalid_subscriptions(
-            bounded_executor,
+            runtime,
             cached_storage_server_summary,
             optimistic_fetches,
             subscriptions,
@@ -799,7 +797,7 @@ async fn identify_expired_invalid_and_ready_subscriptions<T: StorageReaderInterf
 /// Identifies the ready and invalid subscriptions from the given
 /// map of peers and their highest synced versions and epochs.
 async fn identify_ready_and_invalid_subscriptions<T: StorageReaderInterface>(
-    bounded_executor: BoundedExecutor,
+    runtime: Handle,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
@@ -825,6 +823,7 @@ async fn identify_ready_and_invalid_subscriptions<T: StorageReaderInterface>(
         peers_and_highest_synced_data.into_iter()
     {
         // Clone all required components for the task
+        let runtime = runtime.clone();
         let cached_storage_server_summary = cached_storage_server_summary.clone();
         let highest_synced_ledger_info = highest_synced_ledger_info.clone();
         let optimistic_fetches = optimistic_fetches.clone();
@@ -838,58 +837,55 @@ async fn identify_ready_and_invalid_subscriptions<T: StorageReaderInterface>(
 
         // Spawn a blocking task to determine if the subscription is ready or
         // invalid. We do this because each entry may require reading from storage.
-        let active_task = bounded_executor
-            .spawn_blocking(move || {
-                // Check if we have synced beyond the highest known version
-                if highest_known_version < highest_synced_version {
-                    if highest_known_epoch < highest_synced_epoch {
-                        // Fetch the epoch ending ledger info from storage (the
-                        // peer needs to sync to their epoch ending ledger info).
-                        let epoch_ending_ledger_info = match utils::get_epoch_ending_ledger_info(
-                            cached_storage_server_summary.clone(),
-                            optimistic_fetches.clone(),
-                            subscriptions.clone(),
-                            highest_known_epoch,
-                            lru_response_cache.clone(),
-                            request_moderator.clone(),
-                            &peer_network_id,
-                            storage.clone(),
-                            time_service.clone(),
-                        ) {
-                            Ok(epoch_ending_ledger_info) => epoch_ending_ledger_info,
-                            Err(error) => {
-                                // Log the failure to fetch the epoch ending ledger info
-                                error!(LogSchema::new(LogEntry::SubscriptionRefresh)
-                                    .error(&error)
-                                    .message(&format!(
+        let active_task = runtime.spawn_blocking(move || {
+            // Check if we have synced beyond the highest known version
+            if highest_known_version < highest_synced_version {
+                if highest_known_epoch < highest_synced_epoch {
+                    // Fetch the epoch ending ledger info from storage (the
+                    // peer needs to sync to their epoch ending ledger info).
+                    let epoch_ending_ledger_info = match utils::get_epoch_ending_ledger_info(
+                        cached_storage_server_summary.clone(),
+                        optimistic_fetches.clone(),
+                        subscriptions.clone(),
+                        highest_known_epoch,
+                        lru_response_cache.clone(),
+                        request_moderator.clone(),
+                        &peer_network_id,
+                        storage.clone(),
+                        time_service.clone(),
+                    ) {
+                        Ok(epoch_ending_ledger_info) => epoch_ending_ledger_info,
+                        Err(error) => {
+                            // Log the failure to fetch the epoch ending ledger info
+                            error!(LogSchema::new(LogEntry::SubscriptionRefresh)
+                                .error(&error)
+                                .message(&format!(
                                     "Failed to get the epoch ending ledger info for epoch: {:?} !",
                                     highest_known_epoch
                                 )));
 
-                                return;
-                            },
-                        };
+                            return;
+                        },
+                    };
 
-                        // Check that we haven't been sent an invalid subscription request
-                        // (i.e., a request that does not respect an epoch boundary).
-                        if epoch_ending_ledger_info.ledger_info().version() <= highest_known_version
-                        {
-                            peers_with_invalid_subscriptions
-                                .lock()
-                                .push(peer_network_id);
-                        } else {
-                            peers_with_ready_subscriptions
-                                .lock()
-                                .push((peer_network_id, epoch_ending_ledger_info));
-                        }
+                    // Check that we haven't been sent an invalid subscription request
+                    // (i.e., a request that does not respect an epoch boundary).
+                    if epoch_ending_ledger_info.ledger_info().version() <= highest_known_version {
+                        peers_with_invalid_subscriptions
+                            .lock()
+                            .push(peer_network_id);
                     } else {
                         peers_with_ready_subscriptions
                             .lock()
-                            .push((peer_network_id, highest_synced_ledger_info.clone()));
-                    };
-                }
-            })
-            .await;
+                            .push((peer_network_id, epoch_ending_ledger_info));
+                    }
+                } else {
+                    peers_with_ready_subscriptions
+                        .lock()
+                        .push((peer_network_id, highest_synced_ledger_info.clone()));
+                };
+            }
+        });
 
         // Add the task to the list of active tasks
         active_tasks.push(active_task);

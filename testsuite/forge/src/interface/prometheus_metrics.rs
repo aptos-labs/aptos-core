@@ -3,7 +3,7 @@
 
 use crate::Swarm;
 use prometheus_http_query::response::Sample;
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, sync::Arc};
 
 #[derive(Clone)]
 pub struct MetricSamples(Vec<Sample>);
@@ -58,14 +58,34 @@ impl SystemMetrics {
     }
 }
 
+pub async fn fetch_error_metrics(
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+) -> anyhow::Result<i64> {
+    let error_query = r#"aptos_error_log_count{role=~"validator"}"#;
+
+    let result = swarm
+        .read()
+        .await
+        .query_metrics(error_query, None, None)
+        .await?;
+    let error_samples = result.as_instant().unwrap_or(&[]);
+
+    Ok(error_samples
+        .iter()
+        .map(|s| s.sample().value().round() as i64)
+        .max()
+        .unwrap_or(0))
+}
+
 pub async fn fetch_system_metrics(
-    swarm: &dyn Swarm,
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     start_time: i64,
     end_time: i64,
 ) -> anyhow::Result<SystemMetrics> {
     let cpu_query = r#"avg(rate(container_cpu_usage_seconds_total{container=~"validator"}[30s]))"#;
     let memory_query = r#"avg(container_memory_rss{container=~"validator"})"#;
 
+    let swarm = swarm.read().await;
     let cpu_samples = swarm
         .query_range_metrics(cpu_query, start_time, end_time, None)
         .await?;
@@ -106,7 +126,7 @@ impl LatencyBreakdown {
 }
 
 pub async fn fetch_latency_breakdown(
-    swarm: &dyn Swarm,
+    swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
     start_time: u64,
     end_time: u64,
 ) -> anyhow::Result<LatencyBreakdown> {
@@ -118,6 +138,7 @@ pub async fn fetch_latency_breakdown(
     let qs_batch_to_pos_query = r#"sum(rate(quorum_store_batch_to_PoS_duration_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_batch_to_PoS_duration_count{role=~"validator"}[1m]))"#;
     let qs_pos_to_proposal_query = r#"sum(rate(quorum_store_pos_to_pull_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_pos_to_pull_count{role=~"validator"}[1m]))"#;
 
+    let swarm = swarm.read().await;
     let consensus_proposal_to_ordered_samples = swarm
         .query_range_metrics(
             consensus_proposal_to_ordered_query,

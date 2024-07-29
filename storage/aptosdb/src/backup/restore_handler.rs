@@ -119,7 +119,7 @@ impl RestoreHandler {
     }
 
     pub fn get_next_expected_transaction_version(&self) -> Result<Version> {
-        Ok(self.aptosdb.get_latest_version().map_or(0, |ver| ver + 1))
+        Ok(self.aptosdb.get_synced_version().map_or(0, |ver| ver + 1))
     }
 
     pub fn get_state_snapshot_before(
@@ -133,7 +133,7 @@ impl RestoreHandler {
 
     pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
         let db = self.aptosdb.ledger_db.metadata_db_arc();
-        let mut iter = db.iter::<DbMetadataSchema>(Default::default())?;
+        let mut iter = db.iter::<DbMetadataSchema>()?;
         iter.seek_to_first();
         while let Some((k, _v)) = iter.next().transpose()? {
             if let DbMetadataKey::StateSnapshotRestoreProgress(version) = k {

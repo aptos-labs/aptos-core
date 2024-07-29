@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: value of type `M::R` does not have the `drop` ability
+  ┌─ tests/ability-check/v1-typing/seq_cannot_ignore_resource.move:5:9
+  │
+5 │         R{};
+  │         ^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/seq_cannot_ignore_resource.move:10:9
+   │
+10 │         r;
+   │         ^ implicitly dropped here since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/seq_cannot_ignore_resource.move:14:20
+   │
+14 │         (0, false, R{});
+   │                    ^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/seq_cannot_ignore_resource.move:19:30
+   │
+19 │         if (true) (0, false, R{}) else (0, false, r);
+   │                              ^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/seq_cannot_ignore_resource.move:19:19
+   │
+19 │         if (true) (0, false, R{}) else (0, false, r);
+   │                   ^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/seq_cannot_ignore_resource.move:19:51
+   │
+19 │         if (true) (0, false, R{}) else (0, false, r);
+   │                                                   ^ implicitly dropped here since it is no longer used

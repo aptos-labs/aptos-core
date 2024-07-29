@@ -11,7 +11,7 @@ use move_async_vm::{
     natives::GasParameters as ActorGasParameters,
 };
 use move_binary_format::{access::ModuleAccess, errors::PartialVMError};
-use move_command_line_common::testing::EXP_EXT;
+use move_command_line_common::testing::get_compiler_exp_extension;
 use move_compiler::{
     attr_derivation, compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
     shared::NumericalAddress, Compiler, Flags,
@@ -72,12 +72,12 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         instances,
     )?;
     harness.run(&target_module)?;
-    let baseline_path = path.with_extension(EXP_EXT);
+    let baseline_path = path.with_extension(get_compiler_exp_extension());
     verify_or_update_baseline(baseline_path.as_path(), harness.baseline.borrow().as_str())?;
     Ok(())
 }
 
-datatest_stable::harness!(test_runner, "tests/sources", r".*\.move");
+datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$");
 
 // ========================================================================================
 // Test execution
@@ -280,7 +280,7 @@ impl Harness {
                 address,
                 module: module.clone(),
                 name: struct_,
-                type_params: vec![],
+                type_args: vec![],
             };
             let mut messages = vec![];
             for message in &parts[4..] {

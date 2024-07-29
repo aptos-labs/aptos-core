@@ -26,6 +26,7 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         STATE_VALUE_CF_NAME,
         TRANSACTION_CF_NAME,
         TRANSACTION_ACCUMULATOR_CF_NAME,
+        TRANSACTION_AUXILIARY_DATA_CF_NAME,
         TRANSACTION_BY_ACCOUNT_CF_NAME,
         TRANSACTION_BY_HASH_CF_NAME,
         TRANSACTION_INFO_CF_NAME,
@@ -51,6 +52,14 @@ pub(super) fn transaction_accumulator_db_column_families() -> Vec<ColumnFamilyNa
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         DB_METADATA_CF_NAME,
         TRANSACTION_ACCUMULATOR_CF_NAME,
+    ]
+}
+
+pub(super) fn transaction_auxiliary_data_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        TRANSACTION_AUXILIARY_DATA_CF_NAME,
     ]
 }
 
@@ -102,6 +111,10 @@ pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(super) fn skip_reporting_cf(cf_name: &str) -> bool {
+    cf_name == DEFAULT_COLUMN_FAMILY_NAME || cf_name == DB_METADATA_CF_NAME
+}
+
 pub(super) fn state_kv_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -109,6 +122,16 @@ pub(super) fn state_kv_db_column_families() -> Vec<ColumnFamilyName> {
         STALE_STATE_VALUE_INDEX_CF_NAME,
         STATE_VALUE_CF_NAME,
         STATE_VALUE_INDEX_CF_NAME,
+    ]
+}
+
+pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME,
+        STATE_VALUE_BY_KEY_HASH_CF_NAME,
+        STATE_VALUE_INDEX_CF_NAME, // we still need this cf before deleting all the write callsites
     ]
 }
 
@@ -137,7 +160,7 @@ where
 }
 
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
-    if cf_name == STATE_VALUE_CF_NAME {
+    if cf_name == STATE_VALUE_CF_NAME || cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME {
         let prefix_extractor =
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
         cf_opts.set_prefix_extractor(prefix_extractor);
@@ -156,6 +179,12 @@ pub(super) fn gen_transaction_accumulator_cfds(
     gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
 
+pub(super) fn gen_transaction_auxiliary_data_cfds(
+    rocksdb_config: &RocksdbConfig,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = transaction_auxiliary_data_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
+}
 pub(super) fn gen_transaction_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_db_column_families();
     gen_cfds(rocksdb_config, cfs, |_, _| {})
@@ -190,8 +219,15 @@ pub(super) fn gen_state_merkle_cfds(rocksdb_config: &RocksdbConfig) -> Vec<Colum
     gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
 
-pub(super) fn gen_state_kv_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
-    let cfs = state_kv_db_column_families();
+pub(super) fn gen_state_kv_cfds(
+    rocksdb_config: &RocksdbConfig,
+    enable_sharding: bool,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = if enable_sharding {
+        state_kv_db_new_key_column_families()
+    } else {
+        state_kv_db_column_families()
+    };
     gen_cfds(rocksdb_config, cfs, with_state_key_extractor_processor)
 }
 

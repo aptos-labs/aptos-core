@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 //! Notes: Unlike PVSS, we do NOT want to use a generic unweighted-to-weighted VUF transformation,
 //! since we have a more optimized transformation for some VRF schemes (e.g., BLS and [GJM+21e]).

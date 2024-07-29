@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
@@ -8,16 +8,7 @@ module 0x8675309::M {
     }
     private fun foo() {
         {
-          let _ = pack M::S(0);
-          {
-            let M::R{ f: _ } = pack M::R(0);
-            Tuple()
-          }
-        }
-    }
-    spec fun $foo() {
-        {
-          let _ = pack M::S(0);
+          let _: M::S = pack M::S(0);
           {
             let M::R{ f: _ } = pack M::R(0);
             Tuple()

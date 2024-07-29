@@ -58,4 +58,9 @@ module supra_framework::aggregator_factory {
     public fun initialize_aggregator_factory_for_test(supra_framework: &signer) {
         initialize_aggregator_factory(supra_framework);
     }
+
+    #[test_only]
+    public fun aggregator_factory_exists_for_testing(): bool {
+        exists<AggregatorFactory>(@supra_framework)
+    }
 }

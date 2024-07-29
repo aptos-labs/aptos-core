@@ -47,6 +47,13 @@ impl AccountPublicKey {
             AccountPublicKey::Keyless(_) => None,
         }
     }
+
+    pub fn as_keyless(&self) -> Option<KeylessPublicKey> {
+        match self {
+            AccountPublicKey::Keyless(pk) => Some(pk.clone()),
+            AccountPublicKey::Ed25519(_) => None,
+        }
+    }
 }
 
 /// Details about a Aptos account.
@@ -344,7 +351,7 @@ impl TransactionBuilder {
 }
 
 //---------------------------------------------------------------------------
-// CoinStore resource represenation
+// CoinStore resource representation
 //---------------------------------------------------------------------------
 
 /// Struct that represents an account CoinStore resource for tests.
@@ -385,7 +392,7 @@ impl CoinStore {
 }
 
 //---------------------------------------------------------------------------
-// Account resource represenation
+// Account resource representation
 //---------------------------------------------------------------------------
 
 /// Represents an account along with initial state about it.
@@ -496,11 +503,11 @@ impl AccountData {
     pub fn to_writeset(&self) -> WriteSet {
         let write_set = vec![
             (
-                StateKey::access_path(self.make_account_access_path()),
+                StateKey::resource_typed::<AccountResource>(self.address()).unwrap(),
                 WriteOp::legacy_modification(self.to_bytes().into()),
             ),
             (
-                StateKey::access_path(self.make_coin_store_access_path()),
+                StateKey::resource_typed::<CoinStoreResource>(self.address()).unwrap(),
                 WriteOp::legacy_modification(self.coin_store.to_bytes().into()),
             ),
         ];

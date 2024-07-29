@@ -21,6 +21,9 @@ pub struct Command {
 
     #[clap(long)]
     skip_result: bool,
+
+    #[clap(long)]
+    repeat_execution_times: Option<u64>,
 }
 
 impl Command {
@@ -36,7 +39,11 @@ impl Command {
         };
 
         let result = debugger
-            .execute_past_transactions(self.begin_version, self.limit)
+            .execute_past_transactions(
+                self.begin_version,
+                self.limit,
+                self.repeat_execution_times.unwrap_or(1),
+            )
             .await?;
 
         if !self.skip_result {

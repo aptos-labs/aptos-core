@@ -1,40 +1,66 @@
-// ---- Model Dump
-module 0x42::M {
-    struct Box {
-        f: #0,
-    }
-    struct K {
-        dummy_field: bool,
-    }
-    struct Pair {
-        f1: #0,
-        f2: #1,
-    }
-    struct R {
-        dummy_field: bool,
-    }
-    struct S {
-        dummy_field: bool,
-    }
-    private fun ex<T>(s: &signer,a1: address)
-        acquires M::Box<M::R>(*)
-        acquires M::Box<#0>(*)
-        acquires M::Pair<M::S, M::R>(*)
-     {
-        MoveTo<M::Box<M::R>>(s, pack M::Box<M::R>(pack M::R(false)));
-        BorrowGlobal(Immutable)<M::Box<T>>(a1);
-        BorrowGlobal(Mutable)<M::Box<M::Box<T>>>(a1);
-        M::Pair<M::S, M::R>{ f1: _, f2: _ } = MoveFrom<M::Pair<M::S, M::R>>(a1);
-        exists<M::Pair<M::Box<T>, M::S>>(a1);
-        BorrowGlobal(Immutable)<M::Box<M::K>>(a1);
-        BorrowGlobal(Mutable)<M::Pair<M::S, M::K>>(a1);
-        Tuple()
-    }
-    private fun ignore<T>(_x: #0) {
-        Abort(0)
-    }
-    spec fun $ex<T>(s: &signer,a1: address);
-    spec fun $ignore<T>(_x: #0) {
-        Abort(0)
-    }
-} // end 0x42::M
+
+Diagnostics:
+error: type `R` is missing required ability `store` (type was inferred)
+   ┌─ tests/checking/typing/conditional_global_operations.move:15:9
+   │
+15 │         move_to(s, Box<R> { f: R {} });
+   │         ^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: type `T` is missing required ability `store`
+   ┌─ tests/checking/typing/conditional_global_operations.move:16:23
+   │
+16 │         borrow_global<Box<T>>(a1);
+   │                       ^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `T` is missing required ability `store`
+   ┌─ tests/checking/typing/conditional_global_operations.move:17:27
+   │
+17 │         borrow_global_mut<Box<Box<T>>>(a1);
+   │                           ^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T:key` of function `borrow_global_mut`
+
+error: type `R` is missing required ability `store`
+   ┌─ tests/checking/typing/conditional_global_operations.move:18:43
+   │
+18 │         Pair { f1: _, f2: _ } = move_from<Pair<S, R>>(a1);
+   │                                           ^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `Pair`
+   = required by instantiating type parameter `T:key` of function `move_from`
+
+error: type `T` is missing required ability `store`
+   ┌─ tests/checking/typing/conditional_global_operations.move:19:16
+   │
+19 │         exists<Pair<Box<T>, S>>(a1);
+   │                ^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T1` of struct `Pair`
+   = required by instantiating type parameter `T:key` of function `exists`
+
+error: type `K` is missing required ability `store`
+   ┌─ tests/checking/typing/conditional_global_operations.move:21:23
+   │
+21 │         borrow_global<Box<K>>(a1);
+   │                       ^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `K` is missing required ability `store`
+   ┌─ tests/checking/typing/conditional_global_operations.move:22:27
+   │
+22 │         borrow_global_mut<Pair<S, K>>(a1);
+   │                           ^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `Pair`
+   = required by instantiating type parameter `T:key` of function `borrow_global_mut`

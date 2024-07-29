@@ -61,10 +61,8 @@ fn load_module_impl(
         }
     }
     remote.get_module(module_id)?.ok_or_else(|| {
-        PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!(
-            "Linker Error: Cannot find {:?} in data cache",
-            module_id
-        ))
+        PartialVMError::new(StatusCode::LINKER_ERROR)
+            .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
     })
 }
 

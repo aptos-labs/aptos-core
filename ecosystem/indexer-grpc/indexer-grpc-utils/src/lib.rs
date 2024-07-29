@@ -7,6 +7,7 @@ pub mod config;
 pub mod constants;
 pub mod counters;
 pub mod file_store_operator;
+pub mod in_memory_cache;
 pub mod types;
 
 use anyhow::{Context, Result};
@@ -40,8 +41,9 @@ pub async fn create_grpc_client(address: Url) -> GrpcClientType {
                 Ok(client
                     .max_decoding_message_size(usize::MAX)
                     .max_encoding_message_size(usize::MAX)
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip))
+                    .send_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Zstd))
             },
             Err(e) => {
                 tracing::error!(

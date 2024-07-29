@@ -19,10 +19,7 @@ aptos-indexer-grpc-utils = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
-aptos-runtimes = { workspace = true }
 async-trait = { workspace = true }
-backoff = { workspace = true }
-base64 = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 futures-core = { workspace = true }
@@ -30,12 +27,13 @@ once_cell = { workspace = true }
 prost = { workspace = true }
 redis = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-serde_yaml = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true }

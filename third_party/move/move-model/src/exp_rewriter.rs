@@ -3,17 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Exp, ExpData, MemoryLabel, Operation, Pattern, Spec, TempIndex, Value},
+    ast::{
+        Condition, Exp, ExpData, MatchArm, MemoryLabel, Operation, Pattern, Spec, SpecBlockTarget,
+        TempIndex, Value,
+    },
     model::{GlobalEnv, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
     ty::Type,
 };
+use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use std::collections::BTreeSet;
+use log::trace;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Rewriter for expressions, allowing to substitute locals by expressions as well as instantiate
-/// types.  Not safe for use to rewrite variables in expressions that may contain an `Assign`
-/// expression.
+/// types.
+///
+/// *** Note: will fail to rewrite variables when they appear in an `Assign` expression.***
+/// (For pure functions, or variables guaranteed not to be assigned, this may be OK.)
 pub struct ExpRewriter<'env, 'rewriter> {
     env: &'env GlobalEnv,
     replacer: &'rewriter mut dyn FnMut(NodeId, RewriteTarget) -> Option<Exp>,
@@ -52,9 +59,9 @@ impl<'env, 'rewriter> ExpRewriter<'env, 'rewriter> {
     }
 
     /// Test for shadowing
-    fn is_shadowed(&self, sym: &Symbol) -> bool {
+    fn is_shadowed(&self, sym: Symbol) -> bool {
         for vars in &self.shadowed {
-            if vars.contains(sym) {
+            if vars.contains(&sym) {
                 return true;
             }
         }
@@ -63,26 +70,49 @@ impl<'env, 'rewriter> ExpRewriter<'env, 'rewriter> {
 }
 
 impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
-    fn rewrite_enter_scope<'a>(&mut self, vars: impl Iterator<Item = &'a (NodeId, Symbol)>) {
+    fn rewrite_enter_scope<'a>(
+        &mut self,
+        _id: NodeId,
+        vars: impl Iterator<Item = &'a (NodeId, Symbol)>,
+    ) {
         self.shadowed
             .push(vars.map(|(_node_id, symbol)| *symbol).collect())
     }
 
-    fn rewrite_exit_scope(&mut self) {
+    fn rewrite_exit_scope(&mut self, _id: NodeId) {
         self.shadowed.pop();
     }
 
     fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
-        if self.is_shadowed(&sym) {
+        if self.is_shadowed(sym) {
             None
         } else {
             (*self.replacer)(id, RewriteTarget::LocalVar(sym))
         }
     }
 
-    fn rewrite_pattern(&mut self, _pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
-        if !entering_scope {
-            panic!("ExpRewriter won't work correctly on code with `Assign` operation.");
+    // As `ExpRewriter` has no mechanism to rewrite a `Pattern::Var` to a `Pattern` we check to make
+    // sure that its `replacer` function doesn't want to rewrite a scoped symbol appearing in the
+    // pattern for an `Assign`.  Patterns that create scopes (Let and Lambda) are handled by
+    // `rewrite_enter_scope`, so are not addressed here.
+    fn rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> Option<Pattern> {
+        if !creating_scope {
+            // Any rewrites of variables won't happen in an `Assign` statement.
+            // Let's try to enforce that aren't rewriting any symbols we find.
+            if let Pattern::Var(id, sym) = pat {
+                let sym_replacement = (*self.replacer)(*id, RewriteTarget::LocalVar(*sym));
+                if let Some(exp) = &sym_replacement {
+                    let loc = self.env.get_node_loc(*id);
+                    self.env.diag(
+                        Severity::Bug,
+                        &loc,
+                        &format!(
+                            "Tried to replace symbol `{}` with expression `{}` in an `Assign` expression in `ExpRewriter`",
+                            sym.display(self.env.symbol_pool()),
+                            exp.display(self.env),
+                        ));
+                }
+            }
         }
         None
     }
@@ -119,7 +149,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
 #[allow(unused)] // for trait default parameters
 pub trait ExpRewriterFunctions {
     /// Top-level entry for rewriting an expression. Can be re-implemented to do some
-    /// pre/post processing embedding a call to `do_rewrite`.
+    /// pre/post processing embedding a call to `rewrite_exp_descent`.
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         self.rewrite_exp_descent(exp)
     }
@@ -131,8 +161,13 @@ pub trait ExpRewriterFunctions {
     // Functions to specialize for the rewriting problem
     // --------------------------------------------------
 
-    fn rewrite_enter_scope<'a>(&mut self, vars: impl Iterator<Item = &'a (NodeId, Symbol)>) {}
-    fn rewrite_exit_scope(&mut self) {}
+    fn rewrite_enter_scope<'a>(
+        &mut self,
+        id: NodeId,
+        vars: impl Iterator<Item = &'a (NodeId, Symbol)>,
+    ) {
+    }
+    fn rewrite_exit_scope(&mut self, id: NodeId) {}
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
         None
     }
@@ -163,6 +198,23 @@ pub trait ExpRewriterFunctions {
     fn rewrite_lambda(&mut self, id: NodeId, pat: &Pattern, body: &Exp) -> Option<Exp> {
         None
     }
+    // Optionally can rewrite pat and return new value, otherwise is unchanged.
+    fn rewrite_enter_block_scope(
+        &mut self,
+        id: NodeId,
+        pat: &Pattern,
+        binding: &Option<Exp>,
+    ) -> Option<Pattern> {
+        // Default is just to enter var scopes, but some rewriters may want to
+        // do something clever with pat and binding.
+        self.rewrite_enter_scope(id, pat.vars().iter());
+        None
+    }
+    fn rewrite_assign(&mut self, id: NodeId, lhs: &Pattern, rhs: &Exp) -> Option<Exp> {
+        None
+    }
+    // Note that `rewrite_block` is called *after* `rewrite_exit_scope`.
+    // (So all parameters here have already been processed.)
     fn rewrite_block(
         &mut self,
         id: NodeId,
@@ -172,7 +224,14 @@ pub trait ExpRewriterFunctions {
     ) -> Option<Exp> {
         None
     }
-    fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
+    // Optionally rewrite a pattern, which may be in `Let`, `Lambda`, or `Assign` expression.
+    //
+    // Parameter`creating_scope` is `true` for `Let` and `Lambda` operations, which create a new
+    // variable scope.  It is `false` for `Assign` operations, which do not create a new variable
+    // scope.
+    //
+    // Note that any subpatterns in `pat` (if any) are visited before the enclosing `Pattern`.
+    fn rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> Option<Pattern> {
         None
     }
     fn rewrite_quant(
@@ -188,7 +247,17 @@ pub trait ExpRewriterFunctions {
     fn rewrite_if_else(&mut self, id: NodeId, cond: &Exp, then: &Exp, else_: &Exp) -> Option<Exp> {
         None
     }
-    fn rewrite_spec(&mut self, id: NodeId, spec: &Spec) -> Option<Spec> {
+    fn rewrite_sequence(&mut self, id: NodeId, seq: &[Exp]) -> Option<Exp> {
+        None
+    }
+    fn rewrite_spec(&mut self, target: &SpecBlockTarget, spec: &Spec) -> Option<Spec> {
+        None
+    }
+    fn rewrite_condition(
+        &mut self,
+        target: &SpecBlockTarget,
+        cond: &Condition,
+    ) -> Option<Condition> {
         None
     }
 
@@ -199,7 +268,7 @@ pub trait ExpRewriterFunctions {
         use ExpData::*;
         match exp.as_ref() {
             Value(id, value) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 if let Some(new_exp) = self.rewrite_value(new_id, value) {
                     new_exp
                 } else if id_changed {
@@ -209,7 +278,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             LocalVar(id, sym) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 if let Some(new_exp) = self.rewrite_local_var(new_id, *sym) {
                     new_exp
                 } else if id_changed {
@@ -219,7 +288,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             Temporary(id, idx) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 if let Some(new_exp) = self.rewrite_temporary(new_id, *idx) {
                     new_exp
                 } else if id_changed {
@@ -229,7 +298,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             Call(id, oper, args) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let new_args_opt = self.internal_rewrite_vec(args);
                 let args_ref = if let Some(new_args) = &new_args_opt {
                     new_args.as_slice()
@@ -250,7 +319,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             Invoke(id, target, args) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (target_changed, new_target) = self.internal_rewrite_exp(target);
                 let new_args_opt = self.internal_rewrite_vec(args);
                 let args_ref = if let Some(new_args) = &new_args_opt {
@@ -272,11 +341,11 @@ pub trait ExpRewriterFunctions {
                 }
             },
             Lambda(id, pat, body) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
-                self.rewrite_enter_scope(new_pat.vars().iter());
+                self.rewrite_enter_scope(new_id, new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
-                self.rewrite_exit_scope();
+                self.rewrite_exit_scope(new_id);
                 if let Some(new_exp) = self.rewrite_lambda(new_id, &new_pat, &new_body) {
                     new_exp
                 } else if id_changed || pat_changed || body_changed {
@@ -286,7 +355,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             Block(id, pat, binding, body) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 // Note that `binding` expr must be evaluated *before* we enter new pattern scope.
                 let (binding_changed, new_binding) = if let Some(b) = binding {
                     let (changed, b) = self.internal_rewrite_exp(b);
@@ -294,23 +363,42 @@ pub trait ExpRewriterFunctions {
                 } else {
                     (false, None)
                 };
-                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
-                self.rewrite_enter_scope(new_pat.vars().iter());
+                let (mut pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
+                let optional_pat = self.rewrite_enter_block_scope(new_id, &new_pat, &new_binding);
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
-                self.rewrite_exit_scope();
-                if let Some(new_exp) = self.rewrite_block(new_id, &new_pat, &new_binding, &new_body)
+                self.rewrite_exit_scope(new_id);
+                let newer_pat = if let Some(rewritten_pat) = optional_pat {
+                    pat_changed = true;
+                    trace!(
+                        "Node {} Pat changed from {:#?} to  {:#?}",
+                        id.as_usize(),
+                        &new_pat,
+                        &rewritten_pat,
+                    );
+                    rewritten_pat
+                } else {
+                    trace!(
+                        "Node {} Pat unchanged {:#?} unchanged",
+                        id.as_usize(),
+                        &new_pat,
+                    );
+                    new_pat
+                };
+                if let Some(new_exp) =
+                    self.rewrite_block(new_id, &newer_pat, &new_binding, &new_body)
                 {
                     new_exp
                 } else if id_changed || pat_changed || binding_changed || body_changed {
-                    Block(new_id, new_pat, new_binding, new_body).into_exp()
+                    Block(new_id, newer_pat, new_binding, new_body).into_exp()
                 } else {
                     exp
                 }
             },
             Quant(id, kind, ranges, triggers, cond, body) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (ranges_changed, new_ranges) = self.internal_rewrite_quant_ranges(ranges);
                 self.rewrite_enter_scope(
+                    new_id,
                     ranges
                         .iter()
                         .flat_map(|(pat, _)| pat.vars())
@@ -336,7 +424,7 @@ pub trait ExpRewriterFunctions {
                     new_c
                 });
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
-                self.rewrite_exit_scope();
+                self.rewrite_exit_scope(new_id);
                 if let Some(new_exp) =
                     self.rewrite_quant(new_id, &new_ranges, &new_triggers, &new_cond, &new_body)
                 {
@@ -353,7 +441,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             IfElse(id, cond, then, else_) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (cond_changed, new_cond) = self.internal_rewrite_exp(cond);
                 let (then_changed, new_then) = self.internal_rewrite_exp(then);
                 let (else_changed, new_else) = self.internal_rewrite_exp(else_);
@@ -366,17 +454,49 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
+            Match(id, disc, arms) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
+                let (disc_changed, new_disc) = self.internal_rewrite_exp(disc);
+                let (mut arms_changed, mut new_arms) = (false, vec![]);
+                for arm in arms {
+                    let (pat_changed, new_pat) = self.internal_rewrite_pattern(&arm.pattern, true);
+                    self.rewrite_enter_block_scope(new_id, &new_pat, &None);
+                    let (cond_changed, new_cond) = if let Some(c) = &arm.condition {
+                        let (c, e) = self.internal_rewrite_exp(c);
+                        (c, Some(e))
+                    } else {
+                        (false, arm.condition.clone())
+                    };
+                    let (body_changed, new_body) = self.internal_rewrite_exp(&arm.body);
+                    new_arms.push(MatchArm {
+                        loc: arm.loc.clone(),
+                        pattern: new_pat,
+                        condition: new_cond,
+                        body: new_body,
+                    });
+                    arms_changed = arms_changed || pat_changed || cond_changed || body_changed;
+                }
+                if id_changed || disc_changed || arms_changed {
+                    Match(*id, new_disc, new_arms).into_exp()
+                } else {
+                    exp
+                }
+            },
             Sequence(id, es) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let changed_vec = self.internal_rewrite_vec(es);
-                if id_changed || changed_vec.is_some() {
-                    Sequence(new_id, changed_vec.unwrap_or_else(|| es.clone())).into_exp()
+                let vec_changed = changed_vec.is_some();
+                let new_vec = changed_vec.unwrap_or_else(|| es.clone());
+                if let Some(new_exp) = self.rewrite_sequence(new_id, &new_vec) {
+                    new_exp
+                } else if id_changed || vec_changed {
+                    Sequence(new_id, new_vec).into_exp()
                 } else {
                     exp
                 }
             },
             Loop(id, body) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 if id_changed || body_changed {
                     Loop(new_id, new_body).into_exp()
@@ -385,7 +505,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             LoopCont(id, do_cont) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 if id_changed {
                     LoopCont(new_id, *do_cont).into_exp()
                 } else {
@@ -393,7 +513,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             Return(id, val) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (val_changed, new_val) = self.internal_rewrite_exp(val);
                 if id_changed || val_changed {
                     Return(new_id, new_val).into_exp()
@@ -402,17 +522,19 @@ pub trait ExpRewriterFunctions {
                 }
             },
             Assign(id, lhs, rhs) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (rhs_changed, new_rhs) = self.internal_rewrite_exp(rhs);
                 let (lhs_changed, new_lhs) = self.internal_rewrite_pattern(lhs, false);
-                if id_changed || lhs_changed || rhs_changed {
+                if let Some(new_exp) = self.rewrite_assign(new_id, &new_lhs, &new_rhs) {
+                    new_exp
+                } else if id_changed || lhs_changed || rhs_changed {
                     Assign(new_id, new_lhs, new_rhs).into_exp()
                 } else {
                     exp
                 }
             },
             Mutate(id, lhs, rhs) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (rhs_changed, new_rhs) = self.internal_rewrite_exp(rhs);
                 let (lhs_changed, new_lhs) = self.internal_rewrite_exp(lhs);
                 if id_changed || lhs_changed || rhs_changed {
@@ -422,8 +544,9 @@ pub trait ExpRewriterFunctions {
                 }
             },
             SpecBlock(id, spec) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
-                let (spec_changed, new_spec) = self.internal_rewrite_spec(&new_id, spec);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
+                let (spec_changed, new_spec) =
+                    self.rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
                 if id_changed || spec_changed {
                     SpecBlock(new_id, new_spec).into_exp()
                 } else {
@@ -436,72 +559,153 @@ pub trait ExpRewriterFunctions {
         }
     }
 
-    fn rewrite_pattern_vector(
+    fn internal_rewrite_pattern_vector(
         &mut self,
         pat_vec: &[Pattern],
-        entering_scope: bool,
-    ) -> Option<Vec<Pattern>> {
-        let rewritten_part: Vec<_> = pat_vec
+        creating_scope: bool,
+    ) -> (bool, Vec<Pattern>) {
+        let rewritten: Vec<_> = pat_vec
             .iter()
-            .map(|pat| self.rewrite_pattern(pat, entering_scope))
+            .map(|pat| self.internal_rewrite_pattern(pat, creating_scope))
             .collect();
-        if rewritten_part.iter().any(|opt_pat| opt_pat.is_some()) {
-            // if any subpattern was simplified, then rebuild the vector
-            // with a combination of original and new patterns.
-            let rewritten_vec: Vec<_> = pat_vec
-                .iter()
-                .zip(rewritten_part)
-                .map(|(org_pat, opt_new_pat)| opt_new_pat.unwrap_or(org_pat.clone()))
-                .collect();
-            Some(rewritten_vec)
+        let changed = rewritten.iter().any(|(changed, pat)| *changed);
+        (
+            changed,
+            rewritten.into_iter().map(|(changed, pat)| pat).collect(),
+        )
+    }
+
+    fn internal_rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> (bool, Pattern) {
+        match pat {
+            Pattern::Tuple(_, pattern_vec) | Pattern::Struct(_, _, _, pattern_vec) => {
+                let (changed, final_pattern_vec) =
+                    self.internal_rewrite_pattern_vector(pattern_vec, creating_scope);
+                if changed {
+                    let new_pat = match pat {
+                        Pattern::Tuple(id, _) => Pattern::Tuple(*id, final_pattern_vec),
+                        Pattern::Struct(id, struct_id, variant, _) => {
+                            Pattern::Struct(*id, struct_id.clone(), *variant, final_pattern_vec)
+                        },
+                        _ => unreachable!(),
+                    };
+                    if let Some(rewritten_new_pat) = self.rewrite_pattern(&new_pat, creating_scope)
+                    {
+                        return (true, rewritten_new_pat);
+                    } else {
+                        return (changed, new_pat);
+                    }
+                }
+            },
+            _ => {},
+        }
+        if let Some(rewritten_pat) = self.rewrite_pattern(pat, creating_scope) {
+            (true, rewritten_pat)
         } else {
-            None
+            (false, pat.clone())
         }
     }
 
-    fn internal_rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> (bool, Pattern) {
+    fn internal_rewrite_spec_condition(&mut self, condition: Condition) -> (bool, Condition) {
+        let new_exp = self.rewrite_exp(condition.exp.clone());
+        let maybe_new_additional_exps = self.internal_rewrite_vec(&condition.additional_exps);
+        if let Some(new_additional_exps) = maybe_new_additional_exps {
+            (true, Condition {
+                exp: new_exp,
+                additional_exps: new_additional_exps,
+                ..condition
+            })
+        } else {
+            let changed = !ExpData::ptr_eq(&condition.exp, &new_exp);
+            if changed {
+                (true, Condition {
+                    exp: new_exp,
+                    ..condition
+                })
+            } else {
+                (false, condition)
+            }
+        }
+    }
+
+    fn rewrite_spec_descent(&mut self, target: &SpecBlockTarget, spec: &Spec) -> (bool, Spec) {
         let mut changed = false;
-        let new_pat = match pat {
-            Pattern::Tuple(id, pattern_vec) => {
-                let res_opt = self.rewrite_pattern_vector(pattern_vec, entering_scope);
-                if let Some(result) = res_opt {
-                    changed = true;
-                    Pattern::Tuple(*id, result)
-                } else {
-                    Pattern::Tuple(*id, pattern_vec.clone())
-                }
-            },
-            Pattern::Struct(id, struct_id, pattern_vec) => {
-                let res_opt = self.rewrite_pattern_vector(pattern_vec, entering_scope);
-                if let Some(result) = res_opt {
-                    changed = true;
-                    Pattern::Struct(*id, struct_id.clone(), result)
-                } else {
-                    Pattern::Struct(*id, struct_id.clone(), pattern_vec.clone())
-                }
-            },
-            _ => pat.clone(),
-        };
-        if let Some(new_pat) = self.rewrite_pattern(&new_pat, entering_scope) {
-            (true, new_pat)
-        } else {
-            (changed, new_pat.clone())
-        }
-    }
+        let mut conditions = vec![];
 
-    fn internal_rewrite_spec(&mut self, id: &NodeId, spec: &Spec) -> (bool, Spec) {
-        if let Some(new_spec) = self.rewrite_spec(*id, spec) {
+        // First go over all top-level conditions in this block.
+        for cond in &spec.conditions {
+            let (this_changed, new_cond) = self.internal_rewrite_condition(target, cond);
+            conditions.push(new_cond);
+            changed |= this_changed;
+        }
+        let mut update_map = BTreeMap::new();
+        for (node_id, cond) in &spec.update_map {
+            let (this_changed, new_cond) = self.internal_rewrite_condition(target, cond);
+            update_map.insert(*node_id, new_cond);
+            changed |= this_changed
+        }
+
+        // Next go over any sub-blocks for implementation
+        let mut on_impl = BTreeMap::new();
+        for (code_offs, impl_spec) in &spec.on_impl {
+            // We expect the target to be a function if implementation specs are present
+            let SpecBlockTarget::Function(mid, fid) = target else {
+                panic!("expected function target")
+            };
+            let (this_changed, new_spec) = self.rewrite_spec_descent(
+                &SpecBlockTarget::FunctionCode(*mid, *fid, *code_offs as usize),
+                impl_spec,
+            );
+            on_impl.insert(*code_offs, new_spec);
+            changed |= this_changed
+        }
+
+        let new_spec = Spec {
+            loc: spec.loc.clone(),
+            conditions,
+            properties: spec.properties.clone(),
+            on_impl,
+            update_map,
+        };
+
+        if let Some(new_spec) = self.rewrite_spec(target, &new_spec) {
             (true, new_spec)
         } else {
-            (false, spec.clone())
+            (changed, new_spec)
         }
     }
 
-    fn internal_rewrite_id(&mut self, id: &NodeId) -> (bool, NodeId) {
-        if let Some(new_id) = self.rewrite_node_id(*id) {
+    fn internal_rewrite_condition(
+        &mut self,
+        target: &SpecBlockTarget,
+        cond: &Condition,
+    ) -> (bool, Condition) {
+        let (mut changed, exp) = self.internal_rewrite_exp(&cond.exp);
+        let additional_exps =
+            if let Some(additional_exps) = self.internal_rewrite_vec(&cond.additional_exps) {
+                changed = true;
+                additional_exps
+            } else {
+                cond.additional_exps.clone()
+            };
+        let cond = Condition {
+            loc: cond.loc.clone(),
+            kind: cond.kind.clone(),
+            properties: cond.properties.clone(),
+            exp,
+            additional_exps,
+        };
+        if let Some(new_cond) = self.rewrite_condition(target, &cond) {
+            (true, new_cond)
+        } else {
+            (changed, cond)
+        }
+    }
+
+    fn internal_rewrite_id(&mut self, id: NodeId) -> (bool, NodeId) {
+        if let Some(new_id) = self.rewrite_node_id(id) {
             (true, new_id)
         } else {
-            (false, *id)
+            (false, id)
         }
     }
 
@@ -513,50 +717,15 @@ pub trait ExpRewriterFunctions {
     fn internal_rewrite_vec(&mut self, exps: &[Exp]) -> Option<Vec<Exp>> {
         // The vector rewrite works a bit different as we try to avoid constructing
         // new vectors if nothing changed, and optimize common cases of 0-3 arguments.
-        match exps.len() {
-            0 => None,
-            1 => {
-                let (c, e) = self.internal_rewrite_exp(&exps[0]);
-                if c {
-                    Some(vec![e])
-                } else {
-                    None
-                }
-            },
-            2 => {
-                let (c1, e1) = self.internal_rewrite_exp(&exps[0]);
-                let (c2, e2) = self.internal_rewrite_exp(&exps[1]);
-                if c1 || c2 {
-                    Some(vec![e1, e2])
-                } else {
-                    None
-                }
-            },
-            3 => {
-                let (c1, e1) = self.internal_rewrite_exp(&exps[0]);
-                let (c2, e2) = self.internal_rewrite_exp(&exps[1]);
-                let (c3, e3) = self.internal_rewrite_exp(&exps[2]);
-                if c1 || c2 || c3 {
-                    Some(vec![e1, e2, e3])
-                } else {
-                    None
-                }
-            },
-            _ => {
-                // generic treatment
-                let mut change = false;
-                let mut res = vec![];
-                for exp in exps {
-                    let (c, new_exp) = self.internal_rewrite_exp(exp);
-                    change = change || c;
-                    res.push(new_exp)
-                }
-                if change {
-                    Some(res)
-                } else {
-                    None
-                }
-            },
+        let (changevec, resvec): (Vec<_>, Vec<_>) = exps
+            .iter()
+            .map(|exp| self.internal_rewrite_exp(exp))
+            .unzip();
+        let changed = changevec.into_iter().any(|x| x);
+        if changed {
+            Some(resvec)
+        } else {
+            None
         }
     }
 
@@ -564,17 +733,15 @@ pub trait ExpRewriterFunctions {
         &mut self,
         ranges: &[(Pattern, Exp)],
     ) -> (bool, Vec<(Pattern, Exp)>) {
-        let mut change = false;
-        let new_ranges = ranges
+        let (changevec, new_ranges): (Vec<_>, Vec<_>) = ranges
             .iter()
             .map(|(pat, exp)| {
                 let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
-                change = change || pat_changed;
                 let (exp_changed, new_exp) = self.internal_rewrite_exp(exp);
-                change = change || exp_changed;
-                (new_pat, new_exp)
+                (pat_changed || exp_changed, (new_pat, new_exp))
             })
-            .collect();
+            .unzip();
+        let change = changevec.into_iter().any(|x| x);
         (change, new_ranges)
     }
 }

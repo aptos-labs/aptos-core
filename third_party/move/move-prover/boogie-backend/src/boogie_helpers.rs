@@ -573,6 +573,7 @@ pub fn boogie_value(env: &GlobalEnv, _options: &BoogieOptions, val: &Value) -> S
                 .map(|v| boogie_value(env, _options, v))
                 .collect_vec(),
         ),
+        Value::Tuple(vec) => format!("<<unsupported Tuple({:?})>>", vec),
     }
 }
 

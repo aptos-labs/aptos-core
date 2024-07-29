@@ -11,6 +11,7 @@ use crate::{
 use aptos_consensus_types::block::Block;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
+use fail::fail_point;
 use std::sync::Arc;
 
 pub struct BlockPreparer {
@@ -36,6 +37,12 @@ impl BlockPreparer {
     }
 
     pub async fn prepare_block(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
+        fail_point!("consensus::prepare_block", |_| {
+            use aptos_executor_types::ExecutorError;
+            use std::{thread, time::Duration};
+            thread::sleep(Duration::from_millis(10));
+            Err(ExecutorError::CouldNotGetData)
+        });
         let (txns, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
         let txn_filter = self.txn_filter.clone();

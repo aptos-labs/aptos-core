@@ -62,7 +62,7 @@ impl BorrowGraph {
     /// cannot be chosen.
     pub fn fresh_partition(&mut self, n: Nonce) -> Result<(), String> {
         if self.partition_counter.checked_add(1).is_some() {
-            if self.partition_map.get(&self.partition_counter).is_some() {
+            if self.partition_map.contains_key(&self.partition_counter) {
                 return Err("Partition map already contains ID".to_string());
             }
             self.partition_map.insert(self.partition_counter, vec![n]);
@@ -102,7 +102,7 @@ impl BorrowGraph {
     /// with an error if the given partition ID is not in the graph.
     pub fn partition_freezable(&self, partition_id: PartitionID) -> Result<bool, String> {
         let mut freezable = true;
-        if self.partition_map.get(&partition_id).is_some() {
+        if self.partition_map.contains_key(&partition_id) {
             for (p1, p2, _, _) in self.edges.iter() {
                 if *p1 == partition_id && self.partition_mutability(*p2)? == Mutability::Mutable {
                     freezable = false;

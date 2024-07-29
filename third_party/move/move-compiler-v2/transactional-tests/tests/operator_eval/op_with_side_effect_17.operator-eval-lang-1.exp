@@ -1,0 +1,12 @@
+processed 2 tasks
+
+task 1 'run'. lines 8-8:
+Error: Function execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0xc0ffee::m,
+    indices: redacted,
+    offsets: redacted,
+}
+
+==> Compiler v2 delivered same results!

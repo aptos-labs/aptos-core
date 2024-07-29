@@ -21,7 +21,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::move_vm::MoveVM;
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -247,15 +247,18 @@ fn call_script_with_args_ty_args_signers(
     ty_args: Vec<TypeTag>,
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
-    let move_vm = MoveVM::new(vec![]).unwrap();
+    let move_vm = MoveVM::new(vec![]);
     let remote_view = InMemoryStorage::new();
     let mut session = move_vm.new_session(&remote_view);
+    let traversal_storage = TraversalStorage::new();
+
     session
         .execute_script(
             script,
             ty_args,
             combine_signers_and_args(signers, non_signer_args),
             &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&traversal_storage),
         )
         .map(|_| ())
 }
@@ -271,7 +274,7 @@ fn call_script_function_with_args_ty_args_signers(
     ty_args: Vec<TypeTag>,
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
-    let move_vm = MoveVM::new(vec![]).unwrap();
+    let move_vm = MoveVM::new(vec![]);
     let mut remote_view = InMemoryStorage::new();
 
     let module_id = module.self_id();
@@ -280,12 +283,14 @@ fn call_script_function_with_args_ty_args_signers(
 
     remote_view.publish_or_overwrite_module(module_id.clone(), module_blob);
     let mut session = move_vm.new_session(&remote_view);
+    let traversal_storage = TraversalStorage::new();
     session.execute_function_bypass_visibility(
         &module_id,
         function_name.as_ident_str(),
         ty_args,
         combine_signers_and_args(signers, non_signer_args),
         &mut UnmeteredGasMeter,
+        &mut TraversalContext::new(&traversal_storage),
     )?;
     Ok(())
 }
@@ -771,9 +776,10 @@ fn call_missing_item() {
 
     // missing module
     let function_name = ident_str!("foo");
-    let move_vm = MoveVM::new(vec![]).unwrap();
+    let move_vm = MoveVM::new(vec![]);
     let mut remote_view = InMemoryStorage::new();
     let mut session = move_vm.new_session(&remote_view);
+    let traversal_storage = TraversalStorage::new();
     let error = session
         .execute_function_bypass_visibility(
             &module_id,
@@ -781,6 +787,7 @@ fn call_missing_item() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&traversal_storage),
         )
         .err()
         .unwrap();
@@ -796,6 +803,7 @@ fn call_missing_item() {
     // missing function
     remote_view.publish_or_overwrite_module(module_id.clone(), module_blob);
     let mut session = move_vm.new_session(&remote_view);
+    let traversal_storage = TraversalStorage::new();
     let error = session
         .execute_function_bypass_visibility(
             &module_id,
@@ -803,6 +811,7 @@ fn call_missing_item() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&traversal_storage),
         )
         .err()
         .unwrap();

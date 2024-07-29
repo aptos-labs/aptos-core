@@ -16,7 +16,7 @@ use crate::{
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Payload,
-    executed_block::ExecutedBlock,
+    pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -90,7 +90,7 @@ fn add_execution_phase_test_cases(
     // happy path
     phase_tester.add_test_case(
         ExecutionRequest {
-            ordered_blocks: vec![ExecutedBlock::new(
+            ordered_blocks: vec![PipelinedBlock::new(
                 block,
                 vec![],
                 StateComputeResult::new_dummy(),
@@ -130,7 +130,7 @@ fn add_execution_phase_test_cases(
     .unwrap();
     phase_tester.add_test_case(
         ExecutionRequest {
-            ordered_blocks: vec![ExecutedBlock::new(
+            ordered_blocks: vec![PipelinedBlock::new(
                 bad_block,
                 vec![],
                 StateComputeResult::new_dummy(),

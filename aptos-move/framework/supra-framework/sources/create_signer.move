@@ -11,6 +11,8 @@
 module supra_framework::create_signer {
     friend supra_framework::account;
     friend supra_framework::aptos_account;
+    friend supra_framework::coin;
+    friend supra_framework::fungible_asset;
     friend supra_framework::genesis;
     friend supra_framework::multisig_account;
     friend supra_framework::object;

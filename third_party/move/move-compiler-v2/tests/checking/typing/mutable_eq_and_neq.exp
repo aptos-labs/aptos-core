@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct B {
         f: bool,
@@ -12,47 +12,34 @@ module 0x8675309::M {
         g: u64,
     }
     private fun t(r1: &mut u64,r2: &mut u64,s: &mut M::S) {
-        Eq<&mut u64>(r1, r1);
-        Eq<&mut u64>(r1, r2);
-        Eq<&mut u64>(r2, r2);
-        Eq<&mut u64>(r2, r2);
-        Neq<&mut u64>(r1, r1);
-        Neq<&mut u64>(r1, r2);
-        Neq<&mut u64>(r2, r2);
-        Neq<&mut u64>(r2, r2);
-        Eq<&mut u64>(Borrow(Mutable)(select M::S.f(s)), Borrow(Mutable)(select M::S.f(s)));
-        Eq<&mut u64>(Borrow(Mutable)(select M::S.f(s)), Borrow(Mutable)(select M::S.g(s)));
-        Eq<&mut u64>(Borrow(Mutable)(select M::S.g(s)), Borrow(Mutable)(select M::S.f(s)));
-        Eq<&mut u64>(Borrow(Mutable)(select M::S.g(s)), Borrow(Mutable)(select M::S.g(s)));
-        Neq<&mut u64>(Borrow(Mutable)(select M::S.f(s)), Borrow(Mutable)(select M::S.f(s)));
-        Neq<&mut u64>(Borrow(Mutable)(select M::S.f(s)), Borrow(Mutable)(select M::S.g(s)));
-        Neq<&mut u64>(Borrow(Mutable)(select M::S.g(s)), Borrow(Mutable)(select M::S.f(s)));
-        Neq<&mut u64>(Borrow(Mutable)(select M::S.g(s)), Borrow(Mutable)(select M::S.g(s)));
+        Eq<u64>(Freeze(false)(r1), Freeze(false)(r1));
+        Eq<u64>(Freeze(false)(r1), Freeze(false)(r2));
+        Eq<u64>(Freeze(false)(r2), Freeze(false)(r2));
+        Eq<u64>(Freeze(false)(r2), Freeze(false)(r2));
+        Neq<u64>(Freeze(false)(r1), Freeze(false)(r1));
+        Neq<u64>(Freeze(false)(r1), Freeze(false)(r2));
+        Neq<u64>(Freeze(false)(r2), Freeze(false)(r2));
+        Neq<u64>(Freeze(false)(r2), Freeze(false)(r2));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))));
+        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))));
+        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))));
+        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.f<&mut M::S>(s))));
+        Neq<u64>(Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))), Freeze(false)(Borrow(Mutable)(select M::S.g<&mut M::S>(s))));
         Tuple()
     }
     private fun t1(p: &mut M::P) {
         {
-          let comp: bool = Eq<&mut M::B>(Borrow(Mutable)(select M::P.b1(p)), Borrow(Mutable)(select M::P.b2(p)));
-          select M::B.f(select M::P.b1(p)) = comp
+          let comp: bool = Eq<M::B>(Freeze(false)(Borrow(Mutable)(select M::P.b1<&mut M::P>(p))), Freeze(false)(Borrow(Mutable)(select M::P.b2<&mut M::P>(p))));
+          select M::B.f<M::B>(select M::P.b1<&mut M::P>(p)) = comp
         }
     }
     private fun t2(p: &mut M::P) {
         {
-          let comp: bool = Neq<&mut M::B>(Borrow(Mutable)(select M::P.b1(p)), Borrow(Mutable)(select M::P.b2(p)));
-          select M::B.f(select M::P.b1(p)) = comp
-        }
-    }
-    spec fun $t(r1: &mut u64,r2: &mut u64,s: &mut M::S);
-    spec fun $t1(p: M::P) {
-        {
-          let comp: bool = Eq<M::B>(select M::P.b1(p), select M::P.b2(p));
-          select M::B.f(select M::P.b1(p)) = comp
-        }
-    }
-    spec fun $t2(p: M::P) {
-        {
-          let comp: bool = Neq<M::B>(select M::P.b1(p), select M::P.b2(p));
-          select M::B.f(select M::P.b1(p)) = comp
+          let comp: bool = Neq<M::B>(Freeze(false)(Borrow(Mutable)(select M::P.b1<&mut M::P>(p))), Freeze(false)(Borrow(Mutable)(select M::P.b2<&mut M::P>(p))));
+          select M::B.f<M::B>(select M::P.b1<&mut M::P>(p)) = comp
         }
     }
 } // end 0x8675309::M

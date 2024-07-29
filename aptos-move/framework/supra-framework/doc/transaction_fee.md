@@ -6,8 +6,9 @@
 This module provides an interface to burn or collect and redistribute transaction fees.
 
 
--  [Resource `SupraCoinCapabilities`](#0x1_transaction_fee_SupraCoinCapabilities)
--  [Resource `SupraCoinMintCapability`](#0x1_transaction_fee_SupraCoinMintCapability)
+-  [Resource `AptosCoinCapabilities`](#0x1_transaction_fee_AptosCoinCapabilities)
+-  [Resource `SupraFABurnCapabilities`](#0x1_transaction_fee_SupraFABurnCapabilities)
+-  [Resource `AptosCoinMintCapability`](#0x1_transaction_fee_AptosCoinMintCapability)
 -  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
 -  [Struct `FeeStatement`](#0x1_transaction_fee_FeeStatement)
 -  [Constants](#@Constants_0)
@@ -20,8 +21,9 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
 -  [Function `mint_and_refund`](#0x1_transaction_fee_mint_and_refund)
 -  [Function `collect_fee`](#0x1_transaction_fee_collect_fee)
--  [Function `store_supra_coin_burn_cap`](#0x1_transaction_fee_store_supra_coin_burn_cap)
--  [Function `store_supra_coin_mint_cap`](#0x1_transaction_fee_store_supra_coin_mint_cap)
+-  [Function `store_aptos_coin_burn_cap`](#0x1_transaction_fee_store_aptos_coin_burn_cap)
+-  [Function `convert_to_aptos_fa_burn_ref`](#0x1_transaction_fee_convert_to_aptos_fa_burn_ref)
+-  [Function `store_aptos_coin_mint_cap`](#0x1_transaction_fee_store_aptos_coin_mint_cap)
 -  [Function `initialize_storage_refund`](#0x1_transaction_fee_initialize_storage_refund)
 -  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
 -  [Specification](#@Specification_1)
@@ -42,10 +44,15 @@ This module provides an interface to burn or collect and redistribute transactio
     -  [Function `emit_fee_statement`](#@Specification_1_emit_fee_statement)
 
 
-<pre><code><b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
+<pre><code><b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
+<b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
+<b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="supra_coin.md#0x1_supra_coin">0x1::supra_coin</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -81,7 +88,35 @@ Stores burn capability to burn the gas fees.
 
 </details>
 
-<a id="0x1_transaction_fee_SupraCoinMintCapability"></a>
+<a id="0x1_transaction_fee_SupraFABurnCapabilities"></a>
+
+## Resource `SupraFABurnCapabilities`
+
+Stores burn capability to burn the gas fees.
+
+
+<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>burn_ref: <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_transaction_fee_AptosCoinMintCapability"></a>
 
 ## Resource `SupraCoinMintCapability`
 
@@ -233,6 +268,15 @@ information about collected amounts is already published.
 
 
 <pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EALREADY_COLLECTING_FEES">EALREADY_COLLECTING_FEES</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x1_transaction_fee_EFA_GAS_CHARGING_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EFA_GAS_CHARGING_NOT_ENABLED">EFA_GAS_CHARGING_NOT_ENABLED</a>: u64 = 5;
 </code></pre>
 
 
@@ -515,12 +559,24 @@ Burn transaction fees in epilogue.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a> {
-    <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>&lt;SupraCoin&gt;(
-        <a href="account.md#0x1_account">account</a>,
-        fee,
-        &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a>&gt;(@supra_framework).burn_cap,
-    );
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a>&gt;(@aptos_framework)) {
+        <b>let</b> burn_ref = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a>&gt;(@aptos_framework).burn_ref;
+        <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">aptos_account::burn_from_fungible_store</a>(burn_ref, <a href="account.md#0x1_account">account</a>, fee);
+    } <b>else</b> {
+        <b>let</b> burn_cap = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap;
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_supra_store_enabled">features::operations_default_to_fa_supra_store_enabled</a>()) {
+            <b>let</b> (burn_ref, burn_receipt) = <a href="coin.md#0x1_coin_get_paired_burn_ref">coin::get_paired_burn_ref</a>(burn_cap);
+            <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">aptos_account::burn_from_fungible_store</a>(&burn_ref, <a href="account.md#0x1_account">account</a>, fee);
+            <a href="coin.md#0x1_coin_return_paired_burn_ref">coin::return_paired_burn_ref</a>(burn_ref, burn_receipt);
+        } <b>else</b> {
+            <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>&lt;AptosCoin&gt;(
+                <a href="account.md#0x1_account">account</a>,
+                fee,
+                burn_cap,
+            );
+        };
+    };
 }
 </code></pre>
 
@@ -602,9 +658,45 @@ Only called during genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_supra_coin_burn_cap">store_supra_coin_burn_cap</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_cap: BurnCapability&lt;SupraCoin&gt;) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
-    <b>move_to</b>(supra_framework, <a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a> { burn_cap })
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">store_aptos_coin_burn_cap</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_cap: BurnCapability&lt;AptosCoin&gt;) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_supra_store_enabled">features::operations_default_to_fa_supra_store_enabled</a>()) {
+        <b>let</b> burn_ref = <a href="coin.md#0x1_coin_convert_and_take_paired_burn_ref">coin::convert_and_take_paired_burn_ref</a>(burn_cap);
+        <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a> { burn_ref });
+    } <b>else</b> {
+        <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> { burn_cap })
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_convert_to_aptos_fa_burn_ref"></a>
+
+## Function `convert_to_aptos_fa_burn_ref`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_convert_to_aptos_fa_burn_ref">convert_to_aptos_fa_burn_ref</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_convert_to_aptos_fa_burn_ref">convert_to_aptos_fa_burn_ref</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_supra_store_enabled">features::operations_default_to_fa_supra_store_enabled</a>(), <a href="transaction_fee.md#0x1_transaction_fee_EFA_GAS_CHARGING_NOT_ENABLED">EFA_GAS_CHARGING_NOT_ENABLED</a>);
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>let</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+        burn_cap,
+    } = <b>move_from</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
+    <b>let</b> burn_ref = <a href="coin.md#0x1_coin_convert_and_take_paired_burn_ref">coin::convert_and_take_paired_burn_ref</a>(burn_cap);
+    <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a> { burn_ref });
 }
 </code></pre>
 
@@ -745,7 +837,7 @@ Only called during genesis.
 
 <tr>
 <td>6</td>
-<td>The presence of the resource, indicating collected fees per block under the Aptos framework account, Registering a block proposer. Processing collected fees.</td>
+<td>The presence of the resource, indicating collected fees per block under the Aptos framework account, is a prerequisite for the successful execution of the following functionalities: Upgrading burn percentage. Registering a block proposer. Processing collected fees.</td>
 <td>Low</td>
 <td>The functions: upgrade_burn_percentage, register_proposer_for_fee_collection, and process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under supra_framework by calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists or not.</td>
 <td>Formally verified via <a href="#high-level-req-6.1">register_proposer_for_fee_collection</a>, <a href="#high-level-req-6.2">process_collected_fees</a>, and <a href="#high-level-req-6.3">upgrade_burn_percentage</a>.</td>
@@ -761,10 +853,10 @@ Only called during genesis.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> aborts_if_is_strict;
 // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a>&gt;(@supra_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework) || <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -992,15 +1084,15 @@ Only called during genesis.
 <code><a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a></code> should be exists.
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a>&gt;(@supra_framework);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
 <b>let</b> account_addr = <a href="account.md#0x1_account">account</a>;
 <b>let</b> amount = fee;
-<b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;SupraCoin&gt;().account_address;
-<b>let</b> coin_store = <b>global</b>&lt;CoinStore&lt;SupraCoin&gt;&gt;(account_addr);
-<b>let</b> <b>post</b> post_coin_store = <b>global</b>&lt;CoinStore&lt;SupraCoin&gt;&gt;(account_addr);
-<b>modifies</b> <b>global</b>&lt;CoinStore&lt;SupraCoin&gt;&gt;(account_addr);
-<b>aborts_if</b> amount != 0 && !(<b>exists</b>&lt;CoinInfo&lt;SupraCoin&gt;&gt;(aptos_addr)
-    && <b>exists</b>&lt;CoinStore&lt;SupraCoin&gt;&gt;(account_addr));
+<b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
+<b>let</b> coin_store = <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);
+<b>let</b> <b>post</b> post_coin_store = <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);
+<b>aborts_if</b> amount != 0 && !(<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr)
+    && <b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr));
 <b>aborts_if</b> coin_store.<a href="coin.md#0x1_coin">coin</a>.value &lt; amount;
 <b>let</b> maybe_supply = <b>global</b>&lt;CoinInfo&lt;SupraCoin&gt;&gt;(aptos_addr).supply;
 <b>let</b> supply_aggr = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(maybe_supply);
@@ -1031,16 +1123,14 @@ Only called during genesis.
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;SupraCoin&gt;().account_address;
-<b>modifies</b> <b>global</b>&lt;CoinInfo&lt;SupraCoin&gt;&gt;(aptos_addr);
-<b>aborts_if</b> (refund != 0) && !<b>exists</b>&lt;CoinInfo&lt;SupraCoin&gt;&gt;(aptos_addr);
-<b>include</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">coin::CoinAddAbortsIf</a>&lt;SupraCoin&gt; { amount: refund };
-<b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;SupraCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
-<b>modifies</b> <b>global</b>&lt;CoinStore&lt;SupraCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraCoinMintCapability">SupraCoinMintCapability</a>&gt;(@supra_framework);
-<b>let</b> supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;SupraCoin&gt;;
-<b>let</b> <b>post</b> post_supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;SupraCoin&gt;;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
+<b>aborts_if</b> (refund != 0) && !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);
+<b>include</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">coin::CoinAddAbortsIf</a>&lt;AptosCoin&gt; { amount: refund };
+<b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework);
+<b>let</b> supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;;
+<b>let</b> <b>post</b> post_supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;;
 <b>aborts_if</b> [abstract] supply + refund &gt; MAX_U128;
 <b>ensures</b> post_supply == supply + refund;
 </code></pre>
@@ -1058,7 +1148,8 @@ Only called during genesis.
 
 
 
-<pre><code><b>let</b> collected_fees = <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@supra_framework).amount;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> collected_fees = <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).amount;
 <b>let</b> aggr = collected_fees.value;
 <b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@supra_framework);
@@ -1091,10 +1182,12 @@ Ensure caller is admin.
 Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a></code> already exists.
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
-<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_supra_framework_address">system_addresses::is_supra_framework_address</a>(addr);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a>&gt;(addr);
-<b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraCoinCapabilities">SupraCoinCapabilities</a>&gt;(addr);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a>&gt;(addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_SupraFABurnCapabilities">SupraFABurnCapabilities</a>&gt;(addr) || <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(addr);
 </code></pre>
 
 

@@ -109,8 +109,8 @@ module resource_account::simple_defi {
     public entry fun test_exchange_to_and_exchange_from(origin_account: signer, resource_account: signer, framework: signer) acquires ModuleData {
         use supra_framework::supra_coin;
 
-        set_up_test(&origin_account, &resource_account);
         let (supra_coin_burn_cap, supra_coin_mint_cap) = supra_coin::initialize_for_test(&framework);
+        set_up_test(&origin_account, &resource_account);
 
         // exchange from 5 aptos coins to 5 chloe's coins & assert the results are expected
         let five_a_coins = coin::mint(5, &supra_coin_mint_cap);

@@ -22,7 +22,9 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    module_traversal::{TraversalContext, TraversalStorage},
+    move_vm::MoveVM,
+    native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
 };
 use move_vm_test_utils::{
@@ -101,7 +103,7 @@ fn print_resources_and_extensions(
 ) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
-    let annotator = MoveValueAnnotator::new(storage);
+    let annotator = MoveValueAnnotator::new(storage.clone());
     for (account_addr, account_state) in cs.accounts() {
         writeln!(&mut buf, "0x{}:", account_addr.short_str_lossless())?;
 
@@ -130,6 +132,7 @@ impl TestRunner {
         // TODO: maybe we should require the clients to always pass in a list of native functions so
         // we don't have to make assumptions about their gas parameters.
         native_function_table: Option<NativeFunctionTable>,
+        genesis_state: Option<ChangeSet>,
         cost_table: Option<CostTable>,
         record_writeset: bool,
         #[cfg(feature = "evm-backend")] evm: bool,
@@ -140,7 +143,10 @@ impl TestRunner {
             .map(|(filepath, _)| filepath.to_string())
             .collect();
         let modules = tests.module_info.values().map(|info| &info.module);
-        let starting_storage_state = setup_test_storage(modules)?;
+        let mut starting_storage_state = setup_test_storage(modules)?;
+        if let Some(genesis_state) = genesis_state {
+            starting_storage_state.apply(genesis_state)?;
+        }
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -248,6 +254,7 @@ impl<'a, 'b, W: Write> TestOutput<'a, 'b, W> {
 }
 
 impl SharedTestingConfig {
+    #[allow(clippy::field_reassign_with_default)]
     fn execute_via_move_vm(
         &self,
         test_plan: &ModuleTestPlan,
@@ -259,7 +266,7 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
-        let move_vm = MoveVM::new(self.native_function_table.clone()).unwrap();
+        let move_vm = MoveVM::new(self.native_function_table.clone());
         let extensions = extensions::new_extensions();
         let mut session =
             move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
@@ -267,12 +274,14 @@ impl SharedTestingConfig {
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
+        let storage = TraversalStorage::new();
         let serialized_return_values_result = session.execute_function_bypass_visibility(
             &test_plan.module_id,
             IdentStr::new(function_name).unwrap(),
             vec![], // no ty args, at least for now
             serialize_values(test_info.arguments.iter()),
             &mut gas_meter,
+            &mut TraversalContext::new(&storage),
         );
         let mut return_result = serialized_return_values_result.map(|res| {
             res.return_values
@@ -338,8 +347,12 @@ impl SharedTestingConfig {
             };
             match exec_result {
                 Err(err) => {
-                    let actual_err =
-                        MoveError(err.major_status(), err.sub_status(), err.location().clone());
+                    let actual_err = MoveError(
+                        err.major_status(),
+                        err.sub_status(),
+                        err.location().clone(),
+                        err.message().cloned(),
+                    );
                     assert!(err.major_status() != StatusCode::EXECUTED);
                     match test_info.expected_failure.as_ref() {
                         Some(ExpectedFailure::Expected) => {

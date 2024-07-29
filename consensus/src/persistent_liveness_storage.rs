@@ -7,6 +7,7 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+    vote_data::VoteData, wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -15,7 +16,7 @@ use aptos_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
-use std::{cmp::max, collections::HashSet, sync::Arc};
+use std::{cmp::max, collections::HashSet, fmt::Debug, sync::Arc};
 
 /// PersistentLivenessStorage is essential for maintaining liveness when a node crashes.  Specifically,
 /// upon a restart, a correct node will recover.  Even if all nodes crash, liveness is
@@ -36,7 +37,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn recover_from_ledger(&self) -> LedgerRecoveryData;
 
     /// Construct necessary data to start consensus.
-    fn start(&self) -> LivenessStorageData;
+    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData;
 
     /// Persist the highest 2chain timeout certificate for improved liveness - proof for other replicas
     /// to jump to this round
@@ -60,9 +61,19 @@ pub trait PersistentLivenessStorage: Send + Sync {
 pub struct RootInfo(
     pub Box<Block>,
     pub QuorumCert,
-    pub QuorumCert,
-    pub QuorumCert,
+    pub WrappedLedgerInfo,
+    pub WrappedLedgerInfo,
 );
+
+impl Debug for RootInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "RootInfo: [block: {}, quorum_cert: {}, ordered_cert: {}, commit_cert: {}]",
+            self.0, self.1, self.2, self.3
+        )
+    }
+}
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
 #[derive(Clone)]
@@ -87,6 +98,7 @@ impl LedgerRecoveryData {
         &self,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
+        order_vote_enabled: bool,
     ) -> Result<RootInfo> {
         info!(
             "The last committed block id as recorded in storage: {}",
@@ -127,17 +139,27 @@ impl LedgerRecoveryData {
             .find(|qc| qc.certified_block().id() == root_block.id())
             .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
             .clone();
-        let root_ordered_cert = quorum_certs
-            .iter()
-            .find(|qc| qc.commit_info().id() == root_block.id())
-            .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
-            .clone();
 
+        let (root_ordered_cert, root_commit_cert) = if order_vote_enabled {
+            // We are setting ordered_root same as commit_root. As every committed block is also ordered, this is fine.
+            // As the block store inserts all the fetched blocks and quorum certs and execute the blocks, the block store
+            // updates highest_ordered_cert accordingly.
+            let root_ordered_cert =
+                WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig.clone());
+            (root_ordered_cert.clone(), root_ordered_cert)
+        } else {
+            let root_ordered_cert = quorum_certs
+                .iter()
+                .find(|qc| qc.commit_info().id() == root_block.id())
+                .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
+                .clone()
+                .into_wrapped_ledger_info();
+            let root_commit_cert = root_ordered_cert
+                .create_merged_with_executed_state(latest_ledger_info_sig)
+                .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+            (root_ordered_cert, root_commit_cert)
+        };
         info!("Consensus root block is {}", root_block);
-
-        let root_commit_cert = root_ordered_cert
-            .create_merged_with_executed_state(latest_ledger_info_sig)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
 
         Ok(RootInfo(
             Box::new(root_block),
@@ -204,9 +226,10 @@ impl RecoveryData {
         root_metadata: RootMetadata,
         mut quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
+        order_vote_enabled: bool,
     ) -> Result<Self> {
         let root = ledger_recovery_data
-            .find_root(&mut blocks, &mut quorum_certs)
+            .find_root(&mut blocks, &mut quorum_certs, order_vote_enabled)
             .with_context(|| {
                 // for better readability
                 blocks.sort_by_key(|block| block.round());
@@ -348,7 +371,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         LedgerRecoveryData::new(latest_ledger_info)
     }
 
-    fn start(&self) -> LivenessStorageData {
+    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData {
         info!("Start consensus recovery.");
         let raw_data = self
             .db
@@ -377,7 +400,6 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             "The following quorum certs were restored from ConsensusDB: {}",
             qc_repr.concat()
         );
-
         // find the block corresponding to storage latest ledger info
         let latest_ledger_info = self
             .aptos_db
@@ -396,6 +418,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             accumulator_summary.into(),
             quorum_certs,
             highest_2chain_timeout_cert,
+            order_vote_enabled,
         ) {
             Ok(mut initial_data) => {
                 (self as &dyn PersistentLivenessStorage)

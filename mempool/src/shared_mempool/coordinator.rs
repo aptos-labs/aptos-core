@@ -18,7 +18,6 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_consensus_types::common::TransactionSummary;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -219,17 +218,7 @@ fn handle_commit_notification<TransactionValidator>(
         counters::COMMIT_STATE_SYNC_LABEL,
         msg.transactions.len(),
     );
-    process_committed_transactions(
-        mempool,
-        msg.transactions
-            .iter()
-            .map(|txn| TransactionSummary {
-                sender: txn.sender,
-                sequence_number: txn.sequence_number,
-            })
-            .collect(),
-        msg.block_timestamp_usecs,
-    );
+    process_committed_transactions(mempool, msg.transactions, msg.block_timestamp_usecs);
     mempool_validator.write().notify_commit();
     let latency = start_time.elapsed();
     counters::mempool_service_latency(
@@ -265,9 +254,7 @@ async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator, Conf
         .await;
 }
 
-/// Handles all NewPeer, LostPeer, and network messages.
-/// - NewPeer events start new automatic broadcasts if the peer is upstream. If the peer is not upstream, we ignore it.
-/// - LostPeer events disable the upstream peer, which will cancel ongoing broadcasts.
+/// Handles all network messages.
 /// - Network messages follow a simple Request/Response framework to accept new transactions
 /// TODO: Move to RPC off of DirectSend
 async fn handle_network_event<NetworkClient, TransactionValidator>(
@@ -280,12 +267,6 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
     TransactionValidator: TransactionValidation + 'static,
 {
     match event {
-        Event::NewPeer(_) => {
-            // TODO: remove Event
-        },
-        Event::LostPeer(_) => {
-            // TODO: remove Event
-        },
         Event::Message(peer_id, msg) => {
             counters::shared_mempool_event_inc("message");
             match msg {

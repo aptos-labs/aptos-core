@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: unable to infer type: `M::S<?1>`
+error: unable to infer instantiation of type `S<_>` (consider providing type arguments or annotating the type)
   ┌─ tests/checking/typing/uninferred_type_unpack_decl.move:5:13
   │
 5 │         let S{};

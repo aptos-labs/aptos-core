@@ -158,6 +158,7 @@ fn run_benchmark(
             paths: modules.to_vec(),
             named_address_map: addrs.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: options.move_deps.clone(),

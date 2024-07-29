@@ -659,7 +659,7 @@ module supra_framework::genesis {
             rewards_rate_denominator,
             voting_power_increase_limit
         );
-        features::change_feature_flags(supra_framework, vector[1, 2, 11], vector[]);
+        features::change_feature_flags_for_next_epoch(supra_framework, vector[1, 2, 11], vector[]);
         initialize_supra_coin(supra_framework);
         supra_governance::initialize_for_verification(
             supra_framework,
@@ -758,7 +758,7 @@ module supra_framework::genesis {
     fun test_create_delegation_pool(supra_framework: &signer) {
 		use std::features;
         setup();
-		features::change_feature_flags(supra_framework,vector[11],vector[]);
+		features::change_feature_flags_for_testing(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
         let owner = @0x121341;
         create_account(supra_framework, owner, 0);
@@ -804,7 +804,7 @@ module supra_framework::genesis {
     fun test_create_delegation_pools(supra_framework: &signer) {
 		use std::features;
         setup();
-		features::change_feature_flags(supra_framework,vector[11],vector[]);
+		features::change_feature_flags_for_testing(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
         let owner1 = @0x121341;
         create_account(supra_framework, owner1, 0);
@@ -884,7 +884,7 @@ module supra_framework::genesis {
 		use std::features;
         setup();
 		
-		features::change_feature_flags(supra_framework,vector[11],vector[]);
+		features::change_feature_flags_for_testing(supra_framework,vector[11],vector[]);
 
         initialize_supra_coin(supra_framework);
         let owner = @0x121341;
@@ -935,7 +935,7 @@ module supra_framework::genesis {
     fun test_create_pbo_delegation_pools(supra_framework: &signer) {
 		use std::features;
         setup();
-		features::change_feature_flags(supra_framework,vector[11],vector[]);
+		features::change_feature_flags_for_testing(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
         let owner1 = @0x121341;
 		create_account(supra_framework,@0x121341,0);

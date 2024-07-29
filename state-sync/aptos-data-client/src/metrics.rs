@@ -121,6 +121,16 @@ pub static HIGHEST_ADVERTISED_DATA: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking the ignored peers (by network)
+pub static IGNORED_PEERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_ignored_peers",
+        "Gauge related to the number of ignored peers",
+        &["network"]
+    )
+    .unwrap()
+});
+
 /// Gauge for the lowest advertised data
 pub static LOWEST_ADVERTISED_DATA: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(

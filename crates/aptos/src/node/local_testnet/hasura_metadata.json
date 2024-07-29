@@ -1,5 +1,5 @@
 {
-  "resource_version": 296,
+  "resource_version": 319,
   "metadata": {
     "version": 3,
     "sources": [
@@ -9,9 +9,52 @@
         "tables": [
           {
             "table": {
+              "name": "parsed_asset_uris",
+              "schema": "nft_metadata_crawler"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "animation_optimizer_retry_count",
+                    "asset_uri",
+                    "cdn_animation_uri",
+                    "cdn_image_uri",
+                    "cdn_json_uri",
+                    "image_optimizer_retry_count",
+                    "json_parser_retry_count",
+                    "raw_animation_uri",
+                    "raw_image_uri"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "account_transactions",
               "schema": "public"
             },
+            "object_relationships": [
+              {
+                "name": "user_transaction",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "user_transactions",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
             "array_relationships": [
               {
                 "name": "coin_activities",
@@ -93,10 +136,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "account_address",
-                    "transaction_version"
-                  ],
+                  "columns": ["account_address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -212,10 +252,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "account_address",
-                    "transaction_version"
-                  ],
+                  "columns": ["account_address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -294,10 +331,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "address",
-                    "transaction_version"
-                  ],
+                  "columns": ["address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -596,17 +630,19 @@
                 "role": "anonymous",
                 "permission": {
                   "columns": [
-                    "last_transaction_version",
+                    "domain",
+                    "domain_expiration_timestamp",
+                    "domain_with_suffix",
+                    "expiration_timestamp",
                     "is_active",
                     "is_primary",
-                    "domain",
+                    "last_transaction_version",
                     "owner_address",
                     "registered_address",
                     "subdomain",
+                    "subdomain_expiration_policy",
                     "token_name",
-                    "token_standard",
-                    "domain_with_suffix",
-                    "expiration_timestamp"
+                    "token_standard"
                   ],
                   "filter": {},
                   "limit": 100,
@@ -734,7 +770,23 @@
               "name": "current_collections_v2",
               "schema": "public"
             },
-            "object_relationships": [],
+            "object_relationships": [
+              {
+                "name": "cdn_asset_uris",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "uri": "asset_uri"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "parsed_asset_uris",
+                      "schema": "nft_metadata_crawler"
+                    }
+                  }
+                }
+              }
+            ],
             "select_permissions": [
               {
                 "role": "anonymous",
@@ -1073,6 +1125,21 @@
                 }
               },
               {
+                "name": "cdn_asset_uris",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_uri": "asset_uri"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "parsed_asset_uris",
+                      "schema": "nft_metadata_crawler"
+                    }
+                  }
+                }
+              },
+              {
                 "name": "current_collection",
                 "using": {
                   "manual_configuration": {
@@ -1086,9 +1153,11 @@
                     }
                   }
                 }
-              },
+              }
+            ],
+            "array_relationships": [
               {
-                "name": "current_token_ownership",
+                "name": "current_token_ownerships",
                 "using": {
                   "manual_configuration": {
                     "column_mapping": {
@@ -1109,7 +1178,9 @@
                 "permission": {
                   "columns": [
                     "collection_id",
+                    "decimals",
                     "description",
+                    "is_deleted_v2",
                     "is_fungible_v2",
                     "largest_property_version_v1",
                     "last_transaction_timestamp",
@@ -1254,6 +1325,7 @@
                     "is_soulbound_v2",
                     "last_transaction_timestamp",
                     "last_transaction_version",
+                    "non_transferrable_by_owner",
                     "owner_address",
                     "property_version_v1",
                     "storage_id",
@@ -1404,6 +1476,32 @@
           },
           {
             "table": {
+              "name": "delegated_staking_pool_balances",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "active_table_handle",
+                    "inactive_table_handle",
+                    "operator_commission_percentage",
+                    "staking_pool_address",
+                    "total_coins",
+                    "total_shares",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "delegated_staking_pools",
               "schema": "public"
             },
@@ -1479,10 +1577,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "delegator_address",
-                    "pool_address"
-                  ],
+                  "columns": ["delegator_address", "pool_address"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1599,10 +1694,12 @@
                     "icon_uri",
                     "last_transaction_timestamp",
                     "last_transaction_version",
+                    "maximum_v2",
                     "name",
                     "project_uri",
                     "supply_aggregator_table_handle_v1",
                     "supply_aggregator_table_key_v1",
+                    "supply_v2",
                     "symbol",
                     "token_standard"
                   ],
@@ -1621,10 +1718,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "db",
-                    "is_indexer_up"
-                  ],
+                  "columns": ["db", "is_indexer_up"],
                   "filter": {},
                   "limit": 100
                 }
@@ -1640,9 +1734,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "chain_id"
-                  ],
+                  "columns": ["chain_id"],
                   "filter": {}
                 }
               }
@@ -1657,10 +1749,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "address",
-                    "transaction_version"
-                  ],
+                  "columns": ["address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1677,10 +1766,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "num_active_delegator",
-                    "pool_address"
-                  ],
+                  "columns": ["num_active_delegator", "pool_address"],
                   "filter": {},
                   "limit": 100
                 }
@@ -1698,6 +1784,7 @@
                 "permission": {
                   "columns": [
                     "last_success_version",
+                    "last_transaction_timestamp",
                     "last_updated",
                     "processor"
                   ],
@@ -1734,6 +1821,35 @@
           },
           {
             "table": {
+              "name": "signatures",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "is_sender_primary",
+                    "multi_agent_index",
+                    "multi_sig_index",
+                    "public_key",
+                    "public_key_indices",
+                    "signature",
+                    "signer",
+                    "threshold",
+                    "transaction_block_height",
+                    "transaction_version",
+                    "type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "table_items",
               "schema": "public"
             },
@@ -1764,11 +1880,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "handle",
-                    "key_type",
-                    "value_type"
-                  ],
+                  "columns": ["handle", "key_type", "value_type"],
                   "filter": {},
                   "limit": 100
                 }
@@ -2070,13 +2182,6 @@
               "from_env": "INDEXER_V2_POSTGRES_URL"
             },
             "isolation_level": "read-committed",
-            "pool_settings": {
-              "connection_lifetime": 600,
-              "idle_timeout": 180,
-              "max_connections": 100,
-              "total_max_connections": 1500,
-              "pool_timeout": 120
-            },
             "use_prepared_statements": false
           }
         }
@@ -2089,7 +2194,7 @@
           "queries": [
             {
               "name": "Latest Processor Status",
-              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n  }\n}"
+              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n    last_transaction_timestamp\n  }\n}"
             }
           ]
         }
@@ -2112,11 +2217,9 @@
             "query_name": "Latest Processor Status"
           }
         },
-        "methods": [
-          "GET"
-        ],
+        "methods": ["GET"],
         "name": "Latest Processor Status",
-        "url": "get_lastest_processor_status"
+        "url": "get_latest_processor_status"
       }
     ],
     "api_limits": {

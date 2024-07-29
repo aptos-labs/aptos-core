@@ -1,36 +1,36 @@
 
 Diagnostics:
-error: expected `()` but found `integer`
+error: expected expression with no value but found `integer`
   ┌─ tests/checking/typing/while_body_invalid.move:3:22
   │
 3 │         while (cond) 0;
   │                      ^
 
-error: expected `()` but found `bool`
+error: expected expression with no value but found `bool`
   ┌─ tests/checking/typing/while_body_invalid.move:4:22
   │
 4 │         while (cond) false;
   │                      ^^^^^
 
-error: expected `()` but found `address`
+error: expected expression with no value but found `address`
   ┌─ tests/checking/typing/while_body_invalid.move:5:24
   │
 5 │         while (cond) { @0x0 };
   │                        ^^^^
 
-error: expected `()` but found `integer`
-  ┌─ tests/checking/typing/while_body_invalid.move:6:35
+error: tuple type `()` is not allowed
+  ┌─ tests/checking/typing/while_body_invalid.move:6:28
   │
 6 │         while (cond) { let x = 0; x };
-  │                                   ^
+  │                            ^
 
-error: expected `()` but found `integer`
+error: expected expression with no value but found `integer`
   ┌─ tests/checking/typing/while_body_invalid.move:7:34
   │
 7 │         while (cond) { if (cond) 1 else 0 };
   │                                  ^
 
-error: expected `()` but found `integer`
+error: expected expression with no value but found `integer`
   ┌─ tests/checking/typing/while_body_invalid.move:7:41
   │
 7 │         while (cond) { if (cond) 1 else 0 };

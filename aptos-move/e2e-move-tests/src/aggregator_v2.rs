@@ -129,7 +129,7 @@ impl ElementType {
                 address: AccountAddress::ONE,
                 module: ident_str!("string").to_owned(),
                 name: ident_str!("String").to_owned(),
-                type_params: vec![],
+                type_args: vec![],
             })),
         }
     }
@@ -187,7 +187,7 @@ impl AggV2TestHarness {
         &mut self,
         block_split: BlockSplit,
         txn_block: Vec<(u64, SignedTransaction)>,
-    ) {
+    ) -> Vec<TransactionOutput> {
         let result = self
             .harness
             .run_block_in_parts_and_check(block_split, txn_block.clone());
@@ -196,6 +196,19 @@ impl AggV2TestHarness {
             let new_result = h.run_block_in_parts_and_check(block_split, txn_block.clone());
             assert_outputs_equal(&result, "baseline", &new_result, name);
         }
+
+        result
+    }
+
+    pub fn run_block(&mut self, txn_block: Vec<SignedTransaction>) -> Vec<TransactionOutput> {
+        let result = self.harness.run_block_get_output(txn_block.clone());
+
+        for (h, name) in self.comparison_harnesses.iter_mut() {
+            let new_result = h.run_block_get_output(txn_block.clone());
+            assert_outputs_equal(&result, "baseline", &new_result, name);
+        }
+
+        result
     }
 
     pub fn run_block(&mut self, txn_block: Vec<SignedTransaction>) -> Vec<TransactionOutput> {
@@ -247,6 +260,30 @@ impl AggV2TestHarness {
             .unwrap(),
             vec![element_type.get_type_tag()],
             vec![bcs::to_bytes(&(use_type as u32)).unwrap()],
+        )
+    }
+
+    pub fn delete(
+        &mut self,
+        account: Option<&Account>,
+        use_type: UseType,
+        element_type: ElementType,
+        struct_type: StructType,
+    ) -> SignedTransaction {
+        self.txn_index += 1;
+        self.harness.create_entry_function(
+            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
+            str::parse(match struct_type {
+                StructType::Aggregator => "0x1::aggregator_v2_test::delete_aggregator",
+                StructType::Snapshot => "0x1::aggregator_v2_test::delete_snapshot",
+                StructType::DerivedString => "0x1::aggregator_v2_test::delete_derived_string",
+            })
+            .unwrap(),
+            vec![element_type.get_type_tag()],
+            vec![
+                bcs::to_bytes(&account.unwrap_or(&self.account).address()).unwrap(),
+                bcs::to_bytes(&(use_type as u32)).unwrap(),
+            ],
         )
     }
 
@@ -343,6 +380,25 @@ impl AggV2TestHarness {
 
     pub fn add_sub(&mut self, agg_loc: &AggregatorLocation, a: u128, b: u128) -> SignedTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_sub", agg_loc, &[a, b])
+    }
+
+    pub fn add_if_at_least(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        min_value: u128,
+        delta: u128,
+    ) -> SignedTransaction {
+        self.create_entry_agg_func_with_args(
+            "0x1::aggregator_v2_test::add_if_at_least",
+            agg_loc,
+            &[min_value, delta],
+        )
+    }
+
+    pub fn add_delete(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {
+        self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_delete", agg_loc, &[
+            value,
+        ])
     }
 
     pub fn materialize(&mut self, agg_loc: &AggregatorLocation) -> SignedTransaction {

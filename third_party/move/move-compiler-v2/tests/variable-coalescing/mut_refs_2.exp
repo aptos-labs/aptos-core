@@ -1,0 +1,173 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test($t0: m::S): u64 {
+     var $t1: u64
+     var $t2: m::S
+     var $t3: m::S
+     var $t4: &mut u64
+     var $t5: &mut m::S
+     var $t6: u64
+     var $t7: &m::S
+     var $t8: &u64
+  0: $t2 := infer($t0)
+  1: $t3 := infer($t2)
+  2: $t5 := borrow_local($t2)
+  3: $t4 := borrow_field<m::S>.a($t5)
+  4: $t6 := 0
+  5: write_ref($t4, $t6)
+  6: $t7 := borrow_local($t3)
+  7: $t8 := borrow_field<m::S>.a($t7)
+  8: $t1 := read_ref($t8)
+  9: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: m::S): u64 {
+     var $t1: u64
+     var $t2: m::S
+     var $t3: m::S
+     var $t4: &mut u64
+     var $t5: &mut m::S
+     var $t6: u64
+     var $t7: &m::S
+     var $t8: &u64
+  0: $t2 := move($t0)
+  1: $t3 := copy($t2)
+  2: $t5 := borrow_local($t2)
+  3: $t4 := borrow_field<m::S>.a($t5)
+  4: $t6 := 0
+  5: write_ref($t4, $t6)
+  6: $t7 := borrow_local($t3)
+  7: $t8 := borrow_field<m::S>.a($t7)
+  8: $t1 := read_ref($t8)
+  9: return $t1
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test($t0: m::S): u64 {
+     var $t1: u64
+     var $t2: m::S
+     var $t3: m::S
+     var $t4: &mut u64
+     var $t5: &mut m::S
+     var $t6: u64
+     var $t7: &m::S
+     var $t8: &u64
+     # live vars: $t0
+     # events: b:$t0, e:$t0
+  0: $t2 := move($t0)
+     # live vars: $t2
+  1: $t3 := copy($t2)
+     # live vars: $t2, $t3
+     # events: b:$t5
+  2: $t5 := borrow_local($t2)
+     # live vars: $t3, $t5
+     # events: e:$t5, b:$t4
+  3: $t4 := borrow_field<m::S>.a($t5)
+     # live vars: $t3, $t4
+     # events: b:$t6
+  4: $t6 := 0
+     # live vars: $t3, $t4, $t6
+     # events: e:$t4, e:$t6
+  5: write_ref($t4, $t6)
+     # live vars: $t3
+     # events: b:$t7
+  6: $t7 := borrow_local($t3)
+     # live vars: $t7
+     # events: e:$t7, b:$t8
+  7: $t8 := borrow_field<m::S>.a($t7)
+     # live vars: $t8
+     # events: e:$t8, b:$t1
+  8: $t1 := read_ref($t8)
+     # live vars: $t1
+     # events: e:$t1
+  9: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test($t0: m::S): u64 {
+     var $t1: u64 [unused]
+     var $t2: m::S
+     var $t3: m::S
+     var $t4: &mut u64
+     var $t5: &mut m::S
+     var $t6: u64
+     var $t7: &m::S
+     var $t8: &u64
+  0: $t2 := move($t0)
+  1: $t3 := copy($t2)
+  2: $t5 := borrow_local($t2)
+  3: $t4 := borrow_field<m::S>.a($t5)
+  4: $t6 := 0
+  5: write_ref($t4, $t6)
+  6: $t7 := borrow_local($t3)
+  7: $t8 := borrow_field<m::S>.a($t7)
+  8: $t6 := read_ref($t8)
+  9: return $t6
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: m::S): u64 {
+     var $t1: u64 [unused]
+     var $t2: m::S
+     var $t3: m::S
+     var $t4: &mut u64
+     var $t5: &mut m::S
+     var $t6: u64
+     var $t7: &m::S
+     var $t8: &u64
+  0: $t2 := move($t0)
+  1: $t3 := copy($t2)
+  2: $t5 := borrow_local($t2)
+  3: $t4 := borrow_field<m::S>.a($t5)
+  4: $t6 := 0
+  5: write_ref($t4, $t6)
+  6: $t7 := borrow_local($t3)
+  7: $t8 := borrow_field<m::S>.a($t7)
+  8: $t6 := read_ref($t8)
+  9: return $t6
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+struct S has copy, drop {
+	a: u64,
+	b: u64
+}
+
+test(Arg0: S): u64 /* def_idx: 0 */ {
+L1:	loc0: S
+L2:	loc1: S
+L3:	loc2: u64
+L4:	loc3: &mut u64
+B0:
+	0: MoveLoc[0](Arg0: S)
+	1: StLoc[1](loc0: S)
+	2: CopyLoc[1](loc0: S)
+	3: StLoc[2](loc1: S)
+	4: MutBorrowLoc[1](loc0: S)
+	5: MutBorrowField[0](S.a: u64)
+	6: LdU64(0)
+	7: StLoc[3](loc2: u64)
+	8: StLoc[4](loc3: &mut u64)
+	9: MoveLoc[3](loc2: u64)
+	10: MoveLoc[4](loc3: &mut u64)
+	11: WriteRef
+	12: ImmBorrowLoc[2](loc1: S)
+	13: ImmBorrowField[0](S.a: u64)
+	14: ReadRef
+	15: Ret
+}
+}
+============ bytecode verification succeeded ========

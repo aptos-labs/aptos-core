@@ -173,7 +173,7 @@ where
                         if stage_executed > 0 {
                             info!("Execution finished stage {}", stage_index);
                             stage_overall_measuring.print_end(
-                                &format!("Staged execution: stage {}: ", stage_index),
+                                &format!("Staged execution: stage {}:", stage_index),
                                 stage_executed,
                             );
                         }
@@ -186,7 +186,7 @@ where
                 if stage_index > 0 && stage_executed > 0 {
                     info!("Execution finished stage {}", stage_index);
                     stage_overall_measuring.print_end(
-                        &format!("Staged execution: stage {}: ", stage_index),
+                        &format!("Staged execution: stage {}:", stage_index),
                         stage_executed,
                     );
                 }

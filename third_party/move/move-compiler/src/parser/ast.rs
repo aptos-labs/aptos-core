@@ -9,7 +9,7 @@ use crate::shared::{
 use move_command_line_common::files::FileHash;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
-use std::{fmt, hash::Hash};
+use std::{fmt, fmt::Formatter, hash::Hash};
 
 macro_rules! new_name {
     ($n:ident) => {
@@ -199,6 +199,7 @@ pub struct FriendDecl {
 
 new_name!(Field);
 new_name!(StructName);
+new_name!(VariantName);
 
 pub type ResourceLoc = Option<Loc>;
 
@@ -216,13 +217,22 @@ pub struct StructDefinition {
     pub abilities: Vec<Ability>,
     pub name: StructName,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub fields: StructFields,
+    pub layout: StructLayout,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum StructFields {
-    Defined(Vec<(Field, Type)>),
+pub enum StructLayout {
+    Singleton(Vec<(Field, Type)>),
+    Variants(Vec<StructVariant>),
     Native(Loc),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StructVariant {
+    pub attributes: Vec<Attributes>,
+    pub loc: Loc,
+    pub name: VariantName,
+    pub fields: Vec<(Field, Type)>,
 }
 
 //**************************************************************************************************
@@ -249,7 +259,7 @@ pub type AccessSpecifier = Spanned<AccessSpecifier_>;
 /// An address specifier specifies the address at which a resource is accessed.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressSpecifier_ {
-    /// Represents that now address was specicied, as in `Resource`
+    /// Represents that no address was specified, as in `Resource`
     Empty,
     /// Represents that the specified address is a wildcard, as in `Resource(*)`.
     Any,
@@ -452,6 +462,8 @@ pub enum NameAccessChain_ {
     Two(LeadingNameAccess, Name),
     // (<Name>|<Num>)::<Name>::<Name>
     Three(Spanned<(LeadingNameAccess, Name)>, Name),
+    // (<Name>|<Num>)::<Name>::<Name>::<Name>
+    Four(Spanned<(LeadingNameAccess, Name)>, Name, Name),
 }
 pub type NameAccessChain = Spanned<NameAccessChain_>;
 
@@ -586,6 +598,16 @@ pub enum QuantKind_ {
 }
 pub type QuantKind = Spanned<QuantKind_>;
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum CallKind {
+    /// Regular function call.
+    Regular,
+    /// Macro style call (e.g. `assert!(c, x)`)
+    Macro,
+    /// Receiver style call (e.g. `x.f(y)`)
+    Receiver,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum Exp_ {
@@ -599,7 +621,13 @@ pub enum Exp_ {
 
     // f(earg,*)
     // f!(earg,*)
-    Call(NameAccessChain, bool, Option<Vec<Type>>, Spanned<Vec<Exp>>),
+    // earg.f(*)
+    Call(
+        NameAccessChain,
+        CallKind,
+        Option<Vec<Type>>,
+        Spanned<Vec<Exp>>,
+    ),
 
     // tn {f1: e1, ... , f_n: e_n }
     Pack(NameAccessChain, Option<Vec<Type>>, Vec<(Field, Exp)>),
@@ -618,6 +646,8 @@ pub enum Exp_ {
     While(Box<Exp>, Box<Exp>),
     // loop eloop
     Loop(Box<Exp>),
+    // match (e) { b1 [ if c_1] => e1, ... }
+    Match(Box<Exp>, Vec<Spanned<(BindList, Option<Exp>, Exp)>>),
 
     // { seq }
     Block(Sequence),
@@ -700,6 +730,16 @@ pub enum SequenceItem_ {
     Bind(BindList, Option<Type>, Box<Exp>),
 }
 pub type SequenceItem = Spanned<SequenceItem_>;
+
+pub type MatchArm = Spanned<MatchArm_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchArm_ {
+    bind: Bind,
+    variant_name: NameAccessChain,
+    type_args: Option<Vec<Type>>,
+    bindings: Vec<(Field, Bind)>,
+}
 
 //**************************************************************************************************
 // Traits
@@ -951,6 +991,9 @@ impl fmt::Display for NameAccessChain_ {
             NameAccessChain_::One(n) => write!(f, "{}", n),
             NameAccessChain_::Two(ln, n2) => write!(f, "{}::{}", ln, n2),
             NameAccessChain_::Three(sp!(_, (ln, n2)), n3) => write!(f, "{}::{}::{}", ln, n2, n3),
+            NameAccessChain_::Four(sp!(_, (ln, n2)), n3, n4) => {
+                write!(f, "{}::{}::{}::{}", ln, n2, n3, n4)
+            },
         }
     }
 }
@@ -989,6 +1032,15 @@ impl fmt::Display for Ability_ {
     }
 }
 
+impl fmt::Display for CallKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            CallKind::Regular => "",
+            CallKind::Macro => "!",
+            CallKind::Receiver => ".",
+        })
+    }
+}
 //**************************************************************************************************
 // Debug
 //**************************************************************************************************
@@ -1240,7 +1292,7 @@ impl AstDebug for StructDefinition {
             abilities,
             name,
             type_parameters,
-            fields,
+            layout,
         } = self;
         attributes.ast_debug(w);
 
@@ -1249,19 +1301,21 @@ impl AstDebug for StructDefinition {
             false
         });
 
-        if let StructFields::Native(_) = fields {
+        if let StructLayout::Native(_) = layout {
             w.write("native ");
         }
 
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
-        if let StructFields::Defined(fields) = fields {
-            w.block(|w| {
+        match layout {
+            StructLayout::Singleton(fields) => w.block(|w| {
                 w.semicolon(fields, |w, (f, st)| {
                     w.write(&format!("{}: ", f));
                     st.ast_debug(w);
                 });
-            })
+            }),
+            StructLayout::Variants(_) => w.writeln("variant printing NYI"),
+            StructLayout::Native(_) => {},
         }
     }
 }
@@ -1723,11 +1777,9 @@ impl AstDebug for Exp_ {
                     w.write(">");
                 }
             },
-            E::Call(ma, is_macro, tys_opt, sp!(_, rhs)) => {
+            E::Call(ma, kind, tys_opt, sp!(_, rhs)) => {
                 ma.ast_debug(w);
-                if *is_macro {
-                    w.write("!");
-                }
+                w.write(kind.to_string());
                 if let Some(ss) = tys_opt {
                     w.write("<");
                     ss.ast_debug(w);
@@ -1770,6 +1822,20 @@ impl AstDebug for Exp_ {
                 if let Some(f) = f_opt {
                     w.write(" else ");
                     f.ast_debug(w);
+                }
+            },
+            E::Match(e, arms) => {
+                w.write("match (");
+                e.ast_debug(w);
+                w.write(") {");
+                for arm in arms {
+                    arm.value.0.ast_debug(w);
+                    if let Some(cond) = &arm.value.1 {
+                        w.write(" if ");
+                        cond.ast_debug(w);
+                    }
+                    w.write(" => ");
+                    arm.value.2.ast_debug(w)
                 }
             },
             E::While(b, e) => {

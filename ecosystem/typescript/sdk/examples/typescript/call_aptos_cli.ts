@@ -15,7 +15,7 @@ const args_aptos_info = ["aptos", "info"];
   const run_local_testnet = lib.run_aptos_async(args_run_local_testnet.join(" "));
   try {
     console.log(`Aptos Info: ${aptos_info.readCString()}`);
-    console.log(`Run Local Testnet: ${run_local_testnet.readCString()}`);
+    console.log(`Run Localnet: ${run_local_testnet.readCString()}`);
   } catch (error) {
     console.error(error);
   } finally {

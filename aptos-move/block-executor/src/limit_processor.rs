@@ -4,8 +4,9 @@
 use crate::{counters, types::ReadWriteSummary};
 use aptos_logger::info;
 use aptos_types::{
-    fee_statement::FeeStatement, on_chain_config::BlockGasLimitType,
-    transaction::BlockExecutableTransaction as Transaction,
+    fee_statement::FeeStatement,
+    on_chain_config::BlockGasLimitType,
+    transaction::{block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction},
 };
 use claims::{assert_le, assert_none};
 
@@ -16,7 +17,6 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
     accumulated_fee_statement: FeeStatement,
     txn_fee_statements: Vec<FeeStatement>,
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
-    block_limit_reached: bool,
     module_rw_conflict: bool,
 }
 
@@ -29,7 +29,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             accumulated_fee_statement: FeeStatement::zero(),
             txn_fee_statements: Vec::with_capacity(init_size),
             txn_read_write_summaries: Vec::with_capacity(init_size),
-            block_limit_reached: false,
             module_rw_conflict: false,
         }
     }
@@ -130,8 +129,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_block_gas {} >= PER_BLOCK_GAS_LIMIT {}",
                     mode, accumulated_block_gas, per_block_gas_limit,
                 );
-                self.block_limit_reached = true;
-
                 return true;
             }
         }
@@ -147,8 +144,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_output {} >= PER_BLOCK_OUTPUT_LIMIT {}",
                     mode, accumulated_output, per_block_output_limit,
                 );
-                self.block_limit_reached = true;
-
                 return true;
             }
         }
@@ -248,9 +243,25 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         self.finish_update_counters_and_log_info(false, num_committed, num_total)
     }
 
-    #[allow(unused)]
-    pub(crate) fn is_block_limit_reached(&self) -> bool {
-        self.block_limit_reached
+    pub(crate) fn get_block_end_info(&self) -> BlockEndInfo {
+        BlockEndInfo::V0 {
+            block_gas_limit_reached: self
+                .block_gas_limit_type
+                .block_gas_limit()
+                .map(|per_block_gas_limit| {
+                    self.get_effective_accumulated_block_gas() >= per_block_gas_limit
+                })
+                .unwrap_or(false),
+            block_output_limit_reached: self
+                .block_gas_limit_type
+                .block_output_limit()
+                .map(|per_block_output_limit| {
+                    self.get_accumulated_approx_output_size() >= per_block_output_limit
+                })
+                .unwrap_or(false),
+            block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
+            block_approx_output_size: self.get_accumulated_approx_output_size(),
+        }
     }
 }
 

@@ -33,6 +33,9 @@ module supra_framework::delegation_pool_integration_tests {
     const DELEGATION_POOLS: u64 = 11;
 
     #[test_only]
+    const MODULE_EVENT: u64 = 26;
+
+    #[test_only]
     const CONSENSUS_KEY_1: vector<u8> = x"c1bd3bcb387e4ee9a909f6304a1c9902661b0ecfb1e148c7892b210c7f353dfd";
 
     #[test_only]
@@ -79,7 +82,7 @@ module supra_framework::delegation_pool_integration_tests {
             voting_power_increase_limit
         );
         reconfiguration::initialize_for_test(supra_framework);
-        features::change_feature_flags(supra_framework, vector[DELEGATION_POOLS], vector[]);
+        features::change_feature_flags_for_testing(supra_framework, vector[DELEGATION_POOLS, MODULE_EVENT], vector[]);
     }
 
     #[test_only]

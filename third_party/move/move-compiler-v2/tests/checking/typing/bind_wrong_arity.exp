@@ -1,18 +1,26 @@
 
 Diagnostics:
-error: expected `()` but found `u64` (from assignment or declaration context)
+error: tuple type `()` is not allowed as a local variable type
+  ┌─ tests/checking/typing/bind_wrong_arity.move:5:13
+  │
+5 │         let x: () = ();
+  │             ^
+  │
+  = required by declaration of local `x`
+
+error: cannot bind `u64` to left-hand side of type `()`
   ┌─ tests/checking/typing/bind_wrong_arity.move:6:13
   │
 6 │         let (): u64 = 0;
   │             ^^
 
-error: expected 4 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 4
   ┌─ tests/checking/typing/bind_wrong_arity.move:7:13
   │
 7 │         let (x, b, R{f}): (u64, bool, R, R) = (0, false, R{f: 0}, R{f: 0});
   │             ^^^^^^^^^^^^
 
-error: expected 2 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 2
   ┌─ tests/checking/typing/bind_wrong_arity.move:8:13
   │
 8 │         let (x, b, R{f}): (u64, bool) = (0, false);

@@ -62,7 +62,7 @@ impl FastSyncStorageWrapper {
             && (db_main
                 .ledger_db
                 .metadata_db()
-                .get_latest_version()
+                .get_synced_version()
                 .map_or(0, |v| v)
                 == 0)
         {

@@ -82,7 +82,6 @@ impl DbWriter for AptosDB {
         })
     }
 
-    // TODO(bowu): populate the flag indicating the fast_sync is done.
     fn finalize_state_snapshot(
         &self,
         version: Version,
@@ -228,7 +227,7 @@ impl AptosDB {
             .current_version
             .map(|version| version + 1)
             .unwrap_or(0);
-        let num_transactions_in_db = self.get_latest_version().map_or(0, |v| v + 1);
+        let num_transactions_in_db = self.get_synced_version().map_or(0, |v| v + 1);
         ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
             "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
             first_version,
@@ -319,6 +318,10 @@ impl AptosDB {
                     .commit_transaction_accumulator(txns_to_commit, first_version)
                     .unwrap()
             });
+            s.spawn(|_| {
+                self.commit_transaction_auxiliary_data(txns_to_commit, first_version)
+                    .unwrap()
+            });
         });
 
         Ok(new_root_hash)
@@ -359,7 +362,7 @@ impl AptosDB {
             skip_index_and_usage,
             txns_to_commit
                 .iter()
-                .rposition(|txn| txn.is_state_checkpoint()),
+                .rposition(|txn| txn.has_state_checkpoint_hash()),
         )?;
 
         // Write block index if event index is skipped.
@@ -473,6 +476,38 @@ impl AptosDB {
             .write_schemas(batch)?;
 
         Ok(root_hash)
+    }
+
+    fn commit_transaction_auxiliary_data(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: u64,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_auxiliary_data"])
+            .start_timer();
+
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .iter()
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                TransactionAuxiliaryDataDb::put_transaction_auxiliary_data(
+                    first_version + i as u64,
+                    txn_to_commit.transaction_auxiliary_data(),
+                    &batch,
+                )?;
+
+
+            Ok(())
+        })?;
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_auxiliary_data___commit"])
+            .start_timer();
+        self.ledger_db
+            .transaction_auxiliary_data_db()
+            .write_schemas(batch)
     }
 
     fn commit_transaction_infos(

@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: unable to generate test
+  ┌─ tests/unit_test/notest/script_with_multiple_on_main.move:4:7
+  │
+4 │     #[expected_failure]
+  │       ^^^^^^^^^^^^^^^^ Testing attributes are not allowed in scripts.
+
+error: unable to generate test
+  ┌─ tests/unit_test/notest/script_with_multiple_on_main.move:5:7
+  │
+5 │     #[test_only, test]
+  │       ^^^^^^^^^ Testing attributes are not allowed in scripts.
+
+error: unable to generate test
+  ┌─ tests/unit_test/notest/script_with_multiple_on_main.move:5:18
+  │
+5 │     #[test_only, test]
+  │                  ^^^^ Testing attributes are not allowed in scripts.

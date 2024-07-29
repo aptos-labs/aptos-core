@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+mod consensus;
 mod indexer;
 mod logger;
 mod network;
@@ -15,7 +16,6 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
-use crate::network::ApplicationNetworkInterfaces;
 use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
@@ -23,20 +23,17 @@ use aptos_build_info::build_information;
 use aptos_config::config::{
     merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
 };
-use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
-use aptos_jwk_consensus::start_jwk_consensus_runtime;
+use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
-use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::chain_id::ChainId;
-use aptos_validator_transaction_pool::VTxnPoolState;
+use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
-    fs,
+    env, fs,
     io::Write,
     path::{Path, PathBuf},
     sync::{
@@ -76,6 +73,10 @@ pub struct AptosNodeArgs {
     /// Run only a single validator node testnet.
     #[clap(long)]
     test: bool,
+
+    /// Optimize the single validator node testnet for higher performance
+    #[clap(long, requires("test"))]
+    performance: bool,
 
     /// Random number generator seed for starting a single validator testnet.
     #[clap(long, value_parser = load_seed, requires("test"))]
@@ -132,6 +133,9 @@ impl AptosNodeArgs {
 
         if self.test {
             println!("WARNING: Entering test mode! This should never be used in production!");
+            if self.performance {
+                println!("WARNING: Entering performance mode! System utilization may be high!");
+            }
 
             // Set the genesis framework
             let genesis_framework = if let Some(path) = self.genesis_framework {
@@ -152,6 +156,7 @@ impl AptosNodeArgs {
                 self.test_dir,
                 self.random_ports,
                 self.lazy,
+                self.performance,
                 &genesis_framework,
                 rng,
             )
@@ -191,6 +196,8 @@ pub struct AptosHandle {
     _admin_service: AdminService,
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
+    _consensus_observer_runtime: Option<Runtime>,
+    _consensus_publisher_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
@@ -202,6 +209,7 @@ pub struct AptosHandle {
     _peer_monitoring_service_runtime: Runtime,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
+    _indexer_db_runtime: Option<Runtime>,
 }
 
 /// Start an Aptos node
@@ -266,6 +274,7 @@ pub fn load_node_config<R>(
     test_dir: &Path,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<NodeConfig>
@@ -286,6 +295,7 @@ where
             test_dir,
             random_ports,
             enable_lazy_mode,
+            enable_performance_mode,
             framework,
             rng,
         )?;
@@ -366,6 +376,7 @@ pub fn setup_test_environment_and_start_node<R>(
     test_dir: Option<PathBuf>,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<()>
@@ -388,6 +399,7 @@ where
             &test_dir,
             random_ports,
             enable_lazy_mode,
+            enable_performance_mode,
             framework,
             rng,
         )?,
@@ -405,6 +417,7 @@ pub fn create_single_node_test_config<R>(
     test_dir: &Path,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<NodeConfig>
@@ -435,14 +448,27 @@ where
 
     // Adjust some fields in the default template to lower the overhead of
     // running on a local machine.
+    // Some are further overridden to give us higher performance when enable_performance_mode is true
     node_config
         .consensus
         .quorum_store
         .num_workers_for_remote_batches = 1;
-    node_config.consensus.quorum_store_poll_time_ms = 1000;
 
-    node_config.execution.concurrency_level = 1;
-    node_config.execution.num_proof_reading_threads = 1;
+    if enable_performance_mode {
+        // Setting to a pretty conservative concurrency level. It can be tuned locally.
+        node_config.execution.concurrency_level = 4;
+        // Don't constrain the TPS of Quorum Store for this single node.
+        node_config
+            .consensus
+            .quorum_store
+            .back_pressure
+            .dynamic_max_txn_per_s = 10_000;
+    } else {
+        node_config.execution.concurrency_level = 1;
+        node_config.execution.num_proof_reading_threads = 1;
+        node_config.consensus.quorum_store_poll_time_ms = 1000;
+    }
+
     node_config.execution.paranoid_hot_potato_verification = false;
     node_config.execution.paranoid_type_verification = false;
     node_config
@@ -454,11 +480,19 @@ where
         .peer_monitoring_service
         .enable_peer_monitoring_client = false;
 
-    node_config
-        .mempool
-        .shared_mempool_max_concurrent_inbound_syncs = 1;
-    node_config.mempool.default_failovers = 1;
-    node_config.mempool.max_broadcasts_per_peer = 1;
+    if enable_performance_mode {
+        node_config
+            .mempool
+            .shared_mempool_max_concurrent_inbound_syncs = 16;
+        node_config.mempool.shared_mempool_tick_interval_ms = 10;
+        node_config.mempool.default_failovers = 0;
+    } else {
+        node_config
+            .mempool
+            .shared_mempool_max_concurrent_inbound_syncs = 1;
+        node_config.mempool.default_failovers = 1;
+        node_config.mempool.max_broadcasts_per_peer = 1;
+    }
 
     node_config
         .state_sync
@@ -529,6 +563,14 @@ where
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
             genesis_config.recurring_lockup_duration_secs = 7200;
+            genesis_config.jwk_consensus_config_override = match env::var("INITIALIZE_JWK_CONSENSUS") {
+                Ok(val) if val.as_str() == "1" => {
+                    let config = OnChainJWKConsensusConfig::default_enabled();
+                    println!("Flag `INITIALIZE_JWK_CONSENSUS` detected, will enable JWK Consensus for all default OIDC providers in genesis: {:?}", config);
+                    Some(config)
+                },
+                _ => None,
+            };
         })))
         .with_randomize_first_validator_ports(random_ports);
     let (root_key, _genesis, genesis_waypoint, mut validators) = builder.build(rng)?;
@@ -565,7 +607,7 @@ pub fn setup_environment_and_start_node(
     node_config.log_all_configs();
 
     // Starts the admin service
-    let admin_service = services::start_admin_service(&node_config);
+    let mut admin_service = services::start_admin_service(&node_config);
 
     // Set up the storage database and any RocksDB checkpoints
     let (db_rw, backup_service, genesis_waypoint) =
@@ -594,6 +636,7 @@ pub fn setup_environment_and_start_node(
     let (
         mut event_subscription_service,
         mempool_reconfig_subscription,
+        consensus_observer_reconfig_subscription,
         consensus_reconfig_subscription,
         dkg_subscriptions,
         jwk_consensus_subscriptions,
@@ -604,6 +647,7 @@ pub fn setup_environment_and_start_node(
     let (
         network_runtimes,
         consensus_network_interfaces,
+        consensus_observer_network_interfaces,
         dkg_network_interfaces,
         jwk_consensus_network_interfaces,
         mempool_network_interfaces,
@@ -623,6 +667,8 @@ pub fn setup_environment_and_start_node(
         db_rw.reader.clone(),
     );
 
+    let internal_indexer_db = InternalIndexerDBService::get_indexer_db(&node_config);
+
     // Start state sync and get the notification endpoints for mempool and consensus
     let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
@@ -631,6 +677,7 @@ pub fn setup_environment_and_start_node(
             genesis_waypoint,
             event_subscription_service,
             db_rw.clone(),
+            internal_indexer_db.clone(),
         )?;
 
     // Start the node inspection service
@@ -647,7 +694,13 @@ pub fn setup_environment_and_start_node(
         indexer_table_info_runtime,
         indexer_runtime,
         indexer_grpc_runtime,
-    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
+        internal_indexer_db_runtime,
+    ) = services::bootstrap_api_and_indexer(
+        &node_config,
+        db_rw.clone(),
+        chain_id,
+        internal_indexer_db,
+    )?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
@@ -672,86 +725,57 @@ pub fn setup_environment_and_start_node(
         aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
     }
 
-    let vtxn_pool = VTxnPoolState::default();
-    let maybe_dkg_dealer_sk =
-        load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
-    debug!("maybe_dkg_dealer_sk={:?}", maybe_dkg_dealer_sk);
-    let dkg_runtime = match (dkg_network_interfaces, maybe_dkg_dealer_sk) {
-        (Some(interfaces), Ok(dkg_dealer_sk)) => {
-            let ApplicationNetworkInterfaces {
-                network_client,
-                network_service_events,
-            } = interfaces;
-            let (reconfig_events, dkg_start_events) = dkg_subscriptions
-                .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
-            let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
-            let dkg_runtime = start_dkg_runtime(
-                my_addr,
-                dkg_dealer_sk,
-                network_client,
-                network_service_events,
-                reconfig_events,
-                dkg_start_events,
-                vtxn_pool.clone(),
-            );
-            Some(dkg_runtime)
-        },
-        _ => None,
-    };
+    // Create the DKG runtime and get the VTxn pool
+    let (vtxn_pool, dkg_runtime) =
+        consensus::create_dkg_runtime(&mut node_config, dkg_subscriptions, dkg_network_interfaces);
 
-    let maybe_jwk_consensus_key =
-        load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
-    debug!("maybe_jwk_consensus_key={:?}", maybe_jwk_consensus_key);
+    // Create the JWK consensus runtime
+    let jwk_consensus_runtime = consensus::create_jwk_consensus_runtime(
+        &mut node_config,
+        jwk_consensus_subscriptions,
+        jwk_consensus_network_interfaces,
+        &vtxn_pool,
+    );
 
-    let jwk_consensus_runtime = match (jwk_consensus_network_interfaces, maybe_jwk_consensus_key) {
-        (Some(interfaces), Ok(consensus_key)) => {
-            let ApplicationNetworkInterfaces {
-                network_client,
-                network_service_events,
-            } = interfaces;
-            let (reconfig_events, onchain_jwk_updated_events) = jwk_consensus_subscriptions.expect(
-                "JWK consensus needs to listen to NewEpochEvents and OnChainJWKMapUpdated events.",
-            );
-            let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
-            let jwk_consensus_runtime = start_jwk_consensus_runtime(
-                my_addr,
-                consensus_key,
-                network_client,
-                network_service_events,
-                reconfig_events,
-                onchain_jwk_updated_events,
-                vtxn_pool.clone(),
-            );
-            Some(jwk_consensus_runtime)
-        },
-        _ => None,
-    };
+    // Wait until state sync has been initialized
+    debug!("Waiting until state sync is initialized!");
+    state_sync_runtimes.block_until_initialized();
+    debug!("State sync initialization complete.");
 
-    // Create the consensus runtime (this blocks on state sync first)
-    let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
-        // Wait until state sync has been initialized
-        debug!("Waiting until state sync is initialized!");
-        state_sync_runtimes.block_until_initialized();
-        debug!("State sync initialization complete.");
+    // Create the consensus observer publisher (if enabled)
+    let (consensus_publisher_runtime, consensus_publisher) =
+        consensus::create_consensus_publisher(&node_config, &consensus_observer_network_interfaces);
 
-        // Initialize and start consensus
-        let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
-            &mut node_config,
-            db_rw,
-            consensus_reconfig_subscription,
-            consensus_network_interfaces,
-            consensus_notifier,
-            consensus_to_mempool_sender,
-            vtxn_pool,
-        );
-        admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
-        runtime
-    });
+    // Create the consensus runtime (if enabled)
+    let consensus_runtime = consensus::create_consensus_runtime(
+        &node_config,
+        db_rw.clone(),
+        consensus_reconfig_subscription,
+        consensus_network_interfaces,
+        consensus_notifier.clone(),
+        consensus_to_mempool_sender.clone(),
+        vtxn_pool,
+        consensus_publisher.clone(),
+        &mut admin_service,
+    );
+
+    // Create the consensus observer runtime (if enabled)
+    let consensus_observer_runtime = consensus::create_consensus_observer_runtime(
+        &node_config,
+        consensus_observer_network_interfaces,
+        consensus_publisher,
+        consensus_notifier,
+        consensus_to_mempool_sender,
+        db_rw,
+        consensus_observer_reconfig_subscription,
+    );
 
     Ok(AptosHandle {
         _admin_service: admin_service,
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
+        _consensus_observer_runtime: consensus_observer_runtime,
+        _consensus_publisher_runtime: consensus_publisher_runtime,
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
@@ -763,6 +787,7 @@ pub fn setup_environment_and_start_node(
         _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
+        _indexer_db_runtime: internal_indexer_db_runtime,
     })
 }
 

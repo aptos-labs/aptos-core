@@ -6,7 +6,6 @@ use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_sdk::{transaction_builder::aptos_stdlib::aptos_token_stdlib, types::LocalAccount};
 use aptos_storage_interface::DbReader;
 use move_core_types::account_address::AccountAddress;
-use move_package::BuildConfig;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -125,6 +124,7 @@ async fn test_get_account_module_not_found() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_merkle_leaves_with_nft_transfer() {
     let mut context = new_test_context(current_function_name!());
+    let num_block_resource = 1;
 
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
@@ -171,7 +171,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
 
     let num_leaves_at_beginning = ctx
         .db
-        .get_state_leaf_count(ctx.db.get_latest_version().unwrap())
+        .get_state_leaf_count(ctx.db.get_latest_ledger_info_version().unwrap())
         .unwrap();
 
     let transfer_to_owner_txn = creator.sign_multi_agent_with_transaction_builder(
@@ -188,11 +188,11 @@ async fn test_merkle_leaves_with_nft_transfer() {
     ctx.commit_block(&vec![transfer_to_owner_txn]).await;
     let num_leaves_after_transfer_nft = ctx
         .db
-        .get_state_leaf_count(ctx.db.get_latest_version().unwrap())
+        .get_state_leaf_count(ctx.db.get_latest_ledger_info_version().unwrap())
         .unwrap();
     assert_eq!(
         num_leaves_after_transfer_nft,
-        num_leaves_at_beginning + 2 /* 1 token store + 1 token*/
+        num_leaves_at_beginning + 2  /* 1 token store + 1 token*/ + num_block_resource
     );
 
     let transfer_to_creator_txn = owner.sign_multi_agent_with_transaction_builder(
@@ -209,22 +209,21 @@ async fn test_merkle_leaves_with_nft_transfer() {
     ctx.commit_block(&vec![transfer_to_creator_txn]).await;
     let num_leaves_after_return_nft = ctx
         .db
-        .get_state_leaf_count(ctx.db.get_latest_version().unwrap())
+        .get_state_leaf_count(ctx.db.get_latest_ledger_info_version().unwrap())
         .unwrap();
 
-    assert_eq!(num_leaves_after_return_nft, num_leaves_at_beginning + 1);
+    assert_eq!(
+        num_leaves_after_return_nft,
+        num_leaves_at_beginning + 1 + num_block_resource * 2
+    );
 }
 
-#[ignore] // TODO: deactivate because of module-bundle publish not longer there; reactivate.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_table_item() {
     let mut context = new_test_context(current_function_name!());
     let ctx = &mut context;
-    let mut account = ctx.gen_account();
-    let acc = &mut account;
-    let txn = ctx.create_user_account(acc).await;
-    ctx.commit_block(&vec![txn.clone()]).await;
-    make_test_tables(ctx, acc).await;
+    let mut acc = ctx.root_account().await;
+    make_test_tables(ctx, &mut acc).await;
 
     // get the TestTables instance
     let tt = ctx
@@ -318,37 +317,24 @@ fn get_table_item(handle: AccountAddress) -> String {
 }
 
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
-    let module = build_test_module(account.address()).await;
-
-    ctx.api_publish_module(account, module.into()).await;
-    ctx.api_execute_entry_function(account, "make_test_tables", json!([]), json!([]))
-        .await
-}
-
-async fn build_test_module(account: AccountAddress) -> Vec<u8> {
-    let package_dir = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
+    let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("api/move-test-package");
-    let build_config = BuildConfig {
-        generate_docs: false,
-        install_dir: Some(package_dir.clone()),
-        additional_named_addresses: [("TestAccount".to_string(), account)].into(),
-        ..Default::default()
-    };
-    let package = build_config
-        .compile_package(&package_dir, &mut Vec::new())
-        .unwrap();
+    let txn =
+        TestContext::build_package(path, vec![("TestAccount".to_string(), account.address())]);
+    ctx.publish_package(account, txn).await;
 
-    let mut out = Vec::new();
-    package
-        .root_modules_map()
-        .iter_modules()
-        .first()
-        .unwrap()
-        .serialize(&mut out)
-        .unwrap();
-    out
+    ctx.api_execute_entry_function(
+        account,
+        &format!(
+            "0x{}::TableTestData::make_test_tables",
+            account.address().to_hex()
+        ),
+        json!([]),
+        json!([]),
+    )
+    .await
 }
 
 async fn api_get_table_item<T: Serialize>(

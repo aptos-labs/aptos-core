@@ -3,7 +3,7 @@
 
 use crate::{
     convert::convert_transaction,
-    counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
+    counters::UNABLE_TO_FETCH_TRANSACTION,
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
@@ -23,7 +23,6 @@ use aptos_protos::{
     },
     util::timestamp::Timestamp,
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use itertools::Itertools;
 use serde::Serialize;
 use std::{sync::Arc, time::Duration};
@@ -340,9 +339,7 @@ impl IndexerStreamCoordinator {
 
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
-        let resolver = state_view.as_move_resolver();
-        let converter =
-            resolver.as_converter(context.db.clone(), context.table_info_reader.clone());
+        let converter = state_view.as_converter(context.db.clone(), context.indexer_reader.clone());
 
         // Enrich data with block metadata
         let (_, _, block_event) = context
@@ -366,7 +363,13 @@ impl IndexerStreamCoordinator {
             // Do not update block_height if first block is block metadata
             if ind > 0 {
                 // Update the timestamp if the next block occurs
-                if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
+                if let Some(txn) = raw_txn.transaction.try_as_block_metadata_ext() {
+                    timestamp = txn.timestamp_usecs();
+                    epoch = txn.epoch();
+                    epoch_bcs = aptos_api_types::U64::from(epoch);
+                    block_height += 1;
+                    block_height_bcs = aptos_api_types::U64::from(block_height);
+                } else if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                     epoch = txn.epoch();
                     epoch_bcs = aptos_api_types::U64::from(epoch);
@@ -375,7 +378,7 @@ impl IndexerStreamCoordinator {
                 }
             }
             let size_info = Self::get_size_info(&raw_txn);
-            match converter
+            let res = converter
                 .try_into_onchain_transaction(timestamp, raw_txn)
                 .map(|mut txn| {
                     match txn {
@@ -400,13 +403,19 @@ impl IndexerStreamCoordinator {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);
                         },
+                        APITransaction::BlockEpilogueTransaction(ref mut bet) => {
+                            bet.info.block_height = Some(block_height_bcs);
+                            bet.info.epoch = Some(epoch_bcs);
+                        },
                         APITransaction::ValidatorTransaction(ref mut vt) => {
-                            vt.info.block_height = Some(block_height_bcs);
-                            vt.info.epoch = Some(epoch_bcs);
+                            let info = vt.transaction_info_mut();
+                            info.block_height = Some(block_height_bcs);
+                            info.epoch = Some(epoch_bcs);
                         },
                     };
                     txn
-                }) {
+                });
+            match res {
                 Ok(transaction) => transactions.push((transaction, size_info)),
                 Err(err) => {
                     UNABLE_TO_FETCH_TRANSACTION.inc();
@@ -443,7 +452,6 @@ impl IndexerStreamCoordinator {
             "[Indexer Fullnode] Successfully converted transactions",
         );
 
-        FETCHED_TRANSACTION.inc();
         transactions
     }
 

@@ -361,6 +361,40 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         }));
     }
 
+    /// Versioned write of metadata at a given resource group key (and version). Returns true
+    /// if the previously stored metadata has changed as observed by later transactions (e.g.
+    /// metadata of a deletion can never be observed by later transactions).
+    pub fn write_metadata(
+        &self,
+        key: K,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        data: V,
+    ) -> bool {
+        let arc_data = Arc::new(data);
+
+        let mut v = self.values.entry(key).or_default();
+        let prev_entry = v.versioned_map.insert(
+            ShiftedTxnIndex::new(txn_idx),
+            CachePadded::new(Entry::new_write_from(
+                incarnation,
+                ValueWithLayout::Exchanged(arc_data.clone(), None),
+            )),
+        );
+
+        // Changes versioned metadata that was stored.
+        prev_entry.map_or(true, |entry| -> bool {
+            if let EntryCell::Write(_, existing_v) = &entry.cell {
+                arc_data.as_state_value_metadata()
+                    != existing_v
+                        .extract_value_no_layout()
+                        .as_state_value_metadata()
+            } else {
+                unreachable!("Group metadata can't be written at AggregatorV1 key");
+            }
+        })
+    }
+
     /// When a transaction is committed, this method can be called for its delta outputs to add
     /// a 'shortcut' to the corresponding materialized aggregator value, so any subsequent reads
     /// do not have to traverse below the index. It must be guaranteed by the caller that the

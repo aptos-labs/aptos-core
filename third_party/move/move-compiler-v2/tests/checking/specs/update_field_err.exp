@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: field `z` not declared in struct `update_field_ok::R` (update field)
+error: field `z` not declared in struct `R`
    ┌─ tests/checking/specs/update_field_err.move:16:9
    │
 16 │         update_field(r, z, 1)
    │         ^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `u64` but found `bool`
+error: expected `u64` but found a value of type `bool`
    ┌─ tests/checking/specs/update_field_err.move:20:28
    │
 20 │         update_field(r, x, true)

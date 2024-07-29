@@ -4,6 +4,7 @@
 
 use crate::{Address, Bytecode, IdentifierWrapper, VerifyInput, VerifyInputWithRecursion};
 use anyhow::{bail, format_err};
+use aptos_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
@@ -18,7 +19,6 @@ use move_core_types::{
     parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
-use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 use poem_openapi::{types::Type, Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -46,7 +46,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
 
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         Ok(Self {
-            typ: s.type_.clone().into(),
+            typ: s.ty_tag.clone().into(),
             data: s.try_into()?,
         })
     }
@@ -302,7 +302,7 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
             ),
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
             AnnotatedMoveValue::Struct(v) => {
-                if MoveValue::is_utf8_string(&v.type_) {
+                if MoveValue::is_utf8_string(&v.ty_tag) {
                     MoveValue::convert_utf8_string(v)?
                 } else {
                     MoveValue::Struct(v.try_into()?)
@@ -414,7 +414,7 @@ impl From<StructTag> for MoveStructTag {
             address: tag.address.into(),
             module: tag.module.into(),
             name: tag.name.into(),
-            generic_type_params: tag.type_params.into_iter().map(MoveType::from).collect(),
+            generic_type_params: tag.type_args.into_iter().map(MoveType::from).collect(),
         }
     }
 }
@@ -425,7 +425,7 @@ impl From<&StructTag> for MoveStructTag {
             address: tag.address.into(),
             module: IdentifierWrapper::from(&tag.module),
             name: IdentifierWrapper::from(&tag.name),
-            generic_type_params: tag.type_params.iter().map(MoveType::from).collect(),
+            generic_type_params: tag.type_args.iter().map(MoveType::from).collect(),
         }
     }
 }
@@ -469,7 +469,7 @@ impl TryFrom<MoveStructTag> for StructTag {
             address: tag.address.into(),
             module: tag.module.into(),
             name: tag.name.into(),
-            type_params: tag
+            type_args: tag
                 .generic_type_params
                 .into_iter()
                 .map(|p| p.try_into())
@@ -1223,7 +1223,6 @@ mod tests {
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-    use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
     use serde::{de::DeserializeOwned, Serialize};
     use serde_json::{json, to_value, Value};
     use std::{boxed::Box, convert::TryFrom, fmt::Debug};
@@ -1469,7 +1468,7 @@ mod tests {
             address: address("0x1"),
             module: identifier("Home"),
             name: identifier("ABC"),
-            type_params: vec![TypeTag::Address, TypeTag::Struct(Box::new(account))],
+            type_args: vec![TypeTag::Address, TypeTag::Struct(Box::new(account))],
         }
     }
 
@@ -1478,7 +1477,7 @@ mod tests {
             address: address("0x1"),
             module: identifier("account"),
             name: identifier("Base"),
-            type_params: vec![
+            type_args: vec![
                 TypeTag::U128,
                 TypeTag::Vector(Box::new(TypeTag::U64)),
                 TypeTag::Vector(Box::new(TypeTag::Struct(Box::new(type_struct("String"))))),
@@ -1492,7 +1491,7 @@ mod tests {
             address: address("0x1"),
             module: identifier("type"),
             name: identifier(t),
-            type_params: vec![],
+            type_args: vec![],
         }
     }
 
@@ -1506,7 +1505,7 @@ mod tests {
     ) -> AnnotatedMoveStruct {
         AnnotatedMoveStruct {
             abilities: AbilitySet::EMPTY,
-            type_: type_struct(typ),
+            ty_tag: type_struct(typ),
             value: values,
         }
     }

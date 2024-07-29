@@ -6,7 +6,7 @@ use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Payload, Round},
-    executed_block::ExecutedBlock,
+    pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
@@ -63,7 +63,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     init_qc: Option<QuorumCert>,
     init_round: Round,
 ) -> (
-    Vec<ExecutedBlock>,
+    Vec<PipelinedBlock>,
     LedgerInfoWithSignatures,
     Vec<VoteProposal>,
 ) {
@@ -106,6 +106,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         vec![],
         vec![],
         vec![],
+        None, // block end info
     );
 
     let li = LedgerInfo::new(
@@ -119,10 +120,10 @@ pub fn prepare_executed_blocks_with_ledger_info(
 
     let li_sig = generate_ledger_info_with_sig(&[signer.clone()], li);
 
-    let executed_blocks: Vec<ExecutedBlock> = proposals
+    let executed_blocks: Vec<PipelinedBlock> = proposals
         .iter()
         .map(|proposal| {
-            ExecutedBlock::new(proposal.block().clone(), vec![], compute_result.clone())
+            PipelinedBlock::new(proposal.block().clone(), vec![], compute_result.clone())
         })
         .collect();
 
@@ -131,7 +132,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
 
 pub fn prepare_executed_blocks_with_executed_ledger_info(
     signer: &ValidatorSigner,
-) -> (Vec<ExecutedBlock>, LedgerInfoWithSignatures) {
+) -> (Vec<PipelinedBlock>, LedgerInfoWithSignatures) {
     let genesis_qc = certificate_for_genesis();
     let (executed_blocks, li_sig, _) = prepare_executed_blocks_with_ledger_info(
         signer,
@@ -147,7 +148,7 @@ pub fn prepare_executed_blocks_with_executed_ledger_info(
 
 pub fn prepare_executed_blocks_with_ordered_ledger_info(
     signer: &ValidatorSigner,
-) -> (Vec<ExecutedBlock>, LedgerInfoWithSignatures) {
+) -> (Vec<PipelinedBlock>, LedgerInfoWithSignatures) {
     let genesis_qc = certificate_for_genesis();
     let (executed_blocks, li_sig, _) = prepare_executed_blocks_with_ledger_info(
         signer,

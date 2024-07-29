@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: cannot assign `R` to left-hand side of type `S`
+   ┌─ tests/checking/error_context/assign.move:15:10
+   │
+15 │         (S{x, y}, R{z, s}) = (r, s);
+   │          ^^^^^^^
+
+error: cannot assign `S` to left-hand side of type `R`
+   ┌─ tests/checking/error_context/assign.move:15:19
+   │
+15 │         (S{x, y}, R{z, s}) = (r, s);
+   │                   ^^^^^^^
+
+error: the left-hand side has 2 items but the right-hand side provided 3
+   ┌─ tests/checking/error_context/assign.move:20:9
+   │
+20 │         (x, y) = (1, 2, 3);
+   │         ^^^^^^
+
+error: expected `bool` but found a value of type `u64`
+   ┌─ tests/checking/error_context/assign.move:24:9
+   │
+24 │         s.x = true;
+   │         ^^^
+
+error: cannot assign `&mut u8` to left-hand side of type `&mut u64`
+   ┌─ tests/checking/error_context/assign.move:25:10
+   │
+25 │         *x = 1u8;
+   │          ^
+
+error: the left-hand side expected `&mut` but `&` was provided
+   ┌─ tests/checking/error_context/assign.move:30:9
+   │
+30 │         r = &s2;
+   │         ^

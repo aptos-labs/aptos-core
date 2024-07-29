@@ -40,14 +40,15 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     env, str,
-    sync::Arc,
+    sync::{atomic::AtomicU32, Arc},
 };
+// use std::sync::Mutex;
 use tokio::{runtime::Runtime, time::Duration};
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
     fullnodes: HashMap<PeerId, K8sNode>,
-    root_account: LocalAccount,
+    root_account: Arc<LocalAccount>,
     kube_client: K8sClient,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
@@ -86,6 +87,7 @@ impl K8sSwarm {
             )
         })?;
         let root_account = LocalAccount::new(address, account_key, sequence_number);
+        let root_account = Arc::new(root_account);
 
         let mut versions = HashMap::new();
         let cur_version = Version::new(0, image_tag.to_string());
@@ -178,7 +180,7 @@ impl K8sSwarm {
             self.get_kube_client(),
             Some(self.kube_namespace.clone()),
         ));
-        let (peer_id, mut k8snode) = install_public_fullnode(
+        let (peer_id, k8snode) = install_public_fullnode(
             stateful_set_api,
             configmap_api,
             persistent_volume_claim_api,
@@ -201,7 +203,7 @@ impl K8sSwarm {
 
 #[async_trait::async_trait]
 impl Swarm for K8sSwarm {
-    async fn health_check(&mut self) -> Result<()> {
+    async fn health_check(&self) -> Result<()> {
         let nodes = self.validators.values().collect();
         let unhealthy_nodes = nodes_healthcheck(nodes).await.unwrap();
         if !unhealthy_nodes.is_empty() {
@@ -221,24 +223,8 @@ impl Swarm for K8sSwarm {
         Box::new(validators.into_iter())
     }
 
-    fn validators_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn Validator> + 'a> {
-        let mut validators: Vec<_> = self
-            .validators
-            .values_mut()
-            .map(|v| v as &'a mut dyn Validator)
-            .collect();
-        validators.sort_by_key(|v| v.index());
-        Box::new(validators.into_iter())
-    }
-
     fn validator(&self, id: PeerId) -> Option<&dyn Validator> {
         self.validators.get(&id).map(|v| v as &dyn Validator)
-    }
-
-    fn validator_mut(&mut self, id: PeerId) -> Option<&mut dyn Validator> {
-        self.validators
-            .get_mut(&id)
-            .map(|v| v as &mut dyn Validator)
     }
 
     /// TODO: this should really be a method on Node rather than Swarm
@@ -281,22 +267,8 @@ impl Swarm for K8sSwarm {
         Box::new(full_nodes.into_iter())
     }
 
-    fn full_nodes_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn FullNode> + 'a> {
-        let mut full_nodes: Vec<_> = self
-            .fullnodes
-            .values_mut()
-            .map(|n| n as &'a mut dyn FullNode)
-            .collect();
-        full_nodes.sort_by_key(|n| n.index());
-        Box::new(full_nodes.into_iter())
-    }
-
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {
         self.fullnodes.get(&id).map(|v| v as &dyn FullNode)
-    }
-
-    fn full_node_mut(&mut self, id: PeerId) -> Option<&mut dyn FullNode> {
-        self.fullnodes.get_mut(&id).map(|v| v as &mut dyn FullNode)
     }
 
     fn add_validator(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {
@@ -337,11 +309,11 @@ impl Swarm for K8sSwarm {
         Box::new(self.versions.keys().cloned())
     }
 
-    fn chain_info(&mut self) -> ChainInfo<'_> {
+    fn chain_info(&self) -> ChainInfo {
         let rest_api_url = self.get_rest_api_url(0);
         let inspection_service_url = self.get_inspection_service_url(0);
         ChainInfo::new(
-            &mut self.root_account,
+            self.root_account.clone(),
             rest_api_url,
             inspection_service_url,
             self.chain_id,
@@ -457,11 +429,11 @@ impl Swarm for K8sSwarm {
         bail!("No prom client");
     }
 
-    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo {
         let rest_api_url = self.get_rest_api_url(idx);
         let inspection_service_url = self.get_inspection_service_url(idx);
         ChainInfo::new(
-            &mut self.root_account,
+            self.root_account.clone(),
             rest_api_url,
             inspection_service_url,
             self.chain_id,
@@ -570,7 +542,7 @@ fn get_k8s_node_from_stateful_set(
         peer_id: PeerId::random(),
         index,
         service_name,
-        rest_api_port,
+        rest_api_port: AtomicU32::new(rest_api_port),
         version: Version::new(0, image_tag),
         namespace: namespace.to_string(),
         haproxy_enabled: enable_haproxy,
@@ -706,7 +678,7 @@ trait ChaosExperimentOps {
     async fn list_stress_chaos(&self) -> Result<Vec<StressChaos>>;
 
     async fn ensure_chaos_experiments_active(&self) -> Result<()> {
-        let timeout_duration = Duration::from_secs(30);
+        let timeout_duration = Duration::from_secs(300); // 5 minutes
         let polling_interval = Duration::from_secs(5);
 
         tokio::time::timeout(timeout_duration, async {

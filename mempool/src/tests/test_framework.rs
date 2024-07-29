@@ -23,7 +23,7 @@ use aptos_network::{
         storage::PeersAndMetadata,
     },
     peer_manager::{
-        conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
+        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
         PeerManagerRequestSender,
     },
     protocols::{
@@ -171,7 +171,7 @@ impl MempoolNode {
             let block = self
                 .mempool
                 .lock()
-                .get_batch(100, 102400, true, false, btreemap![]);
+                .get_batch(100, 102400, true, btreemap![]);
 
             if block_contains_all_transactions(&block, txns) {
                 break;
@@ -224,7 +224,7 @@ impl MempoolNode {
         let block = self
             .mempool
             .lock()
-            .get_batch(100, 102400, true, false, btreemap![]);
+            .get_batch(100, 102400, true, btreemap![]);
         if !condition(&block, txns) {
             let actual: Vec<_> = block
                 .iter()
@@ -540,22 +540,19 @@ fn setup_network(
     let (reqs_inbound_sender, reqs_inbound_receiver) = aptos_channel();
     let (reqs_outbound_sender, reqs_outbound_receiver) = aptos_channel();
     let (connection_outbound_sender, _connection_outbound_receiver) = aptos_channel();
-    let (connection_inbound_sender, connection_inbound_receiver) = conn_notifs_channel::new();
 
     // Create the network sender and events
     let network_sender = NetworkSender::new(
         PeerManagerRequestSender::new(reqs_outbound_sender),
         ConnectionRequestSender::new(connection_outbound_sender),
     );
-    let network_events =
-        NetworkEvents::new(reqs_inbound_receiver, connection_inbound_receiver, None);
+    let network_events = NetworkEvents::new(reqs_inbound_receiver, None, true);
 
     (
         network_sender,
         network_events,
         InboundNetworkHandle {
             inbound_message_sender: reqs_inbound_sender,
-            connection_update_sender: connection_inbound_sender,
             peers_and_metadata,
         },
         reqs_outbound_receiver,

@@ -1,0 +1,12 @@
+processed 4 tasks
+
+task 3 'publish'. lines 28-35:
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M'. Got VMError: {
+    message: Module Update Failure: Friend signature of new module differs from existing module in 0000000000000000000000000000000000000000000000000000000000000042::M,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

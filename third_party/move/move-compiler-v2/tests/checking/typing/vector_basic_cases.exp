@@ -1,13 +1,13 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::Test {
     struct X {
         dummy_field: bool,
     }
     private fun many() {
-        Vector<u8>(0, 1, 2);
-        Vector<u64>(0, 1, 2);
-        Vector<u128>(0, 1, 2);
-        Vector<address>(0x0, 0x1);
+        [Number(0), Number(1), Number(2)];
+        [Number(0), Number(1), Number(2)];
+        [Number(0), Number(1), Number(2)];
+        [Address(Numerical(0000000000000000000000000000000000000000000000000000000000000000)), Address(Numerical(0000000000000000000000000000000000000000000000000000000000000001))];
         Vector<Test::X>(pack Test::X(false), pack Test::X(false));
         Vector<vector<address>>(Vector<address>(), Vector<address>());
         Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>(), Vector<address>()), Vector<vector<address>>());
@@ -18,16 +18,13 @@ module 0x42::Test {
         Tuple()
     }
     private fun one() {
-        Vector<u8>(0);
-        Vector<u64>(0);
-        Vector<u128>(0);
-        Vector<address>(0x0);
+        [Number(0)];
+        [Number(0)];
+        [Number(0)];
+        [Address(Numerical(0000000000000000000000000000000000000000000000000000000000000000))];
         Vector<Test::X>(pack Test::X(false));
         Vector<vector<address>>(Vector<address>());
         Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>()));
         Tuple()
     }
-    spec fun $many();
-    spec fun $none();
-    spec fun $one();
 } // end 0x42::Test

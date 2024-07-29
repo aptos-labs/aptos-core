@@ -1,24 +1,23 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0(x: u64,r: M::R) {
-        BitAnd<u64>(0, 0);
-        BitAnd<u64>(1, 0);
-        BitAnd<u64>(0, 1);
-        BitAnd<u8>(0, 1);
-        BitAnd<u8>(0, 1);
-        BitAnd<u128>(0, 1);
-        BitAnd<u128>(0, 1);
-        BitAnd<u64>(0, 1);
+        0;
+        0;
+        0;
+        0;
+        0;
+        0;
+        0;
+        0;
         BitAnd<u64>(Copy(x), Move(x));
-        BitAnd<u64>(select M::R.f(r), select M::R.f(r));
-        BitAnd<u64>(BitAnd<u64>(BitAnd<u64>(1, select M::R.f(r)), select M::R.f(r)), 0);
+        BitAnd<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        BitAnd<u64>(BitAnd<u64>(BitAnd<u64>(1, select M::R.f<M::R>(r)), select M::R.f<M::R>(r)), 0);
         {
           let M::R{ f: _ } = r;
           Tuple()
         }
     }
-    spec fun $t0(x: u64,r: M::R);
 } // end 0x8675309::M

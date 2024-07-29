@@ -13,13 +13,13 @@ use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{serialize, DeltaOp},
     resolver::AggregatorV1Resolver,
-    types::{code_invariant_error, DelayedFieldID},
+    types::code_invariant_error,
 };
 use aptos_types::{
     contract_event::ContractEvent,
     delayed_fields::PanicError,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         state_value::StateValueMetadata,
     },
     transaction::ChangeSet as StorageChangeSet,
@@ -34,6 +34,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::Rng;
 use std::{
     collections::{

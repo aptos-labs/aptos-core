@@ -166,7 +166,7 @@ module aptos_std::ristretto255_bulletproofs {
     #[test(fx = @std)]
     #[expected_failure(abort_code = 0x010003, location = Self)]
     fun test_unsupported_ranges(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
         let comm = ristretto255::new_point_from_bytes(A_COMM);
         let comm = std::option::extract(&mut comm);
@@ -179,7 +179,7 @@ module aptos_std::ristretto255_bulletproofs {
 
     #[test(fx = @std)]
     fun test_prover(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
         let v = ristretto255::new_scalar_from_u64(59);
         let r = ristretto255::new_scalar_from_bytes(A_BLINDER);
@@ -197,7 +197,7 @@ module aptos_std::ristretto255_bulletproofs {
     #[test(fx = @std)]
     #[expected_failure(abort_code = 0x010001, location = Self)]
     fun test_empty_range_proof(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
         let proof = &range_proof_from_bytes(vector[ ]);
         let num_bits = 64;
@@ -212,7 +212,7 @@ module aptos_std::ristretto255_bulletproofs {
 
     #[test(fx = @std)]
     fun test_valid_range_proof_verifies_against_comm(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
         let value = ristretto255::new_scalar_from_bytes(A_VALUE);
         let value = std::option::extract(&mut value);
@@ -232,7 +232,7 @@ module aptos_std::ristretto255_bulletproofs {
 
     #[test(fx = @std)]
     fun test_invalid_range_proof_fails_verification(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
         let comm = ristretto255::new_point_from_bytes(A_COMM);
         let comm = std::option::extract(&mut comm);
