@@ -1953,13 +1953,9 @@ fn realistic_env_max_load_test(
     let long_running = duration_secs >= 2400;
 
     // resource override for long_running tests
-    let resource_override = if long_running {
-        NodeResourceOverride {
-            storage_gib: Some(1000), // long running tests need more storage
-            ..NodeResourceOverride::default()
-        }
-    } else {
-        NodeResourceOverride::default() // no overrides
+    let resource_override = NodeResourceOverride {
+        storage_gib: Some(2000), // need more storage
+        ..NodeResourceOverride::default()
     };
 
     let mut success_criteria = SuccessCriteria::new(95)
