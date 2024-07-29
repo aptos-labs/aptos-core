@@ -1061,6 +1061,16 @@ pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of expired txns removed in block preparer.
+pub static NUM_EXPIRED_TXNS_IN_BLOCK_PREPARER: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_num_expired_txns_in_block_preparer",
+        "Histogram for the number of expired txns in a block preparer.",
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 1.5, /*count=*/ 25).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Count of the number of `DKG` validator transactions received while the feature is disabled.
 pub static UNEXPECTED_DKG_VTXN_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
