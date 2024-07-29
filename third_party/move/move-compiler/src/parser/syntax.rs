@@ -2820,17 +2820,24 @@ fn parse_abilities(context: &mut Context) -> Result<Vec<Ability>, Box<Diagnostic
 
 /// Parse postfix ability declarations:
 ///   PostfixAbilities = (<Abilities> ";")?
-fn parse_postfix_abilities(context: &mut Context, prefix_abilities: &mut Vec<Ability>) -> Result<(), Box<Diagnostic>> {
+fn parse_postfix_abilities(
+    context: &mut Context,
+    prefix_abilities: &mut Vec<Ability>,
+) -> Result<(), Box<Diagnostic>> {
     let postfix_abilities = parse_abilities(context)?;
     if !postfix_abilities.is_empty() {
         consume_token(context.tokens, Tok::Semicolon)?;
     }
-    if let (Some(sp!(_l1, _)), Some(sp!(l2, _))) = (prefix_abilities.first(), postfix_abilities.first()) {
+    if let (Some(sp!(_l1, _)), Some(sp!(l2, _))) =
+        (prefix_abilities.first(), postfix_abilities.first())
+    {
         let msg = format!(
             "Conflicting ability declarations. Abilities must be declared either before or after \
              the variant list, not both."
         );
-        context.env.add_diag(diag!(Syntax::InvalidModifier, (*l2, msg)));
+        context
+            .env
+            .add_diag(diag!(Syntax::InvalidModifier, (*l2, msg)));
     } else {
         if !postfix_abilities.is_empty() {
             *prefix_abilities = postfix_abilities;

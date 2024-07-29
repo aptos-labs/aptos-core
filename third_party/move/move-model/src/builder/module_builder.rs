@@ -256,7 +256,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 
     pub fn is_variant(maccess: &EA::ModuleAccess) -> bool {
-        matches!(maccess.value, EA::ModuleAccess_::ModuleAccess(_, _, Some(_)))
+        matches!(
+            maccess.value,
+            EA::ModuleAccess_::ModuleAccess(_, _, Some(_))
+        )
     }
 
     pub fn check_no_variant(&self, maccess: &EA::ModuleAccess) -> bool {

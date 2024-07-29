@@ -2838,7 +2838,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // handles call of struct/variant with positional fields
-        if maccess.value.is_valid_struct_constant_or_schema_name() && self.can_resolve_to_struct(maccess) || ModuleBuilder::is_variant(maccess) {
+        if maccess.value.is_valid_struct_constant_or_schema_name()
+            && self.can_resolve_to_struct(maccess)
+            || ModuleBuilder::is_variant(maccess)
+        {
             self.check_language_version(loc, "positional fields", LanguageVersion::V2_0);
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =
@@ -4335,9 +4338,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &format!(
                     "expected {} for struct constructor `{}`",
                     if is_positional_constructor {
-                        format!("positional constructor `{}{}(..)`", struct_name_display, variant_name_display)
+                        format!(
+                            "positional constructor `{}{}(..)`",
+                            struct_name_display, variant_name_display
+                        )
                     } else {
-                        format!("struct constructor `{}{} {{ .. }}`", struct_name_display, variant_name_display)
+                        format!(
+                            "struct constructor `{}{} {{ .. }}`",
+                            struct_name_display, variant_name_display
+                        )
                     },
                     struct_name_display
                 ),
