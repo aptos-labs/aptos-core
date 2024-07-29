@@ -750,7 +750,7 @@ fn build_common_tables(
                 if binary.version() < VERSION_7 {
                     return Err(
                         PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                            "Struct variants not applicable in bytecode version {}",
+                            "Enum types not available for bytecode version {}",
                             binary.version()
                         )),
                     );
@@ -1384,7 +1384,7 @@ fn load_struct_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<StructDef
             } else {
                 return Err(
                     PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                        "Struct variants not supported in version {}",
+                        "Enum types not supported in version {}",
                         cursor.version()
                     )),
                 );
@@ -1641,7 +1641,7 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             {
                 return Err(
                     PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                        "Struct variant operations not available before bytecode version {}",
+                        "Enum type operations not available before bytecode version {}",
                         VERSION_7
                     )),
                 );

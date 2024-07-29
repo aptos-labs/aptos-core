@@ -179,6 +179,10 @@ pub struct CompilerConfig {
     #[clap(long = "language-version", global = true,
            value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
+
+    /// Experiments for v2 compiler to set to true
+    #[clap(long = "experiments", global = true)]
+    pub experiments: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
