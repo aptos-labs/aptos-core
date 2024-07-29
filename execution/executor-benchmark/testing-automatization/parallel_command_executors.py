@@ -73,12 +73,12 @@ local_ip_address = {
     "sharding-executor-22": "10.128.0.8",
     "sharding-executor-23": "10.128.0.9",
     "sharding-executor-24": "10.128.0.10",
-    "sharding-executor-25": "10.128.0.11",
-    "sharding-executor-26": "10.128.0.12",
-    "sharding-executor-27": "10.128.0.29",
-    "sharding-executor-28": "10.128.0.53",
-    "sharding-executor-29": "10.128.0.54",
-    "sharding-executor-30": "10.128.0.55",
+    "sharding-executor-25": "10.128.0.60",
+    "sharding-executor-26": "10.128.0.61",
+    "sharding-executor-27": "10.128.0.62",
+    "sharding-executor-28": "10.128.15.192",
+    "sharding-executor-29": "10.128.0.63",
+    "sharding-executor-30": "10.128.15.193",
     "sharding-executor-31": "10.128.0.56",
     "sharding-executor-32": "10.128.0.57",
 
@@ -87,9 +87,10 @@ local_ip_address = {
 # Global list of commands to be executed on each VM
 
 metrics = "PUSH_METRICS_NAMESPACE=jan-benchmark PUSH_METRICS_ENDPOINT=https://gw-c7-2b.cloud.victoriametrics.com/api/v1/import/prometheus PUSH_METRICS_API_TOKEN=06147e32-17de-4d29-989e-6a640ab50f13"
-# coordinator = "10.128.0.58" # run-benchmark-1
+coordinator = "10.128.0.58" # run-benchmark-1
 coordinator = "10.128.0.59" # sharding-benchmarking-1
-num_shards = 24
+
+num_shards = 30
 rem_exe_add = "--remote-executor-addresses "
 for i in range(num_shards):
     rem_exe_add += local_ip_address[f"sharding-executor-{i+1}"] + ":" + str(52200 + i + 2) + " "
@@ -97,7 +98,7 @@ commands = []
 for i in range(num_shards):
     commands.append(f"cd aptos-core && {metrics} /home/janolkowski/.cargo/bin/cargo run --profile performance -p aptos-executor-service --manifest-path /home/janolkowski/aptos-core/execution/executor-service/Cargo.toml -- --shard-id {i} --num-shards {num_shards} --coordinator-address {coordinator}:52200 " + rem_exe_add + f"--num-executor-threads 48 > executor-{i}.log")
 
-# print(commands)
+#print(commands[0])
 
 git_update_command = [
     f"cd aptos-core/ && git remote set-url origin https://github.com/aptos-labs/aptos-core && git checkout main && git fetch && git pull && git checkout multi_machine_sharding_jan_playground && git pull",

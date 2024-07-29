@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 // @generated
 /// Generated client implementations.
 pub mod network_message_service_client {
@@ -93,34 +95,51 @@ pub mod network_message_service_client {
             &mut self,
             request: impl tonic::IntoRequest<super::NetworkMessage>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
-            );
-            let mut req = request.into_request();
-            let message_type = req.get_ref().message_type.clone();
-            let seq_num = req.get_ref().seq_no;
-            let shard_id = req.get_ref().shard_id;
-
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "aptos.remote_executor.v1.NetworkMessageService",
-                        "SimpleMsgExchange",
-                    ),
-                );
-            let threshold = 30;
+            let threshold = 10;
             let start_time = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            let result = self.inner.unary(req, path, codec).await;
+            let mut result;
+            let mut req1 = request.into_request();
+            // req1.extensions_mut()
+            //     .insert(
+            //         GrpcMethod::new(
+            //             "aptos.remote_executor.v1.NetworkMessageService",
+            //             "SimpleMsgExchange",
+            //         ),
+            //     );
+            let message_type = req1.get_ref().message_type.clone();
+            let seq_num = req1.get_ref().seq_no;
+            let shard_id = req1.get_ref().shard_id;
+
+            loop {
+                self.inner
+                    .ready()
+                    .await
+                    .map_err(|e| {
+                        tonic::Status::new(
+                            tonic::Code::Unknown,
+                            format!("Service was not ready: {}", e.into()),
+                        )
+                    })?;
+                let codec = tonic::codec::ProstCodec::default();
+                let path = http::uri::PathAndQuery::from_static(
+                    "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
+                );
+
+                let mut req = tonic::Request::from_parts(req1.metadata().clone(), tonic::Extensions::default(), req1.get_ref().clone());
+                req.extensions_mut()
+                    .insert(
+                        GrpcMethod::new(
+                            "aptos.remote_executor.v1.NetworkMessageService",
+                            "SimpleMsgExchange",
+                        ),
+                    );
+
+                req.set_timeout(std::time::Duration::from_millis(2));
+                result = self.inner.unary(req, path, codec).await;
+                if result.is_ok() {
+                    break;
+                }
+            }
             let end_time = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             if end_time - start_time > threshold {
                 eprintln!("GRPC request took more {:?} ms > {:?}. The message info: message_type: {:?}, seg_num {:?}, shard_id {:?}",
