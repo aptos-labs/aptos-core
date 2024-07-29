@@ -709,8 +709,9 @@ async fn rotate_vk_by_governance<'a>(
         .await;
     debug!("txn_summary={:?}", txn_summary);
     assert_eq!(Some(true), txn_summary.unwrap().success);
+
     // Increment sequence number as we ran a governance proposal
-    // info.root_account().increment_sequence_number();
+    info.root_account().increment_sequence_number();
 }
 
 async fn print_account_resource<T: DeserializeOwned + Debug>(
