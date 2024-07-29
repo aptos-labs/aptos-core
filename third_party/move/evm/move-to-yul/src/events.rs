@@ -58,11 +58,7 @@ impl EventSignature {
         let st_name = st.symbol_pool().string(st.get_name()).to_string();
         let mut para_type_lst = vec![];
 
-        let ordered_types = EventSignature::get_ordered_types(st);
-        for (offset, move_ty, field_name) in ordered_types
-            .map(|(offset, ty, field_name)| (offset, ty, field_name))
-            .collect_vec()
-        {
+        for (offset, move_ty, field_name) in EventSignature::get_ordered_types(st) {
             let solidity_ty = SolidityType::translate_from_move(ctx, &move_ty, false); // implicit mapping from a move type to a solidity type
             para_type_lst.push((offset, solidity_ty, move_ty.clone(), false, field_name));
             // no index by default
