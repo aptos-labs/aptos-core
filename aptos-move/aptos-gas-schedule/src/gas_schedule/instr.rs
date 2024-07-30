@@ -3,7 +3,7 @@
 
 //! This module defines the gas parameters for all Move instructions.
 
-use crate::gas_schedule::VMGasParameters;
+use crate::{gas_feature_versions::RELEASE_V1_18, gas_schedule::VMGasParameters};
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
     InternalGasPerTypeNode,
@@ -43,8 +43,23 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [mut_borrow_loc: InternalGas, "mut_borrow_loc", 220],
         [imm_borrow_field: InternalGas, "imm_borrow_field", 735],
         [mut_borrow_field: InternalGas, "mut_borrow_field", 735],
-        [imm_borrow_field_generic: InternalGas, "imm_borrow_field_generic", 735],
+        [imm_borrow_field_generic: InternalGas, "imm_borrow_field_generic" , 735],
         [mut_borrow_field_generic: InternalGas, "mut_borrow_field_generic", 735],
+        [imm_borrow_variant_field: InternalGas,
+            { RELEASE_V1_18.. => "imm_borrow_variant_field" }, 835],
+        [mut_borrow_variant_field: InternalGas,
+            { RELEASE_V1_18.. => "mut_borrow_variant_field" }, 835],
+        [imm_borrow_variant_field_generic: InternalGas,
+            { RELEASE_V1_18 => "imm_borrow_variant_field_generic" }, 835],
+        [mut_borrow_variant_field_generic: InternalGas,
+            { RELEASE_V1_18 => "mut_borrow_variant_field_generic" }, 835],
+
+        // variant testing
+        [test_variant: InternalGas,
+            { RELEASE_V1_18 => "test_variant" }, 535],
+        [test_variant_generic: InternalGas,
+            { RELEASE_V1_18 => "test_variant_generic" }, 535],
+
         // locals
         [copy_loc_base: InternalGas, "copy_loc.base", 294],
         [copy_loc_per_abs_val_unit: InternalGasPerAbstractValueUnit, "copy_loc.per_abs_val_unit", 14],

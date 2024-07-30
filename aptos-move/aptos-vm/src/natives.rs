@@ -162,10 +162,13 @@ pub fn aptos_natives(
         None,
     );
 
-    aptos_natives_with_builder(&mut builder)
+    aptos_natives_with_builder(&mut builder, false)
 }
 
-pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunctionTable {
+pub fn aptos_natives_with_builder(
+    builder: &mut SafeNativeBuilder,
+    inject_create_signer_for_gov_sim: bool,
+) -> NativeFunctionTable {
     #[allow(unreachable_code)]
     aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
         .into_iter()
@@ -173,6 +176,7 @@ pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunc
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             builder,
+            inject_create_signer_for_gov_sim,
         ))
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,

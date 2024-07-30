@@ -39,6 +39,7 @@ CompiledPackageInfo {
                 V1,
             ),
             language_version: None,
+            experiments: [],
         },
     },
 }

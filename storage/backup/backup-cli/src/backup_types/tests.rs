@@ -125,6 +125,7 @@ fn test_end_to_end_impl(d: TestData) {
         rocksdb_opt: RocksdbOpt::default(),
         concurrent_downloads: ConcurrentDownloadsOpt::default(),
         replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
+        enable_state_indices: false,
     }
     .try_into()
     .unwrap();

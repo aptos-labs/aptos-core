@@ -4,7 +4,13 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_types::{account_address::AccountAddress, transaction::Transaction};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{
+        use_case::{UseCaseAwareTransaction, UseCaseKey},
+        Transaction,
+    },
+};
 use async_trait::async_trait;
 use futures::{channel::mpsc, stream::FusedStream, SinkExt, Stream};
 use serde::{Deserialize, Serialize};
@@ -81,6 +87,7 @@ impl MempoolNotificationSender for MempoolNotifier {
                 Transaction::UserTransaction(signed_txn) => Some(CommittedTransaction {
                     sender: signed_txn.sender(),
                     sequence_number: signed_txn.sequence_number(),
+                    use_case: signed_txn.parse_use_case(),
                 }),
                 _ => None,
             })
@@ -160,11 +167,16 @@ impl fmt::Display for MempoolCommitNotification {
 pub struct CommittedTransaction {
     pub sender: AccountAddress,
     pub sequence_number: u64,
+    pub use_case: UseCaseKey,
 }
 
 impl fmt::Display for CommittedTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(
+            f,
+            "{}:{}:{:?}",
+            self.sender, self.sequence_number, self.use_case
+        )
     }
 }
 
@@ -177,8 +189,8 @@ mod tests {
         block_metadata::BlockMetadata,
         chain_id::ChainId,
         transaction::{
-            ChangeSet, RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload,
-            WriteSetPayload,
+            use_case::UseCaseAwareTransaction, ChangeSet, RawTransaction, Script,
+            SignedTransaction, Transaction, TransactionPayload, WriteSetPayload,
         },
         write_set::WriteSetMut,
     };
@@ -280,6 +292,7 @@ mod tests {
                         CommittedTransaction {
                             sender: signed_transaction.sender(),
                             sequence_number: signed_transaction.sequence_number(),
+                            use_case: signed_transaction.parse_use_case(),
                         }
                     ]);
                     assert_eq!(

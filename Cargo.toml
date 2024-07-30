@@ -569,6 +569,7 @@ fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 file_diff = "1.0.0"
+firestore = "0.43.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
 flexi_logger = "0.27.4"
@@ -606,7 +607,7 @@ indoc = "1.0.6"
 inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
-itertools = "0.12"
+itertools = "0.13"
 jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",

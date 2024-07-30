@@ -7,7 +7,7 @@ use crate::{
     error::error_kind,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    payload_manager::PayloadManager,
+    payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
         batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
@@ -51,7 +51,7 @@ impl QuorumStoreBuilder {
         &mut self,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
-        Arc<PayloadManager>,
+        Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
         match self {
@@ -100,10 +100,10 @@ impl DirectMempoolInnerBuilder {
     fn init_payload_manager(
         &mut self,
     ) -> (
-        Arc<PayloadManager>,
+        Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
-        (Arc::from(PayloadManager::DirectMempool), None)
+        (Arc::from(DirectMempoolPayloadManager::new()), None)
     }
 
     fn start(self) {
@@ -268,6 +268,7 @@ impl InnerBuilder {
         batch_reader
     }
 
+    #[allow(clippy::unwrap_used)]
     fn spawn_quorum_store(
         mut self,
     ) -> (
@@ -432,17 +433,18 @@ impl InnerBuilder {
         &mut self,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
-        Arc<PayloadManager>,
+        Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
         let batch_reader = self.create_batch_store();
 
         (
-            Arc::from(PayloadManager::InQuorumStore(
+            Arc::from(QuorumStorePayloadManager::new(
                 batch_reader,
                 // TODO: remove after splitting out clean requests
                 self.coordinator_tx.clone(),
                 consensus_publisher,
+                self.verifier.get_ordered_account_addresses(),
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

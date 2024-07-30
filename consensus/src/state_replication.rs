@@ -4,7 +4,7 @@
 
 use crate::{
     error::StateSyncError,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
@@ -72,7 +72,7 @@ pub trait StateComputer: Send + Sync {
     fn new_epoch(
         &self,
         epoch_state: &EpochState,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
+    error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
-    network_message::BlockPayload,
+    network_message::{BlockPayload, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
@@ -140,6 +141,65 @@ impl BlockPayloadStore {
         );
     }
 
+    /// Verifies all block payloads against the given ordered block.
+    /// If verification fails, an error is returned.
+    pub fn verify_payloads_against_ordered_block(
+        &mut self,
+        ordered_block: &OrderedBlock,
+    ) -> Result<(), Error> {
+        // Verify each of the blocks in the ordered block
+        for ordered_block in ordered_block.blocks() {
+            // Get the block epoch and round
+            let block_epoch = ordered_block.epoch();
+            let block_round = ordered_block.round();
+
+            // Fetch the block payload
+            match self.block_payloads.lock().entry((block_epoch, block_round)) {
+                Entry::Occupied(entry) => {
+                    // Get the block transaction payload
+                    let transaction_payload = match entry.get() {
+                        BlockPayloadStatus::AvailableAndVerified(block_payload) => {
+                            &block_payload.transaction_payload
+                        },
+                        BlockPayloadStatus::AvailableAndUnverified(_) => {
+                            // The payload should have already been verified
+                            return Err(Error::InvalidMessageError(format!(
+                                "Payload verification failed! Block payload for epoch: {:?} and round: {:?} is unverified.",
+                                ordered_block.epoch(),
+                                ordered_block.round()
+                            )));
+                        },
+                    };
+
+                    // Get the ordered block payload
+                    let ordered_block_payload = match ordered_block.block().payload() {
+                        Some(payload) => payload,
+                        None => {
+                            return Err(Error::InvalidMessageError(format!(
+                                "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
+                                ordered_block.epoch(),
+                                ordered_block.round()
+                            )));
+                        },
+                    };
+
+                    // Verify the transaction payload against the ordered block payload
+                    transaction_payload.verify_against_ordered_payload(ordered_block_payload)?;
+                },
+                Entry::Vacant(_) => {
+                    // The payload is missing (this should never happen)
+                    return Err(Error::InvalidMessageError(format!(
+                        "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
+                        ordered_block.epoch(),
+                        ordered_block.round()
+                    )));
+                },
+            }
+        }
+
+        Ok(())
+    }
+
     /// Verifies the block payload signatures against the given epoch state.
     /// If verification is successful, blocks are marked as verified. Each
     /// new verified block is
@@ -207,10 +267,11 @@ impl BlockPayloadStore {
 mod test {
     use super::*;
     use crate::consensus_observer::network_message::BlockTransactionPayload;
+    use aptos_bitvec::BitVec;
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        common::ProofWithData,
+        common::{Author, Payload, ProofWithData},
         proof_of_store::{BatchId, BatchInfo, ProofOfStore},
         quorum_cert::QuorumCert,
     };
@@ -218,11 +279,13 @@ mod test {
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_info::{BlockInfo, Round},
+        ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         transaction::Version,
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
         PeerId,
     };
+    use claims::assert_matches;
     use rand::{rngs::OsRng, Rng};
 
     #[test]
@@ -383,8 +446,7 @@ mod test {
         check_num_verified_payloads(&block_payload_store, num_blocks_in_store - 1);
 
         // Insert the same block payload into the block payload store (as verified)
-        let transaction_payload =
-            BlockTransactionPayload::new(vec![], Some(0), ProofWithData::empty(), vec![]);
+        let transaction_payload = BlockTransactionPayload::empty();
         let block_payload = BlockPayload::new(verified_blocks[0].block_info(), transaction_payload);
         block_payload_store.insert_block_payload(block_payload, true);
 
@@ -758,7 +820,7 @@ mod test {
         let epoch_state = EpochState::new(next_epoch, ValidatorVerifier::new(vec![]));
 
         // Verify the block payload signatures
-        block_payload_store.verify_payload_signatures(&epoch_state);
+        let verified_rounds = block_payload_store.verify_payload_signatures(&epoch_state);
 
         // Verify the unverified payloads were moved to the verified store
         assert!(block_payload_store.all_payloads_exist(&unverified_blocks));
@@ -771,6 +833,13 @@ mod test {
             num_future_blocks
         );
 
+        // Check the rounds of the newly verified payloads
+        let expected_verified_rounds = unverified_blocks
+            .iter()
+            .map(|block| block.round())
+            .collect::<Vec<_>>();
+        assert_eq!(verified_rounds, expected_verified_rounds);
+
         // Clear the verified blocks and check the verified blocks are empty
         block_payload_store.remove_committed_blocks(&unverified_blocks);
         assert_eq!(get_num_verified_payloads(&block_payload_store), 0);
@@ -779,7 +848,7 @@ mod test {
         let epoch_state = EpochState::new(future_epoch, ValidatorVerifier::new(vec![]));
 
         // Verify the block payload signatures for a future epoch
-        block_payload_store.verify_payload_signatures(&epoch_state);
+        let verified_rounds = block_payload_store.verify_payload_signatures(&epoch_state);
 
         // Verify the future unverified payloads were moved to the verified store
         assert!(block_payload_store.all_payloads_exist(&future_unverified_blocks));
@@ -788,6 +857,59 @@ mod test {
             num_future_blocks
         );
         assert_eq!(get_num_unverified_payloads(&block_payload_store), 0);
+
+        // Check the rounds of the newly verified payloads
+        let expected_verified_rounds = future_unverified_blocks
+            .iter()
+            .map(|block| block.round())
+            .collect::<Vec<_>>();
+        assert_eq!(verified_rounds, expected_verified_rounds);
+    }
+
+    #[test]
+    fn test_verify_payloads_against_ordered_block() {
+        // Create a new block payload store
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+
+        // Add some verified blocks for the current epoch
+        let current_epoch = 0;
+        let num_verified_blocks = 10;
+        let verified_blocks = create_and_add_blocks_to_store(
+            block_payload_store.clone(),
+            num_verified_blocks,
+            current_epoch,
+            true,
+        );
+
+        // Create an ordered block using the verified blocks
+        let ordered_block = OrderedBlock::new(
+            verified_blocks.clone(),
+            create_empty_ledger_info(current_epoch),
+        );
+
+        // Verify the ordered block and ensure it passes
+        block_payload_store
+            .verify_payloads_against_ordered_block(&ordered_block)
+            .unwrap();
+
+        // Mark the first block payload as unverified
+        mark_payload_as_unverified(block_payload_store.clone(), &verified_blocks[0]);
+
+        // Verify the ordered block and ensure it fails (since the payloads are unverified)
+        let error = block_payload_store
+            .verify_payloads_against_ordered_block(&ordered_block)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Clear the block payload store
+        block_payload_store.clear_all_payloads();
+
+        // Verify the ordered block and ensure it fails (since the payloads are missing)
+        let error = block_payload_store
+            .verify_payloads_against_ordered_block(&ordered_block)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
     }
 
     #[test]
@@ -896,10 +1018,10 @@ mod test {
                 );
                 proofs_of_store.push(ProofOfStore::new(batch_info, AggregateSignature::empty()));
             }
-            let block_transaction_payload = BlockTransactionPayload::new(
+            let block_transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
                 vec![],
+                proofs_of_store.clone(),
                 None,
-                ProofWithData::new(proofs_of_store),
                 vec![],
             );
 
@@ -907,13 +1029,25 @@ mod test {
             let block_payload = BlockPayload::new(block_info.clone(), block_transaction_payload);
             block_payload_store.insert_block_payload(block_payload, verified_payload_signatures);
 
+            // Create the block type
+            let payload = Payload::InQuorumStore(ProofWithData::new(proofs_of_store));
+            let block_type = BlockType::DAGBlock {
+                author: Author::random(),
+                failed_authors: vec![],
+                validator_txns: vec![],
+                payload,
+                node_digests: vec![],
+                parent_block_id: HashValue::random(),
+                parents_bitvec: BitVec::with_num_bits(0),
+            };
+
             // Create the equivalent pipelined block
             let block_data = BlockData::new_for_testing(
                 block_info.epoch(),
                 block_info.round(),
                 block_info.timestamp_usecs(),
                 QuorumCert::dummy(),
-                BlockType::Genesis,
+                block_type,
             );
             let block = Block::new_for_testing(block_info.id(), block_data, None);
             let pipelined_block = Arc::new(PipelinedBlock::new_ordered(block));
@@ -941,6 +1075,14 @@ mod test {
     ) {
         let num_payloads = get_num_verified_payloads(block_payload_store);
         assert_eq!(num_payloads, expected_num_payloads);
+    }
+
+    /// Creates and returns a new ledger info with an empty signature set
+    fn create_empty_ledger_info(epoch: u64) -> LedgerInfoWithSignatures {
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(BlockInfo::random_with_epoch(epoch, 0), HashValue::random()),
+            AggregateSignature::empty(),
+        )
     }
 
     /// Generates and returns a random number (u64)
