@@ -187,7 +187,6 @@ impl PrioritizedPeersState {
 
     /// Returns true iff the prioritized peers list is ready for another update
     pub fn ready_for_update(&self, peers_changed: bool) -> bool {
-        info!("ready for update: peers_changed: {}, observed_all_ping_latencies: {}, last_peer_priority_update: {:?}", peers_changed, self.observed_all_ping_latencies, self.last_peer_priority_update);
         // If intelligent peer prioritization is disabled, we should only
         // update the prioritized peers if the peers have changed.
         if !self.mempool_config.enable_intelligent_peer_prioritization {
@@ -249,9 +248,8 @@ impl PrioritizedPeersState {
         num_txns_received_since_peers_updated: u64,
     ) {
         // TODO: If the top peer set didn't change, then don't change the Primary sender bucket assignment.
-        // TODO: If the load is low, don't do load balancing for Failover buckets as well.
+        // TODO: (Minor) If the load is low, don't do load balancing for Failover buckets.
         assert!(self.prioritized_peers.read().len() == peer_monitoring_data.len());
-        let old_peer_to_sender_buckets = self.peer_to_sender_buckets.clone();
 
         // Obtain the top peers to assign the sender buckets with Primary priority
         let mut top_peers = vec![];
@@ -280,7 +278,16 @@ impl PrioritizedPeersState {
                 num_peers_required_for_load_balancing,
             ),
         );
-        info!("Time elapsed since last peer update: {:?}, num_txns: {:?}, num_peers_required: {:?}, num_top_peers: {:?}", time_elapsed_since_last_update, num_txns_received_since_peers_updated, num_peers_required_for_load_balancing, num_top_peers);
+        info!(
+            "Time elapsed since last peer update: {:?}\n 
+               Number of transactions received since last peer update: {:?},\n
+               Ideal number of peers required for load balancing: {:?},\n
+               Number of top peers picked: {:?}",
+            time_elapsed_since_last_update,
+            num_txns_received_since_peers_updated,
+            num_peers_required_for_load_balancing,
+            num_top_peers
+        );
 
         if self.node_type.is_validator_fullnode() {
             // Use the peer on the VFN network with lowest ping latency as the primary peer
@@ -316,7 +323,10 @@ impl PrioritizedPeersState {
 
                 if base_ping_latency.is_none()
                     || ping_latency.is_none()
-                    || ping_latency.unwrap() < base_ping_latency.unwrap() + 0.030
+                    || ping_latency.unwrap()
+                        < base_ping_latency.unwrap()
+                            + (self.mempool_config.latency_slack_between_top_upstream_peers as f64)
+                                / 1000.0
                 {
                     top_peers.push(*peer);
                 }
@@ -363,8 +373,6 @@ impl PrioritizedPeersState {
                 }
             }
         }
-
-        info!("Old peer to sender buckets: {:?}, New peer to sender buckets: {:?}, Peer monitoring data {:?}", old_peer_to_sender_buckets, self.peer_to_sender_buckets, peer_monitoring_data);
     }
 
     /// Updates the prioritized peers list
@@ -401,7 +409,7 @@ impl PrioritizedPeersState {
         // Set the last peer priority update time
         self.last_peer_priority_update = Some(self.time_service.now());
         info!(
-            "Update_prioritized_peers: count: {:?}, latencies: {:?}, prioritized_peers: {:?}, sender_buckets: {:?}",
+            "Updated prioritized peers. Peer count: {:?}, Latencies: {:?},\n Prioritized pers: {:?},\n Sender bucket assignment: {:?}",
             peers_and_metadata.len(),
             peers_and_metadata
                 .iter()

@@ -120,7 +120,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> MempoolNetworkInterface<NetworkClient> {
         let prioritized_peers_state =
             PrioritizedPeersState::new(mempool_config.clone(), node_type, TimeService::real());
-        info!("mempool network interface created {:?}", node_type);
         Self {
             network_client,
             sync_states: Arc::new(RwLock::new(HashMap::new())),
@@ -136,7 +135,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         &self,
         updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
     ) -> (Vec<(PeerNetworkId, ConnectionMetadata)>, Vec<PeerNetworkId>) {
-        info!("updated_peers {:?}", updated_peers);
         let sync_states = self.sync_states.read();
         let to_disable: Vec<_> = sync_states
             .keys()
@@ -191,9 +189,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
         // Get the upstream peers to add or disable, using a read lock
         let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
-        info!("to_add {:?}, to_disable: {:?}", to_add, to_disable);
         info!(
-            "to_add_keys {:?}, to_disable_keys: {:?}",
+            "Mempool peers added: {:?}, Mempool peers disabled: {:?}",
             to_add.iter().map(|(peer, _)| peer).collect::<Vec<_>>(),
             to_disable
         );
@@ -240,10 +237,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             })
             .collect();
 
-        info!(
-            "Num txns received since last peer udpate: {:?}",
-            self.num_txns_received_since_peers_updated
-        );
         // Update the prioritized peers list
         self.prioritized_peers_state.update_prioritized_peers(
             peers_and_metadata,
@@ -260,7 +253,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: &PeerNetworkId,
         metadata: Option<&ConnectionMetadata>,
     ) -> bool {
-        info!("is_upstream_peer for node_type: {:?}, peer: {}, metadata: {:?}, is_validator_network: {:?}, sync_state_exists: {:?}", self.node_type, peer, metadata, peer.network_id().is_validator_network(), self.sync_states_exists(peer));
         // P2P networks have everyone be upstream
         if peer.network_id().is_validator_network() {
             return true;
@@ -282,7 +274,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         backoff: bool,
         timestamp: SystemTime,
     ) {
-        info!("process_broadcast_ack for node_type: {:?}, peer: {}, message_id: {:?}, retry: {}, backoff: {}, timestamp: {:?}", self.node_type, peer, message_id, retry, backoff, timestamp);
         let mut sync_states = self.sync_states.write();
 
         let sync_state = if let Some(state) = sync_states.get_mut(&peer) {
@@ -360,10 +351,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         ),
         BroadcastError,
     > {
-        info!(
-            "determine_broadcast_batch for node_type: {:?}, peer: {}, scheduled_backoff: {}",
-            self.node_type, peer, scheduled_backoff
-        );
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
@@ -481,10 +468,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             .clone()
                             .into_iter()
                             .collect();
-                    info!(
-                        "sender_buckets: {:?}, peer: {:?}, node_type: {:?}",
-                        sender_buckets, peer, self.node_type
-                    );
                     // Sort sender_buckets based on priority. Primary peer should be first.
                     sender_buckets.sort_by(|(_, priority_a), (_, priority_b)| {
                         if priority_a == priority_b {
@@ -553,22 +536,17 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         // For each transaction, we include the ready time in millis since epoch
         transactions: Vec<(SignedTransaction, u64, BroadcastPeerPriority)>,
     ) -> Result<(), BroadcastError> {
-        let len = transactions.len();
         let request = if self.mempool_config.include_ready_time_in_broadcast {
             MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
-                message_id: message_id.clone(),
+                message_id,
                 transactions,
             }
         } else {
             MempoolSyncMsg::BroadcastTransactionsRequest {
-                message_id: message_id.clone(),
+                message_id,
                 transactions: transactions.into_iter().map(|(txn, _, _)| txn).collect(),
             }
         };
-        info!(
-            "send_batch_to_peer for node_type: {:?}, peer: {}, message_id: {:?}, num_txns: {}",
-            self.node_type, peer, message_id, len
-        );
 
         if let Err(e) = self.network_client.send_to_peer(request, peer) {
             counters::network_send_fail_inc(counters::BROADCAST_TXNS);
@@ -586,10 +564,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         fail_point!("mempool::send_to", |_| {
             Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
         });
-        info!(
-            "send_message_to_peer for node_type: {:?}, peer: {}",
-            self.node_type, peer
-        );
         self.network_client.send_to_peer(message, peer)
     }
 
@@ -626,23 +600,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> Result<(), BroadcastError> {
         // Start timer for tracking broadcast latency.
         let start_time = Instant::now();
-        let result = self.determine_broadcast_batch(peer, scheduled_backoff, smp);
-        info!(
-            "execute_broadcast for node_type: {:?}, peer: {}. result: {}",
-            self.node_type,
-            peer,
-            result.is_ok()
-        );
-        let (message_id, transactions, metric_label) = result?;
-        info!(
-            "execute_broadcast for node_type: {:?}, peer: {}. message_id: {:?}, num_txns: {}, metric_label: {:?}",
-            self.node_type,
-            peer,
-            message_id,
-            transactions.len(),
-            metric_label
-        );
-
+        let (message_id, transactions, metric_label) =
+            self.determine_broadcast_batch(peer, scheduled_backoff, smp)?;
         let num_txns = transactions.len();
         let send_time = SystemTime::now();
         self.send_batch_to_peer(peer, message_id.clone(), transactions)
