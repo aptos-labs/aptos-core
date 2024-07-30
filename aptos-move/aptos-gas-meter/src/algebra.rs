@@ -176,7 +176,6 @@ impl GasAlgebra for StandardGasAlgebra {
         if self.feature_version < 12 {
             self.execution_gas_used += amount;
         }
-        Ok(())
         if self.feature_version >= 7 && self.execution_gas_used > self.max_execution_gas {
             println!("self.execution_gas_used:{}, self.max_execution_gas:{}", self.execution_gas_used, self.max_execution_gas);
             Err(PartialVMError::new(StatusCode::EXECUTION_LIMIT_REACHED))

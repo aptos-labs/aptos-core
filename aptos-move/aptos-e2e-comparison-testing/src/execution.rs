@@ -402,7 +402,7 @@ impl Execution {
         let mut txns = vec![txn.clone()];
         for txn in &mut txns {
             if let UserTransaction(signed_transaction) = txn {
-                signed_transaction.set_max_gmount(min(2_000_000, signed_transaction.max_gas_amount() * 2));
+                // signed_transaction.set_max_gmount(min(100_000, signed_transaction.max_gas_amount() * 2));
             }
         }
         if let Some(debugger) = debugger_opt {
