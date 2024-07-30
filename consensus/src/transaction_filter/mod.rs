@@ -15,7 +15,12 @@ impl TransactionFilter {
         Self { filter }
     }
 
-    pub fn filter(&self, block_id: HashValue, timestamp: u64, txns: &mut Vec<SignedTransaction>) {
+    pub fn filter(
+        &self,
+        block_id: HashValue,
+        timestamp: u64,
+        mut txns: Vec<SignedTransaction>,
+    ) -> Vec<SignedTransaction> {
         // Special case for no filter to avoid unnecessary iteration through all transactions in the default case
         let num_txns_before = txns.len();
         txns.retain(|txn| {
@@ -24,9 +29,11 @@ impl TransactionFilter {
         NUM_EXPIRED_TXNS_IN_TXN_FILTER.observe((num_txns_before - txns.len()) as f64);
 
         if self.filter.is_empty() {
-            return;
+            return txns;
         }
         txns.retain(|txn| self.filter.allows(block_id, timestamp, txn));
+
+        txns
     }
 }
 
@@ -103,51 +110,51 @@ mod test {
 
     #[test]
     fn test_no_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let no_filter = TransactionFilter::new(Filter::empty());
         let before_txns = txns.clone();
-        no_filter.filter(block_id, 0, &mut txns);
+        let txns = no_filter.filter(block_id, 0, txns);
         assert_eq!(before_txns, txns);
     }
 
     #[test]
     fn test_expiration_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let empty_filter = TransactionFilter::new(Filter::empty());
-        empty_filter.filter(block_id, 10_000_000, &mut txns);
+        let txns = empty_filter.filter(block_id, 10_000_000, txns);
         assert_eq!(txns, vec![]);
     }
 
     #[test]
     fn test_all_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let all_filter = TransactionFilter::new(Filter::empty().add_deny_all());
-        all_filter.filter(block_id, 0, &mut txns);
+        let txns = all_filter.filter(block_id, 0, txns);
         assert_eq!(txns, vec![]);
     }
 
     #[test]
     fn test_block_id_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let block_id_filter = TransactionFilter::new(Filter::empty().add_deny_block_id(block_id));
 
-        block_id_filter.filter(block_id, 0, &mut txns);
+        let txns = block_id_filter.filter(block_id, 0, txns);
         assert_eq!(txns, vec![]);
 
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let before_txns = txns.clone();
-        block_id_filter.filter(block_id, 0, &mut txns);
-        assert_eq!(before_txns, txns);
+        let txns = block_id_filter.filter(block_id, 0, txns);
+        assert_eq!(txns, before_txns);
     }
 
     #[test]
     fn test_block_timestamp_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         // Allows all transactions with block timestamp greater than 1000
         let block_timestamp_filter = TransactionFilter::new(
@@ -156,30 +163,30 @@ mod test {
                 .add_deny_all(),
         );
 
-        block_timestamp_filter.filter(block_id, 0, &mut txns);
+        let txns = block_timestamp_filter.filter(block_id, 0, txns);
         assert_eq!(txns, vec![]);
 
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let before_txns = txns.clone();
-        block_timestamp_filter.filter(block_id, 1001, &mut txns);
+        let txns = block_timestamp_filter.filter(block_id, 1001, txns);
         assert_eq!(before_txns, txns);
     }
 
     #[test]
     fn test_transaction_hash_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let transaction_hash_filter = TransactionFilter::new(
             Filter::empty().add_deny_transaction_id(txns[0].committed_hash()),
         );
         let filtered_txns = txns.clone()[1..].to_vec();
-        transaction_hash_filter.filter(block_id, 0, &mut txns);
+        let txns = transaction_hash_filter.filter(block_id, 0, txns);
         assert_eq!(filtered_txns, txns);
     }
 
     #[test]
     fn test_sender_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let block_list_sender_filter = TransactionFilter::new(
             Filter::empty()
@@ -187,13 +194,13 @@ mod test {
                 .add_deny_sender(txns[1].sender()),
         );
         let filtered_txns = txns.clone()[2..].to_vec();
-        block_list_sender_filter.filter(block_id, 0, &mut txns);
+        let txns = block_list_sender_filter.filter(block_id, 0, txns);
         assert_eq!(filtered_txns, txns);
     }
 
     #[test]
     fn test_entry_function_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let allow_list_entry_function_filter = TransactionFilter::new(
             Filter::empty()
@@ -210,10 +217,10 @@ mod test {
                 .add_deny_all(),
         );
         let filtered_txns = txns.clone()[0..2].to_vec();
-        allow_list_entry_function_filter.filter(block_id, 0, &mut txns);
+        let txns = allow_list_entry_function_filter.filter(block_id, 0, txns);
         assert_eq!(filtered_txns, txns);
 
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let deny_list_entry_function_filter = TransactionFilter::new(
             Filter::empty()
                 .add_deny_entry_function(
@@ -228,13 +235,13 @@ mod test {
                 ),
         );
         let filtered_txns = txns.clone()[2..].to_vec();
-        deny_list_entry_function_filter.filter(block_id, 0, &mut txns);
+        let txns = deny_list_entry_function_filter.filter(block_id, 0, txns);
         assert_eq!(filtered_txns, txns);
     }
 
     #[test]
     fn test_allow_list_module_address_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let allow_list_module_address_filter = TransactionFilter::new(
             Filter::empty()
@@ -243,23 +250,23 @@ mod test {
                 .add_deny_all(),
         );
         let filtered_txns = txns.clone()[0..4].to_vec();
-        allow_list_module_address_filter.filter(block_id, 0, &mut txns);
+        let txns = allow_list_module_address_filter.filter(block_id, 0, txns);
         assert_eq!(filtered_txns, txns);
 
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_list_module_address_filter = TransactionFilter::new(
             Filter::empty()
                 .add_deny_module_address(get_module_address(&txns[0]))
                 .add_deny_module_address(get_module_address(&txns[1])),
         );
         let filtered_txns = txns.clone()[4..].to_vec();
-        block_list_module_address_filter.filter(block_id, 0, &mut txns);
+        let txns = block_list_module_address_filter.filter(block_id, 0, txns);
         assert_eq!(filtered_txns, txns);
     }
 
     #[test]
     fn test_composite_allow_list_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let filter = serde_yaml::from_str::<Filter>(r#"
             rules:
@@ -282,13 +289,13 @@ mod test {
 
         let allow_list_filter = TransactionFilter::new(filter);
         let filtered_txns = txns.clone()[0..4].to_vec();
-        allow_list_filter.filter(block_id, 0, &mut txns);
+        let txns = allow_list_filter.filter(block_id, 0, txns);
         assert_eq!(filtered_txns, txns);
     }
 
     #[test]
     fn test_composite_block_list_filter() {
-        let mut txns = get_transactions();
+        let txns = get_transactions();
         let block_id = HashValue::random();
         let filter = serde_yaml::from_str::<Filter>(r#"
             rules:
@@ -310,7 +317,7 @@ mod test {
 
         let allow_list_filter = TransactionFilter::new(filter);
         let filtered_txns = txns.clone()[4..].to_vec();
-        allow_list_filter.filter(block_id, 0, &mut txns);
+        let txns = allow_list_filter.filter(block_id, 0, txns);
         assert_eq!(filtered_txns, txns);
     }
 }
