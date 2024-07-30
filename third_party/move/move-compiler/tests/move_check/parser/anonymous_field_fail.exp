@@ -8,7 +8,7 @@ error[E01013]: unsupported language construct
   ┌─ tests/move_check/parser/anonymous_field_fail.move:4:5
   │
 4 │     enum E {
-  │     ^^^^ Move 2 language construct is not enabled: struct variants
+  │     ^^^^ Move 2 language construct is not enabled: enum types
 
 error[E01013]: unsupported language construct
   ┌─ tests/move_check/parser/anonymous_field_fail.move:5:10
