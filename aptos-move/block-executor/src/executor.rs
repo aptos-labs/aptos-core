@@ -798,6 +798,7 @@ where
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
         worker_id: &usize,
+        start_time_all: &Instant,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -881,6 +882,8 @@ where
                             ),
                         )? {
                             //if we are in fallback and won write => no need to validate
+                            let cur = Instant::now();
+                            println!("executed fallback on critical path, thread_id={}, time elapsed={:?}", worker_id, cur-*start_time_all);
                             scheduler.finish_execution(
                                 last_commit_idx,
                                 incarnation,
@@ -1028,6 +1031,7 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let start = Instant::now();
         let worker_ids: Vec<usize> = (0..num_workers).collect();
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
@@ -1046,6 +1050,7 @@ where
                         &final_results,
                         num_workers,
                         worker_id,
+                        &start,
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,
