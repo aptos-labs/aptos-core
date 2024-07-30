@@ -303,18 +303,6 @@ impl PrioritizedPeersState {
         &mut self,
         peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
     ) {
-        info!("Updating prioritized peers: {:?}", peers_and_metadata);
-        info!(
-            "Update_prioritized_peers: count: {:?}, {:?}",
-            peers_and_metadata.len(),
-            peers_and_metadata
-                .iter()
-                .map(|(peer, metadata)| (
-                    peer,
-                    metadata.map(|metadata| metadata.average_ping_latency_secs)
-                ))
-                .collect::<Vec<_>>()
-        );
         let peer_monitoring_data: HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>> =
             peers_and_metadata.clone().into_iter().collect();
 
@@ -340,9 +328,17 @@ impl PrioritizedPeersState {
         // Set the last peer priority update time
         self.last_peer_priority_update = Some(self.time_service.now());
         info!(
-            "new_prioritized peers: count:{:?}, {:?}",
-            self.prioritized_peers.read().len(),
-            self.prioritized_peers.read()
+            "Update_prioritized_peers: count: {:?}, latencies: {:?}, prioritized_peers: {:?}, sender_buckets: {:?}",
+            peers_and_metadata.len(),
+            peers_and_metadata
+                .iter()
+                .map(|(peer, metadata)| (
+                    peer,
+                    metadata.map(|metadata| metadata.average_ping_latency_secs)
+                ))
+                .collect::<Vec<_>>(),
+            self.prioritized_peers.read(),
+            self.peer_to_sender_buckets,
         );
     }
 
