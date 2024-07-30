@@ -4,10 +4,11 @@
 
 use crate::{
     application::{metadata::ConnectionState, storage::PeersAndMetadata},
-    peer_manager::{PeerManagerNotification, PeerManagerRequest},
+    peer_manager::PeerManagerRequest,
     protocols::{
-        direct_send::Message,
-        rpc::{InboundRpcRequest, OutboundRpcRequest},
+        network::ReceivedMessage,
+        rpc::OutboundRpcRequest,
+        wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
     },
     transport::ConnectionMetadata,
     ProtocolId,
@@ -24,7 +25,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// A sender to a node to mock an inbound network message from [`PeerManager`]
 pub type InboundMessageSender =
-    aptos_channels::aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>;
+    aptos_channels::aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>;
 
 /// A sender to a node to mock an inbound connection from [`PeerManager`]
 pub type ConnectionUpdateSender = crate::peer_manager::conn_notifs_channel::Sender;
@@ -306,15 +307,33 @@ pub trait TestNode: ApplicationNode + Sync {
     async fn send_next_network_msg(&mut self, network_id: NetworkId) {
         let request = self.get_next_network_msg(network_id).await;
 
-        let (remote_peer_id, protocol_id, data, maybe_rpc_info) = match request {
-            PeerManagerRequest::SendRpc(peer_id, msg) => (
-                peer_id,
-                msg.protocol_id,
-                msg.data,
-                Some((msg.timeout, msg.res_tx)),
-            ),
+        let (remote_peer_id, protocol_id, rmsg) = match request {
+            PeerManagerRequest::SendRpc(peer_id, msg) => {
+                let rmsg = ReceivedMessage {
+                    message: NetworkMessage::RpcRequest(RpcRequest {
+                        protocol_id: msg.protocol_id,
+                        request_id: 0,
+                        priority: 0,
+                        raw_request: msg.data.into(),
+                    }),
+                    sender: self.peer_network_id(network_id),
+                    receive_timestamp_micros: 0,
+                    rpc_replier: Some(Arc::new(msg.res_tx)),
+                };
+                (peer_id, msg.protocol_id, rmsg)
+            },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.mdata, None)
+                let rmsg = ReceivedMessage {
+                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                        protocol_id: msg.protocol_id,
+                        priority: 0,
+                        raw_msg: msg.mdata.into(),
+                    }),
+                    sender: self.peer_network_id(network_id),
+                    receive_timestamp_micros: 0,
+                    rpc_replier: None,
+                };
+                (peer_id, msg.protocol_id, rmsg)
             },
         };
 
@@ -323,22 +342,9 @@ pub trait TestNode: ApplicationNode + Sync {
         let receiver_handle = self.get_inbound_handle_for_peer(receiver_peer_network_id);
         let sender_peer_id = sender_peer_network_id.peer_id();
 
-        // TODO: Add timeout functionality
-        let peer_manager_notif = if let Some((_timeout, res_tx)) = maybe_rpc_info {
-            PeerManagerNotification::RecvRpc(sender_peer_id, InboundRpcRequest {
-                protocol_id,
-                data,
-                res_tx,
-            })
-        } else {
-            PeerManagerNotification::RecvMessage(sender_peer_id, Message {
-                protocol_id,
-                mdata: data,
-            })
-        };
         receiver_handle
             .inbound_message_sender
-            .push((sender_peer_id, protocol_id), peer_manager_notif)
+            .push((sender_peer_id, protocol_id), rmsg)
             .unwrap();
     }
 }

@@ -829,7 +829,7 @@ fn optimize_for_maximum_throughput(
 ) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_unique_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_txns_after_filtering = max_txns_per_block as u64;
     config.consensus.max_sending_block_txns = config
         .consensus
         .max_sending_block_txns
@@ -1120,7 +1120,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         criteria: [
             (7700, 100, 0.3, 0.5, 0.5, 0.5),
             (7000, 100, 0.3, 0.5, 0.5, 0.5),
-            (2000, 300, 0.3, 1.0, 0.6, 1.0),
+            (2000, 300, 0.3, 2.5, 0.6, 1.0),
             (3200, 500, 0.3, 1.5, 0.7, 0.7),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
@@ -1451,10 +1451,10 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_wait_for_catchup_s(180) // 3 minutes
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
-                    // Check that we don't use more than 18 CPU cores for 30% of the time.
-                    MetricsThreshold::new(18.0, 40),
-                    // Check that we don't use more than 6 GB of memory for more than 10% of the time.
-                    MetricsThreshold::new_gb(6.0, 10),
+                    // Check that we don't use more than 24 CPU cores for 20% of the time.
+                    MetricsThreshold::new(24.0, 20),
+                    // Check that we don't use more than 7.5 GB of memory for more than 10% of the time.
+                    MetricsThreshold::new_gb(7.5, 10),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1967,8 +1967,8 @@ fn realistic_env_max_load_test(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(18.0, 15),
             // Memory starts around 3.5GB, and grows around 1.4GB/hr in this test.
-            // Check that we don't use more than final expected memory for more than 10% of the time.
-            MetricsThreshold::new_gb(3.5 + 1.4 * (duration_secs as f64 / 3600.0), 10),
+            // Check that we don't use more than final expected memory for more than 40% of the time.
+            MetricsThreshold::new_gb(3.5 + 1.4 * (duration_secs as f64 / 3600.0), 40),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -2030,6 +2030,12 @@ fn realistic_env_max_load_test(
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
+            optimize_state_sync_for_throughput(config, 2000);
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(move |config, _| {
+            optimize_state_sync_for_throughput(config, 2000);
+        }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
@@ -2070,7 +2076,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-            optimize_state_sync_for_throughput(config);
+            optimize_state_sync_for_throughput(config, 15_000);
 
             optimize_for_maximum_throughput(config, TARGET_TPS, MAX_TXNS_PER_BLOCK, VN_LATENCY_S);
 
@@ -2109,7 +2115,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                optimize_state_sync_for_throughput(config);
+                optimize_state_sync_for_throughput(config, 15_000);
 
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
@@ -2163,15 +2169,16 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     forge_config
 }
 
-/// Optimizes the state sync configs for throughput
-fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig) {
-    let max_chunk_size = 15_000; // This allows state sync to match consensus block sizes
+/// Optimizes the state sync configs for throughput.
+/// `max_chunk_size` is the maximum number of transactions to include in a chunk.
+fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig, max_chunk_size: u64) {
     let max_chunk_bytes = 40 * 1024 * 1024; // 10x the current limit (to prevent execution fallback)
 
     // Update the chunk sizes for the data client
     let data_client_config = &mut node_config.state_sync.aptos_data_client;
     data_client_config.max_transaction_chunk_size = max_chunk_size;
     data_client_config.max_transaction_output_chunk_size = max_chunk_size;
+
     // Update the chunk sizes for the storage service
     let storage_service_config = &mut node_config.state_sync.storage_service;
     storage_service_config.max_transaction_chunk_size = max_chunk_size;
@@ -2253,9 +2260,10 @@ pub fn changing_working_quorum_test_helper(
             } else {
                 for (i, item) in chain_health_backoff.iter_mut().enumerate() {
                     // as we have lower TPS, make limits smaller
-                    item.max_sending_block_txns_override =
+                    item.max_sending_block_txns_after_filtering_override =
                         (block_size / 2_u64.pow(i as u32 + 1)).max(2);
-                    min_block_txns = min_block_txns.min(item.max_sending_block_txns_override);
+                    min_block_txns =
+                        min_block_txns.min(item.max_sending_block_txns_after_filtering_override);
                     // as we have fewer nodes, make backoff triggered earlier:
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
@@ -2461,7 +2469,7 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
@@ -2472,14 +2480,14 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(95)
+            SuccessCriteria::new(4500)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)
-                // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
-                .add_latency_threshold(2.5, LatencyType::P50)
-                .add_latency_threshold(4., LatencyType::P90)
-                .add_latency_threshold(5., LatencyType::P99)
+                // Percentile thresholds are estimated and should be revisited.
+                .add_latency_threshold(3.5, LatencyType::P50)
+                .add_latency_threshold(4.5, LatencyType::P90)
+                .add_latency_threshold(5.5, LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),

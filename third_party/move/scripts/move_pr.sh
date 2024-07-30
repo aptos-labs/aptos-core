@@ -94,8 +94,10 @@ MOVE_CRATES="\
   -p move-bytecode-verifier\
   -p move-binary-format\
   -p move-compiler\
+  -p move-compiler-transactional-tests\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
+  -p move-ir-compiler-transactional-tests\
   -p move-prover-boogie-backend\
   -p move-prover\
   -p move-transactional-test-runner\
@@ -107,6 +109,7 @@ MOVE_CRATES="\
 # MOVE_COMPILER_V2 env var.
 MOVE_CRATES_V2_ENV_DEPENDENT="\
   -p aptos-transactional-test-harness \
+  -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
   -p move-async-vm \
   -p move-cli \

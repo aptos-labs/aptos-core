@@ -441,8 +441,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for (name, fun_def) in module_def.functions.key_cloned_iter() {
             self.decl_ana_fun(&name, fun_def);
         }
-        // we have collected all package and friend visibilities in the current module
-        self.check_visibility_compatibility();
         for (name, const_def) in module_def.constants.key_cloned_iter() {
             self.decl_ana_const(&name, const_def);
         }
@@ -455,6 +453,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for (friend_mod_id, friend) in module_def.friends.key_cloned_iter() {
             self.decl_ana_friend_decl(&friend_mod_id, &friend.loc);
         }
+        // we have collected all package and friend visibilities in the current module
+        // and friend declarations in the current module, before we can check their compatibility
+        self.check_visibility_compatibility();
     }
 
     fn decl_ana_const(&mut self, name: &PA::ConstantName, def: &EA::Constant) {
@@ -1244,11 +1245,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         }
                     })
                     .collect_vec();
-                // Identify common fields
                 if !variant_maps.is_empty() {
-                    let mut common_fields = BTreeSet::new();
+                    // Identify common fields and compute their offsets. Common fields
+                    // occupy the first N slots in a variant layout, where the order
+                    // is determined by the first variant which declares them.
+                    let mut common_fields: BTreeMap<Symbol, usize> = BTreeMap::new();
                     let main = &variant_maps[0];
-                    for field in main.fields.values() {
+                    for field in main.fields.values().sorted_by_key(|f| f.offset) {
                         let mut common = true;
                         for other in &variant_maps[1..variant_maps.len()] {
                             if !other
@@ -1261,12 +1264,25 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             }
                         }
                         if common {
-                            common_fields.insert(field.name);
+                            common_fields.insert(field.name, common_fields.len());
                         }
                     }
+                    // Now adjust the offsets of the fields over all variants.
                     for variant_map in variant_maps.iter_mut() {
-                        for field in variant_map.fields.values_mut() {
-                            field.common_for_variants = common_fields.contains(&field.name)
+                        let mut next_offset = common_fields.len();
+                        for field in variant_map
+                            .fields
+                            .values_mut()
+                            .sorted_by_key(|v| v.offset)
+                            .collect_vec()
+                        {
+                            if let Some(offset) = common_fields.get(&field.name) {
+                                field.common_for_variants = true;
+                                field.offset = *offset
+                            } else {
+                                field.offset = next_offset;
+                                next_offset += 1
+                            }
                         }
                     }
                 }
@@ -1864,12 +1880,18 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         et
     }
 
-    /// Checks if both package and friend visibility are used in the same module
+    /// Checks if both package and friend visibility/declaration are used in the same module
     fn check_visibility_compatibility(&self) {
-        if let Some(friend_vis_loc) = &self.friend_fun_loc {
-            let friend_vis_loc = self.parent.to_loc(friend_vis_loc);
-            if let Some(package_vis_loc) = &self.package_fun_loc {
-                let package_vis_loc = self.parent.to_loc(package_vis_loc);
+        if let Some(package_vis_loc) = &self.package_fun_loc {
+            let package_vis_loc = self.parent.to_loc(package_vis_loc);
+            let friend_vis_loc = if let Some(friend_vis_loc) = &self.friend_fun_loc {
+                Some(self.parent.to_loc(friend_vis_loc))
+            } else {
+                self.friend_decls
+                    .first()
+                    .map(|friend_decl| friend_decl.loc.clone())
+            };
+            if let Some(friend_vis_loc) = friend_vis_loc {
                 self.parent.env.diag_with_labels(
                     Severity::Error,
                     &friend_vis_loc,
@@ -3470,25 +3492,26 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     field_data.extend(fields.values().map(|f| (FieldId::new(f.name), f.clone())));
                 },
                 StructLayout::Variants(entry_variants) => {
-                    for variant in entry_variants {
+                    for (order, variant) in entry_variants.iter().enumerate() {
                         variants.insert(variant.name, model::StructVariant {
                             loc: variant.loc.clone(),
+                            order,
                             attributes: variant.attributes.clone(),
                         });
-                        let pool = self.parent.env.symbol_pool();
-                        field_data.extend(variant.fields.values().map(|f| {
-                            let variant_field_name = if !f.common_for_variants {
+                        for field in variant.fields.values().sorted_by_key(|f| f.offset).cloned() {
+                            let variant_field_name = if !field.common_for_variants {
                                 // If the field is not common between variants, we need to qualify
                                 // the name with the variant for a unique id.
+                                let pool = self.parent.env.symbol_pool();
                                 pool.make(&FieldId::make_variant_field_id_str(
                                     pool.string(variant.name).as_str(),
-                                    pool.string(f.name).as_str(),
+                                    pool.string(field.name).as_str(),
                                 ))
                             } else {
-                                f.name
+                                field.name
                             };
-                            (FieldId::new(variant_field_name), f.clone())
-                        }))
+                            field_data.insert(FieldId::new(variant_field_name), field);
+                        }
                     }
                 },
                 StructLayout::None => {},

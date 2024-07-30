@@ -118,6 +118,34 @@ fn serialize_field_inst_index(
     write_as_uleb128(binary, idx.0, FIELD_INST_INDEX_MAX)
 }
 
+fn serialize_variant_field_handle_index(
+    binary: &mut BinaryData,
+    idx: &VariantFieldHandleIndex,
+) -> Result<()> {
+    write_as_uleb128(binary, idx.0, VARIANT_FIELD_HANDLE_INDEX_MAX)
+}
+
+fn serialize_variant_field_inst_index(
+    binary: &mut BinaryData,
+    idx: &VariantFieldInstantiationIndex,
+) -> Result<()> {
+    write_as_uleb128(binary, idx.0, VARIANT_FIELD_INST_INDEX_MAX)
+}
+
+fn serialize_struct_variant_handle_index(
+    binary: &mut BinaryData,
+    idx: &StructVariantHandleIndex,
+) -> Result<()> {
+    write_as_uleb128(binary, idx.0, STRUCT_VARIANT_HANDLE_INDEX_MAX)
+}
+
+fn serialize_struct_variant_inst_index(
+    binary: &mut BinaryData,
+    idx: &StructVariantInstantiationIndex,
+) -> Result<()> {
+    write_as_uleb128(binary, idx.0, STRUCT_VARIANT_INST_INDEX_MAX)
+}
+
 fn serialize_function_inst_index(
     binary: &mut BinaryData,
     idx: &FunctionInstantiationIndex,
@@ -168,8 +196,16 @@ fn serialize_field_count(binary: &mut BinaryData, len: usize) -> Result<()> {
     write_as_uleb128(binary, len as u64, FIELD_COUNT_MAX)
 }
 
+fn serialize_variant_count(binary: &mut BinaryData, len: usize) -> Result<()> {
+    write_as_uleb128(binary, len as u64, VARIANT_COUNT_MAX)
+}
+
 fn serialize_field_offset(binary: &mut BinaryData, offset: u16) -> Result<()> {
     write_as_uleb128(binary, offset, FIELD_OFFSET_MAX)
+}
+
+fn serialize_variant_offset(binary: &mut BinaryData, offset: u16) -> Result<()> {
+    write_as_uleb128(binary, offset, VARIANT_OFFSET_MAX)
 }
 
 fn serialize_acquires_count(binary: &mut BinaryData, len: usize) -> Result<()> {
@@ -300,6 +336,11 @@ struct ModuleSerializer {
     field_handles: (u32, u32),
     field_instantiations: (u32, u32),
     friend_decls: (u32, u32),
+    // Since bytecode version 7
+    variant_field_handles: (u32, u32),
+    variant_field_instantiations: (u32, u32),
+    struct_variant_handles: (u32, u32),
+    struct_variant_instantiations: (u32, u32),
 }
 
 /// Holds data to compute the header of a transaction script binary.
@@ -527,7 +568,7 @@ fn serialize_function_instantiation(
 /// A `String` gets serialized as follows:
 /// - `String` size as a ULEB128
 /// - `String` bytes - *exact format to be defined, Rust utf8 right now*
-fn serialize_identifier(binary: &mut BinaryData, string: &str) -> Result<()> {
+fn serialize_identifier(binary: &mut BinaryData, string: &Identifier) -> Result<()> {
     let bytes = string.as_bytes();
     serialize_identifier_size(binary, bytes.len())?;
     for byte in bytes {
@@ -578,12 +619,8 @@ fn serialize_byte_blob(
 }
 
 /// Serializes a `StructDefinition`.
-///
-/// A `StructDefinition` gets serialized as follows:
-/// - `StructDefinition.handle` as a ULEB128 (index into the `ModuleHandle` table)
-/// - `StructDefinition.field_count` as a ULEB128 (number of fields defined in the type)
-/// - `StructDefinition.fields` as a ULEB128 (index into the `FieldDefinition` table)
 fn serialize_struct_definition(
+    major_version: u32,
     binary: &mut BinaryData,
     struct_definition: &StructDefinition,
 ) -> Result<()> {
@@ -593,6 +630,21 @@ fn serialize_struct_definition(
         StructFieldInformation::Declared(fields) => {
             binary.push(SerializedNativeStructFlag::DECLARED as u8)?;
             serialize_field_definitions(binary, fields)
+        },
+        StructFieldInformation::DeclaredVariants(variants) => {
+            if major_version >= VERSION_7 {
+                binary.push(SerializedNativeStructFlag::DECLARED_VARIANTS as u8)?;
+                serialize_variant_count(binary, variants.len())?;
+                for variant in variants {
+                    serialize_variant_definition(binary, variant)?
+                }
+                Ok(())
+            } else {
+                Err(anyhow!(
+                    "Enum types not supported in bytecode version {}",
+                    major_version
+                ))
+            }
         },
     }
 }
@@ -606,7 +658,7 @@ fn serialize_struct_def_instantiation(
     Ok(())
 }
 
-/// Serializes `FieldDefinition` within a struct.
+/// Serializes `FieldDefinition` list within a struct.
 fn serialize_field_definitions(binary: &mut BinaryData, fields: &[FieldDefinition]) -> Result<()> {
     serialize_field_count(binary, fields.len())?;
     for field_definition in fields {
@@ -615,18 +667,21 @@ fn serialize_field_definitions(binary: &mut BinaryData, fields: &[FieldDefinitio
     Ok(())
 }
 
-/// Serializes a `FieldDefinition`.
-///
-/// A `FieldDefinition` gets serialized as follows:
-/// - `FieldDefinition.struct_` as a ULEB128 (index into the `StructHandle` table)
-/// - `StructDefinition.name` as a ULEB128 (index into the `IdentifierPool` table)
-/// - `StructDefinition.signature` a serialized `TypeSignatureToekn`)
+/// Serializes a `FieldDefinition` within a struct.
 fn serialize_field_definition(
     binary: &mut BinaryData,
     field_definition: &FieldDefinition,
 ) -> Result<()> {
     serialize_identifier_index(binary, &field_definition.name)?;
     serialize_signature_token(binary, &field_definition.signature.0)
+}
+
+fn serialize_variant_definition(
+    binary: &mut BinaryData,
+    variant_definition: &VariantDefinition,
+) -> Result<()> {
+    serialize_identifier_index(binary, &variant_definition.name)?;
+    serialize_field_definitions(binary, &variant_definition.fields)
 }
 
 fn serialize_field_handle(binary: &mut BinaryData, field_handle: &FieldHandle) -> Result<()> {
@@ -641,6 +696,46 @@ fn serialize_field_instantiation(
 ) -> Result<()> {
     serialize_field_handle_index(binary, &field_inst.handle)?;
     serialize_signature_index(binary, &field_inst.type_parameters)?;
+    Ok(())
+}
+
+fn serialize_variant_field_handle(
+    binary: &mut BinaryData,
+    handle: &VariantFieldHandle,
+) -> Result<()> {
+    serialize_struct_def_index(binary, &handle.struct_index)?;
+    serialize_field_offset(binary, handle.field)?;
+    serialize_variant_count(binary, handle.variants.len())?;
+    for variant in &handle.variants {
+        serialize_variant_offset(binary, *variant)?
+    }
+    Ok(())
+}
+
+fn serialize_variant_field_instantiation(
+    binary: &mut BinaryData,
+    inst: &VariantFieldInstantiation,
+) -> Result<()> {
+    serialize_variant_field_handle_index(binary, &inst.handle)?;
+    serialize_signature_index(binary, &inst.type_parameters)?;
+    Ok(())
+}
+
+fn serialize_struct_variant_handle(
+    binary: &mut BinaryData,
+    handle: &StructVariantHandle,
+) -> Result<()> {
+    serialize_struct_def_index(binary, &handle.struct_index)?;
+    serialize_variant_offset(binary, handle.variant)?;
+    Ok(())
+}
+
+fn serialize_struct_variant_instantiation(
+    binary: &mut BinaryData,
+    inst: &StructVariantInstantiation,
+) -> Result<()> {
+    serialize_struct_variant_handle_index(binary, &inst.handle)?;
+    serialize_signature_index(binary, &inst.type_parameters)?;
     Ok(())
 }
 
@@ -933,6 +1028,22 @@ fn serialize_instruction_inner(
             binary.push(Opcodes::IMM_BORROW_FIELD_GENERIC as u8)?;
             serialize_field_inst_index(binary, field_idx)
         },
+        Bytecode::MutBorrowVariantField(field_idx) => {
+            binary.push(Opcodes::MUT_BORROW_VARIANT_FIELD as u8)?;
+            serialize_variant_field_handle_index(binary, field_idx)
+        },
+        Bytecode::MutBorrowVariantFieldGeneric(field_idx) => {
+            binary.push(Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC as u8)?;
+            serialize_variant_field_inst_index(binary, field_idx)
+        },
+        Bytecode::ImmBorrowVariantField(field_idx) => {
+            binary.push(Opcodes::IMM_BORROW_VARIANT_FIELD as u8)?;
+            serialize_variant_field_handle_index(binary, field_idx)
+        },
+        Bytecode::ImmBorrowVariantFieldGeneric(field_idx) => {
+            binary.push(Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC as u8)?;
+            serialize_variant_field_inst_index(binary, field_idx)
+        },
         Bytecode::Call(method_idx) => {
             binary.push(Opcodes::CALL as u8)?;
             serialize_function_handle_index(binary, method_idx)
@@ -956,6 +1067,30 @@ fn serialize_instruction_inner(
         Bytecode::UnpackGeneric(class_idx) => {
             binary.push(Opcodes::UNPACK_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
+        },
+        Bytecode::UnpackVariant(class_idx) => {
+            binary.push(Opcodes::UNPACK_VARIANT as u8)?;
+            serialize_struct_variant_handle_index(binary, class_idx)
+        },
+        Bytecode::PackVariant(class_idx) => {
+            binary.push(Opcodes::PACK_VARIANT as u8)?;
+            serialize_struct_variant_handle_index(binary, class_idx)
+        },
+        Bytecode::UnpackVariantGeneric(class_idx) => {
+            binary.push(Opcodes::UNPACK_VARIANT_GENERIC as u8)?;
+            serialize_struct_variant_inst_index(binary, class_idx)
+        },
+        Bytecode::PackVariantGeneric(class_idx) => {
+            binary.push(Opcodes::PACK_VARIANT_GENERIC as u8)?;
+            serialize_struct_variant_inst_index(binary, class_idx)
+        },
+        Bytecode::TestVariant(class_idx) => {
+            binary.push(Opcodes::TEST_VARIANT as u8)?;
+            serialize_struct_variant_handle_index(binary, class_idx)
+        },
+        Bytecode::TestVariantGeneric(class_idx) => {
+            binary.push(Opcodes::TEST_VARIANT_GENERIC as u8)?;
+            serialize_struct_variant_inst_index(binary, class_idx)
         },
         Bytecode::ReadRef => binary.push(Opcodes::READ_REF as u8),
         Bytecode::WriteRef => binary.push(Opcodes::WRITE_REF as u8),
@@ -1083,6 +1218,27 @@ fn serialize_code(major_version: u32, binary: &mut BinaryData, code: &[Bytecode]
     Ok(())
 }
 
+/// Generic function to serialize a table. Maintains a table counter, skipping empty table
+/// entries, and returns start index and length in the binary.
+fn serialize_table<T>(
+    table_count: &mut u8,
+    binary: &mut BinaryData,
+    table: &[T],
+    serializer: impl Fn(&mut BinaryData, &T) -> Result<()>,
+) -> Result<(u32, u32)> {
+    if !table.is_empty() {
+        // Note:  table count is smaller than `max(u8)`, so wrapping_add is safe
+        *table_count = table_count.wrapping_add(1);
+        let start = check_index_in_binary(binary.len())?;
+        for elem in table {
+            serializer(binary, elem)?
+        }
+        Ok((start, checked_calculate_table_size(binary, start)?))
+    } else {
+        Ok((0, 0))
+    }
+}
+
 /// Compute the table size with a check for underflow
 fn checked_calculate_table_size(binary: &mut BinaryData, start: u32) -> Result<u32> {
     let offset = check_index_in_binary(binary.len())?;
@@ -1109,7 +1265,12 @@ impl CommonSerializer {
 
     fn serialize_header(&mut self, binary: &mut BinaryData) -> Result<()> {
         serialize_magic(binary)?;
-        write_u32(binary, self.major_version)?;
+        let version = if self.major_version >= VERSION_7 {
+            APTOS_BYTECODE_VERSION_MASK | self.major_version
+        } else {
+            self.major_version
+        };
+        write_u32(binary, version)?;
         Ok(())
     }
 
@@ -1183,171 +1344,65 @@ impl CommonSerializer {
         tables: &T,
     ) -> Result<()> {
         debug_assert!(self.table_count == 0);
-        self.serialize_module_handles(binary, tables.get_module_handles())?;
-        self.serialize_struct_handles(binary, tables.get_struct_handles())?;
-        self.serialize_function_handles(binary, tables.get_function_handles())?;
+        let mut table_count = self.table_count; // avoid &mut on self
+        self.module_handles = serialize_table(
+            &mut table_count,
+            binary,
+            tables.get_module_handles(),
+            serialize_module_handle,
+        )?;
+        self.struct_handles = serialize_table(
+            &mut table_count,
+            binary,
+            tables.get_struct_handles(),
+            serialize_struct_handle,
+        )?;
+        self.function_handles = serialize_table(
+            &mut table_count,
+            binary,
+            tables.get_function_handles(),
+            |binary, handle| serialize_function_handle(self.major_version, binary, handle),
+        )?;
         debug_assert!(self.table_count < 6);
-        self.serialize_function_instantiations(binary, tables.get_function_instantiations())?;
-        self.serialize_signatures(binary, tables.get_signatures())?;
-        self.serialize_identifiers(binary, tables.get_identifiers())?;
-        self.serialize_address_identifiers(binary, tables.get_address_identifiers())?;
-        self.serialize_constants(binary, tables.get_constant_pool())?;
+        self.function_instantiations = serialize_table(
+            &mut table_count,
+            binary,
+            tables.get_function_instantiations(),
+            serialize_function_instantiation,
+        )?;
+        self.signatures = serialize_table(
+            &mut table_count,
+            binary,
+            tables.get_signatures(),
+            serialize_signature,
+        )?;
+        self.identifiers = serialize_table(
+            &mut table_count,
+            binary,
+            tables.get_identifiers(),
+            serialize_identifier,
+        )?;
+        self.address_identifiers = serialize_table(
+            &mut table_count,
+            binary,
+            tables.get_address_identifiers(),
+            serialize_address,
+        )?;
+        self.constant_pool = serialize_table(
+            &mut table_count,
+            binary,
+            tables.get_constant_pool(),
+            serialize_constant,
+        )?;
         if self.major_version >= VERSION_5 {
-            self.serialize_metadata(binary, tables.get_metadata())?;
+            self.metadata = serialize_table(
+                &mut table_count,
+                binary,
+                tables.get_metadata(),
+                serialize_metadata_entry,
+            )?;
         }
-        Ok(())
-    }
-
-    /// Serializes `ModuleHandle` table.
-    fn serialize_module_handles(
-        &mut self,
-        binary: &mut BinaryData,
-        module_handles: &[ModuleHandle],
-    ) -> Result<()> {
-        if !module_handles.is_empty() {
-            self.table_count += 1;
-            self.module_handles.0 = check_index_in_binary(binary.len())?;
-            for module_handle in module_handles {
-                serialize_module_handle(binary, module_handle)?;
-            }
-            self.module_handles.1 = checked_calculate_table_size(binary, self.module_handles.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes `StructHandle` table.
-    fn serialize_struct_handles(
-        &mut self,
-        binary: &mut BinaryData,
-        struct_handles: &[StructHandle],
-    ) -> Result<()> {
-        if !struct_handles.is_empty() {
-            self.table_count += 1;
-            self.struct_handles.0 = check_index_in_binary(binary.len())?;
-            for struct_handle in struct_handles {
-                serialize_struct_handle(binary, struct_handle)?;
-            }
-            self.struct_handles.1 = checked_calculate_table_size(binary, self.struct_handles.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes `FunctionHandle` table.
-    fn serialize_function_handles(
-        &mut self,
-        binary: &mut BinaryData,
-        function_handles: &[FunctionHandle],
-    ) -> Result<()> {
-        if !function_handles.is_empty() {
-            self.table_count += 1;
-            self.function_handles.0 = check_index_in_binary(binary.len())?;
-            for function_handle in function_handles {
-                serialize_function_handle(self.major_version, binary, function_handle)?;
-            }
-            self.function_handles.1 =
-                checked_calculate_table_size(binary, self.function_handles.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes `FunctionInstantiation` table.
-    fn serialize_function_instantiations(
-        &mut self,
-        binary: &mut BinaryData,
-        function_instantiations: &[FunctionInstantiation],
-    ) -> Result<()> {
-        if !function_instantiations.is_empty() {
-            self.table_count += 1;
-            self.function_instantiations.0 = check_index_in_binary(binary.len())?;
-            for function_instantiation in function_instantiations {
-                serialize_function_instantiation(binary, function_instantiation)?;
-            }
-            self.function_instantiations.1 =
-                checked_calculate_table_size(binary, self.function_instantiations.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes `Identifiers`.
-    fn serialize_identifiers(
-        &mut self,
-        binary: &mut BinaryData,
-        identifiers: &[Identifier],
-    ) -> Result<()> {
-        if !identifiers.is_empty() {
-            self.table_count += 1;
-            self.identifiers.0 = check_index_in_binary(binary.len())?;
-            for identifier in identifiers {
-                // User strings and identifiers use the same serialization.
-                serialize_identifier(binary, identifier.as_str())?;
-            }
-            self.identifiers.1 = checked_calculate_table_size(binary, self.identifiers.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes `AddressIdentifiers`.
-    fn serialize_address_identifiers(
-        &mut self,
-        binary: &mut BinaryData,
-        addresses: &[AccountAddress],
-    ) -> Result<()> {
-        if !addresses.is_empty() {
-            self.table_count += 1;
-            self.address_identifiers.0 = check_index_in_binary(binary.len())?;
-            for address in addresses {
-                serialize_address(binary, address)?;
-            }
-            self.address_identifiers.1 =
-                checked_calculate_table_size(binary, self.address_identifiers.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes `ConstantPool`.
-    fn serialize_constants(
-        &mut self,
-        binary: &mut BinaryData,
-        constants: &[Constant],
-    ) -> Result<()> {
-        if !constants.is_empty() {
-            self.table_count += 1;
-            self.constant_pool.0 = check_index_in_binary(binary.len())?;
-            for constant in constants {
-                serialize_constant(binary, constant)?;
-            }
-            self.constant_pool.1 = checked_calculate_table_size(binary, self.constant_pool.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes metadata.
-    fn serialize_metadata(&mut self, binary: &mut BinaryData, metadata: &[Metadata]) -> Result<()> {
-        if !metadata.is_empty() {
-            self.table_count += 1;
-            self.metadata.0 = check_index_in_binary(binary.len())?;
-            for entry in metadata {
-                serialize_metadata_entry(binary, entry)?;
-            }
-            self.metadata.1 = checked_calculate_table_size(binary, self.metadata.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes `SignaturePool` table.
-    fn serialize_signatures(
-        &mut self,
-        binary: &mut BinaryData,
-        signatures: &[Signature],
-    ) -> Result<()> {
-        if !signatures.is_empty() {
-            self.table_count += 1;
-            self.signatures.0 = check_index_in_binary(binary.len())?;
-            for signature in signatures {
-                serialize_signature(binary, signature)?;
-            }
-            self.signatures.1 = checked_calculate_table_size(binary, self.signatures.0)?;
-        }
+        self.table_count = table_count;
         Ok(())
     }
 
@@ -1366,17 +1421,82 @@ impl ModuleSerializer {
             field_handles: (0, 0),
             field_instantiations: (0, 0),
             friend_decls: (0, 0),
+            // Since bytecode version 7
+            variant_field_handles: (0, 0),
+            variant_field_instantiations: (0, 0),
+            struct_variant_handles: (0, 0),
+            struct_variant_instantiations: (0, 0),
         }
     }
 
     fn serialize_tables(&mut self, binary: &mut BinaryData, module: &CompiledModule) -> Result<()> {
         self.common.serialize_common_tables(binary, module)?;
-        self.serialize_struct_definitions(binary, &module.struct_defs)?;
-        self.serialize_struct_def_instantiations(binary, &module.struct_def_instantiations)?;
-        self.serialize_function_definitions(binary, &module.function_defs)?;
-        self.serialize_field_handles(binary, &module.field_handles)?;
-        self.serialize_field_instantiations(binary, &module.field_instantiations)?;
-        self.serialize_friend_declarations(binary, &module.friend_decls)
+        let mut table_count = self.common.table_count; // avoid holding &mut on self
+        self.struct_defs = serialize_table(
+            &mut table_count,
+            binary,
+            &module.struct_defs,
+            |binary, def| serialize_struct_definition(self.common.major_version, binary, def),
+        )?;
+        self.struct_def_instantiations = serialize_table(
+            &mut table_count,
+            binary,
+            &module.struct_def_instantiations,
+            serialize_struct_def_instantiation,
+        )?;
+        self.function_defs = serialize_table(
+            &mut table_count,
+            binary,
+            &module.function_defs,
+            |binary, def| self.serialize_function_definition(binary, def),
+        )?;
+        self.field_handles = serialize_table(
+            &mut table_count,
+            binary,
+            &module.field_handles,
+            serialize_field_handle,
+        )?;
+        self.field_instantiations = serialize_table(
+            &mut table_count,
+            binary,
+            &module.field_instantiations,
+            serialize_field_instantiation,
+        )?;
+        self.friend_decls = serialize_table(
+            &mut table_count,
+            binary,
+            &module.friend_decls,
+            serialize_module_handle,
+        )?;
+
+        if self.common.major_version() >= VERSION_7 {
+            self.variant_field_handles = serialize_table(
+                &mut table_count,
+                binary,
+                &module.variant_field_handles,
+                serialize_variant_field_handle,
+            )?;
+            self.variant_field_instantiations = serialize_table(
+                &mut table_count,
+                binary,
+                &module.variant_field_instantiations,
+                serialize_variant_field_instantiation,
+            )?;
+            self.struct_variant_handles = serialize_table(
+                &mut table_count,
+                binary,
+                &module.struct_variant_handles,
+                serialize_struct_variant_handle,
+            )?;
+            self.struct_variant_instantiations = serialize_table(
+                &mut table_count,
+                binary,
+                &module.struct_variant_instantiations,
+                serialize_struct_variant_instantiation,
+            )?;
+        }
+        self.common.table_count = table_count;
+        Ok(())
     }
 
     fn serialize_table_indices(&mut self, binary: &mut BinaryData) -> Result<()> {
@@ -1401,7 +1521,7 @@ impl ModuleSerializer {
         )?;
         serialize_table_index(
             binary,
-            TableType::FIELD_HANDLE,
+            TableType::FIELD_HANDLES,
             self.field_handles.0,
             self.field_handles.1,
         )?;
@@ -1417,91 +1537,33 @@ impl ModuleSerializer {
             self.friend_decls.0,
             self.friend_decls.1,
         )?;
-        Ok(())
-    }
-
-    /// Serializes `StructDefinition` table.
-    fn serialize_struct_definitions(
-        &mut self,
-        binary: &mut BinaryData,
-        struct_definitions: &[StructDefinition],
-    ) -> Result<()> {
-        if !struct_definitions.is_empty() {
-            self.common.table_count = self.common.table_count.wrapping_add(1); // the count will bound to a small number
-            self.struct_defs.0 = check_index_in_binary(binary.len())?;
-            for struct_definition in struct_definitions {
-                serialize_struct_definition(binary, struct_definition)?;
-            }
-            self.struct_defs.1 = checked_calculate_table_size(binary, self.struct_defs.0)?;
+        if self.common.major_version >= VERSION_7 {
+            serialize_table_index(
+                binary,
+                TableType::VARIANT_FIELD_HANDLES,
+                self.variant_field_handles.0,
+                self.variant_field_handles.1,
+            )?;
+            serialize_table_index(
+                binary,
+                TableType::VARIANT_FIELD_INST,
+                self.variant_field_instantiations.0,
+                self.variant_field_instantiations.1,
+            )?;
+            serialize_table_index(
+                binary,
+                TableType::STRUCT_VARIANT_HANDLES,
+                self.struct_variant_handles.0,
+                self.struct_variant_handles.1,
+            )?;
+            serialize_table_index(
+                binary,
+                TableType::STRUCT_VARIANT_INST,
+                self.struct_variant_instantiations.0,
+                self.struct_variant_instantiations.1,
+            )?;
         }
-        Ok(())
-    }
 
-    /// Serializes `StructInstantiation` table.
-    fn serialize_struct_def_instantiations(
-        &mut self,
-        binary: &mut BinaryData,
-        struct_def_instantiations: &[StructDefInstantiation],
-    ) -> Result<()> {
-        if !struct_def_instantiations.is_empty() {
-            self.common.table_count = self.common.table_count.wrapping_add(1); // the count will bound to a small number
-            self.struct_def_instantiations.0 = check_index_in_binary(binary.len())?;
-            for struct_instantiation in struct_def_instantiations {
-                serialize_struct_def_instantiation(binary, struct_instantiation)?;
-            }
-            self.struct_def_instantiations.1 =
-                checked_calculate_table_size(binary, self.struct_def_instantiations.0)?;
-        }
-        Ok(())
-    }
-
-    /// Serializes `FunctionDefinition` table.
-    fn serialize_field_handles(
-        &mut self,
-        binary: &mut BinaryData,
-        field_handles: &[FieldHandle],
-    ) -> Result<()> {
-        if !field_handles.is_empty() {
-            self.common.table_count += 1;
-            self.field_handles.0 = check_index_in_binary(binary.len())?;
-            for field_handle in field_handles {
-                serialize_field_handle(binary, field_handle)?;
-            }
-            self.field_handles.1 = checked_calculate_table_size(binary, self.field_handles.0)?;
-        }
-        Ok(())
-    }
-
-    fn serialize_field_instantiations(
-        &mut self,
-        binary: &mut BinaryData,
-        field_instantiations: &[FieldInstantiation],
-    ) -> Result<()> {
-        if !field_instantiations.is_empty() {
-            self.common.table_count += 1;
-            self.field_instantiations.0 = check_index_in_binary(binary.len())?;
-            for field_instantiation in field_instantiations {
-                serialize_field_instantiation(binary, field_instantiation)?;
-            }
-            self.field_instantiations.1 =
-                checked_calculate_table_size(binary, self.field_instantiations.0)?;
-        }
-        Ok(())
-    }
-
-    fn serialize_function_definitions(
-        &mut self,
-        binary: &mut BinaryData,
-        function_definitions: &[FunctionDefinition],
-    ) -> Result<()> {
-        if !function_definitions.is_empty() {
-            self.common.table_count = self.common.table_count.wrapping_add(1); // the count will bound to a small number
-            self.function_defs.0 = check_index_in_binary(binary.len())?;
-            for function_definition in function_definitions {
-                self.serialize_function_definition(binary, function_definition)?;
-            }
-            self.function_defs.1 = checked_calculate_table_size(binary, self.function_defs.0)?;
-        }
         Ok(())
     }
 
@@ -1515,7 +1577,7 @@ impl ModuleSerializer {
     ///   - bit 0x2: native indicator, indicates whether the function is a native function.
     /// - `FunctionDefinition.code` a variable size stream for the `CodeUnit`
     fn serialize_function_definition(
-        &mut self,
+        &self,
         binary: &mut BinaryData,
         function_definition: &FunctionDefinition,
     ) -> Result<()> {
@@ -1545,22 +1607,6 @@ impl ModuleSerializer {
         serialize_acquires(binary, &function_definition.acquires_global_resources)?;
         if let Some(code) = &function_definition.code {
             serialize_code_unit(self.common.major_version(), binary, code)?;
-        }
-        Ok(())
-    }
-
-    fn serialize_friend_declarations(
-        &mut self,
-        binary: &mut BinaryData,
-        friend_declarations: &[ModuleHandle],
-    ) -> Result<()> {
-        if !friend_declarations.is_empty() {
-            self.common.table_count = self.common.table_count.wrapping_add(1); // the count will bound to a small number
-            self.friend_decls.0 = check_index_in_binary(binary.len())?;
-            for module in friend_declarations {
-                serialize_module_handle(binary, module)?;
-            }
-            self.friend_decls.1 = checked_calculate_table_size(binary, self.friend_decls.0)?;
         }
         Ok(())
     }

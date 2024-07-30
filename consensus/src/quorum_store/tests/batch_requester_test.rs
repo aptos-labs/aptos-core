@@ -14,7 +14,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
-    aggregate_signature::{AggregateSignature, PartialSignatures},
+    aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
@@ -22,6 +22,7 @@ use aptos_types::{
 };
 use move_core_types::account_address::AccountAddress;
 use std::time::{Duration, Instant};
+use tokio::sync::oneshot;
 
 #[derive(Clone)]
 struct MockBatchRequester {
@@ -99,13 +100,14 @@ async fn test_batch_request_exists() {
         ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key()),
     );
 
+    let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
+            subscriber_rx,
         )
         .await;
     assert!(result.is_some());
@@ -194,13 +196,14 @@ async fn test_batch_request_not_exists_not_expired() {
     );
 
     let request_start = Instant::now();
+    let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
+            subscriber_rx,
         )
         .await;
     let request_duration = request_start.elapsed();
@@ -241,13 +244,14 @@ async fn test_batch_request_not_exists_expired() {
     );
 
     let request_start = Instant::now();
+    let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
+            subscriber_rx,
         )
         .await;
     let request_duration = request_start.elapsed();

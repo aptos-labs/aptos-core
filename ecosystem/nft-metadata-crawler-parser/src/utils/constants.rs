@@ -13,6 +13,9 @@ pub const MAX_JSON_REQUEST_RETRY_SECONDS: u64 = 30;
 /// Allocate 90 seconds for downloading large image files
 pub const MAX_IMAGE_REQUEST_RETRY_SECONDS: u64 = 90;
 
+/// Allocate 180 seconds for uploading large image files
+pub const MAX_ASSET_UPLOAD_RETRY_SECONDS: u64 = 180;
+
 /// Max number of retries for a given asset_uri
 pub const DEFAULT_MAX_NUM_PARSE_RETRIES: i32 = 3;
 

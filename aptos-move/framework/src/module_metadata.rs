@@ -312,6 +312,17 @@ pub fn get_compilation_metadata_from_compiled_module(
     }
 }
 
+/// Extract compilation metadata from a compiled script
+pub fn get_compilation_metadata_from_compiled_script(
+    module: &CompiledScript,
+) -> Option<CompilationMetadata> {
+    if let Some(data) = find_metadata_in_script(module, COMPILATION_METADATA_KEY) {
+        bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
+    } else {
+        None
+    }
+}
+
 // This is mostly a copy paste of the existing function
 // get_metadata_from_compiled_module. In the API types there is a unifying trait for
 // modules and scripts called Bytecode that could help eliminate this duplication,
@@ -431,7 +442,7 @@ pub fn is_valid_resource_group(
     if let Ok(ident_struct) = Identifier::new(struct_) {
         if let Some((struct_handle, struct_def)) = structs.get(ident_struct.as_ident_str()) {
             let num_fields = match &struct_def.field_information {
-                StructFieldInformation::Native => 0,
+                StructFieldInformation::Native | StructFieldInformation::DeclaredVariants(_) => 0,
                 StructFieldInformation::Declared(fields) => fields.len(),
             };
             if struct_handle.abilities == AbilitySet::EMPTY

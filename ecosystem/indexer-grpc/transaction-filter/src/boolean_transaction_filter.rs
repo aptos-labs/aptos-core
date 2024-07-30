@@ -286,13 +286,10 @@ impl Filterable<Transaction> for APIFilter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        filters::{
-            event::EventFilterBuilder, move_module::MoveStructTagFilterBuilder,
-            /*user_transaction::EntryFunctionFilter,*/ TransactionRootFilterBuilder,
-            UserTransactionFilterBuilder, /*UserTransactionPayloadFilterBuilder,*/
-        },
-        /*test_lib::load_graffio_fixture,*/
+    use crate::filters::{
+        event::EventFilterBuilder, move_module::MoveStructTagFilterBuilder,
+        /*user_transaction::EntryFunctionFilter,*/ TransactionRootFilterBuilder,
+        UserTransactionFilterBuilder, /*UserTransactionPayloadFilterBuilder,*/
     };
 
     // Disabled for now while we investigate an issue with lz4 in aptos-core:

@@ -88,14 +88,13 @@ spec:
         aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
         {{- end}}
     spec:
-      terminationGracePeriodSeconds: 0
       securityContext:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
         - name: run-script
           image: curlimages/curl:latest
-          command:
+          args:
             - sh
             - -c
             - |
@@ -125,7 +124,7 @@ spec:
         {{- end }}
       {{- with $.Values.validator }}
         imagePullPolicy: {{ .image.pullPolicy }}
-        command:
+        args:
           - /bin/bash
           - -c
           - |-
@@ -136,7 +135,7 @@ spec:
               # Delete the command file so we only wipe the DB once
               rm -vf /opt/aptos/data/wipe-db
             fi
-            /usr/local/bin/aptos-node -f /opt/aptos/etc/validator.yaml
+            exec /usr/local/bin/aptos-node -f /opt/aptos/etc/validator.yaml
         resources:
           {{- toYaml .resources | nindent 10 }}
         env:

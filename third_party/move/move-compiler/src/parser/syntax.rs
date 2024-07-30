@@ -994,7 +994,10 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
             }
             return parse_binop_exp(context, control_exp, /* min_prec */ 1);
         },
-        Tok::Identifier if context.tokens.content() == "match" => {
+        Tok::Identifier
+            if context.tokens.content() == "match"
+                && context.tokens.lookahead()? == Tok::LParen =>
+        {
             // Match always ends in block (see above case for comparison)
             let match_exp = parse_match_exp(context)?;
             if at_end_of_exp(context) {
@@ -1464,21 +1467,80 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
 
 // Match = "match" "(" <Exp> ")" "{" ( <MatchArm> ","? )* "}"
 // MatchArm = <Bind> ( "if" <Exp> )? "=>" <Exp>
+// If called, we know we are looking at `match (`.
 fn parse_match_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
+    // We cannot uniquely determine this is actually a match expression
+    // until we have seen the `match (exp) {` prefix. We parse the parts and
+    // decide on the go whether to interpret this as a call to a function `match`.
     let start_loc = context.tokens.start_loc();
-    require_move_2_and_advance(context, "match expression")?;
-    consume_token(context.tokens, Tok::LParen)?;
-    let exp = parse_exp(context)?;
-    consume_token(context.tokens, Tok::RParen)?;
-    consume_token(context.tokens, Tok::LBrace)?;
-    let arms = parse_match_arms(context)?;
-    consume_token(context.tokens, Tok::RBrace)?;
-    Ok(spanned(
-        context.tokens.file_hash(),
-        start_loc,
-        context.tokens.previous_end_loc(),
-        Exp_::Match(Box::new(exp), arms),
-    ))
+    let match_ident = parse_identifier(context)?;
+    debug_assert!(match_ident.value.as_str() == "match");
+    let start_lparen_loc = context.tokens.start_loc();
+    assert!(consume_token(context.tokens, Tok::LParen).is_ok());
+    if match_token(context.tokens, Tok::RParen)? {
+        // Interpret as function call `match()`
+        let end_loc = context.tokens.previous_end_loc();
+        Ok(spanned(
+            context.tokens.file_hash(),
+            start_loc,
+            end_loc,
+            Exp_::Call(
+                sp(match_ident.loc, NameAccessChain_::One(match_ident)),
+                CallKind::Regular,
+                None,
+                spanned(
+                    match_ident.loc.file_hash(),
+                    start_lparen_loc,
+                    end_loc,
+                    vec![],
+                ),
+            ),
+        ))
+    } else {
+        let exp = parse_exp(context)?;
+        // As we have seen `match (exp`, now check whether we are looking at `match (exp) {`
+        // to confirm match expression
+        if (context.tokens.peek(), context.tokens.lookahead()?) == (Tok::RParen, Tok::LBrace) {
+            require_move_2(context, match_ident.loc, "match expression");
+            consume_token(context.tokens, Tok::RParen)?;
+            consume_token(context.tokens, Tok::LBrace)?;
+            let arms = parse_match_arms(context)?;
+            consume_token(context.tokens, Tok::RBrace)?;
+            Ok(spanned(
+                context.tokens.file_hash(),
+                start_loc,
+                context.tokens.previous_end_loc(),
+                Exp_::Match(Box::new(exp), arms),
+            ))
+        } else {
+            // Interpret as a function call `match(arg1, .., argn)`
+            let mut args = vec![exp];
+            if context.tokens.peek() == Tok::Comma {
+                // parse remaining `, arg2, arg3, ..)`
+                args.append(&mut parse_comma_list(
+                    context,
+                    Tok::Comma,
+                    Tok::RParen,
+                    parse_exp,
+                    "a call argument expression",
+                )?);
+            } else {
+                consume_token(context.tokens, Tok::RParen)?;
+            }
+            let end_loc = context.tokens.previous_end_loc();
+            Ok(spanned(
+                match_ident.loc.file_hash(),
+                start_loc,
+                end_loc,
+                Exp_::Call(
+                    sp(match_ident.loc, NameAccessChain_::One(match_ident)),
+                    CallKind::Regular,
+                    None,
+                    spanned(match_ident.loc.file_hash(), start_lparen_loc, end_loc, args),
+                ),
+            ))
+        }
+    }
 }
 
 fn parse_match_arms(
@@ -2602,7 +2664,7 @@ fn parse_struct_decl(
     }
 
     if is_enum {
-        require_move_2_and_advance(context, "struct variants")?;
+        require_move_2_and_advance(context, "enum types")?;
     } else {
         consume_token(context.tokens, Tok::Struct)?;
     }

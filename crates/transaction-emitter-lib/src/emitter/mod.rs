@@ -30,7 +30,11 @@ use aptos_transaction_generator_lib::{
 use aptos_types::account_config::aptos_test_root_address;
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, seq::IteratorRandom, Rng};
+use rand::{
+    rngs::StdRng,
+    seq::{IteratorRandom, SliceRandom},
+    Rng,
+};
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -53,13 +57,12 @@ pub const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 2000 + 8;
 
 const MAX_RETRIES: usize = 12;
 
-// This retry policy is used for important client calls necessary for setting
-// up the test (e.g. account creation) and collecting its results (e.g. checking
-// account sequence numbers). If these fail, the whole test fails. We do not use
-// this for submitting transactions, as we have a way to handle when that fails.
-// This retry policy means an operation will take 8 seconds at most.
-pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
-    RetryPolicy::exponential(Duration::from_millis(125))
+// This retry policy is used for querying sequence numbers and account balances in the initialization step.
+// If these fail, the whole test fails. Backoff is large, as generally only other side
+// throttling our requests is the cause for failures.
+// We do not use this for submitting transactions, as we have a way to handle when that fails.
+static FETCH_ACCOUNT_RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
+    RetryPolicy::exponential(Duration::from_secs(1))
         .with_max_retries(MAX_RETRIES)
         .with_jitter(true)
 });
@@ -177,6 +180,8 @@ pub struct EmitJobRequest {
     coordination_delay_between_instances: Duration,
 
     latency_polling_interval: Duration,
+    // Default additional wait is (txn_expiration_time_secs + 5). Override to wait for different length.
+    tps_wait_after_expiration_secs: Option<u64>,
 
     account_minter_seed: Option<[u8; 32]>,
 }
@@ -207,6 +212,7 @@ impl Default for EmitJobRequest {
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
             latency_polling_interval: Duration::from_millis(300),
+            tps_wait_after_expiration_secs: None,
             account_minter_seed: None,
             coins_per_account_override: None,
         }
@@ -439,7 +445,12 @@ impl EmitJobRequest {
                 // That's why we set wait_seconds conservativelly, to make sure all processing and
                 // client calls finish within that time.
 
-                let wait_seconds = self.txn_expiration_time_secs + 180;
+                let wait_seconds =
+                    if let Some(wait_after_expiration) = self.tps_wait_after_expiration_secs {
+                        self.txn_expiration_time_secs + wait_after_expiration
+                    } else {
+                        self.txn_expiration_time_secs * 2 + 5
+                    };
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
@@ -781,8 +792,10 @@ impl TxnEmitter {
         // traffic pattern to be correct.
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
+        let all_clients = Arc::new(req.rest_clients.clone());
         for index in 0..num_accounts {
-            let client = &req.rest_clients[index % req.rest_clients.len()];
+            let main_client_index = index % all_clients.len();
+
             let accounts = all_accounts.split_off(all_accounts.len() - 1);
             let stop = stop.clone();
             let stats = Arc::clone(&stats);
@@ -791,7 +804,8 @@ impl TxnEmitter {
 
             let worker = SubmissionWorker::new(
                 accounts,
-                client.clone(),
+                all_clients.clone(),
+                main_client_index,
                 stop,
                 mode_params.clone(),
                 stats,
@@ -897,6 +911,11 @@ impl TxnEmitter {
     }
 }
 
+#[allow(dead_code)]
+fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
+    clients.choose(&mut rand::thread_rng()).unwrap()
+}
+
 /// This function waits for the submitted transactions to be committed, up to
 /// a wait_timeout (counted from the start_time passed in, not from the function call).
 /// It returns number of transactions that expired without being committed,
@@ -999,7 +1018,7 @@ where
     I: Iterator<Item = &'a AccountAddress>,
 {
     let futures = addresses.map(|address| {
-        RETRY_POLICY.retry(move || get_account_address_and_seq_num(client, *address))
+        FETCH_ACCOUNT_RETRY_POLICY.retry(move || get_account_address_and_seq_num(client, *address))
     });
 
     let (seq_nums, timestamps): (Vec<_>, Vec<_>) = try_join_all(futures)

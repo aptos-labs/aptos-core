@@ -977,13 +977,14 @@ impl FakeExecutor {
             let resolver = self.data_store.as_move_resolver();
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new_with_gas_hook(
+            let vm = MoveVmExt::new_with_extended_options(
                 LATEST_GAS_FEATURE_VERSION,
                 Ok(&AptosGasParameters::zeros()),
                 self.env.clone(),
                 Some(Arc::new(move |expression| {
                     a2.lock().unwrap().push(expression);
                 })),
+                false,
                 &resolver,
             );
             let mut session = vm.new_session(&resolver, SessionId::void(), None);

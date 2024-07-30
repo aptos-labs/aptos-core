@@ -10,7 +10,7 @@ use crate::{
         BlockReader,
     },
     counters,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
@@ -19,8 +19,12 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
-    block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    block::Block,
+    common::Round,
+    pipelined_block::{ExecutionSummary, PipelinedBlock},
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutCertificate,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
@@ -32,7 +36,9 @@ use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
+#[cfg(any(test, feature = "fuzzing"))]
+use std::sync::atomic::Ordering;
 use std::{sync::Arc, time::Duration};
 
 #[cfg(test)]
@@ -74,7 +80,7 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     vote_back_pressure_limit: Round,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
@@ -89,7 +95,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
@@ -144,7 +150,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
@@ -290,7 +296,6 @@ impl BlockStore {
         root_metadata: RootMetadata,
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
-        order_vote_enabled: bool,
     ) {
         info!(
             "Rebuilding block tree. root {:?}, blocks {:?}, qcs {:?}",
@@ -318,7 +323,7 @@ impl BlockStore {
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
-            order_vote_enabled,
+            self.order_vote_enabled,
             self.pending_blocks.clone(),
         )
         .await;
@@ -461,96 +466,21 @@ impl BlockStore {
             .store(back_pressure, Ordering::Relaxed)
     }
 
-    /// Return if the consensus is backpressured
-    fn vote_back_pressure(&self) -> bool {
-        #[cfg(any(test, feature = "fuzzing"))]
-        {
-            if self.back_pressure_for_test.load(Ordering::Relaxed) {
-                return true;
-            }
-        }
-        let commit_round = self.commit_root().round();
-        let ordered_round = self.ordered_root().round();
-        counters::OP_COUNTERS
-            .gauge("back_pressure")
-            .set((ordered_round - commit_round) as i64);
-        ordered_round > self.vote_back_pressure_limit + commit_round
-    }
-
     pub fn pending_blocks(&self) -> Arc<Mutex<PendingBlocks>> {
         self.pending_blocks.clone()
     }
 
-    pub fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
-        let ordered_root = self.ordered_root();
-        let commit_root = self.commit_root();
-        let pending_path = self
-            .path_from_commit_root(self.ordered_root().id())
-            .unwrap_or_default();
-        let pending_rounds = pending_path.len();
-        let oldest_not_committed = pending_path.into_iter().min_by_key(|b| b.round());
+    pub async fn wait_for_payload(&self, block: &Block) -> anyhow::Result<()> {
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            self.payload_manager.get_transactions(block),
+        )
+        .await??;
+        Ok(())
+    }
 
-        let oldest_not_committed_spent_in_pipeline = oldest_not_committed
-            .as_ref()
-            .and_then(|b| b.elapsed_in_pipeline())
-            .unwrap_or(Duration::ZERO);
-
-        let ordered_round = ordered_root.round();
-        let oldest_not_committed_round = oldest_not_committed.as_ref().map_or(0, |b| b.round());
-        let commit_round = commit_root.round();
-        let ordered_timestamp = Duration::from_micros(ordered_root.timestamp_usecs());
-        let oldest_not_committed_timestamp = oldest_not_committed
-            .as_ref()
-            .map(|b| Duration::from_micros(b.timestamp_usecs()))
-            .unwrap_or(Duration::ZERO);
-        let committed_timestamp = Duration::from_micros(commit_root.timestamp_usecs());
-        let commit_cert_timestamp =
-            Duration::from_micros(self.highest_commit_cert().commit_info().timestamp_usecs());
-
-        fn latency_from_proposal(proposal_timestamp: Duration, timestamp: Duration) -> Duration {
-            if timestamp.is_zero() {
-                // latency not known without non-genesis blocks
-                Duration::ZERO
-            } else {
-                proposal_timestamp.checked_sub(timestamp).unwrap()
-            }
-        }
-
-        let latency_to_committed = latency_from_proposal(proposal_timestamp, committed_timestamp);
-        let latency_to_oldest_not_committed =
-            latency_from_proposal(proposal_timestamp, oldest_not_committed_timestamp);
-        let latency_to_ordered = latency_from_proposal(proposal_timestamp, ordered_timestamp);
-
-        info!(
-            pending_rounds = pending_rounds,
-            ordered_round = ordered_round,
-            oldest_not_committed_round = oldest_not_committed_round,
-            commit_round = commit_round,
-            oldest_not_committed_spent_in_pipeline =
-                oldest_not_committed_spent_in_pipeline.as_millis() as u64,
-            latency_to_ordered_ms = latency_to_ordered.as_millis() as u64,
-            latency_to_oldest_not_committed = latency_to_oldest_not_committed.as_millis() as u64,
-            latency_to_committed_ms = latency_to_committed.as_millis() as u64,
-            latency_to_commit_cert_ms =
-                latency_from_proposal(proposal_timestamp, commit_cert_timestamp).as_millis() as u64,
-            "Pipeline pending latency on proposal creation",
-        );
-
-        counters::CONSENSUS_PROPOSAL_PENDING_ROUNDS.observe(pending_rounds as f64);
-        counters::CONSENSUS_PROPOSAL_PENDING_DURATION
-            .observe_duration(oldest_not_committed_spent_in_pipeline);
-
-        if pending_rounds > 1 {
-            // TODO cleanup
-            // previous logic was using difference between committed and ordered.
-            // keeping it until we test out the new logic.
-            // latency_to_oldest_not_committed
-            //     .saturating_sub(latency_to_ordered.min(MAX_ORDERING_PIPELINE_LATENCY_REDUCTION))
-
-            oldest_not_committed_spent_in_pipeline
-        } else {
-            Duration::ZERO
-        }
+    pub fn check_payload(&self, proposal: &Block) -> bool {
+        self.payload_manager.check_payload_availability(proposal)
     }
 }
 
@@ -613,12 +543,118 @@ impl BlockReader for BlockStore {
         )
     }
 
+    /// Return if the consensus is backpressured
     fn vote_back_pressure(&self) -> bool {
-        self.vote_back_pressure()
+        #[cfg(any(test, feature = "fuzzing"))]
+        {
+            if self.back_pressure_for_test.load(Ordering::Relaxed) {
+                return true;
+            }
+        }
+        let commit_round = self.commit_root().round();
+        let ordered_round = self.ordered_root().round();
+        counters::OP_COUNTERS
+            .gauge("back_pressure")
+            .set((ordered_round - commit_round) as i64);
+        ordered_round > self.vote_back_pressure_limit + commit_round
     }
 
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
-        self.pipeline_pending_latency(proposal_timestamp)
+        let ordered_root = self.ordered_root();
+        let commit_root = self.commit_root();
+        let pending_path = self
+            .path_from_commit_root(self.ordered_root().id())
+            .unwrap_or_default();
+        let pending_rounds = pending_path.len();
+        let oldest_not_committed = pending_path.into_iter().min_by_key(|b| b.round());
+
+        let oldest_not_committed_spent_in_pipeline = oldest_not_committed
+            .as_ref()
+            .and_then(|b| b.elapsed_in_pipeline())
+            .unwrap_or(Duration::ZERO);
+
+        let ordered_round = ordered_root.round();
+        let oldest_not_committed_round = oldest_not_committed.as_ref().map_or(0, |b| b.round());
+        let commit_round = commit_root.round();
+        let ordered_timestamp = Duration::from_micros(ordered_root.timestamp_usecs());
+        let oldest_not_committed_timestamp = oldest_not_committed
+            .as_ref()
+            .map(|b| Duration::from_micros(b.timestamp_usecs()))
+            .unwrap_or(Duration::ZERO);
+        let committed_timestamp = Duration::from_micros(commit_root.timestamp_usecs());
+        let commit_cert_timestamp =
+            Duration::from_micros(self.highest_commit_cert().commit_info().timestamp_usecs());
+
+        fn latency_from_proposal(proposal_timestamp: Duration, timestamp: Duration) -> Duration {
+            if timestamp.is_zero() {
+                // latency not known without non-genesis blocks
+                Duration::ZERO
+            } else {
+                proposal_timestamp.saturating_sub(timestamp)
+            }
+        }
+
+        let latency_to_committed = latency_from_proposal(proposal_timestamp, committed_timestamp);
+        let latency_to_oldest_not_committed =
+            latency_from_proposal(proposal_timestamp, oldest_not_committed_timestamp);
+        let latency_to_ordered = latency_from_proposal(proposal_timestamp, ordered_timestamp);
+
+        info!(
+            pending_rounds = pending_rounds,
+            ordered_round = ordered_round,
+            oldest_not_committed_round = oldest_not_committed_round,
+            commit_round = commit_round,
+            oldest_not_committed_spent_in_pipeline =
+                oldest_not_committed_spent_in_pipeline.as_millis() as u64,
+            latency_to_ordered_ms = latency_to_ordered.as_millis() as u64,
+            latency_to_oldest_not_committed = latency_to_oldest_not_committed.as_millis() as u64,
+            latency_to_committed_ms = latency_to_committed.as_millis() as u64,
+            latency_to_commit_cert_ms =
+                latency_from_proposal(proposal_timestamp, commit_cert_timestamp).as_millis() as u64,
+            "Pipeline pending latency on proposal creation",
+        );
+
+        counters::CONSENSUS_PROPOSAL_PENDING_ROUNDS.observe(pending_rounds as f64);
+        counters::CONSENSUS_PROPOSAL_PENDING_DURATION
+            .observe_duration(oldest_not_committed_spent_in_pipeline);
+
+        if pending_rounds > 1 {
+            // TODO cleanup
+            // previous logic was using difference between committed and ordered.
+            // keeping it until we test out the new logic.
+            // latency_to_oldest_not_committed
+            //     .saturating_sub(latency_to_ordered.min(MAX_ORDERING_PIPELINE_LATENCY_REDUCTION))
+
+            oldest_not_committed_spent_in_pipeline
+        } else {
+            Duration::ZERO
+        }
+    }
+
+    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<ExecutionSummary> {
+        let mut res = vec![];
+        let mut cur_block = Some(self.ordered_root());
+        loop {
+            match cur_block {
+                Some(block) => {
+                    if let Some(execution_time_and_size) = block.get_execution_summary() {
+                        info!(
+                            "Found execution time for {}, {:?}",
+                            block.id(),
+                            execution_time_and_size
+                        );
+                        res.push(execution_time_and_size);
+                        if res.len() >= num_blocks {
+                            return res;
+                        }
+                    } else {
+                        info!("Couldn't find execution time for {}", block.id());
+                    }
+                    cur_block = self.get_block(block.parent_id());
+                },
+                None => return res,
+            }
+        }
     }
 }
 

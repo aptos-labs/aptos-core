@@ -757,6 +757,10 @@ async fn test_account_transaction_with_context(mut context: TestContext) {
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn]).await;
 
+    if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
+        indexer_reader.wait_for_internal_indexer(2).unwrap();
+    }
+
     let txns = context
         .get(
             format!(

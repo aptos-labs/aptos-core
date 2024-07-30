@@ -30,6 +30,8 @@ pub struct ConsensusObserverConfig {
 
     /// Interval (in milliseconds) to garbage collect peer state
     pub garbage_collection_interval_ms: u64,
+    /// Maximum number of blocks to keep in memory (e.g., pending blocks, ordered blocks, etc.)
+    pub max_num_pending_blocks: u64,
     /// Maximum timeout (in milliseconds) for active subscriptions
     pub max_subscription_timeout_ms: u64,
     /// Maximum timeout (in milliseconds) we'll wait for the synced version to
@@ -50,6 +52,7 @@ impl Default for ConsensusObserverConfig {
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 10_000,                // 10 seconds
             garbage_collection_interval_ms: 60_000,            // 60 seconds
+            max_num_pending_blocks: 100,                       // 100 blocks
             max_subscription_timeout_ms: 30_000,               // 30 seconds
             max_synced_version_timeout_ms: 60_000,             // 60 seconds
             peer_optimality_check_interval_ms: 60_000,         // 60 seconds
@@ -103,8 +106,9 @@ impl ConfigOptimizer for ConsensusObserverConfig {
             },
             NodeType::PublicFullnode => {
                 if ENABLE_ON_PUBLIC_FULLNODES && !observer_manually_set {
-                    // Only enable the observer for PFNs
+                    // Enable both the observer and the publisher for PFNs
                     consensus_observer_config.observer_enabled = true;
+                    consensus_observer_config.publisher_enabled = true;
                     modified_config = true;
                 }
             },

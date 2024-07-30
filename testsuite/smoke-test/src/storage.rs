@@ -430,6 +430,7 @@ pub(crate) fn db_restore(
 
     if enable_storage_sharding {
         cmd.arg("--enable_storage_sharding");
+        cmd.arg("--enable-state-indices");
     }
     if let Some(version) = target_verion {
         cmd.arg("--target-version");

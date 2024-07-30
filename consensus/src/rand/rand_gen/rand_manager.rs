@@ -212,7 +212,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         message: RandMessage<S, D>,
     ) {
         let msg = message.into_network_message();
-        let _ = sender.send(Ok(protocol.to_bytes(&msg).unwrap().into()));
+        let _ = sender.send(Ok(protocol
+            .to_bytes(&msg)
+            .expect("Message should be serializable into protocol")
+            .into()));
     }
 
     async fn verification_task(
@@ -348,7 +351,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         mut reset_rx: Receiver<ResetRequest>,
         bounded_executor: BoundedExecutor,
-        highest_ordered_round: Round,
+        highest_known_round: Round,
     ) {
         info!("RandManager started");
         let (verified_msg_tx, mut verified_msg_rx) = unbounded();
@@ -357,7 +360,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let fast_rand_config = self.fast_config.clone();
         self.rand_store
             .lock()
-            .update_highest_known_round(highest_ordered_round);
+            .update_highest_known_round(highest_known_round);
         spawn_named!(
             "rand manager verification",
             Self::verification_task(

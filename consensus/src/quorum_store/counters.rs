@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
     register_histogram_vec, register_int_counter, register_int_counter_vec, Histogram,
@@ -745,10 +747,25 @@ pub static RECEIVED_BATCH_RESPONSE_ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static RECEIVED_BATCH_FROM_SUBSCRIPTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_from_subscription_count",
+        "Count of the number of batches received via batch store subscription."
+    )
+    .unwrap()
+});
+
 pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_backpressure_txn_count",
         "Indicator of whether Quorum Store is backpressured due to txn count exceeding threshold.",
+    )
+});
+
+pub static QS_BACKPRESSURE_MAKE_STRICTER_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "quorum_store_backpressure_make_stricter_txn_count",
+        "Indicator of whether Quorum Store txn count backpressure is being made stricter.",
     )
 });
 

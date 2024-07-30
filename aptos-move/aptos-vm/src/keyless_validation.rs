@@ -33,9 +33,16 @@ macro_rules! value_deserialization_error {
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<T, VMStatus> {
+    let metadata = resolver.get_module_metadata(&T::struct_tag().module_id());
     let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &T::struct_tag())
+        .get_resource_bytes_with_metadata_and_layout(
+            &CORE_CODE_ADDRESS,
+            &T::struct_tag(),
+            &metadata,
+            None,
+        )
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
+        .0
         .ok_or_else(|| {
             value_deserialization_error!(format!(
                 "get_resource failed on {}::{}::{}",

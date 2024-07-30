@@ -25,6 +25,7 @@ use aptos_types::{
 };
 use futures::executor::block_on;
 use handlebars::Handlebars;
+use move_binary_format::file_format_common::VERSION_6;
 use once_cell::sync::Lazy;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -717,7 +718,7 @@ impl Default for ReleaseConfig {
                     metadata: ProposalMetadata::default(),
                     name: "framework".to_string(),
                     update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
-                        bytecode_version: 6, // TODO: remove explicit bytecode version from sources
+                        bytecode_version: VERSION_6,
                         git_hash: None,
                     })],
                 },

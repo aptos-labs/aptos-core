@@ -1389,6 +1389,25 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     None,
                 ))
             },
+            MoveBytecode::PackVariant(_)
+            | MoveBytecode::PackVariantGeneric(_)
+            | MoveBytecode::UnpackVariant(_)
+            | MoveBytecode::UnpackVariantGeneric(_)
+            | MoveBytecode::TestVariant(_)
+            | MoveBytecode::TestVariantGeneric(_)
+            | MoveBytecode::MutBorrowVariantField(_)
+            | MoveBytecode::MutBorrowVariantFieldGeneric(_)
+            | MoveBytecode::ImmBorrowVariantField(_)
+            | MoveBytecode::ImmBorrowVariantFieldGeneric(_) => {
+                // TODO(#13806): implement enum types to enable analysis of code with
+                //   enums via the model and the prover
+                self.func_env.module_env.env.diag(
+                    Severity::Warning,
+                    self.context.location_table.get(&attr_id).unwrap(),
+                    "stackless bytecode generator does not support variant structs yet",
+                );
+                self.code.push(Bytecode::Nop(attr_id))
+            },
         }
     }
 

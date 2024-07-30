@@ -6,7 +6,7 @@ use crate::{
     create_account_transaction, publishing::publish_util::PackageHandler, RootAccountHandle,
     TransactionGenerator, TransactionGeneratorCreator,
 };
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
@@ -238,12 +238,23 @@ impl CustomModulesDelegationGeneratorCreator {
         txn_executor
             .execute_transactions(&requests_create)
             .await
+            .inspect_err(|err| {
+                error!(
+                    "Failed to execute creation of publisher accounts: {:#}",
+                    err
+                )
+            })
             .unwrap();
 
-        info!("Publishing {} packages", requests_publish.len());
+        info!(
+            "Publishing {} copies of package {}",
+            requests_publish.len(),
+            package_name
+        );
         txn_executor
             .execute_transactions(&requests_publish)
             .await
+            .inspect_err(|err| error!("Failed to publish test package {}: {:#}", package_name, err))
             .unwrap();
 
         info!("Done publishing {} packages", packages.len());

@@ -355,7 +355,7 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
         .iter()
         .map(|txn| txn.expect_valid().type_name().to_string())
         // conflate same consecutive elements into one with count
-        .group_by(|k| k.clone())
+        .chunk_by(|k| k.clone())
         .into_iter()
         .map(|(k, r)| {
             let num = r.count();
@@ -384,7 +384,7 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
         })
         // Count number of instances for each (irrsepsecitve of order)
         .sorted()
-        .group_by(|k| k.clone())
+        .chunk_by(|k| k.clone())
         .into_iter()
         .map(|(k, r)| (r.count(), k))
         .sorted_by_key(|(num, _k)| *num)

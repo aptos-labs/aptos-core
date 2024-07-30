@@ -19,7 +19,7 @@ use crate::{
     monitor,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
 };
@@ -274,14 +274,8 @@ impl BlockStore {
             committed_round = root.0.round(),
             block_id = root.0.id(),
         );
-        self.rebuild(
-            root,
-            root_metadata,
-            blocks,
-            quorum_certs,
-            self.order_vote_enabled,
-        )
-        .await;
+        self.rebuild(root, root_metadata, blocks, quorum_certs)
+            .await;
 
         if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
             retriever
@@ -301,7 +295,7 @@ impl BlockStore {
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
     ) -> anyhow::Result<RecoveryData> {
         info!(
@@ -692,7 +686,7 @@ impl BlockRetriever {
                     // extend the result blocks
                     let batch = result.blocks().clone();
                     progress += batch.len() as u64;
-                    last_block_id = batch.last().unwrap().parent_id();
+                    last_block_id = batch.last().expect("Batch should not be empty").parent_id();
                     result_blocks.extend(batch);
                 },
                 Ok(result)
@@ -712,7 +706,13 @@ impl BlockRetriever {
                 },
             }
         }
-        assert_eq!(result_blocks.last().unwrap().id(), target_block_id);
+        assert_eq!(
+            result_blocks
+                .last()
+                .expect("Expected at least a result_block")
+                .id(),
+            target_block_id
+        );
         Ok(result_blocks)
     }
 
