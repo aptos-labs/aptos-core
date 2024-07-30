@@ -2831,17 +2831,14 @@ fn parse_postfix_abilities(
     if let (Some(sp!(_l1, _)), Some(sp!(l2, _))) =
         (prefix_abilities.first(), postfix_abilities.first())
     {
-        let msg = format!(
+        let msg =
             "Conflicting ability declarations. Abilities must be declared either before or after \
-             the variant list, not both."
-        );
+             the variant list, not both.";
         context
             .env
             .add_diag(diag!(Syntax::InvalidModifier, (*l2, msg)));
-    } else {
-        if !postfix_abilities.is_empty() {
-            *prefix_abilities = postfix_abilities;
-        }
+    } else if !postfix_abilities.is_empty() {
+        *prefix_abilities = postfix_abilities;
     }
     Ok(())
 }
