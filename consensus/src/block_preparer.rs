@@ -43,7 +43,7 @@ impl BlockPreparer {
             thread::sleep(Duration::from_millis(10));
             Err(ExecutorError::CouldNotGetData)
         });
-        let (txns, max_txns_from_block_to_execute) =
+        let (mut txns, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
@@ -52,8 +52,8 @@ impl BlockPreparer {
         let block_timestamp_usecs = block.timestamp_usecs();
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         tokio::task::spawn_blocking(move || {
-            let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
-            let deduped_txns = txn_deduper.dedup(filtered_txns);
+            txn_filter.filter(block_id, block_timestamp_usecs, &mut txns);
+            let deduped_txns = txn_deduper.dedup(txns);
             let mut shuffled_txns = {
                 let _timer = TXN_SHUFFLE_SECONDS.start_timer();
 
