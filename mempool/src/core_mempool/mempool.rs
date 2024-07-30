@@ -172,7 +172,12 @@ impl Mempool {
         }
     }
 
-    fn log_commit_and_parked_latency(insertion_info: &InsertionInfo, bucket: &str, priority: &str) {
+    fn log_commit_and_parked_latency(
+        insertion_info: &InsertionInfo,
+        bucket: &str,
+        priority: &str,
+        tracked_use_case: Option<(UseCaseKey, &String)>,
+    ) {
         let parked_duration = if let Some(park_time) = insertion_info.park_time {
             let parked_duration = insertion_info
                 .ready_time
@@ -202,6 +207,22 @@ impl Mempool {
                 commit_minus_parked,
                 priority,
             );
+
+            if insertion_info.park_time.is_none() {
+                let use_case_label = tracked_use_case
+                    .as_ref()
+                    .map_or("entry_user_other", |(_, use_case_name)| {
+                        use_case_name.as_str()
+                    });
+
+                counters::TXN_E2E_USE_CASE_COMMIT_LATENCY
+                    .with_label_values(&[
+                        use_case_label,
+                        insertion_info.submitted_by_label(),
+                        bucket,
+                    ])
+                    .observe(commit_duration.as_secs_f64());
+            }
         }
     }
 
@@ -222,7 +243,7 @@ impl Mempool {
                 counters::COMMIT_ACCEPTED_LABEL,
                 priority.as_str(),
             );
-            Self::log_commit_and_parked_latency(insertion_info, bucket.as_str(), priority.as_str());
+            Self::log_commit_and_parked_latency(insertion_info, bucket.as_str(), priority.as_str(), tracked_use_case);
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
@@ -234,20 +255,6 @@ impl Mempool {
                     insertion_to_block,
                     priority.to_string().as_str(),
                 );
-
-                let use_case_label = tracked_use_case
-                    .as_ref()
-                    .map_or("entry_user_other", |(_, use_case_name)| {
-                        use_case_name.as_str()
-                    });
-
-                counters::TXN_E2E_USE_CASE_COMMIT_LATENCY
-                    .with_label_values(&[
-                        use_case_label,
-                        insertion_info.submitted_by_label(),
-                        bucket.as_str(),
-                    ])
-                    .observe(insertion_to_block.as_secs_f64());
             }
         }
     }

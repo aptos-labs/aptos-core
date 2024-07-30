@@ -309,6 +309,7 @@ impl NodeSetup {
             5,
             500,
             10,
+            1,
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,

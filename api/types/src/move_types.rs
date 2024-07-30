@@ -225,6 +225,12 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
 
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
+        if let Some((_, name)) = s.variant_info {
+            map.insert(
+                IdentifierWrapper::from_str("__variant__")?,
+                MoveValue::String(name.to_string()).json()?,
+            );
+        }
         for (id, val) in s.value {
             map.insert(id.into(), MoveValue::try_from(val)?.json()?);
         }
@@ -1507,6 +1513,7 @@ mod tests {
         AnnotatedMoveStruct {
             abilities: AbilitySet::EMPTY,
             ty_tag: type_struct(typ),
+            variant_info: None,
             value: values,
         }
     }
