@@ -694,7 +694,7 @@ impl Scheduler {
                             Some(false)
                         },
                         ExecutingFlag::Fallback => {
-                            let old_incarnation = *incarnation;
+                            /*let old_incarnation = *incarnation;
                             drop(status);
                             if validation_f() {
                                 let mut status = self.txn_status[txn_idx as usize].0.write();
@@ -704,7 +704,8 @@ impl Scheduler {
                                 )
                             } else {
                                 None
-                            }
+                            }*/
+                            None
                         },
                         ExecutingFlag::Writing => None,
                     },
