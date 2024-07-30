@@ -151,6 +151,7 @@ impl<'a> FunctionGenerator<'a> {
                     .get_extension::<Options>()
                     .expect("Options is available");
                 if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
+                    // TODO: fix source mapping (#14167)
                     peephole_optimizer::run(&mut code);
                 }
             } else {
