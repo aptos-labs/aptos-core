@@ -185,7 +185,7 @@ pub struct Account {
     /// Address of account
     address: Address,
     /// Lookup ledger version
-    ledger_version: u64,
+    pub ledger_version: u64,
     /// Where to start for pagination
     start: Option<StateKey>,
     /// Max number of items to retrieve
@@ -528,7 +528,7 @@ impl Account {
         &self,
         resource_type: &StructTag,
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
-        let (ledger_info, ledger_version, state_view) =
+        let (ledger_info, requested_ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
 
         let bytes = state_view
@@ -546,7 +546,12 @@ impl Account {
                 )
             })?
             .ok_or_else(|| {
-                resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
+                resource_not_found(
+                    self.address,
+                    resource_type,
+                    requested_ledger_version,
+                    &ledger_info,
+                )
             })?;
 
         state_view
