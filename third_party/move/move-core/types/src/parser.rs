@@ -5,7 +5,7 @@
 use crate::{
     account_address::AccountAddress,
     identifier::{self, Identifier},
-    language_storage::{StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     transaction_argument::TransactionArgument,
 };
 use anyhow::{bail, format_err, Result};
@@ -267,6 +267,20 @@ impl<I: Iterator<Item = Token>> Parser<I> {
         })
     }
 
+    fn parse_module_id(&mut self) -> Result<ModuleId> {
+        Ok(match self.next()? {
+            Token::Address(addr) => match self.next()? {
+                Token::Name(s) => ModuleId::new(AccountAddress::from_hex_literal(&addr)?, Identifier::new(s)?),
+                Token::ColonColon => match self.next()? {
+                    Token::Name(s) => ModuleId::new(AccountAddress::from_hex_literal(&addr)?, Identifier::new(s)?),
+                    tok => bail!("unexpected token {:?}, expected string", tok),
+                }
+                tok =>  bail!("unexpected token {:?}, expected string", tok),
+            }
+            tok =>  bail!("unexpected token {:?}, expected string", tok),
+        })
+    }
+
     fn parse_type_tag(&mut self, depth: u8) -> Result<TypeTag> {
         if depth >= crate::safe_serialize::MAX_TYPE_TAG_NESTING {
             bail!("Exceeded TypeTag nesting limit during parsing: {}", depth);
@@ -368,6 +382,10 @@ pub fn parse_type_tags(s: &str) -> Result<Vec<TypeTag>> {
     parse(s, |parser| {
         parser.parse_comma_list(|parser| parser.parse_type_tag(0), Token::EOF, true)
     })
+}
+
+pub fn parse_module_id(s: &str) -> Result<ModuleId> {
+    parse(s, |parser| parser.parse_module_id())
 }
 
 pub fn parse_type_tag(s: &str) -> Result<TypeTag> {
