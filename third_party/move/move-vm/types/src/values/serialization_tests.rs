@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Contains tests for serialization
-//!
+
 use crate::{
     delayed_values::delayed_field_id::DelayedFieldID,
     value_serde::{serialize_and_allow_delayed_values, serialized_size_allowing_delayed_values},
-    values::{Struct as StructValue, Value},
+    values::{values_impl, Struct, Value},
 };
 use claims::{assert_err, assert_ok, assert_some};
 use move_core_types::{
@@ -14,14 +14,23 @@ use move_core_types::{
     u256,
     value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
 };
+use serde::{Deserialize, Serialize};
+use std::iter;
 
-#[test]
-fn enum_round_trip() {
-    let layout = MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(vec![
+fn test_layout() -> MoveTypeLayout {
+    MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(vec![
         vec![MoveTypeLayout::U64],
         vec![],
         vec![MoveTypeLayout::Bool, MoveTypeLayout::U32],
-    ]));
+    ]))
+}
+
+// ---------------------------------------------------------------------------
+// Serialization round trip tests
+
+#[test]
+fn enum_round_trip_move_value() {
+    let layout = test_layout();
     let good_values = vec![
         MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![MoveValue::U64(42)])),
         MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![])),
@@ -43,7 +52,7 @@ fn enum_round_trip() {
     MoveValue::simple_deserialize(&blob, &layout)
         .inspect_err(|e| {
             assert!(
-                e.to_string().contains("invalid value"),
+                e.to_string().contains("invalid length"),
                 "unexpected error message: {}",
                 e
             );
@@ -56,13 +65,118 @@ fn enum_round_trip() {
     MoveValue::simple_deserialize(&blob, &layout)
         .inspect_err(|e| {
             assert!(
-                e.to_string().contains("end of input"),
+                e.to_string().contains("invalid length"),
                 "unexpected error message: {}",
                 e
             );
         })
         .expect_err("bad struct value deserialization fails");
 }
+
+#[test]
+fn enum_round_trip_vm_value() {
+    let layout = test_layout();
+    let good_values = vec![
+        Value::struct_(Struct::pack_variant(0, iter::once(Value::u64(42)))),
+        Value::struct_(Struct::pack_variant(1, iter::empty())),
+        Value::struct_(Struct::pack_variant(
+            2,
+            [Value::bool(true), Value::u32(13)].into_iter(),
+        )),
+    ];
+    for value in good_values {
+        let blob = value
+            .simple_serialize(&layout)
+            .expect("serialization succeeds");
+        let de_value = Value::simple_deserialize(&blob, &layout).expect("deserialization succeeds");
+        assert!(
+            value.equals(&de_value).unwrap(),
+            "roundtrip serialization succeeds"
+        )
+    }
+    let bad_tag_value = Value::struct_(Struct::pack_variant(3, [Value::u64(42)]));
+    assert!(
+        bad_tag_value.simple_serialize(&layout).is_none(),
+        "serialization fails"
+    );
+    let bad_struct_value = Value::struct_(Struct::pack([Value::u64(42)]));
+    assert!(
+        bad_struct_value.simple_serialize(&layout).is_none(),
+        "serialization fails"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Rust cross-serialization tests
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+pub enum RustEnum {
+    Number(u64),
+    Empty,
+    BoolNumber(bool, u32),
+}
+
+#[test]
+fn enum_rust_round_trip_move_value() {
+    let layout = test_layout();
+    let move_values = vec![
+        MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![MoveValue::U64(42)])),
+        MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![])),
+        MoveValue::Struct(MoveStruct::RuntimeVariant(2, vec![
+            MoveValue::Bool(true),
+            MoveValue::U32(13),
+        ])),
+    ];
+    let rust_values = vec![
+        RustEnum::Number(42),
+        RustEnum::Empty,
+        RustEnum::BoolNumber(true, 13),
+    ];
+    for (move_value, rust_value) in move_values.into_iter().zip(rust_values) {
+        let from_move = move_value.simple_serialize().expect("from move succeeds");
+        let to_rust = bcs::from_bytes::<RustEnum>(&from_move).expect("to rust successful");
+        assert_eq!(to_rust, rust_value);
+
+        let from_rust = bcs::to_bytes(&rust_value).expect("from rust succeeds");
+        let to_move = MoveValue::simple_deserialize(&from_rust, &layout).expect("to move succeeds");
+        assert_eq!(to_move, move_value)
+    }
+}
+
+#[test]
+fn enum_rust_round_trip_vm_value() {
+    let layout = test_layout();
+    let move_values = vec![
+        Value::struct_(Struct::pack_variant(0, iter::once(Value::u64(42)))),
+        Value::struct_(Struct::pack_variant(1, iter::empty())),
+        Value::struct_(Struct::pack_variant(
+            2,
+            [Value::bool(true), Value::u32(13)].into_iter(),
+        )),
+    ];
+    let rust_values = vec![
+        RustEnum::Number(42),
+        RustEnum::Empty,
+        RustEnum::BoolNumber(true, 13),
+    ];
+    for (move_value, rust_value) in move_values.into_iter().zip(rust_values) {
+        let from_move = move_value
+            .simple_serialize(&layout)
+            .expect("from move succeeds");
+        let to_rust = bcs::from_bytes::<RustEnum>(&from_move).expect("to rust successful");
+        assert_eq!(to_rust, rust_value);
+
+        let from_rust = bcs::to_bytes(&rust_value).expect("from rust succeeds");
+        let to_move = Value::simple_deserialize(&from_rust, &layout).expect("to move succeeds");
+        assert!(
+            to_move.equals(&move_value).unwrap(),
+            "from rust to move failed"
+        )
+    }
+}
+
+// --------------------------------------------------------------------------
+// Serialization size tests
 
 #[test]
 fn test_serialized_size() {
@@ -102,7 +216,7 @@ fn test_serialized_size() {
             Vector(Box::new(Address)),
         ),
         (
-            Value::struct_(StructValue::pack(vec![
+            Value::struct_(values_impl::Struct::pack(vec![
                 Value::bool(true),
                 Value::vector_u32(vec![1, 2, 3, 4, 5]),
             ])),

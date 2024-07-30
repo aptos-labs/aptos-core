@@ -9,18 +9,28 @@ use crate::{
     u256,
 };
 use anyhow::{anyhow, bail, Result as AResult};
+use once_cell::sync::Lazy;
 use serde::{
-    de::{Error as DeError, Unexpected},
-    ser::{SerializeMap, SerializeSeq, SerializeStruct, SerializeTuple},
+    de::{EnumAccess, Error as DeError, VariantAccess},
+    ser::{SerializeMap, SerializeSeq, SerializeStruct, SerializeTuple, SerializeTupleVariant},
     Deserialize, Serialize,
 };
 use std::{
+    collections::{btree_map::Entry, BTreeMap},
     convert::TryInto,
     fmt::{self, Debug},
+    sync::Mutex,
 };
+
+/// The maximal number of enum variants which are supported in values. This must align with
+/// the configuration in the binary format, so the bytecode verifier checks its validness.
+pub const VARIANT_COUNT_MAX: u64 = 127;
 
 /// In the `WithTypes` configuration, a Move struct gets serialized into a Serde struct with this name
 pub const MOVE_STRUCT_NAME: &str = "struct";
+
+/// A Move enum gets serialized into a Serde struct with this name
+pub const MOVE_ENUM_NAME: &str = "enum";
 
 /// In the `WithTypes` configuration, a Move struct gets serialized into a Serde struct with this as the first field
 pub const MOVE_STRUCT_TYPE: &str = "type";
@@ -33,6 +43,37 @@ pub const MOVE_VARIANT_NAME: &str = "variant";
 
 /// In the `WithVariant` configuration, a Move enum variant gets serialized into a Serde struct with this as the first field
 pub const MOVE_VARIANT_NAME_FIELD: &str = "name";
+
+/// In order to serialize enums with serde, we have to provide `&'static str` names for
+/// variants. This static cache is used to generate those names, and contains
+/// signatures of the form `["0", "1", "2", ..]`. The size of this cache
+/// is bound by `VARIANT_COUNT_MAX * VARIANT_COUNT_MAX / 2` (8064 with max 127)
+static VARIANT_NAME_PLACEHOLDER_CACHE: Lazy<Mutex<BTreeMap<usize, &'static [&'static str]>>> =
+    Lazy::new(|| Mutex::new(Default::default()));
+
+/// Returns variant name placeholders for providing dummy names in serde serialization.
+pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
+    assert!(
+        len < VARIANT_COUNT_MAX as usize,
+        "variant count is restricted to {}",
+        VARIANT_COUNT_MAX
+    );
+    let mutex = &VARIANT_NAME_PLACEHOLDER_CACHE;
+    let mut lock = mutex.lock().expect("acquire index name lock");
+    match lock.entry(len) {
+        Entry::Vacant(e) => {
+            let signature = Box::new(
+                (0..len)
+                    .map(|idx| Box::new(format!("{}", idx)).leak() as &str)
+                    .collect::<Vec<_>>(),
+            )
+            .leak();
+            e.insert(signature);
+            signature
+        },
+        Entry::Occupied(e) => e.get(),
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
@@ -525,32 +566,30 @@ impl<'d, 'a> serde::de::Visitor<'d> for StructVariantVisitor<'a> {
         formatter.write_str("Variant")
     }
 
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
     where
-        A: serde::de::SeqAccess<'d>,
+        A: EnumAccess<'d>,
     {
-        let mut val = Vec::new();
-
-        // First deserialize the variant tag
-        let variant_tag = match seq.next_element::<u16>()? {
-            Some(tag) => {
-                let tag = tag as usize;
-                if tag >= self.0.len() {
-                    return Err(A::Error::invalid_value(Unexpected::StructVariant, &self));
-                }
-                tag
-            },
-            None => return Err(A::Error::invalid_length(0, &self)),
-        };
-
-        // Based on the validated variant tag, we know the field types
-        for (i, field_type) in self.0[variant_tag].iter().enumerate() {
-            match seq.next_element_seed(field_type)? {
-                Some(elem) => val.push(elem),
-                None => return Err(A::Error::invalid_length(i, &self)),
+        let (tag, rest) = data.variant()?;
+        if tag as usize >= self.0.len() {
+            Err(A::Error::invalid_length(0, &self))
+        } else {
+            let fields = &self.0[tag as usize];
+            match fields.len() {
+                0 => {
+                    rest.unit_variant()?;
+                    Ok((tag, vec![]))
+                },
+                1 => {
+                    let value = rest.newtype_variant_seed(&fields[0])?;
+                    Ok((tag, vec![value]))
+                },
+                _ => {
+                    let values = rest.tuple_variant(fields.len(), StructFieldVisitor(fields))?;
+                    Ok((tag, values))
+                },
             }
         }
-        Ok((variant_tag as u16, val))
     }
 }
 
@@ -579,7 +618,15 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
                 Ok(MoveStruct::Runtime(fields))
             },
             MoveStructLayout::RuntimeVariants(variants) => {
-                let (tag, fields) = deserializer.deserialize_seq(StructVariantVisitor(variants))?;
+                if variants.len() > (u16::MAX as usize) {
+                    return Err(D::Error::custom("variant count out of range"));
+                }
+                let variant_names = variant_name_placeholder(variants.len());
+                let (tag, fields) = deserializer.deserialize_enum(
+                    MOVE_ENUM_NAME,
+                    variant_names,
+                    StructVariantVisitor(variants),
+                )?;
                 Ok(MoveStruct::RuntimeVariant(tag, fields))
             },
             MoveStructLayout::WithFields(layout) => {
@@ -600,14 +647,19 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
             },
             MoveStructLayout::WithVariants(decorated_variants) => {
                 // Downgrade the decorated variants to simple layouts to deserialize the fields.
-                let (tag, fields) = deserializer.deserialize_seq(StructVariantVisitor(
-                    &decorated_variants
-                        .iter()
-                        .map(|v| v.fields.iter().map(|f| f.layout.clone()).collect())
-                        .collect::<Vec<_>>(),
-                ))?;
+                let variant_names = variant_name_placeholder(decorated_variants.len());
+                let (tag, fields) = deserializer.deserialize_enum(
+                    MOVE_ENUM_NAME,
+                    variant_names,
+                    StructVariantVisitor(
+                        &decorated_variants
+                            .iter()
+                            .map(|v| v.fields.iter().map(|f| f.layout.clone()).collect())
+                            .collect::<Vec<_>>(),
+                    ),
+                )?;
                 // Now decorate the raw value. This is not optimally efficient but
-                // decorated values should not be in the serving path.
+                // decorated values should not be in the execution path.
                 Ok(MoveStruct::RuntimeVariant(tag, fields).decorate(self))
             },
         }
@@ -653,21 +705,41 @@ impl<'a> serde::Serialize for MoveFields<'a> {
 impl serde::Serialize for MoveStruct {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::Runtime(s) => {
-                let mut t = serializer.serialize_tuple(s.len())?;
-                for v in s.iter() {
+            Self::Runtime(values) => {
+                let mut t = serializer.serialize_tuple(values.len())?;
+                for v in values.iter() {
                     t.serialize_element(v)?;
                 }
                 t.end()
             },
-            Self::RuntimeVariant(tag, s) => {
+            Self::RuntimeVariant(tag, values) => {
                 // Variants need to be serialized as sequences, as the size is not statically known.
-                let mut t = serializer.serialize_seq(Some(s.len() + 1))?;
-                t.serialize_element(tag)?;
-                for v in s.iter() {
-                    t.serialize_element(v)?;
+                let tag_idx = *tag as usize;
+                let variant_tag = tag_idx as u32;
+                let variant_name = variant_name_placeholder((tag + 1) as usize)[tag_idx];
+                match values.len() {
+                    0 => {
+                        serializer.serialize_unit_variant(MOVE_ENUM_NAME, variant_tag, variant_name)
+                    },
+                    1 => serializer.serialize_newtype_variant(
+                        MOVE_ENUM_NAME,
+                        variant_tag,
+                        variant_name,
+                        &values[0],
+                    ),
+                    _ => {
+                        let mut t = serializer.serialize_tuple_variant(
+                            MOVE_ENUM_NAME,
+                            variant_tag,
+                            variant_name,
+                            values.len(),
+                        )?;
+                        for v in values {
+                            t.serialize_field(v)?
+                        }
+                        t.end()
+                    },
                 }
-                t.end()
             },
             Self::WithFields(fields) => MoveFields(fields).serialize(serializer),
             Self::WithTypes { type_, fields } => {
