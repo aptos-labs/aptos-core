@@ -5,7 +5,7 @@
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
-        BlockReader, BlockRetriever, BlockStore,
+        BlockReader, BlockRetriever, BlockStore, NeedFetchResult,
     },
     counters::{
         self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED,
@@ -126,7 +126,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
-                    v.verify(validator)?;
+                    v.verify_order_vote(validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -1000,6 +1000,8 @@ impl RoundManager {
             });
 
             let order_vote = order_vote_msg.order_vote();
+            self.new_qc_from_order_vote_msg(&order_vote_msg).await?;
+
             debug!(
                 self.new_log(LogEvent::ReceiveOrderVote)
                     .remote_peer(order_vote.author()),
@@ -1021,7 +1023,7 @@ impl RoundManager {
                 let vote_reception_result = self
                     .pending_order_votes
                     .insert_order_vote(order_vote_msg.order_vote(), &self.epoch_state.verifier);
-                self.process_order_vote_reception_result(&order_vote_msg, vote_reception_result)
+                self.process_order_vote_reception_result(vote_reception_result)
                     .await?;
             } else {
                 ORDER_VOTE_VERY_OLD.inc();
@@ -1205,16 +1207,14 @@ impl RoundManager {
 
     async fn process_order_vote_reception_result(
         &mut self,
-        order_vote_msg: &OrderVoteMsg,
         result: OrderVoteReceptionResult,
     ) -> anyhow::Result<()> {
         match result {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(ledger_info_with_signatures) => {
-                self.new_ordered_cert(
-                    WrappedLedgerInfo::new(VoteData::dummy(), ledger_info_with_signatures),
-                    order_vote_msg.quorum_cert(),
-                    order_vote_msg.order_vote().author(),
-                )
+                self.new_ordered_cert(WrappedLedgerInfo::new(
+                    VoteData::dummy(),
+                    ledger_info_with_signatures,
+                ))
                 .await
             },
             OrderVoteReceptionResult::VoteAdded(_) => {
@@ -1242,31 +1242,51 @@ impl RoundManager {
         result
     }
 
-    // Insert ordered certificate formed by aggregating order votes
-    async fn new_ordered_cert(
+    async fn new_qc_from_order_vote_msg(
         &mut self,
-        ordered_cert: WrappedLedgerInfo,
-        quorum_cert: &QuorumCert,
-        preferred_peer: Author,
+        order_vote_msg: &OrderVoteMsg,
     ) -> anyhow::Result<()> {
-        ensure!(
-            ordered_cert.commit_info().id() == quorum_cert.certified_block().id(),
-            "QuorumCert attached to order votes doesn't match"
-        );
+        if let NeedFetchResult::QCAlreadyExist = self
+            .block_store
+            .need_fetch_for_quorum_cert(order_vote_msg.quorum_cert())
+        {
+            return Ok(());
+        }
+
+        let start = Instant::now();
+        order_vote_msg
+            .quorum_cert()
+            .verify(&self.epoch_state().verifier)
+            .context("[OrderVoteMsg QuorumCert verification failed")?;
+        counters::VERIFY_MSG
+            .with_label_values(&["order_vote_qc"])
+            .observe(start.elapsed().as_secs_f64());
+
+        let result = self
+            .block_store
+            .insert_quorum_cert(
+                order_vote_msg.quorum_cert(),
+                &mut self.create_block_retriever(order_vote_msg.order_vote().author()),
+            )
+            .await
+            .context("[RoundManager] Failed to process the QC from order vote msg");
+        self.process_certificates().await?;
+        result
+    }
+
+    // Insert ordered certificate formed by aggregating order votes
+    async fn new_ordered_cert(&mut self, ordered_cert: WrappedLedgerInfo) -> anyhow::Result<()> {
         if self
             .block_store
             .get_block(ordered_cert.commit_info().id())
             .is_none()
         {
             ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE.inc();
+            error!(
+                "Ordered certificate created without block in block store: {:?}",
+                ordered_cert
+            );
         }
-        self.block_store
-            .insert_quorum_cert(
-                quorum_cert,
-                &mut self.create_block_retriever(preferred_peer),
-            )
-            .await
-            .context("RoundManager] Failed to process QC in order Cert")?;
         let result = self
             .block_store
             .insert_ordered_cert(&ordered_cert)
