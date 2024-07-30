@@ -49,14 +49,25 @@ impl MetadataBackendAdapter {
 
     // TODO: we should change NewBlockEvent on LeaderReputation to take a trait
     fn convert(&self, event: CommitEvent) -> NewBlockEvent {
-        let validators = self.epoch_to_validators.get(&event.epoch()).unwrap();
+        let validators = self
+            .epoch_to_validators
+            .get(&event.epoch())
+            .expect("Event epoch should map back to validators!");
         let mut bitvec = BitVec::with_num_bits(validators.len() as u16);
         for author in event.parents() {
-            bitvec.set(*validators.get(author).unwrap() as u16);
+            bitvec.set(
+                *validators
+                    .get(author)
+                    .expect("Author should be in validators set!") as u16,
+            );
         }
         let mut failed_authors = vec![];
         for author in event.failed_authors() {
-            failed_authors.push(*validators.get(author).unwrap() as u64);
+            failed_authors.push(
+                *validators
+                    .get(author)
+                    .expect("Author should be in validators set!") as u64,
+            );
         }
         NewBlockEvent::new(
             AccountAddress::ZERO,

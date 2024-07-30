@@ -84,7 +84,6 @@ pub(crate) fn bootstrap_db(
                 (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
             },
         };
-    //
     Ok((aptos_db_reader, db_rw, backup_service, internal_indexer_db))
 }
 

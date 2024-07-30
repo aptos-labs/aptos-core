@@ -256,7 +256,9 @@ impl DagStateSynchronizer {
 
         self.execution_client.sync_to(commit_li).await?;
 
-        Ok(Arc::into_inner(sync_dag_store).unwrap())
+        let inner =
+            Arc::into_inner(sync_dag_store).expect("Only one strong reference should exists");
+        Ok(inner)
     }
 }
 

@@ -641,7 +641,7 @@ fn serialize_struct_definition(
                 Ok(())
             } else {
                 Err(anyhow!(
-                    "Struct variants not supported in bytecode version {}",
+                    "Enum types not supported in bytecode version {}",
                     major_version
                 ))
             }
@@ -1265,7 +1265,12 @@ impl CommonSerializer {
 
     fn serialize_header(&mut self, binary: &mut BinaryData) -> Result<()> {
         serialize_magic(binary)?;
-        write_u32(binary, self.major_version)?;
+        let version = if self.major_version >= VERSION_7 {
+            APTOS_BYTECODE_VERSION_MASK | self.major_version
+        } else {
+            self.major_version
+        };
+        write_u32(binary, version)?;
         Ok(())
     }
 

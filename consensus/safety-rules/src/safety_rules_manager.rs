@@ -52,7 +52,10 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
             config.initial_safety_rules_config,
             InitialSafetyRulesConfig::None
         ) {
-            let identity_blob = config.initial_safety_rules_config.identity_blob().unwrap();
+            let identity_blob = config
+                .initial_safety_rules_config
+                .identity_blob()
+                .expect("No identity blob in initial safety rules config");
             let waypoint = config.initial_safety_rules_config.waypoint();
 
             let backend = &config.backend;

@@ -132,7 +132,7 @@ impl ModuleGenerator {
                 .expect("Serialization of CompilationMetadata should succeed"),
         };
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_NEXT,
+            version: file_format_common::VERSION_MAX,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
             metadata: vec![metadata],
             ..Default::default()

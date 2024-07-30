@@ -14,7 +14,7 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, OnChainConfig},
-    transaction::TransactionStatus,
+    transaction::{Script, TransactionPayload, TransactionStatus},
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
@@ -267,6 +267,118 @@ fn test_compilation_metadata_internal(
             ),
         )
     }
+}
+
+fn test_compilation_metadata_script_internal(
+    mainnet_flag: bool,
+    v2_flag: bool,
+    feature_enabled: bool,
+) -> TransactionStatus {
+    let mut h = MoveHarness::new();
+    if feature_enabled {
+        h.enable_features(
+            vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT],
+            vec![],
+        );
+    } else {
+        h.enable_features(vec![], vec![
+            FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
+        ]);
+    }
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source(
+        "m.move",
+        r#"
+        script {
+            fun main() { }
+        }
+        "#,
+    );
+    let path = builder.write_to_temp().unwrap();
+
+    let compiler_version = if v2_flag {
+        CompilerVersion::V2_0
+    } else {
+        CompilerVersion::V1
+    };
+    let package = build_package_with_compiler_version(
+        path.path().to_path_buf(),
+        BuildOptions::default(),
+        compiler_version,
+    )
+    .expect("building package must succeed");
+
+    let code = package.extract_script_code().into_iter().next().unwrap();
+
+    let script = TransactionPayload::Script(Script::new(code, vec![], vec![]));
+
+    if mainnet_flag {
+        h.set_resource(
+            CORE_CODE_ADDRESS,
+            ChainId::struct_tag(),
+            &ChainId::mainnet().id(),
+        );
+        h.run_transaction_payload_mainnet(&account, script)
+    } else {
+        h.run_transaction_payload(&account, script)
+    }
+}
+
+#[test]
+fn test_compilation_metadata_for_script() {
+    let mut enable_check = true;
+    // run compiler v2 code to mainnet
+    assert_vm_status!(
+        test_compilation_metadata_script_internal(true, true, enable_check),
+        StatusCode::UNSTABLE_BYTECODE_REJECTED
+    );
+    // run compiler v1 code to mainnet
+    assert_success!(test_compilation_metadata_script_internal(
+        true,
+        false,
+        enable_check
+    ));
+    // run compiler v2 code to test
+    assert_success!(test_compilation_metadata_script_internal(
+        false,
+        true,
+        enable_check
+    ));
+    // run compiler v1 code to test
+    assert_success!(test_compilation_metadata_script_internal(
+        false,
+        false,
+        enable_check
+    ));
+
+    enable_check = false;
+    // run compiler v2 code to mainnet
+    // success because the feature flag is turned off
+    assert_success!(test_compilation_metadata_script_internal(
+        true,
+        true,
+        enable_check
+    ),);
+    // run compiler v1 code to mainnet
+    assert_success!(test_compilation_metadata_script_internal(
+        true,
+        false,
+        enable_check
+    ));
+    // run compiler v2 code to test
+    // success because the feature flag is turned off
+    assert_success!(test_compilation_metadata_script_internal(
+        false,
+        true,
+        enable_check
+    ),);
+    // run compiler v1 code to test
+    assert_success!(test_compilation_metadata_script_internal(
+        false,
+        false,
+        enable_check
+    ));
 }
 
 #[test]

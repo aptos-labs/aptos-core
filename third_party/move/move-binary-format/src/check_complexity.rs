@@ -144,7 +144,7 @@ impl<'a> BinaryComplexityMeter<'a> {
                 .struct_variant_instantiations()
                 .ok_or_else(|| {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                        "Can't get struct variant instantiations -- not a module.".to_string(),
+                        "Can't get enum type instantiation -- not a module.".to_string(),
                     )
                 })?;
         let struct_variant_inst = safe_get_table(struct_variant_insts, struct_inst_idx.0)?;

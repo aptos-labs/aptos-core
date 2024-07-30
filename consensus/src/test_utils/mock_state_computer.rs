@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use futures::SinkExt;
 use futures_channel::mpsc::UnboundedSender;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub struct EmptyStateComputer {
     executor_channel: UnboundedSender<OrderedBlocks>,
@@ -45,6 +45,7 @@ impl StateComputer for EmptyStateComputer {
         Ok(PipelineExecutionResult::new(
             vec![],
             StateComputeResult::new_dummy(),
+            Duration::from_secs(0),
         ))
     }
 
@@ -129,7 +130,8 @@ impl StateComputer for RandomComputeResultStateComputer {
                 self.random_compute_result_root_hash,
             ))
         };
-        let pipeline_execution_res = res.map(|res| PipelineExecutionResult::new(vec![], res));
+        let pipeline_execution_res =
+            res.map(|res| PipelineExecutionResult::new(vec![], res, Duration::from_secs(0)));
         Box::pin(async move { pipeline_execution_res })
     }
 

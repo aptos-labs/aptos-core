@@ -61,7 +61,7 @@ use aptos_types::{
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignedTransaction, Transaction,
+        MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
@@ -90,6 +90,7 @@ use move_binary_format::{
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    file_format::CompiledScript,
     CompiledModule,
 };
 use move_core_types::{
@@ -712,6 +713,19 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         script: &Script,
     ) -> Result<(), VMStatus> {
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
+        {
+            for arg in script.args() {
+                if let TransactionArgument::Serialized(_) = arg {
+                    return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
+                        .finish(Location::Script)
+                        .into_vm_status());
+                }
+            }
+        }
+
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
@@ -725,11 +739,30 @@ impl AptosVM {
 
         let func = session.load_script(script.code(), script.ty_args())?;
 
-        // TODO(Gerardo): consolidate the extended validation to verifier.
-        verifier::event_validation::verify_no_event_emission_in_script(
+        let compiled_script = match CompiledScript::deserialize_with_config(
             script.code(),
             self.deserializer_config(),
-        )?;
+        ) {
+            Ok(script) => script,
+            Err(err) => {
+                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                let partial_err = PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Script);
+                return Err(partial_err.into_vm_status());
+            },
+        };
+
+        // Check that unstable bytecode cannot be executed on mainnet
+        if self
+            .features()
+            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT)
+        {
+            self.reject_unstable_bytecode_for_script(&compiled_script)?;
+        }
+
+        // TODO(Gerardo): consolidate the extended validation to verifier.
+        verifier::event_validation::verify_no_event_emission_in_compiled_script(&compiled_script)?;
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
@@ -1504,7 +1537,6 @@ impl AptosVM {
                     gas_meter,
                     Compatibility::new(
                         true,
-                        true,
                         !self
                             .features()
                             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
@@ -1604,6 +1636,22 @@ impl AptosVM {
                             )
                             .finish(Location::Undefined));
                     }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
+    pub fn reject_unstable_bytecode_for_script(&self, module: &CompiledScript) -> VMResult<()> {
+        if self.chain_id().is_mainnet() {
+            if let Some(metadata) =
+                aptos_framework::get_compilation_metadata_from_compiled_script(module)
+            {
+                if metadata.unstable {
+                    return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
+                        .with_message("script marked unstable cannot be run on mainnet".to_string())
+                        .finish(Location::Script));
                 }
             }
         }
@@ -2601,6 +2649,19 @@ impl VMValidator for AptosVM {
                 }
             } else {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            }
+        }
+
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
+        {
+            if let TransactionPayload::Script(script) = transaction.payload() {
+                for arg in script.args() {
+                    if let TransactionArgument::Serialized(_) = arg {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
             }
         }
 

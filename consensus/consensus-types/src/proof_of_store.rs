@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::payload::TDataInfo;
 use anyhow::{bail, ensure, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -145,6 +146,24 @@ impl Display for BatchInfo {
     }
 }
 
+impl TDataInfo for BatchInfo {
+    fn num_txns(&self) -> u64 {
+        self.num_txns()
+    }
+
+    fn num_bytes(&self) -> u64 {
+        self.num_bytes()
+    }
+
+    fn info(&self) -> &BatchInfo {
+        self
+    }
+
+    fn signers(&self, _ordered_authors: &[PeerId]) -> Vec<PeerId> {
+        vec![self.author()]
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedBatchInfoMsg {
     signed_infos: Vec<SignedBatchInfo>,
@@ -269,6 +288,7 @@ pub enum SignedBatchInfoError {
     InvalidAuthor,
     NotFound,
     AlreadyCommitted,
+    NoTimeStamps,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
@@ -350,10 +370,8 @@ impl ProofOfStore {
         result
     }
 
-    pub fn shuffled_signers(&self, validator: &ValidatorVerifier) -> Vec<PeerId> {
-        let mut ret: Vec<PeerId> = self
-            .multi_signature
-            .get_signers_addresses(&validator.get_ordered_account_addresses());
+    pub fn shuffled_signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId> {
+        let mut ret: Vec<PeerId> = self.multi_signature.get_signers_addresses(ordered_authors);
         ret.shuffle(&mut thread_rng());
         ret
     }
@@ -372,5 +390,23 @@ impl Deref for ProofOfStore {
 
     fn deref(&self) -> &Self::Target {
         &self.info
+    }
+}
+
+impl TDataInfo for ProofOfStore {
+    fn num_txns(&self) -> u64 {
+        self.num_txns
+    }
+
+    fn num_bytes(&self) -> u64 {
+        self.num_bytes
+    }
+
+    fn info(&self) -> &BatchInfo {
+        self.info()
+    }
+
+    fn signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId> {
+        self.shuffled_signers(ordered_authors)
     }
 }

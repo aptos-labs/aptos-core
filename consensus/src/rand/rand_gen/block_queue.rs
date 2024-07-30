@@ -40,12 +40,16 @@ impl QueueItem {
         self.blocks().len()
     }
 
+    #[allow(clippy::unwrap_used)]
     pub fn first_round(&self) -> u64 {
         self.blocks().first().unwrap().block().round()
     }
 
     pub fn offset(&self, round: Round) -> usize {
-        *self.offsets_by_round.get(&round).unwrap()
+        *self
+            .offsets_by_round
+            .get(&round)
+            .expect("Round should be in the queue")
     }
 
     pub fn num_undecided(&self) -> usize {
@@ -106,6 +110,8 @@ impl BlockQueue {
     }
 
     /// Dequeue all ordered blocks prefix that have randomness
+    /// Unwrap is safe because the queue is not empty
+    #[allow(clippy::unwrap_used)]
     pub fn dequeue_rand_ready_prefix(&mut self) -> Vec<OrderedBlocks> {
         let mut rand_ready_prefix = vec![];
         while let Some((_starting_round, item)) = self.queue.first_key_value() {

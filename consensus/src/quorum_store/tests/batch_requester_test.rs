@@ -14,7 +14,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
-    aggregate_signature::{AggregateSignature, PartialSignatures},
+    aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
@@ -103,10 +103,9 @@ async fn test_batch_request_exists() {
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )
@@ -200,10 +199,9 @@ async fn test_batch_request_not_exists_not_expired() {
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )
@@ -249,10 +247,9 @@ async fn test_batch_request_not_exists_expired() {
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )

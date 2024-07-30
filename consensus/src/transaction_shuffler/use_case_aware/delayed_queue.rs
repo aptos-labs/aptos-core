@@ -198,7 +198,10 @@ impl UseCase {
         let account_delay_key = account.delay_key();
         self.account_by_delay
             .strict_insert(account_delay_key, address);
-        let (_, head_address) = self.account_by_delay.first_key_value().unwrap();
+        let (_, head_address) = self
+            .account_by_delay
+            .first_key_value()
+            .expect("Must exist.");
         if head_address == &address {
             self.input_idx = account_delay_key.input_idx;
         }
