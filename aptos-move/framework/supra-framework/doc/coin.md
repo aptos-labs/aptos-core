@@ -35,7 +35,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `paired_metadata`](#0x1_coin_paired_metadata)
 -  [Function `create_coin_conversion_map`](#0x1_coin_create_coin_conversion_map)
 -  [Function `create_pairing`](#0x1_coin_create_pairing)
--  [Function `is_apt`](#0x1_coin_is_apt)
+-  [Function `is_sup`](#0x1_coin_is_sup)
 -  [Function `create_and_return_paired_metadata_if_not_exist`](#0x1_coin_create_and_return_paired_metadata_if_not_exist)
 -  [Function `ensure_paired_metadata`](#0x1_coin_ensure_paired_metadata)
 -  [Function `paired_coin`](#0x1_coin_paired_coin)
@@ -1381,13 +1381,13 @@ Create APT pairing by passing <code>AptosCoin</code>.
 
 </details>
 
-<a id="0x1_coin_is_apt"></a>
+<a id="0x1_coin_is_sup"></a>
 
-## Function `is_apt`
+## Function `is_sup`
 
 
 
-<pre><code><b>fun</b> <a href="coin.md#0x1_coin_is_apt">is_apt</a>&lt;CoinType&gt;(): bool
+<pre><code><b>fun</b> <a href="coin.md#0x1_coin_is_sup">is_sup</a>&lt;CoinType&gt;(): bool
 </code></pre>
 
 
@@ -1396,8 +1396,8 @@ Create APT pairing by passing <code>AptosCoin</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_is_apt">is_apt</a>&lt;CoinType&gt;(): bool {
-    <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;CoinType&gt;() == <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"0x1::aptos_coin::AptosCoin")
+<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_is_sup">is_sup</a>&lt;CoinType&gt;(): bool {
+    <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;CoinType&gt;() == <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="supra_coin.md#0x1_supra_coin_SupraCoin">0x1::supra_coin::SupraCoin</a>")
 }
 </code></pre>
 
@@ -1429,10 +1429,10 @@ Create APT pairing by passing <code>AptosCoin</code>.
     <b>let</b> map = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@supra_framework);
     <b>let</b> type = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;();
     <b>if</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&map.coin_to_fungible_asset_map, type)) {
-        <b>let</b> is_apt = <a href="coin.md#0x1_coin_is_apt">is_apt</a>&lt;CoinType&gt;();
-        <b>assert</b>!(!is_apt || allow_apt_creation, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_EAPT_PAIRING_IS_NOT_ENABLED">EAPT_PAIRING_IS_NOT_ENABLED</a>));
+        <b>let</b> is_sup = <a href="coin.md#0x1_coin_is_sup">is_sup</a>&lt;CoinType&gt;();
+        <b>assert</b>!(!is_sup || allow_apt_creation, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_EAPT_PAIRING_IS_NOT_ENABLED">EAPT_PAIRING_IS_NOT_ENABLED</a>));
         <b>let</b> metadata_object_cref =
-            <b>if</b> (is_apt) {
+            <b>if</b> (is_sup) {
                 <a href="object.md#0x1_object_create_sticky_object_at_address">object::create_sticky_object_at_address</a>(@supra_framework, @aptos_fungible_asset)
             } <b>else</b> {
                 <a href="object.md#0x1_object_create_named_object">object::create_named_object</a>(
