@@ -2470,7 +2470,7 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(20)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 12000 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 10000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
