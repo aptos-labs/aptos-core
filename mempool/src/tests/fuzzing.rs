@@ -7,7 +7,10 @@ use crate::{
     network::{BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{tasks, types::SharedMempool},
 };
-use aptos_config::{config::NodeConfig, network_id::NetworkId};
+use aptos_config::{
+    config::{NodeConfig, NodeType},
+    network_id::NetworkId,
+};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
@@ -86,7 +89,7 @@ pub fn test_mempool_process_incoming_transactions_impl(
         Arc::new(mock_db),
         vm_validator,
         vec![],
-        config.base.role,
+        NodeType::extract_from_config(&config),
     );
 
     let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);

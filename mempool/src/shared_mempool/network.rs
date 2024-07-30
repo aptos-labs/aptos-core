@@ -17,7 +17,7 @@ use crate::{
     },
 };
 use aptos_config::{
-    config::{MempoolConfig, RoleType},
+    config::{MempoolConfig, NodeType},
     network_id::PeerNetworkId,
 };
 use aptos_infallible::RwLock;
@@ -106,7 +106,7 @@ impl Display for BroadcastPeerPriority {
 pub(crate) struct MempoolNetworkInterface<NetworkClient> {
     network_client: NetworkClient,
     sync_states: Arc<RwLock<HashMap<PeerNetworkId, PeerSyncState>>>,
-    role: RoleType,
+    node_type: NodeType,
     mempool_config: MempoolConfig,
     prioritized_peers_state: PrioritizedPeersState,
 }
@@ -114,16 +114,16 @@ pub(crate) struct MempoolNetworkInterface<NetworkClient> {
 impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterface<NetworkClient> {
     pub(crate) fn new(
         network_client: NetworkClient,
-        role: RoleType,
+        node_type: NodeType,
         mempool_config: MempoolConfig,
     ) -> MempoolNetworkInterface<NetworkClient> {
         let prioritized_peers_state =
             PrioritizedPeersState::new(mempool_config.clone(), TimeService::real());
-        info!("mempool network interface created {:?}", role);
+        info!("mempool network interface created {:?}", node_type);
         Self {
             network_client,
             sync_states: Arc::new(RwLock::new(HashMap::new())),
-            role,
+            node_type,
             mempool_config,
             prioritized_peers_state,
         }
@@ -214,7 +214,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peers_changed: bool,
     ) {
         // Only fullnodes should prioritize peers (e.g., VFNs and PFNs)
-        if self.role.is_validator() {
+        if self.node_type.is_validator() {
             return;
         }
 
@@ -244,7 +244,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     }
 
     pub fn is_validator(&self) -> bool {
-        self.role.is_validator()
+        self.node_type.is_validator()
     }
 
     pub fn is_upstream_peer(
@@ -252,7 +252,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: &PeerNetworkId,
         metadata: Option<&ConnectionMetadata>,
     ) -> bool {
-        info!("is_upstream_peer for role: {:?}, peer: {}, metadata: {:?}, is_validator_network: {:?}, sync_state_exists: {:?}", self.role, peer, metadata, peer.network_id().is_validator_network(), self.sync_states_exists(peer));
+        info!("is_upstream_peer for node_type: {:?}, peer: {}, metadata: {:?}, is_validator_network: {:?}, sync_state_exists: {:?}", self.node_type, peer, metadata, peer.network_id().is_validator_network(), self.sync_states_exists(peer));
         // P2P networks have everyone be upstream
         if peer.network_id().is_validator_network() {
             return true;
@@ -274,7 +274,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         backoff: bool,
         timestamp: SystemTime,
     ) {
-        info!("process_broadcast_ack for role: {:?}, peer: {}, message_id: {:?}, retry: {}, backoff: {}, timestamp: {:?}", self.role, peer, message_id, retry, backoff, timestamp);
+        info!("process_broadcast_ack for node_type: {:?}, peer: {}, message_id: {:?}, retry: {}, backoff: {}, timestamp: {:?}", self.node_type, peer, message_id, retry, backoff, timestamp);
         let mut sync_states = self.sync_states.write();
 
         let sync_state = if let Some(state) = sync_states.get_mut(&peer) {
@@ -353,8 +353,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         BroadcastError,
     > {
         info!(
-            "determine_broadcast_batch for role: {:?}, peer: {}, scheduled_backoff: {}",
-            self.role, peer, scheduled_backoff
+            "determine_broadcast_batch for node_type: {:?}, peer: {}, scheduled_backoff: {}",
+            self.node_type, peer, scheduled_backoff
         );
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
@@ -473,7 +473,10 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             .clone()
                             .into_iter()
                             .collect();
-                    info!("sender_buckets: {:?}, peer: {:?}, role: {:?}", sender_buckets, peer, self.role);
+                    info!(
+                        "sender_buckets: {:?}, peer: {:?}, node_type: {:?}",
+                        sender_buckets, peer, self.node_type
+                    );
                     // Sort sender_buckets based on priority. Primary peer should be first.
                     sender_buckets.sort_by(|(_, priority_a), (_, priority_b)| {
                         if priority_a == priority_b {
@@ -555,8 +558,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             }
         };
         info!(
-            "send_batch_to_peer for role: {:?}, peer: {}, message_id: {:?}, num_txns: {}",
-            self.role, peer, message_id, len
+            "send_batch_to_peer for node_type: {:?}, peer: {}, message_id: {:?}, num_txns: {}",
+            self.node_type, peer, message_id, len
         );
 
         if let Err(e) = self.network_client.send_to_peer(request, peer) {
@@ -576,8 +579,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
         });
         info!(
-            "send_message_to_peer for role: {:?}, peer: {}",
-            self.role, peer
+            "send_message_to_peer for node_type: {:?}, peer: {}",
+            self.node_type, peer
         );
         self.network_client.send_to_peer(message, peer)
     }
@@ -617,15 +620,15 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         let start_time = Instant::now();
         let result = self.determine_broadcast_batch(peer, scheduled_backoff, smp);
         info!(
-            "execute_broadcast for role: {:?}, peer: {}. result: {}",
-            self.role,
+            "execute_broadcast for node_type: {:?}, peer: {}. result: {}",
+            self.node_type,
             peer,
             result.is_ok()
         );
         let (message_id, transactions, metric_label) = result?;
         info!(
-            "execute_broadcast for role: {:?}, peer: {}. message_id: {:?}, num_txns: {}, metric_label: {:?}",
-            self.role,
+            "execute_broadcast for node_type: {:?}, peer: {}. message_id: {:?}, num_txns: {}, metric_label: {:?}",
+            self.node_type,
             peer,
             message_id,
             transactions.len(),

@@ -11,7 +11,7 @@ use crate::{
     },
     QuorumStoreRequest,
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, NodeType};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
@@ -50,6 +50,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     TransactionValidator: TransactionValidation + 'static,
     ConfigProvider: OnChainConfigProvider,
 {
+    let node_type = NodeType::extract_from_config(config);
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, TransactionValidator> =
         SharedMempool::new(
             mempool.clone(),
@@ -58,7 +59,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
             db,
             validator,
             subscribers,
-            config.base.role,
+            node_type,
         );
 
     executor.spawn(coordinator(

@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_config::{
-    config::{MempoolConfig, RoleType},
+    config::{MempoolConfig, NodeType},
     network_id::PeerNetworkId,
 };
 use aptos_consensus_types::common::{
@@ -69,9 +69,10 @@ impl<
         db: Arc<dyn DbReader>,
         validator: Arc<RwLock<TransactionValidator>>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
-        role: RoleType,
+        node_type: NodeType,
     ) -> Self {
-        let network_interface = MempoolNetworkInterface::new(network_client, role, config.clone());
+        let network_interface =
+            MempoolNetworkInterface::new(network_client, node_type, config.clone());
         let use_case_history = UseCaseHistory::new(
             config.usecase_stats_num_blocks_to_track,
             config.usecase_stats_num_top_to_track,
