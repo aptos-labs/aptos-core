@@ -121,6 +121,11 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> MempoolNetworkInterface<NetworkClient> {
         let prioritized_peers_state =
             PrioritizedPeersState::new(mempool_config.clone(), TimeService::real());
+        info!(
+            "Mempool network interface created {:?}, time: {:?}",
+            role,
+            Instant::now()
+        );
         Self {
             network_client,
             sync_states: Arc::new(RwLock::new(HashMap::new())),
@@ -187,6 +192,15 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         // Get the upstream peers to add or disable, using a read lock
         let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
 
+        info!(
+            "update_peers: to_add: {:?}, to_disable: {:?}",
+            to_add, to_disable
+        );
+        info!(
+            "update_peers_network_ids: to_add: {:?}, to_disable: {:?}",
+            to_add.iter().map(|(x, _)| x).collect::<Vec<_>>(),
+            to_disable
+        );
         // If there are updates, apply using a write lock
         self.add_and_disable_upstream_peers(&to_add, &to_disable);
 
@@ -230,6 +244,10 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             })
             .collect();
 
+        info!(
+            "update_prioritized_peers: peers_and_metadata: {:?}",
+            peers_and_metadata
+        );
         // Update the prioritized peers list
         self.prioritized_peers_state
             .update_prioritized_peers(peers_and_metadata);
@@ -244,6 +262,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: &PeerNetworkId,
         metadata: Option<&ConnectionMetadata>,
     ) -> bool {
+        info!("is_upstream_peer called. role = {:?}, peer: {:?}, metadata: {:?}, is_validator: {:?}, sync_state_exists:{:?}", self.role, peer, metadata, peer.network_id().is_validator_network(), self.sync_states_exists(peer));
         // P2P networks have everyone be upstream
         if peer.network_id().is_validator_network() {
             return true;
@@ -265,6 +284,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         backoff: bool,
         timestamp: SystemTime,
     ) {
+        info!("process_broadcast_ack from peer {:?}. batch_id: {:?} role: {:?}, retry: {:?}, backoff: {:?}, timestamp: {:?}", peer, batch_id, self.role, retry, backoff, timestamp);
         let mut sync_states = self.sync_states.write();
 
         let sync_state = if let Some(state) = sync_states.get_mut(&peer) {
@@ -363,6 +383,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         ),
         BroadcastError,
     > {
+        info!("determine_broadcast_batch called. role = {:?}", self.role);
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
@@ -373,8 +394,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         let peer_priority = self.check_peer_prioritized(peer)?;
 
         info!(
-            "determine_broadcast_batch: peer: {}, scheduled_backoff: {}, peer_priority: {:?}",
-            peer, scheduled_backoff, peer_priority
+            "determine_broadcast_batch: role: {:?} peer: {}, scheduled_backoff: {}, peer_priority: {:?}",
+            self.role, peer, scheduled_backoff, peer_priority,
         );
         // If backoff mode is on for this peer, only execute broadcasts that were scheduled as a backoff broadcast.
         // This is to ensure the backoff mode is actually honored (there is a chance a broadcast was scheduled
@@ -497,7 +518,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             }
         };
         info!(
-            "send_batch_to_peer: peer: {}, batch_id: {:?}, transactions.len(): {}, priority: {:?}",
+            "send_batch_to_peer: role: {:?}, peer: {}, batch_id: {:?}, transactions.len(): {}, priority: {:?}",
+            self.role,
             peer,
             batch_id,
             len,
@@ -569,7 +591,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
         let result = self.determine_broadcast_batch(peer, scheduled_backoff, smp);
         info!(
-            "execute_broadcast: peer: {}, scheduled_backoff: {}, result: {:?}",
+            "execute_broadcast: role: {:?}, peer: {}, scheduled_backoff: {}, result: {:?}",
+            self.role,
             peer,
             scheduled_backoff,
             result.is_ok()

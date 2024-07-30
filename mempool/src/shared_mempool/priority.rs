@@ -237,6 +237,11 @@ impl PrioritizedPeersState {
 
         // Set the last peer priority update time
         self.last_peer_priority_update = Some(self.time_service.now());
+        info!(
+            "updated peers: count: {:?}, {:?}",
+            self.prioritized_peers.read().len(),
+            self.prioritized_peers.read()
+        );
     }
 
     /// Updates the prioritized peer metrics based on the new prioritization
