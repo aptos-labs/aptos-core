@@ -180,19 +180,19 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
-            max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
+            max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE / 3, // Triple the default client size (to add a buffer)
             max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
             max_num_active_subscriptions: 30,
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
-            max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_period_ms: 30_000, // 30 seconds
-            max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
-            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-            min_time_to_ignore_peers_secs: 300, // 5 minutes
-            request_moderator_refresh_interval_ms: 1000, // 1 second
+            max_state_chunk_size: MAX_STATE_CHUNK_SIZE / 3, // Triple the default client size (to add a buffer)
+            max_subscription_period_ms: 30_000,             // 30 seconds
+            max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE / 3, // Triple the default client size (to add a buffer)
+            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE / 3, // Triple the default client size (to add a buffer)
+            min_time_to_ignore_peers_secs: 300,                                       // 5 minutes
+            request_moderator_refresh_interval_ms: 1000,                              // 1 second
             storage_summary_refresh_interval_ms: 100, // Optimal for <= 10 blocks per second
         }
     }
