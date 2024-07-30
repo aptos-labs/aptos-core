@@ -62,7 +62,7 @@ use std::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -825,9 +825,12 @@ where
             Ok(())
         };
 
-        let start = Instant::now();
+        let mut commit_time = Duration::from_secs(0);
+        let mut time_outside_commit = Duration::from_secs(0);
 
         loop {
+            let start = Instant::now();
+
             if matches!(scheduler_task, SchedulerTask::Retry) {
                 let mut last_commit_idx = None;
                 while scheduler.should_coordinate_commits() {
@@ -884,7 +887,13 @@ where
                 }
             }
 
+            let end = Instant::now();
+
+            commit_time += end - start;
+
             drain_commit_queue()?;
+
+            let start2 = Instant::now();
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
@@ -950,13 +959,15 @@ where
                     drain_commit_queue()?;
                     break;
                 },
-            }
+            };
+            let end2 = Instant::now();
+            time_outside_commit += end2 - start2;
         }
 
-        let end = Instant::now();
-        let duration = end - start;
-
-        print!("thread_id={}, had total time={:?}", worker_id, duration);
+        println!(
+            "num_threads={}, thread_id={}, time in commit={:?}, time outside commit={:?}",
+            num_workers, worker_id, commit_time, time_outside_commit
+        );
         Ok(())
     }
 
@@ -1006,7 +1017,7 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
-        let worker_ids: Vec<usize> = (0..self.config.local.concurrency_level).collect();
+        let worker_ids: Vec<usize> = (0..num_workers).collect();
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
             for worker_id in &worker_ids {
