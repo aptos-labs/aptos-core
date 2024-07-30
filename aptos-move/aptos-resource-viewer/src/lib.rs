@@ -66,7 +66,7 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
         &self,
         tag: &StructTag,
         blob: &[u8],
-    ) -> anyhow::Result<Vec<(Identifier, MoveValue)>> {
+    ) -> anyhow::Result<(Option<Identifier>, Vec<(Identifier, MoveValue)>)> {
         self.0.move_struct_fields(tag, blob)
     }
 
