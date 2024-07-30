@@ -2317,12 +2317,10 @@ module supra_framework::multisig_account {
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
-        reject_transaction(owner_2, multisig_account, 1);
         execute_rejected_transaction(owner_3, multisig_account);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
-    #[expected_failure(abort_code = 0x3000A, location = Self)]
     public entry fun test_execute_rejected_transaction_timeout_should_success(
         owner_1: &signer, owner_2: &signer, owner_3: &signer) acquires MultisigAccount {
         setup();
@@ -2334,8 +2332,7 @@ module supra_framework::multisig_account {
         create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
-        reject_transaction(owner_2, multisig_account, 1);
-        fast_forward_seconds(MINIMAL_TIMEOUT_DURATION);
+        fast_forward_seconds(MINIMAL_TIMEOUT_DURATION+1);
         execute_rejected_transaction(owner_3, multisig_account);
     }
 
