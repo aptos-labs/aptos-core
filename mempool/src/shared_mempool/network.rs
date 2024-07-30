@@ -119,6 +119,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> MempoolNetworkInterface<NetworkClient> {
         let prioritized_peers_state =
             PrioritizedPeersState::new(mempool_config.clone(), TimeService::real());
+        info!("mempool network interface created {:?}", role);
         Self {
             network_client,
             sync_states: Arc::new(RwLock::new(HashMap::new())),
@@ -189,6 +190,11 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         // Get the upstream peers to add or disable, using a read lock
         let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
         info!("to_add {:?}, to_disable: {:?}", to_add, to_disable);
+        info!(
+            "to_add_keys {:?}, to_disable_keys: {:?}",
+            to_add.iter().map(|(peer, _)| peer).collect::<Vec<_>>(),
+            to_disable
+        );
         // If there are updates, apply using a write lock
         self.add_and_disable_upstream_peers(&to_add, &to_disable);
 
@@ -246,6 +252,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         peer: &PeerNetworkId,
         metadata: Option<&ConnectionMetadata>,
     ) -> bool {
+        info!("is_upstream_peer for role: {:?}, peer: {}, metadata: {:?}, is_validator_network: {:?}, sync_state_exists: {:?}", self.role, peer, metadata, peer.network_id().is_validator_network(), self.sync_states_exists(peer));
         // P2P networks have everyone be upstream
         if peer.network_id().is_validator_network() {
             return true;
@@ -267,6 +274,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         backoff: bool,
         timestamp: SystemTime,
     ) {
+        info!("process_broadcast_ack for role: {:?}, peer: {}, message_id: {:?}, retry: {}, backoff: {}, timestamp: {:?}", self.role, peer, message_id, retry, backoff, timestamp);
         let mut sync_states = self.sync_states.write();
 
         let sync_state = if let Some(state) = sync_states.get_mut(&peer) {
@@ -345,8 +353,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         BroadcastError,
     > {
         info!(
-            "determine_broadcast_batch for peer: {}, scheduled_backoff: {}",
-            peer, scheduled_backoff
+            "determine_broadcast_batch for role: {:?}, peer: {}, scheduled_backoff: {}",
+            self.role, peer, scheduled_backoff
         );
         let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
@@ -534,17 +542,22 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         // For each transaction, we include the ready time in millis since epoch
         transactions: Vec<(SignedTransaction, u64, BroadcastPeerPriority)>,
     ) -> Result<(), BroadcastError> {
+        let len = transactions.len();
         let request = if self.mempool_config.include_ready_time_in_broadcast {
             MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
-                message_id,
+                message_id: message_id.clone(),
                 transactions,
             }
         } else {
             MempoolSyncMsg::BroadcastTransactionsRequest {
-                message_id,
+                message_id: message_id.clone(),
                 transactions: transactions.into_iter().map(|(txn, _, _)| txn).collect(),
             }
         };
+        info!(
+            "send_batch_to_peer for role: {:?}, peer: {}, message_id: {:?}, num_txns: {}",
+            self.role, peer, message_id, len
+        );
 
         if let Err(e) = self.network_client.send_to_peer(request, peer) {
             counters::network_send_fail_inc(counters::BROADCAST_TXNS);
@@ -562,6 +575,10 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         fail_point!("mempool::send_to", |_| {
             Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
         });
+        info!(
+            "send_message_to_peer for role: {:?}, peer: {}",
+            self.role, peer
+        );
         self.network_client.send_to_peer(message, peer)
     }
 
@@ -600,13 +617,15 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         let start_time = Instant::now();
         let result = self.determine_broadcast_batch(peer, scheduled_backoff, smp);
         info!(
-            "execute_broadcast for peer: {}. result: {}",
+            "execute_broadcast for role: {:?}, peer: {}. result: {}",
+            self.role,
             peer,
             result.is_ok()
         );
         let (message_id, transactions, metric_label) = result?;
         info!(
-            "execute_broadcast for peer: {}. message_id: {:?}, num_txns: {}, metric_label: {:?}",
+            "execute_broadcast for role: {:?}, peer: {}. message_id: {:?}, num_txns: {}, metric_label: {:?}",
+            self.role,
             peer,
             message_id,
             transactions.len(),
