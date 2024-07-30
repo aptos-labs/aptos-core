@@ -18,7 +18,7 @@ pub trait FixedWindowOptimizer {
     /// The fixed window size for this optimizer.
     fn fixed_window_size(&self) -> usize;
 
-    /// Given a fixed `window` of bytecode of size `self.fixed_window_size()`, 
+    /// Given a fixed `window` of bytecode of size `self.fixed_window_size()`,
     /// optionally return its optimized version.
     /// If `None` is returned, the `window` is not optimized.
     fn optimize_fixed_window(&self, window: &[Bytecode]) -> Option<Vec<Bytecode>>;
