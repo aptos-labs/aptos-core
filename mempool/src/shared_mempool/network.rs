@@ -242,6 +242,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             peers_and_metadata,
             self.num_txns_received_since_peers_updated,
         );
+        // Resetting the counter
+        self.num_txns_received_since_peers_updated = 0;
     }
 
     pub fn is_validator(&self) -> bool {

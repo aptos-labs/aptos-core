@@ -243,7 +243,12 @@ impl Mempool {
                 counters::COMMIT_ACCEPTED_LABEL,
                 priority.as_str(),
             );
-            Self::log_commit_and_parked_latency(insertion_info, bucket.as_str(), priority.as_str(), tracked_use_case);
+            Self::log_commit_and_parked_latency(
+                insertion_info,
+                bucket.as_str(),
+                priority.as_str(),
+                tracked_use_case,
+            );
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
