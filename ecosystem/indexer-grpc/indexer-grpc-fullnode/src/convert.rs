@@ -176,6 +176,12 @@ pub fn convert_transaction_payload(
                 convert_multisig_payload(mp),
             )),
         },
+        TransactionPayload::IntentPayload(intent_calls) => transaction::TransactionPayload {
+            r#type: transaction::transaction_payload::Type::IntentPayload as i32,
+            payload: Some(transaction::transaction_payload::Payload::IntentPayload(
+                transaction::IntentPayload { intent_calls: intent_calls.intent_calls.iter().map(|call| convert_entry_function_payload(call)).collect() }
+            )),
+        },
 
         // Deprecated.
         TransactionPayload::ModuleBundlePayload(_) => {

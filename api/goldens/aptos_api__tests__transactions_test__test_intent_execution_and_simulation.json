@@ -1,0 +1,52 @@
+{
+  "hash": "",
+  "sender": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+  "sequence_number": "0",
+  "max_gas_amount": "100000000",
+  "gas_unit_price": "0",
+  "expiration_timestamp_secs": "18446744073709551615",
+  "payload": {
+    "intent_calls": [
+      {
+        "function": "0x1::coin::withdraw",
+        "type_arguments": [
+          "0x1::aptos_coin::AptosCoin"
+        ],
+        "arguments": [
+          "10"
+        ]
+      },
+      {
+        "function": "0x1::coin::coin_to_fungible_asset",
+        "type_arguments": [
+          "0x1::aptos_coin::AptosCoin"
+        ],
+        "arguments": [
+          {
+            "call_idx": 0,
+            "return_idx": 0,
+            "operation_type": "Move"
+          }
+        ]
+      },
+      {
+        "function": "0x1::primary_fungible_store::deposit",
+        "type_arguments": [],
+        "arguments": [
+          "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+          {
+            "call_idx": 1,
+            "return_idx": 0,
+            "operation_type": "Move"
+          }
+        ]
+      }
+    ],
+    "type": "intent_payload"
+  },
+  "signature": {
+    "public_key": "0xd5a781494d2bf1a174ddffde1e02cb8881cff6dab70e61cbdef393deac0ce639",
+    "signature": "0xbb2abf03f04c64eb9f4932c17c14ee9c7fcba956c99ab142fc3b5defef1aba2b6275726c89e5724b8bb04d190d05fe1523c70f217c18ab7fc4a92dd1788c6601",
+    "type": "ed25519_signature"
+  }
+}

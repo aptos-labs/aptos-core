@@ -5,8 +5,9 @@
 use crate::{
     transaction::{
         BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
-        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
-        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
+        DeletedTableData, IntentPayload, MultisigPayload, MultisigTransactionPayload,
+        StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
+        WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
@@ -16,8 +17,9 @@ use crate::{
     TransactionPayload, UserTransactionRequest, VersionedEvent, WriteSet, WriteSetChange,
     WriteSetPayload,
 };
-use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
+use anyhow::{anyhow, bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_intent::BatchArgument;
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_storage_interface::DbReader;
@@ -278,23 +280,72 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         let ret = match payload {
             Script(s) => {
                 let (code, ty_args, args) = s.into_inner();
-                let script_args = self.inner.view_script_arguments(&code, &args, &ty_args);
+                if let Ok(intents) = aptos_intent::generate_intent_payload(&code, &args, &ty_args) {
+                    let mut annotated_intents = vec![];
+                    for call in intents {
+                        let (module, function, ty_args, args) = call.into_inner();
 
-                let json_args = match script_args {
-                    Ok(values) => values
-                        .into_iter()
-                        .map(|v| MoveValue::try_from(v)?.json())
-                        .collect::<Result<_>>()?,
-                    Err(_e) => convert_txn_args(&args)
-                        .into_iter()
-                        .map(|arg| HexEncodedBytes::from(arg).json())
-                        .collect::<Result<_>>()?,
-                };
-                TransactionPayload::ScriptPayload(ScriptPayload {
-                    code: MoveScriptBytecode::new(code).try_parse_abi(),
-                    type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
-                    arguments: json_args,
-                })
+                        let mut viewer = self.inner.function_arguments_viewer(
+                            &module,
+                            function.as_ident_str(),
+                            &ty_args,
+                        )?;
+                        let mut arguments = vec![];
+
+                        for (idx, arg) in args.into_iter().enumerate() {
+                            match arg {
+                                BatchArgument::Raw(bytes) => {
+                                    arguments.push(match viewer.view_argument(idx, &bytes) {
+                                        Ok(v) => MoveValue::try_from(v)?.json()?,
+                                        Err(_) => HexEncodedBytes::from(bytes).json()?,
+                                    })
+                                },
+                                BatchArgument::PreviousResult(result) => {
+                                    arguments.push(serde_json::to_value(&result).map_err(
+                                        |err| {
+                                            anyhow!(
+                                                "Failed to serialized previous result: {:?}",
+                                                err
+                                            )
+                                        },
+                                    )?);
+                                },
+                                // Signer is ignored for now to align with the existing entry function logic,
+                                BatchArgument::Signer(_) => (),
+                            }
+                        }
+
+                        annotated_intents.push(EntryFunctionPayload {
+                            function: EntryFunctionId {
+                                module: module.into(),
+                                name: function.into(),
+                            },
+                            type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+                            arguments,
+                        });
+                    }
+                    TransactionPayload::IntentPayload(IntentPayload {
+                        intent_calls: annotated_intents,
+                    })
+                } else {
+                    let script_args = self.inner.view_script_arguments(&code, &args, &ty_args);
+
+                    let json_args = match script_args {
+                        Ok(values) => values
+                            .into_iter()
+                            .map(|v| MoveValue::try_from(v)?.json())
+                            .collect::<Result<_>>()?,
+                        Err(_e) => convert_txn_args(&args)
+                            .into_iter()
+                            .map(|arg| HexEncodedBytes::from(arg).json())
+                            .collect::<Result<_>>()?,
+                    };
+                    TransactionPayload::ScriptPayload(ScriptPayload {
+                        code: MoveScriptBytecode::new(code).try_parse_abi(),
+                        type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+                        arguments: json_args,
+                    })
+                }
             },
             EntryFunction(fun) => {
                 let (module, function, ty_args, args) = fun.into_inner();
@@ -792,6 +843,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
                 bail!("Module bundle payload has been removed")
+            },
+            TransactionPayload::IntentPayload(_) => {
+                // TODO: Implement using the compilation logic?
+                bail!("Intent payload cannot be converted")
             },
         };
         Ok(ret)

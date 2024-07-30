@@ -954,6 +954,12 @@ impl TestContext {
         }
     }
 
+    pub fn poem_url(&self) -> String {
+        match self.api_specific_config {
+            ApiSpecificConfig::V1(address) => format!("http://{}/v1", address),
+        }
+    }
+
     // Currently we still run our tests with warp.
     // https://github.com/aptos-labs/aptos-core/issues/2966
     pub fn get_routes_with_poem(

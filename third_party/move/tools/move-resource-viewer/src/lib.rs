@@ -151,6 +151,22 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         self.view_arguments_impl(&param_tys, ty_args, args, &mut limit)
     }
 
+    pub fn function_arguments_viewer(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        ty_args: &[TypeTag],
+    ) -> anyhow::Result<FunctionAnnotator<V>> {
+        let mut limit = Limiter::default();
+        let parameter_types = self.resolve_function_arguments(module, function, &mut limit)?;
+        Ok(FunctionAnnotator {
+            annotator: self,
+            limiter: limit,
+            parameter_types,
+            ty_args: ty_args.iter().map(|inner| inner.into()).collect(),
+        })
+    }
+
     fn view_arguments_impl(
         &self,
         param_tys: &[FatType],
@@ -766,5 +782,21 @@ impl Display for AnnotatedMoveValue {
 impl Display for AnnotatedMoveStruct {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         pretty_print_struct(f, self, 0)
+    }
+}
+
+pub struct FunctionAnnotator<'a, V> {
+    annotator: &'a MoveValueAnnotator<V>,
+    limiter: Limiter,
+    ty_args: Vec<FatType>,
+    parameter_types: Vec<FatType>,
+}
+
+impl<'a, V: CompiledModuleView> FunctionAnnotator<'a, V> {
+    pub fn view_argument(&mut self, idx: usize, arg: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {
+        let param_ty = self.parameter_types.get(idx).ok_or_else(|| anyhow!("Argument type access out of bound"))?;
+        param_ty.subst(&self.ty_args, &mut self.limiter)
+            .map_err(anyhow::Error::from)
+            .and_then(|fat_type| self.annotator.view_value_by_fat_type(&fat_type, arg, &mut self.limiter))
     }
 }

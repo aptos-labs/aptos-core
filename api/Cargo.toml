@@ -53,6 +53,7 @@ aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
+aptos-intent = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-sdk = { workspace = true }
