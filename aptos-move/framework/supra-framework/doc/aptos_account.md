@@ -19,7 +19,7 @@
 -  [Function `assert_account_is_registered_for_apt`](#0x1_aptos_account_assert_account_is_registered_for_apt)
 -  [Function `set_allow_direct_coin_transfers`](#0x1_aptos_account_set_allow_direct_coin_transfers)
 -  [Function `can_receive_direct_coin_transfers`](#0x1_aptos_account_can_receive_direct_coin_transfers)
--  [Function `register_apt`](#0x1_aptos_account_register_apt)
+-  [Function `register_supra`](#0x1_aptos_account_register_supra)
 -  [Function `fungible_transfer_only`](#0x1_aptos_account_fungible_transfer_only)
 -  [Function `is_fungible_balance_at_least`](#0x1_aptos_account_is_fungible_balance_at_least)
 -  [Function `burn_from_fungible_store`](#0x1_aptos_account_burn_from_fungible_store)
@@ -38,7 +38,7 @@
     -  [Function `assert_account_is_registered_for_apt`](#@Specification_1_assert_account_is_registered_for_apt)
     -  [Function `set_allow_direct_coin_transfers`](#@Specification_1_set_allow_direct_coin_transfers)
     -  [Function `can_receive_direct_coin_transfers`](#@Specification_1_can_receive_direct_coin_transfers)
-    -  [Function `register_apt`](#@Specification_1_register_apt)
+    -  [Function `register_supra`](#@Specification_1_register_supra)
     -  [Function `fungible_transfer_only`](#@Specification_1_fungible_transfer_only)
     -  [Function `is_fungible_balance_at_least`](#@Specification_1_is_fungible_balance_at_least)
     -  [Function `burn_from_fungible_store`](#@Specification_1_burn_from_fungible_store)
@@ -230,7 +230,7 @@ Basic account creation methods.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(auth_key: <b>address</b>) {
     <b>let</b> account_signer = <a href="account.md#0x1_account_create_account">account::create_account</a>(auth_key);
-    <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(&account_signer);
+    <a href="aptos_account.md#0x1_aptos_account_register_supra">register_supra</a>(&account_signer);
 }
 </code></pre>
 
@@ -299,10 +299,10 @@ This would create the recipient account first, which also registers it to receiv
     } <b>else</b> {
         // Resource accounts can be created without registering them <b>to</b> receive APT.
         // This conveniently does the registration <b>if</b> necessary.
-        <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(<b>to</b>)) {
-            <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(<b>to</b>));
+        <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;SupraCoin&gt;(<b>to</b>)) {
+            <a href="coin.md#0x1_coin_register">coin::register</a>&lt;SupraCoin&gt;(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(<b>to</b>));
         };
-        <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(source, <b>to</b>, amount)
+        <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(source, <b>to</b>, amount)
     }
 }
 </code></pre>
@@ -393,8 +393,8 @@ This would create the recipient account first and register it to receive the Coi
     <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
         <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(<b>to</b>);
         <b>spec</b> {
-            <b>assert</b> <a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;AptosCoin&gt;(<b>to</b>);
-            <b>assume</b> aptos_std::type_info::type_of&lt;CoinType&gt;() == aptos_std::type_info::type_of&lt;AptosCoin&gt;() ==&gt;
+            <b>assert</b> <a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;SupraCoin&gt;(<b>to</b>);
+            <b>assume</b> aptos_std::type_info::type_of&lt;CoinType&gt;() == aptos_std::type_info::type_of&lt;SupraCoin&gt;() ==&gt;
                 <a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;CoinType&gt;(<b>to</b>);
         };
     };
@@ -545,13 +545,13 @@ By default, this returns true if an account has not explicitly set whether the c
 
 </details>
 
-<a id="0x1_aptos_account_register_apt"></a>
+<a id="0x1_aptos_account_register_supra"></a>
 
-## Function `register_apt`
+## Function `register_supra`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -560,11 +560,11 @@ By default, this returns true if an account has not explicitly set whether the c
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>()) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_supra_store_enabled">features::new_accounts_default_to_fa_supra_store_enabled</a>()) {
         <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
     } <b>else</b> {
-        <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(account_signer);
+        <a href="coin.md#0x1_coin_register">coin::register</a>&lt;SupraCoin&gt;(account_signer);
     }
 }
 </code></pre>
@@ -844,7 +844,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
     auth_key: <b>address</b>;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
     <b>aborts_if</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key);
-    <b>aborts_if</b> auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
+    <b>aborts_if</b> auth_key == @vm_reserved || auth_key == @supra_framework || auth_key == @aptos_token;
 }
 </code></pre>
 
@@ -1063,7 +1063,7 @@ Check if the SupraCoin under the address existed.
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(addr);
-<b>aborts_if</b> !<a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;AptosCoin&gt;(addr);
+<b>aborts_if</b> !<a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;SupraCoin&gt;(addr);
 </code></pre>
 
 
@@ -1106,12 +1106,12 @@ Check if the SupraCoin under the address existed.
 
 
 
-<a id="@Specification_1_register_apt"></a>
+<a id="@Specification_1_register_supra"></a>
 
-### Function `register_apt`
+### Function `register_supra`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -1177,7 +1177,7 @@ Check if the SupraCoin under the address existed.
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a> {
     <b>to</b>: <b>address</b>;
     <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(<b>to</b>);
-    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && (<b>to</b> == @vm_reserved || <b>to</b> == @aptos_framework || <b>to</b> == @aptos_token);
+    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && (<b>to</b> == @vm_reserved || <b>to</b> == @supra_framework || <b>to</b> == @aptos_token);
 }
 </code></pre>
 
@@ -1222,8 +1222,8 @@ Check if the SupraCoin under the address existed.
 <pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt; {
     <b>to</b>: <b>address</b>;
     <b>aborts_if</b> !<a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;CoinType&gt;(<b>to</b>) && !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
-    <b>aborts_if</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
-    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;() != <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;();
+    <b>aborts_if</b> <b>exists</b>&lt;supra_framework::account::Account&gt;(<b>to</b>);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;() != <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;SupraCoin&gt;();
 }
 </code></pre>
 

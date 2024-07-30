@@ -381,12 +381,13 @@ The store object that holds concurrent fungible asset balance.
 
 <a id="0x1_fungible_asset_FungibleAsset"></a>
 
-## Resource `FungibleAssetEvents`
+## Struct `FungibleAsset`
+
+FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
+FungibleAsset is ephemeral and cannot be stored directly. It must be deposited back into a store.
 
 
-
-<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
-<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>
 </code></pre>
 
 
@@ -397,19 +398,13 @@ The store object that holds concurrent fungible asset balance.
 
 <dl>
 <dt>
-<code>deposit_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DepositEvent">fungible_asset::DepositEvent</a>&gt;</code>
+<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>withdraw_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_WithdrawEvent">fungible_asset::WithdrawEvent</a>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>frozen_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">fungible_asset::FrozenEvent</a>&gt;</code>
+<code>amount: u64</code>
 </dt>
 <dd>
 
@@ -419,15 +414,43 @@ The store object that holds concurrent fungible asset balance.
 
 </details>
 
-<a id="0x1_fungible_asset_FungibleAsset"></a>
+<a id="0x1_fungible_asset_MintRef"></a>
 
-## Struct `FungibleAsset`
+## Struct `MintRef`
 
-FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
-FungibleAsset is ephemeral and cannot be stored directly. It must be deposited back into a store.
+MintRef can be used to mint the fungible asset into an account's store.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_TransferRef"></a>
+
+## Struct `TransferRef`
+
+TransferRef can be used to allow or disallow the owner of fungible assets from transferring the asset
+and allow the holder of TransferRef to transfer fungible assets from any account.
+
+
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -539,14 +562,15 @@ Emitted when fungible assets are deposited into a store.
 
 </details>
 
-<a id="0x1_fungible_asset_MintRef"></a>
+<a id="0x1_fungible_asset_Withdraw"></a>
 
-## Struct `MintRef`
+## Struct `Withdraw`
 
-MintRef can be used to mint the fungible asset into an account's store.
+Emitted when fungible assets are withdrawn from a store.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -557,7 +581,13 @@ MintRef can be used to mint the fungible asset into an account's store.
 
 <dl>
 <dt>
-<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
+<code>store: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
 </dt>
 <dd>
 
@@ -567,15 +597,15 @@ MintRef can be used to mint the fungible asset into an account's store.
 
 </details>
 
-<a id="0x1_fungible_asset_TransferRef"></a>
+<a id="0x1_fungible_asset_Frozen"></a>
 
-## Struct `TransferRef`
+## Struct `Frozen`
 
-TransferRef can be used to allow or disallow the owner of fungible assets from transferring the asset
-and allow the holder of TransferRef to transfer fungible assets from any account.
+Emitted when a store's frozen status is updated.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Frozen">Frozen</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -586,7 +616,13 @@ and allow the holder of TransferRef to transfer fungible assets from any account
 
 <dl>
 <dt>
-<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
+<code>store: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>frozen: bool</code>
 </dt>
 <dd>
 
@@ -596,14 +632,15 @@ and allow the holder of TransferRef to transfer fungible assets from any account
 
 </details>
 
-<a id="0x1_fungible_asset_BurnRef"></a>
+<a id="0x1_fungible_asset_FungibleAssetEvents"></a>
 
-## Struct `BurnRef`
-
-BurnRef can be used to burn fungible assets from a given holder account.
+## Resource `FungibleAssetEvents`
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> <b>has</b> drop, store
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+#[deprecated]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> <b>has</b> key
 </code></pre>
 
 
@@ -614,7 +651,19 @@ BurnRef can be used to burn fungible assets from a given holder account.
 
 <dl>
 <dt>
-<code>metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;</code>
+<code>deposit_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DepositEvent">fungible_asset::DepositEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>withdraw_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_WithdrawEvent">fungible_asset::WithdrawEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>frozen_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">fungible_asset::FrozenEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -628,10 +677,10 @@ BurnRef can be used to burn fungible assets from a given holder account.
 
 ## Struct `DepositEvent`
 
-Emitted when fungible assets are deposited into a store.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_DepositEvent">DepositEvent</a> <b>has</b> drop, store
+<pre><code>#[deprecated]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_DepositEvent">DepositEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -656,10 +705,10 @@ Emitted when fungible assets are deposited into a store.
 
 ## Struct `WithdrawEvent`
 
-Emitted when fungible assets are withdrawn from a store.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_WithdrawEvent">WithdrawEvent</a> <b>has</b> drop, store
+<pre><code>#[deprecated]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_WithdrawEvent">WithdrawEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -684,10 +733,10 @@ Emitted when fungible assets are withdrawn from a store.
 
 ## Struct `FrozenEvent`
 
-Emitted when a store's frozen status is updated.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">FrozenEvent</a> <b>has</b> drop, store
+<pre><code>#[deprecated]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">FrozenEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -1303,7 +1352,7 @@ Create a fungible asset store whose transfer rule would be overloaded by the pro
     // Verify that caller type matches callee type so wrongly typed function cannot be registered.
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_for_each_ref">option::for_each_ref</a>(&withdraw_function, |withdraw_function| {
         <b>let</b> dispatcher_withdraw_function_info = <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(
-            @aptos_framework,
+            @supra_framework,
             <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">dispatchable_fungible_asset</a>"),
             <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"dispatchable_withdraw"),
         );
@@ -1321,7 +1370,7 @@ Create a fungible asset store whose transfer rule would be overloaded by the pro
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_for_each_ref">option::for_each_ref</a>(&deposit_function, |deposit_function| {
         <b>let</b> dispatcher_deposit_function_info = <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(
-            @aptos_framework,
+            @supra_framework,
             <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">dispatchable_fungible_asset</a>"),
             <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"dispatchable_deposit"),
         );
@@ -1339,7 +1388,7 @@ Create a fungible asset store whose transfer rule would be overloaded by the pro
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_for_each_ref">option::for_each_ref</a>(&derived_balance_function, |balance_function| {
         <b>let</b> dispatcher_derived_balance_function_info = <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(
-            @aptos_framework,
+            @supra_framework,
             <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">dispatchable_fungible_asset</a>"),
             <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"dispatchable_derived_balance"),
         );
@@ -2673,7 +2722,7 @@ Enable/disable a store's ability to do direct transfers of the fungible asset.
     ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a>,
     store: Object&lt;T&gt;,
     frozen: bool,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
     <b>assert</b>!(
         ref.metadata == <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>(store),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ETRANSFER_REF_AND_STORE_MISMATCH">ETRANSFER_REF_AND_STORE_MISMATCH</a>),
@@ -2708,8 +2757,7 @@ Enable/disable a store's ability to do direct transfers of the fungible asset.
     <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
     <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).frozen = frozen;
 
-    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(store_addr);
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> events.frozen_events, <a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">FrozenEvent</a> { frozen });
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Frozen">Frozen</a> { store: store_addr, frozen });
 }
 </code></pre>
 

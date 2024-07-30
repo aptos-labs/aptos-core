@@ -148,8 +148,8 @@ TODO: update all the tests that reference this function, then disable this funct
 This can be called by on-chain governance to update on-chain consensus configs for the next epoch.
 Example usage:
 ```
-aptos_framework::consensus_config::set_for_next_epoch(&framework_signer, some_config_bytes);
-aptos_framework::aptos_governance::reconfigure(&framework_signer);
+supra_framework::consensus_config::set_for_next_epoch(&framework_signer, some_config_bytes);
+supra_framework::supra_governance::reconfigure(&framework_signer);
 ```
 
 
@@ -163,7 +163,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="consensus_config.md#0x1_consensus_config_EINVALID_CONFIG">EINVALID_CONFIG</a>));
     std::config_buffer::upsert&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a> {config});
 }
@@ -190,11 +190,11 @@ Only used in reconfigurations to apply the pending <code><a href="consensus_conf
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;()) {
         <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;();
-        <b>if</b> (<b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework) = new_config;
+        <b>if</b> (<b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@supra_framework)) {
+            *<b>borrow_global_mut</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@supra_framework) = new_config;
         } <b>else</b> {
             <b>move_to</b>(framework, new_config);
         };
@@ -222,7 +222,7 @@ Only used in reconfigurations to apply the pending <code><a href="consensus_conf
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled">validator_txn_enabled</a>(): bool <b>acquires</b> <a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a> {
-    <b>let</b> config_bytes = <b>borrow_global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework).config;
+    <b>let</b> config_bytes = <b>borrow_global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@supra_framework).config;
     <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled_internal">validator_txn_enabled_internal</a>(config_bytes)
 }
 </code></pre>
@@ -305,7 +305,7 @@ Only used in reconfigurations to apply the pending <code><a href="consensus_conf
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
-<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@supra_framework);
 </code></pre>
 
 
@@ -392,7 +392,7 @@ When setting now time must be later than last_reconfiguration_time.
 
 
 
-<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
+<pre><code><b>requires</b> @supra_framework == std::signer::address_of(framework);
 <b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;;
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
@@ -411,8 +411,8 @@ When setting now time must be later than last_reconfiguration_time.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
-<b>ensures</b> [abstract] result == <a href="consensus_config.md#0x1_consensus_config_spec_validator_txn_enabled_internal">spec_validator_txn_enabled_internal</a>(<b>global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework).config);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@supra_framework);
+<b>ensures</b> [abstract] result == <a href="consensus_config.md#0x1_consensus_config_spec_validator_txn_enabled_internal">spec_validator_txn_enabled_internal</a>(<b>global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@supra_framework).config);
 </code></pre>
 
 

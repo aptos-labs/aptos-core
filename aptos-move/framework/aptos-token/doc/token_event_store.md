@@ -49,7 +49,7 @@ This module provides utils to add and emit new token events that are not in toke
 
 
 <pre><code><b>use</b> <a href="../../supra-framework/doc/account.md#0x1_account">0x1::account</a>;
-<b>use</b> <a href="../aptos-stdlib/doc/any.md#0x1_any">0x1::any</a>;
+<b>use</b> <a href="../../supra-framework/../aptos-stdlib/doc/any.md#0x1_any">0x1::any</a>;
 <b>use</b> <a href="../../supra-framework/doc/event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;

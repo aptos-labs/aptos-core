@@ -10,7 +10,7 @@ use crate::{
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use anyhow::{anyhow, ensure};
-use aptos_crypto::{bls12381, bls12381::PrivateKey};
+use aptos_crypto::{ed25519, ed25519::PrivateKey};
 use aptos_dkg::{
     pvss,
     pvss::{
@@ -107,7 +107,7 @@ pub fn build_dkg_pvss_config(
         maybe_fast_path_secrecy_threshold,
     );
     let rounding_time = timer.elapsed();
-    let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
+    let validator_consensus_keys: Vec<ed25519::PublicKey> = next_validators
         .iter()
         .map(|vi| vi.public_key.clone())
         .collect();

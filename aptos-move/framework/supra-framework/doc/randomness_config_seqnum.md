@@ -75,7 +75,7 @@ Used when re-enable randomness after an emergency randomness disable via local o
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seq_num: u64) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(framework);
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> { seq_num });
 }
 </code></pre>
@@ -101,8 +101,8 @@ Initialize the configuration. Used in genesis or governance.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (!<b>exists</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework)) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(framework);
+    <b>if</b> (!<b>exists</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@supra_framework)) {
         <b>move_to</b>(framework, <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> { seq_num: 0 })
     }
 }
@@ -129,11 +129,11 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;()) {
         <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;();
-        <b>if</b> (<b>exists</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework) = new_config;
+        <b>if</b> (<b>exists</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@supra_framework)) {
+            *<b>borrow_global_mut</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@supra_framework) = new_config;
         } <b>else</b> {
             <b>move_to</b>(framework, new_config);
         }
@@ -161,7 +161,7 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 
 
 
-<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
+<pre><code><b>requires</b> @supra_framework == std::signer::address_of(framework);
 <b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;;
 <b>aborts_if</b> <b>false</b>;
 </code></pre>

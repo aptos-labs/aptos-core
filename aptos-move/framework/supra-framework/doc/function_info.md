@@ -182,7 +182,7 @@ Creates a new function info from names.
 
 Check if the dispatch target function meets the type requirements of the disptach entry point.
 
-framework_function is the dispatch native function defined in the aptos_framework.
+framework_function is the dispatch native function defined in the supra_framework.
 dispatch_target is the function passed in by the user.
 
 dispatch_target should have the same signature (same argument type, same generics constraint) except

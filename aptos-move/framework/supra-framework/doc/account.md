@@ -5,6 +5,7 @@
 
 
 
+-  [Struct `KeyRotation`](#0x1_account_KeyRotation)
 -  [Resource `Account`](#0x1_account_Account)
 -  [Struct `KeyRotationEvent`](#0x1_account_KeyRotationEvent)
 -  [Struct `CoinRegisterEvent`](#0x1_account_CoinRegisterEvent)
@@ -112,6 +113,46 @@
 </code></pre>
 
 
+
+<a id="0x1_account_KeyRotation"></a>
+
+## Struct `KeyRotation`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="account.md#0x1_account_KeyRotation">KeyRotation</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a id="0x1_account_Account"></a>
 

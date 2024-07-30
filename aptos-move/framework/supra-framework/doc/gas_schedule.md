@@ -262,7 +262,7 @@ Abort if the version of the given schedule is lower than the current version.
 Example usage:
 ```
 supra_framework::gas_schedule::set_for_next_epoch(&framework_signer, some_gas_schedule_blob);
-supra_framework::aptos_governance::reconfigure(&framework_signer);
+supra_framework::supra_governance::reconfigure(&framework_signer);
 ```
 
 

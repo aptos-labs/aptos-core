@@ -119,9 +119,9 @@ return true.
 -  [Function `object_native_derived_address_enabled`](#0x1_features_object_native_derived_address_enabled)
 -  [Function `get_dispatchable_fungible_asset_feature`](#0x1_features_get_dispatchable_fungible_asset_feature)
 -  [Function `dispatchable_fungible_asset_enabled`](#0x1_features_dispatchable_fungible_asset_enabled)
--  [Function `get_new_accounts_default_to_fa_apt_store_feature`](#0x1_features_get_new_accounts_default_to_fa_apt_store_feature)
--  [Function `new_accounts_default_to_fa_apt_store_enabled`](#0x1_features_new_accounts_default_to_fa_apt_store_enabled)
--  [Function `get_operations_default_to_fa_apt_store_feature`](#0x1_features_get_operations_default_to_fa_apt_store_feature)
+-  [Function `get_new_accounts_default_to_fa_supra_store_feature`](#0x1_features_get_new_accounts_default_to_fa_supra_store_feature)
+-  [Function `new_accounts_default_to_fa_supra_store_enabled`](#0x1_features_new_accounts_default_to_fa_supra_store_enabled)
+-  [Function `get_operations_default_to_fa_supra_store_feature`](#0x1_features_get_operations_default_to_fa_supra_store_feature)
 -  [Function `operations_default_to_fa_supra_store_enabled`](#0x1_features_operations_default_to_fa_supra_store_enabled)
 -  [Function `get_concurrent_fungible_balance_feature`](#0x1_features_get_concurrent_fungible_balance_feature)
 -  [Function `concurrent_fungible_balance_enabled`](#0x1_features_concurrent_fungible_balance_enabled)
@@ -658,12 +658,12 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE"></a>
+<a id="0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_SUPRA_STORE"></a>
 
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>: u64 = 64;
+<pre><code><b>const</b> <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_SUPRA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_SUPRA_STORE</a>: u64 = 64;
 </code></pre>
 
 
@@ -688,12 +688,12 @@ Whether we use more efficient native implementation of computing object derived 
 
 
 
-<a id="0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE"></a>
+<a id="0x1_features_OPERATIONS_DEFAULT_TO_FA_SUPRA_STORE"></a>
 
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a>: u64 = 65;
+<pre><code><b>const</b> <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_SUPRA_STORE">OPERATIONS_DEFAULT_TO_FA_SUPRA_STORE</a>: u64 = 65;
 </code></pre>
 
 
@@ -2924,13 +2924,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_new_accounts_default_to_fa_apt_store_feature"></a>
+<a id="0x1_features_get_new_accounts_default_to_fa_supra_store_feature"></a>
 
-## Function `get_new_accounts_default_to_fa_apt_store_feature`
+## Function `get_new_accounts_default_to_fa_supra_store_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_supra_store_feature">get_new_accounts_default_to_fa_supra_store_feature</a>(): u64
 </code></pre>
 
 
@@ -2939,20 +2939,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64 { <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_supra_store_feature">get_new_accounts_default_to_fa_supra_store_feature</a>(): u64 { <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_SUPRA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_SUPRA_STORE</a> }
 </code></pre>
 
 
 
 </details>
 
-<a id="0x1_features_new_accounts_default_to_fa_apt_store_enabled"></a>
+<a id="0x1_features_new_accounts_default_to_fa_supra_store_enabled"></a>
 
-## Function `new_accounts_default_to_fa_apt_store_enabled`
+## Function `new_accounts_default_to_fa_supra_store_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">new_accounts_default_to_fa_apt_store_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_supra_store_enabled">new_accounts_default_to_fa_supra_store_enabled</a>(): bool
 </code></pre>
 
 
@@ -2961,8 +2961,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">new_accounts_default_to_fa_apt_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_supra_store_enabled">new_accounts_default_to_fa_supra_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_SUPRA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_SUPRA_STORE</a>)
 }
 </code></pre>
 
@@ -2970,13 +2970,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_operations_default_to_fa_apt_store_feature"></a>
+<a id="0x1_features_get_operations_default_to_fa_supra_store_feature"></a>
 
-## Function `get_operations_default_to_fa_apt_store_feature`
+## Function `get_operations_default_to_fa_supra_store_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_supra_store_feature">get_operations_default_to_fa_supra_store_feature</a>(): u64
 </code></pre>
 
 
@@ -2985,7 +2985,7 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64 { <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_supra_store_feature">get_operations_default_to_fa_supra_store_feature</a>(): u64 { <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_SUPRA_STORE">OPERATIONS_DEFAULT_TO_FA_SUPRA_STORE</a> }
 </code></pre>
 
 
@@ -3008,7 +3008,7 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operations_default_to_fa_supra_store_enabled">operations_default_to_fa_supra_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a>)
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_SUPRA_STORE">OPERATIONS_DEFAULT_TO_FA_SUPRA_STORE</a>)
 }
 </code></pre>
 

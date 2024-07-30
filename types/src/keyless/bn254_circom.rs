@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::circuit_constants::MAX_EXTRA_FIELD_BYTES;
 use crate::{
@@ -10,12 +11,13 @@ use crate::{
     serialize,
 };
 use anyhow::bail;
-use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
+use aptos_crypto::{poseidon_bn254, poseidon_bn254::pad_and_hash_string, CryptoMaterialError};
 use ark_bn254::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
+use quick_cache::sync::Cache;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_big_array::BigArray;
 
@@ -25,8 +27,13 @@ pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
 
 // When the extra_field is none, use this hash value which is equal to the hash of a single space string.
-static EMPTY_EXTRA_FIELD_HASH: Lazy<Fr> =
-    Lazy::new(|| poseidon_bn254::pad_and_hash_string(" ", MAX_EXTRA_FIELD_BYTES as usize).unwrap());
+static EMPTY_EXTRA_FIELD_HASH: Lazy<Fr> = Lazy::new(|| {
+    poseidon_bn254::keyless::pad_and_hash_string(" ", MAX_EXTRA_FIELD_BYTES as usize).unwrap()
+});
+
+static EMPTY_OVERRIDE_AUD_FIELD_HASH: Lazy<Fr> = Lazy::new(|| {
+    poseidon_bn254::keyless::pad_and_hash_string("", IdCommitment::MAX_AUD_VAL_BYTES).unwrap()
+});
 
 /// This will do the proper subgroup membership checks.
 pub fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine> {
@@ -36,7 +43,7 @@ pub fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine>
 
 /// This will do the proper subgroup membership checks.
 pub fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<G2Affine> {
-    let g2_affine = G2Bytes::new_unchecked(x, y)?.as_affine()?;
+    let g2_affine = G2Bytes::new_unchecked(x, y)?.deserialize_into_affine()?;
     Ok(g2_affine)
 }
 
@@ -170,7 +177,7 @@ impl G2Bytes {
         }
     }
 
-    pub fn as_affine(&self) -> Result<G2Affine, CryptoMaterialError> {
+    pub fn deserialize_into_affine(&self) -> Result<G2Affine, CryptoMaterialError> {
         self.try_into()
     }
 }
@@ -238,6 +245,34 @@ impl TryInto<G2Affine> for &G2Bytes {
     }
 }
 
+static PAD_AND_HASH_STRING_CACHE: Lazy<Cache<(String, usize), Fr>> =
+    Lazy::new(|| Cache::new(1_000));
+
+static JWK_HASH_CACHE: Lazy<Cache<RSA_JWK, Fr>> = Lazy::new(|| Cache::new(100));
+
+pub fn cached_pad_and_hash_string(str: &String, max_bytes: usize) -> anyhow::Result<Fr> {
+    let key = (str.to_string(), max_bytes);
+    match PAD_AND_HASH_STRING_CACHE.get(&key) {
+        None => {
+            let hash = pad_and_hash_string(str, max_bytes)?;
+            PAD_AND_HASH_STRING_CACHE.insert(key, hash);
+            Ok(hash)
+        },
+        Some(hash) => Ok(hash),
+    }
+}
+
+pub fn cached_jwk_hash(jwk: &RSA_JWK) -> anyhow::Result<Fr> {
+    match JWK_HASH_CACHE.get(jwk) {
+        None => {
+            let hash = jwk.to_poseidon_scalar()?;
+            JWK_HASH_CACHE.insert(jwk.clone(), hash);
+            Ok(hash)
+        },
+        Some(hash) => Ok(hash),
+    }
+}
+
 pub fn get_public_inputs_hash(
     sig: &KeylessSignature,
     pk: &KeylessPublicKey,
@@ -246,10 +281,10 @@ pub fn get_public_inputs_hash(
 ) -> anyhow::Result<Fr> {
     if let EphemeralCertificate::ZeroKnowledgeSig(proof) = &sig.cert {
         let (has_extra_field, extra_field_hash) = match &proof.extra_field {
-            None => (Fr::zero(), *Lazy::force(&EMPTY_EXTRA_FIELD_HASH)),
+            None => (Fr::zero(), *EMPTY_EXTRA_FIELD_HASH),
             Some(extra_field) => (
                 Fr::one(),
-                poseidon_bn254::pad_and_hash_string(
+                poseidon_bn254::keyless::pad_and_hash_string(
                     extra_field,
                     config.max_extra_field_bytes as usize,
                 )?,
@@ -258,33 +293,25 @@ pub fn get_public_inputs_hash(
 
         let (override_aud_val_hash, use_override_aud) = match &proof.override_aud_val {
             Some(override_aud_val) => (
-                poseidon_bn254::pad_and_hash_string(
-                    override_aud_val,
-                    IdCommitment::MAX_AUD_VAL_BYTES,
-                )?,
+                cached_pad_and_hash_string(override_aud_val, IdCommitment::MAX_AUD_VAL_BYTES)?,
                 ark_bn254::Fr::from(1),
             ),
-            None => (
-                poseidon_bn254::pad_and_hash_string("", IdCommitment::MAX_AUD_VAL_BYTES)?,
-                ark_bn254::Fr::from(0),
-            ),
+            None => (*EMPTY_OVERRIDE_AUD_FIELD_HASH, ark_bn254::Fr::from(0)),
         };
 
         // Add the hash of the jwt_header with the "." separator appended
         let jwt_header_b64_with_separator =
             format!("{}.", base64url_encode_str(sig.jwt_header_json.as_str()));
-        let jwt_header_hash = poseidon_bn254::pad_and_hash_string(
+        let jwt_header_hash = cached_pad_and_hash_string(
             &jwt_header_b64_with_separator,
             config.max_jwt_header_b64_bytes as usize,
         )?;
 
-        let jwk_hash = jwk.to_poseidon_scalar()?;
+        let jwk_hash = cached_jwk_hash(jwk)?;
 
         // Add the hash of the value of the `iss` field
-        let iss_field_hash = poseidon_bn254::pad_and_hash_string(
-            pk.iss_val.as_str(),
-            config.max_iss_val_bytes as usize,
-        )?;
+        let iss_field_hash =
+            cached_pad_and_hash_string(&pk.iss_val, config.max_iss_val_bytes as usize)?;
 
         // Add the id_commitment as a scalar
         let idc = Fr::from_le_bytes_mod_order(&pk.idc.0);
@@ -296,7 +323,7 @@ pub fn get_public_inputs_hash(
         let exp_horizon_secs = Fr::from(proof.exp_horizon_secs);
 
         // Add the epk as padded and packed scalars
-        let mut epk_frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
+        let mut epk_frs = poseidon_bn254::keyless::pad_and_pack_bytes_to_scalars_with_len(
             sig.ephemeral_pubkey.to_bytes().as_slice(),
             config.max_commited_epk_bytes as usize,
         )?;
@@ -308,11 +335,12 @@ pub fn get_public_inputs_hash(
         // println!("IDC:                {}", idc);
         // println!("exp_timestamp_secs: {}", exp_timestamp_secs);
         // println!("exp_horizon_secs:   {}", exp_horizon_secs);
-        // println!("iss field hash:     {}", pk.iss_val);
+        // println!("iss field:          {}", pk.iss_val);
+        // println!("iss field hash:     {}", iss_field_hash);
         // println!("Has extra field:    {}", has_extra_field);
         // println!("Extra field val:    {:?}", proof.extra_field);
         // println!("Extra field hash:   {}", extra_field_hash);
-        // println!("JWT header val:     {}", jwt_header_with_separator);
+        // println!("JWT header val:     {}", jwt_header_b64_with_separator);
         // println!("JWT header hash:    {}", jwt_header_hash);
         // println!("JWK hash:           {}", jwk_hash);
         // println!("Override aud hash:  {}", override_aud_val_hash);
@@ -330,6 +358,8 @@ pub fn get_public_inputs_hash(
         frs.push(jwk_hash);
         frs.push(override_aud_val_hash);
         frs.push(use_override_aud);
+        // TODO(keyless): If we plan on avoiding verifying the same PIH twice, there should be no
+        //  need for caching here. If we do not, we should cache the result here too.
         poseidon_bn254::hash_scalars(frs)
     } else {
         bail!("Can only call `get_public_inputs_hash` on keyless::Signature with Groth16 ZK proof")
@@ -381,6 +411,15 @@ mod test {
     // representation of it.
     fn print_groth16_pvk() {
         let groth16_vk: Groth16VerificationKey = devnet_prepared_vk().into();
+
+        println!("alpha_g1: {:?}", hex::encode(groth16_vk.alpha_g1.clone()));
+        println!("beta_g2: {:?}", hex::encode(groth16_vk.beta_g2.clone()));
+        println!("gamma_g2: {:?}", hex::encode(groth16_vk.gamma_g2.clone()));
+        println!("delta_g2: {:?}", hex::encode(groth16_vk.delta_g2.clone()));
+        let gamma_abc_g1 = groth16_vk.gamma_abc_g1.clone();
+        println!("gamma_abc_g1_0: {:?}", hex::encode(gamma_abc_g1[0].clone()));
+        println!("gamma_abc_g1_1: {:?}", hex::encode(gamma_abc_g1[1].clone()));
+
         let same_pvk: PreparedVerifyingKey<Bn254> = groth16_vk.try_into().unwrap();
 
         assert_eq!(same_pvk, devnet_prepared_vk());

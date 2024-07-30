@@ -192,6 +192,18 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    CoinCreateCoinConversionMap {},
+
+    /// Create APT pairing by passing `AptosCoin`.
+    CoinCreatePairing {
+        coin_type: TypeTag,
+    },
+
+    /// Voluntarily migrate to fungible store for `CoinType` if not yet.
+    CoinMigrateToFungibleStore {
+        coin_type: TypeTag,
+    },
+
     /// Transfers `amount` of coins `CoinType` from `from` to `to`.
     CoinTransfer {
         coin_type: TypeTag,
@@ -994,6 +1006,21 @@ pub enum EntryFunctionCall {
         proposal_id: u64,
     },
 
+    /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
+    SupraGovernanceBatchPartialVote {
+        stake_pools: Vec<AccountAddress>,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    },
+
+    /// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
+    SupraGovernanceBatchVote {
+        stake_pools: Vec<AccountAddress>,
+        proposal_id: u64,
+        should_pass: bool,
+    },
+
     /// Create a single-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
@@ -1015,6 +1042,18 @@ pub enum EntryFunctionCall {
         is_multi_step_proposal: bool,
     },
 
+    /// Change epoch immediately.
+    /// If `RECONFIGURE_WITH_DKG` is enabled and we are in the middle of a DKG,
+    /// stop waiting for DKG and enter the new epoch without randomness.
+    ///
+    /// WARNING: currently only used by tests. In most cases you should use `reconfigure()` instead.
+    /// TODO: migrate these tests to be aware of async reconfiguration.
+    SupraGovernanceForceEndEpoch {},
+
+    /// `force_end_epoch()` equivalent but only called in testnet,
+    /// where the core resources account exists and has been granted power to mint Aptos coins.
+    SupraGovernanceForceEndEpochTestOnly {},
+
     /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
     SupraGovernancePartialVote {
         stake_pool: AccountAddress,
@@ -1023,6 +1062,17 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
+    /// Manually reconfigure. Called at the end of a governance txn that alters on-chain configs.
+    ///
+    /// WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.
+    /// - If feature `RECONFIGURE_WITH_DKG` is disabled, it finishes immediately.
+    ///   - At the end of the calling transaction, we will be in a new epoch.
+    /// - If feature `RECONFIGURE_WITH_DKG` is enabled, it starts DKG, and the new epoch will start in a block prologue after DKG finishes.
+    ///
+    /// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
+    /// since such updates are applied whenever we enter an new epoch.
+    SupraGovernanceReconfigure {},
+
     /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
     SupraGovernanceVote {
         stake_pool: AccountAddress,
@@ -1030,8 +1080,21 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
-    /// Updates the major version to a larger version.
-    /// This can be called by on chain governance.
+    TransactionFeeConvertToAptosFaBurnRef {},
+
+    /// Used in on-chain governances to update the major version for the next epoch.
+    /// Example usage:
+    /// - `supra_framework::version::set_for_next_epoch(&framework_signer, new_version);`
+    /// - `supra_framework::supra_governance::reconfigure(&framework_signer);`
+    VersionSetForNextEpoch {
+        major: u64,
+    },
+
+    /// Deprecated by `set_for_next_epoch()`.
+    ///
+    /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+    ///
+    /// TODO: update all the tests that reference this function, then disable this function.
     VersionSetVersion {
         major: u64,
     },
@@ -1624,6 +1687,22 @@ impl EntryFunctionCall {
             MultisigAccountUpdateTimeoutDuration { timeout_duration } => {
                 multisig_account_update_timeout_duration(timeout_duration)
             },
+            MultisigAccountVoteTransaction {
+                multisig_account,
+                sequence_number,
+                approved,
+            } => multisig_account_vote_transaction(multisig_account, sequence_number, approved),
+            MultisigAccountVoteTransactions {
+                multisig_account,
+                starting_sequence_number,
+                final_sequence_number,
+                approved,
+            } => multisig_account_vote_transactions(
+                multisig_account,
+                starting_sequence_number,
+                final_sequence_number,
+                approved,
+            ),
             MultisigAccountVoteTransanction {
                 multisig_account,
                 sequence_number,
@@ -1830,6 +1909,22 @@ impl EntryFunctionCall {
             SupraGovernanceAddApprovedScriptHashScript { proposal_id } => {
                 supra_governance_add_approved_script_hash_script(proposal_id)
             },
+            SupraGovernanceBatchPartialVote {
+                stake_pools,
+                proposal_id,
+                voting_power,
+                should_pass,
+            } => supra_governance_batch_partial_vote(
+                stake_pools,
+                proposal_id,
+                voting_power,
+                should_pass,
+            ),
+            SupraGovernanceBatchVote {
+                stake_pools,
+                proposal_id,
+                should_pass,
+            } => supra_governance_batch_vote(stake_pools, proposal_id, should_pass),
             SupraGovernanceCreateProposal {
                 stake_pool,
                 execution_hash,
@@ -1854,17 +1949,24 @@ impl EntryFunctionCall {
                 metadata_hash,
                 is_multi_step_proposal,
             ),
+            SupraGovernanceForceEndEpoch {} => supra_governance_force_end_epoch(),
+            SupraGovernanceForceEndEpochTestOnly {} => supra_governance_force_end_epoch_test_only(),
             SupraGovernancePartialVote {
                 stake_pool,
                 proposal_id,
                 voting_power,
                 should_pass,
             } => supra_governance_partial_vote(stake_pool, proposal_id, voting_power, should_pass),
+            SupraGovernanceReconfigure {} => supra_governance_reconfigure(),
             SupraGovernanceVote {
                 stake_pool,
                 proposal_id,
                 should_pass,
             } => supra_governance_vote(stake_pool, proposal_id, should_pass),
+            TransactionFeeConvertToAptosFaBurnRef {} => {
+                transaction_fee_convert_to_aptos_fa_burn_ref()
+            },
+            VersionSetForNextEpoch { major } => version_set_for_next_epoch(major),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
             VestingDistribute { contract_address } => vesting_distribute(contract_address),
@@ -2363,6 +2465,53 @@ pub fn code_publish_package_txn(
             bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
         ],
+    ))
+}
+
+pub fn coin_create_coin_conversion_map() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("create_coin_conversion_map").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Create APT pairing by passing `AptosCoin`.
+pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("create_pairing").to_owned(),
+        vec![coin_type],
+        vec![],
+    ))
+}
+
+/// Voluntarily migrate to fungible store for `CoinType` if not yet.
+pub fn coin_migrate_to_fungible_store(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("migrate_to_fungible_store").to_owned(),
+        vec![coin_type],
+        vec![],
     ))
 }
 
@@ -3624,6 +3773,22 @@ pub fn multisig_account_update_signatures_required(
     ))
 }
 
+/// Update the timeout duration for the multisig account.
+pub fn multisig_account_update_timeout_duration(timeout_duration: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("update_timeout_duration").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&timeout_duration).unwrap()],
+    ))
+}
+
 /// Generic function that can be used to either approve or reject a multisig transaction
 pub fn multisig_account_vote_transaction(
     multisig_account: AccountAddress,
@@ -3671,22 +3836,6 @@ pub fn multisig_account_vote_transactions(
             bcs::to_bytes(&final_sequence_number).unwrap(),
             bcs::to_bytes(&approved).unwrap(),
         ],
-    ))
-}
-
-/// Update the timeout duration for the multisig account.
-pub fn multisig_account_update_timeout_duration(timeout_duration: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("multisig_account").to_owned(),
-        ),
-        ident_str!("update_timeout_duration").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&timeout_duration).unwrap()],
     ))
 }
 
@@ -4819,6 +4968,56 @@ pub fn supra_governance_add_approved_script_hash_script(proposal_id: u64) -> Tra
     ))
 }
 
+/// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
+pub fn supra_governance_batch_partial_vote(
+    stake_pools: Vec<AccountAddress>,
+    proposal_id: u64,
+    voting_power: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("batch_partial_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pools).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&voting_power).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
+pub fn supra_governance_batch_vote(
+    stake_pools: Vec<AccountAddress>,
+    proposal_id: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("batch_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pools).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
 /// Create a single-step proposal with the backing `stake_pool`.
 /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
 /// only the exact script with matching hash can be successfully executed.
@@ -4877,6 +5076,44 @@ pub fn supra_governance_create_proposal_v2(
     ))
 }
 
+/// Change epoch immediately.
+/// If `RECONFIGURE_WITH_DKG` is enabled and we are in the middle of a DKG,
+/// stop waiting for DKG and enter the new epoch without randomness.
+///
+/// WARNING: currently only used by tests. In most cases you should use `reconfigure()` instead.
+/// TODO: migrate these tests to be aware of async reconfiguration.
+pub fn supra_governance_force_end_epoch() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("force_end_epoch").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// `force_end_epoch()` equivalent but only called in testnet,
+/// where the core resources account exists and has been granted power to mint Aptos coins.
+pub fn supra_governance_force_end_epoch_test_only() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("force_end_epoch_test_only").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
 pub fn supra_governance_partial_vote(
     stake_pool: AccountAddress,
@@ -4900,6 +5137,30 @@ pub fn supra_governance_partial_vote(
             bcs::to_bytes(&voting_power).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
         ],
+    ))
+}
+
+/// Manually reconfigure. Called at the end of a governance txn that alters on-chain configs.
+///
+/// WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.
+/// - If feature `RECONFIGURE_WITH_DKG` is disabled, it finishes immediately.
+///   - At the end of the calling transaction, we will be in a new epoch.
+/// - If feature `RECONFIGURE_WITH_DKG` is enabled, it starts DKG, and the new epoch will start in a block prologue after DKG finishes.
+///
+/// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
+/// since such updates are applied whenever we enter an new epoch.
+pub fn supra_governance_reconfigure() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("reconfigure").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -4927,8 +5188,45 @@ pub fn supra_governance_vote(
     ))
 }
 
-/// Updates the major version to a larger version.
-/// This can be called by on chain governance.
+pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("transaction_fee").to_owned(),
+        ),
+        ident_str!("convert_to_aptos_fa_burn_ref").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Used in on-chain governances to update the major version for the next epoch.
+/// Example usage:
+/// - `supra_framework::version::set_for_next_epoch(&framework_signer, new_version);`
+/// - `supra_framework::supra_governance::reconfigure(&framework_signer);`
+pub fn version_set_for_next_epoch(major: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("version").to_owned(),
+        ),
+        ident_str!("set_for_next_epoch").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&major).unwrap()],
+    ))
+}
+
+/// Deprecated by `set_for_next_epoch()`.
+///
+/// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+///
+/// TODO: update all the tests that reference this function, then disable this function.
 pub fn version_set_version(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -5663,6 +5961,38 @@ mod decoder {
             Some(EntryFunctionCall::CodePublishPackageTxn {
                 metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
                 code: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_create_coin_conversion_map(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::CoinCreateCoinConversionMap {})
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_create_pairing(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinCreatePairing {
+                coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_migrate_to_fungible_store(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinMigrateToFungibleStore {
+                coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
             None
@@ -6417,6 +6747,35 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_vote_transaction(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountVoteTransaction {
+                multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+                approved: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_vote_transactions(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountVoteTransactions {
+                multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                starting_sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+                final_sequence_number: bcs::from_bytes(script.args().get(2)?).ok()?,
+                approved: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_vote_transanction(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7096,6 +7455,33 @@ mod decoder {
         }
     }
 
+    pub fn supra_governance_batch_partial_vote(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::SupraGovernanceBatchPartialVote {
+                stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn supra_governance_batch_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::SupraGovernanceBatchVote {
+                stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn supra_governance_create_proposal(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7127,6 +7513,26 @@ mod decoder {
         }
     }
 
+    pub fn supra_governance_force_end_epoch(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::SupraGovernanceForceEndEpoch {})
+        } else {
+            None
+        }
+    }
+
+    pub fn supra_governance_force_end_epoch_test_only(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::SupraGovernanceForceEndEpochTestOnly {})
+        } else {
+            None
+        }
+    }
+
     pub fn supra_governance_partial_vote(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7142,12 +7548,40 @@ mod decoder {
         }
     }
 
+    pub fn supra_governance_reconfigure(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::SupraGovernanceReconfigure {})
+        } else {
+            None
+        }
+    }
+
     pub fn supra_governance_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::SupraGovernanceVote {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
                 should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn transaction_fee_convert_to_aptos_fa_burn_ref(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TransactionFeeConvertToAptosFaBurnRef {})
+        } else {
+            None
+        }
+    }
+
+    pub fn version_set_for_next_epoch(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VersionSetForNextEpoch {
+                major: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -7561,6 +7995,18 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::code_publish_package_txn),
         );
         map.insert(
+            "coin_create_coin_conversion_map".to_string(),
+            Box::new(decoder::coin_create_coin_conversion_map),
+        );
+        map.insert(
+            "coin_create_pairing".to_string(),
+            Box::new(decoder::coin_create_pairing),
+        );
+        map.insert(
+            "coin_migrate_to_fungible_store".to_string(),
+            Box::new(decoder::coin_migrate_to_fungible_store),
+        );
+        map.insert(
             "coin_transfer".to_string(),
             Box::new(decoder::coin_transfer),
         );
@@ -7781,6 +8227,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_update_timeout_duration),
         );
         map.insert(
+            "multisig_account_vote_transaction".to_string(),
+            Box::new(decoder::multisig_account_vote_transaction),
+        );
+        map.insert(
+            "multisig_account_vote_transactions".to_string(),
+            Box::new(decoder::multisig_account_vote_transactions),
+        );
+        map.insert(
             "multisig_account_vote_transanction".to_string(),
             Box::new(decoder::multisig_account_vote_transanction),
         );
@@ -7998,6 +8452,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::supra_governance_add_approved_script_hash_script),
         );
         map.insert(
+            "supra_governance_batch_partial_vote".to_string(),
+            Box::new(decoder::supra_governance_batch_partial_vote),
+        );
+        map.insert(
+            "supra_governance_batch_vote".to_string(),
+            Box::new(decoder::supra_governance_batch_vote),
+        );
+        map.insert(
             "supra_governance_create_proposal".to_string(),
             Box::new(decoder::supra_governance_create_proposal),
         );
@@ -8006,12 +8468,32 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::supra_governance_create_proposal_v2),
         );
         map.insert(
+            "supra_governance_force_end_epoch".to_string(),
+            Box::new(decoder::supra_governance_force_end_epoch),
+        );
+        map.insert(
+            "supra_governance_force_end_epoch_test_only".to_string(),
+            Box::new(decoder::supra_governance_force_end_epoch_test_only),
+        );
+        map.insert(
             "supra_governance_partial_vote".to_string(),
             Box::new(decoder::supra_governance_partial_vote),
         );
         map.insert(
+            "supra_governance_reconfigure".to_string(),
+            Box::new(decoder::supra_governance_reconfigure),
+        );
+        map.insert(
             "supra_governance_vote".to_string(),
             Box::new(decoder::supra_governance_vote),
+        );
+        map.insert(
+            "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),
+            Box::new(decoder::transaction_fee_convert_to_aptos_fa_burn_ref),
+        );
+        map.insert(
+            "version_set_for_next_epoch".to_string(),
+            Box::new(decoder::version_set_for_next_epoch),
         );
         map.insert(
             "version_set_version".to_string(),

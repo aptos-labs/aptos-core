@@ -65,6 +65,7 @@ and implement the governance voting logic on top.
 -  [Struct `TransactionExecutionFailedEvent`](#0x1_multisig_account_TransactionExecutionFailedEvent)
 -  [Struct `TransactionExecutionFailed`](#0x1_multisig_account_TransactionExecutionFailed)
 -  [Struct `MetadataUpdatedEvent`](#0x1_multisig_account_MetadataUpdatedEvent)
+-  [Struct `TimeoutDurationUpdatedEvent`](#0x1_multisig_account_TimeoutDurationUpdatedEvent)
 -  [Struct `MetadataUpdated`](#0x1_multisig_account_MetadataUpdated)
 -  [Constants](#@Constants_0)
 -  [Function `metadata`](#0x1_multisig_account_metadata)
@@ -81,6 +82,7 @@ and implement the governance voting logic on top.
 -  [Function `can_reject`](#0x1_multisig_account_can_reject)
 -  [Function `get_next_multisig_account_address`](#0x1_multisig_account_get_next_multisig_account_address)
 -  [Function `last_resolved_sequence_number`](#0x1_multisig_account_last_resolved_sequence_number)
+-  [Function `tx_creation_time_secs`](#0x1_multisig_account_tx_creation_time_secs)
 -  [Function `next_sequence_number`](#0x1_multisig_account_next_sequence_number)
 -  [Function `vote`](#0x1_multisig_account_vote)
 -  [Function `available_transaction_queue_capacity`](#0x1_multisig_account_available_transaction_queue_capacity)
@@ -1192,6 +1194,46 @@ Event emitted when a transaction's metadata is updated.
 
 </details>
 
+<a id="0x1_multisig_account_TimeoutDurationUpdatedEvent"></a>
+
+## Struct `TimeoutDurationUpdatedEvent`
+
+Event emitted when a transaction's timeout duration is updated.
+
+
+<pre><code><b>struct</b> <a href="multisig_account.md#0x1_multisig_account_TimeoutDurationUpdatedEvent">TimeoutDurationUpdatedEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>executor: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_timeout_duration: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_timeout_duration: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_multisig_account_MetadataUpdated"></a>
 
 ## Struct `MetadataUpdated`
@@ -1314,6 +1356,16 @@ Number of signatures required must be more than zero and at most the total numbe
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EINVALID_SIGNATURES_REQUIRED">EINVALID_SIGNATURES_REQUIRED</a>: u64 = 11;
+</code></pre>
+
+
+
+<a id="0x1_multisig_account_EINVALID_TIMEOUT_DURATION"></a>
+
+Timeout duration must be at least 300 seconds.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EINVALID_TIMEOUT_DURATION">EINVALID_TIMEOUT_DURATION</a>: u64 = 22;
 </code></pre>
 
 
@@ -1458,11 +1510,31 @@ Transaction with specified id cannot be found.
 
 
 
+<a id="0x1_multisig_account_ETRANSACTION_TIMED_OUT"></a>
+
+The transaction has timed out and cannot be executed.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ETRANSACTION_TIMED_OUT">ETRANSACTION_TIMED_OUT</a>: u64 = 21;
+</code></pre>
+
+
+
 <a id="0x1_multisig_account_MAX_PENDING_TRANSACTIONS"></a>
 
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_MAX_PENDING_TRANSACTIONS">MAX_PENDING_TRANSACTIONS</a>: u64 = 20;
+</code></pre>
+
+
+
+<a id="0x1_multisig_account_MINIMAL_TIMEOUT_DURATION"></a>
+
+Define the minimum timeout duration for a transaction.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_MINIMAL_TIMEOUT_DURATION">MINIMAL_TIMEOUT_DURATION</a>: u64 = 300;
 </code></pre>
 
 
@@ -1724,7 +1796,8 @@ Return true if the transaction with given transaction id can be executed now.
     <a href="multisig_account.md#0x1_multisig_account_assert_valid_sequence_number">assert_valid_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
     <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
     sequence_number == <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1 &&
-        num_approvals &gt;= <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>)
+        num_approvals &gt;= <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &&
+        <a href="multisig_account.md#0x1_multisig_account_timeout_duration">timeout_duration</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &gt;= now_seconds() - <a href="multisig_account.md#0x1_multisig_account_tx_creation_time_secs">tx_creation_time_secs</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number)
 }
 </code></pre>
 
@@ -1757,7 +1830,8 @@ Return true if the owner can execute the transaction with given transaction id n
     };
     <a href="multisig_account.md#0x1_multisig_account_is_owner">is_owner</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &&
         sequence_number == <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1 &&
-        num_approvals &gt;= <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>)
+        num_approvals &gt;= <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &&
+        <a href="multisig_account.md#0x1_multisig_account_timeout_duration">timeout_duration</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &gt;= now_seconds() - <a href="multisig_account.md#0x1_multisig_account_tx_creation_time_secs">tx_creation_time_secs</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number)
 }
 </code></pre>
 
@@ -1786,7 +1860,8 @@ Return true if the transaction with given transaction id can be officially rejec
     <a href="multisig_account.md#0x1_multisig_account_assert_valid_sequence_number">assert_valid_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
     <b>let</b> (_, num_rejections) = <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number);
     sequence_number == <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1 &&
-        num_rejections &gt;= <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>)
+        num_rejections &gt;= <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) ||
+        <a href="multisig_account.md#0x1_multisig_account_timeout_duration">timeout_duration</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &lt; now_seconds() - <a href="multisig_account.md#0x1_multisig_account_tx_creation_time_secs">tx_creation_time_secs</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number)
 }
 </code></pre>
 
@@ -1819,7 +1894,8 @@ Return true if the owner can execute the "rejected" transaction with given trans
     };
     <a href="multisig_account.md#0x1_multisig_account_is_owner">is_owner</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &&
         sequence_number == <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) + 1 &&
-        num_rejections &gt;= <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>)
+        num_rejections &gt;= <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) ||
+        <a href="multisig_account.md#0x1_multisig_account_timeout_duration">timeout_duration</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &lt; now_seconds() - <a href="multisig_account.md#0x1_multisig_account_tx_creation_time_secs">tx_creation_time_secs</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number)
 }
 </code></pre>
 
@@ -1874,6 +1950,34 @@ Return the id of the last transaction that was executed (successful or failed) o
 <pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): u64 <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     multisig_account_resource.last_executed_sequence_number
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_tx_creation_time_secs"></a>
+
+## Function `tx_creation_time_secs`
+
+Return the id of the last transaction that was executed (successful or failed) or removed.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_tx_creation_time_secs">tx_creation_time_secs</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_tx_creation_time_secs">tx_creation_time_secs</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64): u64 <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <b>let</b> multisig_account_resource = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&multisig_account_resource.transactions, sequence_number);
+    transaction.creation_time_secs
 }
 </code></pre>
 
@@ -3050,6 +3154,7 @@ Remove the next transaction if it has sufficient owner rejections.
     };
 
     <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>let</b> creation_time_secs = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&multisig_account_resource.transactions, sequence_number).creation_time_secs;
     <b>let</b> (_, num_rejections) = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
     <b>assert</b>!(
         // Can be removed <b>if</b> the number of rejections is greater than or equal <b>to</b> the number of signatures required or <b>if</b> the transaction <b>has</b> timed out.
@@ -3154,6 +3259,8 @@ Transaction payload is optional if it's already stored on chain for the transact
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_APPROVALS">ENOT_ENOUGH_APPROVALS</a>),
         );
     };
+    <b>let</b> multisig_account_resource = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&multisig_account_resource.transactions, sequence_number);
 
     <b>assert</b>!(
         multisig_account_resource.timeout_duration &gt;= now_seconds() - transaction.creation_time_secs,
@@ -3162,8 +3269,6 @@ Transaction payload is optional if it's already stored on chain for the transact
 
     // If the transaction payload is not stored on chain, verify that the provided payload matches the hashes stored
     // on chain.
-    <b>let</b> multisig_account_resource = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&multisig_account_resource.transactions, sequence_number);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&transaction.payload_hash)) {
         <b>let</b> payload_hash = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&transaction.payload_hash);
         <b>assert</b>!(

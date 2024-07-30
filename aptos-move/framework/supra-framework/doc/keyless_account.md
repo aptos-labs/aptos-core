@@ -362,7 +362,7 @@ WARNING: See <code>set_groth16_verification_key_for_next_epoch</code> for caveat
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_update_groth16_verification_key">update_groth16_verification_key</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, vk: <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
     // There should not be a previous resource set here.
     <b>move_to</b>(fx, vk);
@@ -393,7 +393,7 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_update_configuration">update_configuration</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
     // There should not be a previous resource set here.
     <b>move_to</b>(fx, config);
@@ -421,7 +421,7 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_update_training_wheels">update_training_wheels</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pk: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&pk)) {
@@ -454,7 +454,7 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_update_max_exp_horizon">update_max_exp_horizon</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_exp_horizon_secs: u64) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
 
     <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
@@ -483,7 +483,7 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_remove_all_override_auds">remove_all_override_auds</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
 
     <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
@@ -512,7 +512,7 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_add_override_aud">add_override_aud</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aud: String) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
 
     <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
@@ -547,7 +547,7 @@ WARNING: If a malicious key is set, this would lead to stolen funds.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_set_groth16_verification_key_for_next_epoch">set_groth16_verification_key_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, vk: <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;(vk);
 }
 </code></pre>
@@ -577,7 +577,7 @@ recovery service provider to phish users' accounts.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_set_configuration_for_next_epoch">set_configuration_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(config);
 }
 </code></pre>
@@ -606,7 +606,7 @@ WARNING: If a malicious key is set, this *could* lead to stolen funds.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_update_training_wheels_for_next_epoch">update_training_wheels_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pk: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
 
     // If a PK is being set, validate it first.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&pk)) {
@@ -649,7 +649,7 @@ reconfiguration. Only callable via governance proposal.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_update_max_exp_horizon_for_next_epoch">update_max_exp_horizon_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_exp_horizon_secs: u64) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
 
     <b>let</b> config = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()) {
         <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()
@@ -688,7 +688,7 @@ is no longer possible.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_remove_all_override_auds_for_next_epoch">remove_all_override_auds_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
 
     <b>let</b> config = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()) {
         <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()
@@ -726,7 +726,7 @@ WARNING: If a malicious override <code>aud</code> is set, this *could* lead to s
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_add_override_aud_for_next_epoch">add_override_aud_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aud: String) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
 
     <b>let</b> config = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()) {
         <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()
@@ -761,12 +761,12 @@ Only used in reconfigurations to apply the queued up configuration changes, if t
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_on_new_epoch">on_new_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>, <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(fx);
 
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;()) {
         <b>let</b> vk = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>();
-        <b>if</b> (<b>exists</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;(@aptos_framework) = vk;
+        <b>if</b> (<b>exists</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;(@supra_framework)) {
+            *<b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;(@supra_framework) = vk;
         } <b>else</b> {
             <b>move_to</b>(fx, vk);
         }
@@ -774,8 +774,8 @@ Only used in reconfigurations to apply the queued up configuration changes, if t
 
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()) {
         <b>let</b> config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>();
-        <b>if</b> (<b>exists</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(@aptos_framework) = config;
+        <b>if</b> (<b>exists</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(@supra_framework)) {
+            *<b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(@supra_framework) = config;
         } <b>else</b> {
             <b>move_to</b>(fx, config);
         }

@@ -376,7 +376,7 @@ Maximum number of characters in a property name
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_extend">extend</a>(ref: &<a href="../../aptos-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a>, container: <a href="property_map.md#0x4_property_map_PropertyMap">property_map::PropertyMap</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_extend">extend</a>(ref: &<a href="../../supra-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a>, container: <a href="property_map.md#0x4_property_map_PropertyMap">property_map::PropertyMap</a>)
 </code></pre>
 
 
@@ -386,8 +386,8 @@ Maximum number of characters in a property name
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_extend">extend</a>(ref: &ExtendRef, container: <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>) {
-    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(ref);
-    <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, container);
+    <b>let</b> <a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../supra-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(ref);
+    <b>move_to</b>(&<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, container);
 }
 </code></pre>
 
@@ -1244,7 +1244,7 @@ Removes a property from the map, ensuring that it does in fact exist
 
 
 
-<pre><code><b>fun</b> <a href="property_map.md#0x4_property_map_assert_end_to_end_input">assert_end_to_end_input</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;)
+<pre><code><b>fun</b> <a href="property_map.md#0x4_property_map_assert_end_to_end_input">assert_end_to_end_input</a>(<a href="../../supra-framework/doc/object.md#0x1_object">object</a>: <a href="../../supra-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../supra-framework/doc/object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;)
 </code></pre>
 
 
@@ -1253,24 +1253,24 @@ Removes a property from the map, ensuring that it does in fact exist
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="property_map.md#0x4_property_map_assert_end_to_end_input">assert_end_to_end_input</a>(<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>: Object&lt;ObjectCore&gt;) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_bool">read_bool</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"bool")), 0);
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u8">read_u8</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u8")) == 0x12, 1);
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u16">read_u16</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u16")) == 0x1234, 2);
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u32">read_u32</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u32")) == 0x12345678, 3);
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u64">read_u64</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u64")) == 0x1234567812345678, 4);
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u128">read_u128</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u128")) == 0x12345678123456781234567812345678, 5);
+<pre><code><b>fun</b> <a href="property_map.md#0x4_property_map_assert_end_to_end_input">assert_end_to_end_input</a>(<a href="../../supra-framework/doc/object.md#0x1_object">object</a>: Object&lt;ObjectCore&gt;) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_bool">read_bool</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>, &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"bool")), 0);
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u8">read_u8</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>, &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u8")) == 0x12, 1);
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u16">read_u16</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>, &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u16")) == 0x1234, 2);
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u32">read_u32</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>, &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u32")) == 0x12345678, 3);
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u64">read_u64</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>, &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u64")) == 0x1234567812345678, 4);
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_u128">read_u128</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>, &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u128")) == 0x12345678123456781234567812345678, 5);
     <b>assert</b>!(
         <a href="property_map.md#0x4_property_map_read_u256">read_u256</a>(
-            &<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>,
-            &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u256")
+            &<a href="../../supra-framework/doc/object.md#0x1_object">object</a>,
+            &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"u256")
         ) == 0x1234567812345678123456781234567812345678123456781234567812345678,
         6
     );
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_bytes">read_bytes</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;")) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0x01], 7);
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_string">read_string</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">0x1::string::String</a>")) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"a"), 8);
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_bytes">read_bytes</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>, &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;")) == <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0x01], 7);
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_read_string">read_string</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>, &<a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="../../move-stdlib/doc/string.md#0x1_string_String">0x1::string::String</a>")) == <a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"a"), 8);
 
-    <b>assert</b>!(<a href="property_map.md#0x4_property_map_length">length</a>(&<a href="../../aptos-framework/doc/object.md#0x1_object">object</a>) == 9, 9);
+    <b>assert</b>!(<a href="property_map.md#0x4_property_map_length">length</a>(&<a href="../../supra-framework/doc/object.md#0x1_object">object</a>) == 9, 9);
 }
 </code></pre>
 

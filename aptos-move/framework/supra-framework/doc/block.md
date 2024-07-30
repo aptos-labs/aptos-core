@@ -429,7 +429,7 @@ This can only be called during Genesis.
     <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
     <b>assert</b>!(epoch_interval_microsecs &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_EZERO_EPOCH_INTERVAL">EZERO_EPOCH_INTERVAL</a>));
 
-    <b>move_to</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(aptos_framework, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
+    <b>move_to</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(supra_framework, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
         max_capacity: 2000,
         next_idx: 0,
         <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>: <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_new">table_with_length::new</a>(),
@@ -774,8 +774,8 @@ Emit the event and update height and global timestamp
     new_block_event: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>,
     new_block_event_v2: <a href="block.md#0x1_block_NewBlock">NewBlock</a>
 ) <b>acquires</b> <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
-    <b>if</b> (<b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework)) {
-        <b>let</b> commit_history_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework);
+    <b>if</b> (<b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@supra_framework)) {
+        <b>let</b> commit_history_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@supra_framework);
         <b>let</b> idx = commit_history_ref.next_idx;
         <b>if</b> (<a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_contains">table_with_length::contains</a>(&commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx)) {
             <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx);
@@ -820,7 +820,7 @@ reconfiguration event.
 
 
 <pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
-    <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+    <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@supra_framework);
     <b>let</b> genesis_id = @0x0;
     <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(
         &vm,
@@ -972,8 +972,8 @@ new block event for WriteSetPayload.
 ### Module-level Specification
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
-<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework);
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@supra_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@supra_framework);
 </code></pre>
 
 

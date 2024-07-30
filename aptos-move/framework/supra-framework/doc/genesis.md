@@ -51,9 +51,6 @@
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aggregator_factory.md#0x1_aggregator_factory">0x1::aggregator_factory</a>;
-<b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
-<b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
-<b>use</b> <a href="aptos_governance.md#0x1_aptos_governance">0x1::aptos_governance</a>;
 <b>use</b> <a href="block.md#0x1_block">0x1::block</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
@@ -66,6 +63,8 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
+<b>use</b> <a href="jwks.md#0x1_jwks">0x1::jwks</a>;
+<b>use</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool">0x1::pbo_delegation_pool</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
@@ -595,14 +594,15 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="gas_schedule.md#0x1_gas_schedule_initialize">gas_schedule::initialize</a>(&supra_framework_account, <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>);
 
     // Ensure we can create aggregators for supply, but not enable it for common <b>use</b> just yet.
-    <a href="aggregator_factory.md#0x1_aggregator_factory_initialize_aggregator_factory">aggregator_factory::initialize_aggregator_factory</a>(&aptos_framework_account);
-    <a href="coin.md#0x1_coin_initialize_supply_config">coin::initialize_supply_config</a>(&aptos_framework_account);
+    <a href="aggregator_factory.md#0x1_aggregator_factory_initialize_aggregator_factory">aggregator_factory::initialize_aggregator_factory</a>(&supra_framework_account);
+    <a href="coin.md#0x1_coin_initialize_supply_config">coin::initialize_supply_config</a>(&supra_framework_account);
 
-    <a href="chain_id.md#0x1_chain_id_initialize">chain_id::initialize</a>(&aptos_framework_account, <a href="chain_id.md#0x1_chain_id">chain_id</a>);
-    <a href="reconfiguration.md#0x1_reconfiguration_initialize">reconfiguration::initialize</a>(&aptos_framework_account);
-    <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
-    <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
-    <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
+    <a href="chain_id.md#0x1_chain_id_initialize">chain_id::initialize</a>(&supra_framework_account, <a href="chain_id.md#0x1_chain_id">chain_id</a>);
+    <a href="reconfiguration.md#0x1_reconfiguration_initialize">reconfiguration::initialize</a>(&supra_framework_account);
+    <a href="block.md#0x1_block_initialize">block::initialize</a>(&supra_framework_account, epoch_interval_microsecs);
+    <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&supra_framework_account);
+    <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&supra_framework_account);
+    <a href="jwks.md#0x1_jwks_initialize">jwks::initialize</a>(&supra_framework_account);
 }
 </code></pre>
 
@@ -626,18 +626,14 @@ Genesis step 2: Initialize Aptos coin.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_aptos_coin">initialize_aptos_coin</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <b>let</b> (burn_cap, mint_cap) = <a href="aptos_coin.md#0x1_aptos_coin_initialize">aptos_coin::initialize</a>(aptos_framework);
-
-    <a href="coin.md#0x1_coin_create_coin_conversion_map">coin::create_coin_conversion_map</a>(aptos_framework);
-    <a href="coin.md#0x1_coin_create_pairing">coin::create_pairing</a>&lt;AptosCoin&gt;(aptos_framework);
-
-    // Give <a href="stake.md#0x1_stake">stake</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint rewards.
-    <a href="stake.md#0x1_stake_store_aptos_coin_mint_cap">stake::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
-    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> BurnCapability&lt;AptosCoin&gt; so it can burn gas.
-    <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
-    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
-    <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_supra_coin">initialize_supra_coin</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>let</b> (burn_cap, mint_cap) = <a href="supra_coin.md#0x1_supra_coin_initialize">supra_coin::initialize</a>(supra_framework);
+    // Give <a href="stake.md#0x1_stake">stake</a> <b>module</b> MintCapability&lt;SupraCoin&gt; so it can mint rewards.
+    <a href="stake.md#0x1_stake_store_supra_coin_mint_cap">stake::store_supra_coin_mint_cap</a>(supra_framework, mint_cap);
+    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> BurnCapability&lt;SupraCoin&gt; so it can burn gas.
+    <a href="transaction_fee.md#0x1_transaction_fee_store_supra_coin_burn_cap">transaction_fee::store_supra_coin_burn_cap</a>(supra_framework, burn_cap);
+    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;SupraCoin&gt; so it can mint refunds.
+    <a href="transaction_fee.md#0x1_transaction_fee_store_supra_coin_mint_cap">transaction_fee::store_supra_coin_mint_cap</a>(supra_framework, mint_cap);
 }
 </code></pre>
 
@@ -665,22 +661,17 @@ Only called for testnets and e2e tests.
     supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     core_resources_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) {
-    <b>let</b> (burn_cap, mint_cap) = <a href="aptos_coin.md#0x1_aptos_coin_initialize">aptos_coin::initialize</a>(aptos_framework);
-
-    <a href="coin.md#0x1_coin_create_coin_conversion_map">coin::create_coin_conversion_map</a>(aptos_framework);
-    <a href="coin.md#0x1_coin_create_pairing">coin::create_pairing</a>&lt;AptosCoin&gt;(aptos_framework);
-
-    // Give <a href="stake.md#0x1_stake">stake</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint rewards.
-    <a href="stake.md#0x1_stake_store_aptos_coin_mint_cap">stake::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
-    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> BurnCapability&lt;AptosCoin&gt; so it can burn gas.
-    <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
-    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
-    <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
+    <b>let</b> (burn_cap, mint_cap) = <a href="supra_coin.md#0x1_supra_coin_initialize">supra_coin::initialize</a>(supra_framework);
+    // Give <a href="stake.md#0x1_stake">stake</a> <b>module</b> MintCapability&lt;SupraCoin&gt; so it can mint rewards.
+    <a href="stake.md#0x1_stake_store_supra_coin_mint_cap">stake::store_supra_coin_mint_cap</a>(supra_framework, mint_cap);
+    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> BurnCapability&lt;SupraCoin&gt; so it can burn gas.
+    <a href="transaction_fee.md#0x1_transaction_fee_store_supra_coin_burn_cap">transaction_fee::store_supra_coin_burn_cap</a>(supra_framework, burn_cap);
+    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;SupraCoin&gt; so it can mint refunds.
+    <a href="transaction_fee.md#0x1_transaction_fee_store_supra_coin_mint_cap">transaction_fee::store_supra_coin_mint_cap</a>(supra_framework, mint_cap);
 
     <b>let</b> core_resources = <a href="account.md#0x1_account_create_account">account::create_account</a>(@core_resources);
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
-    <a href="aptos_account.md#0x1_aptos_account_register_apt">aptos_account::register_apt</a>(&core_resources); // registers APT store
-    <a href="aptos_coin.md#0x1_aptos_coin_configure_accounts_for_test">aptos_coin::configure_accounts_for_test</a>(aptos_framework, &core_resources, mint_cap);
+    <a href="supra_coin.md#0x1_supra_coin_configure_accounts_for_test">supra_coin::configure_accounts_for_test</a>(supra_framework, &core_resources, mint_cap);
 }
 </code></pre>
 
@@ -1434,10 +1425,10 @@ The last step of genesis.
         rewards_rate_denominator,
         voting_power_increase_limit
     );
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags_for_verification">features::change_feature_flags_for_verification</a>(aptos_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
-    <a href="genesis.md#0x1_genesis_initialize_aptos_coin">initialize_aptos_coin</a>(aptos_framework);
-    <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">aptos_governance::initialize_for_verification</a>(
-        aptos_framework,
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags_for_next_epoch">features::change_feature_flags_for_next_epoch</a>(supra_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2, 11], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
+    <a href="genesis.md#0x1_genesis_initialize_supra_coin">initialize_supra_coin</a>(supra_framework);
+    <a href="supra_governance.md#0x1_supra_governance_initialize_for_verification">supra_governance::initialize_for_verification</a>(
+        supra_framework,
         min_voting_threshold,
         required_proposer_stake,
         voting_duration_secs
@@ -1489,8 +1480,8 @@ The last step of genesis.
 <td>3</td>
 <td>The Aptos coin should be initialized during genesis and only the Aptos framework account should own the mint and burn capabilities for the APT token.</td>
 <td>Critical</td>
-<td>Both mint and burn capabilities are wrapped inside the stake::AptosCoinCapabilities and transaction_fee::AptosCoinCapabilities resources which are stored under the aptos framework account.</td>
-<td>Formally verified via <a href="#high-level-req-3">initialize_aptos_coin</a>.</td>
+<td>Both mint and burn capabilities are wrapped inside the stake::SupraCoinCapabilities and transaction_fee::SupraCoinCapabilities resources which are stored under the aptos framework account.</td>
+<td>Formally verified via <a href="#high-level-req-3">initialize_supra_coin</a>.</td>
 </tr>
 
 <tr>

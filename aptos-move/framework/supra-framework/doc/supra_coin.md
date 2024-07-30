@@ -315,7 +315,6 @@ Expects account and APT store to be registered before calling.
     <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
 
     // Mint the core resource <a href="account.md#0x1_account">account</a> <a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a> for gas so it can execute system transactions.
-    <a href="coin.md#0x1_coin_register">coin::register</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a>&gt;(core_resources);
     <b>let</b> coins = <a href="coin.md#0x1_coin_mint">coin::mint</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a>&gt;(
         ((<a href="supra_coin.md#0x1_supra_coin_MAX_SUPRA_COIN_SUPPLY">MAX_SUPRA_COIN_SUPPLY</a>)/10 <b>as</b> u64),
         &mint_cap,

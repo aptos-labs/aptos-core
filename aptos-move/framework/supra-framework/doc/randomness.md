@@ -185,7 +185,7 @@ Event emitted every time a public randomness API in this module is called.
 
 
 
-<pre><code><b>const</b> <a href="randomness.md#0x1_randomness_DST">DST</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [65, 80, 84, 79, 83, 95, 82, 65, 78, 68, 79, 77, 78, 69, 83, 83];
+<pre><code><b>const</b> <a href="randomness.md#0x1_randomness_DST">DST</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [83, 85, 80, 82, 65, 95, 82, 65, 78, 68, 79, 77, 78, 69, 83, 83];
 </code></pre>
 
 
@@ -219,8 +219,8 @@ Must be called in tests to initialize the <code><a href="randomness.md#0x1_rando
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (!<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework)) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(framework);
+    <b>if</b> (!<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework)) {
         <b>move_to</b>(framework, <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
             epoch: 0,
             round: 0,
@@ -252,8 +252,8 @@ Invoked in block prologues to update the block-level randomness seed.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch: u64, round: u64, seed_for_new_block: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
-    <b>if</b> (<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework)) {
-        <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global_mut</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+    <b>if</b> (<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework)) {
+        <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global_mut</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework);
         <a href="randomness.md#0x1_randomness">randomness</a>.epoch = epoch;
         <a href="randomness.md#0x1_randomness">randomness</a>.round = round;
         <a href="randomness.md#0x1_randomness">randomness</a>.seed = seed_for_new_block;
@@ -286,7 +286,7 @@ of the hash function).
     <b>assert</b>!(<a href="randomness.md#0x1_randomness_is_unbiasable">is_unbiasable</a>(), <a href="randomness.md#0x1_randomness_E_API_USE_IS_BIASIBLE">E_API_USE_IS_BIASIBLE</a>);
 
     <b>let</b> input = <a href="randomness.md#0x1_randomness_DST">DST</a>;
-    <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+    <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework);
     <b>let</b> seed = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<a href="randomness.md#0x1_randomness">randomness</a>.seed);
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, seed);
@@ -1013,7 +1013,7 @@ function as its payload.
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework);
 <a id="0x1_randomness_var"></a>
 <b>global</b> <a href="randomness.md#0x1_randomness_var">var</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
@@ -1032,7 +1032,7 @@ function as its payload.
 
 
 <pre><code><b>let</b> framework_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(framework);
-<b>aborts_if</b> framework_addr != @aptos_framework;
+<b>aborts_if</b> framework_addr != @supra_framework;
 </code></pre>
 
 
@@ -1049,9 +1049,9 @@ function as its payload.
 
 
 <pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(vm) != @vm;
-<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).seed == seed_for_new_block;
-<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).epoch == epoch;
-<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).round == round;
+<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework).seed == seed_for_new_block;
+<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework).epoch == epoch;
+<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework).round == round;
 </code></pre>
 
 
@@ -1069,7 +1069,7 @@ function as its payload.
 
 <pre><code><b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 <b>let</b> input = b"APTOS_RANDOMNESS";
-<b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+<b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework);
 <b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
 <b>let</b> txn_hash = <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">transaction_context::spec_get_txn_hash</a>();
 <b>let</b> txn_counter = <a href="randomness.md#0x1_randomness_spec_fetch_and_increment_txn_counter">spec_fetch_and_increment_txn_counter</a>();
@@ -1084,10 +1084,10 @@ function as its payload.
 
 
 <pre><code><b>schema</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a> {
-    <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+    <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework);
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
     <b>aborts_if</b> !<a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>();
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework);
 }
 </code></pre>
 

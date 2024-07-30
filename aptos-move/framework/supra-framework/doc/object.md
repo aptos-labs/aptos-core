@@ -1187,7 +1187,7 @@ Same as <code>create_object</code> except the object to be created will be undel
 
 ## Function `create_sticky_object_at_address`
 
-Create a sticky object at a specific address. Only used by aptos_framework::coin.
+Create a sticky object at a specific address. Only used by supra_framework::coin.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_sticky_object_at_address">create_sticky_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>

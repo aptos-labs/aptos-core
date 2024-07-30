@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct DummyDKG {}
 
 impl DKGTrait for DummyDKG {
-    type DealerPrivateKey = bls12381::PrivateKey;
+    type DealerPrivateKey = ed25519::PrivateKey;
     type DealtPubKeyShare = ();
     type DealtSecret = DummySecret;
     type DealtSecretShare = DummySecret;
