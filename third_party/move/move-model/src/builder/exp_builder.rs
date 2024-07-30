@@ -4336,7 +4336,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.error(
                 loc,
                 &format!(
-                    "expected {} for struct constructor `{}`",
+                    "expected {} for {} `{}`",
                     if is_positional_constructor {
                         format!(
                             "positional constructor `{}{}(..)`",
@@ -4348,6 +4348,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             struct_name_display, variant_name_display
                         )
                     },
+                    if variant.is_some() {"struct variant"} else {"struct"},
                     struct_name_display
                 ),
             );

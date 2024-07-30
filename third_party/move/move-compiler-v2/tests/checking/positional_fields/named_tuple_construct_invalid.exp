@@ -54,25 +54,25 @@ error: expected `bool` but found a value of type `integer`
 34 │         S2((), 1);
    │                ^
 
-error: expected struct constructor `test::Unit { .. }` for struct constructor `test::Unit`
+error: expected struct constructor `test::Unit { .. }` for struct `test::Unit`
    ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:38:9
    │
 38 │         Unit();
    │         ^^^^^^
 
-error: expected struct constructor `test::E::V1 { .. }` for struct constructor `test::E`
+error: expected struct constructor `test::E::V1 { .. }` for struct variant `test::E`
    ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:39:9
    │
 39 │         E::V1();
    │         ^^^^^^^
 
-error: expected struct constructor `test::E::V2 { .. }` for struct constructor `test::E`
+error: expected struct constructor `test::E::V2 { .. }` for struct variant `test::E`
    ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:40:9
    │
 40 │         E::V2();
    │         ^^^^^^^
 
-error: expected positional constructor `test::E::V3(..)` for struct constructor `test::E`
+error: expected positional constructor `test::E::V3(..)` for struct variant `test::E`
    ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:41:9
    │
 41 │         E::V3 {};
