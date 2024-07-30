@@ -62,6 +62,7 @@ use std::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
+    time::Instant,
 };
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -796,12 +797,14 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
+        worker_id: &usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(env.clone(), base_view);
         drop(init_timer);
 
+        let worker_id = *worker_id;
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
 
         let mut scheduler_task = SchedulerTask::Retry;
@@ -821,6 +824,8 @@ where
             }
             Ok(())
         };
+
+        let start = Instant::now();
 
         loop {
             if matches!(scheduler_task, SchedulerTask::Retry) {
@@ -943,10 +948,16 @@ where
                 },
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
-                    break Ok(());
+                    break;
                 },
             }
         }
+
+        let end = Instant::now();
+        let duration = end - start;
+
+        print!("thread_id={}, had total time={:?}", worker_id, duration);
+        Ok(())
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -995,9 +1006,10 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let worker_ids: Vec<usize> = (0..self.config.local.concurrency_level).collect();
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..num_workers {
+            for worker_id in &worker_ids {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         env,
@@ -1011,6 +1023,7 @@ where
                         &shared_commit_state,
                         &final_results,
                         num_workers,
+                        worker_id,
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,
