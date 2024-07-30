@@ -610,6 +610,7 @@ export interface TransactionPayload {
   scriptPayload?: ScriptPayload | undefined;
   writeSetPayload?: WriteSetPayload | undefined;
   multisigPayload?: MultisigPayload | undefined;
+  intentPayload?: IntentPayload | undefined;
 }
 
 export enum TransactionPayload_Type {
@@ -618,6 +619,7 @@ export enum TransactionPayload_Type {
   TYPE_SCRIPT_PAYLOAD = 2,
   TYPE_WRITE_SET_PAYLOAD = 4,
   TYPE_MULTISIG_PAYLOAD = 5,
+  TYPE_INTENT_PAYLOAD = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -638,6 +640,9 @@ export function transactionPayload_TypeFromJSON(object: any): TransactionPayload
     case 5:
     case "TYPE_MULTISIG_PAYLOAD":
       return TransactionPayload_Type.TYPE_MULTISIG_PAYLOAD;
+    case 6:
+    case "TYPE_INTENT_PAYLOAD":
+      return TransactionPayload_Type.TYPE_INTENT_PAYLOAD;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -657,10 +662,16 @@ export function transactionPayload_TypeToJSON(object: TransactionPayload_Type): 
       return "TYPE_WRITE_SET_PAYLOAD";
     case TransactionPayload_Type.TYPE_MULTISIG_PAYLOAD:
       return "TYPE_MULTISIG_PAYLOAD";
+    case TransactionPayload_Type.TYPE_INTENT_PAYLOAD:
+      return "TYPE_INTENT_PAYLOAD";
     case TransactionPayload_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
+}
+
+export interface IntentPayload {
+  intentCalls?: EntryFunctionPayload[] | undefined;
 }
 
 export interface EntryFunctionPayload {
@@ -6026,6 +6037,7 @@ function createBaseTransactionPayload(): TransactionPayload {
     scriptPayload: undefined,
     writeSetPayload: undefined,
     multisigPayload: undefined,
+    intentPayload: undefined,
   };
 }
 
@@ -6045,6 +6057,9 @@ export const TransactionPayload = {
     }
     if (message.multisigPayload !== undefined) {
       MultisigPayload.encode(message.multisigPayload, writer.uint32(50).fork()).ldelim();
+    }
+    if (message.intentPayload !== undefined) {
+      IntentPayload.encode(message.intentPayload, writer.uint32(58).fork()).ldelim();
     }
     return writer;
   },
@@ -6090,6 +6105,13 @@ export const TransactionPayload = {
           }
 
           message.multisigPayload = MultisigPayload.decode(reader, reader.uint32());
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.intentPayload = IntentPayload.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -6143,6 +6165,7 @@ export const TransactionPayload = {
       scriptPayload: isSet(object.scriptPayload) ? ScriptPayload.fromJSON(object.scriptPayload) : undefined,
       writeSetPayload: isSet(object.writeSetPayload) ? WriteSetPayload.fromJSON(object.writeSetPayload) : undefined,
       multisigPayload: isSet(object.multisigPayload) ? MultisigPayload.fromJSON(object.multisigPayload) : undefined,
+      intentPayload: isSet(object.intentPayload) ? IntentPayload.fromJSON(object.intentPayload) : undefined,
     };
   },
 
@@ -6162,6 +6185,9 @@ export const TransactionPayload = {
     }
     if (message.multisigPayload !== undefined) {
       obj.multisigPayload = MultisigPayload.toJSON(message.multisigPayload);
+    }
+    if (message.intentPayload !== undefined) {
+      obj.intentPayload = IntentPayload.toJSON(message.intentPayload);
     }
     return obj;
   },
@@ -6184,6 +6210,104 @@ export const TransactionPayload = {
     message.multisigPayload = (object.multisigPayload !== undefined && object.multisigPayload !== null)
       ? MultisigPayload.fromPartial(object.multisigPayload)
       : undefined;
+    message.intentPayload = (object.intentPayload !== undefined && object.intentPayload !== null)
+      ? IntentPayload.fromPartial(object.intentPayload)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseIntentPayload(): IntentPayload {
+  return { intentCalls: [] };
+}
+
+export const IntentPayload = {
+  encode(message: IntentPayload, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.intentCalls !== undefined && message.intentCalls.length !== 0) {
+      for (const v of message.intentCalls) {
+        EntryFunctionPayload.encode(v!, writer.uint32(10).fork()).ldelim();
+      }
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): IntentPayload {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseIntentPayload();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.intentCalls!.push(EntryFunctionPayload.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<IntentPayload, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<IntentPayload | IntentPayload[]> | Iterable<IntentPayload | IntentPayload[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [IntentPayload.encode(p).finish()];
+        }
+      } else {
+        yield* [IntentPayload.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, IntentPayload>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<IntentPayload> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [IntentPayload.decode(p)];
+        }
+      } else {
+        yield* [IntentPayload.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): IntentPayload {
+    return {
+      intentCalls: globalThis.Array.isArray(object?.intentCalls)
+        ? object.intentCalls.map((e: any) => EntryFunctionPayload.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: IntentPayload): unknown {
+    const obj: any = {};
+    if (message.intentCalls?.length) {
+      obj.intentCalls = message.intentCalls.map((e) => EntryFunctionPayload.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<IntentPayload>): IntentPayload {
+    return IntentPayload.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<IntentPayload>): IntentPayload {
+    const message = createBaseIntentPayload();
+    message.intentCalls = object.intentCalls?.map((e) => EntryFunctionPayload.fromPartial(e)) || [];
     return message;
   },
 };

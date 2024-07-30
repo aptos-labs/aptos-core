@@ -18,6 +18,7 @@ python = "^3.9"
 grpcio = "^1.57.0"
 protobuf = "^4.24.2"
 grpclib = "^0.4.5"
+multidict = "^6.0.5"
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.57.0"
