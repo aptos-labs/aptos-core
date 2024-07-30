@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::NUM_EXPIRED_TXNS_IN_TXN_FILTER;
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_crypto::HashValue;
 use aptos_types::transaction::SignedTransaction;
-
+use std::time::Duration;
 pub struct TransactionFilter {
     filter: Filter,
 }
@@ -24,6 +25,16 @@ impl TransactionFilter {
         if self.filter.is_empty() {
             return txns;
         }
+
+        let num_txns_before = txns.len();
+        let txns: Vec<SignedTransaction> = txns
+            .into_iter()
+            .filter(|txn| {
+                Duration::from_micros(timestamp).as_secs() < txn.expiration_timestamp_secs()
+            })
+            .collect();
+        NUM_EXPIRED_TXNS_IN_TXN_FILTER.observe((num_txns_before - txns.len()) as f64);
+
         txns.into_iter()
             .filter(|txn| self.filter.allows(block_id, timestamp, txn))
             .collect()

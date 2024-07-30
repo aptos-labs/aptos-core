@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::{
-        MAX_TXNS_FROM_BLOCK_TO_EXECUTE, NUM_EXPIRED_TXNS_IN_BLOCK_PREPARER, TXN_SHUFFLE_SECONDS,
-    },
+    counters::{MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXN_SHUFFLE_SECONDS},
     payload_manager::TPayloadManager,
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
@@ -14,7 +12,7 @@ use aptos_consensus_types::block::Block;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
@@ -45,7 +43,7 @@ impl BlockPreparer {
             thread::sleep(Duration::from_millis(10));
             Err(ExecutorError::CouldNotGetData)
         });
-        let (mut txns, max_txns_from_block_to_execute) =
+        let (txns, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
@@ -54,12 +52,6 @@ impl BlockPreparer {
         let block_timestamp_usecs = block.timestamp_usecs();
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         tokio::task::spawn_blocking(move || {
-            let num_txns_before = txns.len();
-            txns.retain(|txn| {
-                Duration::from_micros(block_timestamp_usecs).as_secs()
-                    < txn.expiration_timestamp_secs()
-            });
-            NUM_EXPIRED_TXNS_IN_BLOCK_PREPARER.observe((num_txns_before - txns.len()) as f64);
             let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
             let mut shuffled_txns = {
