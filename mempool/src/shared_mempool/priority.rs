@@ -327,9 +327,9 @@ impl PrioritizedPeersState {
         // Top peers shouldn't be empty if prioritized_peers is not zero
         assert!(self.prioritized_peers.read().is_empty() || !top_peers.is_empty());
 
-        // Assign sender buckets with Primary priority
         self.peer_to_sender_buckets = HashMap::new();
         if !self.prioritized_peers.read().is_empty() {
+            // Assign sender buckets with Primary priority
             let mut peer_index = 0;
             for bucket_index in 0..self.mempool_config.num_sender_buckets {
                 self.peer_to_sender_buckets
@@ -338,19 +338,23 @@ impl PrioritizedPeersState {
                     .insert(bucket_index, BroadcastPeerPriority::Primary);
                 peer_index = (peer_index + 1) % top_peers.len();
             }
-        }
 
-        // Assign sender buckets with Failover priority. Use Round Robin.
-        for _ in 0..self.mempool_config.default_failovers {
-            for bucket_index in 0..self.mempool_config.num_sender_buckets {
-                // Find the first peer that already doesn't have the sender bucket, and add the bucket
-                for peer in self.prioritized_peers.read().iter() {
-                    let sender_bucket_list = self.peer_to_sender_buckets.entry(*peer).or_default();
-                    if let std::collections::hash_map::Entry::Vacant(e) =
-                        sender_bucket_list.entry(bucket_index)
-                    {
-                        e.insert(BroadcastPeerPriority::Failover);
-                        break;
+            // Assign sender buckets with Failover priority. Use Round Robin.
+            peer_index = 0;
+            for _ in 0..self.mempool_config.default_failovers {
+                for bucket_index in 0..self.mempool_config.num_sender_buckets {
+                    // Find the first peer that already doesn't have the sender bucket, and add the bucket
+                    for _ in 0..self.prioritized_peers.read().len() {
+                        let peer = self.prioritized_peers.read()[peer_index];
+                        let sender_bucket_list =
+                            self.peer_to_sender_buckets.entry(peer).or_default();
+                        if let std::collections::hash_map::Entry::Vacant(e) =
+                            sender_bucket_list.entry(bucket_index)
+                        {
+                            e.insert(BroadcastPeerPriority::Failover);
+                            break;
+                        }
+                        peer_index = (peer_index + 1) % self.prioritized_peers.read().len();
                     }
                 }
             }
