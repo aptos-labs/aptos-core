@@ -4348,7 +4348,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             struct_name_display, variant_name_display
                         )
                     },
-                    if variant.is_some() {"struct variant"} else {"struct"},
+                    if variant.is_some() {
+                        "struct variant"
+                    } else {
+                        "struct"
+                    },
                     struct_name_display
                 ),
             );
