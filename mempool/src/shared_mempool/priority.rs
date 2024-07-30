@@ -712,6 +712,146 @@ mod test {
         }
     }
 
+    fn prioritized_peer_state_well_formed(
+        prioritized_peers_state: &PrioritizedPeersState,
+        num_sender_buckets: u8,
+    ) {
+        // There is exists a peer with primary priority for each bucket
+        for bucket in 0..num_sender_buckets {
+            assert!(prioritized_peers_state.peer_to_sender_buckets.iter().any(
+                |(_, sender_buckets)| {
+                    sender_buckets.contains_key(&bucket)
+                        && sender_buckets.get(&bucket).unwrap() == &BroadcastPeerPriority::Primary
+                }
+            ));
+        }
+
+        // There is exists a peer with failover priority for each bucket
+        for bucket in 0..num_sender_buckets {
+            assert!(prioritized_peers_state.peer_to_sender_buckets.iter().any(
+                |(_, sender_buckets)| {
+                    sender_buckets.contains_key(&bucket)
+                        && sender_buckets.get(&bucket).unwrap() == &BroadcastPeerPriority::Failover
+                }
+            ));
+        }
+    }
+
+    fn all_sender_buckets_assigned_to_vfn_network(
+        prioritized_peers_state: &PrioritizedPeersState,
+        num_sender_buckets: u8,
+    ) {
+        for bucket in 0..num_sender_buckets {
+            assert!(prioritized_peers_state.peer_to_sender_buckets.iter().any(
+                |(peer, sender_buckets)| {
+                    peer.network_id() == NetworkId::Vfn
+                        && sender_buckets.contains_key(&bucket)
+                        && sender_buckets.get(&bucket).unwrap() == &BroadcastPeerPriority::Primary
+                }
+            ));
+        }
+    }
+
+    #[test]
+    fn test_all_sender_buckets_assigned_for_vfns() {
+        let mempool_config = MempoolConfig::default();
+        let mut prioritized_peers_state = PrioritizedPeersState::new(
+            mempool_config.clone(),
+            NodeType::ValidatorFullnode,
+            TimeService::mock(),
+        );
+
+        let peer_metadata_1 = create_metadata_with_distance_and_latency(1, 0.5);
+        let peer_1 = (create_public_peer(), Some(&peer_metadata_1));
+
+        let peer_metadata_2 = create_metadata_with_distance_and_latency(1, 0.31);
+        let peer_2 = (create_vfn_peer(), Some(&peer_metadata_2));
+
+        // let peer_metadata_3 = create_metadata_with_distance_and_latency(1, 0.5);
+        let peer_3 = (create_public_peer(), None);
+
+        let peer_metadata_4 = create_metadata_with_distance_and_latency(1, 0.22);
+        let peer_4 = (create_public_peer(), Some(&peer_metadata_4));
+
+        let all_peers = vec![peer_1, peer_2, peer_3, peer_4];
+        prioritized_peers_state.update_prioritized_peers(all_peers, 5000);
+        assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
+        prioritized_peer_state_well_formed(
+            &prioritized_peers_state,
+            mempool_config.num_sender_buckets,
+        );
+        all_sender_buckets_assigned_to_vfn_network(
+            &prioritized_peers_state,
+            mempool_config.num_sender_buckets,
+        );
+
+        let all_peers = vec![peer_1, peer_2, peer_4];
+        prioritized_peers_state.update_prioritized_peers(all_peers, 3000);
+        assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
+        prioritized_peer_state_well_formed(
+            &prioritized_peers_state,
+            mempool_config.num_sender_buckets,
+        );
+        all_sender_buckets_assigned_to_vfn_network(
+            &prioritized_peers_state,
+            mempool_config.num_sender_buckets,
+        );
+
+        let all_peers = vec![peer_3, peer_1];
+        prioritized_peers_state.update_prioritized_peers(all_peers, 0);
+        assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
+        prioritized_peer_state_well_formed(
+            &prioritized_peers_state,
+            mempool_config.num_sender_buckets,
+        );
+    }
+
+    #[test]
+    fn test_all_sender_buckets_assigned_for_pfns() {
+        let mempool_config = MempoolConfig::default();
+        let mut prioritized_peers_state = PrioritizedPeersState::new(
+            mempool_config.clone(),
+            NodeType::PublicFullnode,
+            TimeService::mock(),
+        );
+
+        let peer_metadata_1 = create_metadata_with_distance_and_latency(1, 0.5);
+        let peer_1 = (create_public_peer(), Some(&peer_metadata_1));
+
+        let peer_metadata_2 = create_metadata_with_distance_and_latency(1, 0.31);
+        let peer_2 = (create_vfn_peer(), Some(&peer_metadata_2));
+
+        // let peer_metadata_3 = create_metadata_with_distance_and_latency(1, 0.5);
+        let peer_3 = (create_public_peer(), None);
+
+        let peer_metadata_4 = create_metadata_with_distance_and_latency(1, 0.22);
+        let peer_4 = (create_public_peer(), Some(&peer_metadata_4));
+
+        let all_peers = vec![peer_1, peer_2, peer_3, peer_4];
+        prioritized_peers_state.update_prioritized_peers(all_peers, 5000);
+        assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
+        prioritized_peer_state_well_formed(
+            &prioritized_peers_state,
+            mempool_config.num_sender_buckets,
+        );
+
+        let all_peers = vec![peer_1, peer_2, peer_4];
+        prioritized_peers_state.update_prioritized_peers(all_peers, 3000);
+        assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
+        prioritized_peer_state_well_formed(
+            &prioritized_peers_state,
+            mempool_config.num_sender_buckets,
+        );
+
+        let all_peers = vec![peer_3, peer_1];
+        prioritized_peers_state.update_prioritized_peers(all_peers, 0);
+        assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
+        prioritized_peer_state_well_formed(
+            &prioritized_peers_state,
+            mempool_config.num_sender_buckets,
+        );
+    }
+
     #[test]
     fn test_ready_for_update_intelligent() {
         // Create a mempool configuration with intelligent peer prioritization enabled
