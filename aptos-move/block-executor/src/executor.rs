@@ -826,7 +826,8 @@ where
         };
 
         let mut commit_time = Duration::from_secs(0);
-        let mut time_outside_commit = Duration::from_secs(0);
+        let mut fallback_time = Duration::from_secs(0);
+        let mut extra_time = Duration::from_secs(0);
 
         loop {
             let start = Instant::now();
@@ -852,6 +853,11 @@ where
                     };
                     scheduler.queueing_commits_mark_done();
                 }
+                let end = Instant::now();
+
+                commit_time += end - start;
+
+                let start3 = Instant::now();
 
                 if let Some(mut last_commit_idx) = last_commit_idx {
                     //need to process next task
@@ -880,11 +886,16 @@ where
                                 incarnation,
                                 validation_mode,
                             )?;
+                            let end3 = Instant::now();
+                            fallback_time += end3 - start3;
                             drain_commit_queue()?;
                             continue;
                         }
                     }
                 }
+
+                let end3 = Instant::now();
+                fallback_time += end3 - start3;
             }
 
             let end = Instant::now();
@@ -961,12 +972,12 @@ where
                 },
             };
             let end2 = Instant::now();
-            time_outside_commit += end2 - start2;
+            extra_time += end2 - start2;
         }
 
         println!(
-            "num_threads={}, thread_id={}, time in commit={:?}, time outside commit={:?}",
-            num_workers, worker_id, commit_time, time_outside_commit
+            "num_threads={}, thread_id={}, time in commit={:?}, time in fallback={:?}, time outside commit/fallback={:?}",
+            num_workers, worker_id, commit_time, fallback_time, extra_time
         );
         Ok(())
     }
