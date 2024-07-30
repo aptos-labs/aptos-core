@@ -7,7 +7,7 @@ use crate::{
     quorum_store::{
         batch_generator::BackPressure,
         counters,
-        utils::{BatchSortKey, ProofQueue},
+        utils::{BatchProofQueue, BatchSortKey},
     },
 };
 use aptos_consensus_types::{
@@ -128,8 +128,7 @@ impl BatchQueue {
 }
 
 pub struct ProofManager {
-    proofs_for_consensus: ProofQueue,
-    batch_queue: BatchQueue,
+    batch_proof_queue: BatchProofQueue,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
@@ -148,8 +147,7 @@ impl ProofManager {
         enable_opt_quorum_store: bool,
     ) -> Self {
         Self {
-            proofs_for_consensus: ProofQueue::new(my_peer_id),
-            batch_queue: BatchQueue::new(batch_store),
+            batch_proof_queue: BatchProofQueue::new(my_peer_id, batch_store),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -161,26 +159,17 @@ impl ProofManager {
 
     pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
         for proof in proofs.into_iter() {
-            self.batch_queue.remove_batch(proof.info());
-            self.proofs_for_consensus.push(proof);
+            self.batch_proof_queue.insert_proof(proof);
         }
         (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.proofs_for_consensus.remaining_txns_and_proofs();
+            self.batch_proof_queue.remaining_txns_and_proofs();
     }
 
     pub(crate) fn receive_batches(
         &mut self,
         batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
-        if self.allow_batches_without_pos_in_proposal {
-            let batches = batch_summaries
-                .iter()
-                .map(|(batch_info, _)| batch_info.clone())
-                .collect();
-            self.batch_queue.add_batches(batches);
-        }
-        self.proofs_for_consensus
-            .add_batch_summaries(batch_summaries);
+        self.batch_proof_queue.insert_batches(batch_summaries);
     }
 
     pub(crate) fn handle_commit_notification(
@@ -192,15 +181,11 @@ impl ProofManager {
             "QS: got clean request from execution at block timestamp {}",
             block_timestamp
         );
-        self.batch_queue.remove_expired_batches();
-        for batch in &batches {
-            self.batch_queue.remove_batch(batch);
-        }
-        self.proofs_for_consensus.mark_committed(batches);
-        self.proofs_for_consensus
+        self.batch_proof_queue.mark_committed(batches);
+        self.batch_proof_queue
             .handle_updated_block_timestamp(block_timestamp);
         (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.proofs_for_consensus.remaining_txns_and_proofs();
+            self.batch_proof_queue.remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
@@ -223,7 +208,7 @@ impl ProofManager {
                     txns_with_proof_size,
                     cur_unique_txns,
                     proof_queue_fully_utilized,
-                ) = self.proofs_for_consensus.pull_proofs(
+                ) = self.batch_proof_queue.pull_proofs(
                     &excluded_batches,
                     max_txns_with_proof,
                     request.max_unique_txns,
@@ -231,26 +216,24 @@ impl ProofManager {
                     request.block_timestamp,
                 );
 
-                counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
+                counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
+                    .observe(self.batch_proof_queue.num_batches_without_proof() as f64);
                 counters::PROOF_QUEUE_FULLY_UTILIZED
                     .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
-
-                let excluded_batches: Vec<_> = excluded_batches.iter().cloned().collect();
 
                 let (opt_batches, opt_batch_txns_size) = if self.enable_opt_quorum_store {
                     // TODO(ibalajiarun): Support unique txn calculation
                     let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
-                    let (opt_batches, size) = self
-                        .batch_queue
-                        .pull_batches(max_opt_batch_txns_size, excluded_batches.clone());
+                    let (opt_batches, opt_payload_size, opt_unique_txns) =
+                        self.batch_proof_queue.pull_batches(
+                            &excluded_batches,
+                            max_opt_batch_txns_size,
+                            request.max_unique_txns,
+                            request.return_non_full,
+                            request.block_timestamp,
+                        );
 
-                    (
-                        opt_batches
-                            .into_iter()
-                            .map(|(batch_info, _)| batch_info)
-                            .collect(),
-                        size,
-                    )
+                    (opt_batches, opt_payload_size)
                 } else {
                     (Vec::new(), PayloadTxnsSize::zero())
                 };
@@ -266,14 +249,19 @@ impl ProofManager {
                             max_inline_txns_to_pull.count,
                             request.max_unique_txns.saturating_sub(cur_unique_txns),
                         );
-                        self.batch_queue.pull_batches(
-                            max_inline_txns_to_pull,
-                            excluded_batches
-                                .iter()
-                                .cloned()
-                                .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                                .collect(),
-                        )
+                        let (inline_batches, inline_payload_size, opt_unique_txns) =
+                            self.batch_proof_queue.pull_batches_with_transactions(
+                                &excluded_batches
+                                    .iter()
+                                    .cloned()
+                                    .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                                    .collect(),
+                                max_inline_txns_to_pull,
+                                request.max_unique_txns,
+                                request.return_non_full,
+                                request.block_timestamp,
+                            );
+                        (inline_batches, inline_payload_size)
                     } else {
                         (Vec::new(), PayloadTxnsSize::zero())
                     };
