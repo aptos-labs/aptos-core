@@ -1,18 +1,36 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! This module contains setup for basic block peephole optimizers.
+
 use move_binary_format::file_format::Bytecode;
 use std::mem;
 
+/// A basic block optimizer that optimizes a basic block of bytecode.
 pub trait BasicBlockOptimizer {
+    /// Given a basic `block`, return its optimized version.
     fn optimize(&self, block: &[Bytecode]) -> Vec<Bytecode>;
 }
 
+/// An optimizer for a fixed window of bytecode.
+/// The fixed window can be assumed to be within a basic block.
+pub trait FixedWindowOptimizer {
+    /// The fixed window size for this optimizer.
+    fn fixed_window_size(&self) -> usize;
+
+    /// Given a fixed `window` of bytecode of size `self.fixed_window_size()`, 
+    /// optionally return its optimized version.
+    /// If `None` is returned, the `window` is not optimized.
+    fn optimize_fixed_window(&self, window: &[Bytecode]) -> Option<Vec<Bytecode>>;
+}
+
+/// A processor to perform fixed window optimizations of a particular style on a basic block.
 pub struct FixedWindowProcessor<T: FixedWindowOptimizer>(T);
 
 impl<T: FixedWindowOptimizer> BasicBlockOptimizer for FixedWindowProcessor<T> {
     fn optimize(&self, block: &[Bytecode]) -> Vec<Bytecode> {
         let mut old_block = block.to_vec();
+        // Run single passes until code stops changing.
         while let Some(mut new_block) = self.optimize_single_pass(&old_block) {
             old_block = mem::take(&mut new_block);
         }
@@ -21,10 +39,13 @@ impl<T: FixedWindowOptimizer> BasicBlockOptimizer for FixedWindowProcessor<T> {
 }
 
 impl<T: FixedWindowOptimizer> FixedWindowProcessor<T> {
+    /// Create a new `FixedWindowProcessor` with the given `optimizer`.
     pub fn new(optimizer: T) -> Self {
         Self(optimizer)
     }
 
+    /// Run a single pass of fixed window peephole optimization on the given basic `block`.
+    /// If the block cannot be optimized further, return `None`.
     fn optimize_single_pass(&self, block: &[Bytecode]) -> Option<Vec<Bytecode>> {
         let window_size = self.0.fixed_window_size();
         let mut changed = false;
@@ -53,10 +74,4 @@ impl<T: FixedWindowOptimizer> FixedWindowProcessor<T> {
             None
         }
     }
-}
-
-pub trait FixedWindowOptimizer {
-    fn fixed_window_size(&self) -> usize;
-
-    fn optimize_fixed_window(&self, window: &[Bytecode]) -> Option<Vec<Bytecode>>;
 }
