@@ -861,6 +861,7 @@ pub enum TransactionPayload {
     ModuleBundlePayload(DeprecatedModuleBundlePayload),
 
     MultisigPayload(MultisigPayload),
+    IntentPayload(IntentPayload),
 }
 
 impl VerifyInput for TransactionPayload {
@@ -869,6 +870,7 @@ impl VerifyInput for TransactionPayload {
             TransactionPayload::EntryFunctionPayload(inner) => inner.verify(),
             TransactionPayload::ScriptPayload(inner) => inner.verify(),
             TransactionPayload::MultisigPayload(inner) => inner.verify(),
+            TransactionPayload::IntentPayload(inner) => inner.verify(),
 
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
@@ -893,11 +895,26 @@ pub struct EntryFunctionPayload {
     pub arguments: Vec<serde_json::Value>,
 }
 
+/// Payload which generated from a batched intents.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct IntentPayload {
+    pub intent_calls: Vec<EntryFunctionPayload>,
+}
+
 impl VerifyInput for EntryFunctionPayload {
     fn verify(&self) -> anyhow::Result<()> {
         self.function.verify()?;
         for type_arg in self.type_arguments.iter() {
             type_arg.verify(0)?;
+        }
+        Ok(())
+    }
+}
+
+impl VerifyInput for IntentPayload {
+    fn verify(&self) -> anyhow::Result<()> {
+        for call in &self.intent_calls {
+            call.verify()?;
         }
         Ok(())
     }

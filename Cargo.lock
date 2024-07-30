@@ -532,6 +532,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-framework",
+ "aptos-intent",
  "aptos-logger",
  "aptos-openapi",
  "aptos-resource-viewer",

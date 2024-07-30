@@ -53,3 +53,9 @@ pub struct BatchedFunctionCall {
     ty_args: Vec<TypeTag>,
     args: Vec<BatchArgument>,
 }
+
+impl BatchedFunctionCall {
+    pub fn into_inner(self) -> (ModuleId, Identifier, Vec<TypeTag>, Vec<BatchArgument>) {
+        (self.module, self.function, self.ty_args, self.args)
+    }
+}
