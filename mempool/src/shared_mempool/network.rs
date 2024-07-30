@@ -118,7 +118,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         mempool_config: MempoolConfig,
     ) -> MempoolNetworkInterface<NetworkClient> {
         let prioritized_peers_state =
-            PrioritizedPeersState::new(mempool_config.clone(), TimeService::real());
+            PrioritizedPeersState::new(mempool_config.clone(), node_type, TimeService::real());
         info!("mempool network interface created {:?}", node_type);
         Self {
             network_client,

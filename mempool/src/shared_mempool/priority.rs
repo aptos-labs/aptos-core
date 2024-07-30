@@ -4,7 +4,7 @@
 use super::types::MempoolSenderBucket;
 use crate::{counters, network::BroadcastPeerPriority};
 use aptos_config::{
-    config::MempoolConfig,
+    config::{MempoolConfig, NodeType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
@@ -142,10 +142,17 @@ pub struct PrioritizedPeersState {
 
     // The time service used to fetch timestamps
     time_service: TimeService,
+
+    // The type of node (Validator, ValidatorFullNode, PublicFullnode)
+    node_type: NodeType,
 }
 
 impl PrioritizedPeersState {
-    pub fn new(mempool_config: MempoolConfig, time_service: TimeService) -> Self {
+    pub fn new(
+        mempool_config: MempoolConfig,
+        node_type: NodeType,
+        time_service: TimeService,
+    ) -> Self {
         Self {
             mempool_config,
             prioritized_peers: Arc::new(RwLock::new(Vec::new())),
@@ -154,6 +161,7 @@ impl PrioritizedPeersState {
             last_peer_priority_update: None,
             time_service,
             peer_to_sender_buckets: HashMap::new(),
+            node_type,
         }
     }
 
@@ -235,67 +243,100 @@ impl PrioritizedPeersState {
             .collect()
     }
 
-    pub fn update_sender_bucket_for_peers(
+    fn update_sender_bucket_for_peers(
         &mut self,
         peer_monitoring_data: &HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>>,
     ) {
+        // TODO: If the top peer set didn't change, then don't change the Primary seender bucket assignment.
+        // TODO: Do load balancing only if the traffic is high
+        // TODO: Use a config parameter instead of 30ms
+
+        assert!(self.prioritized_peers.read().len() == peer_monitoring_data.len());
         let old_peer_to_sender_buckets = self.peer_to_sender_buckets.clone();
 
-        self.peer_to_sender_buckets = HashMap::new();
-        if !self.prioritized_peers.read().is_empty() {
-            let mut peer_index = 0;
+        // Obtain the top peers to assign the sender buckets with Primary priority
+        let mut top_peers = vec![];
+        let num_top_peers = self.mempool_config.num_sender_buckets;
+
+        if self.node_type.is_validator_fullnode() {
+            // Use the peer on the VFN network with lowest ping latency as the primary peer
+            let peers_in_vfn_network = self
+                .prioritized_peers
+                .read()
+                .iter()
+                .cloned()
+                .filter(|peer| peer.network_id() == NetworkId::Vfn)
+                .collect::<Vec<_>>();
+
+            if !peers_in_vfn_network.is_empty() {
+                top_peers = vec![peers_in_vfn_network[0]];
+            }
+        }
+
+        if top_peers.is_empty() {
             let base_ping_latency = self.prioritized_peers.read().first().and_then(|peer| {
                 peer_monitoring_data
                     .get(peer)
                     .and_then(|metadata| get_peer_ping_latency(metadata))
             });
+
+            // Extract top peers with ping latency less than base_ping_latency + 30 ms
+            for peer in self.prioritized_peers.read().iter() {
+                if top_peers.len() >= num_top_peers as usize {
+                    break;
+                }
+
+                let ping_latency = peer_monitoring_data
+                    .get(peer)
+                    .and_then(|metadata| get_peer_ping_latency(metadata));
+
+                if base_ping_latency.is_none()
+                    || ping_latency.is_none()
+                    || ping_latency.unwrap() < base_ping_latency.unwrap() + 0.030
+                {
+                    top_peers.push(*peer);
+                }
+            }
+        }
+        info!(
+            "Identified top peers: {:?}, node_type: {:?}",
+            top_peers, self.node_type
+        );
+
+        assert!(top_peers.len() <= num_top_peers as usize);
+        // Top peers shouldn't be empty if prioritized_peers is not zero
+        assert!(self.prioritized_peers.read().is_empty() || !top_peers.is_empty());
+
+        // Assign sender buckets with Primary priority
+        self.peer_to_sender_buckets = HashMap::new();
+        if !self.prioritized_peers.read().is_empty() {
+            let mut peer_index = 0;
             for bucket_index in 0..self.mempool_config.num_sender_buckets {
                 self.peer_to_sender_buckets
-                    .entry(*self.prioritized_peers.read().get(peer_index).unwrap())
+                    .entry(*top_peers.get(peer_index).unwrap())
                     .or_default()
                     .insert(bucket_index, BroadcastPeerPriority::Primary);
+                peer_index = (peer_index + 1) % top_peers.len();
+            }
+        }
 
-                // Get the next peer_id with ping latency less than base_ping_latency + 30 ms
-                loop {
-                    peer_index = (peer_index + 1) % self.prioritized_peers.read().len();
-
-                    let ping_latency =
-                        self.prioritized_peers
-                            .read()
-                            .get(peer_index)
-                            .and_then(|peer| {
-                                peer_monitoring_data
-                                    .get(peer)
-                                    .and_then(|metadata| get_peer_ping_latency(metadata))
-                            });
-
-                    if base_ping_latency.is_none()
-                        || ping_latency.is_none()
-                        || ping_latency.unwrap() < base_ping_latency.unwrap() + 0.030
+        // Assign sender buckets with Failover priority. Use Round Robin.
+        for _ in 0..self.mempool_config.default_failovers {
+            for bucket_index in 0..self.mempool_config.num_sender_buckets {
+                // Find the first peer that already doesn't have the sender bucket, and add the bucket
+                for peer in self.prioritized_peers.read().iter() {
+                    let sender_bucket_list = self.peer_to_sender_buckets.entry(*peer).or_default();
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        sender_bucket_list.entry(bucket_index)
                     {
+                        e.insert(BroadcastPeerPriority::Failover);
                         break;
                     }
                 }
             }
-
-            for _ in 0..self.mempool_config.default_failovers {
-                for bucket_index in 0..self.mempool_config.num_sender_buckets {
-                    // Find the first peer that already doesn't have the sender bucket, and add the bucket
-                    for peer in self.prioritized_peers.read().iter() {
-                        let sender_bucket_list =
-                            self.peer_to_sender_buckets.entry(*peer).or_default();
-                        if let std::collections::hash_map::Entry::Vacant(e) =
-                            sender_bucket_list.entry(bucket_index)
-                        {
-                            e.insert(BroadcastPeerPriority::Failover);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            info!("Old peer to sender buckets: {:?}, New peer to sender buckets: {:?}, Peer monitoring data {:?}", old_peer_to_sender_buckets, self.peer_to_sender_buckets, peer_monitoring_data);
         }
+
+        info!("Old peer to sender buckets: {:?}, New peer to sender buckets: {:?}, Peer monitoring data {:?}", old_peer_to_sender_buckets, self.peer_to_sender_buckets, peer_monitoring_data);
     }
 
     /// Updates the prioritized peers list
@@ -449,7 +490,7 @@ fn compare_validator_distance(
 mod test {
     use super::*;
     use aptos_config::{
-        config::MempoolConfig,
+        config::{MempoolConfig, NodeType},
         network_id::{NetworkId, PeerNetworkId},
     };
     use aptos_peer_monitoring_service_types::{
@@ -605,8 +646,11 @@ mod test {
     #[test]
     fn test_get_peer_priority() {
         // Create a prioritized peer state
-        let prioritized_peers_state =
-            PrioritizedPeersState::new(MempoolConfig::default(), TimeService::mock());
+        let prioritized_peers_state = PrioritizedPeersState::new(
+            MempoolConfig::default(),
+            NodeType::PublicFullnode,
+            TimeService::mock(),
+        );
 
         // Create a list of peers
         let validator_peer = create_validator_peer();
@@ -641,8 +685,11 @@ mod test {
 
         // Create a prioritized peer state
         let time_service = TimeService::mock();
-        let mut prioritized_peers_state =
-            PrioritizedPeersState::new(mempool_config.clone(), time_service.clone());
+        let mut prioritized_peers_state = PrioritizedPeersState::new(
+            mempool_config.clone(),
+            NodeType::PublicFullnode,
+            time_service.clone(),
+        );
 
         // Verify that the prioritized peers should be updated (no prior update time)
         let peers_changed = false;
@@ -688,8 +735,11 @@ mod test {
 
         // Create a prioritized peers state
         let time_service = TimeService::mock();
-        let prioritized_peers_state =
-            PrioritizedPeersState::new(mempool_config.clone(), time_service.clone());
+        let prioritized_peers_state = PrioritizedPeersState::new(
+            mempool_config.clone(),
+            NodeType::PublicFullnode,
+            time_service.clone(),
+        );
 
         // Verify that the prioritized peers is updated when the peers change
         for _ in 0..10 {
@@ -720,8 +770,11 @@ mod test {
         };
 
         // Create a prioritized peer state
-        let prioritized_peers_state =
-            PrioritizedPeersState::new(mempool_config, TimeService::mock());
+        let prioritized_peers_state = PrioritizedPeersState::new(
+            mempool_config,
+            NodeType::PublicFullnode,
+            TimeService::mock(),
+        );
 
         // Create a list of peers (without metadata)
         let validator_peer = (create_validator_peer(), None);
@@ -799,8 +852,11 @@ mod test {
         };
 
         // Create a prioritized peer state
-        let prioritized_peers_state =
-            PrioritizedPeersState::new(mempool_config, TimeService::mock());
+        let prioritized_peers_state = PrioritizedPeersState::new(
+            mempool_config,
+            NodeType::PublicFullnode,
+            TimeService::mock(),
+        );
 
         // Create a list of peers (without metadata)
         let validator_peer = (create_validator_peer(), None);
@@ -838,8 +894,11 @@ mod test {
 
         // Create a prioritized peer state
         let time_service = TimeService::mock();
-        let mut prioritized_peers_state =
-            PrioritizedPeersState::new(mempool_config, time_service.clone());
+        let mut prioritized_peers_state = PrioritizedPeersState::new(
+            mempool_config,
+            NodeType::PublicFullnode,
+            time_service.clone(),
+        );
 
         // Verify that the last peer priority update time is not set
         assert!(prioritized_peers_state.last_peer_priority_update.is_none());
@@ -917,8 +976,11 @@ mod test {
 
         // Create a prioritized peer state
         let time_service = TimeService::mock();
-        let mut prioritized_peers_state =
-            PrioritizedPeersState::new(mempool_config, time_service.clone());
+        let mut prioritized_peers_state = PrioritizedPeersState::new(
+            mempool_config,
+            NodeType::PublicFullnode,
+            time_service.clone(),
+        );
 
         // Create a list of peers with different network IDs
         let validator_peer = (create_validator_peer(), None);
