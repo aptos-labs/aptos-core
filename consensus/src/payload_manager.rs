@@ -45,6 +45,11 @@ pub trait TPayloadManager: Send + Sync {
     /// available when block is executed.
     fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
 
+    /// Check if the transactions corresponding are available. This is specific to payload
+    /// manager implementations. For optimistic quorum store, we only check if optimistic
+    /// batches are available locally.
+    fn check_payload_availability(&self, block: &Block) -> bool;
+
     /// Get the transactions in a block's payload. This function returns a vector of transactions.
     async fn get_transactions(
         &self,
@@ -66,6 +71,10 @@ impl TPayloadManager for DirectMempoolPayloadManager {
     fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
 
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+
+    fn check_payload_availability(&self, _block: &Block) -> bool {
+        true
+    }
 
     async fn get_transactions(
         &self,
@@ -273,6 +282,29 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 )
             },
         };
+    }
+
+    fn check_payload_availability(&self, block: &Block) -> bool {
+        let Some(payload) = block.payload() else {
+            return true;
+        };
+
+        match payload {
+            Payload::DirectMempool(_) => {
+                unreachable!("QuorumStore doesn't support DirectMempool payload")
+            },
+            Payload::InQuorumStore(_) => true,
+            Payload::InQuorumStoreWithLimit(_) => true,
+            Payload::QuorumStoreInlineHybrid(_, _, _) => true,
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                for batch in opt_qs_payload.opt_batches().deref() {
+                    if self.batch_reader.exists(batch.digest()).is_none() {
+                        return false;
+                    }
+                }
+                true
+            },
+        }
     }
 
     async fn get_transactions(
@@ -633,6 +665,10 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
 
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {
         // noop
+    }
+
+    fn check_payload_availability(&self, _block: &Block) -> bool {
+        unreachable!("this method isn't used in ConsensusObserver")
     }
 
     async fn get_transactions(

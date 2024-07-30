@@ -1162,3 +1162,12 @@ pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_proposal_payload_availability",
+        "The availability of proposal payload locally",
+        &["status"]
+    )
+    .unwrap()
+});
