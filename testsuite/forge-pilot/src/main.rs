@@ -11,6 +11,18 @@ struct Args {
 
     #[clap(short, long, group = "config")]
     gcs_path: Option<String>,
+
+    #[command(flatten)]
+    genesis: GenesisArgs,
+}
+
+#[derive(Parser, Debug)]
+struct GenesisArgs {
+    #[clap(short, long, group = "genesis")]
+    from_file: bool,
+
+    #[clap(short, long, group = "genesis")]
+    docker_image: Option<String>,
 }
 
 fn main() {
