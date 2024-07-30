@@ -138,6 +138,11 @@ BatchPayload:
     - txns:
         SEQ:
           TYPENAME: SignedTransaction
+BatchPointer:
+  STRUCT:
+    - batch_summary:
+        SEQ:
+          TYPENAME: BatchInfo
 BatchRequest:
   STRUCT:
     - epoch: U64
@@ -546,6 +551,17 @@ IdCommitment:
   NEWTYPESTRUCT: BYTES
 Identifier:
   NEWTYPESTRUCT: STR
+InlineBatch:
+  STRUCT:
+    - batch_info:
+        TYPENAME: BatchInfo
+    - transactions:
+        SEQ:
+          TYPENAME: SignedTransaction
+InlineBatches:
+  NEWTYPESTRUCT:
+    SEQ:
+      TYPENAME: InlineBatch
 JWKMoveStruct:
   STRUCT:
     - variant:
@@ -631,6 +647,22 @@ OpenIdSig:
         TYPENAME: Pepper
     - idc_aud_val:
         OPTION: STR
+OptQuorumStorePayload:
+  ENUM:
+    0:
+      V1:
+        NEWTYPE:
+          TYPENAME: OptQuorumStorePayloadV1
+OptQuorumStorePayloadV1:
+  STRUCT:
+    - inline_batches:
+        TYPENAME: InlineBatches
+    - opt_batches:
+        TYPENAME: BatchPointer
+    - proofs:
+        TYPENAME: BatchPointer
+    - execution_limits:
+        TYPENAME: PayloadExecutionLimit
 OrderVote:
   STRUCT:
     - author:
@@ -676,6 +708,17 @@ Payload:
                     TYPENAME: SignedTransaction
           - TYPENAME: ProofWithData
           - OPTION: U64
+    4:
+      OptQuorumStore:
+        NEWTYPE:
+          TYPENAME: OptQuorumStorePayload
+PayloadExecutionLimit:
+  ENUM:
+    0:
+      None: UNIT
+    1:
+      MaxTransactionsToExecute:
+        NEWTYPE: U64
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -937,6 +980,9 @@ TransactionArgument:
           TUPLEARRAY:
             CONTENT: U8
             SIZE: 32
+    9:
+      Serialized:
+        NEWTYPE: BYTES
 TransactionAuthenticator:
   ENUM:
     0:

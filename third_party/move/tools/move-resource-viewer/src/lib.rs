@@ -6,11 +6,12 @@ use crate::fat_type::{FatStructType, FatType, WrappedAbilitySet};
 use anyhow::{anyhow, bail};
 pub use limit::Limiter;
 use move_binary_format::{
-    access::ModuleAccess,
+    access::{ModuleAccess, ScriptAccess},
+    binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError},
     file_format::{
-        Ability, AbilitySet, SignatureToken, StructDefinitionIndex, StructFieldInformation,
-        StructHandleIndex,
+        Ability, AbilitySet, CompiledScript, SignatureToken, StructDefinitionIndex,
+        StructFieldInformation, StructHandleIndex,
     },
     views::FunctionHandleView,
     CompiledModule,
@@ -20,6 +21,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    transaction_argument::{convert_txn_args, TransactionArgument},
     u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
@@ -115,6 +117,27 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         }
     }
 
+    pub fn view_script_arguments(
+        &self,
+        script_bytes: &[u8],
+        args: &[TransactionArgument],
+        ty_args: &[TypeTag],
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        let mut limit = Limiter::default();
+        let compiled_script = CompiledScript::deserialize(script_bytes)
+            .map_err(|err| anyhow!("Failed to deserialzie script: {:?}", err))?;
+        let param_tys = compiled_script
+            .signature_at(compiled_script.parameters)
+            .0
+            .iter()
+            .map(|tok| {
+                self.resolve_signature(BinaryIndexedView::Script(&compiled_script), tok, &mut limit)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let args_bytes = convert_txn_args(args);
+        self.view_arguments_impl(&param_tys, ty_args, &args_bytes, &mut limit)
+    }
+
     pub fn view_function_arguments(
         &self,
         module: &ModuleId,
@@ -123,9 +146,19 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         args: &[Vec<u8>],
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
         let mut limit = Limiter::default();
-        let types: Vec<FatType> = self
-            .resolve_function_arguments(module, function)?
-            .into_iter()
+        let param_tys = self.resolve_function_arguments(module, function, &mut limit)?;
+        self.view_arguments_impl(&param_tys, ty_args, args, &mut limit)
+    }
+
+    fn view_arguments_impl(
+        &self,
+        param_tys: &[FatType],
+        ty_args: &[TypeTag],
+        args: &[Vec<u8>],
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        let types: Vec<&FatType> = param_tys
+            .iter()
             .filter(|t| match t {
                 FatType::Signer => false,
                 FatType::Reference(inner) => !matches!(&**inner, FatType::Signer),
@@ -157,11 +190,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             .iter()
             .enumerate()
             .map(|(i, ty)| {
-                ty.subst(&ty_args, &mut limit)
+                ty.subst(&ty_args, limit)
                     .map_err(anyhow::Error::from)
-                    .and_then(|fat_type| {
-                        self.view_value_by_fat_type(&fat_type, &args[i], &mut limit)
-                    })
+                    .and_then(|fat_type| self.view_value_by_fat_type(&fat_type, &args[i], limit))
             })
             .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
     }
@@ -170,8 +201,8 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         module: &ModuleId,
         function: &IdentStr,
+        limit: &mut Limiter,
     ) -> anyhow::Result<Vec<FatType>> {
-        let mut limit = Limiter::default();
         let m = self.view_existing_module(module)?;
         let m = m.borrow();
         for def in m.function_defs.iter() {
@@ -182,7 +213,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     .parameters()
                     .0
                     .iter()
-                    .map(|signature| self.resolve_signature(m, signature, &mut limit))
+                    .map(|signature| {
+                        self.resolve_signature(BinaryIndexedView::Module(m), signature, limit)
+                    })
                     .collect::<anyhow::Result<_>>();
             }
         }
@@ -281,18 +314,24 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 ty_args,
                 layout: defs
                     .iter()
-                    .map(|field_def| self.resolve_signature(module, &field_def.signature.0, limit))
+                    .map(|field_def| {
+                        self.resolve_signature(
+                            BinaryIndexedView::Module(module),
+                            &field_def.signature.0,
+                            limit,
+                        )
+                    })
                     .collect::<anyhow::Result<_>>()?,
             }),
-            StructFieldInformation::DeclaredVariants(..) => Err(anyhow!(
-                "Struct variants not yet supported by resource viewer"
-            )),
+            StructFieldInformation::DeclaredVariants(..) => {
+                Err(anyhow!("Enum types not yet supported by resource viewer"))
+            },
         }
     }
 
     fn resolve_signature(
         &self,
-        module: &CompiledModule,
+        module: BinaryIndexedView,
         sig: &SignatureToken,
         limit: &mut Limiter,
     ) -> anyhow::Result<FatType> {
@@ -335,7 +374,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
 
     fn resolve_struct_handle(
         &self,
-        module: &CompiledModule,
+        module: BinaryIndexedView,
         idx: StructHandleIndex,
         limit: &mut Limiter,
     ) -> anyhow::Result<FatStructType> {
@@ -428,9 +467,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 .iter()
                 .map(|field_def| module.identifier_at(field_def.name).to_owned())
                 .collect()),
-            StructFieldInformation::DeclaredVariants(..) => Err(anyhow!(
-                "Struct variants not yet supported by resource viewer"
-            )),
+            StructFieldInformation::DeclaredVariants(..) => {
+                Err(anyhow!("Enum types not yet supported by resource viewer"))
+            },
         }
     }
 

@@ -68,7 +68,6 @@ struct SimpleVMTestAdapter<'a> {
 #[derive(Debug, Parser)]
 pub struct AdapterPublishArgs {
     #[clap(long)]
-    /// is skip the struct_and_pub_function_linking compatibility check
     pub skip_check_struct_and_pub_function_linking: bool,
     #[clap(long)]
     /// is skip the struct_layout compatibility check
@@ -209,12 +208,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let sender = *id.address();
         let verbose = extra_args.verbose;
         let result = self.perform_session_action(gas_budget, |session, gas_status| {
-            let compat = Compatibility::new(
-                !extra_args.skip_check_struct_and_pub_function_linking,
-                !extra_args.skip_check_struct_layout,
-                !extra_args.skip_check_friend_linking,
-            );
-
+            let compat = if extra_args.skip_check_struct_and_pub_function_linking {
+                Compatibility::no_check()
+            } else {
+                Compatibility::new(
+                    !extra_args.skip_check_struct_layout,
+                    !extra_args.skip_check_friend_linking,
+                )
+            };
             session.publish_module_bundle_with_compat_config(
                 vec![module_bytes],
                 sender,

@@ -545,7 +545,7 @@ impl fmt::Display for PartialVMError {
         }
 
         if let Some(msg) = &self.0.message {
-            status = format!("{} and message {}", status, msg);
+            status = format!("{} and message '{}'", status, msg);
         }
 
         for (kind, index) in &self.0.indices {

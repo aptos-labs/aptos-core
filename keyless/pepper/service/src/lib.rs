@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
     account_managers::ACCOUNT_MANAGERS,
     vuf_keys::VUF_SK,
     ProcessingFailure::{BadRequest, InternalError},
@@ -9,7 +10,9 @@ use crate::{
 use aptos_crypto::asymmetric_encryption::{
     elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption,
 };
+use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{
+    account_recovery_db::AccountRecoveryDbEntry,
     jwt::Claims,
     vuf::{
         self,
@@ -19,12 +22,13 @@ use aptos_keyless_pepper_common::{
     },
     PepperInput, PepperRequest, PepperResponse, SignatureResponse,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_types::{
     account_address::AccountAddress,
     keyless::{Configuration, IdCommitment, KeylessPublicKey, OpenIdSig},
     transaction::authenticator::{AnyPublicKey, AuthenticationKey, EphemeralPublicKey},
 };
+use firestore::{async_trait, paths};
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
@@ -32,6 +36,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 pub mod about;
+pub mod account_db;
 pub mod account_managers;
 pub mod jwk;
 pub mod metrics;
@@ -48,66 +53,81 @@ pub enum ProcessingFailure {
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/637'/0'/0'/0'";
 
-pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFailure> {
-    let session_id = Uuid::new_v4();
-    let PepperRequest {
-        jwt,
-        epk,
-        exp_date_secs,
-        epk_blinder,
-        uid_key,
-        derivation_path,
-    } = request;
-
-    let (_pepper_base, pepper, address) = process_common(
-        &session_id,
-        jwt,
-        epk,
-        exp_date_secs,
-        epk_blinder,
-        uid_key,
-        derivation_path,
-        false,
-        None,
-    )?;
-
-    Ok(PepperResponse {
-        pepper,
-        address: address.to_vec(),
-    })
+#[async_trait]
+pub trait HandlerTrait<REQ, RES>: Send + Sync {
+    async fn handle(&self, request: REQ) -> Result<RES, ProcessingFailure>;
 }
 
-pub fn process_signature_v0(
-    request: PepperRequest,
-) -> Result<SignatureResponse, ProcessingFailure> {
-    let session_id = Uuid::new_v4();
-    let PepperRequest {
-        jwt,
-        epk,
-        exp_date_secs,
-        epk_blinder,
-        uid_key,
-        derivation_path,
-    } = request;
+pub struct V0FetchHandler;
 
-    let (pepper_base, _pepper, _address) = process_common(
-        &session_id,
-        jwt,
-        epk,
-        exp_date_secs,
-        epk_blinder,
-        uid_key,
-        derivation_path,
-        false,
-        None,
-    )?;
+#[async_trait]
+impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
+    async fn handle(&self, request: PepperRequest) -> Result<PepperResponse, ProcessingFailure> {
+        let session_id = Uuid::new_v4();
+        let PepperRequest {
+            jwt,
+            epk,
+            exp_date_secs,
+            epk_blinder,
+            uid_key,
+            derivation_path,
+        } = request;
 
-    Ok(SignatureResponse {
-        signature: pepper_base,
-    })
+        let (_pepper_base, pepper, address) = process_common(
+            &session_id,
+            jwt,
+            epk,
+            exp_date_secs,
+            epk_blinder,
+            uid_key,
+            derivation_path,
+            false,
+            None,
+        )
+        .await?;
+
+        Ok(PepperResponse {
+            pepper,
+            address: address.to_vec(),
+        })
+    }
 }
 
-fn process_common(
+pub struct V0SignatureHandler;
+
+#[async_trait]
+impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
+    async fn handle(&self, request: PepperRequest) -> Result<SignatureResponse, ProcessingFailure> {
+        let session_id = Uuid::new_v4();
+        let PepperRequest {
+            jwt,
+            epk,
+            exp_date_secs,
+            epk_blinder,
+            uid_key,
+            derivation_path,
+        } = request;
+
+        let (pepper_base, _pepper, _address) = process_common(
+            &session_id,
+            jwt,
+            epk,
+            exp_date_secs,
+            epk_blinder,
+            uid_key,
+            derivation_path,
+            false,
+            None,
+        )
+        .await?;
+
+        Ok(SignatureResponse {
+            signature: pepper_base,
+        })
+    }
+}
+
+async fn process_common(
     session_id: &Uuid,
     jwt: String,
     epk: EphemeralPublicKey,
@@ -197,11 +217,13 @@ fn process_common(
     ) // Signature verification happens here.
     .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
 
-    // If the pepper request is at V1, is from an account manager, and has a target aud specified, compute the pepper for the target aud.
+    // If the pepper request is is from an account manager, and has a target aud specified, compute the pepper for the target aud.
+    let mut aud_overridden = false;
     let mut final_aud = claims.claims.aud.clone();
     if ACCOUNT_MANAGERS.contains(&(claims.claims.iss.clone(), claims.claims.aud.clone())) {
         if let Some(aud) = aud {
             final_aud = aud;
+            aud_overridden = true;
         }
     };
 
@@ -211,14 +233,19 @@ fn process_common(
         uid_val,
         aud: final_aud,
     };
-    info!(
-        session_id = session_id,
-        iss = input.iss,
-        aud = input.aud,
-        uid_val = input.uid_val,
-        uid_key = input.uid_key,
-        "PepperInput is available."
-    );
+
+    if !aud_overridden {
+        info!(
+            session_id = session_id,
+            iss = input.iss.clone(),
+            aud = input.aud.clone(),
+            uid_val = input.uid_val.clone(),
+            uid_key = input.uid_key.clone(),
+            "PepperInput is available."
+        );
+        update_account_recovery_db(&input).await?;
+    }
+
     let input_bytes = bcs::to_bytes(&input).unwrap();
     let (pepper_base, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)
         .map_err(|e| InternalError(format!("bls12381_g1_bls eval error: {e}")))?;
@@ -269,5 +296,42 @@ fn process_common(
         Ok((pepper_base_encrypted, pepper_encrypted, address))
     } else {
         Ok((pepper_base, derived_pepper.to_bytes().to_vec(), address))
+    }
+}
+
+/// Save a pepper request into the account recovery DB.
+///
+/// TODO: once the account recovery DB flow is verified working e2e, DB error should not be ignored.
+async fn update_account_recovery_db(input: &PepperInput) -> Result<(), ProcessingFailure> {
+    match ACCOUNT_RECOVERY_DB.get_or_init(init_account_db).await {
+        Ok(db) => {
+            let entry = AccountRecoveryDbEntry {
+                iss: input.iss.clone(),
+                aud: input.aud.clone(),
+                uid_key: input.uid_key.clone(),
+                uid_val: input.uid_val.clone(),
+                last_request_unix_ms: duration_since_epoch().as_millis() as u64,
+            };
+            let doc_id = entry.document_id();
+
+            // Actual DB operation using fluent API.
+            let op_result = db.fluent()
+                .update()
+                .fields(paths!(AccountRecoveryDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms}))
+                .in_col("accounts")
+                .document_id(&doc_id)
+                .object(&entry)
+                .execute::<AccountRecoveryDbEntry>()
+                .await;
+
+            if let Err(e) = op_result {
+                warn!("ACCOUNT_RECOVERY_DB operation failed: {e}");
+            }
+            Ok(())
+        },
+        Err(e) => {
+            warn!("ACCOUNT_RECOVERY_DB client failed to init: {e}");
+            Ok(())
+        },
     }
 }
