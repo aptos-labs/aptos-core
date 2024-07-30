@@ -2604,9 +2604,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         if let Some(fields) = fields {
             // Check whether all fields are covered.
-            let uncovered_fields = self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
+            let missing_fields =
+                self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
             if let Some(dotdot) = dotdot {
-                for uncoverd_field in uncovered_fields {
+                for uncoverd_field in missing_fields {
                     if let Some(field_data) = field_decls.get(&uncoverd_field) {
                         let field_ty = field_data.ty.instantiate(&instantiation);
                         let expected_field_ty = if let Some(kind) = ref_expected {
@@ -2626,7 +2627,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     }
                 }
             } else {
-                self.report_missing_fields(&uncovered_fields, loc)
+                self.report_missing_fields(&missing_fields, loc)
             }
             // Translate fields
             for (_, name, (_, value)) in fields.iter() {
@@ -4622,7 +4623,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             return None;
         }
         if let Some(fields) = fields {
-            self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
+            let missing_fields = self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
+            self.report_missing_fields(&missing_fields, loc);
             let in_order_fields = self.in_order_fields(&field_decls, fields);
             for (_, name, (exp_idx, field_exp)) in fields.iter() {
                 let (def_idx, field_name, translated_field_exp) =
@@ -4790,7 +4792,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         variant: Option<Symbol>,
     ) -> Option<usize> {
         match (&s.layout, variant) {
-            (StructLayout::Singleton(fields), None) => {
+            (StructLayout::Singleton(fields, _), None) => {
                 Some(if s.is_empty_struct { 0 } else { fields.len() })
             },
             (StructLayout::Variants(variants), Some(name)) => {
@@ -4817,7 +4819,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     fn check_missing_or_undeclared_fields<T>(
         &mut self,
-        loc: &Loc,
         struct_name: QualifiedSymbol,
         field_decls: &BTreeMap<Symbol, FieldData>,
         fields: &EA::Fields<T>,

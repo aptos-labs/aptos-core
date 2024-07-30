@@ -797,7 +797,7 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
             context,
             Tok::LParen,
             Tok::RParen,
-            parse_bind,
+            parse_bind_or_dotdot,
             "a positional field binding",
         )?;
         let end_loc = context.tokens.previous_end_loc();
