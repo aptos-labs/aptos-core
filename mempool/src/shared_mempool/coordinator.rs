@@ -177,6 +177,7 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
                 counters::CLIENT_EVENT_LABEL,
                 counters::START_LABEL,
             );
+            smp.network_interface.num_txns_received_since_peers_updated += 1;
             bounded_executor
                 .spawn(tasks::process_client_transaction_submission(
                     smp.clone(),
@@ -288,6 +289,7 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
+    smp.network_interface.num_txns_received_since_peers_updated += transactions.len() as u64;
     let smp_clone = smp.clone();
     let peer = PeerNetworkId::new(network_id, peer_id);
     let ineligible_for_broadcast = (smp.network_interface.is_validator()

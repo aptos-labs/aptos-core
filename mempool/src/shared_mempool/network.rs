@@ -109,6 +109,7 @@ pub(crate) struct MempoolNetworkInterface<NetworkClient> {
     node_type: NodeType,
     mempool_config: MempoolConfig,
     prioritized_peers_state: PrioritizedPeersState,
+    pub num_txns_received_since_peers_updated: u64,
 }
 
 impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterface<NetworkClient> {
@@ -126,6 +127,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             node_type,
             mempool_config,
             prioritized_peers_state,
+            num_txns_received_since_peers_updated: 0,
         }
     }
 
@@ -238,9 +240,15 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             })
             .collect();
 
+        info!(
+            "Num txns received since last peer udpate: {:?}",
+            self.num_txns_received_since_peers_updated
+        );
         // Update the prioritized peers list
-        self.prioritized_peers_state
-            .update_prioritized_peers(peers_and_metadata);
+        self.prioritized_peers_state.update_prioritized_peers(
+            peers_and_metadata,
+            self.num_txns_received_since_peers_updated,
+        );
     }
 
     pub fn is_validator(&self) -> bool {
