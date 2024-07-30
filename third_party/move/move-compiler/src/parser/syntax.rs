@@ -2868,7 +2868,7 @@ fn parse_struct_variant(context: &mut Context) -> Result<(StructVariant, bool), 
     } else if context.tokens.peek() == Tok::LParen {
         let loc = current_token_loc(context.tokens);
         require_move_2(context, loc, "positional fields");
-        (parse_anonymous_fields(context)?, true, true)
+        (parse_anonymous_fields(context)?, false, true)
     } else {
         (vec![], false, false)
     };
