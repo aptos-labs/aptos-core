@@ -10,9 +10,14 @@ module 0x42::test {
         y: u8
     }
 
-    struct S4<T> has copy{
+    struct S4<T> has copy {
         x: T,
         y: S3
+    }
+
+    enum E1 has drop {
+        A(u8, bool),
+        B(u8),
     }
 
     fun simple_0(x: S0) {
@@ -43,5 +48,16 @@ module 0x42::test {
         let S4 { y: S3 { x: _x1, .. }, x: _x2 } = x;
         let S4 { y: S3 { y: _y, .. }, .. } = x;
         let S4 { y: S3 { x: _x1, .. }, x: _x2 } = x;
+    }
+
+    fun simple_4(x: E1): u8 {
+        match (x) {
+            E1::A(x, ..) => {
+                x
+            }
+            E1::B(x) => {
+                x
+            }
+        }
     }
 }
