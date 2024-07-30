@@ -19,7 +19,7 @@ use aptos_types::{
     account_config::aptos_test_root_address,
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        EntryFunction, Script, SignedTransaction,
+        EntryFunction, Script, SignedTransaction, TransactionPayload,
     },
     utility_coin::APTOS_COIN_TYPE,
 };
@@ -1702,4 +1702,73 @@ fn gen_string(len: u64) -> String {
 // For use when not using the methods on `TestContext` directly.
 fn build_path(path: &str) -> String {
     format!("/v1/transactions{}", path)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_intent_execution_and_simulation() {
+    use aptos_intent::{BatchArgumentWASM, BatchedFunctionCallBuilder};
+    use move_core_types::value::MoveValue;
+
+    let mut context = new_test_context(current_function_name!());
+    let account = context.gen_account();
+    context
+        .commit_block(&vec![context.create_user_account(&account).await])
+        .await;
+
+    let mut builder = BatchedFunctionCallBuilder::single_signer();
+    let url = context.poem_url();
+    builder.load_module(url.clone(), "0x1::coin".to_string()).await.unwrap();
+    builder.load_module(url, "0x1::primary_fungible_store".to_string()).await.unwrap();
+
+    let mut returns_1 = builder
+        .add_batched_call(
+            "0x1::coin".to_string(),
+            "withdraw".to_string(),
+            vec!["0x1::aptos_coin::AptosCoin".to_string()],
+            vec![
+                BatchArgumentWASM::new_signer(0),
+                BatchArgumentWASM::new_bytes(MoveValue::U64(10).simple_serialize().unwrap()),
+            ],
+        )
+        .unwrap();
+    let mut returns_2 = builder
+        .add_batched_call(
+            "0x1::coin".to_string(),
+            "coin_to_fungible_asset".to_string(),
+            vec!["0x1::aptos_coin::AptosCoin".to_string()],
+            vec![returns_1.pop().unwrap()],
+        )
+        .unwrap();
+    builder
+        .add_batched_call(
+            "0x1::primary_fungible_store".to_string(),
+            "deposit".to_string(),
+            vec![],
+            vec![
+                BatchArgumentWASM::new_bytes(
+                    MoveValue::Address(account.address())
+                        .simple_serialize()
+                        .unwrap(),
+                ),
+                returns_2.pop().unwrap(),
+            ],
+        )
+        .unwrap();
+
+    let script = builder.generate_batched_calls().unwrap();
+
+    let txn = account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .payload(TransactionPayload::Script(bcs::from_bytes::<Script>(&script).unwrap()))
+            .expiration_timestamp_secs(u64::MAX),
+    );
+
+    let body = bcs::to_bytes(&txn).unwrap();
+
+    let resp = context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", body)
+        .await;
+    context.check_golden_output(resp);
 }

@@ -176,6 +176,7 @@ pub fn convert_transaction_payload(
                 convert_multisig_payload(mp),
             )),
         },
+        TransactionPayload::IntentPayload(_intent_calls) => unimplemented!(),
 
         // Deprecated.
         TransactionPayload::ModuleBundlePayload(_) => {
