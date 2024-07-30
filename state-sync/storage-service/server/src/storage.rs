@@ -3,7 +3,7 @@
 
 use crate::{error::Error, metrics::increment_network_frame_overflow};
 use aptos_config::config::StorageServiceConfig;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
 use aptos_storage_service_types::responses::{
     CompleteDataRange, DataResponse, DataSummary, TransactionOrOutputListWithProof,
@@ -261,6 +261,10 @@ impl StorageReaderInterface for StorageReader {
                 &transaction_list_with_proof,
                 self.config.max_network_chunk_bytes,
             )?;
+            info!(
+                "Num bytes for transaction list with proof: {:?}. Overflow? {:?}",
+                num_bytes, overflow_frame
+            );
             if !overflow_frame {
                 return Ok(transaction_list_with_proof);
             } else {
@@ -314,6 +318,10 @@ impl StorageReaderInterface for StorageReader {
                 &epoch_change_proof,
                 self.config.max_network_chunk_bytes,
             )?;
+            info!(
+                "Num bytes for epoch change proof: {:?}. Overflow? {:?}",
+                num_bytes, overflow_frame
+            );
             if !overflow_frame {
                 return Ok(epoch_change_proof);
             } else {
@@ -360,6 +368,10 @@ impl StorageReaderInterface for StorageReader {
                 &output_list_with_proof,
                 self.config.max_network_chunk_bytes,
             )?;
+            info!(
+                "Num bytes for transaction outputs with proof: {:?}. Overflow? {:?}",
+                num_bytes, overflow_frame
+            );
             if !overflow_frame {
                 return Ok(output_list_with_proof);
             } else {
@@ -406,6 +418,10 @@ impl StorageReaderInterface for StorageReader {
                 &output_list_with_proof,
                 self.config.max_network_chunk_bytes,
             )?;
+            info!(
+                "Num bytes for transactions or outputs with proof: {:?}. Overflow? {:?}",
+                num_bytes, overflow_frame
+            );
 
             if !overflow_frame {
                 return Ok((None, Some(output_list_with_proof)));
@@ -478,6 +494,10 @@ impl StorageReaderInterface for StorageReader {
                 &state_value_chunk_with_proof,
                 self.config.max_network_chunk_bytes,
             )?;
+            info!(
+                "Num bytes for state value chunk with proof: {:?}. Overflow? {:?}",
+                num_bytes, overflow_frame
+            );
             if !overflow_frame {
                 return Ok(state_value_chunk_with_proof);
             } else {

@@ -2172,8 +2172,6 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 /// Optimizes the state sync configs for throughput.
 /// `max_chunk_size` is the maximum number of transactions to include in a chunk.
 fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig, max_chunk_size: u64) {
-    let max_chunk_bytes = 40 * 1024 * 1024; // 10x the current limit (to prevent execution fallback)
-
     // Update the chunk sizes for the data client
     let data_client_config = &mut node_config.state_sync.aptos_data_client;
     data_client_config.max_transaction_chunk_size = max_chunk_size;
@@ -2183,9 +2181,6 @@ fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig, max_chunk_si
     let storage_service_config = &mut node_config.state_sync.storage_service;
     storage_service_config.max_transaction_chunk_size = max_chunk_size;
     storage_service_config.max_transaction_output_chunk_size = max_chunk_size;
-
-    // Update the chunk bytes for the storage service
-    storage_service_config.max_network_chunk_bytes = max_chunk_bytes;
 }
 
 fn pre_release_suite() -> ForgeConfig {
