@@ -473,7 +473,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             .clone()
                             .into_iter()
                             .collect();
-
+                    info!("sender_buckets: {:?}, peer: {:?}, role: {:?}", sender_buckets, peer, self.role);
                     // Sort sender_buckets based on priority. Primary peer should be first.
                     sender_buckets.sort_by(|(_, priority_a), (_, priority_b)| {
                         if priority_a == priority_b {
