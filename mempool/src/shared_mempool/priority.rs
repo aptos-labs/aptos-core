@@ -249,9 +249,7 @@ impl PrioritizedPeersState {
         num_txns_received_since_peers_updated: u64,
     ) {
         // TODO: If the top peer set didn't change, then don't change the Primary sender bucket assignment.
-        // TODO: Use a config parameter instead of 30ms, 500 TPS
         // TODO: If the load is low, don't do load balancing for Failover buckets as well.
-
         assert!(self.prioritized_peers.read().len() == peer_monitoring_data.len());
         let old_peer_to_sender_buckets = self.peer_to_sender_buckets.clone();
 
@@ -264,11 +262,17 @@ impl PrioritizedPeersState {
                     .duration_since(last_update)
                     .as_secs()
             });
+
+        // If the observed traffic is to be load balanced across upstream peers such that each upstream peer
+        // receives `avg_mempool_traffic_in_tps_per_peer` transactions per second, then this is the number of
+        // upstream peers required.
+        // This is calculated so that when the traffic is low, we don't do load balancing across many peers.
         let num_peers_required_for_load_balancing = min(
             (num_txns_received_since_peers_updated as f64
-                / (500.0 * min(1, time_elapsed_since_last_update) as f64)) as u64,
-            u8::MAX.into(),
-        ) as u8;
+                / ((self.mempool_config.avg_mempool_traffic_in_tps_per_peer
+                    * max(1, time_elapsed_since_last_update)) as f64)) as u64,
+            MempoolSenderBucket::MAX.into(),
+        ) as MempoolSenderBucket;
         let num_top_peers = max(
             1,
             min(
