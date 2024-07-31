@@ -44,11 +44,9 @@ fn native_to_bytes(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    // pop type and value
     let ref_to_val = safely_pop_arg!(args, Reference);
     let arg_type = ty_args.pop().unwrap();
 
-    // get type layout
     let layout = match context.type_to_type_layout(&arg_type) {
         Ok(layout) => layout,
         Err(_) => {
@@ -59,8 +57,10 @@ fn native_to_bytes(
         },
     };
 
-    // serialize value
+    // TODO(#14175): Reading the reference performs a deep copy, and we can
+    //               implement it in a more efficient way.
     let val = ref_to_val.read_ref()?;
+
     let serialized_value = match val.simple_serialize(&layout) {
         Some(serialized_value) => serialized_value,
         None => {
@@ -93,6 +93,8 @@ fn native_serialized_size(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
+    context.charge(BCS_SERIALIZED_SIZE_BASE)?;
+
     let reference = safely_pop_arg!(args, Reference);
     let ty = ty_args.pop().unwrap();
 
@@ -117,6 +119,8 @@ fn serialized_size_impl(
     reference: Reference,
     ty: &Type,
 ) -> PartialVMResult<usize> {
+    // TODO(#14175): Reading the reference performs a deep copy, and we can
+    //               implement it in a more efficient way.
     let value = reference.read_ref()?;
     let ty_layout = context.type_to_type_layout(ty)?;
     serialized_size_allowing_delayed_values(&value, &ty_layout)
@@ -130,7 +134,7 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let funcs = [
         ("to_bytes", native_to_bytes as RawSafeNative),
-        ("serialized_size", native_serialized_size as RawSafeNative),
+        ("serialized_size", native_serialized_size),
     ];
 
     builder.make_named_natives(funcs)

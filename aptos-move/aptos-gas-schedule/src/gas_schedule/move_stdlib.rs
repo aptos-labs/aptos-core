@@ -32,6 +32,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [string_index_of_per_byte_pattern: InternalGasPerByte, "string.index_of.per_byte_pattern", 73],
         [string_index_of_per_byte_searched: InternalGasPerByte, "string.index_of.per_byte_searched", 36],
 
+        // Note(Gas): these initial values are guesswork.
+        [bcs_serialized_size_base: InternalGas, { RELEASE_V1_18.. => "bcs.serialized_size.base" }, 735],
         [bcs_serialized_size_per_byte_serialized: InternalGasPerByte, { RELEASE_V1_18.. => "bcs.serialized_size.per_byte_serialized" }, 36],
         [bcs_serialized_size_failure: InternalGas, { RELEASE_V1_18.. => "bcs.serialized_size.failure" }, 3676],
     ]
