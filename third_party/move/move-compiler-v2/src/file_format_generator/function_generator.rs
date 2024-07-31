@@ -145,7 +145,7 @@ impl<'a> FunctionGenerator<'a> {
                 def_idx,
             });
             if fun_gen.spec_blocks.is_empty() {
-                // Currently, peephole optimizations require that there are no spec blocks.
+                // Currently, peephole optimizations require that there are no inline spec blocks.
                 // This is to ensure that spec-related data structures do not refer to code
                 // offsets which could be changed by the peephole optimizer.
                 let options = ctx
