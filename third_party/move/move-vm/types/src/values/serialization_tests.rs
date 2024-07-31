@@ -130,3 +130,6 @@ fn test_serialized_size() {
         assert_err!(serialized_size_allowing_delayed_values(&value, &layout));
     }
 }
+
+#[test]
+fn test_nothing() {}
