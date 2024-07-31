@@ -878,19 +878,23 @@ impl BatchProofQueue {
                     .items
                     .get_mut(&batch_key)
                     .expect("must exist due to check");
-                item.proof = None;
-                item.proof_insertion_time = None;
 
-                if let Some(ref txn_summaries) = item.txn_summaries {
-                    for txn_summary in txn_summaries {
-                        if let Some(count) = self.txn_summary_num_occurrences.get_mut(txn_summary) {
-                            *count -= 1;
-                            if *count == 0 {
-                                self.txn_summary_num_occurrences.remove(txn_summary);
-                            }
-                        };
+                if item.proof.is_some() {
+                    if let Some(ref txn_summaries) = item.txn_summaries {
+                        for txn_summary in txn_summaries {
+                            if let Some(count) =
+                                self.txn_summary_num_occurrences.get_mut(txn_summary)
+                            {
+                                *count -= 1;
+                                if *count == 0 {
+                                    self.txn_summary_num_occurrences.remove(txn_summary);
+                                }
+                            };
+                        }
                     }
                 }
+                item.proof = None;
+                item.proof_insertion_time = None;
                 item.txn_summaries = None;
             }
         }
