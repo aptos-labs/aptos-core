@@ -48,31 +48,32 @@ pub const MOVE_VARIANT_NAME_FIELD: &str = "name";
 /// variants. This static cache is used to generate those names, and contains
 /// signatures of the form `["0", "1", "2", ..]`. The size of this cache
 /// is bound by `VARIANT_COUNT_MAX * VARIANT_COUNT_MAX / 2` (8064 with max 127)
-static VARIANT_NAME_PLACEHOLDER_CACHE: Lazy<Mutex<BTreeMap<usize, &'static [&'static str]>>> =
-    Lazy::new(|| Mutex::new(Default::default()));
+// static VARIANT_NAME_PLACEHOLDER_CACHE: Lazy<Mutex<BTreeMap<usize, &'static [&'static str]>>> =
+//     Lazy::new(|| Mutex::new(Default::default()));
 
 /// Returns variant name placeholders for providing dummy names in serde serialization.
 pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
-    assert!(
-        len < VARIANT_COUNT_MAX as usize,
-        "variant count is restricted to {}",
-        VARIANT_COUNT_MAX
-    );
-    let mutex = &VARIANT_NAME_PLACEHOLDER_CACHE;
-    let mut lock = mutex.lock().expect("acquire index name lock");
-    match lock.entry(len) {
-        Entry::Vacant(e) => {
-            let signature = Box::new(
-                (0..len)
-                    .map(|idx| Box::new(format!("{}", idx)).leak() as &str)
-                    .collect::<Vec<_>>(),
-            )
-            .leak();
-            e.insert(signature);
-            signature
-        },
-        Entry::Occupied(e) => e.get(),
-    }
+    panic!("called variant_name_placeholder");
+    // assert!(
+    //     len < VARIANT_COUNT_MAX as usize,
+    //     "variant count is restricted to {}",
+    //     VARIANT_COUNT_MAX
+    // );
+    // let mutex = &VARIANT_NAME_PLACEHOLDER_CACHE;
+    // let mut lock = mutex.lock().expect("acquire index name lock");
+    // match lock.entry(len) {
+    //     Entry::Vacant(e) => {
+    //         let signature = Box::new(
+    //             (0..len)
+    //                 .map(|idx| Box::new(format!("{}", idx)).leak() as &str)
+    //                 .collect::<Vec<_>>(),
+    //         )
+    //         .leak();
+    //         e.insert(signature);
+    //         signature
+    //     },
+    //     Entry::Occupied(e) => e.get(),
+    // }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
