@@ -312,7 +312,7 @@ impl PrioritizedPeersState {
                     .and_then(|metadata| get_peer_ping_latency(metadata))
             });
 
-            // Extract top peers with ping latency less than base_ping_latency + 30 ms
+            // Extract top peers with ping latency less than base_ping_latency + 50 ms
             for peer in self.prioritized_peers.read().iter() {
                 if top_peers.len() >= num_top_peers as usize {
                     break;
@@ -356,10 +356,11 @@ impl PrioritizedPeersState {
 
             // Assign sender buckets with Failover priority. Use Round Robin.
             peer_index = 0;
+            let num_prioritized_peers = self.prioritized_peers.read().len();
             for _ in 0..self.mempool_config.default_failovers {
                 for bucket_index in 0..self.mempool_config.num_sender_buckets {
                     // Find the first peer that already doesn't have the sender bucket, and add the bucket
-                    for _ in 0..self.prioritized_peers.read().len() {
+                    for _ in 0..num_prioritized_peers {
                         let peer = self.prioritized_peers.read()[peer_index];
                         let sender_bucket_list =
                             self.peer_to_sender_buckets.entry(peer).or_default();
@@ -369,7 +370,7 @@ impl PrioritizedPeersState {
                             e.insert(BroadcastPeerPriority::Failover);
                             break;
                         }
-                        peer_index = (peer_index + 1) % self.prioritized_peers.read().len();
+                        peer_index = (peer_index + 1) % num_prioritized_peers;
                     }
                 }
             }

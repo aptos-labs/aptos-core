@@ -35,6 +35,10 @@ impl NodeType {
         self == NodeType::ValidatorFullnode
     }
 
+    pub fn is_public_fullnode(self) -> bool {
+        self == NodeType::PublicFullnode
+    }
+
     /// Returns the type of the node as determined by the node config
     pub fn extract_from_config(node_config: &NodeConfig) -> Self {
         // Validator nodes are trivial to detect

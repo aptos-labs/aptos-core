@@ -364,6 +364,8 @@ impl MempoolMessageId {
                         .map(move |(index, (old, new))| {
                             let sender_bucket = *sender_bucket as u64;
                             let timeline_index_identifier = index as u64;
+                            assert!(timeline_index_identifier < 128);
+                            assert!(sender_bucket < 128);
                             (
                                 sender_bucket << 56 | timeline_index_identifier << 48 | old,
                                 sender_bucket << 56 | timeline_index_identifier << 48 | new,
