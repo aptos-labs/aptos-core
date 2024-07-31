@@ -16,6 +16,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
+use aptos_logger::info;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
@@ -42,6 +43,7 @@ pub trait StateComputer: Send + Sync {
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
+        info!("calling schedule_compute 2, block: {}", block);
         self.schedule_compute(block, block_window, parent_block_id, randomness)
             .await
             .await

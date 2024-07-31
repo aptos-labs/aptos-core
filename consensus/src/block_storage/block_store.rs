@@ -250,6 +250,13 @@ impl BlockStore {
             .get_block(block_id_to_commit)
             .ok_or_else(|| format_err!("Committed block id not found"))?;
 
+        info!(
+            "send_for_execution for block {} with round {}, commit root round {}",
+            block_id_to_commit,
+            block_to_commit.round(),
+            self.commit_root().round()
+        );
+
         // First make sure that this commit is new.
         ensure!(
             block_to_commit.round() > self.ordered_root().round(),
