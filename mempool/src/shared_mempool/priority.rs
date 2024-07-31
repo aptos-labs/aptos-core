@@ -411,7 +411,7 @@ impl PrioritizedPeersState {
         // Set the last peer priority update time
         self.last_peer_priority_update = Some(self.time_service.now());
         info!(
-            "Updated prioritized peers. Peer count: {:?}, Latencies: {:?},\n Prioritized pers: {:?},\n Sender bucket assignment: {:?}",
+            "Updated prioritized peers. Peer count: {:?}, Latencies: {:?},\n Prioritized peers: {:?},\n Sender bucket assignment: {:?}",
             peers_and_metadata.len(),
             peers_and_metadata
                 .iter()

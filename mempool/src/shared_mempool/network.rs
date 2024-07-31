@@ -458,10 +458,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                         self.prioritized_peers_state
                             .get_sender_buckets_for_peer(&peer)
                             .ok_or_else(|| {
-                                info!(
-                                    "Peer {} not prioritized. {:?}",
-                                    peer, self.prioritized_peers_state
-                                );
                                 BroadcastError::PeerNotPrioritized(
                                     peer,
                                     self.prioritized_peers_state.get_peer_priority(&peer),

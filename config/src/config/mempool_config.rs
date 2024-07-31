@@ -68,11 +68,12 @@ pub struct MempoolConfig {
     /// We divide the transactions into buckets based on hash of the sender address.
     /// This is the number of sender buckets we use.
     pub num_sender_buckets: u8,
-    /// PFN load balances the traffic to multiple VFNs. This parameter is used to calculate the number of peers
-    /// the PFN should load balance the traffic to.
+    /// PFN load balances the traffic to multiple upstream FNs. The PFN calculates the average mempool traffic in TPS received since
+    /// the last peer udpate. Dividing this mempool traffic by the `avg_mempool_traffic_in_tps_per_peer` gives the number of
+    /// upstream peers to load balance the traffic to. As only PFNs do load balancing, this config is only used by PFNs.
     pub avg_mempool_traffic_in_tps_per_peer: u64,
-    /// PFN load balances the traffic to multiple VFNs. This is maximum difference in average ping latency in milliseconds
-    /// between the selected upstream peers for forwarding mempool traffic.
+    /// PFN load balances the traffic to multiple upstream FNs. This is maximum difference in average ping latency in milliseconds
+    /// between the selected upstream peers for forwarding mempool traffic. As only PFNs do load balancing, this config is only used by PFNs.
     pub latency_slack_between_top_upstream_peers: u64,
 }
 
