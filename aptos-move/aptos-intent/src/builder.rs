@@ -111,6 +111,7 @@ fn find_function<'a>(
     anyhow::bail!("{}::{} doesn't exist on chain", module_id, func_name)
 }
 
+#[wasm_bindgen]
 impl BatchedFunctionCallBuilder {
     fn return_values(
         &mut self,
