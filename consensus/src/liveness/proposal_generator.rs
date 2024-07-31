@@ -465,7 +465,7 @@ impl ProposalGenerator {
                             count: self.max_inline_txns,
                             bytes: self.max_inline_bytes,
                         },
-                        opt_batch_txns_pct: 0,
+                        opt_batch_txns_pct: 80,
                         user_txn_filter: payload_filter,
                         pending_ordering,
                         pending_uncommitted_blocks: pending_blocks.len(),
