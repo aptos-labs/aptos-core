@@ -91,8 +91,8 @@ impl Processor {
         };
         let expected_starting_version = std::cmp::max(starting_version, progress_file.version);
         tracing::info!(
-            "Starting backfill from version {}",
-            expected_starting_version
+            starting_version = expected_starting_version,
+            "Starting backfill.",
         );
         if let Some(expected_end_version) = expected_end_version {
             if expected_starting_version >= expected_end_version {
