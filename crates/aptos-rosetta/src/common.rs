@@ -154,7 +154,8 @@ pub fn native_coin() -> Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
         metadata: Some(CurrencyMetadata {
-            move_type: native_coin_tag().to_string(),
+            move_type: Some(native_coin_tag().to_string()),
+            fa_address: Some("0xA".to_string()),
         }),
     }
 }
@@ -167,17 +168,6 @@ pub fn native_coin_tag() -> TypeTag {
         name: ident_str!(APTOS_COIN_RESOURCE).into(),
         type_args: vec![],
     }))
-}
-
-/// Tells us whether the coin is APT and errors if it's not
-///
-/// TODO: This is the function that needs to be replaced to handle more coin types
-pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
-    if currency == &native_coin() {
-        Ok(())
-    } else {
-        Err(ApiError::UnsupportedCurrency(Some(currency.symbol.clone())))
-    }
 }
 
 /// Determines which block to pull for the request

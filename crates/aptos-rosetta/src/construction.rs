@@ -556,7 +556,8 @@ async fn construction_parse(
                 module.name().as_str(),
                 function_name.as_str(),
             ) {
-                (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
+                (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION)
+                | (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_COINS_FUNCTION) => {
                     parse_transfer_operation(sender, &type_args, &args)?
                 },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
@@ -564,6 +565,9 @@ async fn construction_parse(
                 },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
+                },
+                (AccountAddress::ONE, PRIMARY_FUNGIBLE_STORE_MODULE, TRANSFER_FUNCTION) => {
+                    parse_primary_fa_transfer_operation(sender, &type_args, &args)?
                 },
                 (
                     AccountAddress::ONE,
@@ -768,6 +772,80 @@ fn parse_account_transfer_operation(
         amount,
     ));
     Ok(operations)
+}
+
+/// Parses 0x1::primary_fungible_store::transfer(metadata: address, receiver: address, amount: u64)
+fn parse_primary_fa_transfer_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There are no typeargs
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Primary fungible store transfer should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+    let mut operations = Vec::new();
+
+    // Retrieve the args for the operations
+    let metadata: AccountAddress = if let Some(metadata) = args.first() {
+        bcs::from_bytes(metadata)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No metadata address in primary fungible transfer".to_string(),
+        )));
+    };
+    let receiver: AccountAddress = if let Some(receiver) = args.get(1) {
+        bcs::from_bytes(receiver)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No receiver address in primary fungible transfer".to_string(),
+        )));
+    };
+    let amount: u64 = if let Some(amount) = args.get(2) {
+        bcs::from_bytes(amount)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No amount in primary fungible transfer".to_string(),
+        )));
+    };
+
+    // Grab currency accordingly
+    // FIXME centralize
+    let expected = [native_coin()];
+    let maybe_currency = expected.iter().find(|currency| {
+        if let Some(CurrencyMetadata {
+            move_type: _,
+            fa_address: Some(ref fa_address),
+        }) = currency.metadata
+        {
+            fa_address == &metadata.to_string()
+        } else {
+            false
+        }
+    });
+
+    if let Some(currency) = maybe_currency {
+        operations.push(Operation::withdraw(
+            0,
+            None,
+            AccountIdentifier::base_account(sender),
+            currency.clone(),
+            amount,
+        ));
+        operations.push(Operation::deposit(
+            1,
+            None,
+            AccountIdentifier::base_account(receiver),
+            currency.clone(),
+            amount,
+        ));
+        Ok(operations)
+    } else {
+        Err(ApiError::UnsupportedCurrency(Some(metadata.to_string())))
+    }
 }
 
 /// Parses a specific BCS function argument to the given type
