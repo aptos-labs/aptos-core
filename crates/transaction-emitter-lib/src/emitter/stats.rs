@@ -40,11 +40,11 @@ impl fmt::Display for TxnStatsRate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "committed: {} txn/s{}{}{}, latency: {} ms, (p50: {} ms, p90: {} ms, p99: {} ms), latency samples: {}",
+            "committed: {:.2} txn/s{}{}{}, latency: {:.2} ms, (p50: {} ms, p90: {} ms, p99: {} ms), latency samples: {}",
             self.committed,
-            if self.submitted != self.committed { format!(", submitted: {} txn/s", self.submitted) } else { "".to_string()},
-            if self.failed_submission != 0.0 { format!(", failed submission: {} txn/s", self.failed_submission) } else { "".to_string()},
-            if self.expired != 0.0 { format!(", expired: {} txn/s", self.expired) } else { "".to_string()},
+            if self.submitted != self.committed { format!(", submitted: {:.2} txn/s", self.submitted) } else { "".to_string()},
+            if self.failed_submission != 0.0 { format!(", failed submission: {:.2} txn/s", self.failed_submission) } else { "".to_string()},
+            if self.expired != 0.0 { format!(", expired: {:.2} txn/s", self.expired) } else { "".to_string()},
             self.latency, self.p50_latency, self.p90_latency, self.p99_latency, self.latency_samples,
         )
     }
