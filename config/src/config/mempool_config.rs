@@ -31,7 +31,7 @@ impl Default for LoadBalancingThresholdConfig {
     fn default() -> LoadBalancingThresholdConfig {
         LoadBalancingThresholdConfig {
             avg_mempool_traffic_threshold_in_tps: 0,
-            latency_slack_between_top_upstream_peers: 10,
+            latency_slack_between_top_upstream_peers: 50,
             max_number_of_upstream_peers: 1,
         }
     }
@@ -156,6 +156,11 @@ impl Default for MempoolConfig {
                     avg_mempool_traffic_threshold_in_tps: 3500,
                     latency_slack_between_top_upstream_peers: 125,
                     max_number_of_upstream_peers: 6,
+                },
+                LoadBalancingThresholdConfig {
+                    avg_mempool_traffic_threshold_in_tps: 4500,
+                    latency_slack_between_top_upstream_peers: 150,
+                    max_number_of_upstream_peers: 7,
                 },
             ],
             enable_max_load_balancing_at_any_load: false,

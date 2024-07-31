@@ -40,7 +40,7 @@ pub const TXN_INDEX_ESTIMATED_BYTES: usize = size_of::<crate::core_mempool::inde
     + (size_of::<u64>() * 3 + size_of::<AccountAddress>()) // timeline_index
     + (size_of::<HashValue>() + size_of::<u64>() + size_of::<AccountAddress>()); // hash_index
 
-fn sender_bucket(
+pub fn sender_bucket(
     address: &AccountAddress,
     num_sender_buckets: MempoolSenderBucket,
 ) -> MempoolSenderBucket {

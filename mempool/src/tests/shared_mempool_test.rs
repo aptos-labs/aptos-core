@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    core_mempool::sender_bucket,
     mocks::MockSharedMempool,
     network::BroadcastPeerPriority,
     tests::common::{batch_add_signed_txn, TestTransaction},
     QuorumStoreRequest,
 };
+use aptos_config::config::MempoolConfig;
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_types::{transaction::Transaction, vm_status::DiscardedVMStatus};
@@ -26,6 +28,14 @@ async fn test_consensus_events_rejected_txns() {
     let kept_txn_1 = TestTransaction::new(1, 0, 1).make_signed_transaction();
     let kept_txn_2 = TestTransaction::new(0, 1, 1).make_signed_transaction();
     let txns = vec![rejected_txn.clone(), kept_txn_1.clone(), kept_txn_2.clone()];
+    let sender_bucket_1 = sender_bucket(
+        &kept_txn_1.sender(),
+        MempoolConfig::default().num_sender_buckets,
+    );
+    let sender_bucket_2 = sender_bucket(
+        &kept_txn_2.sender(),
+        MempoolConfig::default().num_sender_buckets,
+    );
     // Add txns to mempool
     {
         let mut pool = smp.mempool.lock();
@@ -46,25 +56,38 @@ async fn test_consensus_events_rejected_txns() {
 
     let pool = smp.mempool.lock();
     // TODO: make less brittle to broadcast buckets changes
-    let (timeline, _) = pool.read_timeline(
-        1,
-        &vec![0; 10].into(),
-        10,
-        None,
-        BroadcastPeerPriority::Primary,
-    );
-    assert_eq!(timeline.len(), 1);
-    assert_eq!(timeline.first().unwrap().0, kept_txn_1);
+    if sender_bucket_1 != sender_bucket_2 {
+        let (timeline, _) = pool.read_timeline(
+            sender_bucket_1,
+            &vec![0; 10].into(),
+            10,
+            None,
+            BroadcastPeerPriority::Primary,
+        );
+        assert_eq!(timeline.len(), 1);
+        assert_eq!(timeline.first().unwrap().0, kept_txn_1);
 
-    let (timeline, _) = pool.read_timeline(
-        0,
-        &vec![0; 10].into(),
-        10,
-        None,
-        BroadcastPeerPriority::Primary,
-    );
-    assert_eq!(timeline.len(), 1);
-    assert_eq!(timeline.first().unwrap().0, kept_txn_2);
+        let (timeline, _) = pool.read_timeline(
+            sender_bucket_2,
+            &vec![0; 10].into(),
+            10,
+            None,
+            BroadcastPeerPriority::Primary,
+        );
+        assert_eq!(timeline.len(), 1);
+        assert_eq!(timeline.first().unwrap().0, kept_txn_2);
+    } else {
+        let (timeline, _) = pool.read_timeline(
+            sender_bucket_1,
+            &vec![0; 10].into(),
+            10,
+            None,
+            BroadcastPeerPriority::Primary,
+        );
+        assert_eq!(timeline.len(), 2);
+        assert_eq!(timeline[0].0, kept_txn_1);
+        assert_eq!(timeline[1].0, kept_txn_2);
+    }
 }
 
 #[allow(clippy::await_holding_lock)] // This appears to be a false positive!
@@ -79,13 +102,16 @@ async fn test_mempool_notify_committed_txns() {
     // Txn 3: not committed and newer than block timestamp
     let committed_txn =
         TestTransaction::new(0, 0, 1).make_signed_transaction_with_expiration_time(0);
-    let kept_txn_1 = TestTransaction::new(1, 0, 1).make_signed_transaction(); // not committed or cleaned out by block timestamp gc
-    let kept_txn_2 = TestTransaction::new(0, 1, 1).make_signed_transaction_with_expiration_time(0);
+    let kept_txn = TestTransaction::new(1, 0, 1).make_signed_transaction(); // not committed or cleaned out by block timestamp gc
     let txns = vec![
         committed_txn.clone(),
-        kept_txn_1.clone(),
-        kept_txn_2.clone(),
+        TestTransaction::new(0, 1, 1).make_signed_transaction_with_expiration_time(0),
+        kept_txn.clone(),
     ];
+    let sender_bucket = sender_bucket(
+        &kept_txn.sender(),
+        MempoolConfig::default().num_sender_buckets,
+    );
     // Add txns to mempool
     {
         let mut pool = smp.mempool.lock();
@@ -105,25 +131,15 @@ async fn test_mempool_notify_committed_txns() {
         let pool = smp.mempool.lock();
         // TODO: make less brittle to broadcast buckets changes
         let (timeline, _) = pool.read_timeline(
-            1,
+            sender_bucket,
             &vec![0; 10].into(),
             10,
             None,
             BroadcastPeerPriority::Primary,
         );
-        assert_eq!(timeline.len(), 1);
-        assert_eq!(timeline.first().unwrap().0, kept_txn_1);
-
-        let (timeline, _) = pool.read_timeline(
-            0,
-            &vec![0; 10].into(),
-            10,
-            None,
-            BroadcastPeerPriority::Primary,
-        );
-
-        assert_eq!(timeline.len(), 1);
-        assert_eq!(timeline.first().unwrap().0, kept_txn_2);
+        if timeline.len() == 10 && timeline.first().unwrap().0 == kept_txn {
+            return; // Mempool handled the commit notification
+        }
         drop(pool);
 
         // Sleep for a while
