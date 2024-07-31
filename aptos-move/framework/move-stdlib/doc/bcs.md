@@ -96,6 +96,7 @@ Native function which is defined in the prover's prelude.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>ensures</b> result == len(<a href="bcs.md#0x1_bcs_serialize">serialize</a>(v));
 </code></pre>
 
 

@@ -21,7 +21,7 @@ module std::bcs {
     }
 
     spec serialized_size<MoveValue>(v: &MoveValue): u64 {
-        // TODO: temporary mockup.
         pragma opaque;
+        ensures result == len(serialize(v));
     }
 }
