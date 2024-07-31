@@ -4,7 +4,7 @@
 
 use crate::common::Author;
 use anyhow::{ensure, Context};
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::{ed25519, HashValue};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{ledger_info::LedgerInfo, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ pub struct OrderVote {
     /// LedgerInfo of a block that is going to be ordered in case this vote gathers QC.
     ledger_info: LedgerInfo,
     /// Signature of the LedgerInfo.
-    signature: bls12381::Signature,
+    signature: ed25519::Signature,
 }
 
 impl Display for OrderVote {
@@ -43,7 +43,7 @@ impl OrderVote {
     pub fn new_with_signature(
         author: Author,
         ledger_info: LedgerInfo,
-        signature: bls12381::Signature,
+        signature: ed25519::Signature,
     ) -> Self {
         Self {
             author,
@@ -60,7 +60,7 @@ impl OrderVote {
         &self.ledger_info
     }
 
-    pub fn signature(&self) -> &bls12381::Signature {
+    pub fn signature(&self) -> &ed25519::Signature {
         &self.signature
     }
 

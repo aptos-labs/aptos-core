@@ -1552,7 +1552,7 @@ async fn test_simulation_failure_with_detail_error() {
                 Identifier::new("MemeCoin").unwrap(),
             ),
             Identifier::new("transfer").unwrap(),
-            vec![APTOS_COIN_TYPE.clone()],
+            vec![SUPRA_COIN_TYPE.clone()],
             vec![
                 bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
                 bcs::to_bytes(&1u64).unwrap(),

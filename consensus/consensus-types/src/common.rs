@@ -268,22 +268,6 @@ impl Payload {
                         .map(|(_, txns)| txns.len())
                         .sum::<usize>()
             },
-            Payload::QuorumStoreInlineHybrid(
-                inline_batches,
-                proof_with_data,
-                max_txns_to_execute,
-            ) => {
-                let num_txns = proof_with_data.len()
-                    + inline_batches
-                        .iter()
-                        .map(|(_, txns)| txns.len())
-                        .sum::<usize>();
-                if max_txns_to_execute.is_some() {
-                    min(max_txns_to_execute.unwrap(), num_txns)
-                } else {
-                    num_txns
-                }
-            },
         }
     }
 
@@ -433,21 +417,6 @@ impl Payload {
                 }
                 Ok(())
             },
-            (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)) => {
-                for proof in proof_with_data.proofs.iter() {
-                    proof.verify(validator)?;
-                }
-                for (batch, payload) in inline_batches.iter() {
-                    // TODO: Can cloning be avoided here?
-                    if BatchPayload::new(batch.author(), payload.clone()).hash() != *batch.digest()
-                    {
-                        return Err(anyhow::anyhow!(
-                            "Hash of the received inline batch doesn't match the digest value",
-                        ));
-                    }
-                }
-                Ok(())
-            },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,
@@ -485,58 +454,6 @@ impl fmt::Display for Payload {
                 )
             },
         }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher)]
-pub struct BatchPayload {
-    author: PeerId,
-    txns: Vec<SignedTransaction>,
-    #[serde(skip)]
-    num_bytes: OnceCell<usize>,
-}
-
-impl CryptoHash for BatchPayload {
-    type Hasher = BatchPayloadHasher;
-
-    fn hash(&self) -> HashValue {
-        let mut state = Self::Hasher::new();
-        let bytes = bcs::to_bytes(&self).expect("Unable to serialize batch payload");
-        self.num_bytes.get_or_init(|| bytes.len());
-        state.update(&bytes);
-        state.finish()
-    }
-}
-
-impl BatchPayload {
-    pub fn new(author: PeerId, txns: Vec<SignedTransaction>) -> Self {
-        Self {
-            author,
-            txns,
-            num_bytes: OnceCell::new(),
-        }
-    }
-
-    pub fn into_transactions(self) -> Vec<SignedTransaction> {
-        self.txns
-    }
-
-    pub fn txns(&self) -> &Vec<SignedTransaction> {
-        &self.txns
-    }
-
-    pub fn num_txns(&self) -> usize {
-        self.txns.len()
-    }
-
-    pub fn num_bytes(&self) -> usize {
-        *self
-            .num_bytes
-            .get_or_init(|| bcs::serialized_size(&self).expect("unable to serialize batch payload"))
-    }
-
-    pub fn author(&self) -> PeerId {
-        self.author
     }
 }
 

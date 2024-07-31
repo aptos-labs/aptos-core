@@ -37,7 +37,7 @@ use aptos_types::{
         RawTransactionWithData, SignedTransaction, TransactionPayload,
     },
     vm_status::StatusCode,
-    APTOS_COIN_TYPE,
+    SUPRA_COIN_TYPE,
 };
 use aptos_vm::{AptosSimulationVM, AptosVM};
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
@@ -568,7 +568,7 @@ impl TransactionsApi {
                     &state_view,
                     ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
                     ident_str!("balance").into(),
-                    vec![APTOS_COIN_TYPE.clone()],
+                    vec![SUPRA_COIN_TYPE.clone()],
                     vec![signed_transaction.sender().to_vec()],
                     context.node_config.api.max_gas_view_function,
                 );
