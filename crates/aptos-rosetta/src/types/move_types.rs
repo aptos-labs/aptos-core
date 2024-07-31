@@ -16,6 +16,10 @@ pub const STAKING_PROXY_MODULE: &str = "staking_proxy";
 pub const STAKING_CONTRACT_MODULE: &str = "staking_contract";
 pub const VESTING_MODULE: &str = "vesting";
 pub const DELEGATION_POOL_MODULE: &str = "delegation_pool";
+pub const OBJECT_MODULE: &str = "object";
+pub const PRIMARY_FUNGIBLE_STORE_MODULE: &str = "primary_fungible_store";
+pub const FUNGIBLE_ASSET_MODULE: &str = "fungible_asset";
+pub const DISPATCHABLE_FUNGIBLE_ASSET_MODULE: &str = "dispatchable_fungible_asset";
 
 pub const ACCOUNT_RESOURCE: &str = "Account";
 pub const APTOS_COIN_RESOURCE: &str = "AptosCoin";
@@ -28,9 +32,12 @@ pub const STAKING_GROUP_UPDATE_COMMISSION_RESOURCE: &str = "StakingGroupUpdateCo
 pub const VESTING_RESOURCE: &str = "Vesting";
 pub const DELEGATION_POOL_RESOURCE: &str = "DelegationPool";
 pub const WITHDRAW_STAKE_EVENT: &str = "WithdrawStakeEvent";
+pub const OBJECT_CORE_RESOURCE: &str = "ObjectCore";
 
 pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
 pub const TRANSFER_FUNCTION: &str = "transfer";
+pub const TRANSFER_COINS_FUNCTION: &str = "transfer_coins";
+pub const BALANCE_FUNCTION: &str = "balance";
 
 // Staking Contract
 pub const RESET_LOCKUP_FUNCTION: &str = "reset_lockup";
@@ -244,4 +251,18 @@ pub struct WithdrawUndelegatedEvent {
     pub pool_address: AccountAddress,
     pub delegator_address: AccountAddress,
     pub amount_withdrawn: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FungibleAssetChangeEvent {
+    pub store: AccountAddress,
+    pub amount: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ObjectCore {
+    pub guid_creation_num: u64,
+    pub owner: AccountAddress,
+    pub allow_ungated_transfer: bool,
+    pub transfer_events: EventHandle,
 }
