@@ -157,14 +157,19 @@ pub fn serialize_and_allow_delayed_values(
 pub fn serialized_size_allowing_delayed_values(
     value: &Value,
     layout: &MoveTypeLayout,
-) -> Option<usize> {
+) -> PartialVMResult<usize> {
     let native_serializer = RelaxedCustomSerDe::new();
     let value = SerializationReadyValue {
         custom_serializer: Some(&native_serializer),
         layout,
         value: &value.0,
     };
-    bcs::serialized_size(&value).ok()
+    bcs::serialized_size(&value).map_err(|e| {
+        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
+            "failed to compute serialized size of a value: {:?}",
+            e
+        ))
+    })
 }
 
 /// Allow conversion between values and identifiers (delayed values). For example,

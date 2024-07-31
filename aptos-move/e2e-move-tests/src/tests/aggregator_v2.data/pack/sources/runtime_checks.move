@@ -124,7 +124,7 @@ module 0x1::runtime_checks {
     }
 
     public entry fun test_serialized_size_with_snapshots() {
-        let a = with_snapshot<u64>(0);
+        let a = with_snapshot<u128>(0);
         let _ = bcs::serialized_size(&a);
     }
 

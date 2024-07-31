@@ -4,11 +4,11 @@
 /// details on BCS.
 module std::bcs {
     /// Returns the binary representation of `v` in BCS (Binary Canonical Serialization) format.
-    /// Returns  `0x1C5` if serialization fails.
+    /// Aborts with `0x1c5` error code if serialization fails.
     native public fun to_bytes<MoveValue>(v: &MoveValue): vector<u8>;
 
     /// Returns the size of the binary representation of `v` in BCS (Binary Canonical Serialization) format.
-    /// Returns  `0x1C5` if there is a failure when calculating serialized size.
+    /// Aborts with `0x1c5` error code if there is a failure when calculating serialized size.
     native public fun serialized_size<MoveValue>(v: &MoveValue): u64;
 
     // ==============================

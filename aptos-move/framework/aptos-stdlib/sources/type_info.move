@@ -70,6 +70,9 @@ module aptos_std::type_info {
     #[test_only]
     use aptos_std::table::Table;
 
+    #[test_only]
+    use std::vector;
+
     #[test]
     fun test_type_of() {
         let type_info = type_of<TypeInfo>();

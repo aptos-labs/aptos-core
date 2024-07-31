@@ -11,44 +11,17 @@ use aptos_native_interface::{
     SafeNativeResult,
 };
 use move_core_types::{
-    gas_algebra::NumBytes, value::MoveTypeLayout,
-    vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
+    gas_algebra::NumBytes, vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    natives::function::PartialVMResult,
     value_serde::serialized_size_allowing_delayed_values,
     values::{values_impl::Reference, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
-
-// Processes arguments passed to the BCS functions, e.g., to_bytes or serialized_size.
-// Returns the value to serialize, and its layout.
-fn process_bcs_args(
-    context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<(Value, MoveTypeLayout)> {
-    debug_assert!(ty_args.len() == 1);
-    debug_assert!(args.len() == 1);
-
-    let ref_to_val = safely_pop_arg!(args, Reference);
-    let arg_type = ty_args.pop().unwrap();
-
-    let layout = match context.type_to_type_layout(&arg_type) {
-        Ok(layout) => layout,
-        Err(_) => {
-            context.charge(BCS_TO_BYTES_FAILURE)?;
-            return Err(SafeNativeError::Abort {
-                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
-            });
-        },
-    };
-
-    let val = ref_to_val.read_ref()?;
-    Ok((val, layout))
-}
 
 /***************************************************************************************************
  * native fun to_bytes
@@ -65,10 +38,29 @@ fn process_bcs_args(
 #[inline]
 fn native_to_bytes(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    args: VecDeque<Value>,
+    mut ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let (val, layout) = process_bcs_args(context, ty_args, args)?;
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(args.len() == 1);
+
+    // pop type and value
+    let ref_to_val = safely_pop_arg!(args, Reference);
+    let arg_type = ty_args.pop().unwrap();
+
+    // get type layout
+    let layout = match context.type_to_type_layout(&arg_type) {
+        Ok(layout) => layout,
+        Err(_) => {
+            context.charge(BCS_TO_BYTES_FAILURE)?;
+            return Err(SafeNativeError::Abort {
+                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
+            });
+        },
+    };
+
+    // serialize value
+    let val = ref_to_val.read_ref()?;
     let serialized_value = match val.simple_serialize(&layout) {
         Some(serialized_value) => serialized_value,
         None => {
@@ -95,29 +87,39 @@ fn native_to_bytes(
  **************************************************************************************************/
 fn native_serialized_size(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    args: VecDeque<Value>,
+    mut ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let (val, layout) = process_bcs_args(context, ty_args, args)?;
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(args.len() == 1);
 
-    // Note:
-    // This function reuses the same gas costs as bcs::to_bytes. We might want to
-    // consider to charge less if
-    //   1) calculation of serialized size changes, or
-    //   2) the final gas cost (it is u64, not vector like in bcs::to_bytes).
-    // Charging for failure during layout construction can stay the same.
-    let serialized_size = match serialized_size_allowing_delayed_values(&val, &layout) {
-        Some(serialized_size) => serialized_size as u64,
-        None => {
-            context.charge(BCS_TO_BYTES_FAILURE)?;
+    let reference = safely_pop_arg!(args, Reference);
+    let ty = ty_args.pop().unwrap();
+
+    let serialized_size = match serialized_size_impl(context, reference, &ty) {
+        Ok(serialized_size) => serialized_size as u64,
+        Err(_) => {
+            context.charge(BCS_SERIALIZED_SIZE_FAILURE)?;
+
+            // Re-use the same abort code as bcs::to_bytes.
             return Err(SafeNativeError::Abort {
                 abort_code: NFE_BCS_SERIALIZATION_FAILURE,
             });
         },
     };
-    context.charge(BCS_TO_BYTES_PER_BYTE_SERIALIZED * NumBytes::new(serialized_size))?;
+    context.charge(BCS_SERIALIZED_SIZE_PER_BYTE_SERIALIZED * NumBytes::new(serialized_size))?;
 
     Ok(smallvec![Value::u64(serialized_size)])
+}
+
+fn serialized_size_impl(
+    context: &mut SafeNativeContext,
+    reference: Reference,
+    ty: &Type,
+) -> PartialVMResult<usize> {
+    let value = reference.read_ref()?;
+    let ty_layout = context.type_to_type_layout(ty)?;
+    serialized_size_allowing_delayed_values(&value, &ty_layout)
 }
 
 /***************************************************************************************************

@@ -24,7 +24,7 @@ details on BCS.
 ## Function `to_bytes`
 
 Returns the binary representation of <code>v</code> in BCS (Binary Canonical Serialization) format.
-Returns  <code>0x1C5</code> if serialization fails.
+Aborts with <code>0x1c5</code> error code if serialization fails.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -48,7 +48,7 @@ Returns  <code>0x1C5</code> if serialization fails.
 ## Function `serialized_size`
 
 Returns the size of the binary representation of <code>v</code> in BCS (Binary Canonical Serialization) format.
-Returns  <code>0x1C5</code> if there is a failure when calculating serialized size.
+Aborts with <code>0x1c5</code> error code if there is a failure when calculating serialized size.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialized_size">serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64

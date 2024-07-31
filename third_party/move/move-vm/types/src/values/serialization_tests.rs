@@ -8,7 +8,7 @@ use crate::{
     value_serde::{serialize_and_allow_delayed_values, serialized_size_allowing_delayed_values},
     values::{Struct as StructValue, Value},
 };
-use claims::{assert_none, assert_ok, assert_some};
+use claims::{assert_err, assert_ok, assert_some};
 use move_core_types::{
     account_address::AccountAddress,
     u256,
@@ -113,7 +113,7 @@ fn test_serialized_size() {
         let bytes = assert_some!(assert_ok!(serialize_and_allow_delayed_values(
             &value, &layout
         )));
-        let size = assert_some!(serialized_size_allowing_delayed_values(&value, &layout));
+        let size = assert_ok!(serialized_size_allowing_delayed_values(&value, &layout));
         assert_eq!(size, bytes.len());
     }
 
@@ -127,6 +127,6 @@ fn test_serialized_size() {
         (Value::u64(12), Native(Aggregator, Box::new(U64))),
     ];
     for (value, layout) in bad_values_layouts_sizes {
-        assert_none!(serialized_size_allowing_delayed_values(&value, &layout));
+        assert_err!(serialized_size_allowing_delayed_values(&value, &layout));
     }
 }
