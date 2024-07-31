@@ -136,7 +136,7 @@ module admin::transaction_context_test {
         let store = borrow_global_mut<TransactionContextStore>(@admin);
 
         let multisig_account = multisig_account::get_next_multisig_account_address(signer::address_of(s));
-        multisig_account::create(s, 1, vector[], vector[]);
+        multisig_account::create(s, 1, vector[], vector[], 300);
         multisig_account::create_transaction(s, multisig_account, payload);
 
         store.multisig_address = multisig_account;

@@ -245,10 +245,6 @@ impl ExecutionAndIOCosts {
             total += dep.cost;
         }
 
-        for dep in &self.dependencies {
-            total += dep.cost;
-        }
-
         for op in self.gas_events() {
             match op {
                 Loc(..) | Call(..) => (),

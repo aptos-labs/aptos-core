@@ -4,5 +4,5 @@ version = "0.0.0"
 upgrade_policy = "compatible"
 
 [dependencies]
-AptosFramework = { local = "../../../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../../../framework/supra-framework" }
 test_package = { local = "../pack_upgrade_compat" }
