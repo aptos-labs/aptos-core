@@ -457,10 +457,7 @@ impl ProposalGenerator {
                 .pull_payload(
                     PayloadPullParameters {
                         max_poll_time: self.quorum_store_poll_time.saturating_sub(proposal_delay),
-                        max_txns: PayloadTxnsSize {
-                            count: self.max_block_txns,
-                            bytes: self.max_block_bytes,
-                        },
+                        max_txns: PayloadTxnsSize::new(self.max_block_txns, max_block_bytes),
                         max_txns_after_filtering: self.max_block_txns_after_filtering,
                         soft_max_txns_after_filtering: max_txns_from_block_to_execute
                             .unwrap_or(max_block_txns_after_filtering),

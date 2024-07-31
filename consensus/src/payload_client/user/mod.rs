@@ -42,7 +42,7 @@ impl UserPayloadClient for DummyClient {
     async fn pull(
         &self,
         mut params: PayloadPullParameters,
-        wait_callback: BoxFuture<'static, ()>,
+        _wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let timer = Instant::now();
         let mut nxt_txn_idx = 0;

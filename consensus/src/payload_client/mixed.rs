@@ -144,8 +144,8 @@ mod tests {
                 PayloadPullParameters::new_for_test(
                     Duration::from_secs(1), // max_poll_time
                     120,                    // max_items
-                    99,                     // max_unique_items
                     1048576,                // size limit: 1MB
+                    99,                     // max_unique_items
                     50,
                     500000, // inline limit: 500KB
                     PayloadFilter::Empty,
@@ -171,8 +171,8 @@ mod tests {
                 PayloadPullParameters::new_for_test(
                     Duration::from_micros(500), // max_poll_time
                     120,                        // max_items
-                    99,                         // max_unique_items
                     1048576,                    // size limit: 1MB
+                    99,                         // max_unique_items
                     50,
                     500000, // inline limit: 500KB
                     PayloadFilter::Empty,
@@ -198,8 +198,8 @@ mod tests {
                 PayloadPullParameters::new_for_test(
                     Duration::from_secs(1), // max_poll_time
                     2,                      // max_items
-                    2,                      // max_unique_items
                     1048576,                // size limit: 1MB
+                    2,                      // max_unique_items
                     0,
                     0, // inline limit: 0
                     PayloadFilter::Empty,
@@ -225,8 +225,8 @@ mod tests {
                 PayloadPullParameters::new_for_test(
                     Duration::from_secs(1), // max_poll_time
                     120,                    // max_items
-                    99,                     // max_unique_items
                     all_validator_txns[0].size_in_bytes() as u64,
+                    99, // max_unique_items
                     50,
                     all_validator_txns[0].size_in_bytes() as u64,
                     PayloadFilter::Empty,
@@ -270,8 +270,8 @@ mod tests {
                 PayloadPullParameters::new_for_test(
                     Duration::from_millis(50), // max_poll_time
                     120,                       // max_items
-                    99,                        // max_unique_items
                     1048576,                   // size limit: 1MB
+                    99,                        // max_unique_items
                     50,
                     500000, // inline limit: 500KB
                     PayloadFilter::Empty,

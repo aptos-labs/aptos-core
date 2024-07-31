@@ -6,6 +6,7 @@ pub struct PayloadTxnsSize {
 
 impl PayloadTxnsSize {
     pub fn new(count: u64, bytes: u64) -> Self {
+        assert!(count <= bytes);
         Self { count, bytes }
     }
 
@@ -72,12 +73,6 @@ impl PartialEq for PayloadTxnsSize {
 
 impl PartialOrd for PayloadTxnsSize {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // If the size in bytes is less than the count, then we cannot compare
-        // the two quantities.
-        if self.count > self.bytes || other.count > other.bytes {
-            return None;
-        }
-
         Some(self.cmp(other))
     }
 }
@@ -86,6 +81,8 @@ impl Eq for PayloadTxnsSize {}
 
 impl Ord for PayloadTxnsSize {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        assert!(self.count <= self.bytes || other.count <= other.bytes);
+
         if self.count == other.count && self.bytes == other.bytes {
             return std::cmp::Ordering::Equal;
         }

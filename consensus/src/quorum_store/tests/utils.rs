@@ -5,6 +5,7 @@ use crate::quorum_store::utils::ProofQueue;
 use aptos_consensus_types::{
     common::TxnSummaryWithExpiration,
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
+    utils::PayloadTxnsSize,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
@@ -83,10 +84,9 @@ fn test_proof_queue_sorting() {
     }
 
     // Expect: [600, 300]
-    let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(
+    let (pulled, _, num_unique_txns, _) = proof_queue.pull_proofs(
         &hashset![],
-        4,
-        2,
+        PayloadTxnsSize::new(4, 10),
         2,
         2,
         true,
@@ -113,10 +113,9 @@ fn test_proof_queue_sorting() {
     assert_eq!(num_unique_txns, 2);
 
     // Expect: [600, 500, 300, 100]
-    let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(
+    let (pulled, _, num_unique_txns, _) = proof_queue.pull_proofs(
         &hashset![],
-        6,
-        4,
+        PayloadTxnsSize::new(6, 10),
         4,
         4,
         true,
@@ -496,14 +495,13 @@ fn test_proof_pull_proofs_with_duplicates() {
 
     let result = proof_queue.pull_proofs(
         &hashset![],
-        8,
+        PayloadTxnsSize::new(8, 400),
         4,
         4,
-        400,
         true,
         Duration::from_micros(now_in_usecs),
     );
-    assert_eq!(result.1, 4);
+    assert_eq!(result.2, 4);
 
     let mut pulled_txns = HashSet::new();
     for proof in result.0 {
@@ -523,141 +521,131 @@ fn test_proof_pull_proofs_with_duplicates() {
 
     let result = proof_queue.pull_proofs(
         &hashset![info_0.clone()],
-        8,
+        PayloadTxnsSize::new(8, 400),
         4,
         4,
-        400,
         true,
         Duration::from_micros(now_in_usecs),
     );
     assert_eq!(result.0.len(), 7);
     // filtered_txns: txn_0 (included in excluded batches)
-    assert_eq!(result.1, 3);
+    assert_eq!(result.2, 3);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 500_000);
     // Nothing changes
     let result = proof_queue.pull_proofs(
         &hashset![],
-        8,
+        PayloadTxnsSize::new(8, 400),
         5,
         5,
-        400,
         true,
         Duration::from_micros(now_in_usecs + 500_100),
     );
-    assert_eq!(result.1, 4);
+    assert_eq!(result.2, 4);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 1_000_000);
     // txn_1 expired
     let result = proof_queue.pull_proofs(
         &hashset![],
-        8,
+        PayloadTxnsSize::new(8, 400),
         5,
         5,
-        400,
         true,
         Duration::from_micros(now_in_usecs + 1_000_100),
     );
     assert_eq!(result.0.len(), 8);
-    assert_eq!(result.1, 3);
+    assert_eq!(result.2, 3);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 1_200_000);
     // author_0_batches[0] is removed. txn_1 expired.
     let result = proof_queue.pull_proofs(
         &hashset![],
-        8,
+        PayloadTxnsSize::new(8, 400),
         4,
         4,
-        400,
         true,
         Duration::from_micros(now_in_usecs + 1_200_100),
     );
     assert_eq!(result.0.len(), 7);
-    assert_eq!(result.1, 3);
+    assert_eq!(result.2, 3);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 2_000_000);
     // author_0_batches[0] is removed. txn_0, txn_1 are expired.
     let result = proof_queue.pull_proofs(
         &hashset![],
-        8,
+        PayloadTxnsSize::new(8, 400),
         4,
         4,
-        400,
         true,
         Duration::from_micros(now_in_usecs + 2_000_100),
     );
     assert_eq!(result.0.len(), 7);
-    assert_eq!(result.1, 2);
+    assert_eq!(result.2, 2);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 2_500_000);
     // author_0_batches[0], author_1_batches[1] is removed. txn_0, txn_1 is expired.
     let result = proof_queue.pull_proofs(
         &hashset![],
-        8,
+        PayloadTxnsSize::new(8, 400),
         4,
         4,
-        400,
         true,
         Duration::from_micros(now_in_usecs + 2_500_100),
     );
     assert_eq!(result.0.len(), 6);
-    assert_eq!(result.1, 2);
+    assert_eq!(result.2, 2);
 
     let result = proof_queue.pull_proofs(
         &hashset![info_7],
-        8,
+        PayloadTxnsSize::new(8, 400),
         4,
         4,
-        400,
         true,
         Duration::from_micros(now_in_usecs + 2_500_100),
     );
     // author_0_batches[0], author_1_batches[1] is removed. author_1_batches[2] is excluded. txn_0, txn_1 are expired.
     assert_eq!(result.0.len(), 5);
-    assert_eq!(result.1, 1);
+    assert_eq!(result.2, 1);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 3_000_000);
     let result = proof_queue.pull_proofs(
         &hashset![],
+        PayloadTxnsSize::new(8, 400),
         8,
-        4,
-        4,
-        400,
+        8,
         true,
         Duration::from_micros(now_in_usecs + 3_000_100),
     );
     // author_0_batches[0], author_0_batches[1], author_1_batches[1] are removed. txn_0, txn_1, txn_2 are expired.
     assert_eq!(result.0.len(), 5);
-    assert_eq!(result.1, 1);
+    assert_eq!(result.2, 1);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 3_500_000);
     let result = proof_queue.pull_proofs(
         &hashset![],
-        8,
+        PayloadTxnsSize::new(8, 400),
         4,
         4,
-        400,
         true,
         Duration::from_micros(now_in_usecs + 3_500_100),
     );
     // author_0_batches[0], author_0_batches[1], author_1_batches[1], author_1_batches[2] are removed. txn_0, txn_1, txn_0 are expired.
     assert_eq!(result.0.len(), 4);
-    assert_eq!(result.1, 0);
+    assert_eq!(result.2, 0);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 4_000_000);
     let result = proof_queue.pull_proofs(
         &hashset![],
-        8,
+        PayloadTxnsSize::new(8, 400),
         4,
         4,
-        400,
         true,
         Duration::from_micros(now_in_usecs + 4_000_100),
     );
     // author_0_batches[0], author_0_batches[1], author_0_batches[3], author_1_batches[0], author_1_batches[1], author_1_batches[2] are removed.
     // txn_0, txn_1, txn_2 are expired.
     assert_eq!(result.0.len(), 2);
-    assert_eq!(result.1, 0);
+    assert_eq!(result.2, 0);
 }
 
 #[test]
@@ -681,7 +669,6 @@ fn test_proof_queue_soft_limit() {
         100,
         12,
         12,
-        100,
         true,
         aptos_infallible::duration_since_epoch(),
     );
@@ -694,7 +681,6 @@ fn test_proof_queue_soft_limit() {
         100,
         30,
         12,
-        100,
         true,
         aptos_infallible::duration_since_epoch(),
     );
