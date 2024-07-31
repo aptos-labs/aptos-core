@@ -164,8 +164,8 @@ impl BatchKey {
 
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub struct BatchSortKey {
-    pub batch_key: BatchKey,
-    pub gas_bucket_start: u64,
+    batch_key: BatchKey,
+    gas_bucket_start: u64,
 }
 
 impl BatchSortKey {
@@ -295,7 +295,7 @@ impl BatchProofQueue {
                         if let Some(item) = self.items.get(&batch_sort_key.batch_key) {
                             if item.txn_summaries.is_none() {
                                 if let Some(ref proof) = item.proof {
-                                    // The batch is included in author_to_batches, batch_to_proof, but not in batch_summaries
+                                    // The batch has a proof but not txn summaries
                                     return proof.num_txns();
                                 }
                             }
@@ -350,7 +350,8 @@ impl BatchProofQueue {
             });
 
         // If we are here, then proof is added for the first time. Otherwise, we will
-        // return early. We only count when proof is added for the first time.
+        // return early. We only count when proof is added for the first time and txn
+        // summary exists.
         if let Some(ref txn_summaries) = item.txn_summaries {
             for txn_summary in txn_summaries {
                 *self
@@ -388,7 +389,7 @@ impl BatchProofQueue {
             self.expirations
                 .add_item(batch_sort_key, batch_info.expiration());
 
-            let mut txn_summary_exists = false;
+            let mut txn_summary_already_exists = false;
             let mut proof_exists = false;
             let batch_key = BatchKey::from_info(&batch_info);
             let item = self
@@ -398,7 +399,8 @@ impl BatchProofQueue {
                     if item.txn_summaries.is_none() {
                         item.txn_summaries = Some(txn_summaries.clone())
                     } else {
-                        txn_summary_exists = true;
+                        debug!("Txn Summary already exists for batch {}", batch_key);
+                        txn_summary_already_exists = true;
                     }
 
                     if item.proof.is_some() {
@@ -412,7 +414,9 @@ impl BatchProofQueue {
                     txn_summaries: Some(txn_summaries.clone()),
                 });
 
-            if proof_exists && txn_summary_exists {
+            // We only count txn summaries first time it is added to the queue
+            // and only if the proof already exists.
+            if proof_exists && !txn_summary_already_exists {
                 for txn_summary in &txn_summaries {
                     *self
                         .txn_summary_num_occurrences
