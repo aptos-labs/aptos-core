@@ -303,6 +303,20 @@ fn assert_equal_if_true_test() {
 }
 
 #[test]
+fn full_circuit_test() {
+    let circuit_handle = TestCircuitHandle::new("../main.circom").unwrap();
+    let config = CircuitPaddingConfig::new()
+            .max_length("ev_name", 20)
+            .max_length("ev_value", 10)
+            .max_length("uid_name", 30);
+    let original_b64 = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTM5OTAzMDcwODI4OTk3MTg3NzUiLCJhdF9oYXNoIjoibFZlRDR4UDZRMVpHckwzZ0ZjQ1FMUSIsIm5hbWUiOiJNaWNoYWVsIFN0cmFrYSIsInBpY3R1cmUiOiJodHRwczovL2xoMy5nb29nbGV1c2VyY29udGVudC5jb20vYS9BQ2c4b2NMVm44RjhWblhLTk5KaFJPaFRwUXVMTGpGRWR2X3Vob2UtRFVhUlRseEtFeTllNHc9czk2LWMiLCJnaXZlbl9uYW1lIjoiTWljaGFlbCIsImZhbWlseV9uYW1lIjoiU3RyYWthIiwiaWF0IjoxNzE5ODY2MTM4LCJleHAiOjE3MTk4Njk3MzgsIm5vbmNlIjoiMjI4NDQ3MzMzMzQ0MjI1MTgwNDM3OTY4MTY0Mzk2NTMwODE1NDMxMTc3MzY2NzUyNTM5ODExOTQ5Njc5NzU0NTU5NDcwNTM1NjQ5NSJ9";
+    let max_aud_kv_pair_len = 140;
+    let max_aud_name_len = 40;
+    let max_aud_value_len = 120;
+    let aud_field_string = "\"aud\":\"407408718192.apps.googleusercontent.com\",";
+}
+
+#[test]
 fn email_verified_check_test() {
     let circuit_handle = TestCircuitHandle::new("misc/email_verified_check_test.circom").unwrap();
 
