@@ -4,7 +4,6 @@
 //! This module contains the peephole optimizer for the Move file format bytecode.
 //! Peephole optimizations assume that the bytecode is valid, and all user-facing
 //! error checks have already been performed.
-//! We currently do not perform peephole optimizations if inline spec blocks are present.
 
 pub mod inefficient_binops;
 pub mod optimizers;
