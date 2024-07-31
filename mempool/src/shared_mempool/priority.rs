@@ -268,7 +268,8 @@ impl PrioritizedPeersState {
         let num_peers_required_for_load_balancing = min(
             (num_txns_received_since_peers_updated as f64
                 / ((self.mempool_config.avg_mempool_traffic_in_tps_per_peer
-                    * max(1, time_elapsed_since_last_update)) as f64)) as u64,
+                    * max(1, time_elapsed_since_last_update)) as f64))
+                .ceil() as u64,
             MempoolSenderBucket::MAX.into(),
         ) as MempoolSenderBucket;
         let num_top_peers = max(
