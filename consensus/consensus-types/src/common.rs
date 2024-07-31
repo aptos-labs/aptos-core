@@ -283,13 +283,9 @@ impl Payload {
                 panic!("Payload is in direct mempool format");
             },
             Payload::OptQuorumStore(mut opt_qs_payload) => {
-                let execution_limits = match max_txns_to_execute {
-                    Some(max_txns_to_execute) => {
-                        PayloadExecutionLimit::MaxTransactionsToExecute(max_txns_to_execute)
-                    },
-                    None => PayloadExecutionLimit::None,
-                };
-                opt_qs_payload.set_execution_limit(execution_limits);
+                opt_qs_payload.set_execution_limit(PayloadExecutionLimit::max_txns_to_execute(
+                    max_txns_to_execute,
+                ));
                 Payload::OptQuorumStore(opt_qs_payload)
             },
         }
@@ -421,6 +417,24 @@ impl Payload {
                 p3.extend(p2);
                 Payload::QuorumStoreInlineHybrid(b2, p3, m3)
             },
+            (
+                Payload::QuorumStoreInlineHybrid(inline_batches, proofs, limit),
+                Payload::OptQuorumStore(opt_qs),
+            )
+            | (
+                Payload::OptQuorumStore(opt_qs),
+                Payload::QuorumStoreInlineHybrid(inline_batches, proofs, limit),
+            ) => {
+                let execution_limits = PayloadExecutionLimit::max_txns_to_execute(limit);
+                let converted_payload = OptQuorumStorePayload::new(
+                    inline_batches.into(),
+                    Vec::new().into(),
+                    proofs.into(),
+                    execution_limits,
+                );
+                let opt_qs3 = opt_qs.extend(converted_payload);
+                Payload::OptQuorumStore(opt_qs3)
+            },
             (Payload::OptQuorumStore(opt_qs1), Payload::OptQuorumStore(opt_qs2)) => {
                 let opt_qs3 = opt_qs1.extend(opt_qs2);
                 Payload::OptQuorumStore(opt_qs3)
@@ -512,8 +526,9 @@ impl Payload {
             (true, Payload::OptQuorumStore(opt_quorum_store)) => {
                 let proof_with_data = opt_quorum_store.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
-                // TODO(ibalajiarun): Remove this when ready to support OptQuorumStore.
-                bail!("OptQuorumStore is not supported yet.");
+                // TODO(ibalajiarun): Remove this log when OptQS is enabled.
+                error!("OptQuorumStore Payload is not expected yet");
+                Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",

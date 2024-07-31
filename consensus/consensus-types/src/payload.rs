@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::DataStatus,
+    common::{DataStatus, ProofWithData},
     proof_of_store::{BatchInfo, ProofOfStore},
 };
 use aptos_infallible::Mutex;
@@ -112,6 +112,15 @@ impl<T> IntoIterator for BatchPointer<T> {
     }
 }
 
+impl From<ProofWithData> for BatchPointer<ProofOfStore> {
+    fn from(value: ProofWithData) -> Self {
+        Self {
+            batch_summary: value.proofs,
+            status: value.status,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum PayloadExecutionLimit {
     None,
@@ -128,6 +137,12 @@ impl PayloadExecutionLimit {
                 PayloadExecutionLimit::MaxTransactionsToExecute(limit2),
             ) => PayloadExecutionLimit::MaxTransactionsToExecute(*limit1 + *limit2),
         };
+    }
+
+    pub(crate) fn max_txns_to_execute(limit: Option<u64>) -> Self {
+        limit.map_or(PayloadExecutionLimit::None, |val| {
+            PayloadExecutionLimit::MaxTransactionsToExecute(val)
+        })
     }
 }
 
@@ -189,6 +204,16 @@ impl From<Vec<InlineBatch>> for InlineBatches {
     }
 }
 
+impl From<Vec<(BatchInfo, Vec<SignedTransaction>)>> for InlineBatches {
+    fn from(value: Vec<(BatchInfo, Vec<SignedTransaction>)>) -> Self {
+        value
+            .into_iter()
+            .map(|(batch_info, transactions)| InlineBatch::new(batch_info, transactions))
+            .collect::<Vec<_>>()
+            .into()
+    }
+}
+
 impl Deref for InlineBatches {
     type Target = Vec<InlineBatch>;
 
@@ -246,12 +271,13 @@ impl OptQuorumStorePayload {
         inline_batches: InlineBatches,
         opt_batches: BatchPointer<BatchInfo>,
         proofs: BatchPointer<ProofOfStore>,
+        execution_limits: PayloadExecutionLimit,
     ) -> Self {
         Self::V1(OptQuorumStorePayloadV1 {
             inline_batches,
             opt_batches,
             proofs,
-            execution_limits: PayloadExecutionLimit::None,
+            execution_limits,
         })
     }
 

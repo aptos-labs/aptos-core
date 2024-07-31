@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
-    payload::{InlineBatch, OptQuorumStorePayload},
+    payload::{InlineBatch, OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -282,24 +282,15 @@ impl ProofManager {
                 counters::NUM_INLINE_TXNS.observe(inline_block_size.bytes as f64);
 
                 let response = if self.enable_opt_quorum_store {
+                    let inline_batches = inline_block.into();
                     Payload::OptQuorumStore(OptQuorumStorePayload::new(
-                        inline_block
-                            .into_iter()
-                            .map(|(info, txns)| InlineBatch::new(info, txns))
-                            .collect::<Vec<InlineBatch>>()
-                            .into(),
+                        inline_batches,
                         opt_batches.into(),
                         proof_block.into(),
+                        PayloadExecutionLimit::None,
                     ))
                 } else if proof_block.is_empty() && inline_block.is_empty() {
                     Payload::empty(true, self.allow_batches_without_pos_in_proposal)
-                } else if inline_block.is_empty() {
-                    trace!(
-                        "QS: GetBlockRequest excluded len {}, block len {}",
-                        excluded_batches.len(),
-                        proof_block.len()
-                    );
-                    Payload::InQuorumStore(ProofWithData::new(proof_block))
                 } else {
                     trace!(
                         "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",
