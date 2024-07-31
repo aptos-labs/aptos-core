@@ -603,12 +603,11 @@ fn k8s_test_suite() -> ForgeConfig {
 fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
-    _test_cmd: &TestCommand,
+    test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            pfn_const_tps(duration, true, true, false)
-            // realistic_env_max_load_test(duration, test_cmd, 7, 5)
+            realistic_env_max_load_test(duration, test_cmd, 7, 5)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
@@ -2468,11 +2467,11 @@ fn pfn_const_tps(
     };
 
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
-        .with_initial_fullnode_count(20)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 10000 }))
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .add_network_test(PFNPerformance::new(
-            4,
+            7,
             add_cpu_chaos,
             add_network_emulation,
             None,
