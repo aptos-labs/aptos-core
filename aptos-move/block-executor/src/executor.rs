@@ -113,12 +113,20 @@ where
         executor: &E,
         base_view: &S,
         parallel_state: ParallelState<T, X>,
+        start_time_all: &Instant,
+        thread_id: &usize,
     ) -> Result<Option<ValidationMode>, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
+        
+
+        if idx_to_execute <= 2 {
+            let cur = Instant::now();
+            println!("critical path, about to execute transaction with version, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+        }
         let execute_result = executor.execute_transaction_with_version(
             &sync_view,
             txn,
@@ -126,6 +134,11 @@ where
             incarnation,
             fallback,
         );
+
+        if idx_to_execute <= 2 {
+            let cur = Instant::now();
+            println!("critical path, executed transaction with vertsion, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+        }
 
         let mut read_set = sync_view.take_parallel_reads();
 
@@ -139,6 +152,10 @@ where
             })
         };
 
+        if idx_to_execute <= 2 {
+            let cur = Instant::now();
+            println!("critical path, about to execute execution flag writing, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+        }
         let mut ret_mode = if let Some(is_validated) =
             scheduler.try_set_execution_flag_writing(idx_to_execute, validation_function)
         {
@@ -150,6 +167,12 @@ where
         } else {
             return Ok(None);
         };
+
+
+       if idx_to_execute <= 2 {                                                                                                          
+           let cur = Instant::now();
+           println!("critical path, executed execution flag writing, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+       }
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -513,6 +536,8 @@ where
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
                 // Because of that, we can also ignore _needs_suffix_validation result.
+                let cur = Instant::now();
+                let dummy_id: usize = 0;
                 let _validation_mode = Self::execute(
                     txn_idx,
                     incarnation + 1,
@@ -529,6 +554,8 @@ where
                         start_shared_counter,
                         shared_counter,
                     ),
+                    &cur,
+                    &dummy_id,
                 )?;
 
                 scheduler.finish_execution_during_commit(txn_idx)?;
@@ -805,7 +832,6 @@ where
         let executor = E::init(env.clone(), base_view);
         drop(init_timer);
 
-        let worker_id = *worker_id;
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
 
         let mut scheduler_task = SchedulerTask::Retry;
@@ -850,6 +876,10 @@ where
                         block,
                         num_workers,
                     )? {
+                            if last_idx <= 2 {
+                                let cur = Instant::now();
+                                println!("critical path, thread_id={}, transaction_id={}, commited at time={:?}", *worker_id, last_idx, cur-*start_time_all);
+                            }
                         last_commit_idx.replace(last_idx);
                     };
                     scheduler.queueing_commits_mark_done();
@@ -863,7 +893,16 @@ where
                 if let Some(mut last_commit_idx) = last_commit_idx {
                     //need to process next task
                     last_commit_idx += 1;
+                    
+                    if last_commit_idx <= 2 {
+                        let cur = Instant::now();
+                        println!("critical path, thread_id={}, transaction_id={}, trying fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                    }
                     if let Some(incarnation) = scheduler.try_fallback(last_commit_idx) {
+                        if last_commit_idx <= 2 {                                                                                                                                             
+                            let cur = Instant::now();
+                            println!("critical path, thread_id={}, transaction_id={}, inside fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                        }
                         if let Some(validation_mode) = Self::execute(
                             last_commit_idx,
                             incarnation,
@@ -880,13 +919,17 @@ where
                                 start_shared_counter,
                                 shared_counter,
                             ),
+                            start_time_all,
+                            worker_id
                         )? {
                             //if we are in fallback and won write => no need to validate
-                            let cur = Instant::now();
-                            println!("executed fallback on critical path, thread_id={}, time elapsed={:?}", worker_id, cur-*start_time_all);
-                            scheduler.finish_execution(
-                                last_commit_idx,
-                                incarnation,
+                                if last_commit_idx <= 2 { 
+                                    let cur = Instant::now();
+                                    println!("executed fallback on critical path, thread_id={}, transaction_id={}, time elapsed={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                                }
+                                scheduler.finish_execution(
+                                    last_commit_idx,
+                                    incarnation,
                                 validation_mode,
                             )?;
                             let end3 = Instant::now();
@@ -944,9 +987,15 @@ where
                             start_shared_counter,
                             shared_counter,
                         ),
+                        start_time_all,
+                        worker_id,
                     )? {
                         let temp =
                             scheduler.finish_execution(txn_idx, incarnation, validation_mode)?;
+                        if txn_idx <= 1 {
+                            let cur = Instant::now();
+                            println!("critical path, finished execution in main, thread_id={}, txn_idx={}, at time={:?}", *worker_id, txn_idx, cur-*start_time_all);
+                        }
                         temp
                     } else {
                         SchedulerTask::Retry
