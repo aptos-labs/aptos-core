@@ -279,7 +279,7 @@ impl PrioritizedPeersState {
             ),
         );
         info!(
-            "Time elapsed since last peer update: {:?}\n 
+            "Time elapsed since last peer update: {:?}\n
                Number of transactions received since last peer update: {:?},\n
                Ideal number of peers required for load balancing: {:?},\n
                Number of top peers picked: {:?}",
