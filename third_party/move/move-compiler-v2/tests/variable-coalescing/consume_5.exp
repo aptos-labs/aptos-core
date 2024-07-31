@@ -405,17 +405,16 @@ B2:
 	8: Call consume(u32)
 B3:
 	9: MoveLoc[0](Arg0: bool)
-	10: Not
-	11: BrFalse(15)
+	10: BrTrue(14)
 B4:
-	12: MoveLoc[1](Arg1: u32)
-	13: Call consume(u32)
-	14: Branch(17)
+	11: MoveLoc[1](Arg1: u32)
+	12: Call consume(u32)
+	13: Branch(16)
 B5:
-	15: MoveLoc[2](loc0: u32)
-	16: Call consume(u32)
+	14: MoveLoc[2](loc0: u32)
+	15: Call consume(u32)
 B6:
-	17: Ret
+	16: Ret
 }
 public test_struct(Arg0: bool, Arg1: W) /* def_idx: 3 */ {
 L2:	loc0: W
@@ -434,17 +433,16 @@ B2:
 	8: Call consume_(W)
 B3:
 	9: MoveLoc[0](Arg0: bool)
-	10: Not
-	11: BrFalse(15)
+	10: BrTrue(14)
 B4:
-	12: MoveLoc[1](Arg1: W)
-	13: Call consume_(W)
-	14: Branch(17)
+	11: MoveLoc[1](Arg1: W)
+	12: Call consume_(W)
+	13: Branch(16)
 B5:
-	15: MoveLoc[2](loc0: W)
-	16: Call consume_(W)
+	14: MoveLoc[2](loc0: W)
+	15: Call consume_(W)
 B6:
-	17: Ret
+	16: Ret
 }
 }
 ============ bytecode verification succeeded ========
