@@ -6,5 +6,3 @@ module 0xc0ffee::m {
         consume(x, x, 1, x);
     }
 }
-
-
