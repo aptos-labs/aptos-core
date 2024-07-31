@@ -8,6 +8,10 @@ In rare case, upstream changes that don't reflect in proto schema require backfi
 To mitigate the issue, you need a backfiller to reply transactions against the new proto
 schema so that the changes can surface up. 
 
+## Prerequisite
+
+* A running archival fullnode with `index` enabled. You can check more from [here](https://aptos.dev/en/network/nodes/configure/state-sync#archival-pfns) and [fullnode config](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/indexer-grpc/indexer-grpc-fullnode).
+
 
 ## How to run it.
 
