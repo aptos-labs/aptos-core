@@ -442,12 +442,20 @@ mod test {
 
         let left = MempoolMessageId(vec![(0, 3), (1, 4), (2, 5)]);
         let sender = 1 << 56;
-        let right = MempoolMessageId(vec![(2 | sender, 5), (1, 4), (0, 3)]);
+        let right = MempoolMessageId(vec![(2, 5), (1, 4), (sender, 3)]);
         assert!(right > left);
 
-        let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 4), (2 | sender, 5)]);
-        let right = MempoolMessageId(vec![(2 | sender, 5), (1, 4), (0, 3)]);
+        let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 4), (2 | sender, 3)]);
+        let right = MempoolMessageId(vec![(2 | sender, 5), (1, 4), (0, 5)]);
         assert!(left > right);
+
+        let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 4), (2, 3)]);
+        let right = MempoolMessageId(vec![(2 | sender, 5), (1, 4), (2, 3)]);
+        assert!(left > right);
+
+        let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 3), (2, 3)]);
+        let right = MempoolMessageId(vec![(2 | sender, 5), (1 | sender, 4), (2, 3)]);
+        assert!(right > left);
     }
 }
 
