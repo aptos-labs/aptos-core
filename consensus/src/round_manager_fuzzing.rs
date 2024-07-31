@@ -190,6 +190,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         1,
         1024,
         10,
+        1,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,

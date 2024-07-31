@@ -3494,6 +3494,11 @@ impl<'env> StructEnv<'env> {
             .map(|p| p as VariantIndex)
     }
 
+    /// Get the name of the variant in the struct by index.
+    pub fn get_variant_name_by_idx(&self, variant: VariantIndex) -> Option<Symbol> {
+        self.get_variants().nth(variant as usize)
+    }
+
     /// Returns the attributes of the variant.
     pub fn get_variant_attributes(&self, variant: Symbol) -> &[Attribute] {
         self.data
