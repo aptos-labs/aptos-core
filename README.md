@@ -54,7 +54,7 @@ Total mutants killed: 4
 ╰────────────────────────────────────────────────┴────────────────┴────────────────┴────────────╯
 ```
 
-The specification testing tool respects `RUST_LOG` variable, and it will print out as much information as the variable allows. There is possibility to enable logging only for the specific modules. Please refer to the[env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
+The specification testing tool respects the `RUST_LOG` variable, and it will print out as much information as the variable allows. There is possibility to enable logging only for the specific modules. Please refer to the[env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
 
 To generate a report in a JSON format, use the `-o` option:
 ```bash
@@ -87,12 +87,12 @@ To check possible options run:
 $ move-spec-test --help
 ```
 
-Move Specification tool runs Move Mutator internally, however there is possibility to run it manually. To check possible options run:
+Move Specification tool runs Move Mutator internally, however there is a possibility to run it manually. To check possible options run:
 ```bash
 $ move-mutator --help
 ```
 
-By default, the output shall be stored in the `mutants_output` directory unless otherwise specified. The mutator tool also respects `RUST_LOG` variable.
+By default, the output shall be stored in the `mutants_output` directory unless otherwise specified. The mutator tool also respects the `RUST_LOG` variable.
 
 To generate mutants for all files within a test project (for the whole Move package) run:
 ```bash
@@ -103,6 +103,9 @@ $ move-mutator -p third_party/move/tools/move-mutator/tests/move-assets/simple/
 
 **Move Specification Tester** and **Move Mutator** are released under the open source [Apache License](LICENSE)
 
-## About Us
+## About [Eiger](https://www.eiger.co)
 
-[Eiger](https://www.eiger.co) helps leading technology companies to scale and develop their core technologies to gain an edge by providing expert teams in the most critical areas of modern web3 development.
+We are engineers. We contribute to various ecosystems by building low level implementations and core components. We built these tools because we believe in Move. We are happy to contribute to the Aptos ecosystem and will continue to do so in the future.
+
+Contact us at hello@eiger.co
+Follow us on [X/Twitter](https://x.com/eiger_co)
