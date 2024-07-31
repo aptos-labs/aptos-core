@@ -263,6 +263,36 @@ static SYSTEM_12_CORES_10GB_THRESHOLD: Lazy<SystemMetricsThreshold> = Lazy::new(
     )
 });
 
+static RELIABLE_PROGRESS_THRESHOLD: Lazy<StateProgressThreshold> = Lazy::new(|| {
+    StateProgressThreshold {
+        max_non_epoch_no_progress_secs: 10.0,
+        max_epoch_no_progress_secs: 10.0,
+        max_non_epoch_round_gap: 4,
+        max_epoch_round_gap: 4,
+    }
+});
+
+static PROGRESS_THRESHOLD_20_6: Lazy<StateProgressThreshold> = Lazy::new(|| {
+    StateProgressThreshold {
+        max_non_epoch_no_progress_secs: 20.0,
+        max_epoch_no_progress_secs: 20.0,
+        max_non_epoch_round_gap: 6,
+        max_epoch_round_gap: 6,
+    }
+});
+
+static RELIABLE_REAL_ENV_PROGRESS_THRESHOLD: Lazy<StateProgressThreshold> = Lazy::new(|| {
+    StateProgressThreshold {
+        max_non_epoch_no_progress_secs: 30.0,
+        max_epoch_no_progress_secs: 30.0,
+        max_non_epoch_round_gap: 10,
+        max_epoch_round_gap: 10,
+    }
+});
+
+
+
+
 /// Make an easy to remember random namespace for your testnet
 fn random_namespace<R: Rng>(dictionary: Vec<String>, rng: &mut R) -> Result<String> {
     // Pick four random words
@@ -797,10 +827,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             SuccessCriteria::new(10000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
+                .add_chain_progress(PROGRESS_THRESHOLD_20_6.clone()),
         )
 }
 
@@ -871,10 +898,7 @@ fn twin_validator_test() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
                 .add_system_metrics_threshold(SYSTEM_12_CORES_5GB_THRESHOLD.clone())
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
+                .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
         )
 }
 
@@ -1046,10 +1070,7 @@ fn realistic_env_sweep_wrap(
             SuccessCriteria::new(0)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 30.0,
-                    max_round_gap: 10,
-                }),
+                .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD),
         )
 }
 
@@ -1291,10 +1312,7 @@ fn load_vs_perf_benchmark() -> ForgeConfig {
             SuccessCriteria::new(0)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 30.0,
-                    max_round_gap: 10,
-                }),
+                .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD.clone()),
         )
 }
 
@@ -1368,10 +1386,7 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
             SuccessCriteria::new(0)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 30.0,
-                    max_round_gap: 10,
-                }),
+                .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD.clone()),
         )
 }
 
@@ -1416,10 +1431,7 @@ fn graceful_overload() -> ForgeConfig {
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 30.0,
-                    max_round_gap: 10,
-                }),
+                .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD.clone()),
         )
 }
 
@@ -1458,10 +1470,7 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 30.0,
-                    max_round_gap: 10,
-                }),
+                .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD),
         )
 }
 
@@ -1551,10 +1560,7 @@ fn workload_mix_test() -> ForgeConfig {
             SuccessCriteria::new(3000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
+                .add_chain_progress(PROGRESS_THRESHOLD_20_6),
         )
 }
 
@@ -1619,10 +1625,7 @@ fn individual_workload_tests(test_name: String) -> ForgeConfig {
             })
             .add_no_restarts()
             .add_wait_for_catchup_s(240)
-            .add_chain_progress(StateProgressThreshold {
-                max_no_progress_secs: 20.0,
-                max_round_gap: 6,
-            }),
+            .add_chain_progress(PROGRESS_THRESHOLD_20_6),
         )
 }
 
@@ -1772,10 +1775,7 @@ fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
             SuccessCriteria::new(1000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
+                .add_chain_progress(PROGRESS_THRESHOLD_20_6.clone()),
         )
 }
 
@@ -1790,10 +1790,7 @@ fn three_region_simulation() -> ForgeConfig {
             SuccessCriteria::new(3000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
+                .add_chain_progress(PROGRESS_THRESHOLD_20_6),
         )
 }
 
@@ -1928,10 +1925,7 @@ fn validators_join_and_leave() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
+                .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
         )
 }
 
@@ -1978,8 +1972,10 @@ fn realistic_env_max_load_test(
         .add_latency_threshold(3.4, LatencyType::P50)
         .add_latency_threshold(4.5, LatencyType::P90)
         .add_chain_progress(StateProgressThreshold {
-            max_no_progress_secs: 15.0,
-            max_round_gap: 4,
+            max_non_epoch_no_progress_secs: 15.0,
+            max_epoch_no_progress_secs: 15.0,
+            max_non_epoch_round_gap: 4,
+            max_epoch_round_gap: 4,
         });
     if !ha_proxy {
         success_criteria = success_criteria.add_latency_breakdown_threshold(
@@ -2145,10 +2141,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     /* This test runs at high load, so we need more catchup time */
                     .add_wait_for_catchup_s(120),
                 /* Doesn't work without event indices
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
+                .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
                  */
             );
     } else {
@@ -2158,10 +2151,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 /* This test runs at high load, so we need more catchup time */
                 .add_wait_for_catchup_s(120),
             /* Doesn't work without event indices
-                .add_chain_progress(StateProgressThreshold {
-                     max_no_progress_secs: 10.0,
-                     max_round_gap: 4,
-                 }),
+                .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
             */
         );
     }
@@ -2301,21 +2291,26 @@ pub fn changing_working_quorum_test_helper(
             let success_criteria = SuccessCriteria::new(min_avg_tps)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(30)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: if max_down_nodes == 0 {
+                .add_chain_progress({
+                    let max_no_progress_secs = if max_down_nodes == 0 {
                         // very aggressive if no nodes are expected to be down
                         3.0
                     } else if max_down_nodes * 3 + 1 + 2 < num_validators {
                         // number of down nodes is at least 2 below the quorum limit, so
-                        // we can still be reasonably aggressive
+                        // we can still be reasonably aggqressive
                         15.0
                     } else {
                         // number of down nodes is close to the quorum limit, so
                         // make a check a bit looser, as state sync might be required
                         // to get the quorum back.
                         40.0
-                    },
-                    max_round_gap: 60,
+                    };
+                    StateProgressThreshold {
+                        max_non_epoch_no_progress_secs: max_no_progress_secs,
+                        max_epoch_no_progress_secs: max_no_progress_secs,
+                        max_non_epoch_round_gap: 60,
+                        max_epoch_round_gap: 60,
+                    }
                 });
 
             // If errors are allowed, overwrite the success criteria
@@ -2365,10 +2360,7 @@ fn large_db_test(
             SuccessCriteria::new(min_avg_tps)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(30)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
+                .add_chain_progress(PROGRESS_THRESHOLD_20_6),
         )
 }
 
@@ -2382,10 +2374,7 @@ fn quorum_store_reconfig_enable_test() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
+                .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
         )
 }
 
@@ -2412,10 +2401,7 @@ fn mainnet_like_simulation_test() -> ForgeConfig {
             SuccessCriteria::new(10000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
+                .add_chain_progress(PROGRESS_THRESHOLD_20_6),
         )
 }
 
@@ -2441,10 +2427,7 @@ fn multiregion_benchmark_test() -> ForgeConfig {
                     180,
                 )
                 .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
+                .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
         )
 }
 
@@ -2492,10 +2475,7 @@ fn pfn_const_tps(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),
                 )
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
+                .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
         )
 }
 
@@ -2554,10 +2534,7 @@ fn pfn_performance(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),
                 )
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
+                .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
         )
 }
 

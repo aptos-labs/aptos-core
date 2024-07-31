@@ -24,8 +24,10 @@ fn main() -> Result<()> {
         )
         .with_success_criteria(SuccessCriteria::new(20).add_chain_progress(
             StateProgressThreshold {
-                max_no_progress_secs: 0.0,
-                max_round_gap: 0,
+                max_non_epoch_no_progress_secs: 0.0,
+                max_epoch_no_progress_secs: 0.0,
+                max_non_epoch_round_gap: 0,
+                max_epoch_round_gap: 0,
             },
         ));
 
