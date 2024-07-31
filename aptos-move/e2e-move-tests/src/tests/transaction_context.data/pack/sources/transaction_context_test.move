@@ -5,8 +5,8 @@ module admin::transaction_context_test {
     use std::vector;
     use aptos_std::from_bcs;
     use aptos_std::type_info;
-    use aptos_framework::transaction_context;
-    use aptos_framework::multisig_account;
+    use supra_framework::transaction_context;
+    use supra_framework::multisig_account;
 
     /// Since tests in e2e-move-tests/ can only call entry functions which don't have return values, we must store
     /// the results we are interested in inside this (rather-artificial) resource, which we can read back in our

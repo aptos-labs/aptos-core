@@ -196,7 +196,7 @@ fn test_coin_to_fungible_asset_migration() {
             (*root.address()).to_hex()
         ))
         .unwrap(),
-        vec![TypeTag::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+        vec![TypeTag::from_str("0x1::supra_coin::SupraCoin").unwrap()],
         vec![],
     ));
     assert!(h
@@ -210,7 +210,7 @@ fn test_coin_to_fungible_asset_migration() {
     let result = h.run_entry_function(
         &alice,
         str::parse("0x1::coin::migrate_to_fungible_store").unwrap(),
-        vec![TypeTag::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+        vec![TypeTag::from_str("0x1::supra_coin::SupraCoin").unwrap()],
         vec![],
     );
     assert_success!(result);

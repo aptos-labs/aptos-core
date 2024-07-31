@@ -51,6 +51,7 @@
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aggregator_factory.md#0x1_aggregator_factory">0x1::aggregator_factory</a>;
+<b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="block.md#0x1_block">0x1::block</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
@@ -63,7 +64,6 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
-<b>use</b> <a href="jwks.md#0x1_jwks">0x1::jwks</a>;
 <b>use</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool">0x1::pbo_delegation_pool</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
@@ -602,7 +602,6 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="block.md#0x1_block_initialize">block::initialize</a>(&supra_framework_account, epoch_interval_microsecs);
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&supra_framework_account);
     <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&supra_framework_account);
-    <a href="jwks.md#0x1_jwks_initialize">jwks::initialize</a>(&supra_framework_account);
 }
 </code></pre>
 
@@ -628,6 +627,8 @@ Genesis step 2: Initialize Aptos coin.
 
 <pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_supra_coin">initialize_supra_coin</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>let</b> (burn_cap, mint_cap) = <a href="supra_coin.md#0x1_supra_coin_initialize">supra_coin::initialize</a>(supra_framework);
+    <a href="coin.md#0x1_coin_create_coin_conversion_map">coin::create_coin_conversion_map</a>(supra_framework);
+    <a href="coin.md#0x1_coin_create_pairing">coin::create_pairing</a>&lt;SupraCoin&gt;(supra_framework);
     // Give <a href="stake.md#0x1_stake">stake</a> <b>module</b> MintCapability&lt;SupraCoin&gt; so it can mint rewards.
     <a href="stake.md#0x1_stake_store_supra_coin_mint_cap">stake::store_supra_coin_mint_cap</a>(supra_framework, mint_cap);
     // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> BurnCapability&lt;SupraCoin&gt; so it can burn gas.
@@ -662,6 +663,8 @@ Only called for testnets and e2e tests.
     core_resources_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) {
     <b>let</b> (burn_cap, mint_cap) = <a href="supra_coin.md#0x1_supra_coin_initialize">supra_coin::initialize</a>(supra_framework);
+    <a href="coin.md#0x1_coin_create_coin_conversion_map">coin::create_coin_conversion_map</a>(supra_framework);
+    <a href="coin.md#0x1_coin_create_pairing">coin::create_pairing</a>&lt;SupraCoin&gt;(supra_framework);
     // Give <a href="stake.md#0x1_stake">stake</a> <b>module</b> MintCapability&lt;SupraCoin&gt; so it can mint rewards.
     <a href="stake.md#0x1_stake_store_supra_coin_mint_cap">stake::store_supra_coin_mint_cap</a>(supra_framework, mint_cap);
     // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> BurnCapability&lt;SupraCoin&gt; so it can burn gas.
@@ -670,6 +673,7 @@ Only called for testnets and e2e tests.
     <a href="transaction_fee.md#0x1_transaction_fee_store_supra_coin_mint_cap">transaction_fee::store_supra_coin_mint_cap</a>(supra_framework, mint_cap);
 
     <b>let</b> core_resources = <a href="account.md#0x1_account_create_account">account::create_account</a>(@core_resources);
+    <a href="aptos_account.md#0x1_aptos_account_register_supra">aptos_account::register_supra</a>(&core_resources); // register Supra store
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
     <a href="supra_coin.md#0x1_supra_coin_configure_accounts_for_test">supra_coin::configure_accounts_for_test</a>(supra_framework, &core_resources, mint_cap);
 }
@@ -1074,7 +1078,7 @@ encoded in a single BCS byte array.
         <a href="delegation_pool.md#0x1_delegation_pool_add_stake">delegation_pool::add_stake</a>(delegator, pool_address, delegator_stake);
         i = i + 1;
     };
-		
+
 		<b>let</b> validator = delegator_config.validator.validator_config;
 		<a href="genesis.md#0x1_genesis_assert_validator_addresses_check">assert_validator_addresses_check</a>(&validator);
 
@@ -1425,7 +1429,7 @@ The last step of genesis.
         rewards_rate_denominator,
         voting_power_increase_limit
     );
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags_for_next_epoch">features::change_feature_flags_for_next_epoch</a>(supra_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2, 11], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags_for_verification">features::change_feature_flags_for_verification</a>(supra_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2, 11], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
     <a href="genesis.md#0x1_genesis_initialize_supra_coin">initialize_supra_coin</a>(supra_framework);
     <a href="supra_governance.md#0x1_supra_governance_initialize_for_verification">supra_governance::initialize_for_verification</a>(
         supra_framework,

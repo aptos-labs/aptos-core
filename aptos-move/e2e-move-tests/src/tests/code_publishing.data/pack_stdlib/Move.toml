@@ -1,6 +1,1 @@
-[package]
-name = "MoveStdlib"
-version = "1.5.0"
-
-[addresses]
-std = "0x1"
+../../../../../framework/move-stdlib/Move.toml

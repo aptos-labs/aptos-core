@@ -1,5 +1,5 @@
 module 0x1::some_randapp {
-    use aptos_framework::randomness;
+    use supra_framework::randomness;
 
     #[randomness]
     entry fun safe_private_entry_call() {

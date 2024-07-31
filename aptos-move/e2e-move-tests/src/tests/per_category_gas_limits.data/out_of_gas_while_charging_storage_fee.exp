@@ -6,7 +6,7 @@ Ok(
                     WriteSetMut {
                         write_set: {
                             StateKey {
-                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>)" },
                                 hash: OnceCell(Uninit),
                             }: Modification(985428a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
                             StateKey {
@@ -55,7 +55,7 @@ Ok(
                     WriteSetMut {
                         write_set: {
                             StateKey {
-                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>)" },
                                 hash: OnceCell(Uninit),
                             }: Modification(d87b80a37e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
                             StateKey {
@@ -88,7 +88,7 @@ Ok(
                     WriteSetMut {
                         write_set: {
                             StateKey {
-                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>)" },
                                 hash: OnceCell(Uninit),
                             }: Modification(18a3d8a27e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
                             StateKey {

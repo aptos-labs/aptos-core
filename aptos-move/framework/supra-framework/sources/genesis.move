@@ -4,6 +4,7 @@ module supra_framework::genesis {
     use std::vector;
 
     use aptos_std::simple_map;
+    use supra_framework::aptos_account;
     use supra_framework::delegation_pool;
     use supra_framework::pbo_delegation_pool;
 
@@ -19,7 +20,6 @@ module supra_framework::genesis {
     use supra_framework::execution_config;
     use supra_framework::create_signer::create_signer;
     use supra_framework::gas_schedule;
-    use supra_framework::jwks;
     use supra_framework::reconfiguration;
     use supra_framework::stake;
     use supra_framework::staking_contract;
@@ -35,7 +35,7 @@ module supra_framework::genesis {
 
 
 	const VESTING_CONTRACT_SEED: vector<u8> = b"VESTING_WIHOUT_STAKING_SEED";
-	
+
 	const EDUPLICATE_ACCOUNT: u64 = 1;
     const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
 	const EVESTING_SCHEDULE_IS_ZERO: u64 = 3;
@@ -45,7 +45,7 @@ module supra_framework::genesis {
 	const ENUMERATOR_GREATER_THAN_DENOMINATOR: u64 = 7;
 	const EDENOMINATOR_IS_ZERO: u64 = 8;
 	const EACCOUNT_NOT_REGISTERED_FOR_COIN: u64 = 9;
-	
+
 
     struct AccountMap has drop {
         account_address: address,
@@ -174,12 +174,13 @@ module supra_framework::genesis {
         block::initialize(&supra_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&supra_framework_account);
         timestamp::set_time_has_started(&supra_framework_account);
-        jwks::initialize(&supra_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
     fun initialize_supra_coin(supra_framework: &signer) {
         let (burn_cap, mint_cap) = supra_coin::initialize(supra_framework);
+        coin::create_coin_conversion_map(supra_framework);
+        coin::create_pairing<SupraCoin>(supra_framework);
         // Give stake module MintCapability<SupraCoin> so it can mint rewards.
         stake::store_supra_coin_mint_cap(supra_framework, mint_cap);
         // Give transaction_fee module BurnCapability<SupraCoin> so it can burn gas.
@@ -194,6 +195,8 @@ module supra_framework::genesis {
         core_resources_auth_key: vector<u8>,
     ) {
         let (burn_cap, mint_cap) = supra_coin::initialize(supra_framework);
+        coin::create_coin_conversion_map(supra_framework);
+        coin::create_pairing<SupraCoin>(supra_framework);
         // Give stake module MintCapability<SupraCoin> so it can mint rewards.
         stake::store_supra_coin_mint_cap(supra_framework, mint_cap);
         // Give transaction_fee module BurnCapability<SupraCoin> so it can burn gas.
@@ -202,6 +205,7 @@ module supra_framework::genesis {
         transaction_fee::store_supra_coin_mint_cap(supra_framework, mint_cap);
 
         let core_resources = account::create_account(@core_resources);
+        aptos_account::register_supra(&core_resources); // register Supra store
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
         supra_coin::configure_accounts_for_test(supra_framework, &core_resources, mint_cap);
     }
@@ -408,7 +412,7 @@ module supra_framework::genesis {
         vector::for_each_ref(&delegator_configs, |delegator_config| {
             let delegator_config: &DelegatorConfiguration = delegator_config;
 			//Ensure that there is a unique owner_address for each pool
-			//This is needed otherwise move_to of DelegationPoolOwnership at owner_address would fail 
+			//This is needed otherwise move_to of DelegationPoolOwnership at owner_address would fail
 			assert!(!vector::contains(&unique_accounts,&delegator_config.owner_address),
 				error::already_exists(EDUPLICATE_ACCOUNT));
 				vector::push_back(&mut unique_accounts,delegator_config.owner_address);
@@ -446,7 +450,7 @@ module supra_framework::genesis {
             delegation_pool::add_stake(delegator, pool_address, delegator_stake);
             i = i + 1;
         };
-		
+
 		let validator = delegator_config.validator.validator_config;
 		assert_validator_addresses_check(&validator);
 
@@ -511,7 +515,7 @@ module supra_framework::genesis {
 		pbo_delegation_pool::set_operator(&owner_signer,validator.operator_address);
 		pbo_delegation_pool::set_delegated_voter(&owner_signer,validator.voter_address);
 		assert_validator_addresses_check(&validator);
-        
+
 		if (pbo_delegator_config.delegator_config.validator.join_during_genesis) {
             initialize_validator(pool_address,&validator);
         };
@@ -659,7 +663,7 @@ module supra_framework::genesis {
             rewards_rate_denominator,
             voting_power_increase_limit
         );
-        features::change_feature_flags_for_next_epoch(supra_framework, vector[1, 2, 11], vector[]);
+        features::change_feature_flags_for_verification(supra_framework, vector[1, 2, 11], vector[]);
         initialize_supra_coin(supra_framework);
         supra_governance::initialize_for_verification(
             supra_framework,
@@ -692,7 +696,7 @@ module supra_framework::genesis {
             1,
             30,
         )
-		
+
     }
 
     #[test]
@@ -752,7 +756,33 @@ module supra_framework::genesis {
 
 	#[test_only]
 	use aptos_std::ed25519;
-	
+
+    #[test(supra_framework = @0x1)]
+
+    fun test_create_root_account(supra_framework: &signer) {
+        use supra_framework::aggregator_factory;
+        use supra_framework::object;
+        use supra_framework::primary_fungible_store;
+        use supra_framework::fungible_asset::Metadata;
+        use std::features;
+
+        let feature = features::get_new_accounts_default_to_fa_supra_store_feature();
+        features::change_feature_flags_for_testing(supra_framework, vector[feature], vector[]);
+        aggregator_factory::initialize_aggregator_factory_for_test(supra_framework);
+
+        let (burn_cap, mint_cap) = supra_coin::initialize(supra_framework);
+        supra_coin::ensure_initialized_with_apt_fa_metadata_for_test();
+
+        let core_resources = account::create_account(@core_resources);
+        aptos_account::register_supra(&core_resources); // registers APT store
+
+        let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
+        assert!(primary_fungible_store::primary_store_exists(@core_resources, apt_metadata), 2);
+
+        supra_coin::configure_accounts_for_test(supra_framework, &core_resources, mint_cap);
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+    }
 
     #[test(supra_framework = @0x1)]
     fun test_create_delegation_pool(supra_framework: &signer) {
@@ -883,7 +913,7 @@ module supra_framework::genesis {
     fun test_create_pbo_delegation_pool(supra_framework: &signer) {
 		use std::features;
         setup();
-		
+
 		features::change_feature_flags_for_testing(supra_framework,vector[11],vector[]);
 
         initialize_supra_coin(supra_framework);

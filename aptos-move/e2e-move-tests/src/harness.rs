@@ -854,7 +854,7 @@ impl MoveHarness {
                     .unwrap(),
             ]);
         self.executor
-            .exec("aptos_governance", "force_end_epoch", vec![], vec![
+            .exec("supra_governance", "force_end_epoch", vec![], vec![
                 core_signer_arg,
             ]);
     }

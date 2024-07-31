@@ -450,7 +450,7 @@ impl FakeExecutor {
             .execute_view_function(
                 str::parse("0x1::coin::supply").unwrap(),
                 vec![move_core_types::language_storage::TypeTag::from_str(
-                    "0x1::aptos_coin::AptosCoin",
+                    "0x1::supra_coin::SupraCoin",
                 )
                 .unwrap()],
                 vec![],
