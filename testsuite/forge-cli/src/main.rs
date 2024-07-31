@@ -2472,7 +2472,7 @@ fn pfn_const_tps(
         .with_initial_fullnode_count(20)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 10000 }))
         .add_network_test(PFNPerformance::new(
-            4,
+            5,
             add_cpu_chaos,
             add_network_emulation,
             None,
