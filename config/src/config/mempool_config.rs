@@ -144,7 +144,11 @@ impl ConfigOptimizer for MempoolConfig {
                 mempool_config.shared_mempool_batch_size = 200;
                 modified_config = true;
             }
-            mempool_config.num_sender_buckets = 1;
+            // Set the number of sender buckets for load balancing to 1 (default is 4)
+            if local_mempool_config_yaml["num_sender_buckets"].is_null() {
+                mempool_config.num_sender_buckets = 1;
+                modified_config = true;
+            }
         }
         if node_type.is_validator_fullnode() {
             // Set the shared_mempool_max_concurrent_inbound_syncs to 16 (default is 4)
@@ -158,10 +162,12 @@ impl ConfigOptimizer for MempoolConfig {
                 mempool_config.default_failovers = 0;
                 modified_config = true;
             }
-            mempool_config.num_sender_buckets = 1;
-        }
-        if node_type.is_public_fullnode() {
-            mempool_config.num_sender_buckets = 4;
+
+            // Set the number of sender buckets for load balancing to 1 (default is 4)
+            if local_mempool_config_yaml["num_sender_buckets"].is_null() {
+                mempool_config.num_sender_buckets = 1;
+                modified_config = true;
+            }
         }
 
         Ok(modified_config)
