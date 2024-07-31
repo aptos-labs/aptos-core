@@ -3,7 +3,17 @@
 
 //! Contains tests for serialization
 //!
-use move_core_types::value::{MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue};
+use crate::{
+    delayed_values::delayed_field_id::DelayedFieldID,
+    value_serde::{serialize_and_allow_delayed_values, serialized_size_allowing_delayed_values},
+    values::{Struct as StructValue, Value},
+};
+use claims::{assert_none, assert_ok, assert_some};
+use move_core_types::{
+    account_address::AccountAddress,
+    u256,
+    value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
+};
 
 #[test]
 fn enum_round_trip() {
@@ -52,4 +62,71 @@ fn enum_round_trip() {
             );
         })
         .expect_err("bad struct value deserialization fails");
+}
+
+#[test]
+fn test_serialized_size() {
+    use IdentifierMappingKind::*;
+    use MoveStructLayout::*;
+    use MoveTypeLayout::*;
+
+    let u64_delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(12, 8));
+    let u128_delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(123, 16));
+    let derived_string_delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(12, 60));
+
+    // First field is a string, second field is a padding to ensure constant size.
+    let derived_string_layout = Struct(Runtime(vec![
+        Struct(Runtime(vec![Vector(Box::new(U8))])),
+        Vector(Box::new(U8)),
+    ]));
+
+    // All these pairs should serialize.
+    let good_values_layouts_sizes = [
+        (Value::u8(10), U8),
+        (Value::u16(10), U16),
+        (Value::u32(10), U32),
+        (Value::u64(10), U64),
+        (Value::u128(10), U128),
+        (Value::u256(u256::U256::one()), U256),
+        (Value::bool(true), Bool),
+        (Value::address(AccountAddress::ONE), Address),
+        (Value::signer(AccountAddress::ONE), Signer),
+        (u64_delayed_value, Native(Aggregator, Box::new(U64))),
+        (u128_delayed_value, Native(Snapshot, Box::new(U128))),
+        (
+            derived_string_delayed_value,
+            Native(DerivedString, Box::new(derived_string_layout)),
+        ),
+        (
+            Value::vector_address(vec![AccountAddress::ONE]),
+            Vector(Box::new(Address)),
+        ),
+        (
+            Value::struct_(StructValue::pack(vec![
+                Value::bool(true),
+                Value::vector_u32(vec![1, 2, 3, 4, 5]),
+            ])),
+            Struct(Runtime(vec![Bool, Vector(Box::new(U32))])),
+        ),
+    ];
+    for (value, layout) in good_values_layouts_sizes {
+        let bytes = assert_some!(assert_ok!(serialize_and_allow_delayed_values(
+            &value, &layout
+        )));
+        let size = assert_some!(serialized_size_allowing_delayed_values(&value, &layout));
+        assert_eq!(size, bytes.len());
+    }
+
+    // Also test unhappy path, mostly mismatches in value-layout.
+    let u64_delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(0, 8));
+    let malformed_delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(1, 7));
+    let bad_values_layouts_sizes = [
+        (Value::u8(10), U16),
+        (u64_delayed_value, U64),
+        (malformed_delayed_value, U64),
+        (Value::u64(12), Native(Aggregator, Box::new(U64))),
+    ];
+    for (value, layout) in bad_values_layouts_sizes {
+        assert_none!(serialized_size_allowing_delayed_values(&value, &layout));
+    }
 }
