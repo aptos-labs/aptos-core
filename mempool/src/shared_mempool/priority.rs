@@ -261,32 +261,42 @@ impl PrioritizedPeersState {
                     .as_secs()
             });
 
-        // If the observed traffic is to be load balanced across upstream peers such that each upstream peer
-        // receives `avg_mempool_traffic_in_tps_per_peer` transactions per second, then this is the number of
-        // upstream peers required.
-        // This is calculated so that when the traffic is low, we don't do load balancing across many peers.
-        let num_peers_required_for_load_balancing = min(
-            (num_txns_received_since_peers_updated as f64
-                / ((self.mempool_config.avg_mempool_traffic_in_tps_per_peer
-                    * max(1, time_elapsed_since_last_update)) as f64))
-                .ceil() as u64,
-            MempoolSenderBucket::MAX.into(),
-        ) as MempoolSenderBucket;
+        let average_mempool_traffic_observed = num_txns_received_since_peers_updated as f64
+            / max(1, time_elapsed_since_last_update) as f64;
+        // Obtain the highest threshold from mempool_config.load_balancing_thresholds for which avg_mempool_traffic_threshold_in_tps exceeds average_mempool_traffic_observed
+        let threshold_config = self
+            .mempool_config
+            .load_balancing_thresholds
+            .clone()
+            .into_iter()
+            .rev()
+            .find(|threshold_config| {
+                threshold_config.avg_mempool_traffic_threshold_in_tps
+                    <= average_mempool_traffic_observed as u64
+            })
+            .unwrap_or_default();
+
         let num_top_peers = max(
             1,
             min(
                 self.mempool_config.num_sender_buckets,
-                num_peers_required_for_load_balancing,
+                if self.mempool_config.enable_max_load_balancing_at_any_load {
+                    u8::MAX
+                } else {
+                    threshold_config.max_number_of_upstream_peers
+                },
             ),
         );
         info!(
             "Time elapsed since last peer update: {:?}\n
-               Number of transactions received since last peer update: {:?},\n
-               Ideal number of peers required for load balancing: {:?},\n
-               Number of top peers picked: {:?}",
+            Number of transactions received since last peer update: {:?},\n
+            Average mempool traffic observed: {:?},\n
+            Load balancing threshold config: {:?},\n
+            Number of top peers picked: {:?}",
             time_elapsed_since_last_update,
             num_txns_received_since_peers_updated,
-            num_peers_required_for_load_balancing,
+            average_mempool_traffic_observed,
+            threshold_config,
             num_top_peers
         );
 
@@ -326,7 +336,7 @@ impl PrioritizedPeersState {
                     || ping_latency.is_none()
                     || ping_latency.unwrap()
                         < base_ping_latency.unwrap()
-                            + (self.mempool_config.latency_slack_between_top_upstream_peers as f64)
+                            + (threshold_config.latency_slack_between_top_upstream_peers as f64)
                                 / 1000.0
                 {
                     top_peers.push(*peer);
