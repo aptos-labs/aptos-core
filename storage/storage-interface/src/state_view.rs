@@ -19,24 +19,29 @@ type Result<T, E = StateviewError> = std::result::Result<T, E>;
 pub struct DbStateView {
     db: Arc<dyn DbReader>,
     version: Option<Version>,
-    verify_against_state_root_hash: Option<HashValue>,
+    /// DB doesn't support returning proofs for buffered state, so only optionally verify proof.
+    /// TODO: support returning state proof for buffered state.
+    maybe_verify_against_state_root_hash: Option<HashValue>,
 }
 
 impl DbStateView {
     fn get(&self, key: &StateKey) -> Result<Option<StateValue>> {
-        Ok(if let Some(version) = self.version {
-            if let Some(root_hash) = self.verify_against_state_root_hash {
-                let (value, proof) = self
-                    .db
-                    .get_state_value_with_proof_by_version(key, version)?;
-                proof.verify(root_hash, CryptoHash::hash(key), value.as_ref())?;
-                value
-            } else {
-                self.db.get_state_value_by_version(key, version)?
+        if let Some(version) = self.version {
+            if let Some(root_hash) = self.maybe_verify_against_state_root_hash {
+                // DB doesn't support returning proofs for buffered state, so only optionally
+                // verify proof.
+                // TODO: support returning state proof for buffered state.
+                if let Ok((value, proof)) =
+                    self.db.get_state_value_with_proof_by_version(key, version)
+                {
+                    proof.verify(root_hash, CryptoHash::hash(key), value.as_ref())?;
+                    return Ok(value);
+                }
             }
+            Ok(self.db.get_state_value_by_version(key, version)?)
         } else {
-            None
-        })
+            Ok(None)
+        }
     }
 }
 
@@ -65,7 +70,7 @@ impl LatestDbStateCheckpointView for Arc<dyn DbReader> {
             version: self
                 .get_latest_state_checkpoint_version()
                 .map_err(Into::<StateviewError>::into)?,
-            verify_against_state_root_hash: None,
+            maybe_verify_against_state_root_hash: None,
         })
     }
 }
@@ -79,7 +84,7 @@ impl DbStateViewAtVersion for Arc<dyn DbReader> {
         Ok(DbStateView {
             db: self.clone(),
             version,
-            verify_against_state_root_hash: None,
+            maybe_verify_against_state_root_hash: None,
         })
     }
 }
@@ -114,13 +119,13 @@ impl VerifiedStateViewAtVersion for Arc<dyn DbReader> {
             Ok(DbStateView {
                 db,
                 version: Some(version),
-                verify_against_state_root_hash: Some(state_root_hash),
+                maybe_verify_against_state_root_hash: Some(state_root_hash),
             })
         } else {
             Ok(DbStateView {
                 db,
                 version: None,
-                verify_against_state_root_hash: None,
+                maybe_verify_against_state_root_hash: None,
             })
         }
     }

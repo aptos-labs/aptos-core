@@ -857,6 +857,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.max_sending_inline_txns,
             self.config.max_sending_inline_bytes,
             onchain_consensus_config.max_failed_authors_to_store(),
+            self.config
+                .min_max_txns_in_block_after_filtering_from_backpressure,
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
@@ -1796,7 +1798,7 @@ fn load_dkg_decrypt_key(
 }
 
 #[derive(Debug)]
-enum NoRandomnessReason {
+pub enum NoRandomnessReason {
     VTxnDisabled,
     FeatureDisabled,
     DKGStateResourceMissing(anyhow::Error),
@@ -1811,4 +1813,5 @@ enum NoRandomnessReason {
     KeyPairDeserializationError(bcs::Error),
     KeyPairSerializationError(bcs::Error),
     KeyPairPersistError(anyhow::Error),
+    // Test only reasons
 }

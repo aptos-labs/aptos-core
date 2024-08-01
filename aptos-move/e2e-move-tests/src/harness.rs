@@ -20,6 +20,7 @@ use aptos_types::{
     },
     chain_id::ChainId,
     contract_event::ContractEvent,
+    fee_statement::FeeStatement,
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
     state_store::{
@@ -321,7 +322,7 @@ impl MoveHarness {
         &mut self,
         account: &Account,
         payload: TransactionPayload,
-    ) -> (TransactionGasLog, u64) {
+    ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
         let (output, gas_log) = self
             .executor
@@ -330,7 +331,11 @@ impl MoveHarness {
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
         }
-        (gas_log, output.gas_used())
+        (
+            gas_log,
+            output.gas_used(),
+            output.try_extract_fee_statement().unwrap(),
+        )
     }
 
     /// Creates a transaction which runs the specified entry point `fun`. Arguments need to be
@@ -630,7 +635,7 @@ impl MoveHarness {
         &mut self,
         account: &Account,
         path: &Path,
-    ) -> (TransactionGasLog, u64) {
+    ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_publish_package(account, path, None, |_| {});
         let (output, gas_log) = self
             .executor
@@ -639,7 +644,11 @@ impl MoveHarness {
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
         }
-        (gas_log, output.gas_used())
+        (
+            gas_log,
+            output.gas_used(),
+            output.try_extract_fee_statement().unwrap(),
+        )
     }
 
     /// Runs transaction which publishes the Move Package.

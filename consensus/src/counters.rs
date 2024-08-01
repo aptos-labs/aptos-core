@@ -367,6 +367,16 @@ pub static PROPOSER_PENDING_BLOCKS_FILL_FRACTION: Lazy<Gauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for max number of transactions calibrated block should have, based on the proposer
+pub static PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_estimated_calibrated_block_txns",
+        "Histogram for max number of transactions calibrated block should have, based on the proposer",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 /// Next set of counters are computed at leader election time, with some delay.
 
 /// Current voting power fraction that participated in consensus
@@ -1159,6 +1169,15 @@ pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_rand_queue_size",
         "Number of randomness-pending blocks."
+    )
+    .unwrap()
+});
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_proposal_payload_availability",
+        "The availability of proposal payload locally",
+        &["status"]
     )
     .unwrap()
 });

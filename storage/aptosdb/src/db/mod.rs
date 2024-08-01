@@ -20,6 +20,7 @@ use crate::{
     schema::{
         block_info::BlockInfoSchema,
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,

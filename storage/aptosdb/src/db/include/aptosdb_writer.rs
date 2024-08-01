@@ -474,6 +474,33 @@ impl AptosDB {
             .transaction_accumulator_db()
             .write_schemas(batch)?;
 
+        let batch = SchemaBatch::new();
+        let all_versions: Vec<_> =
+            (first_version..first_version + txns_to_commit.len() as u64).collect();
+        THREAD_MANAGER
+            .get_non_exe_cpu_pool()
+            .install(|| -> Result<()> {
+                let all_root_hashes = all_versions
+                    .into_par_iter()
+                    .with_min_len(64)
+                    .map(|version| {
+                        self.ledger_db
+                            .transaction_accumulator_db()
+                            .get_root_hash(version)
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                all_root_hashes
+                    .iter()
+                    .enumerate()
+                    .try_for_each(|(i, hash)| {
+                        let version = first_version + i as u64;
+                        batch.put::<TransactionAccumulatorRootHashSchema>(&version, hash)
+                    })?;
+                self.ledger_db
+                    .transaction_accumulator_db()
+                    .write_schemas(batch)
+            })?;
+
         Ok(root_hash)
     }
 
@@ -497,9 +524,8 @@ impl AptosDB {
                     &batch,
                 )?;
 
-
-            Ok(())
-        })?;
+                Ok(())
+            })?;
 
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_auxiliary_data___commit"])

@@ -12,7 +12,14 @@ pub struct AccountRecoveryDbEntry {
     pub aud: String,
     pub uid_key: String,
     pub uid_val: String,
-    pub last_request_unix_ms: u64,
+
+    pub num_requests: Option<u64>,
+
+    /// First request time in unix milliseconds, but minus 1 quadrillion (10^15).
+    ///
+    /// See comments in function `update_account_recovery_db` for more context.
+    pub first_request_unix_ms_minus_1q: Option<i64>,
+    pub last_request_unix_ms: Option<u64>,
 }
 
 impl AccountRecoveryDbEntry {

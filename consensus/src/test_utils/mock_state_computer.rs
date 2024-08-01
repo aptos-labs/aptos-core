@@ -36,19 +36,6 @@ impl EmptyStateComputer {
 
 #[async_trait::async_trait]
 impl StateComputer for EmptyStateComputer {
-    async fn compute(
-        &self,
-        _block: &Block,
-        _parent_block_id: HashValue,
-        _randomness: Option<Randomness>,
-    ) -> ExecutorResult<PipelineExecutionResult> {
-        Ok(PipelineExecutionResult::new(
-            vec![],
-            StateComputeResult::new_dummy(),
-            Duration::from_secs(0),
-        ))
-    }
-
     async fn commit(
         &self,
         blocks: &[Arc<PipelinedBlock>],
