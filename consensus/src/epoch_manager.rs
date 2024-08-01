@@ -1798,7 +1798,7 @@ fn load_dkg_decrypt_key(
 }
 
 #[derive(Debug)]
-enum NoRandomnessReason {
+pub enum NoRandomnessReason {
     VTxnDisabled,
     FeatureDisabled,
     DKGStateResourceMissing(anyhow::Error),
@@ -1813,4 +1813,5 @@ enum NoRandomnessReason {
     KeyPairDeserializationError(bcs::Error),
     KeyPairSerializationError(bcs::Error),
     KeyPairPersistError(anyhow::Error),
+    // Test only reasons
 }
