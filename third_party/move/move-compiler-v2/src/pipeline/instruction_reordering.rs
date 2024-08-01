@@ -165,7 +165,7 @@ impl InstructionReordering {
         // Is it Prepare? Skip. Go to upper.
         // Is is empty-sourced? Add it to stack (`new_code`). Mark as taken. Go to upper.
         // Else, start an ordered DFS numbering (dfs with lowest offset tracking), assert that none of them are `taken`.
-        //   Find the lowest numbered instruction.
+        //   Find the lowest numbered instruction. Also note that prepare comes later!!
         //   Starting from there, for each numbered pair till this, check if constraints are satisfied.
         //   For each unmarked, check if constraints are satisfied with each numbered, assuming unmarked goes before.
         //   If yes, leave all the unmarked, copy all numbered to the stack (in reverse order). Mark them as taken.
@@ -183,44 +183,133 @@ impl InstructionReordering {
                 continue;
             }
             if instr.sources().is_empty() {
-                reordered_block.push(instr.clone());
+                // May not be needed, as it is covered by the DFS case.
+                reordered_block.push((offset, instr.clone()));
                 taken[offset] = true;
                 continue;
             }
-            Self::dfs_post_order();
+            let ordered_offsets = Self::dfs_post_order(&use_def_graph, offset as CodeOffset);
+            let valid = Self::is_valid_order(&ordered_offsets, offset as CodeOffset, &dependencies);
+            if valid {
+                for off in ordered_offsets.into_iter().rev() {
+                    let off = usize::from(off);
+                    reordered_block.push((off, new_block[off].clone()));
+                    taken[off] = true;
+                }
+            } else {
+                reordered_block.push((offset, instr.clone()));
+                taken[offset] = true;
+            }
         }
-
-        // Start DFS port-order numbering from unvisited relatively immovable instructions.
-        // Iteration is in reverse direction from the end of the block.
-        let dfs_numberings = Self::dfs_post_order_numbering(&new_block, &use_def_graph);
-        let constraints = OrderingConstraints {
-            dependencies,
-            dfs_numberings,
-        };
-        let reordered_indices = constraints.get_ordered_instr_indices();
-        // Re-order the instructions in the block based on ordering (after sort).
-        let reordered_block = reordered_indices
+        reordered_block.reverse();
+        let remap = reordered_block
             .iter()
-            .map(|v| new_block[usize::from(*v)].clone())
-            .collect::<Vec<_>>();
-        let mut index_remapping = vec![0; reordered_indices.len()];
-        for (i, reordered_index) in reordered_indices.iter().enumerate() {
-            index_remapping[usize::from(*reordered_index)] = i as CodeOffset;
-        }
-        let prepare_use_map = prepare_use_map
-            .into_iter()
-            .map(|(k, v)| {
+            .enumerate()
+            .map(|(i, (off, _))| (*off as CodeOffset, i as CodeOffset))
+            .collect::<BTreeMap<_, _>>();
+        let prepare_use_map = prepare_use_map.into_iter().filter_map(|(p, u)| {
+            remap.get(&p).map(|new_p| {
                 (
-                    index_remapping[usize::from(k)],
-                    (index_remapping[usize::from(v.0)], v.1, v.2),
+                    *new_p,
+                    (*remap.get(&u.0).expect("existing offset"), u.1, u.2),
                 )
             })
-            .collect::<BTreeMap<_, _>>();
+        });
+        // Start DFS port-order numbering from unvisited relatively immovable instructions.
+        // Iteration is in reverse direction from the end of the block.
+        // let dfs_numberings = Self::dfs_post_order_numbering(&new_block, &use_def_graph);
+        // let constraints = OrderingConstraints {
+        //     dependencies,
+        //     dfs_numberings,
+        // };
+        // let reordered_indices = constraints.get_ordered_instr_indices();
+        // // Re-order the instructions in the block based on ordering (after sort).
+        // let reordered_block = reordered_indices
+        //     .iter()
+        //     .map(|v| new_block[usize::from(*v)].clone())
+        //     .collect::<Vec<_>>();
+        // let mut index_remapping = vec![0; reordered_indices.len()];
+        // for (i, reordered_index) in reordered_indices.iter().enumerate() {
+        //     index_remapping[usize::from(*reordered_index)] = i as CodeOffset;
+        // }
+        // let prepare_use_map = prepare_use_map
+        //     .into_iter()
+        //     .map(|(k, v)| {
+        //         (
+        //             index_remapping[usize::from(k)],
+        //             (index_remapping[usize::from(v.0)], v.1, v.2),
+        //         )
+        //     })
+        //     .collect::<BTreeMap<_, _>>();
         ReorderedBlock {
-            block: reordered_block,
-            ordering: constraints.remap_and_convert_to_annotation(&index_remapping),
-            touch_use: PrepareUseAnnotation(prepare_use_map),
+            block: reordered_block.into_iter().map(|(_, instr)| instr).collect(),
+            ordering: OrderingAnnotation(BTreeMap::new()),
+            touch_use: PrepareUseAnnotation(prepare_use_map.collect()),
         }
+    }
+
+    fn dfs_post_order(graph: &UseDefGraph, node: CodeOffset) -> Vec<CodeOffset> {
+        let mut visited = BTreeSet::new();
+        let mut post_order = vec![];
+        Self::dfs_post_order_recurse(node, graph, &mut visited, &mut post_order);
+        post_order
+    }
+
+    fn dfs_post_order_recurse(
+        node: CodeOffset,
+        graph: &UseDefGraph,
+        visited: &mut BTreeSet<CodeOffset>,
+        post_order: &mut Vec<CodeOffset>,
+    ) {
+        if !visited.insert(node) {
+            return;
+        }
+        for dependent in graph
+            .0
+            .get(&node)
+            .map(|deps| deps.iter().filter_map(|d| *d).collect::<Vec<_>>())
+            .unwrap_or_default()
+        {
+            Self::dfs_post_order_recurse(dependent, graph, visited, post_order);
+        }
+        post_order.push(node);
+    }
+
+    fn is_valid_order(
+        offsets: &[CodeOffset],
+        node: CodeOffset,
+        dependencies: &BTreeMap<CodeOffset, BTreeSet<CodeOffset>>,
+    ) -> bool {
+        assert!(offsets.contains(&node));
+        for i in 0..offsets.len() {
+            for j in i + 1..offsets.len() {
+                let before = offsets[i];
+                let after = offsets[j];
+                if dependencies
+                    .get(&after)
+                    .is_some_and(|nodes| nodes.contains(&before))
+                {
+                    return false;
+                }
+            }
+        }
+        let seen = offsets.iter().collect::<BTreeSet<_>>();
+        let min = **seen.first().expect("at least one offset");
+        for i in min..=node {
+            if !seen.contains(&i) {
+                // `i` is not visited.
+                // Is it safe to move `i` before everything else?
+                for o in offsets {
+                    if dependencies
+                        .get(o)
+                        .map_or(false, |nodes| nodes.contains(&i))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     }
 
     fn ordered_edge_data_dependence_graph(

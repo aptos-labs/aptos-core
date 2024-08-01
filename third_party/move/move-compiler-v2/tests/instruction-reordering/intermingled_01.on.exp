@@ -2,14 +2,12 @@
 
 [variant baseline]
 fun m::bar($t0: u64, $t1: u64) {
-     # deps: {}, dfs: []
   0: return ()
 }
 
 
 [variant baseline]
 fun m::baz($t0: u64) {
-     # deps: {}, dfs: []
   0: return ()
 }
 
@@ -17,7 +15,6 @@ fun m::baz($t0: u64) {
 [variant baseline]
 fun m::id($t0: u64): u64 {
      var $t1: u64 [unused]
-     # deps: {}, dfs: [Some(0)]
   0: return $t0
 }
 
@@ -25,9 +22,7 @@ fun m::id($t0: u64): u64 {
 [variant baseline]
 fun m::one(): u64 {
      var $t0: u64
-     # deps: {1}, dfs: [Some(0)]
   0: $t0 := 1
-     # deps: {}, dfs: [Some(1)]
   1: return $t0
 }
 
@@ -38,15 +33,10 @@ public fun m::test1() {
      var $t1: u64
      var $t2: u64 [unused]
      var $t3: u64 [unused]
-     # deps: {1, 2, 3, 4}, dfs: [None, Some(0)]
   0: $t0 := m::one()
-     # deps: {2, 3, 4}, dfs: [Some(0), None]
   1: $t1 := m::two()
-     # deps: {3, 4}, dfs: [None, Some(1)]
   2: $t0 := m::id($t0)
-     # deps: {4}, dfs: [Some(1), None]
   3: $t1 := m::id($t1)
-     # deps: {}, dfs: [None, None]
   4: return ()
 }
 
@@ -57,15 +47,10 @@ public fun m::test2() {
      var $t1: u64
      var $t2: u64 [unused]
      var $t3: u64 [unused]
-     # deps: {1, 2, 3, 4}, dfs: [None, Some(0)]
   0: $t1 := 1
-     # deps: {2, 3, 4}, dfs: [None, Some(1)]
   1: $t0 := m::id($t1)
-     # deps: {3, 4}, dfs: [Some(0), None]
   2: $t1 := 2
-     # deps: {4}, dfs: [Some(1), None]
   3: $t1 := m::id($t1)
-     # deps: {}, dfs: [None, None]
   4: return ()
 }
 
@@ -76,17 +61,11 @@ public fun m::test3($t0: u64): u64 {
      var $t2: u64 [unused]
      var $t3: u64 [unused]
      var $t4: u64
-     # deps: {1, 2, 3, 4}, dfs: [Some(0)]
   0: touch($t0)
-     # deps: {1, 2, 3, 4}, dfs: [Some(1)]
   1: $t4 := 1
-     # deps: {2, 3, 4}, dfs: [Some(2)]
   2: $t4 := +($t0, $t4)
-     # deps: {3, 4}, dfs: [Some(3)]
   3: $t4 := +($t4, $t0)
-     # deps: {4}, dfs: [Some(4)]
   4: $t0 := +($t4, $t0)
-     # deps: {}, dfs: [Some(5)]
   5: return $t0
 }
 
@@ -98,21 +77,13 @@ public fun m::test4() {
      var $t2: u64 [unused]
      var $t3: u64
      var $t4: u64
-     # deps: {1, 2, 3, 4, 5, 6, 7}, dfs: [None, Some(0)]
   0: $t0 := m::one()
-     # deps: {2, 3, 4, 5, 6, 7}, dfs: [None, Some(1)]
   1: $t1 := m::two()
-     # deps: {3, 4, 5, 6, 7}, dfs: [Some(0), None]
   2: $t3 := m::one()
-     # deps: {4, 5, 6, 7}, dfs: [Some(1), None]
   3: $t4 := m::two()
-     # deps: {5, 6, 7}, dfs: [Some(2), None]
   4: $t3 := +($t3, $t4)
-     # deps: {6, 7}, dfs: [None, Some(2)]
   5: m::bar($t0, $t1)
-     # deps: {7}, dfs: [Some(3), None]
   6: m::baz($t3)
-     # deps: {}, dfs: [None, None]
   7: return ()
 }
 
@@ -120,9 +91,7 @@ public fun m::test4() {
 [variant baseline]
 fun m::two(): u64 {
      var $t0: u64
-     # deps: {1}, dfs: [Some(0)]
   0: $t0 := 2
-     # deps: {}, dfs: [Some(1)]
   1: return $t0
 }
 
@@ -179,18 +148,15 @@ B0:
 	6: Ret
 }
 public test3(Arg0: u64): u64 /* def_idx: 6 */ {
-L1:	loc0: u64
 B0:
-	0: LdU64(1)
-	1: StLoc[1](loc0: u64)
-	2: CopyLoc[0](Arg0: u64)
-	3: MoveLoc[1](loc0: u64)
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: CopyLoc[0](Arg0: u64)
 	4: Add
-	5: CopyLoc[0](Arg0: u64)
+	5: MoveLoc[0](Arg0: u64)
 	6: Add
-	7: MoveLoc[0](Arg0: u64)
-	8: Add
-	9: Ret
+	7: Ret
 }
 public test4() /* def_idx: 7 */ {
 L0:	loc0: u64

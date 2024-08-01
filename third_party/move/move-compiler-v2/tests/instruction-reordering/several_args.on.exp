@@ -9,21 +9,13 @@ fun m::bar($t0: &u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64
      var $t11: u64 [unused]
      var $t12: u64 [unused]
      var $t13: u64
-     # deps: {1, 2, 3, 4, 5, 6, 7}, dfs: [Some(0)]
   0: $t13 := read_ref($t0)
-     # deps: {2, 3, 4, 5, 6, 7}, dfs: [Some(1)]
   1: $t1 := +($t13, $t1)
-     # deps: {3, 4, 5, 6, 7}, dfs: [Some(2)]
   2: $t1 := +($t1, $t2)
-     # deps: {4, 5, 6, 7}, dfs: [Some(3)]
   3: $t1 := +($t1, $t3)
-     # deps: {5, 6, 7}, dfs: [Some(4)]
   4: $t1 := +($t1, $t4)
-     # deps: {6, 7}, dfs: [Some(5)]
   5: $t1 := +($t1, $t5)
-     # deps: {7}, dfs: [Some(6)]
   6: $t1 := +($t1, $t6)
-     # deps: {}, dfs: [Some(7)]
   7: return $t1
 }
 
@@ -37,23 +29,14 @@ public fun m::test($t0: &u64): u64 {
      var $t5: u64
      var $t6: u64
      var $t7: u64
-     # deps: {6, 7}, dfs: [Some(0)]
   0: touch($t0)
-     # deps: {6, 7}, dfs: [Some(1)]
   1: $t2 := 2
-     # deps: {6, 7}, dfs: [Some(2)]
   2: $t3 := 3
-     # deps: {6, 7}, dfs: [Some(3)]
   3: $t4 := 4
-     # deps: {6, 7}, dfs: [Some(4)]
   4: $t5 := 5
-     # deps: {6, 7}, dfs: [Some(5)]
   5: $t6 := 6
-     # deps: {6, 7}, dfs: [Some(6)]
   6: $t7 := 7
-     # deps: {7}, dfs: [Some(7)]
   7: $t2 := m::bar($t0, $t2, $t3, $t4, $t5, $t6, $t7)
-     # deps: {}, dfs: [Some(8)]
   8: return $t2
 }
 

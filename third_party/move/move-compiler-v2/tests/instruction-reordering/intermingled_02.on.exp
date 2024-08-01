@@ -2,9 +2,7 @@
 
 [variant baseline]
 fun m::foo($t0: &u64) {
-     # deps: {1}, dfs: [Some(0)]
   0: drop($t0)
-     # deps: {}, dfs: [None]
   1: return ()
 }
 
@@ -13,15 +11,10 @@ fun m::foo($t0: &u64) {
 public fun m::test($t0: u64, $t1: u64) {
      var $t2: &u64
      var $t3: &u64
-     # deps: {2, 3, 4}, dfs: [None, Some(0)]
   0: $t2 := borrow_local($t0)
-     # deps: {3, 4}, dfs: [None, Some(1)]
   1: m::foo($t2)
-     # deps: {3, 4}, dfs: [Some(0), None]
   2: $t3 := borrow_local($t1)
-     # deps: {4}, dfs: [Some(1), None]
   3: m::foo($t3)
-     # deps: {}, dfs: [None, None]
   4: return ()
 }
 

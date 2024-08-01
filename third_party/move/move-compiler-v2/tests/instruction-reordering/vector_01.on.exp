@@ -1,0 +1,88 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+public fun m::contains($t0: &vector<u8>, $t1: u64): bool {
+     var $t2: bool [unused]
+     var $t3: u8 [unused]
+     var $t4: u8
+     var $t5: u8
+     var $t6: bool
+     var $t7: u64 [unused]
+     var $t8: u64
+     var $t9: u8 [unused]
+     var $t10: u8 [unused]
+     var $t11: &u8
+     var $t12: u64 [unused]
+     var $t13: u8
+     var $t14: &vector<u8>
+  0: $t4 := 1
+  1: $t5 := (u8)($t1)
+  2: $t4 := <<($t4, $t5)
+  3: $t1 := 0
+  4: $t14 := copy($t0)
+  5: $t8 := vector::length<u8>($t14)
+  6: $t6 := <($t1, $t8)
+  7: if ($t6) goto 8 else goto 17
+  8: label L0
+  9: touch($t0)
+ 10: $t1 := 0
+ 11: $t11 := vector::borrow<u8>($t0, $t1)
+ 12: $t5 := read_ref($t11)
+ 13: $t5 := &($t5, $t4)
+ 14: $t13 := 0
+ 15: $t6 := !=($t5, $t13)
+ 16: goto 20
+ 17: label L1
+ 18: drop($t0)
+ 19: $t6 := false
+ 20: label L2
+ 21: return $t6
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+public contains(Arg0: &vector<u8>, Arg1: u64): bool /* def_idx: 0 */ {
+L2:	loc0: &vector<u8>
+L3:	loc1: bool
+L4:	loc2: u8
+B0:
+	0: LdU8(1)
+	1: MoveLoc[1](Arg1: u64)
+	2: CastU8
+	3: Shl
+	4: LdU64(0)
+	5: CopyLoc[0](Arg0: &vector<u8>)
+	6: StLoc[2](loc0: &vector<u8>)
+	7: MoveLoc[2](loc0: &vector<u8>)
+	8: VecLen(2)
+	9: Lt
+	10: StLoc[3](loc1: bool)
+	11: StLoc[4](loc2: u8)
+	12: MoveLoc[3](loc1: bool)
+	13: BrFalse(24)
+B1:
+	14: MoveLoc[0](Arg0: &vector<u8>)
+	15: LdU64(0)
+	16: VecImmBorrow(2)
+	17: ReadRef
+	18: MoveLoc[4](loc2: u8)
+	19: BitAnd
+	20: LdU8(0)
+	21: Neq
+	22: StLoc[3](loc1: bool)
+	23: Branch(28)
+B2:
+	24: MoveLoc[0](Arg0: &vector<u8>)
+	25: Pop
+	26: LdFalse
+	27: StLoc[3](loc1: bool)
+B3:
+	28: MoveLoc[3](loc1: bool)
+	29: Ret
+}
+}
+============ bytecode verification succeeded ========

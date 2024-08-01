@@ -4,13 +4,9 @@
 public fun m::test($t0: u64): u64 {
      var $t1: u64 [unused]
      var $t2: u64
-     # deps: {1, 2}, dfs: [Some(0)]
   0: touch($t0)
-     # deps: {1, 2}, dfs: [Some(1)]
   1: $t2 := 1
-     # deps: {2}, dfs: [Some(2)]
   2: $t0 := +($t0, $t2)
-     # deps: {}, dfs: [Some(3)]
   3: return $t0
 }
 

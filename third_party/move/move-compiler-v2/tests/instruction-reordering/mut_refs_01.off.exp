@@ -1,0 +1,621 @@
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::inc_immut($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::inc_mut($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t3
+  1: $t4 := 1
+     # live vars: $t0, $t3, $t4
+  2: $t2 := +($t3, $t4)
+     # live vars: $t0, $t2
+  3: write_ref($t2, $t0)
+     # live vars: $t0
+  4: $t1 := read_ref($t0)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: &mut u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t6 := borrow_local($t1)
+     # live vars: $t6
+  2: $t5 := m::inc_mut($t6)
+     # live vars: $t5
+  3: $t7 := 1
+     # live vars: $t5, $t7
+  4: $t4 := +($t5, $t7)
+     # live vars: $t4
+  5: $t1 := infer($t4)
+     # live vars: $t1
+  6: $t9 := 1
+     # live vars: $t1, $t9
+  7: $t8 := +($t1, $t9)
+     # live vars: $t8
+  8: $t1 := infer($t8)
+     # live vars: $t1
+  9: $t3 := infer($t1)
+     # live vars: $t1, $t3
+ 10: $t2 := m::inc_immut($t3)
+     # live vars: $t1, $t2
+ 11: $t13 := borrow_local($t1)
+     # live vars: $t2, $t13
+ 12: $t12 := m::inc_mut($t13)
+     # live vars: $t2, $t12
+ 13: $t14 := 1
+     # live vars: $t2, $t12, $t14
+ 14: $t11 := +($t12, $t14)
+     # live vars: $t2, $t11
+ 15: $t1 := infer($t11)
+     # live vars: $t1, $t2
+ 16: $t10 := infer($t1)
+     # live vars: $t2, $t10
+ 17: $t0 := +($t2, $t10)
+     # live vars: $t0
+ 18: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::inc_immut($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::inc_mut($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t3
+  1: $t4 := 1
+     # live vars: $t0, $t3, $t4
+  2: $t2 := +($t3, $t4)
+     # live vars: $t0, $t2
+  3: write_ref($t2, $t0)
+     # live vars: $t0
+  4: $t1 := read_ref($t0)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: &mut u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t6 := borrow_local($t1)
+     # live vars: $t6
+  2: $t5 := m::inc_mut($t6)
+     # live vars: $t5
+  3: $t7 := 1
+     # live vars: $t5, $t7
+  4: $t4 := +($t5, $t7)
+     # live vars: $t4
+  5: $t1 := infer($t4)
+     # live vars: $t1
+  6: $t9 := 1
+     # live vars: $t1, $t9
+  7: $t8 := +($t1, $t9)
+     # live vars: $t8
+  8: $t1 := infer($t8)
+     # live vars: $t1
+  9: $t3 := infer($t1)
+     # live vars: $t1, $t3
+ 10: $t2 := m::inc_immut($t3)
+     # live vars: $t1, $t2
+ 11: $t13 := borrow_local($t1)
+     # live vars: $t2, $t13
+ 12: $t12 := m::inc_mut($t13)
+     # live vars: $t2, $t12
+ 13: $t14 := 1
+     # live vars: $t2, $t12, $t14
+ 14: $t11 := +($t12, $t14)
+     # live vars: $t2, $t11
+ 15: $t1 := infer($t11)
+     # live vars: $t1, $t2
+ 16: $t10 := infer($t1)
+     # live vars: $t2, $t10
+ 17: $t0 := +($t2, $t10)
+     # live vars: $t0
+ 18: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::inc_immut($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::inc_mut($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t3
+  1: $t4 := 1
+     # live vars: $t0, $t3, $t4
+  2: $t2 := +($t3, $t4)
+     # live vars: $t0, $t2
+  3: write_ref($t2, $t0)
+     # live vars: $t0
+  4: $t1 := read_ref($t0)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: &mut u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t6 := borrow_local($t1)
+     # live vars: $t6
+  2: $t5 := m::inc_mut($t6)
+     # live vars: $t5
+  3: $t7 := 1
+     # live vars: $t5, $t7
+  4: $t4 := +($t5, $t7)
+     # live vars: $t4
+  5: $t1 := move($t4)
+     # live vars: $t1
+  6: $t9 := 1
+     # live vars: $t1, $t9
+  7: $t8 := +($t1, $t9)
+     # live vars: $t8
+  8: $t1 := move($t8)
+     # live vars: $t1
+  9: $t3 := copy($t1)
+     # live vars: $t1, $t3
+ 10: $t2 := m::inc_immut($t3)
+     # live vars: $t1, $t2
+ 11: $t13 := borrow_local($t1)
+     # live vars: $t2, $t13
+ 12: $t12 := m::inc_mut($t13)
+     # live vars: $t2, $t12
+ 13: $t14 := 1
+     # live vars: $t2, $t12, $t14
+ 14: $t11 := +($t12, $t14)
+     # live vars: $t2, $t11
+ 15: $t1 := move($t11)
+     # live vars: $t1, $t2
+ 16: $t10 := move($t1)
+     # live vars: $t2, $t10
+ 17: $t0 := +($t2, $t10)
+     # live vars: $t0
+ 18: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::inc_immut($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::inc_mut($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t3
+  1: $t4 := 1
+     # live vars: $t0, $t3, $t4
+  2: $t2 := +($t3, $t4)
+     # live vars: $t0, $t2
+  3: write_ref($t2, $t0)
+     # live vars: $t0
+  4: $t1 := read_ref($t0)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: &mut u64
+     var $t14: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t6 := borrow_local($t1)
+     # live vars: $t6
+  2: $t5 := m::inc_mut($t6)
+     # live vars: $t5
+  3: $t7 := 1
+     # live vars: $t5, $t7
+  4: $t4 := +($t5, $t7)
+     # live vars: $t4
+  5: $t1 := move($t4)
+     # live vars: $t1
+  6: $t9 := 1
+     # live vars: $t1, $t9
+  7: $t8 := +($t1, $t9)
+     # live vars: $t8
+  8: $t1 := move($t8)
+     # live vars: $t1
+  9: $t3 := copy($t1)
+     # live vars: $t1, $t3
+ 10: $t2 := m::inc_immut($t3)
+     # live vars: $t1, $t2
+ 11: $t13 := borrow_local($t1)
+     # live vars: $t2, $t13
+ 12: $t12 := m::inc_mut($t13)
+     # live vars: $t2, $t12
+ 13: $t14 := 1
+     # live vars: $t2, $t12, $t14
+ 14: $t11 := +($t12, $t14)
+     # live vars: $t2, $t11
+ 15: $t1 := move($t11)
+     # live vars: $t1, $t2
+ 16: $t10 := move($t1)
+     # live vars: $t2, $t10
+ 17: $t0 := +($t2, $t10)
+     # live vars: $t0
+ 18: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::inc_immut($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun m::inc_mut($t0: &mut u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t3
+  1: $t4 := 1
+     # live vars: $t0, $t3, $t4
+  2: $t3 := +($t3, $t4)
+     # live vars: $t0, $t3
+  3: write_ref($t3, $t0)
+     # live vars: $t0
+  4: $t3 := read_ref($t0)
+     # live vars: $t3
+  5: return $t3
+}
+
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: u64
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: &mut u64 [unused]
+     var $t14: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t6 := borrow_local($t1)
+     # live vars: $t6
+  2: $t5 := m::inc_mut($t6)
+     # live vars: $t5
+  3: $t7 := 1
+     # live vars: $t5, $t7
+  4: $t5 := +($t5, $t7)
+     # live vars: $t5
+  5: $t1 := move($t5)
+     # live vars: $t1
+  6: $t5 := 1
+     # live vars: $t1, $t5
+  7: $t5 := +($t1, $t5)
+     # live vars: $t5
+  8: $t1 := move($t5)
+     # live vars: $t1
+  9: $t5 := copy($t1)
+     # live vars: $t1, $t5
+ 10: $t5 := m::inc_immut($t5)
+     # live vars: $t1, $t5
+ 11: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+ 12: $t7 := m::inc_mut($t6)
+     # live vars: $t5, $t7
+ 13: $t14 := 1
+     # live vars: $t5, $t7, $t14
+ 14: $t7 := +($t7, $t14)
+     # live vars: $t5, $t7
+ 15: $t1 := move($t7)
+     # live vars: $t1, $t5
+ 16: $t7 := move($t1)
+     # live vars: $t5, $t7
+ 17: $t5 := +($t5, $t7)
+     # live vars: $t5
+ 18: return $t5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::inc_immut($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun m::inc_mut($t0: &mut u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t3
+  1: $t4 := 1
+     # live vars: $t0, $t3, $t4
+  2: $t3 := +($t3, $t4)
+     # live vars: $t0, $t3
+  3: write_ref($t3, $t0)
+     # live vars: $t0
+  4: $t3 := read_ref($t0)
+     # live vars: $t3
+  5: return $t3
+}
+
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: u64
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: &mut u64 [unused]
+     var $t14: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t6 := borrow_local($t1)
+     # live vars: $t6
+  2: $t5 := m::inc_mut($t6)
+     # live vars: $t5
+  3: $t7 := 1
+     # live vars: $t5, $t7
+  4: $t5 := +($t5, $t7)
+     # live vars: $t5
+  5: $t1 := move($t5)
+     # live vars: $t1
+  6: $t5 := 1
+     # live vars: $t1, $t5
+  7: $t5 := +($t1, $t5)
+     # live vars: $t5
+  8: $t1 := move($t5)
+     # live vars: $t1
+  9: $t5 := copy($t1)
+     # live vars: $t1, $t5
+ 10: $t5 := m::inc_immut($t5)
+     # live vars: $t1, $t5
+ 11: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+ 12: $t7 := m::inc_mut($t6)
+     # live vars: $t5, $t7
+ 13: $t14 := 1
+     # live vars: $t5, $t7, $t14
+ 14: $t7 := +($t7, $t14)
+     # live vars: $t5, $t7
+ 15: $t1 := move($t7)
+     # live vars: $t1, $t5
+ 16: $t7 := move($t1)
+     # live vars: $t5, $t7
+ 17: $t5 := +($t5, $t7)
+     # live vars: $t5
+ 18: return $t5
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+inc_immut(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: LdU64(1)
+	1: StLoc[1](loc0: u64)
+	2: MoveLoc[0](Arg0: u64)
+	3: MoveLoc[1](loc0: u64)
+	4: Add
+	5: Ret
+}
+inc_mut(Arg0: &mut u64): u64 /* def_idx: 1 */ {
+B0:
+	0: CopyLoc[0](Arg0: &mut u64)
+	1: ReadRef
+	2: LdU64(1)
+	3: Add
+	4: CopyLoc[0](Arg0: &mut u64)
+	5: WriteRef
+	6: MoveLoc[0](Arg0: &mut u64)
+	7: ReadRef
+	8: Ret
+}
+public test1(): u64 /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+B0:
+	0: LdU64(1)
+	1: StLoc[0](loc0: u64)
+	2: MutBorrowLoc[0](loc0: u64)
+	3: Call inc_mut(&mut u64): u64
+	4: LdU64(1)
+	5: Add
+	6: StLoc[0](loc0: u64)
+	7: LdU64(1)
+	8: StLoc[1](loc1: u64)
+	9: MoveLoc[0](loc0: u64)
+	10: MoveLoc[1](loc1: u64)
+	11: Add
+	12: StLoc[0](loc0: u64)
+	13: CopyLoc[0](loc0: u64)
+	14: StLoc[1](loc1: u64)
+	15: MoveLoc[1](loc1: u64)
+	16: Call inc_immut(u64): u64
+	17: MutBorrowLoc[0](loc0: u64)
+	18: Call inc_mut(&mut u64): u64
+	19: LdU64(1)
+	20: Add
+	21: StLoc[0](loc0: u64)
+	22: MoveLoc[0](loc0: u64)
+	23: StLoc[2](loc2: u64)
+	24: MoveLoc[2](loc2: u64)
+	25: Add
+	26: Ret
+}
+}
+============ bytecode verification succeeded ========
