@@ -27,11 +27,12 @@ pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
     command_rx: Arc<Receiver<Message>>,
     //result_tx: Sender<Message>,
-    result_tx: OutboundRpcHelper,
+    result_tx: Arc<Mutex<OutboundRpcHelper>>,
     shard_id: ShardId,
     cmd_rx_msg_duration_since_epoch: Arc<AtomicU64>,
     is_block_init_done: Arc<AtomicBool>,//Mutex<bool>,
     cmd_rx_thread_pool: Arc<rayon::ThreadPool>,
+    result_tx_thread_pool: Arc<rayon::ThreadPool>,
 }
 
 impl RemoteCoordinatorClient {
@@ -43,12 +44,20 @@ impl RemoteCoordinatorClient {
         let execute_command_type = format!("execute_command_{}", shard_id);
         let execute_result_type = format!("execute_result_{}", shard_id);
         let command_rx = controller.create_inbound_channel(execute_command_type);
-        let result_tx = OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime());
+        let result_tx = Arc::new(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime())));
             //controller.create_outbound_channel(coordinator_address, execute_result_type);
         let cmd_rx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("remote-state-view-shard-send-request-{}-{}", shard_id, index))
                 .num_threads(8)
+                .build()
+                .unwrap(),
+        );
+
+        let result_tx_thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .thread_name(move |index| format!("remote-state-view-shard-send-results-{}-{}", shard_id, index))
+                .num_threads(4)
                 .build()
                 .unwrap(),
         );
@@ -64,6 +73,7 @@ impl RemoteCoordinatorClient {
             cmd_rx_msg_duration_since_epoch: Arc::new(AtomicU64::new(0)),
             is_block_init_done: Arc::new(AtomicBool::new(false)),
             cmd_rx_thread_pool,
+            result_tx_thread_pool
         }
     }
 
@@ -302,15 +312,31 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         let delta = get_delta_time(duration_since_epoch);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["6_results_tx_msg_shard_send"]).observe(delta as f64);
-        self.result_tx.send(Message::create_with_metadata(output_message, duration_since_epoch, 0, 0), &MessageType::new(execute_result_type));
+        self.result_tx.lock().unwrap().send(Message::create_with_metadata(output_message, duration_since_epoch, 0, 0), &MessageType::new(execute_result_type));
     }
 
+    // Parallelizes the sending of the result batches to the coordinator.
     fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
         //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
-        let execute_result_type = format!("execute_result_{}", self.shard_id);
-        let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
-        self.result_tx.send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
+        let result_tx_clone = self.result_tx.clone();
+        let shard_id_clone = self.shard_id.clone();
+        self.result_tx_thread_pool.spawn(move || {
+            let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
+                .with_label_values(&[&shard_id_clone.to_string(), "result_tx_bcs_ser"])
+                .start_timer();
+            let execute_result_type = format!("execute_result_{}", shard_id_clone);
+            let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
+            drop(bcs_ser_timer);
+            result_tx_clone.lock().unwrap().send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
+        });
     }
+
+    // fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
+    //     //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
+    //     let execute_result_type = format!("execute_result_{}", self.shard_id);
+    //     let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
+    //     self.result_tx.send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
+    // }
 
     fn record_execution_complete_time_on_shard(&self) {
         let duration_since_epoch = self.cmd_rx_msg_duration_since_epoch.load(std::sync::atomic::Ordering::Relaxed);
