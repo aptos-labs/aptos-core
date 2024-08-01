@@ -435,17 +435,27 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                         .decode()
                         .into_iter()
                         .flat_map(|(sender_bucket, start_end_pairs)| {
-                            self.prioritized_peers_state
-                                .get_sender_bucket_priority_for_peer(&peer, sender_bucket)
-                                .map_or_else(Vec::new, |priority| {
-                                    mempool
-                                        .timeline_range(sender_bucket, start_end_pairs)
-                                        .into_iter()
-                                        .map(|(txn, ready_time)| {
-                                            (txn, ready_time, priority.clone())
-                                        })
-                                        .collect::<Vec<_>>()
-                                })
+                            if self.node_type.is_validator() {
+                                mempool
+                                    .timeline_range(sender_bucket, start_end_pairs)
+                                    .into_iter()
+                                    .map(|(txn, ready_time)| {
+                                        (txn, ready_time, BroadcastPeerPriority::Primary)
+                                    })
+                                    .collect::<Vec<_>>()
+                            } else {
+                                self.prioritized_peers_state
+                                    .get_sender_bucket_priority_for_peer(&peer, sender_bucket)
+                                    .map_or_else(Vec::new, |priority| {
+                                        mempool
+                                            .timeline_range(sender_bucket, start_end_pairs)
+                                            .into_iter()
+                                            .map(|(txn, ready_time)| {
+                                                (txn, ready_time, priority.clone())
+                                            })
+                                            .collect::<Vec<_>>()
+                                    })
+                            }
                         })
                         .collect::<Vec<_>>();
                     (message_id.clone(), txns, metric_label)
