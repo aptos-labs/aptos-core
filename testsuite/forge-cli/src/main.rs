@@ -1964,19 +1964,11 @@ fn realistic_env_max_load_test(
 
     let mut success_criteria = SuccessCriteria::new(95)
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
-<<<<<<< HEAD
-            // Check that we don't use more than 18 CPU cores for 10% of the time.
-            MetricsThreshold::new(18.0, 10),
-            // Memory starts around 3.5GB, and grows around 1.4GB/hr in this test.
-            // Check that we don't use more than final expected memory for more than 10% of the time.
-            MetricsThreshold::new_gb(3.5 + 1.4 * (duration_secs as f64 / 3600.0), 10),
-=======
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),
             // Memory starts around 5GB, and grows around 1.4GB/hr in this test.
             // Check that we don't use more than final expected memory for more than 15% of the time.
             MetricsThreshold::new_gb(5.0 + 1.4 * (duration_secs as f64 / 3600.0), 15),
->>>>>>> 620914b111 (increasing block limit (#14161))
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -2038,15 +2030,12 @@ fn realistic_env_max_load_test(
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
-<<<<<<< HEAD
-=======
         .with_validator_override_node_config_fn(Arc::new(move |config, _| {
             optimize_state_sync_for_throughput(config, 3500);
         }))
         .with_fullnode_override_node_config_fn(Arc::new(move |config, _| {
             optimize_state_sync_for_throughput(config, 3500);
         }))
->>>>>>> 620914b111 (increasing block limit (#14161))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
