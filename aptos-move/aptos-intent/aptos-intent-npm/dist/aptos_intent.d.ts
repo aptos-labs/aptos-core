@@ -18,6 +18,28 @@ export enum BatchArgumentType {
 */
 export class BatchArgument {
   free(): void;
+/**
+* @param {Uint8Array} bytes
+* @returns {BatchArgument}
+*/
+  static new_bytes(bytes: Uint8Array): BatchArgument;
+/**
+* @param {number} signer_idx
+* @returns {BatchArgument}
+*/
+  static new_signer(signer_idx: number): BatchArgument;
+/**
+* @returns {BatchArgument}
+*/
+  borrow(): BatchArgument;
+/**
+* @returns {BatchArgument}
+*/
+  borrow_mut(): BatchArgument;
+/**
+* @returns {BatchArgument}
+*/
+  copy(): BatchArgument;
 }
 /**
 * Call a Move entry function.
@@ -70,11 +92,11 @@ export interface InitOutput {
   readonly batchedfunctioncallbuilder_add_batched_call: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
   readonly batchedfunctioncallbuilder_generate_batched_calls: (a: number, b: number) => void;
   readonly batchedfunctioncallbuilder_load_module: (a: number, b: number, c: number, d: number, e: number) => number;
-  readonly batchargumentwasm_new_bytes: (a: number, b: number) => number;
-  readonly batchargumentwasm_new_signer: (a: number) => number;
-  readonly batchargumentwasm_borrow: (a: number, b: number) => void;
-  readonly batchargumentwasm_borrow_mut: (a: number, b: number) => void;
-  readonly batchargumentwasm_copy: (a: number, b: number) => void;
+  readonly batchargument_new_bytes: (a: number, b: number) => number;
+  readonly batchargument_new_signer: (a: number) => number;
+  readonly batchargument_borrow: (a: number, b: number) => void;
+  readonly batchargument_borrow_mut: (a: number, b: number) => void;
+  readonly batchargument_copy: (a: number, b: number) => void;
   readonly __wbg_batchedfunctioncall_free: (a: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
@@ -106,3 +128,5 @@ export function initSync(module: SyncInitInput): InitOutput;
 * @returns {Promise<InitOutput>}
 */
 export default function __wbg_init (module_or_path?: InitInput | Promise<InitInput>): Promise<InitOutput>;
+
+export function get_wasm(): Promise<any>; 

@@ -374,7 +374,7 @@ impl BatchedFunctionCallBuilder {
     }
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = BatchArgument)]
 impl BatchArgumentWASM {
     pub fn new_bytes(bytes: Vec<u8>) -> Self {
         Self {
