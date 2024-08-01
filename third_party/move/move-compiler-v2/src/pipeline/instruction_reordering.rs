@@ -7,7 +7,7 @@ use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{Bytecode, Operation},
+    stackless_bytecode::{AssignKind, Bytecode, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::{
@@ -19,6 +19,25 @@ use std::{
 struct OrderInfo {
     dependencies: BTreeSet<CodeOffset>,
     dfs_numberings: Vec<Option<CodeOffset>>,
+}
+
+impl OrderInfo {
+    pub fn remap(&self, base: CodeOffset) -> Self {
+        let dependencies = self
+            .dependencies
+            .iter()
+            .map(|d| *d + base)
+            .collect::<BTreeSet<_>>();
+        let dfs_numberings = self
+            .dfs_numberings
+            .iter()
+            .map(|n| n.map(|n| n + base))
+            .collect::<Vec<_>>();
+        Self {
+            dependencies,
+            dfs_numberings,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -84,9 +103,10 @@ impl InstructionReordering {
             let new_lower = new_code.len() as CodeOffset;
             new_code.extend(block);
             for (offset, order_info) in ordering.0.into_iter() {
-                ordering_annotation
-                    .0
-                    .insert(new_lower + offset as CodeOffset, order_info);
+                ordering_annotation.0.insert(
+                    new_lower + offset as CodeOffset,
+                    order_info.remap(new_lower),
+                );
             }
             for (touch_offset, triplet) in touch_use.0 {
                 touch_use_annotation.0.insert(
@@ -112,7 +132,7 @@ impl InstructionReordering {
         let mut new_block = code[usize::from(lower)..=usize::from(upper)].to_vec();
         // If there are any spec blocks, we do not perform any optimizations, as dependencies
         // in spec blocks are not captured. We could relax this limitation in the future.
-        if new_block.len() > 128
+        if new_block.len() > 256
             || new_block.iter().any(|instr| {
                 instr.is_spec_only()
                     || matches!(instr, Bytecode::SpecBlock(..))
@@ -130,29 +150,45 @@ impl InstructionReordering {
         // Compute the use-def graph for this block.
         let (use_def_graph, prepare_use_map) =
             Self::ordered_edge_data_dependence_graph(&mut new_block);
-        // Insert `Touch` instructions as needed to the end and update the use-def graph.
-        // `Touch` instructions will be re-ordered below, along with the rest of the instructions.
-        //let touch_use_map = Self::insert_prepares(&mut new_block, &mut use_def_graph);
-        // Number all the relatively immovable instructions, rest get `None`.
-        // Iteration is in forward direction from the beginning of the block.
-        // let relatively_non_reorderable = new_block
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(offset, instr)| {
-        //         if Self::is_relatively_non_reorderable(instr) {
-        //             Some(offset as CodeOffset)
-        //         } else {
-        //             None
-        //         }
-        //     })
-        //     .collect::<Vec<_>>();
-        let dependencies = DependenceConstraints::default()
+        let dependencies = DependenceConstraints::empty()
             .add_false_dependencies(&new_block)
             .add_true_dependencies(&use_def_graph)
             .add_ref_arg_dependencies(&new_block, target)
+            .add_move_dependencies(&new_block)
             .add_relatively_non_reorderable_dependencies(&new_block)
             .make_transitively_closed()
             .get_constraints();
+
+        // None are marked as taken initially. (`taken`: bool vector)
+        // Start from bottom.
+        // It is marked as taken? Skip. Go to upper.
+        // Is it Prepare? Skip. Go to upper.
+        // Is is empty-sourced? Add it to stack (`new_code`). Mark as taken. Go to upper.
+        // Else, start an ordered DFS numbering (dfs with lowest offset tracking), assert that none of them are `taken`.
+        //   Find the lowest numbered instruction.
+        //   Starting from there, for each numbered pair till this, check if constraints are satisfied.
+        //   For each unmarked, check if constraints are satisfied with each numbered, assuming unmarked goes before.
+        //   If yes, leave all the unmarked, copy all numbered to the stack (in reverse order). Mark them as taken.
+        //   If not, add it to the stack. Go to upper.
+        //
+        // Note: for numbered pairs, data dependence is always satisfied. For unmarked, it may not be.
+        // Number of instructions cannot grow (to make sure there are no double copies).
+        let mut taken = vec![false; new_block.len()];
+        let mut reordered_block = vec![];
+        for (offset, instr) in new_block.iter().enumerate().rev() {
+            if taken[offset] {
+                continue;
+            }
+            if let Bytecode::Call(_, _, Operation::Prepare, ..) = instr {
+                continue;
+            }
+            if instr.sources().is_empty() {
+                reordered_block.push(instr.clone());
+                taken[offset] = true;
+                continue;
+            }
+            Self::dfs_post_order();
+        }
 
         // Start DFS port-order numbering from unvisited relatively immovable instructions.
         // Iteration is in reverse direction from the end of the block.
@@ -226,10 +262,11 @@ impl InstructionReordering {
         // In addition, also update the `graph`.
         let mut prepare_use_map: BTreeMap<CodeOffset, (CodeOffset, usize, bool)> = BTreeMap::new();
         let mut prepare_instrs: Vec<Bytecode> = vec![];
-        let mut prepare_edges: BTreeMap<CodeOffset, CodeOffset> = BTreeMap::new();
+        // let mut prepare_edges: BTreeMap<CodeOffset, CodeOffset> = BTreeMap::new();
         for (usage_offset, usage_instr) in block.iter().enumerate() {
             let sources = usage_instr.sources();
             if sources.len() < 2 {
+                // No need to insert `Prepare` for single source instructions.
                 continue;
             }
             let usage_offset = usage_offset as CodeOffset;
@@ -259,81 +296,81 @@ impl InstructionReordering {
                             *def = Some(prepare_offset);
                             prepare_use_map.insert(prepare_offset, (usage_offset, pos, false));
                         },
-                        Some(def_offset) => {
+                        Some(_def_offset) => {
                             // The definition is explicit in the block.
                             // If it is an `Assign`, then we need to insert a `Prepare`.
-                            let def_instr = &block[usize::from(*def_offset)];
-                            if matches!(def_instr, Bytecode::Assign(..)) {
-                                let prepare_offset =
-                                    (block.len() + prepare_instrs.len()) as CodeOffset;
-                                let prepare = Bytecode::Call(
-                                    usage_instr.get_attr_id(),
-                                    vec![],
-                                    Operation::Prepare,
-                                    vec![*tmp],
-                                    None,
-                                );
-                                prepare_instrs.push(prepare);
-                                prepare_edges.insert(prepare_offset, *def_offset);
-                                *def = Some(prepare_offset);
-                                prepare_use_map.insert(prepare_offset, (usage_offset, pos, false));
-                            }
+                            // let def_instr = &block[usize::from(*def_offset)];
+                            // if matches!(def_instr, Bytecode::Assign(..)) {
+                            //     let prepare_offset =
+                            //         (block.len() + prepare_instrs.len()) as CodeOffset;
+                            //     let prepare = Bytecode::Call(
+                            //         usage_instr.get_attr_id(),
+                            //         vec![],
+                            //         Operation::Prepare,
+                            //         vec![*tmp],
+                            //         None,
+                            //     );
+                            //     prepare_instrs.push(prepare);
+                            //     prepare_edges.insert(prepare_offset, *def_offset);
+                            //     *def = Some(prepare_offset);
+                            //     prepare_use_map.insert(prepare_offset, (usage_offset, pos, false));
+                            // }
                         },
                     }
                 }
             }
         }
-        for ((tmp, _), use_pairs) in uses {
-            if use_pairs.len() > 1 {
-                // The definition is used multiple times.
-                // So, let's insert a `Prepare` instruction for each use,
-                // except for the last one, unless one is already present.
-                for (use_offset, pos) in use_pairs {
-                    // All use instructions are guaranteed to be within the `block`.
-                    // Because, `Prepare` instructions were not considered in `uses`.
-                    let use_instr = &block[use_offset as usize];
-                    let sources = use_instr.sources();
-                    if sources.is_empty() || pos == sources.len() - 1 {
-                        // The last operand does not need a `Prepare`.
-                        continue;
-                    }
-                    if let Some(defs) = graph.get_mut(&use_offset) {
-                        if let Some(def) = defs[pos] {
-                            if def as usize >= block.len() {
-                                // `Prepare` instruction.
-                                // No need to insert a `Prepare` instruction.
-                                // Just update the `prepare_use_map` to say this is a multi-use.
-                                if let Some(triplet) = prepare_use_map.get_mut(&def) {
-                                    triplet.2 = true;
-                                }
-                            } else {
-                                // Not a `Prepare` instruction.
-                                let prepare_offset =
-                                    (block.len() + prepare_instrs.len()) as CodeOffset;
-                                let prepare = Bytecode::Call(
-                                    use_instr.get_attr_id(),
-                                    vec![],
-                                    Operation::Prepare,
-                                    vec![tmp],
-                                    None,
-                                );
-                                prepare_instrs.push(prepare);
-                                prepare_edges.insert(prepare_offset, def);
-                                defs[pos] = Some(prepare_offset);
-                                prepare_use_map.insert(prepare_offset, (use_offset, pos, true));
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // for ((tmp, _), use_pairs) in uses {
+        //     if use_pairs.len() > 1 {
+        //         // The definition is used multiple times.
+        //         // So, let's insert a `Prepare` instruction for each use,
+        //         // except for the last one, unless one is already present.
+        //         for (use_offset, pos) in use_pairs {
+        //             // All use instructions are guaranteed to be within the `block`.
+        //             // Because, `Prepare` instructions were not considered in `uses`.
+        //             let use_instr = &block[use_offset as usize];
+        //             let sources = use_instr.sources();
+        //             if sources.is_empty() || pos == sources.len() - 1 {
+        //                 // The last operand does not need a `Prepare`.
+        //                 continue;
+        //             }
+        //             if let Some(defs) = graph.get_mut(&use_offset) {
+        //                 if let Some(def) = defs[pos] {
+        //                     if def as usize >= block.len() {
+        //                         // `Prepare` instruction.
+        //                         // No need to insert a `Prepare` instruction.
+        //                         // Just update the `prepare_use_map` to say this is a multi-use.
+        //                         if let Some(triplet) = prepare_use_map.get_mut(&def) {
+        //                             triplet.2 = true;
+        //                         }
+        //                     } else {
+        //                         // Not a `Prepare` instruction.
+        //                         let prepare_offset =
+        //                             (block.len() + prepare_instrs.len()) as CodeOffset;
+        //                         let prepare = Bytecode::Call(
+        //                             use_instr.get_attr_id(),
+        //                             vec![],
+        //                             Operation::Prepare,
+        //                             vec![tmp],
+        //                             None,
+        //                         );
+        //                         prepare_instrs.push(prepare);
+        //                         prepare_edges.insert(prepare_offset, def);
+        //                         defs[pos] = Some(prepare_offset);
+        //                         prepare_use_map.insert(prepare_offset, (use_offset, pos, true));
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
         block.extend(prepare_instrs);
-        for (prepare_offset, def_offset) in prepare_edges {
-            graph
-                .entry(prepare_offset)
-                .or_default()
-                .push(Some(def_offset));
-        }
+        // for (prepare_offset, def_offset) in prepare_edges {
+        //     graph
+        //         .entry(prepare_offset)
+        //         .or_default()
+        //         .push(Some(def_offset));
+        // }
         (UseDefGraph(graph), prepare_use_map)
     }
 
@@ -442,7 +479,7 @@ impl InstructionReordering {
         let mut visited_by_any_run: BTreeSet<CodeOffset> = BTreeSet::new();
         for (offset, instr) in block.iter().enumerate().rev() {
             if !visited_by_any_run.contains(&(offset as CodeOffset))
-                && Self::is_relatively_non_reorderable(instr)
+                // && Self::is_relatively_non_reorderable(instr)
                 && !instr.sources().is_empty()
             {
                 let mut visited_by_this_run = BTreeSet::new();
@@ -509,6 +546,10 @@ struct DependenceConstraints {
 }
 
 impl DependenceConstraints {
+    fn empty() -> Self {
+        Self::default()
+    }
+
     /// Compute the false dependence graph for a `block` (of straight-line code).
     /// A false dependence graph includes write-after-read and write-after-write dependencies.
     /// Since it is computed within a block, it is a directed acyclic graph (by construction).
@@ -567,6 +608,11 @@ impl DependenceConstraints {
         let mut ref_args: BTreeMap<TempIndex, CodeOffset> = BTreeMap::new();
         for (offset, instr) in block.iter().enumerate() {
             let offset = offset as CodeOffset;
+            if matches!(instr, Bytecode::Call(_, _, Operation::Prepare, ..)) {
+                // `Prepare` is always inserted at the end.
+                // We are not adding ref-arg dependencies for `Prepare` instructions.
+                break;
+            }
             if Self::is_ref_arg_instr(instr, target) {
                 for src in instr.sources() {
                     if let Some(prev_reads) = reads.remove(&src) {
@@ -589,17 +635,36 @@ impl DependenceConstraints {
                     }
                 }
             }
-            // if let Bytecode::Call(_, _, Operation::FreezeRef(_), sources, _) = instr {
-            //     if let Some(prev_offset) = latest_freeze_ref.insert(sources[0], offset) {
-            //         self.edges.entry(prev_offset).or_default().insert(offset);
-            //     }
-            // } else {
-            //     for src in instr.sources() {
-            //         if let Some(freeze_offset) = latest_freeze_ref.get(&src) {
-            //             self.edges.entry(*freeze_offset).or_default().insert(offset);
-            //         }
-            //     }
-            // }
+        }
+        self
+    }
+
+    fn add_move_dependencies(&mut self, block: &[Bytecode]) -> &mut Self {
+        let mut reads_before_move: BTreeMap<TempIndex, BTreeSet<CodeOffset>> = BTreeMap::new();
+        use AssignKind::*;
+        for (offset, instr) in block.iter().enumerate() {
+            if matches!(instr, Bytecode::Call(_, _, Operation::Prepare, ..)) {
+                // `Prepare` is always inserted at the end.
+                // We are not adding false dependencies for `Prepare` instructions.
+                break;
+            }
+            if let Bytecode::Assign(_, _, src, Move | Inferred | Store) = instr {
+                if let Some(reads) = reads_before_move.remove(src) {
+                    for read in reads {
+                        self.edges
+                            .entry(read)
+                            .or_default()
+                            .insert(offset as CodeOffset);
+                    }
+                }
+            } else {
+                for src in instr.sources() {
+                    reads_before_move
+                        .entry(src)
+                        .or_default()
+                        .insert(offset as CodeOffset);
+                }
+            }
         }
         self
     }
@@ -619,6 +684,7 @@ impl DependenceConstraints {
     }
 
     fn make_transitively_closed(&mut self) -> &mut Self {
+        assert!(!self.has_cycle());
         // Floyd-Warshall algorithm to compute the transitive closure.
         // TODO: Consider using a more efficient algorithm if this is a fairly sparse graph.
         for k in 0..self.num_nodes {
@@ -636,10 +702,13 @@ impl DependenceConstraints {
     }
 
     fn is_ref_arg_instr(instr: &Bytecode, target: &FunctionTarget) -> bool {
+        use Operation::*;
         match instr {
-            Bytecode::Call(_, _, Operation::FreezeRef(_), _, _) => true,
-            Bytecode::Call(_, dsts, Operation::BorrowLoc, _, _) => {
+            Bytecode::Call(_, dsts, BorrowLoc, _, _) => {
                 target.get_local_type(dsts[0]).is_mutable_reference()
+            },
+            Bytecode::Call(_, _, op, _, _) => {
+                matches!(op, FreezeRef(_) | WriteRef | BorrowGlobal(..))
             },
             _ => false,
         }
@@ -647,6 +716,38 @@ impl DependenceConstraints {
 
     pub fn get_constraints(&mut self) -> BTreeMap<CodeOffset, BTreeSet<CodeOffset>> {
         mem::take(self).edges
+    }
+
+    fn has_cycle(&self) -> bool {
+        let mut visited_ever = BTreeSet::new();
+        let mut ancestors = BTreeSet::new();
+        for node in 0..self.num_nodes {
+            if self.dfs(node, &mut visited_ever, &mut ancestors) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn dfs(
+        &self,
+        node: CodeOffset,
+        visited_ever: &mut BTreeSet<CodeOffset>,
+        ancestors: &mut BTreeSet<CodeOffset>,
+    ) -> bool {
+        if !visited_ever.insert(node) {
+            return false;
+        }
+        ancestors.insert(node);
+        if let Some(children) = self.edges.get(&node) {
+            for child in children {
+                if ancestors.contains(child) || self.dfs(*child, visited_ever, ancestors) {
+                    return true;
+                }
+            }
+        }
+        ancestors.remove(&node);
+        false
     }
 }
 
@@ -660,15 +761,6 @@ impl OrderingConstraints {
     pub fn get_ordered_instr_indices(&self) -> Vec<CodeOffset> {
         let mut order = (0..self.dfs_numberings.len() as CodeOffset).collect::<Vec<_>>();
         order.sort_by(|a, b| {
-            // If both of the instructions are relatively non-reorderable,
-            // their relative order is based on their original order.
-            // if let (Some(a_rank), Some(b_rank)) = (
-            //     self.relatively_non_reorderable[*a as usize],
-            //     self.relatively_non_reorderable[*b as usize],
-            // ) {
-            //     debug_assert!(a_rank != b_rank);
-            //     return a_rank.cmp(&b_rank);
-            // }
             // If there is a dependence between `a` and `b`, then ordering should respect it.
             if self
                 .dependencies
@@ -706,7 +798,14 @@ impl OrderingConstraints {
             let dependencies = self
                 .dependencies
                 .remove(&(offset as CodeOffset))
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .into_iter()
+                .map(|d| remap[d as usize])
+                .collect();
+            let dfs_numberings = dfs_numberings
+                .into_iter()
+                .map(|num| num.map(|n| remap[n as usize]))
+                .collect();
             ordering.insert(remap[offset] as CodeOffset, OrderInfo {
                 dependencies,
                 dfs_numberings,

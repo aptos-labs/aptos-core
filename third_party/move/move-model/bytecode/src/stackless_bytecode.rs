@@ -67,11 +67,11 @@ impl SpecBlockId {
 /// The kind of an assignment in the bytecode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AssignKind {
-    /// The assign copies the lhs value.
+    /// The assign copies the rhs value.
     Copy,
-    /// The assign moves the lhs value.
+    /// The assign moves the rhs value.
     Move,
-    /// The assign stores the lhs value.
+    /// The assign stores the rhs value.
     // TODO: figure out why we can't treat this as either copy or move. The lifetime analysis
     // currently makes a difference of this case. It originates from stack code where Copy
     // and Move push on the stack and Store pops.
