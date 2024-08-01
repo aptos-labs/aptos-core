@@ -1,0 +1,387 @@
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun m::baz($t0: &mut u64, $t1: u64) {
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0, $t1
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t1, $t3
+  1: $t2 := +($t3, $t1)
+     # live vars: $t0, $t2
+  2: write_ref($t2, $t0)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut m::Foo) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t0, $t2
+  1: $t1 := m::bar($t2)
+     # live vars: $t0, $t1
+  2: $t3 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t1, $t3
+  3: $t5 := 1
+     # live vars: $t1, $t3, $t5
+  4: $t4 := +($t1, $t5)
+     # live vars: $t3, $t4
+  5: m::baz($t3, $t4)
+     # live vars:
+  6: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun m::baz($t0: &mut u64, $t1: u64) {
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0, $t1
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t1, $t3
+  1: $t2 := +($t3, $t1)
+     # live vars: $t0, $t2
+  2: write_ref($t2, $t0)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut m::Foo) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t0, $t2
+  1: $t1 := m::bar($t2)
+     # live vars: $t0, $t1
+  2: $t3 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t1, $t3
+  3: $t5 := 1
+     # live vars: $t1, $t3, $t5
+  4: $t4 := +($t1, $t5)
+     # live vars: $t3, $t4
+  5: m::baz($t3, $t4)
+     # live vars:
+  6: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun m::baz($t0: &mut u64, $t1: u64) {
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0, $t1
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t1, $t3
+  1: $t2 := +($t3, $t1)
+     # live vars: $t0, $t2
+  2: write_ref($t2, $t0)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut m::Foo) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t0, $t2
+  1: $t1 := m::bar($t2)
+     # live vars: $t0, $t1
+  2: $t3 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t1, $t3
+  3: $t5 := 1
+     # live vars: $t1, $t3, $t5
+  4: $t4 := +($t1, $t5)
+     # live vars: $t3, $t4
+  5: m::baz($t3, $t4)
+     # live vars:
+  6: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun m::baz($t0: &mut u64, $t1: u64) {
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0, $t1
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t1, $t3
+  1: $t2 := +($t3, $t1)
+     # live vars: $t0, $t2
+  2: write_ref($t2, $t0)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut m::Foo) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t0, $t2
+  1: $t1 := m::bar($t2)
+     # live vars: $t0, $t1
+  2: $t3 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t1, $t3
+  3: $t5 := 1
+     # live vars: $t1, $t3, $t5
+  4: $t4 := +($t1, $t5)
+     # live vars: $t3, $t4
+  5: m::baz($t3, $t4)
+     # live vars:
+  6: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t2 := +($t2, $t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+fun m::baz($t0: &mut u64, $t1: u64) {
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0, $t1
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t1, $t3
+  1: $t1 := +($t3, $t1)
+     # live vars: $t0, $t1
+  2: write_ref($t1, $t0)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut m::Foo) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &mut u64
+     var $t4: u64 [unused]
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t0, $t2
+  1: $t1 := m::bar($t2)
+     # live vars: $t0, $t1
+  2: $t3 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t1, $t3
+  3: $t5 := 1
+     # live vars: $t1, $t3, $t5
+  4: $t1 := +($t1, $t5)
+     # live vars: $t1, $t3
+  5: m::baz($t3, $t1)
+     # live vars:
+  6: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t2 := +($t2, $t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+fun m::baz($t0: &mut u64, $t1: u64) {
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0, $t1
+  0: $t3 := read_ref($t0)
+     # live vars: $t0, $t1, $t3
+  1: $t1 := +($t3, $t1)
+     # live vars: $t0, $t1
+  2: write_ref($t1, $t0)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut m::Foo) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &mut u64
+     var $t4: u64 [unused]
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t0, $t2
+  1: $t1 := m::bar($t2)
+     # live vars: $t0, $t1
+  2: $t3 := borrow_field<m::Foo>.x($t0)
+     # live vars: $t1, $t3
+  3: $t5 := 1
+     # live vars: $t1, $t3, $t5
+  4: $t1 := +($t1, $t5)
+     # live vars: $t1, $t3
+  5: m::baz($t3, $t1)
+     # live vars:
+  6: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+struct Foo {
+	x: u64
+}
+
+bar(Arg0: &u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: &u64)
+	1: ReadRef
+	2: LdU64(1)
+	3: Add
+	4: Ret
+}
+baz(Arg0: &mut u64, Arg1: u64) /* def_idx: 1 */ {
+B0:
+	0: CopyLoc[0](Arg0: &mut u64)
+	1: ReadRef
+	2: MoveLoc[1](Arg1: u64)
+	3: Add
+	4: MoveLoc[0](Arg0: &mut u64)
+	5: WriteRef
+	6: Ret
+}
+public test(Arg0: &mut Foo) /* def_idx: 2 */ {
+L1:	loc0: u64
+L2:	loc1: &mut u64
+L3:	loc2: u64
+B0:
+	0: CopyLoc[0](Arg0: &mut Foo)
+	1: ImmBorrowField[0](Foo.x: u64)
+	2: Call bar(&u64): u64
+	3: MoveLoc[0](Arg0: &mut Foo)
+	4: MutBorrowField[0](Foo.x: u64)
+	5: LdU64(1)
+	6: StLoc[1](loc0: u64)
+	7: StLoc[2](loc1: &mut u64)
+	8: StLoc[3](loc2: u64)
+	9: MoveLoc[3](loc2: u64)
+	10: MoveLoc[1](loc0: u64)
+	11: Add
+	12: StLoc[3](loc2: u64)
+	13: MoveLoc[2](loc1: &mut u64)
+	14: MoveLoc[3](loc2: u64)
+	15: Call baz(&mut u64, u64)
+	16: Ret
+}
+}
+============ bytecode verification succeeded ========

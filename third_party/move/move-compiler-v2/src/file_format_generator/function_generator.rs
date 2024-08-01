@@ -556,9 +556,7 @@ impl<'a> FunctionGenerator<'a> {
                 )
             },
             Operation::ReadRef => self.gen_builtin(ctx, dest, FF::Bytecode::ReadRef, source),
-            Operation::WriteRef => {
-                self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, source)
-            },
+            Operation::WriteRef => self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, source),
             Operation::Release => {
                 // Move bytecode does not process release, values are released indirectly
                 // when the borrowed head of the borrow chain is destroyed
@@ -915,43 +913,40 @@ impl<'a> FunctionGenerator<'a> {
             .get_annotations()
             .get::<PrepareUseAnnotation>()
             .expect("prepare-use annotation is a prerequisite");
-        let (use_offset, _use_index, multi_use) = prepare_use_map
+        let (use_offset, only_copy_allowed) = prepare_use_map
             .get(&ctx.code_offset)
             .expect("code offset for `Prepare` must be in the map");
-        if !*multi_use && self.stack.iter().any(|(t, _)| *t == temp) {
+        // If it is already on the stack, let's not mess with the stack.
+        if self.stack.iter().any(|(t, _)| *t == temp) {
             return;
         }
+        // If this arg appears multiple times in the use instruction, skip it.
+        let use_instr = &fun_ctx.fun.data.code[*use_offset as usize];
+        if use_instr.sources().iter().filter(|s| *s == &temp).count() > 1 {
+            return;
+        }
+        let live_var_annotation = fun_ctx
+            .fun
+            .get_annotations()
+            .get::<LiveVarAnnotation>()
+            .expect("livevar analysis is a prerequisite");
+        let alive_after = !use_instr.dests().contains(&temp)
+            && live_var_annotation
+                .get_live_var_info_at(*use_offset)
+                .map(|a| a.after.contains_key(&temp))
+                .unwrap_or(false);
+        // If only_copy_allowed hint is set, we have to either copy or skip it.
         let local: u8 = self.temp_to_local(fun_ctx, Some(ctx.attr_id), temp);
-        if *multi_use {
-            // assert!(fun_ctx.is_copyable(temp)); // multi-use temporaries must be copyable?
+        // Either move or copy the local to the top of the stack.
+        if fun_ctx.is_copyable(temp) && (alive_after || *only_copy_allowed) {
+            self.emit(FF::Bytecode::CopyLoc(local));
+            self.stack.push((temp, false));
+        } else if *only_copy_allowed {
+            // Only copy is allowed, but it is not copy-able.
+            return;
         } else {
-            // Either move or copy the local to the top of the stack.
-            let stack_only;
-            if !fun_ctx.is_copyable(temp) {
-                stack_only = true;
-                self.emit(FF::Bytecode::MoveLoc(local));
-            } else {
-                // `temp` is copyable, but we should copy or move it based on whether it is alive after
-                let live_var_annotation = fun_ctx
-                    .fun
-                    .get_annotations()
-                    .get::<LiveVarAnnotation>()
-                    .expect("livevar analysis is a prerequisite");
-                let use_instr = &fun_ctx.fun.data.code[*use_offset as usize];
-                let alive_after = !use_instr.dests().contains(&temp)
-                    && live_var_annotation
-                        .get_live_var_info_at(*use_offset)
-                        .map(|a| a.after.contains_key(&temp))
-                        .unwrap_or(false);
-                if alive_after {
-                    stack_only = false;
-                    self.emit(FF::Bytecode::CopyLoc(local));
-                } else {
-                    stack_only = true;
-                    self.emit(FF::Bytecode::MoveLoc(local));
-                }
-            }
-            self.stack.push((temp, stack_only));
+            self.emit(FF::Bytecode::MoveLoc(local));
+            self.stack.push((temp, true));
         }
     }
 
