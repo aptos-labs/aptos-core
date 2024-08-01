@@ -193,7 +193,7 @@ impl PrioritizedPeersState {
         &self,
         peers_and_metadata: &[(PeerNetworkId, Option<&PeerMonitoringMetadata>)],
     ) -> Vec<PeerNetworkId> {
-        peers_and_metadata
+        let result = peers_and_metadata
             .iter()
             .sorted_by(|peer_a, peer_b| {
                 // Only use intelligent peer prioritization if it is enabled
@@ -205,7 +205,12 @@ impl PrioritizedPeersState {
                 ordering.reverse() // Prioritize higher values (i.e., sorted by descending order)
             })
             .map(|(peer, _)| *peer)
-            .collect()
+            .collect();
+        info!(
+            "sort peers by priority: {:?}, peers_and_metadata: {:?}",
+            result, peers_and_metadata
+        );
+        result
     }
 
     /// Updates the prioritized peers list
@@ -213,9 +218,10 @@ impl PrioritizedPeersState {
         &mut self,
         peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
     ) {
+        info!("update peer metadata: {:?}", peers_and_metadata);
         // Calculate the new set of prioritized peers
         let new_prioritized_peers = self.sort_peers_by_priority(&peers_and_metadata);
-
+        info!("new prioritized peers: {:?}", new_prioritized_peers);
         // Update the prioritized peer metrics
         self.update_prioritized_peer_metrics(&new_prioritized_peers);
 
@@ -231,10 +237,16 @@ impl PrioritizedPeersState {
 
         // Set the last peer priority update time
         self.last_peer_priority_update = Some(self.time_service.now());
+        info!(
+            "updated peers: count: {:?}, {:?}",
+            self.prioritized_peers.read().len(),
+            self.prioritized_peers.read()
+        );
     }
 
     /// Updates the prioritized peer metrics based on the new prioritization
     fn update_prioritized_peer_metrics(&mut self, new_prioritized_peers: &Vec<PeerNetworkId>) {
+        info!("update prioritized peers: {:?}", new_prioritized_peers);
         // Calculate the number of peers that changed priorities
         let current_prioritized_peers = self.prioritized_peers.read();
         let num_peers_changed = new_prioritized_peers

@@ -403,13 +403,16 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
+    info!("handle update peers: {:?}", peers_and_metadata);
     if let Ok(connected_peers) = peers_and_metadata.get_connected_peers_and_metadata() {
+        info!("connected peers: {:?}", connected_peers);
         let (newly_added_upstream, disabled) = smp.network_interface.update_peers(&connected_peers);
         if !newly_added_upstream.is_empty() || !disabled.is_empty() {
             counters::shared_mempool_event_inc("peer_update");
             notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
         }
         for peer in &newly_added_upstream {
+            info!("newly added upstream peer: {:?}", peer);
             debug!(LogSchema::new(LogEntry::NewPeer).peer(peer));
             tasks::execute_broadcast(*peer, false, smp, scheduled_broadcasts, executor.clone())
                 .await;
