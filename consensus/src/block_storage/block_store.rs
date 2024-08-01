@@ -159,7 +159,7 @@ impl BlockStore {
         window_size: usize,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
-        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
+        let RootInfo(root_block, window_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
         //verify root is correct
         assert!(
@@ -193,13 +193,14 @@ impl BlockStore {
         );
 
         let pipelined_root_block = PipelinedBlock::new(
-            *root_block,
+            *window_block,
             vec![],
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );
 
         let tree = BlockTree::new(
+            root_block.id(),
             pipelined_root_block,
             root_qc,
             root_ordered_cert,
@@ -362,7 +363,6 @@ impl BlockStore {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
-        let with_window = self.commit_root().round() < block.round();
 
         // ensure local time past the block time
         let block_time = Duration::from_micros(block.timestamp_usecs());
@@ -408,6 +408,7 @@ impl BlockStore {
                 block.round(),
                 block.epoch(),
             );
+            // TODO: assert that this is an older block than commit root
             let pipelined_block =
                 PipelinedBlock::new_ordered(block.clone(), OrderedBlockWindow::empty());
             block_tree.insert_block(pipelined_block)

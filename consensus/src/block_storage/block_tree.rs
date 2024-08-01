@@ -75,6 +75,7 @@ pub struct BlockTree {
     ordered_root_id: HashValue,
     /// Commit Root id: this is the root of commit phase
     commit_root_id: HashValue,
+    window_root_id: HashValue,
     /// A certified block id with highest round
     highest_certified_block_id: HashValue,
 
@@ -97,7 +98,9 @@ pub struct BlockTree {
 
 impl BlockTree {
     pub(super) fn new(
-        root: PipelinedBlock,
+        root_block_id: HashValue,
+        // TODO: need the certs?
+        window_root: PipelinedBlock,
         root_quorum_cert: QuorumCert,
         root_ordered_cert: WrappedLedgerInfo,
         root_commit_cert: WrappedLedgerInfo,
@@ -105,12 +108,13 @@ impl BlockTree {
         window_size: usize,
         highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     ) -> Self {
-        assert_eq!(root.epoch(), root_ordered_cert.commit_info().epoch());
-        assert!(root.round() <= root_ordered_cert.commit_info().round());
-        let root_id = root.id();
+        assert_eq!(window_root.epoch(), root_ordered_cert.commit_info().epoch());
+        assert!(window_root.round() <= root_ordered_cert.commit_info().round());
+        let window_root_id = window_root.id();
 
+        // Build the tree from the window root block which is <= the commit root block.
         let mut id_to_block = HashMap::new();
-        id_to_block.insert(root_id, LinkableBlock::new(root));
+        id_to_block.insert(window_root_id, LinkableBlock::new(window_root));
         counters::NUM_BLOCKS_IN_TREE.set(1);
 
         let root_quorum_cert = Arc::new(root_quorum_cert);
@@ -124,9 +128,10 @@ impl BlockTree {
 
         BlockTree {
             id_to_block,
-            ordered_root_id: root_id,
-            commit_root_id: root_id, // initially we set commit_root_id = root_id
-            highest_certified_block_id: root_id,
+            ordered_root_id: root_block_id,
+            commit_root_id: root_block_id, // initially we set commit_root_id = root_id
+            window_root_id,
+            highest_certified_block_id: root_block_id,
             highest_quorum_cert: Arc::clone(&root_quorum_cert),
             highest_ordered_cert: Arc::new(root_ordered_cert),
             highest_commit_cert: Arc::new(root_commit_cert),
@@ -372,21 +377,20 @@ impl BlockTree {
     /// Note this function is read-only, use with process_pruned_blocks to do the actual prune.
     pub(super) fn find_blocks_to_prune(
         &self,
-        next_root_id: HashValue,
-        window_start_round: u64,
+        next_window_root_id: HashValue,
     ) -> VecDeque<HashValue> {
-        // Nothing to do if this is the commit root
-        if next_root_id == self.commit_root_id {
+        // Nothing to do if this is the window root
+        if next_window_root_id == self.window_root_id {
             return VecDeque::new();
         }
 
-        let mut blocks_pruned = BTreeMap::new();
+        let mut blocks_pruned = VecDeque::new();
         let mut blocks_to_be_pruned = vec![self.linkable_root()];
         while let Some(block_to_remove) = blocks_to_be_pruned.pop() {
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
             for child_id in block_to_remove.children() {
-                if next_root_id == *child_id {
+                if next_window_root_id == *child_id {
                     continue;
                 }
                 blocks_to_be_pruned.push(
@@ -395,22 +399,9 @@ impl BlockTree {
                 );
             }
             // Track all the block ids removed
-            blocks_pruned.insert(block_to_remove.executed_block.round(), block_to_remove.id());
+            blocks_pruned.push_back(block_to_remove.id());
         }
-
-        // Add back all blocks that are in the path from
-        // commit root to exec root (first block that is <= window_start_round)
-        let mut curr_block_id = self.commit_root_id;
-        while let Some(block_to_add_back) = self.get_block(&curr_block_id) {
-            blocks_pruned.remove(&block_to_add_back.round());
-            // Stop after adding the first block that is <= window_start_round
-            if block_to_add_back.round() <= window_start_round {
-                break;
-            }
-            curr_block_id = block_to_add_back.parent_id();
-        }
-
-        blocks_pruned.values().cloned().collect()
+        blocks_pruned
     }
 
     pub(super) fn update_ordered_root(&mut self, root_id: HashValue) {
@@ -421,6 +412,28 @@ impl BlockTree {
     pub(super) fn update_commit_root(&mut self, root_id: HashValue) {
         assert!(self.block_exists(&root_id));
         self.commit_root_id = root_id;
+    }
+
+    pub(super) fn update_window_root(&mut self, root_id: HashValue) {
+        assert!(self.block_exists(&root_id));
+        self.window_root_id = root_id;
+    }
+
+    pub(super) fn find_window_root(&self, commit_root_id: HashValue) -> HashValue {
+        let mut curr_block_id = commit_root_id;
+        while let Some(block) = self.get_block(&curr_block_id) {
+            if block.round()
+                <= self
+                    .commit_root()
+                    .round()
+                    .saturating_add(1)
+                    .saturating_sub(self.window_size as u64)
+            {
+                break;
+            }
+            curr_block_id = block.parent_id();
+        }
+        curr_block_id
     }
 
     /// Process the data returned by the prune_tree, they're separated because caller might
@@ -520,13 +533,8 @@ impl BlockTree {
             block_id = block_to_commit.id(),
         );
 
-        let ids_to_remove = self.find_blocks_to_prune(
-            block_to_commit.id(),
-            block_to_commit
-                .round()
-                .saturating_add(1)
-                .saturating_sub(self.window_size as u64),
-        );
+        let window_root_id = self.find_window_root(block_to_commit.id());
+        let ids_to_remove = self.find_blocks_to_prune(block_to_commit.id());
         info!("Pruning blocks: {:?}", ids_to_remove);
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
@@ -536,6 +544,7 @@ impl BlockTree {
         }
         self.process_pruned_blocks(ids_to_remove);
         self.update_highest_commit_cert(commit_proof);
+        self.update_window_root(window_root_id);
     }
 }
 
