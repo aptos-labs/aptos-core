@@ -23,21 +23,23 @@ impl RemoteStateValue {
 
     pub fn set_value(&self, value: Option<StateValue>) {
         let (lock, cvar, start_time) = &*self.value_condition;
+        let _timer = SHARDED_EXECUTOR_SERVICE_SECONDS.with_label_values(&["0", "kv_recv_wait_time_shard"]).start_timer();
         let mut status = lock.lock().unwrap();
         *status = RemoteValueStatus::Ready(value);
         cvar.notify_all();
-        SHARDED_EXECUTOR_SERVICE_SECONDS
-            .with_label_values(&["0", "kv_recv_wait_time_shard"]).observe(start_time.elapsed().as_secs_f64());
+        // SHARDED_EXECUTOR_SERVICE_SECONDS
+        //     .with_label_values(&["0", "kv_recv_wait_time_shard"]).observe(start_time.elapsed().as_secs_f64());
     }
 
     pub fn get_value(&self) -> Option<StateValue> {
         let (lock, cvar, start_time) = &*self.value_condition;
         let mut status = lock.lock().unwrap();
+        let _timer = SHARDED_EXECUTOR_SERVICE_SECONDS.with_label_values(&["0", "kv_read_wait_time_shard"]).start_timer();
         while let RemoteValueStatus::Waiting = *status {
             status = cvar.wait(status).unwrap();
         }
-        SHARDED_EXECUTOR_SERVICE_SECONDS
-            .with_label_values(&["0", "kv_read_wait_time_shard"]).observe(start_time.elapsed().as_secs_f64());
+        // SHARDED_EXECUTOR_SERVICE_SECONDS
+        //     .with_label_values(&["0", "kv_read_wait_time_shard"]).observe(start_time.elapsed().as_secs_f64());
         match &*status {
             RemoteValueStatus::Ready(value) => value.clone(),
             RemoteValueStatus::Waiting => unreachable!(),
