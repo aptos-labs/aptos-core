@@ -206,7 +206,7 @@ impl CompiledScript {
     pub fn import_call_by_name(
         &mut self,
         name: &IdentStr,
-        module: &CompiledModule
+        module: &CompiledModule,
     ) -> PartialVMResult<FunctionHandleIndex> {
         for (idx, handle) in module.function_handles().iter().enumerate() {
             if module.identifier_at(handle.name) == name {
