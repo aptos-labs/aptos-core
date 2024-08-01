@@ -12,7 +12,7 @@ use crate::{
     shared_mempool::{
         tasks::{self, process_committed_transactions},
         types::{
-            notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
+            notify_subscribers, MempoolMessageId, ScheduledBroadcast, SharedMempool,
             SharedMempoolNotification,
         },
         use_case_history::UseCaseHistory,
@@ -177,6 +177,7 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
                 counters::CLIENT_EVENT_LABEL,
                 counters::START_LABEL,
             );
+            smp.network_interface.num_txns_received_since_peers_updated += 1;
             bounded_executor
                 .spawn(tasks::process_client_transaction_submission(
                     smp.clone(),
@@ -277,14 +278,18 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
     bounded_executor: &BoundedExecutor,
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     network_id: NetworkId,
-    request_id: MultiBatchId,
-    transactions: Vec<(SignedTransaction, Option<u64>)>,
+    message_id: MempoolMessageId,
+    transactions: Vec<(
+        SignedTransaction,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
     peer_id: PeerId,
-    priority: BroadcastPeerPriority,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
+    smp.network_interface.num_txns_received_since_peers_updated += transactions.len() as u64;
     let smp_clone = smp.clone();
     let peer = PeerNetworkId::new(network_id, peer_id);
     let ineligible_for_broadcast = (smp.network_interface.is_validator()
@@ -311,11 +316,10 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
         .spawn(tasks::process_transaction_broadcast(
             smp_clone,
             transactions,
-            request_id,
+            message_id,
             timeline_state,
             peer,
             task_start_timer,
-            priority,
         ))
         .await;
 }
@@ -337,45 +341,45 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
             counters::shared_mempool_event_inc("message");
             match msg {
                 MempoolSyncMsg::BroadcastTransactionsRequest {
-                    request_id,
+                    message_id,
                     transactions,
                 } => {
                     process_received_txns(
                         bounded_executor,
                         smp,
                         network_id,
-                        request_id,
-                        transactions.into_iter().map(|t| (t, None)).collect(),
+                        message_id,
+                        transactions.into_iter().map(|t| (t, None, None)).collect(),
                         peer_id,
-                        BroadcastPeerPriority::Primary,
                     )
                     .await;
                 },
                 MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
-                    request_id,
+                    message_id,
                     transactions,
-                    priority,
                 } => {
                     process_received_txns(
                         bounded_executor,
                         smp,
                         network_id,
-                        request_id,
-                        transactions.into_iter().map(|t| (t.0, Some(t.1))).collect(),
+                        message_id,
+                        transactions
+                            .into_iter()
+                            .map(|t| (t.0, Some(t.1), Some(t.2)))
+                            .collect(),
                         peer_id,
-                        priority,
                     )
                     .await;
                 },
                 MempoolSyncMsg::BroadcastTransactionsResponse {
-                    request_id,
+                    message_id,
                     retry,
                     backoff,
                 } => {
                     let ack_timestamp = SystemTime::now();
                     smp.network_interface.process_broadcast_ack(
                         PeerNetworkId::new(network_id, peer_id),
-                        request_id,
+                        message_id,
                         retry,
                         backoff,
                         ack_timestamp,
