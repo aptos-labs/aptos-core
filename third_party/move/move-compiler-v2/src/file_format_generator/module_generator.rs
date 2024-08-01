@@ -279,6 +279,7 @@ impl ModuleGenerator {
             .expect(SOURCE_MAP_OK);
         let mut field_symbol = field_env.get_name();
         let field_name = ctx.symbol_to_str(field_symbol);
+        // Append `_` if this is a positional field (digits), as the binary format expects proper identifiers
         if field_name.starts_with(|c: char| c.is_ascii_digit()) {
             field_symbol = ctx.env.symbol_pool().make(&format!("_{}", field_name));
         }
