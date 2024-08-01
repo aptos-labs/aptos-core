@@ -41,6 +41,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
 
 /// Helper function to start consensus based on configuration and return the runtime
+#[allow(clippy::unwrap_used)]
 pub fn start_consensus(
     node_config: &NodeConfig,
     network_client: NetworkClient<ConsensusMsg>,
@@ -76,7 +77,10 @@ pub fn start_consensus(
     let (self_sender, self_receiver) =
         aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
+    let bounded_executor = BoundedExecutor::new(
+        node_config.consensus.num_bounded_executor_tasks as usize,
+        runtime.handle().clone(),
+    );
     let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
 
     let execution_client = Arc::new(ExecutionProxyClient::new(

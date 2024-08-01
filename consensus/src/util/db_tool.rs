@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     consensusdb::ConsensusDB,
     quorum_store::{
@@ -9,7 +11,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
-use aptos_consensus_types::{block::Block, common::Payload, proof_of_store::ProofOfStore};
+use aptos_consensus_types::{block::Block, common::Payload};
 use aptos_crypto::HashValue;
 use aptos_types::transaction::{SignedTransaction, Transaction};
 use clap::Parser;
@@ -44,6 +46,7 @@ impl Command {
         let mut txns = Vec::new();
         for block in blocks {
             let id = block.id();
+            #[allow(clippy::unwrap_in_result)]
             if self.block_id.is_none() || id == self.block_id.unwrap() {
                 txns.extend(
                     extract_txns_from_block(&block, &all_batches)?
@@ -58,49 +61,78 @@ impl Command {
     }
 }
 
+fn extract_txns_from_quorum_store(
+    digests: impl Iterator<Item = HashValue>,
+    all_batches: &HashMap<HashValue, PersistedValue>,
+) -> anyhow::Result<Vec<&SignedTransaction>> {
+    let mut block_txns = Vec::new();
+    for digest in digests {
+        if let Some(batch) = all_batches.get(&digest) {
+            if let Some(txns) = batch.payload() {
+                block_txns.extend(txns);
+            } else {
+                bail!("Payload is not found for batch ({digest}).");
+            }
+        } else {
+            bail!("Batch ({digest}) is not found.");
+        }
+    }
+    Ok(block_txns)
+}
+
 pub fn extract_txns_from_block<'a>(
     block: &'a Block,
     all_batches: &'a HashMap<HashValue, PersistedValue>,
 ) -> anyhow::Result<Vec<&'a SignedTransaction>> {
     match block.payload().as_ref() {
-        Some(payload) => {
-            let mut block_txns = Vec::new();
-
-            let extract_txns_from_proof_stores = move |proofs: &Vec<ProofOfStore>| {
-                for proof in proofs {
-                    let digest = proof.digest();
-                    if let Some(batch) = all_batches.get(digest) {
-                        if let Some(txns) = batch.payload() {
-                            block_txns.extend(txns);
-                        } else {
-                            bail!("Payload is not found for batch ({digest}).");
-                        }
-                    } else {
-                        bail!("Batch ({digest}) is not found.");
-                    }
+        Some(payload) => match payload {
+            Payload::DirectMempool(_) => {
+                bail!("DirectMempool is not supported.");
+            },
+            Payload::InQuorumStore(proof_with_data) => extract_txns_from_quorum_store(
+                proof_with_data.proofs.iter().map(|proof| *proof.digest()),
+                all_batches,
+            ),
+            Payload::InQuorumStoreWithLimit(proof_with_data) => extract_txns_from_quorum_store(
+                proof_with_data
+                    .proof_with_data
+                    .proofs
+                    .iter()
+                    .map(|proof| *proof.digest()),
+                all_batches,
+            ),
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                let mut all_txns = extract_txns_from_quorum_store(
+                    proof_with_data.proofs.iter().map(|proof| *proof.digest()),
+                    all_batches,
+                )
+                .unwrap();
+                for (_, txns) in inline_batches {
+                    all_txns.extend(txns);
                 }
-                Ok(block_txns)
-            };
-
-            match payload {
-                Payload::DirectMempool(_) => {
-                    bail!("DirectMempool is not supported.");
-                },
-                Payload::InQuorumStore(proof_with_data) => {
-                    extract_txns_from_proof_stores(&proof_with_data.proofs)
-                },
-                Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                    extract_txns_from_proof_stores(&proof_with_data.proof_with_data.proofs)
-                },
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
-                    let mut all_txns =
-                        extract_txns_from_proof_stores(&proof_with_data.proofs).unwrap();
-                    for (_, txns) in inline_batches {
-                        all_txns.extend(txns);
-                    }
-                    Ok(all_txns)
-                },
-            }
+                Ok(all_txns)
+            },
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                let mut all_txns = extract_txns_from_quorum_store(
+                    opt_qs_payload
+                        .proof_with_data()
+                        .iter()
+                        .map(|proof| *proof.digest()),
+                    all_batches,
+                )
+                .unwrap();
+                all_txns.extend(
+                    extract_txns_from_quorum_store(
+                        opt_qs_payload
+                            .opt_batches()
+                            .iter()
+                            .map(|info| *info.digest()),
+                        all_batches,
+                    )
+                    .unwrap(),
+                );
+                Ok(all_txns)
+            },
         },
         None => Ok(vec![]),
     }

@@ -15,15 +15,13 @@ use crate::{
 };
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_data_streaming_service::data_notification::NotificationId;
-use aptos_db_indexer_schemas::schema::state_keys::StateKeysSchema;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_metrics_core::HistogramTimer;
-use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{AptosDbError, DbReader, DbReaderWriter, StateSnapshotReceiver};
+use aptos_storage_interface::{DbReader, DbReaderWriter, StateSnapshotReceiver};
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -88,7 +86,6 @@ pub trait StorageSynchronizerInterface {
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
         target_output_with_proof: TransactionOutputListWithProof,
-        internal_indexer_db: Option<Arc<DB>>,
     ) -> Result<JoinHandle<()>, Error>;
 
     /// Returns true iff there is storage data that is still waiting
@@ -377,7 +374,6 @@ impl<
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
         target_output_with_proof: TransactionOutputListWithProof,
-        internal_indexer_db: Option<Arc<DB>>,
     ) -> Result<JoinHandle<()>, Error> {
         // Create a channel to notify the state snapshot receiver when data chunks are ready
         let max_pending_data_chunks = self.driver_config.max_pending_data_chunks as usize;
@@ -397,7 +393,6 @@ impl<
             target_ledger_info,
             target_output_with_proof,
             self.runtime.clone(),
-            internal_indexer_db,
         );
         self.state_snapshot_notifier = Some(state_snapshot_notifier);
 
@@ -796,20 +791,6 @@ fn spawn_commit_post_processor<
     spawn(runtime, commit_post_processor)
 }
 
-fn write_kv_to_indexer_db(
-    internal_indexer_db: &Option<Arc<DB>>,
-    kvs: &Vec<(StateKey, StateValue)>,
-) -> aptos_storage_interface::Result<()> {
-    // add state value to internal indexer
-    if let Some(indexer_db) = internal_indexer_db.as_ref() {
-        let batch = SchemaBatch::new();
-        for (state_key, _) in kvs {
-            batch.put::<StateKeysSchema>(state_key, &())?;
-        }
-        indexer_db.write_schemas(batch)?;
-    }
-    Ok(())
-}
 /// Spawns a dedicated receiver that commits state values from a state snapshot
 fn spawn_state_snapshot_receiver<
     ChunkExecutor: ChunkExecutorTrait + 'static,
@@ -826,7 +807,6 @@ fn spawn_state_snapshot_receiver<
     target_ledger_info: LedgerInfoWithSignatures,
     target_output_with_proof: TransactionOutputListWithProof,
     runtime: Option<Handle>,
-    internal_indexer_db: Option<Arc<DB>>,
 ) -> JoinHandle<()> {
     // Create a state snapshot receiver
     let receiver = async move {
@@ -861,8 +841,6 @@ fn spawn_state_snapshot_receiver<
                     let all_states_synced = states_with_proof.is_last_chunk();
                     let last_committed_state_index = states_with_proof.last_index;
                     let num_state_values = states_with_proof.raw_values.len();
-                    let indexer_results: Result<(), AptosDbError> =
-                        write_kv_to_indexer_db(&internal_indexer_db, &states_with_proof.raw_values);
 
                     let result = state_snapshot_receiver.add_chunk(
                         states_with_proof.raw_values,
@@ -870,8 +848,8 @@ fn spawn_state_snapshot_receiver<
                     );
 
                     // Handle the commit result
-                    match (result, indexer_results) {
-                        (Ok(()), Ok(())) => {
+                    match result {
+                        Ok(()) => {
                             // Update the logs and metrics
                             info!(
                                 LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
@@ -942,19 +920,9 @@ fn spawn_state_snapshot_receiver<
                             decrement_pending_data_chunks(pending_data_chunks.clone());
                             return; // There's nothing left to do!
                         },
-                        (Err(error), _) => {
+                        Err(error) => {
                             let error =
                                 format!("Failed to commit state value chunk! Error: {:?}", error);
-                            send_storage_synchronizer_error(
-                                error_notification_sender.clone(),
-                                notification_id,
-                                error,
-                            )
-                            .await;
-                        },
-                        (_, Err(error)) => {
-                            let error =
-                                format!("Failed to commit state value chunk to internal indexer! Error: {:?}", error);
                             send_storage_synchronizer_error(
                                 error_notification_sender.clone(),
                                 notification_id,

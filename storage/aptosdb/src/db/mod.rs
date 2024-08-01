@@ -20,6 +20,7 @@ use crate::{
     schema::{
         block_info::BlockInfoSchema,
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
@@ -146,6 +147,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -156,7 +158,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             true,
-            None,
+            internal_indexer_db,
         )
     }
 

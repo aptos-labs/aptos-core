@@ -33,8 +33,9 @@ pub fn bootstrap_internal_indexer_db(
         InternalIndexerDBService::new(db_rw.reader, internal_indexer_db.unwrap());
     let db_indexer = indexer_service.get_db_indexer();
     // Spawn task for db indexer
+    let config_clone = config.to_owned();
     runtime.spawn(async move {
-        indexer_service.run().await;
+        indexer_service.run(&config_clone).await.unwrap();
     });
 
     Some((runtime, db_indexer))

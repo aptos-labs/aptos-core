@@ -109,8 +109,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
         for (epoch, batch_id) in epoch_batch_id {
             assert!(current_epoch >= epoch);
             if epoch < current_epoch {
-                self.delete_batch_id(epoch)
-                    .expect("Could not delete from db");
+                self.delete_batch_id(epoch)?;
             } else {
                 ret = Some(batch_id);
             }

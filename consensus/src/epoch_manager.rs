@@ -180,7 +180,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::unwrap_used)]
     pub(crate) fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
@@ -344,7 +344,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let voting_powers: Vec<_> = if weight_by_voting_power {
                     proposers
                         .iter()
-                        .map(|p| epoch_state.verifier.get_voting_power(p).unwrap())
+                        .map(|p| {
+                            epoch_state
+                                .verifier
+                                .get_voting_power(p)
+                                .expect("INVARIANT VIOLATION: proposer not in verifier set")
+                        })
                         .collect()
                 } else {
                     vec![1; proposers.len()]
@@ -387,7 +392,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
             ProposerElectionType::RoundProposer(round_proposers) => {
                 // Hardcoded to the first proposer
-                let default_proposer = proposers.first().unwrap();
+                let default_proposer = proposers
+                    .first()
+                    .expect("INVARIANT VIOLATION: proposers is empty");
                 Arc::new(RoundProposer::new(
                     round_proposers.clone(),
                     *default_proposer,
@@ -798,8 +805,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.create_proposer_election(&epoch_state, &onchain_consensus_config);
         let chain_health_backoff_config =
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
-        let pipeline_backpressure_config =
-            PipelineBackpressureConfig::new(self.config.pipeline_backpressure.clone());
+        let pipeline_backpressure_config = PipelineBackpressureConfig::new(
+            self.config.pipeline_backpressure.clone(),
+            self.config.execution_backpressure.clone(),
+        );
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
@@ -843,11 +852,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.time_service.clone(),
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
             self.config.max_sending_block_txns,
-            self.config.max_sending_block_unique_txns,
+            self.config.max_sending_block_txns_after_filtering,
             self.config.max_sending_block_bytes,
             self.config.max_sending_inline_txns,
             self.config.max_sending_inline_bytes,
             onchain_consensus_config.max_failed_authors_to_store(),
+            self.config
+                .min_max_txns_in_block_after_filtering_from_backpressure,
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
@@ -1298,7 +1309,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .storage
             .aptos_db()
             .get_latest_ledger_info()
-            .unwrap()
+            .expect("unable to get latest ledger info")
             .commit_info()
             .round();
 
@@ -1346,7 +1357,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.aptos_time_service.clone(),
             payload_manager,
             payload_client,
-            self.execution_client.get_execution_channel().unwrap(),
+            self.execution_client
+                .get_execution_channel()
+                .expect("unable to get execution channel"),
             self.execution_client.clone(),
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.effective_validator_txn_config(),
@@ -1397,7 +1410,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Err(err) => return Err(err),
             }
             // same epoch -> run well-formedness + signature check
-            let epoch_state = self.epoch_state.clone().unwrap();
+            let epoch_state = self
+                .epoch_state
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
             let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();

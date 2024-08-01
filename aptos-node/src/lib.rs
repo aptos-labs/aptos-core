@@ -672,9 +672,6 @@ pub fn setup_environment_and_start_node(
             genesis_waypoint,
             event_subscription_service,
             db_rw.clone(),
-            indexer_db_opt
-                .as_ref()
-                .map(|inner| inner.get_inner_db_clone()),
         )?;
 
     // Start the node inspection service

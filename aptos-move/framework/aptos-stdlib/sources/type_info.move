@@ -2,7 +2,6 @@ module aptos_std::type_info {
     use std::bcs;
     use std::features;
     use std::string::{Self, String};
-    use std::vector;
 
     //
     // Error codes
@@ -65,12 +64,14 @@ module aptos_std::type_info {
     /// nesting patterns, as well as `test_size_of_val_vectors()` for an
     /// analysis of vector size dynamism.
     public fun size_of_val<T>(val_ref: &T): u64 {
-        // Return vector length of vectorized BCS representation.
-        vector::length(&bcs::to_bytes(val_ref))
+        bcs::serialized_size(val_ref)
     }
 
     #[test_only]
     use aptos_std::table::Table;
+
+    #[test_only]
+    use std::vector;
 
     #[test]
     fun test_type_of() {

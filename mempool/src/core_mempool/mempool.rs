@@ -12,6 +12,7 @@ use crate::{
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
+    network::BroadcastPeerPriority,
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
@@ -124,6 +125,7 @@ impl Mempool {
         insertion_info: &InsertionInfo,
         bucket: &str,
         stage: &'static str,
+        priority: &str,
     ) {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             counters::core_mempool_txn_commit_latency(
@@ -131,19 +133,25 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 time_delta,
+                priority,
             );
         }
     }
 
     fn log_consensus_pulled_latency(&self, account: AccountAddress, sequence_number: u64) {
-        if let Some((insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket, priority)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
             let prev_count = insertion_info
                 .consensus_pulled_counter
                 .fetch_add(1, Ordering::Relaxed);
-            Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
+            Self::log_txn_latency(
+                insertion_info,
+                bucket,
+                counters::CONSENSUS_PULLED_LABEL,
+                priority.to_string().as_str(),
+            );
             counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
         }
     }
@@ -154,15 +162,20 @@ impl Mempool {
         sequence_number: u64,
         stage: &'static str,
     ) {
-        if let Some((insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket, priority)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_latency(insertion_info, bucket, stage);
+            Self::log_txn_latency(insertion_info, bucket, stage, priority.to_string().as_str());
         }
     }
 
-    fn log_commit_and_parked_latency(insertion_info: &InsertionInfo, bucket: &str) {
+    fn log_commit_and_parked_latency(
+        insertion_info: &InsertionInfo,
+        bucket: &str,
+        priority: &str,
+        tracked_use_case: Option<(UseCaseKey, &String)>,
+    ) {
         let parked_duration = if let Some(park_time) = insertion_info.park_time {
             let parked_duration = insertion_info
                 .ready_time
@@ -173,6 +186,7 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 parked_duration,
+                priority,
             );
             parked_duration
         } else {
@@ -189,34 +203,10 @@ impl Mempool {
                 insertion_info.submitted_by_label(),
                 bucket,
                 commit_minus_parked,
+                priority,
             );
-        }
-    }
 
-    fn log_commit_latency(
-        &self,
-        account: AccountAddress,
-        sequence_number: u64,
-        tracked_use_case: Option<(UseCaseKey, &String)>,
-        block_timestamp: Duration,
-    ) {
-        if let Some((insertion_info, bucket)) = self
-            .transactions
-            .get_insertion_info_and_bucket(&account, sequence_number)
-        {
-            Self::log_txn_latency(insertion_info, bucket, counters::COMMIT_ACCEPTED_LABEL);
-            Self::log_commit_and_parked_latency(insertion_info, bucket);
-
-            let insertion_timestamp =
-                aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
-            if let Some(insertion_to_block) = block_timestamp.checked_sub(insertion_timestamp) {
-                counters::core_mempool_txn_commit_latency(
-                    counters::COMMIT_ACCEPTED_BLOCK_LABEL,
-                    insertion_info.submitted_by_label(),
-                    bucket,
-                    insertion_to_block,
-                );
-
+            if insertion_info.park_time.is_none() {
                 let use_case_label = tracked_use_case
                     .as_ref()
                     .map_or("entry_user_other", |(_, use_case_name)| {
@@ -229,7 +219,45 @@ impl Mempool {
                         insertion_info.submitted_by_label(),
                         bucket,
                     ])
-                    .observe(insertion_to_block.as_secs_f64());
+                    .observe(commit_duration.as_secs_f64());
+            }
+        }
+    }
+
+    fn log_commit_latency(
+        &self,
+        account: AccountAddress,
+        sequence_number: u64,
+        tracked_use_case: Option<(UseCaseKey, &String)>,
+        block_timestamp: Duration,
+    ) {
+        if let Some((insertion_info, bucket, priority)) = self
+            .transactions
+            .get_insertion_info_and_bucket(&account, sequence_number)
+        {
+            Self::log_txn_latency(
+                insertion_info,
+                bucket,
+                counters::COMMIT_ACCEPTED_LABEL,
+                priority.to_string().as_str(),
+            );
+            Self::log_commit_and_parked_latency(
+                insertion_info,
+                bucket,
+                priority.to_string().as_str(),
+                tracked_use_case,
+            );
+
+            let insertion_timestamp =
+                aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
+            if let Some(insertion_to_block) = block_timestamp.checked_sub(insertion_timestamp) {
+                counters::core_mempool_txn_commit_latency(
+                    counters::COMMIT_ACCEPTED_BLOCK_LABEL,
+                    insertion_info.submitted_by_label(),
+                    bucket,
+                    insertion_to_block,
+                    priority.to_string().as_str(),
+                );
             }
         }
     }
@@ -247,6 +275,11 @@ impl Mempool {
         db_sequence_number: u64,
         timeline_state: TimelineState,
         client_submitted: bool,
+        // The time at which the transaction was inserted into the mempool of the
+        // downstream node (sender of the mempool transaction) in millis since epoch
+        ready_time_at_sender: Option<u64>,
+        // The prority of this node for the peer that sent the transaction
+        priority: BroadcastPeerPriority,
     ) -> MempoolStatus {
         trace!(
             LogSchema::new(LogEntry::AddTxn)
@@ -268,16 +301,31 @@ impl Mempool {
             aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
         let txn_info = MempoolTransaction::new(
-            txn,
+            txn.clone(),
             expiration_time,
             ranking_score,
             timeline_state,
             db_sequence_number,
             now,
             client_submitted,
+            priority.clone(),
         );
 
+        let submitted_by_label = txn_info.insertion_info.submitted_by_label();
         let status = self.transactions.insert(txn_info);
+        let now = aptos_infallible::duration_since_epoch().as_millis() as u64;
+
+        if status.code == MempoolStatusCode::Accepted {
+            if let Some(ready_time_at_sender) = ready_time_at_sender {
+                counters::core_mempool_txn_commit_latency(
+                    counters::BROADCAST_RECEIVED_LABEL,
+                    submitted_by_label,
+                    self.transactions.get_bucket(ranking_score),
+                    Duration::from_millis(now.saturating_sub(ready_time_at_sender)),
+                    priority.to_string().as_str(),
+                );
+            }
+        }
         counters::core_mempool_txn_ranking_score(
             counters::INSERT_LABEL,
             status.code.to_string().as_str(),
@@ -470,18 +518,25 @@ impl Mempool {
         self.transactions.gc_by_expiration_time(block_time);
     }
 
-    /// Returns block of transactions and new last_timeline_id.
+    /// Returns block of transactions and new last_timeline_id. For each transaction, the output includes
+    /// the transaction ready time in millis since epoch
     pub(crate) fn read_timeline(
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
-    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
-        self.transactions.read_timeline(timeline_id, count, before)
+        priority_of_receiver: BroadcastPeerPriority,
+    ) -> (Vec<(SignedTransaction, u64)>, MultiBucketTimelineIndexIds) {
+        self.transactions
+            .read_timeline(timeline_id, count, before, priority_of_receiver)
     }
 
-    /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
-    pub(crate) fn timeline_range(&self, start_end_pairs: &[(u64, u64)]) -> Vec<SignedTransaction> {
+    /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive),
+    /// along with their ready times in millis since poch
+    pub(crate) fn timeline_range(
+        &self,
+        start_end_pairs: &[(u64, u64)],
+    ) -> Vec<(SignedTransaction, u64)> {
         self.transactions.timeline_range(start_end_pairs)
     }
 

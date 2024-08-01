@@ -108,6 +108,10 @@ function build-oss-fuzz() {
     export CXXFLAGS_EXTRA="-stdlib=libc++"
     export CXXFLAGS="$CFLAGS $CXXFLAGS_EXTRA"
 
+    # component versions good to have in logs
+    ld.lld --version
+    clang --version
+
     if ! build all ./target; then
         env
         error "Build failed. Exiting."

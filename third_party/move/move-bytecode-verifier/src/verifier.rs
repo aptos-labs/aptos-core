@@ -5,7 +5,7 @@
 //! This module contains the public APIs supported by the bytecode verifier.
 use crate::{
     ability_field_requirements, check_duplication::DuplicationChecker,
-    code_unit_verifier::CodeUnitVerifier, constants, friends,
+    code_unit_verifier::CodeUnitVerifier, constants, features::FeatureVerifier, friends,
     instantiation_loops::InstantiationLoopChecker, instruction_consistency::InstructionConsistency,
     limits::LimitsVerifier, script_signature,
     script_signature::no_additional_script_signature_checks, signature::SignatureChecker,
@@ -41,6 +41,8 @@ pub struct VerifierConfig {
     pub max_per_mod_meter_units: Option<u128>,
     pub use_signature_checker_v2: bool,
     pub sig_checker_v2_fix_script_ty_param_count: bool,
+    pub enable_enum_types: bool,
+    pub enable_resource_access_control: bool,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -91,11 +93,13 @@ pub fn verify_module_with_config_for_test(
 pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
+        // Always needs to run bound checker first as subsequent passes depend on it
         BoundsChecker::verify_module(module).map_err(|e| {
             // We can't point the error at the module, because if bounds-checking
             // failed, we cannot safely index into module's handle to itself.
             e.finish(Location::Undefined)
         })?;
+        FeatureVerifier::verify_module(config, module)?;
         LimitsVerifier::verify_module(config, module)?;
         DuplicationChecker::verify_module(module)?;
 
@@ -150,7 +154,13 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
 
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
-        BoundsChecker::verify_script(script).map_err(|e| e.finish(Location::Script))?;
+        // Always needs to run bound checker first as subsequent passes depend on it
+        BoundsChecker::verify_script(script).map_err(|e| {
+            // We can't point the error at the script, because if bounds-checking
+            // failed, we cannot safely index into script
+            e.finish(Location::Undefined)
+        })?;
+        FeatureVerifier::verify_script(config, script)?;
         LimitsVerifier::verify_script(config, script)?;
         DuplicationChecker::verify_script(script)?;
 
@@ -217,6 +227,9 @@ impl Default for VerifierConfig {
             use_signature_checker_v2: true,
 
             sig_checker_v2_fix_script_ty_param_count: true,
+
+            enable_enum_types: true,
+            enable_resource_access_control: true,
         }
     }
 }
@@ -259,6 +272,9 @@ impl VerifierConfig {
             use_signature_checker_v2: true,
 
             sig_checker_v2_fix_script_ty_param_count: true,
+
+            enable_enum_types: true,
+            enable_resource_access_control: true,
         }
     }
 }

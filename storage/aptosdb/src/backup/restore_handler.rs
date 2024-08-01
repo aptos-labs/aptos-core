@@ -136,7 +136,7 @@ impl RestoreHandler {
         let mut iter = db.iter::<DbMetadataSchema>()?;
         iter.seek_to_first();
         while let Some((k, _v)) = iter.next().transpose()? {
-            if let DbMetadataKey::StateSnapshotRestoreProgress(version) = k {
+            if let DbMetadataKey::StateSnapshotKvRestoreProgress(version) = k {
                 return Ok(Some(version));
             }
         }

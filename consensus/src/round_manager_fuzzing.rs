@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     block_storage::{pending_blocks::PendingBlocks, BlockStore},
     liveness::{
@@ -188,6 +190,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         1,
         1024,
         10,
+        1,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,

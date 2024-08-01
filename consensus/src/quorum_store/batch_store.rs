@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedBatchInfo};
+use aptos_consensus_types::proof_of_store::SignedBatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::prelude::*;
@@ -174,13 +174,15 @@ impl BatchStore {
             "QS: Batchreader recovery expired keys len {}",
             expired_keys.len()
         );
-        db_clone.delete_batches(expired_keys).unwrap();
+        db_clone
+            .delete_batches(expired_keys)
+            .expect("Deletion of expired keys should not fail");
 
         batch_store
     }
 
     fn epoch(&self) -> u64 {
-        *self.epoch.get().unwrap()
+        *self.epoch.get().expect("Epoch should always be set")
     }
 
     fn free_quota(&self, value: PersistedValue) {
@@ -246,10 +248,13 @@ impl BatchStore {
         }
 
         // Add expiration for the inserted entry, no need to be atomic w. insertion.
-        self.expirations
-            .lock()
-            .unwrap()
-            .add_item(digest, expiration_time);
+        #[allow(clippy::unwrap_used)]
+        {
+            self.expirations
+                .lock()
+                .unwrap()
+                .add_item(digest, expiration_time);
+        }
         Ok(true)
     }
 
@@ -276,6 +281,7 @@ impl BatchStore {
     }
 
     // pub(crate) for testing
+    #[allow(clippy::unwrap_used)]
     pub(crate) fn clear_expired_payload(&self, certified_time: u64) -> Vec<HashValue> {
         let expired_digests = self.expirations.lock().unwrap().expire(certified_time);
         let mut ret = Vec::new();
@@ -309,6 +315,7 @@ impl BatchStore {
                 let batch_info = persist_request.batch_info().clone();
                 trace!("QS: sign digest {}", persist_request.digest());
                 if needs_db {
+                    #[allow(clippy::unwrap_in_result)]
                     self.db
                         .save_batch(persist_request)
                         .expect("Could not write to DB");
@@ -420,7 +427,9 @@ pub trait BatchReader: Send + Sync {
 
     fn get_batch(
         &self,
-        proof: ProofOfStore,
+        digest: HashValue,
+        expiration: u64,
+        signers: Vec<PeerId>,
     ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>;
 
     fn update_certified_timestamp(&self, certified_time: u64);
@@ -450,28 +459,30 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
 
     fn get_batch(
         &self,
-        proof: ProofOfStore,
+        digest: HashValue,
+        expiration: u64,
+        signers: Vec<PeerId>,
     ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
         let (tx, rx) = oneshot::channel();
         let batch_store = self.batch_store.clone();
         let batch_requester = self.batch_requester.clone();
         tokio::spawn(async move {
-            if let Ok(mut value) = batch_store.get_batch_from_local(proof.digest()) {
+            if let Ok(mut value) = batch_store.get_batch_from_local(&digest) {
                 if tx
                     .send(Ok(value.take_payload().expect("Must have payload")))
                     .is_err()
                 {
                     debug!(
                         "Receiver of local batch not available for digest {}",
-                        proof.digest()
+                        digest,
                     )
                 };
             } else {
                 // Quorum store metrics
                 counters::MISSED_BATCHES_COUNT.inc();
-                let subscriber_rx = batch_store.subscribe(*proof.digest());
+                let subscriber_rx = batch_store.subscribe(digest);
                 if let Some((batch_info, payload)) = batch_requester
-                    .request_batch(proof, tx, subscriber_rx)
+                    .request_batch(digest, expiration, signers, tx, subscriber_rx)
                     .await
                 {
                     batch_store.persist(vec![PersistedValue::new(batch_info, Some(payload))]);

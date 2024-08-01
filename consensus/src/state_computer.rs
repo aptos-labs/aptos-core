@@ -34,7 +34,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
+use std::{boxed::Box, sync::Arc, time::Duration};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
@@ -43,11 +43,20 @@ pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecu
 pub struct PipelineExecutionResult {
     pub input_txns: Vec<SignedTransaction>,
     pub result: StateComputeResult,
+    pub execution_time: Duration,
 }
 
 impl PipelineExecutionResult {
-    pub fn new(input_txns: Vec<SignedTransaction>, result: StateComputeResult) -> Self {
-        Self { input_txns, result }
+    pub fn new(
+        input_txns: Vec<SignedTransaction>,
+        result: StateComputeResult,
+        execution_time: Duration,
+    ) -> Self {
+        Self {
+            input_txns,
+            result,
+            execution_time,
+        }
     }
 }
 
@@ -304,7 +313,7 @@ impl StateComputer for ExecutionProxy {
             "commit_block",
             tokio::task::spawn_blocking(move || {
                 executor
-                    .commit_blocks_ext(block_ids, proof, false)
+                    .commit_blocks(block_ids, proof)
                     .expect("Failed to commit blocks");
             })
             .await
@@ -469,11 +478,10 @@ async fn test_commit_sync_race() {
             todo!()
         }
 
-        fn commit_blocks_ext(
+        fn commit_blocks(
             &self,
             _block_ids: Vec<HashValue>,
             ledger_info_with_sigs: LedgerInfoWithSignatures,
-            _save_state_snapshots: bool,
         ) -> ExecutorResult<()> {
             *self.time.lock() = LogicalTime::new(
                 ledger_info_with_sigs.ledger_info().epoch(),
