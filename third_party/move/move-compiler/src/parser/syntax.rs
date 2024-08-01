@@ -315,9 +315,7 @@ fn parse_identifier(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
 fn parse_identifier_or_positional_field(context: &mut Context) -> Result<Name, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let id: Symbol = context.tokens.content().into();
-    if (context.tokens.peek() != Tok::Identifier && context.tokens.peek() != Tok::NumValue)
-        || (context.tokens.peek() == Tok::NumValue
-            && id.as_str().chars().any(|c| !c.is_ascii_digit()))
+    if !(context.tokens.peek() == Tok::Identifier || next_token_is_positional_field(context))
     {
         return Err(unexpected_token_error(
             context.tokens,
@@ -339,6 +337,15 @@ fn parse_identifier_or_positional_field(context: &mut Context) -> Result<Name, B
         require_move_2(context, loc, "positional field");
     }
     Ok(Spanned::new(loc, id))
+}
+
+fn next_token_is_positional_field(context: &mut Context) -> bool {
+    if context.tokens.peek() == Tok::NumValue {
+        let id: Symbol = context.tokens.content().into();
+        id.as_str().chars().all(|c| c.is_ascii_digit())
+    } else {
+        false
+    }
 }
 
 // Parse a numerical address value
