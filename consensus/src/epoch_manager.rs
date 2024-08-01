@@ -66,7 +66,7 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
     proof_of_store::ProofCache,
 };
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 use aptos_dkg::{
     pvss::{traits::Transcript, Player},
     weighted_vuf::traits::WeightedVUF,
@@ -1723,7 +1723,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 }
 
-fn new_consensus_key_from_storage(backend: &SecureBackend) -> anyhow::Result<bls12381::PrivateKey> {
+fn new_consensus_key_from_storage(backend: &SecureBackend) -> anyhow::Result<ed25519::PrivateKey> {
     let storage: Storage = backend.into();
     storage
         .available()
