@@ -455,17 +455,25 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
                     // If the peer doesn't have any sender_buckets assigned, let's not broadcast to the peer
                     let mut sender_buckets: Vec<(MempoolSenderBucket, BroadcastPeerPriority)> =
-                        self.prioritized_peers_state
-                            .get_sender_buckets_for_peer(&peer)
-                            .ok_or_else(|| {
-                                BroadcastError::PeerNotPrioritized(
-                                    peer,
-                                    self.prioritized_peers_state.get_peer_priority(&peer),
-                                )
-                            })?
-                            .clone()
-                            .into_iter()
-                            .collect();
+                        if self.node_type.is_validator() {
+                            (0..self.mempool_config.num_sender_buckets)
+                                .map(|sender_bucket| {
+                                    (sender_bucket, BroadcastPeerPriority::Primary)
+                                })
+                                .collect()
+                        } else {
+                            self.prioritized_peers_state
+                                .get_sender_buckets_for_peer(&peer)
+                                .ok_or_else(|| {
+                                    BroadcastError::PeerNotPrioritized(
+                                        peer,
+                                        self.prioritized_peers_state.get_peer_priority(&peer),
+                                    )
+                                })?
+                                .clone()
+                                .into_iter()
+                                .collect()
+                        };
                     // Sort sender_buckets based on priority. Primary peer should be first.
                     sender_buckets.sort_by(|(_, priority_a), (_, priority_b)| {
                         if priority_a == priority_b {
