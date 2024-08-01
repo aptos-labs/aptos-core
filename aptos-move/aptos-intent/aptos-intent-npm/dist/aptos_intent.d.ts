@@ -16,30 +16,8 @@ export enum BatchArgumentType {
 /**
 * Arguments for each function. Wasm bindgen only support C-style enum so use option to work around.
 */
-export class BatchArgumentWASM {
+export class BatchArgument {
   free(): void;
-/**
-* @param {Uint8Array} bytes
-* @returns {BatchArgumentWASM}
-*/
-  static new_bytes(bytes: Uint8Array): BatchArgumentWASM;
-/**
-* @param {number} signer_idx
-* @returns {BatchArgumentWASM}
-*/
-  static new_signer(signer_idx: number): BatchArgumentWASM;
-/**
-* @returns {BatchArgumentWASM}
-*/
-  borrow(): BatchArgumentWASM;
-/**
-* @returns {BatchArgumentWASM}
-*/
-  borrow_mut(): BatchArgumentWASM;
-/**
-* @returns {BatchArgumentWASM}
-*/
-  copy(): BatchArgumentWASM;
 }
 /**
 * Call a Move entry function.
@@ -64,10 +42,10 @@ export class BatchedFunctionCallBuilder {
 * @param {string} module
 * @param {string} _function
 * @param {(string)[]} ty_args
-* @param {(BatchArgumentWASM)[]} args
-* @returns {(BatchArgumentWASM)[]}
+* @param {(BatchArgument)[]} args
+* @returns {(BatchArgument)[]}
 */
-  add_batched_call(module: string, _function: string, ty_args: (string)[], args: (BatchArgumentWASM)[]): (BatchArgumentWASM)[];
+  add_batched_call(module: string, _function: string, ty_args: (string)[], args: (BatchArgument)[]): (BatchArgument)[];
 /**
 * @returns {Uint8Array}
 */
@@ -85,7 +63,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly generate_intent_payload_wasm: (a: number, b: number, c: number) => void;
-  readonly __wbg_batchargumentwasm_free: (a: number) => void;
+  readonly __wbg_batchargument_free: (a: number) => void;
   readonly __wbg_batchedfunctioncallbuilder_free: (a: number) => void;
   readonly batchedfunctioncallbuilder_single_signer: () => number;
   readonly batchedfunctioncallbuilder_multi_signer: (a: number) => number;

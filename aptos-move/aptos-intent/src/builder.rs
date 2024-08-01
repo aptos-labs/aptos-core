@@ -27,7 +27,7 @@ pub enum BatchArgumentType {
     PreviousResult,
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = BatchArgument)]
 /// Arguments for each function. Wasm bindgen only support C-style enum so use option to work around.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BatchArgumentWASM {

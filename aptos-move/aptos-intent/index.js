@@ -27,7 +27,7 @@ rust
       "0x0000000000000000000000000000000000000000000000000000000000000001::coin",
       "withdraw",
       ["0x1::aptos_coin::AptosCoin"],
-      [m.BatchArgumentWASM.new_signer(0), m.BatchArgumentWASM.new_bytes(amount)]
+      [m.BatchArgument.new_signer(0), m.BatchArgument.new_bytes(amount)]
     );
     let returns_2 = builder.add_batched_call(
       "0x0000000000000000000000000000000000000000000000000000000000000001::coin",
@@ -39,7 +39,7 @@ rust
       "0x0000000000000000000000000000000000000000000000000000000000000001::primary_fungible_store",
       "deposit",
       [],
-      [m.BatchArgumentWASM.new_bytes(address), returns_2[0]]
+      [m.BatchArgument.new_bytes(address), returns_2[0]]
     );
     let i = builder.generate_batched_calls();
     console.log(Buffer.from(i).toString("hex"))
