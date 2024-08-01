@@ -29,8 +29,8 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result,
-    Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
+    EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt,
+    Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
@@ -262,6 +262,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 duration,
                 WARMUP_DURATION_FRACTION,
                 COOLDOWN_DURATION_FRACTION,
+                None,
             )
             .await?;
 
@@ -334,6 +335,7 @@ pub async fn create_buffered_load(
     warmup_duration_fraction: f32,
     cooldown_duration_fraction: f32,
     mut inner_test_and_report: Option<(&dyn NetworkLoadTest, &mut TestReport)>,
+    mut synchronized_with_job: Option<&mut EmitJob>,
 ) -> Result<Vec<LoadTestPhaseStats>> {
     // Generate some traffic
     let (mut emitter, emit_job_request) = create_emitter_and_request(
@@ -376,6 +378,10 @@ pub async fn create_buffered_load(
     job = job.periodic_stat_forward(warmup_duration, 60).await;
     info!("{}s warmup finished", warmup_duration.as_secs());
 
+    if let Some(job) = synchronized_with_job.as_mut() {
+        job.start_next_phase()
+    }
+
     let mut phase_timing = Vec::new();
     let mut phase_start_network_state = Vec::new();
     let test_start = Instant::now();
@@ -411,6 +417,9 @@ pub async fn create_buffered_load(
 
     phase_start_network_state.push(NetworkState::new(&clients).await);
     job.start_next_phase();
+    if let Some(job) = synchronized_with_job.as_mut() {
+        job.start_next_phase()
+    }
     let cooldown_start = Instant::now();
 
     let cooldown_used = cooldown_start.elapsed();
@@ -479,6 +488,7 @@ impl dyn NetworkLoadTest + '_ {
         duration: Duration,
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
+        synchronized_with_job: Option<&mut EmitJob>,
     ) -> Result<Vec<LoadTestPhaseStats>> {
         let destination = self.setup(ctx).await.context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm.clone()).await;
@@ -491,6 +501,7 @@ impl dyn NetworkLoadTest + '_ {
             warmup_duration_fraction,
             cooldown_duration_fraction,
             Some((self, ctx.report)),
+            synchronized_with_job,
         )
         .await
     }

@@ -17,7 +17,7 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::Op,
     gas_algebra::AbstractMemorySize,
-    u256,
+    u256, value,
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::{sub_status::NFE_VECTOR_ERROR_BASE, StatusCode},
 };
@@ -3104,8 +3104,8 @@ pub mod debug {
 use crate::value_serde::{CustomDeserializer, CustomSerializer, RelaxedCustomSerDe};
 use move_binary_format::file_format::VariantIndex;
 use serde::{
-    de::{Error as DeError, Unexpected},
-    ser::{Error as SerError, SerializeSeq, SerializeTuple},
+    de::{EnumAccess, Error as DeError, Unexpected, VariantAccess},
+    ser::{Error as SerError, SerializeSeq, SerializeTuple, SerializeTupleVariant},
     Deserialize,
 };
 
@@ -3271,30 +3271,51 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
     for SerializationReadyValue<'c, 'l, 'v, MoveStructLayout, Vec<ValueImpl>, C>
 {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let values = self.value.as_slice();
+        let mut values = self.value.as_slice();
         if let Some((tag, variant_layouts)) = try_get_variant_field_layouts(self.layout, values) {
-            // Variants need to be serialized as sequences, as the deserializer cannot know
-            // their static size.
-            let mut t = serializer.serialize_seq(Some(values.len()))?;
-            t.serialize_element(&SerializationReadyValue {
-                custom_serializer: self.custom_serializer,
-                layout: &MoveTypeLayout::U16,
-                value: &ValueImpl::U16(tag),
-            })?;
-            if variant_layouts.len() != values.len() - 1 {
+            let tag_idx = tag as usize;
+            let variant_tag = tag_idx as u32;
+            let variant_name = value::variant_name_placeholder((tag + 1) as usize)[tag_idx];
+            values = &values[1..];
+            if variant_layouts.len() != values.len() {
                 return Err(invariant_violation::<S>(format!(
-                    "cannot serialize variant value {:?} as {:?} -- number of fields mismatch",
+                    "cannot serialize struct value {:?} as {:?} -- number of fields mismatch",
                     self.value, self.layout
                 )));
             }
-            for (field_layout, value) in variant_layouts.iter().zip(values.iter().skip(1)) {
-                t.serialize_element(&SerializationReadyValue {
-                    custom_serializer: self.custom_serializer,
-                    layout: field_layout,
-                    value,
-                })?;
+            match values.len() {
+                0 => serializer.serialize_unit_variant(
+                    value::MOVE_ENUM_NAME,
+                    variant_tag,
+                    variant_name,
+                ),
+                1 => serializer.serialize_newtype_variant(
+                    value::MOVE_ENUM_NAME,
+                    variant_tag,
+                    variant_name,
+                    &SerializationReadyValue {
+                        custom_serializer: self.custom_serializer,
+                        layout: &variant_layouts[0],
+                        value: &values[0],
+                    },
+                ),
+                _ => {
+                    let mut t = serializer.serialize_tuple_variant(
+                        value::MOVE_ENUM_NAME,
+                        variant_tag,
+                        variant_name,
+                        values.len(),
+                    )?;
+                    for (layout, value) in variant_layouts.iter().zip(values) {
+                        t.serialize_field(&SerializationReadyValue {
+                            custom_serializer: self.custom_serializer,
+                            layout,
+                            value,
+                        })?
+                    }
+                    t.end()
+                },
             }
-            t.end()
         } else {
             let field_layouts = self.layout.fields(None);
             let mut t = serializer.serialize_tuple(values.len())?;
@@ -3421,11 +3442,16 @@ impl<'d, C: CustomDeserializer> serde::de::DeserializeSeed<'d>
                 )?;
                 Ok(Struct::pack(fields))
             },
-            MoveStructLayout::RuntimeVariants(variant_layouts) => {
-                let fields = deserializer.deserialize_seq(StructVariantVisitor(
-                    self.custom_deserializer,
-                    variant_layouts,
-                ))?;
+            MoveStructLayout::RuntimeVariants(variants) => {
+                if variants.len() > (u16::MAX as usize) {
+                    return Err(D::Error::custom("variant count out of range"));
+                }
+                let variant_names = value::variant_name_placeholder(variants.len());
+                let fields = deserializer.deserialize_enum(
+                    value::MOVE_ENUM_NAME,
+                    variant_names,
+                    StructVariantVisitor(self.custom_deserializer, variants),
+                )?;
                 Ok(Struct::pack(fields))
             },
             MoveStructLayout::WithFields(_)
@@ -3496,6 +3522,39 @@ impl<'d, 'c, 'l, C: CustomDeserializer> serde::de::Visitor<'d> for StructVariant
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("Variant")
+    }
+
+    fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
+    where
+        A: EnumAccess<'d>,
+    {
+        let (tag, rest) = data.variant()?;
+        if tag as usize >= self.1.len() {
+            Err(A::Error::invalid_length(0, &self))
+        } else {
+            let mut values = vec![Value::u16(tag)];
+            let fields = &self.1[tag as usize];
+            match fields.len() {
+                0 => {
+                    rest.unit_variant()?;
+                    Ok(values)
+                },
+                1 => {
+                    values.push(rest.newtype_variant_seed(DeserializationSeed {
+                        custom_deserializer: self.0,
+                        layout: &fields[0],
+                    })?);
+                    Ok(values)
+                },
+                _ => {
+                    values.append(
+                        &mut rest
+                            .tuple_variant(fields.len(), StructFieldVisitor(self.0, fields))?,
+                    );
+                    Ok(values)
+                },
+            }
+        }
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
