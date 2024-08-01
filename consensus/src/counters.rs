@@ -1234,3 +1234,12 @@ pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::
     )
     .unwrap()
 });
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_proposal_payload_fetch_duration",
+        "Time to fetch payload behind proposal with status",
+        &["status"]
+    )
+    .unwrap()
+});
