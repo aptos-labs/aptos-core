@@ -1099,11 +1099,12 @@ if [[ "$INSTALL_JSTS" == "true" ]]; then
   install_solidity
 fi
 
+install_libudev-dev
+
 install_python3
 if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
   if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
     pip3 install pre-commit
-    install_libudev-dev
   else
     install_pkg python-pre-commit "$PACKAGE_MANAGER"
   fi
