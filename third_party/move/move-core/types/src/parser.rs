@@ -270,14 +270,13 @@ impl<I: Iterator<Item = Token>> Parser<I> {
     fn parse_module_id(&mut self) -> Result<ModuleId> {
         Ok(match self.next()? {
             Token::Address(addr) => match self.next()? {
-                Token::Name(s) => ModuleId::new(AccountAddress::from_hex_literal(&addr)?, Identifier::new(s)?),
                 Token::ColonColon => match self.next()? {
                     Token::Name(s) => ModuleId::new(AccountAddress::from_hex_literal(&addr)?, Identifier::new(s)?),
-                    tok => bail!("unexpected token {:?}, expected string", tok),
+                    tok => bail!("unexpected token {:?}, expected identifier", tok),
                 }
-                tok =>  bail!("unexpected token {:?}, expected string", tok),
+                tok =>  bail!("unexpected token {:?}, expected ::", tok),
             }
-            tok =>  bail!("unexpected token {:?}, expected string", tok),
+            tok =>  bail!("unexpected token {:?}, expected address", tok),
         })
     }
 

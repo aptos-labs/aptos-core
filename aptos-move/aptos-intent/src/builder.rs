@@ -27,7 +27,7 @@ pub enum BatchArgumentType {
     PreviousResult,
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = BatchArgument)]
 /// Arguments for each function. Wasm bindgen only support C-style enum so use option to work around.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BatchArgumentWASM {
@@ -93,6 +93,16 @@ impl BatchedFunctionCallBuilder {
         )
         .map_err(|err| format!("{:?}", err))
     }
+
+    pub async fn load_module(
+        &mut self,
+        api_url: String,
+        module_name: String,
+    ) -> Result<(), JsValue> {
+        self.load_module_impl(api_url, module_name)
+            .await
+            .map_err(|err| JsValue::from(format!("{:?}", err)))
+    }
 }
 
 fn find_function<'a>(
@@ -118,6 +128,9 @@ impl BatchedFunctionCallBuilder {
         func_name: &IdentStr,
         ty_args: &[TypeTag],
     ) -> anyhow::Result<Vec<BatchArgument>> {
+        if self.calls.is_empty() {
+            bail!("No calls exists in the builder yet");
+        }
         let (module, handle) = find_function(&self.modules, module_id, func_name)?;
         let mut returns = vec![];
         for (idx, sig) in module.signature_at(handle.return_).0.iter().enumerate() {
@@ -355,16 +368,6 @@ impl BatchedFunctionCallBuilder {
             },
             Err(_message) => Ok(()),
         }
-    }
-
-    pub async fn load_module(
-        &mut self,
-        api_url: String,
-        module_name: String,
-    ) -> Result<(), JsValue> {
-        self.load_module_impl(api_url, module_name)
-            .await
-            .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
 
     #[cfg(test)]
