@@ -887,6 +887,34 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
+
+        let block_store = self.block_store.clone();
+        if !block_store.check_payload(&proposal) {
+            debug!("Payload not available locally for block: {}", proposal.id());
+            counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
+                .with_label_values(&["missing"])
+                .inc();
+            let future =
+                async move { (block_store.wait_for_payload(&proposal).await, proposal) }.boxed();
+            self.futures.push(future);
+            return Ok(());
+        }
+
+        counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
+            .with_label_values(&["available"])
+            .inc();
+
+        self.check_backpressure_and_process_proposal(proposal).await
+    }
+
+    async fn check_backpressure_and_process_proposal(
+        &mut self,
+        proposal: Block,
+    ) -> anyhow::Result<()> {
+        let author = proposal
+            .author()
+            .expect("Proposal should be verified having an author");
+
         if self.block_store.vote_back_pressure() {
             counters::CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED.observe(1.0);
             // In case of back pressure, we delay processing proposal. This is done by resending the
@@ -915,23 +943,7 @@ impl RoundManager {
         }
 
         counters::CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED.observe(0.0);
-
-        let block_store = self.block_store.clone();
-        if block_store.check_payload(&proposal) {
-            counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
-                .with_label_values(&["available"])
-                .inc();
-            self.process_verified_proposal(proposal).await
-        } else {
-            debug!("Payload not available locally for block: {}", proposal.id());
-            counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
-                .with_label_values(&["missing"])
-                .inc();
-            let future =
-                async move { (block_store.wait_for_payload(&proposal).await, proposal) }.boxed();
-            self.futures.push(future);
-            Ok(())
-        }
+        self.process_verified_proposal(proposal).await
     }
 
     async fn resend_verified_proposal_to_self(
@@ -1497,7 +1509,7 @@ impl RoundManager {
                 Some((result, block)) = self.futures.next() => {
                     match result {
                         Ok(_) => {
-                            if let Err(e) = self.process_delayed_proposal_msg(block).await {
+                            if let Err(e) = self.check_backpressure_and_process_proposal(block).await {
                                 warn!("error {}", e);
                             }
                         },
