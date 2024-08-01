@@ -162,7 +162,6 @@ pub enum LogEntry {
     BroadcastTransaction,
     BroadcastACK,
     ReceiveACK,
-    InvariantViolated,
     AddTxn,
     RemoveTxn,
     MempoolFullEvictedTxn,
