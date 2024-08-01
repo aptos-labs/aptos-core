@@ -48,6 +48,7 @@ pub trait BlockReader: Send + Sync {
     fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>>;
 
     /// Return the certified block with the highest round.
+    #[cfg(test)]
     fn highest_certified_block(&self) -> Arc<PipelinedBlock>;
 
     /// Return the quorum certificate with the highest round

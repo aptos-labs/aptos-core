@@ -30,6 +30,4 @@ pub trait PayloadClient: Send + Sync {
         recent_max_fill_fraction: f32,
         block_timestamp: Duration,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError>;
-
-    fn trace_payloads(&self) {}
 }
