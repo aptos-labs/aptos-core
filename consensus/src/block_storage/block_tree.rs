@@ -171,6 +171,11 @@ impl BlockTree {
             .expect("Root must exist")
     }
 
+    fn linkable_window_root(&self) -> &LinkableBlock {
+        self.get_linkable_block(&self.window_root_id)
+            .expect("Window root must exist")
+    }
+
     fn remove_block(&mut self, block_id: HashValue) {
         info!("remove_block: {}", block_id);
         // Remove the block from the store
@@ -385,7 +390,7 @@ impl BlockTree {
         }
 
         let mut blocks_pruned = VecDeque::new();
-        let mut blocks_to_be_pruned = vec![self.linkable_root()];
+        let mut blocks_to_be_pruned = vec![self.linkable_window_root()];
         while let Some(block_to_remove) = blocks_to_be_pruned.pop() {
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
