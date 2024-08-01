@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/positional_fields/variant_decl_invalid.move:4:3
+  │
+4 │         Variant1()
+  │         ^^^^^^^^
+  │         │
+  │         Unexpected 'Variant1'
+  │         Expected ','
