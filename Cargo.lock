@@ -2411,15 +2411,12 @@ dependencies = [
  "anyhow",
  "aptos-types",
  "bcs 0.1.4",
- "bytes",
  "e2e-move-tests",
- "getrandom 0.2.11",
  "hex",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
  "reqwest 0.12.5",
- "reqwest-wasm",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -14319,44 +14316,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reqwest-wasm"
-version = "0.11.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59fdca8934fccbd5aec3e208bdb5a76107ce8690aa51c6c292c31f21541b52b9"
-dependencies = [
- "base64 0.13.1",
- "bytes",
- "encoding_rs",
- "futures",
- "futures-core",
- "futures-util",
- "h2 0.3.26",
- "http 0.2.11",
- "http-body 0.4.6",
- "hyper 0.14.28",
- "hyper-tls 0.5.0",
- "ipnet",
- "js-sys",
- "log",
- "mime",
- "native-tls",
- "once_cell",
- "percent-encoding",
- "pin-project-lite",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "tokio",
- "tokio-native-tls",
- "tower-service",
- "url",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "winreg 0.10.1",
-]
-
-[[package]]
 name = "retain_mut"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -17966,15 +17925,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7520bbdec7211caa7c4e682eb1fbe07abe20cee6756b6e00f537c82c11816aa"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "winreg"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80d0f4e272c85def139476380b12f9ac60926689dd2e01d4923222f40580869d"
-dependencies = [
- "winapi 0.3.9",
 ]
 
 [[package]]

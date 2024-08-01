@@ -6,6 +6,7 @@ use crate::{
 };
 use move_binary_format::{
     access::ScriptAccess,
+    builders::CompiledScriptBuilder,
     errors::{PartialVMError, PartialVMResult},
     file_format::*,
 };
@@ -91,16 +92,8 @@ impl Context {
     fn compile_batched_call(
         &mut self,
         call: &BatchedFunctionCall,
-        module_resolver: &BTreeMap<ModuleId, CompiledModule>,
+        func_id: FunctionHandleIndex,
     ) -> PartialVMResult<()> {
-        let target_module = match module_resolver.get(&call.module) {
-            Some(module) => module,
-            None => return Err(PartialVMError::new(StatusCode::LOOKUP_FAILED)),
-        };
-        let func_id = self
-            .script
-            .import_call_by_name(&call.function, target_module)?;
-
         let func_handle = self.script.function_handle_at(func_id).clone();
         let mut subst_mapping = BTreeMap::new();
         for (idx, ty_param) in call.ty_args.iter().enumerate() {
@@ -178,7 +171,7 @@ impl Context {
                 .map(|idx| SignatureToken::TypeParameter(*idx))
                 .collect();
 
-            let type_parameters = self.script.add_signature(Signature(inst_sig))?;
+            let type_parameters = self.add_signature(Signature(inst_sig))?;
             self.script
                 .function_instantiations
                 .push(FunctionInstantiation {
@@ -218,6 +211,25 @@ impl Context {
 
         Ok(())
     }
+
+    fn add_signature(&mut self, sig: Signature) -> PartialVMResult<SignatureIndex> {
+        Ok(SignatureIndex(match self
+            .script
+            .signatures()
+            .iter()
+            .position(|item| item == &sig)
+        {
+            Some(idx) => idx,
+            None => {
+                let idx = self.script.signatures().len();
+                if idx >= TableIndex::MAX as usize {
+                    return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
+                }
+                self.script.signatures.push(sig);
+                idx
+            },
+        } as u16))
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -235,21 +247,26 @@ pub fn generate_script_from_batched_calls(
     module_resolver: &BTreeMap<ModuleId, CompiledModule>,
 ) -> PartialVMResult<Vec<u8>> {
     let mut context = Context::default();
-    context.script = empty_script();
-    context.script.code.code = vec![];
-    context.script.signatures = vec![];
+    let mut script_builder = CompiledScriptBuilder::new(CompiledScript::default());
+    let call_idxs = calls
+        .iter()
+        .map(|call| {
+            let target_module = match module_resolver.get(&call.module) {
+                Some(module) => module,
+                None => return Err(PartialVMError::new(StatusCode::LOOKUP_FAILED)),
+            };
+            script_builder.import_call_by_name(&call.function, target_module)
+        })
+        .collect::<PartialVMResult<Vec<_>>>()?;
+    context.script = script_builder.into_inner();
     context.add_signers(signer_count)?;
     context.allocate_parameters(calls)?;
-    for call in calls.iter() {
-        context.compile_batched_call(call, module_resolver)?;
+    for (call, fh_idx) in calls.iter().zip(call_idxs.into_iter()) {
+        context.compile_batched_call(call, fh_idx)?;
     }
     context.script.code.code.push(Bytecode::Ret);
-    context.script.parameters = context
-        .script
-        .add_signature(Signature(context.parameters.clone()))?;
-    context.script.code.locals = context
-        .script
-        .add_signature(Signature(context.locals.clone()))?;
+    context.script.parameters = context.add_signature(Signature(context.parameters.clone()))?;
+    context.script.code.locals = context.add_signature(Signature(context.locals.clone()))?;
     move_bytecode_verifier::verify_script(&context.script).map_err(|err| {
         err.to_partial()
             .with_message(format!("{:?}", context.script))
