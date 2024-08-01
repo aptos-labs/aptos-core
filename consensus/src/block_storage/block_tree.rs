@@ -534,7 +534,7 @@ impl BlockTree {
         );
 
         let window_root_id = self.find_window_root(block_to_commit.id());
-        let ids_to_remove = self.find_blocks_to_prune(block_to_commit.id());
+        let ids_to_remove = self.find_blocks_to_prune(window_root_id);
         info!("Pruning blocks: {:?}", ids_to_remove);
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
