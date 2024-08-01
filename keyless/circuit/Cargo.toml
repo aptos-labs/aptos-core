@@ -19,7 +19,7 @@ aptos-keyless-common = { workspace = true }
 aptos-logger = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ff = { workspace = true }
-base64 = { workspace = true }
+base64.workspace = true
 itertools = { workspace = true }
 num-traits = { workspace = true }
 rand = { workspace = true }

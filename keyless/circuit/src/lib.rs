@@ -29,6 +29,8 @@ mod packing;
 mod rsa;
 #[cfg(test)]
 mod sha;
+#[cfg(test)]
+mod full_circuit;
 
 pub struct TestCircuitHandle {
     dir: TempDir,
