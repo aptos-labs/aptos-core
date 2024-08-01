@@ -309,7 +309,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
         let execute_result_type = format!("execute_result_{}", self.shard_id);
         let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
-        self.result_tx.send(Message::new(output_message), &MessageType::new(execute_result_type));
+        self.result_tx.send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
     }
 
     fn record_execution_complete_time_on_shard(&self) {
