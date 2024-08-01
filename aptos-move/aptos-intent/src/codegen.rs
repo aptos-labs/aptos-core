@@ -77,7 +77,7 @@ impl Context {
             self.args_to_local.push(total_args_count);
             for arg in call.args.iter() {
                 if let BatchArgument::Raw(bytes) = arg {
-                    if total_args_count >= TableIndex::MAX {
+                    if total_args_count == TableIndex::MAX {
                         return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
                     }
                     self.args.push(bytes.clone());
@@ -110,7 +110,7 @@ impl Context {
                     *stored_idx
                 } else {
                     let new_call_idx = self.ty_args.len() as u16;
-                    if new_call_idx >= TableIndex::MAX {
+                    if new_call_idx == TableIndex::MAX {
                         return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
                     }
                     self.script
@@ -135,11 +135,9 @@ impl Context {
                         if *return_idx >= self.return_counts[*call_idx as usize] {
                             return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
                         }
-                        let local_idx = (*idx
-                            + *return_idx
-                            + self.args.len() as u16
-                            + self.signer_counts as u16)
-                            as u8;
+                        let local_idx =
+                            (*idx + *return_idx + self.args.len() as u16 + self.signer_counts)
+                                as u8;
                         // TODO: Check return_idx is in range.
                         self.script.code.code.push(match operation_type {
                             ArgumentOperation::Borrow => Bytecode::ImmBorrowLoc(local_idx),
@@ -230,6 +228,7 @@ pub(crate) struct Script {
     pub args: Vec<TransactionArgument>,
 }
 
+#[allow(clippy::field_reassign_with_default)]
 pub fn generate_script_from_batched_calls(
     calls: &[BatchedFunctionCall],
     signer_count: u16,

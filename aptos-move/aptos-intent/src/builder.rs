@@ -136,7 +136,7 @@ impl BatchedFunctionCallBuilder {
         for (idx, sig) in module.signature_at(handle.return_).0.iter().enumerate() {
             let call_idx = (self.calls.len() - 1) as u16;
             let return_idx = idx as u16;
-            let ty = self.type_tag_from_signature(module, sig, ty_args)?;
+            let ty = Self::type_tag_from_signature(module, sig, ty_args)?;
             let ability = BinaryIndexedView::Module(module)
                 .abilities(sig, &handle.type_parameters)
                 .unwrap();
@@ -150,7 +150,7 @@ impl BatchedFunctionCallBuilder {
                 operation_type: ArgumentOperation::Move,
             }));
         }
-        return Ok(returns);
+        Ok(returns)
     }
 
     fn check_parameters(
@@ -172,84 +172,81 @@ impl BatchedFunctionCallBuilder {
             );
         }
         for (tok, param) in param_tys.0.iter().zip(params.iter()) {
-            match param {
-                BatchArgument::PreviousResult(PreviousResult {
-                    call_idx,
-                    return_idx,
-                    operation_type,
-                }) => {
-                    let (ty, ability) = self
-                        .type_of_returns
-                        .get(&(*call_idx, *return_idx))
-                        .ok_or_else(|| anyhow!("Type of return not found"))?;
-                    match operation_type {
-                        ArgumentOperation::Copy => {
-                            if !ability.has_ability(Ability::Copy) {
-                                bail!("Copying value of non-copyable type: {}", ty);
-                            }
-                            let expected_ty = self.type_tag_from_signature(module, tok, ty_args)?;
-                            if &expected_ty != ty {
-                                bail!(
-                                    "Type mismatch in arguments. Expected: {}, got: {}",
-                                    expected_ty,
-                                    ty
-                                );
-                            }
-                        },
-                        ArgumentOperation::Move => {
-                            let expected_ty = self.type_tag_from_signature(module, tok, ty_args)?;
-                            if &expected_ty != ty {
-                                bail!(
-                                    "Type mismatch in arguments. Expected: {}, got: {}",
-                                    expected_ty,
-                                    ty
-                                );
-                            }
-                        },
-                        ArgumentOperation::Borrow => {
-                            let expected_ty = match tok {
-                                SignatureToken::Reference(inner_ty) => {
-                                    self.type_tag_from_signature(module, &inner_ty, ty_args)?
-                                },
-                                _ => bail!("Type mismatch in arguments. Got reference of {}", ty),
-                            };
+            if let BatchArgument::PreviousResult(PreviousResult {
+                call_idx,
+                return_idx,
+                operation_type,
+            }) = param
+            {
+                let (ty, ability) = self
+                    .type_of_returns
+                    .get(&(*call_idx, *return_idx))
+                    .ok_or_else(|| anyhow!("Type of return not found"))?;
+                match operation_type {
+                    ArgumentOperation::Copy => {
+                        if !ability.has_ability(Ability::Copy) {
+                            bail!("Copying value of non-copyable type: {}", ty);
+                        }
+                        let expected_ty = Self::type_tag_from_signature(module, tok, ty_args)?;
+                        if &expected_ty != ty {
+                            bail!(
+                                "Type mismatch in arguments. Expected: {}, got: {}",
+                                expected_ty,
+                                ty
+                            );
+                        }
+                    },
+                    ArgumentOperation::Move => {
+                        let expected_ty = Self::type_tag_from_signature(module, tok, ty_args)?;
+                        if &expected_ty != ty {
+                            bail!(
+                                "Type mismatch in arguments. Expected: {}, got: {}",
+                                expected_ty,
+                                ty
+                            );
+                        }
+                    },
+                    ArgumentOperation::Borrow => {
+                        let expected_ty = match tok {
+                            SignatureToken::Reference(inner_ty) => {
+                                Self::type_tag_from_signature(module, inner_ty, ty_args)?
+                            },
+                            _ => bail!("Type mismatch in arguments. Got reference of {}", ty),
+                        };
 
-                            if &expected_ty != ty {
-                                bail!(
-                                    "Type mismatch in arguments. Expected: {}, got: {}",
-                                    expected_ty,
-                                    ty
-                                );
-                            }
-                        },
-                        ArgumentOperation::BorrowMut => {
-                            let expected_ty = match tok {
-                                SignatureToken::MutableReference(inner_ty) => {
-                                    self.type_tag_from_signature(module, &inner_ty, ty_args)?
-                                },
-                                _ => bail!(
-                                    "Type mismatch in arguments. Got mutable reference of {}",
-                                    ty
-                                ),
-                            };
-                            if &expected_ty != ty {
-                                bail!(
-                                    "Type mismatch in arguments. Expected: {}, got: {}",
-                                    expected_ty,
-                                    ty
-                                );
-                            }
-                        },
-                    }
-                },
-                _ => (),
+                        if &expected_ty != ty {
+                            bail!(
+                                "Type mismatch in arguments. Expected: {}, got: {}",
+                                expected_ty,
+                                ty
+                            );
+                        }
+                    },
+                    ArgumentOperation::BorrowMut => {
+                        let expected_ty = match tok {
+                            SignatureToken::MutableReference(inner_ty) => {
+                                Self::type_tag_from_signature(module, inner_ty, ty_args)?
+                            },
+                            _ => bail!(
+                                "Type mismatch in arguments. Got mutable reference of {}",
+                                ty
+                            ),
+                        };
+                        if &expected_ty != ty {
+                            bail!(
+                                "Type mismatch in arguments. Expected: {}, got: {}",
+                                expected_ty,
+                                ty
+                            );
+                        }
+                    },
+                }
             }
         }
         Ok(())
     }
 
     fn type_tag_from_signature(
-        &self,
         module: &CompiledModule,
         tok: &SignatureToken,
         ty_args: &[TypeTag],
@@ -278,7 +275,7 @@ impl BatchedFunctionCallBuilder {
                 }))
             },
             SignatureToken::Vector(tok) => TypeTag::Vector(Box::new(
-                self.type_tag_from_signature(module, tok, ty_args)?,
+                Self::type_tag_from_signature(module, tok, ty_args)?,
             )),
             SignatureToken::StructInstantiation(idx, toks) => {
                 let st_handle = module.struct_handle_at(*idx);
@@ -289,7 +286,7 @@ impl BatchedFunctionCallBuilder {
                     name: module.identifier_at(st_handle.name).to_owned(),
                     type_args: toks
                         .iter()
-                        .map(|tok| self.type_tag_from_signature(module, tok, ty_args))
+                        .map(|tok| Self::type_tag_from_signature(module, tok, ty_args))
                         .collect::<anyhow::Result<_>>()?,
                 }))
             },
@@ -361,7 +358,7 @@ impl BatchedFunctionCallBuilder {
                 self.modules.insert(
                     module_id,
                     CompiledModule::deserialize(
-                        hex::decode(bytes_hex.replace("0x", "").replace("\"", ""))?.as_slice(),
+                        hex::decode(bytes_hex.replace("0x", "").replace('\"', ""))?.as_slice(),
                     )?,
                 );
                 Ok(())
@@ -450,9 +447,9 @@ impl From<BatchArgumentWASM> for BatchArgument {
     }
 }
 
-impl Into<BatchArgumentWASM> for BatchArgument {
-    fn into(self) -> BatchArgumentWASM {
-        match self {
+impl From<BatchArgument> for BatchArgumentWASM {
+    fn from(value: BatchArgument) -> BatchArgumentWASM {
+        match value {
             BatchArgument::PreviousResult(r) => BatchArgumentWASM {
                 ty: BatchArgumentType::PreviousResult,
                 raw: None,
