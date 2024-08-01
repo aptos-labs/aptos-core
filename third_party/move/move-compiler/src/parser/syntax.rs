@@ -2851,7 +2851,7 @@ fn parse_postfix_abilities(
     Ok(())
 }
 
-// Parse a struct variant. The returned boolean indicates whether the variant has a braced (`{..}`)
+// Parse a struct variant, which may have positional fields. The returned boolean indicates whether the variant has a braced (`{..}`)
 // field list.
 fn parse_struct_variant(context: &mut Context) -> Result<(StructVariant, bool), Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
