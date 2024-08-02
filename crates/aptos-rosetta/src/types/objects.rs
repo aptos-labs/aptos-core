@@ -31,7 +31,7 @@ use aptos_types::{
     account_config::{
         fungible_store::FungibleStoreResource, AccountResource, CoinStoreResource, WithdrawEvent,
     },
-    contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
+    contract_event::{ContractEvent, ContractEventV2, FEE_STATEMENT_EVENT_TYPE},
     event::EventKey,
     fee_statement::FeeStatement,
     stake_pool::{SetOperatorEvent, StakePool},
@@ -41,17 +41,16 @@ use aptos_types::{
 };
 use itertools::Itertools;
 use move_core_types::{language_storage::TypeTag, parser::parse_type_tag};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     fmt::{Display, Formatter},
     hash::Hash,
     str::FromStr,
 };
-use once_cell::sync::Lazy;
-use aptos_types::contract_event::ContractEventV2;
 
 /// A description of all types used by the Rosetta implementation.
 ///
@@ -952,6 +951,7 @@ impl Transaction {
             // Parse all failed operations from the payload
             if let Some(user_txn) = maybe_user_txn {
                 let mut ops = parse_failed_operations_from_txn_payload(
+                    &server_context.currencies,
                     operation_index,
                     user_txn.sender(),
                     user_txn.payload(),
@@ -998,6 +998,7 @@ impl Transaction {
 /// This case only occurs if the transaction failed, and that's because it's less accurate
 /// than just following the state changes
 fn parse_failed_operations_from_txn_payload(
+    currencies: &HashSet<Currency>,
     operation_index: u64,
     sender: AccountAddress,
     payload: &TransactionPayload,
@@ -1014,9 +1015,7 @@ fn parse_failed_operations_from_txn_payload(
                 // We could add a create here as well on transfer_coins, but we don't know if it will actually happen
                 if let Some(type_tag) = inner.ty_args().first() {
                     // Find currency from type tag
-                    // FIXME centralize list
-                    let expected = [native_coin()];
-                    let maybe_currency = expected.iter().find(|currency| {
+                    let maybe_currency = currencies.iter().find(|currency| {
                         if let Some(CurrencyMetadata {
                             move_type: Some(ref move_type),
                             fa_address: _,
@@ -1055,9 +1054,7 @@ fn parse_failed_operations_from_txn_payload(
                     .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded));
                 if let Some(Ok(addr)) = maybe_metadata_address {
                     // Find currency from type tag
-                    // FIXME centralize list
-                    let expected = [native_coin()];
-                    let maybe_currency = expected.iter().find(|currency| {
+                    let maybe_currency = currencies.iter().find(|currency| {
                         if let Some(CurrencyMetadata {
                             move_type: _,
                             fa_address: Some(ref fa_address),
@@ -1380,11 +1377,8 @@ async fn parse_operations_from_write_set(
         },
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_args.first() {
-                // FIXME centralize list
-                let expected = [native_coin()];
-
                 // Find the currency and parse it accordingly
-                let maybe_currency = expected.iter().find(|currency| {
+                let maybe_currency = server_context.currencies.iter().find(|currency| {
                     if let Some(CurrencyMetadata {
                         move_type: Some(ref move_type),
                         fa_address: _,
@@ -1418,10 +1412,9 @@ async fn parse_operations_from_write_set(
             }
         },
         (AccountAddress::ONE, FUNGIBLE_ASSET_MODULE, STORE_RESOURCE, 0) => {
-            // FIXME centralize list
-            let currencies = [native_coin()];
             parse_fungible_store_changes(
-                &currencies,
+                owner_map,
+                &server_context.currencies,
                 version,
                 address,
                 data,
@@ -1988,7 +1981,8 @@ async fn parse_coinstore_changes(
 ///
 /// Note that, we don't know until we introspect the change, which fa it is
 async fn parse_fungible_store_changes(
-    currencies: &[Currency],
+    owner_map: &mut BTreeMap<AccountAddress, AccountAddress>,
+    currencies: &HashSet<Currency>,
     version: u64,
     address: AccountAddress,
     data: &[u8],
@@ -2026,11 +2020,16 @@ async fn parse_fungible_store_changes(
 
     // If there's a currency, let's fill in operations
     if let Some(currency) = maybe_currency {
-        static WITHDRAW_TYPE_TAG: Lazy<TypeTag> = Lazy::new(|| parse_type_tag("0x1::fungible_asset::Withdraw").unwrap());
-        static DEPOSIT_TYPE_TAG: Lazy<TypeTag> = Lazy::new(|| parse_type_tag("0x1::fungible_asset::Deposit").unwrap());
+        static WITHDRAW_TYPE_TAG: Lazy<TypeTag> =
+            Lazy::new(|| parse_type_tag("0x1::fungible_asset::Withdraw").unwrap());
+        static DEPOSIT_TYPE_TAG: Lazy<TypeTag> =
+            Lazy::new(|| parse_type_tag("0x1::fungible_asset::Deposit").unwrap());
 
-        // FIXME find owner of store
-        let owner = AccountAddress::ZERO;
+        // TODO:, this defaults to zero, we will need to do a second pass after all to fix them accordingly...
+        let owner = owner_map
+            .get(&address)
+            .copied()
+            .unwrap_or(AccountAddress::ZERO);
 
         let withdraw_amounts = get_amount_from_fa_event(events, &WITHDRAW_TYPE_TAG, address);
         for amount in withdraw_amounts {
@@ -2057,7 +2056,7 @@ async fn parse_fungible_store_changes(
         }
     }
 
-    return Ok(operations);
+    Ok(operations)
 }
 
 /// Pulls the balance change from a withdraw or deposit event
@@ -2084,7 +2083,7 @@ fn get_amount_from_fa_event(
     store_address: AccountAddress,
 ) -> Vec<u64> {
     filter_v2_events(type_tag, events, |event| {
-        if let Ok(event) = bcs::from_bytes::<WithdrawFungibleAssetEvent>(event.event_data()) {
+        if let Ok(event) = bcs::from_bytes::<FungibleAssetChangeEvent>(event.event_data()) {
             if event.store == store_address {
                 Some(event.amount)
             } else {
@@ -2142,7 +2141,7 @@ fn filter_v2_events<F: Fn(&ContractEventV2) -> Option<T>, T>(
         .filter(|event| event.is_v2())
         .map(|event| event.v2().unwrap())
         .filter(|event| event_type == event.type_tag())
-        .filter_map(|event| parser(event))
+        .filter_map(parser)
         .collect()
 }
 
@@ -2461,8 +2460,6 @@ impl InternalOperation {
                 create_account.sender,
             ),
             InternalOperation::Transfer(transfer) => {
-                // FIXME: provide a proper list of currencies
-                let expected = [native_coin()];
                 // Check if the currency is known
                 let currency = &transfer.currency;
 
@@ -2475,44 +2472,40 @@ impl InternalOperation {
                 }
 
                 // For all other coins and FAs we need to handle them accordingly
-                if expected.contains(currency) {
-                    if let Some(ref metadata) = currency.metadata {
-                        match (&metadata.move_type, &metadata.fa_address) {
-                            // For currencies with the coin type, we will always use the coin functionality, even if migrated
-                            (Some(coin_type), Some(_)) | (Some(coin_type), None) => {
-                                let coin_type_tag = parse_type_tag(coin_type)
-                                    .map_err(|err| ApiError::InvalidInput(Some(err.to_string())))?;
-                                (
-                                    aptos_stdlib::aptos_account_transfer_coins(
-                                        coin_type_tag,
-                                        transfer.receiver,
-                                        transfer.amount.0,
-                                    ),
-                                    transfer.sender,
-                                )
-                            },
-                            // For FA only currencies, we use the FA functionality
-                            (None, Some(fa_address_str)) => {
-                                let _fa_address = AccountAddress::from_str(fa_address_str)?;
+                if let Some(ref metadata) = currency.metadata {
+                    match (&metadata.move_type, &metadata.fa_address) {
+                        // For currencies with the coin type, we will always use the coin functionality, even if migrated
+                        (Some(coin_type), Some(_)) | (Some(coin_type), None) => {
+                            let coin_type_tag = parse_type_tag(coin_type)
+                                .map_err(|err| ApiError::InvalidInput(Some(err.to_string())))?;
+                            (
+                                aptos_stdlib::aptos_account_transfer_coins(
+                                    coin_type_tag,
+                                    transfer.receiver,
+                                    transfer.amount.0,
+                                ),
+                                transfer.sender,
+                            )
+                        },
+                        // For FA only currencies, we use the FA functionality
+                        (None, Some(fa_address_str)) => {
+                            let _fa_address = AccountAddress::from_str(fa_address_str)?;
 
-                                todo!("We need the FA function here, but it looks like it'll have to be hand crafted");
-                            },
-                            _ => {
-                                return Err(ApiError::InvalidInput(Some(format!(
-                                    "{} does not have a move type provided",
-                                    currency.symbol
-                                ))))
-                            },
-                        }
-                    } else {
-                        // This should never happen unless the server's currency list is improperly set
-                        return Err(ApiError::InvalidInput(Some(format!(
-                            "{} does not have a currency information provided",
-                            currency.symbol
-                        ))));
+                            todo!("We need the FA function here, but it looks like it'll have to be hand crafted");
+                        },
+                        _ => {
+                            return Err(ApiError::InvalidInput(Some(format!(
+                                "{} does not have a move type provided",
+                                currency.symbol
+                            ))))
+                        },
                     }
                 } else {
-                    return Err(ApiError::UnsupportedCurrency(Some(currency.symbol.clone())));
+                    // This should never happen unless the server's currency list is improperly set
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "{} does not have a currency information provided",
+                        currency.symbol
+                    ))));
                 }
             },
             InternalOperation::SetOperator(set_operator) => {

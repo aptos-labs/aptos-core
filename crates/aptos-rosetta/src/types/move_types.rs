@@ -253,7 +253,7 @@ pub struct WithdrawUndelegatedEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WithdrawFungibleAssetEvent {
+pub struct FungibleAssetChangeEvent {
     pub store: AccountAddress,
     pub amount: u64,
 }

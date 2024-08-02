@@ -7,14 +7,15 @@
 
 use crate::{
     block::BlockRetriever,
-    common::{handle_request, with_context},
+    common::{handle_request, native_coin, with_context},
     error::{ApiError, ApiResult},
+    types::Currency,
 };
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use aptos_warp_webserver::{logger, Error, WebServer};
-use std::{convert::Infallible, sync::Arc};
+use std::{collections::HashSet, convert::Infallible, sync::Arc};
 use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
@@ -31,6 +32,9 @@ pub mod common;
 pub mod error;
 pub mod types;
 
+#[cfg(test)]
+mod test;
+
 pub const NODE_VERSION: &str = "0.1";
 pub const ROSETTA_VERSION: &str = "1.4.12";
 
@@ -43,6 +47,8 @@ pub struct RosettaContext {
     pub chain_id: ChainId,
     /// Block index cache
     pub block_cache: Option<Arc<BlockRetriever>>,
+    /// Set of supported currencies
+    pub currencies: HashSet<Currency>,
 }
 
 impl RosettaContext {
@@ -50,11 +56,16 @@ impl RosettaContext {
         rest_client: Option<Arc<aptos_rest_client::Client>>,
         chain_id: ChainId,
         block_cache: Option<Arc<BlockRetriever>>,
+        mut currencies: HashSet<Currency>,
     ) -> Self {
+        // Always add APT
+        currencies.insert(native_coin());
+
         RosettaContext {
             rest_client,
             chain_id,
             block_cache,
+            currencies,
         }
     }
 
@@ -123,7 +134,8 @@ pub async fn bootstrap_async(
             ))
         });
 
-        let context = RosettaContext::new(rest_client.clone(), chain_id, block_cache).await;
+        let context =
+            RosettaContext::new(rest_client.clone(), chain_id, block_cache, HashSet::new()).await;
         api.serve(routes(context)).await;
     });
     Ok(handle)
