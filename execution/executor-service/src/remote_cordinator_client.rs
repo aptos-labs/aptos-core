@@ -333,7 +333,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
             drop(bcs_ser_timer);
             info!("Sending results with rand thread: {}", rand_thread);
-            result_tx_clone[rand_thread].lock().unwrap().send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
+            result_tx_clone[rand_thread as usize].lock().unwrap().send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
         });
     }
 
