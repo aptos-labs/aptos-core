@@ -62,12 +62,8 @@ impl GRPCNetworkMessageServiceServerWrapper {
             let server_addr = server_addr.clone();
             let rpc_timeout_ms = rpc_timeout_ms.clone();
             let self_clone = self_arc.clone();
-            std::thread::spawn(move || {
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .block_on(start_async(self_clone, server_addr, rpc_timeout_ms));
+            rt.spawn(async move {
+                    start_async(self_clone, server_addr, rpc_timeout_ms).await;
             });
             // rt.spawn(async move {
             //     Self::start_async(
