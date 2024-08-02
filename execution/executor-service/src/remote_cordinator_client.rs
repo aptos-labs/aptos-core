@@ -322,7 +322,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     // Parallelizes the sending of the result batches to the coordinator.
     fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
         //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
-        let rand_thread = fastrand::i32(..) % self.result_tx.len() as i32;
+        let rand_thread = fastrand::u32(..) % self.result_tx.len() as i32;
         let result_tx_clone = self.result_tx.clone();
         let shard_id_clone = self.shard_id.clone();
         self.result_tx_thread_pool.spawn(move || {
@@ -332,7 +332,6 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             let execute_result_type = format!("execute_result_{}", shard_id_clone);
             let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
             drop(bcs_ser_timer);
-            info!("Sending results with rand thread: {}", rand_thread);
             result_tx_clone[rand_thread as usize].lock().unwrap().send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
         });
     }
