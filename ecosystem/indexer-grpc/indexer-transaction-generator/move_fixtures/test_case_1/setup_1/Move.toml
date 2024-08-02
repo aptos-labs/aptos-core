@@ -1,0 +1,15 @@
+[package]
+name = "setup_1"
+version = "1.0.0"
+authors = []
+
+[addresses]
+setup_1 = "a531b7fdd7917f73ca216d89a8d9ce0cf7e7cfb9086ca6f6cbf9521532748d16"
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]

@@ -2275,6 +2275,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-test-transactions"
+version = "1.0.0"
+dependencies = [
+ "aptos-protos 1.3.1",
+ "serde_json",
+]
+
+[[package]]
+name = "aptos-indexer-transaction-generator"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos",
+ "aptos-config",
+ "aptos-indexer-grpc-utils",
+ "aptos-protos 1.3.1",
+ "clap 4.4.14",
+ "futures",
+ "itertools 0.13.0",
+ "rand 0.7.3",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml 0.7.8",
+ "tonic 0.11.0",
+ "url",
+]
+
+[[package]]
 name = "aptos-infallible"
 version = "0.1.0"
 
