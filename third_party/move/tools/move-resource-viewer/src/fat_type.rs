@@ -50,7 +50,13 @@ pub(crate) struct FatStructType {
     pub name: Identifier,
     pub abilities: WrappedAbilitySet,
     pub ty_args: Vec<FatType>,
-    pub layout: Vec<FatType>,
+    pub layout: FatStructLayout,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) enum FatStructLayout {
+    Singleton(Vec<FatType>),
+    Variants(Vec<Vec<FatType>>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,11 +94,25 @@ impl FatStructType {
                 .iter()
                 .map(|ty| ty.clone_with_limit(limit))
                 .collect::<PartialVMResult<_>>()?,
-            layout: self
-                .layout
-                .iter()
-                .map(|ty| ty.clone_with_limit(limit))
-                .collect::<PartialVMResult<_>>()?,
+            layout: match &self.layout {
+                FatStructLayout::Singleton(fields) => FatStructLayout::Singleton(
+                    fields
+                        .iter()
+                        .map(|ty| ty.clone_with_limit(limit))
+                        .collect::<PartialVMResult<_>>()?,
+                ),
+                FatStructLayout::Variants(variants) => FatStructLayout::Variants(
+                    variants
+                        .iter()
+                        .map(|fields| {
+                            fields
+                                .iter()
+                                .map(|ty| ty.clone_with_limit(limit))
+                                .collect::<PartialVMResult<Vec<_>>>()
+                        })
+                        .collect::<PartialVMResult<_>>()?,
+                ),
+            },
         })
     }
 
@@ -114,11 +134,25 @@ impl FatStructType {
                 .iter()
                 .map(|ty| ty.subst(ty_args, limiter))
                 .collect::<PartialVMResult<_>>()?,
-            layout: self
-                .layout
-                .iter()
-                .map(|ty| ty.subst(ty_args, limiter))
-                .collect::<PartialVMResult<_>>()?,
+            layout: match &self.layout {
+                FatStructLayout::Singleton(fields) => FatStructLayout::Singleton(
+                    fields
+                        .iter()
+                        .map(|ty| ty.subst(ty_args, limiter))
+                        .collect::<PartialVMResult<_>>()?,
+                ),
+                FatStructLayout::Variants(variants) => FatStructLayout::Variants(
+                    variants
+                        .iter()
+                        .map(|fields| {
+                            fields
+                                .iter()
+                                .map(|ty| ty.subst(ty_args, limiter))
+                                .collect::<PartialVMResult<_>>()
+                        })
+                        .collect::<PartialVMResult<_>>()?,
+                ),
+            },
         })
     }
 
@@ -259,7 +293,7 @@ impl From<&StructTag> for FatStructType {
                 .iter()
                 .map(|inner| inner.into())
                 .collect(),
-            layout: vec![], // We can't get field types from struct tag
+            layout: FatStructLayout::Singleton(vec![]), // We can't get field types from struct tag
         }
     }
 }
@@ -268,13 +302,24 @@ impl TryInto<MoveStructLayout> for &FatStructType {
     type Error = PartialVMError;
 
     fn try_into(self) -> Result<MoveStructLayout, Self::Error> {
-        Ok(MoveStructLayout::new(
-            self.layout
-                .iter()
-                .map(|ty| ty.try_into())
-                .collect::<PartialVMResult<Vec<_>>>()?,
-        ))
+        Ok(match &self.layout {
+            FatStructLayout::Singleton(fields) => MoveStructLayout::new(into_types(fields.iter())?),
+            FatStructLayout::Variants(variants) => MoveStructLayout::new_variants(
+                variants
+                    .iter()
+                    .map(|fields| into_types(fields.iter()))
+                    .collect::<PartialVMResult<_>>()?,
+            ),
+        })
     }
+}
+
+fn into_types<'a>(
+    types: impl Iterator<Item = &'a FatType>,
+) -> PartialVMResult<Vec<MoveTypeLayout>> {
+    types
+        .map(|ty| ty.try_into())
+        .collect::<PartialVMResult<Vec<_>>>()
 }
 
 impl TryInto<MoveTypeLayout> for &FatType {
@@ -291,12 +336,7 @@ impl TryInto<MoveTypeLayout> for &FatType {
             FatType::U256 => MoveTypeLayout::U256,
             FatType::Bool => MoveTypeLayout::Bool,
             FatType::Vector(v) => MoveTypeLayout::Vector(Box::new(v.as_ref().try_into()?)),
-            FatType::Struct(s) => MoveTypeLayout::Struct(MoveStructLayout::new(
-                s.layout
-                    .iter()
-                    .map(|ty| ty.try_into())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            )),
+            FatType::Struct(s) => MoveTypeLayout::Struct(s.as_ref().try_into()?),
             FatType::Signer => MoveTypeLayout::Signer,
             FatType::Reference(_) | FatType::MutableReference(_) | FatType::TyParam(_) => {
                 return Err(PartialVMError::new(StatusCode::ABORT_TYPE_MISMATCH_ERROR))

@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    core_mempool::{CoreMempool, MempoolTransaction, SubmittedBy, TimelineState},
+    core_mempool::{sender_bucket, CoreMempool, MempoolTransaction, SubmittedBy, TimelineState},
     network::BroadcastPeerPriority,
     tests::common::{
         add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool,
         setup_mempool_with_broadcast_buckets, txn_bytes_len, TestTransaction,
     },
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{MempoolConfig, NodeConfig};
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -77,7 +77,7 @@ fn test_transaction_metrics() {
         TimelineState::NotReady,
         false,
         None,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     );
     let txn = TestTransaction::new(1, 0, 1).make_signed_transaction();
     mempool.add_txn(
@@ -87,7 +87,7 @@ fn test_transaction_metrics() {
         TimelineState::NonQualified,
         false,
         None,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     );
     let txn = TestTransaction::new(2, 0, 1).make_signed_transaction();
     mempool.add_txn(
@@ -97,7 +97,7 @@ fn test_transaction_metrics() {
         TimelineState::NotReady,
         true,
         None,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     );
 
     // Check timestamp returned as end-to-end for broadcast-able transaction
@@ -364,36 +364,60 @@ fn view(txns: Vec<(SignedTransaction, u64)>) -> Vec<u64> {
 #[test]
 fn test_timeline() {
     let mut pool = setup_mempool().0;
-    add_txns_to_mempool(&mut pool, vec![
+    let txns = add_txns_to_mempool(&mut pool, vec![
         TestTransaction::new(1, 0, 1),
         TestTransaction::new(1, 1, 1),
         TestTransaction::new(1, 3, 1),
         TestTransaction::new(1, 5, 1),
     ]);
+    let sender_bucket = sender_bucket(
+        &txns[0].sender(),
+        MempoolConfig::default().num_sender_buckets,
+    );
 
-    let (timeline, _) =
-        pool.read_timeline(&vec![0].into(), 10, None, BroadcastPeerPriority::Primary);
+    let (timeline, _) = pool.read_timeline(
+        sender_bucket,
+        &vec![0].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
     assert_eq!(view(timeline), vec![0, 1]);
     // Txns 3 and 5 should be in parking lot.
     assert_eq!(2, pool.get_parking_lot_size());
 
     // Add txn 2 to unblock txn3.
     add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 2, 1)]);
-    let (timeline, _) =
-        pool.read_timeline(&vec![0].into(), 10, None, BroadcastPeerPriority::Primary);
+    let (timeline, _) = pool.read_timeline(
+        sender_bucket,
+        &vec![0].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
     assert_eq!(view(timeline), vec![0, 1, 2, 3]);
     // Txn 5 should be in parking lot.
     assert_eq!(1, pool.get_parking_lot_size());
 
     // Try different start read position.
-    let (timeline, _) =
-        pool.read_timeline(&vec![2].into(), 10, None, BroadcastPeerPriority::Primary);
+    let (timeline, _) = pool.read_timeline(
+        sender_bucket,
+        &vec![2].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
     assert_eq!(view(timeline), vec![2, 3]);
 
     // Simulate callback from consensus to unblock txn 5.
     pool.commit_transaction(&TestTransaction::get_address(1), 4);
-    let (timeline, _) =
-        pool.read_timeline(&vec![0].into(), 10, None, BroadcastPeerPriority::Primary);
+    let (timeline, _) = pool.read_timeline(
+        sender_bucket,
+        &vec![0].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
     assert_eq!(view(timeline), vec![5]);
     // check parking lot is empty
     assert_eq!(0, pool.get_parking_lot_size());
@@ -402,15 +426,20 @@ fn test_timeline() {
 #[test]
 fn test_timeline_before() {
     let mut pool = setup_mempool().0;
-    add_txns_to_mempool(&mut pool, vec![
+    let txns = add_txns_to_mempool(&mut pool, vec![
         TestTransaction::new(1, 0, 1),
         TestTransaction::new(1, 1, 1),
         TestTransaction::new(1, 3, 1),
         TestTransaction::new(1, 5, 1),
     ]);
+    let sender_bucket = sender_bucket(
+        &txns[0].sender(),
+        MempoolConfig::default().num_sender_buckets,
+    );
     let insertion_done_time = Instant::now();
 
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0].into(),
         10,
         Some(insertion_done_time - Duration::from_millis(200)),
@@ -419,6 +448,7 @@ fn test_timeline_before() {
     assert!(timeline.is_empty());
 
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0].into(),
         10,
         Some(insertion_done_time),
@@ -427,6 +457,7 @@ fn test_timeline_before() {
     assert_eq!(view(timeline), vec![0, 1]);
 
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0].into(),
         10,
         Some(insertion_done_time + Duration::from_millis(200)),
@@ -438,14 +469,19 @@ fn test_timeline_before() {
 #[test]
 fn test_multi_bucket_timeline() {
     let mut pool = setup_mempool_with_broadcast_buckets(vec![0, 101, 201]).0;
-    add_txns_to_mempool(&mut pool, vec![
+    let txns = add_txns_to_mempool(&mut pool, vec![
         TestTransaction::new(1, 0, 1),   // bucket 0
         TestTransaction::new(1, 1, 100), // bucket 0
         TestTransaction::new(1, 3, 200), // bucket 1
         TestTransaction::new(1, 5, 300), // bucket 2
     ]);
+    let sender_bucket = sender_bucket(
+        &txns[0].sender(),
+        MempoolConfig::default().num_sender_buckets,
+    );
 
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         10,
         None,
@@ -458,6 +494,7 @@ fn test_multi_bucket_timeline() {
     // Add txn 2 to unblock txn3.
     add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 2, 1)]);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         10,
         None,
@@ -469,6 +506,7 @@ fn test_multi_bucket_timeline() {
 
     // Try different start read positions. Expected buckets: [[0, 1, 2], [3], []]
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![1, 0, 0].into(),
         10,
         None,
@@ -476,6 +514,7 @@ fn test_multi_bucket_timeline() {
     );
     assert_eq!(view(timeline), vec![1, 2, 3]);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![2, 0, 0].into(),
         10,
         None,
@@ -483,6 +522,7 @@ fn test_multi_bucket_timeline() {
     );
     assert_eq!(view(timeline), vec![2, 3]);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 1, 0].into(),
         10,
         None,
@@ -490,6 +530,7 @@ fn test_multi_bucket_timeline() {
     );
     assert_eq!(view(timeline), vec![0, 1, 2]);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![1, 1, 0].into(),
         10,
         None,
@@ -497,6 +538,7 @@ fn test_multi_bucket_timeline() {
     );
     assert_eq!(view(timeline), vec![1, 2]);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![2, 1, 0].into(),
         10,
         None,
@@ -504,6 +546,7 @@ fn test_multi_bucket_timeline() {
     );
     assert_eq!(view(timeline), vec![2]);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![3, 0, 0].into(),
         10,
         None,
@@ -511,6 +554,7 @@ fn test_multi_bucket_timeline() {
     );
     assert_eq!(view(timeline), vec![3]);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![3, 1, 0].into(),
         10,
         None,
@@ -520,6 +564,7 @@ fn test_multi_bucket_timeline() {
 
     // Ensure high gas is prioritized.
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         1,
         None,
@@ -530,6 +575,7 @@ fn test_multi_bucket_timeline() {
     // Simulate callback from consensus to unblock txn 5.
     pool.commit_transaction(&TestTransaction::get_address(1), 4);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         10,
         None,
@@ -543,15 +589,20 @@ fn test_multi_bucket_timeline() {
 #[test]
 fn test_multi_bucket_gas_ranking_update() {
     let mut pool = setup_mempool_with_broadcast_buckets(vec![0, 101, 201]).0;
-    add_txns_to_mempool(&mut pool, vec![
+    let txns = add_txns_to_mempool(&mut pool, vec![
         TestTransaction::new(1, 0, 1),   // bucket 0
         TestTransaction::new(1, 1, 100), // bucket 0
         TestTransaction::new(1, 2, 101), // bucket 1
         TestTransaction::new(1, 3, 200), // bucket 1
     ]);
+    let sender_bucket = sender_bucket(
+        &txns[0].sender(),
+        MempoolConfig::default().num_sender_buckets,
+    );
 
     // txn 2 and 3 are prioritized
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         2,
         None,
@@ -560,6 +611,7 @@ fn test_multi_bucket_gas_ranking_update() {
     assert_eq!(view(timeline), vec![2, 3]);
     // read only bucket 2
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![10, 10, 0].into(),
         10,
         None,
@@ -572,6 +624,7 @@ fn test_multi_bucket_gas_ranking_update() {
 
     // txn 2 is now prioritized
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         1,
         None,
@@ -580,6 +633,7 @@ fn test_multi_bucket_gas_ranking_update() {
     assert_eq!(view(timeline), vec![2]);
     // then txn 3 is prioritized
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         2,
         None,
@@ -588,6 +642,7 @@ fn test_multi_bucket_gas_ranking_update() {
     assert_eq!(view(timeline), vec![2, 3]);
     // read only bucket 2
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![10, 10, 0].into(),
         10,
         None,
@@ -596,6 +651,7 @@ fn test_multi_bucket_gas_ranking_update() {
     assert_eq!(view(timeline), vec![2]);
     // read only bucket 1
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![10, 0, 10].into(),
         10,
         None,
@@ -607,14 +663,19 @@ fn test_multi_bucket_gas_ranking_update() {
 #[test]
 fn test_multi_bucket_removal() {
     let mut pool = setup_mempool_with_broadcast_buckets(vec![0, 101, 201]).0;
-    add_txns_to_mempool(&mut pool, vec![
+    let txns = add_txns_to_mempool(&mut pool, vec![
         TestTransaction::new(1, 0, 1),   // bucket 0
         TestTransaction::new(1, 1, 100), // bucket 0
         TestTransaction::new(1, 2, 300), // bucket 2
         TestTransaction::new(1, 3, 200), // bucket 1
     ]);
+    let sender_bucket = sender_bucket(
+        &txns[0].sender(),
+        MempoolConfig::default().num_sender_buckets,
+    );
 
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         10,
         None,
@@ -624,6 +685,7 @@ fn test_multi_bucket_removal() {
 
     pool.commit_transaction(&TestTransaction::get_address(1), 0);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         10,
         None,
@@ -633,6 +695,7 @@ fn test_multi_bucket_removal() {
 
     pool.commit_transaction(&TestTransaction::get_address(1), 1);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         10,
         None,
@@ -642,6 +705,7 @@ fn test_multi_bucket_removal() {
 
     pool.commit_transaction(&TestTransaction::get_address(1), 2);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         10,
         None,
@@ -651,6 +715,7 @@ fn test_multi_bucket_removal() {
 
     pool.commit_transaction(&TestTransaction::get_address(1), 3);
     let (timeline, _) = pool.read_timeline(
+        sender_bucket,
         &vec![0, 0, 0].into(),
         10,
         None,
@@ -724,7 +789,7 @@ fn test_capacity_bytes() {
                 txn.timeline_state,
                 false,
                 None,
-                BroadcastPeerPriority::Primary,
+                Some(BroadcastPeerPriority::Primary),
             );
             assert_eq!(status.code, MempoolStatusCode::Accepted);
         });
@@ -737,7 +802,7 @@ fn test_capacity_bytes() {
                 txn.timeline_state,
                 false,
                 None,
-                BroadcastPeerPriority::Primary,
+                Some(BroadcastPeerPriority::Primary),
             );
             assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
         }
@@ -756,7 +821,7 @@ fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> Mempool
         0,
         SystemTime::now(),
         false,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     )
 }
 
@@ -825,6 +890,8 @@ fn test_gc_ready_transaction() {
 
     // Insert in the middle transaction that's going to be expired.
     let txn = TestTransaction::new(1, 1, 1).make_signed_transaction_with_expiration_time(0);
+    let sender_bucket = sender_bucket(&txn.sender(), MempoolConfig::default().num_sender_buckets);
+
     pool.add_txn(
         txn,
         1,
@@ -832,7 +899,7 @@ fn test_gc_ready_transaction() {
         TimelineState::NotReady,
         false,
         None,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     );
 
     // Insert few transactions after it.
@@ -841,8 +908,13 @@ fn test_gc_ready_transaction() {
     add_txn(&mut pool, TestTransaction::new(1, 3, 1)).unwrap();
 
     // Check that all txns are ready.
-    let (timeline, _) =
-        pool.read_timeline(&vec![0].into(), 10, None, BroadcastPeerPriority::Primary);
+    let (timeline, _) = pool.read_timeline(
+        sender_bucket,
+        &vec![0].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
     assert_eq!(timeline.len(), 4);
 
     // GC expired transaction.
@@ -853,8 +925,13 @@ fn test_gc_ready_transaction() {
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 0);
 
-    let (timeline, _) =
-        pool.read_timeline(&vec![0].into(), 10, None, BroadcastPeerPriority::Primary);
+    let (timeline, _) = pool.read_timeline(
+        sender_bucket,
+        &vec![0].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline[0].0.sequence_number(), 0);
 
@@ -862,8 +939,13 @@ fn test_gc_ready_transaction() {
     add_txn(&mut pool, TestTransaction::new(1, 1, 1)).unwrap();
 
     // Make sure txns 2 and 3 can be broadcast after txn 1 is resubmitted
-    let (timeline, _) =
-        pool.read_timeline(&vec![0].into(), 10, None, BroadcastPeerPriority::Primary);
+    let (timeline, _) = pool.read_timeline(
+        sender_bucket,
+        &vec![0].into(),
+        10,
+        None,
+        BroadcastPeerPriority::Primary,
+    );
     assert_eq!(timeline.len(), 4);
 }
 
@@ -882,7 +964,7 @@ fn test_clean_stuck_transactions() {
         TimelineState::NotReady,
         false,
         None,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     );
     let block = pool.get_batch(1, 1024, true, btreemap![]);
     assert_eq!(block.len(), 1);
@@ -901,7 +983,7 @@ fn test_get_transaction_by_hash() {
         TimelineState::NotReady,
         false,
         None,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     );
     let hash = txn.committed_hash();
     let ret = pool.get_by_hash(hash);
@@ -923,7 +1005,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         TimelineState::NotReady,
         false,
         None,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     );
     let hash = txn.committed_hash();
 
@@ -936,7 +1018,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         TimelineState::NotReady,
         false,
         None,
-        BroadcastPeerPriority::Primary,
+        Some(BroadcastPeerPriority::Primary),
     );
     let new_txn_hash = new_txn.committed_hash();
 

@@ -37,10 +37,6 @@ impl MockBatchRequester {
 
 #[async_trait::async_trait]
 impl QuorumStoreSender for MockBatchRequester {
-    async fn send_batch_request(&self, _request: BatchRequest, _recipients: Vec<Author>) {
-        unimplemented!()
-    }
-
     async fn request_batch(
         &self,
         _request: BatchRequest,
@@ -48,10 +44,6 @@ impl QuorumStoreSender for MockBatchRequester {
         _timeout: Duration,
     ) -> anyhow::Result<BatchResponse> {
         Ok(self.return_value.clone())
-    }
-
-    async fn send_batch(&self, _batch: Batch, _recipients: Vec<Author>) {
-        unimplemented!()
     }
 
     async fn send_signed_batch_info_msg(

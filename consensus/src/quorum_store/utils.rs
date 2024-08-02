@@ -256,6 +256,7 @@ impl ProofQueue {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn batch_summaries_len(&self) -> usize {
         self.batch_summaries.len()
     }
