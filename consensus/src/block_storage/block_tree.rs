@@ -426,7 +426,12 @@ impl BlockTree {
     }
 
     pub(super) fn update_window_root(&mut self, root_id: HashValue) {
-        assert!(self.block_exists(&root_id));
+        assert!(
+            self.block_exists(&root_id),
+            "Block {} not found, previous window_root: {}",
+            root_id,
+            self.window_root_id
+        );
         self.window_root_id = root_id;
     }
 
@@ -530,6 +535,8 @@ impl BlockTree {
         finality_proof: WrappedLedgerInfo,
         commit_decision: LedgerInfoWithSignatures,
     ) {
+        info!("commit_callback blocks_to_commit: {:?}", blocks_to_commit);
+
         let commit_proof = finality_proof
             .create_merged_with_executed_state(commit_decision)
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
@@ -545,6 +552,11 @@ impl BlockTree {
         );
 
         let window_root_id = self.find_window_root(block_to_commit.id());
+        info!(
+            "Window root: {}",
+            self.get_block(&window_root_id)
+                .expect("Window root must exist")
+        );
         let ids_to_remove = self.find_blocks_to_prune(window_root_id);
         info!("Pruning blocks: {:?}", ids_to_remove);
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
