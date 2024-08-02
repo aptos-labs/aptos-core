@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::keyless::Groth16Proof;
 use ark_ec::Group;
 use ark_groth16::{prepare_verifying_key, Groth16};
 use ark_crypto_primitives::snark::SNARK;
@@ -215,7 +216,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         public_inputs: &[E::ScalarField],
         pk: &Trapdoor<E>,
         rng: &mut impl Rng,
-    ) -> R1CSResult<Proof<E>>
+    ) -> Result<Proof<E>, SynthesisError> //R1CSResult<Proof<E>>
     where
     {
         let a = Self::generate_random_scalar(rng);
@@ -230,7 +231,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         a: E::ScalarField,
         b: E::ScalarField,
         input_assignment: &[E::ScalarField],
-    ) -> R1CSResult<Proof<E>> {
+    ) -> Result<Proof<E>, SynthesisError> {//R1CSResult<Proof<E>> {
         let public_inputs = input_assignment;
         let mut g_ic = pk.gamma_abc_g1[0].into_group();
         for (i, b) in public_inputs.iter().zip(pk.gamma_abc_g1.iter().skip(1)) {
