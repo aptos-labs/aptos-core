@@ -114,6 +114,8 @@ module supra_framework::pbo_delegation_pool {
     use std::features;
     use std::signer;
     use std::vector;
+    use std::option::{Self,Option};
+    use std::fixed_point32::{Self,FixedPoint32};
 
     use aptos_std::math64;
     use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
@@ -130,6 +132,8 @@ module supra_framework::pbo_delegation_pool {
     use supra_framework::stake::{Self, get_operator};
     use supra_framework::staking_config;
     use supra_framework::timestamp;
+    use supra_framework::multisig_account;
+
 
     const MODULE_SALT: vector<u8> = b"supra_framework::pbo_delegation_pool";
 
@@ -203,17 +207,48 @@ module supra_framework::pbo_delegation_pool {
     const ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED: u64 = 22;
 
     /// Vector length is not the same.
-    const VECTOR_LENGTH_NOT_SAME:u64 = 23;
+    const EVECTOR_LENGTH_NOT_SAME:u64 = 23;
 
     /// Coin value is not the same with principle stake.
-    const COIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE:u64 = 24;
+    const ECOIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE:u64 = 24;
 
-    /// Balance below principle stake after unlock
-    const BALANCE_BELOW_PRINCIPLE_STAKE:u64 = 25;
+    /// Requested amount too high, the balance would fall below principle stake after unlock
+    const EAMOUNT_REQUESTED_NOT_UNLOCKABLE: u64 = 25;
 
     /// Active share is not the same in stake pool and delegation pool
-    const ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL:u64 = 26;
+    const EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL:u64 = 26;
+    
+    /// Provided admin address is not a multisig account
+    const EADMIN_NOT_MULTISIG: u64 = 27;
+    
+    /// Delegator address does not exist in pool tables
+    const EDELEGATOR_DOES_NOT_EXIST: u64 = 28;
 
+    ///Pool unlock time in past
+    const ESTARTUP_TIME_IN_PAST: u64 = 29;
+    
+    //Pool unlock schedule is empty
+    const EEMPTY_UNLOCK_SCHEDULE: u64 = 30;
+
+    //Pool unlock schedule has a zero fraction
+    const ESCHEDULE_WITH_ZERO_FRACTION: u64 = 31;
+    
+
+    //Pool unlock has zero period duration
+    const EPERIOD_DURATION_IS_ZERO: u64 = 32;
+    
+    // Zero denominator in unlock schedule
+    const EDENOMINATOR_IS_ZERO: u64 = 33;
+
+    // Sum of numerators must be less than denominator
+    const ENUMERATORS_GRATER_THAN_DENOMINATOR: u64 = 34;
+    
+    const EADMIN_ADDRESS_CANNOT_BE_ZERO: u64 = 35;
+
+    const ENOT_AUTHORIZED: u64 = 36; 
+    
+    const ENEW_IS_SAME_AS_OLD_DELEGATOR: u64 = 37;
+    
     const MAX_U64: u64 = 18446744073709551615;
 
     /// Maximum operator percentage fee(of double digit precision): 22.85% is represented as 2285
@@ -251,7 +286,26 @@ module supra_framework::pbo_delegation_pool {
         index: u64,
     }
 
+    struct UnlockSchedule has copy, drop, store {
+        // The vesting schedule as a list of fractions that vest for each period. The last number is repeated until the
+        // vesting amount runs out.
+        // For example [1/24, 1/24, 1/48] with a period of 1 month means that after vesting starts, the first two months
+        // will vest 1/24 of the original total amount. From the third month only, 1/48 will vest until the vesting fund
+        // runs out.
+        // u32/u32 should be sufficient to support vesting schedule fractions.
+        schedule: vector<FixedPoint32>,
+        // When the vesting should start.
+        start_timestamp_secs: u64,
+        // In seconds. How long each vesting period is. For example 1 month.
+        period_duration: u64,
+        // Last vesting period, 1-indexed. For example if 2 months have passed, the last vesting period, if distribution
+        // was requested, would be 2. Default value is 0 which means there have been no vesting periods yet.
+        last_unlock_period: u64,
+        cumulative_unlocked_fraction: FixedPoint32,
+    }
     struct DelegationPool has key {
+
+        multisig_admin: Option<address>,
         // Shares pool of `active` + `pending_active` stake
         active_shares: pool_u64::Pool,
         // Index of current observed lockup cycle on the delegation pool since its creation
@@ -267,8 +321,8 @@ module supra_framework::pbo_delegation_pool {
         total_coins_inactive: u64,
         // Commission fee paid to the node operator out of pool rewards
         operator_commission_percentage: u64,
-        // Timestamp in future, which is the same for everyone
-        principle_lockup_time:u64,
+        // Unlock schedule for principle/initial stake, same for everyone
+        principle_unlock_schedule:UnlockSchedule,
         // From shareholders to their initial stake
         principle_stake: Table<address, u64>,
         // The events emitted by stake-management operations on the delegation pool
@@ -381,6 +435,14 @@ module supra_framework::pbo_delegation_pool {
         commission_active: u64,
         commission_pending_inactive: u64,
     }
+    
+    #[event]
+    struct DelegatorReplacemendEvent has drop,store {
+        pool_address: address,
+        old_delegator: address,
+        new_delegator: address,
+    }
+    
 
     struct VoteEvent has drop, store {
         voter: address,
@@ -675,34 +737,57 @@ module supra_framework::pbo_delegation_pool {
         let config = staking_config::get();
         staking_config::get_recurring_lockup_duration(&config) / 4
     }
-
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
     /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
     /// to host the delegation pool resource and own the underlying stake pool.
     /// Ownership over setting the operator/voter is granted to `owner` who has both roles initially.
     public fun initialize_delegation_pool(
         owner: &signer,
+        multisig_admin: option::Option<address>,
         operator_commission_percentage: u64,
         delegation_pool_creation_seed: vector<u8>,
         delegator_address: vector<address>,
         principle_stake: vector<u64>,
         coin: Coin<SupraCoin>,
-        principle_lockup_time: u64,
+        unlock_numerators: vector<u64>,
+        unlock_denominator: u64,
+        unlock_start_time: u64,
+        unlock_duration: u64,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        
+        //if there is an admin, it must be a multisig
+        if (option::is_some<address>(&multisig_admin)) {
+            // `ms_admin` is guaranteed to be NOT `@0x0` here
+            let ms_admin = option::get_with_default<address>(&multisig_admin,@0x0);
+            assert!(ms_admin!=@0x0,error::invalid_argument(EADMIN_ADDRESS_CANNOT_BE_ZERO));
+            assert!(multisig_account::num_signatures_required(ms_admin)>=2,EADMIN_NOT_MULTISIG);            
+        };
         // fail if the length of delegator_address and principle_stake is not the same
-        assert!(vector::length(&delegator_address) == vector::length(&principle_stake), error::invalid_argument(VECTOR_LENGTH_NOT_SAME));
+        assert!(vector::length(&delegator_address) == vector::length(&principle_stake), error::invalid_argument(EVECTOR_LENGTH_NOT_SAME));
+        //Delegation pool must be enabled
         assert!(features::delegation_pools_enabled(), error::invalid_state(EDELEGATION_POOLS_DISABLED));
+        //Unlock start time can not be in the past
+        assert!(unlock_start_time>=timestamp::now_seconds(),error::invalid_argument(ESTARTUP_TIME_IN_PAST));
+        //Unlock duration can not be zero
+        assert!(unlock_duration>0,error::invalid_argument(EPERIOD_DURATION_IS_ZERO));
+        //Fraction denominator can not be zero
+        assert!(unlock_denominator!=0,error::invalid_argument(EDENOMINATOR_IS_ZERO));
+        //Fraction numerators can not be empty
+        assert!(vector::length(&unlock_numerators)>0,error::invalid_argument(EEMPTY_UNLOCK_SCHEDULE)); 
+        //Fraction numerators can not be zero
+        assert!(!vector::any(&unlock_numerators,|e|{*e==0}),error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION));
+
+        let sum = vector::foldr(unlock_numerators,0,|e,a|{e+a});
+        //Sum of numerators can not be greater than denominators
+        assert!(sum <= unlock_denominator,error::invalid_argument(ENUMERATORS_GRATER_THAN_DENOMINATOR));
+
         let owner_address = signer::address_of(owner);
         assert!(!owner_cap_exists(owner_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
         assert!(operator_commission_percentage <= MAX_FEE, error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE));
-        let sum = 0;
-        let index = 0;
-        while (index < vector::length(&principle_stake)) {
-            sum = sum + *vector::borrow(&principle_stake, index);
-            index = index + 1;
-        };
-        // fail if the value of coin and the sum of principle_stake is not the same
-        assert!(coin::value(&coin) == sum, error::invalid_argument(COIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE));
+
+        let sum = vector::fold(principle_stake,0,|a,e|{a+e});
+       // fail if the value of coin and the sum of principle_stake is not the same
+        assert!(coin::value(&coin) == sum, error::invalid_state(ECOIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE));
         // generate a seed to be used to create the resource account hosting the delegation pool
         let seed = create_resource_account_seed(delegation_pool_creation_seed);
 
@@ -712,6 +797,7 @@ module supra_framework::pbo_delegation_pool {
         // stake_pool_signer will be owner of the stake pool and have its `stake::OwnerCapability`
         let pool_address = signer::address_of(&stake_pool_signer);
         stake::initialize_stake_owner(&stake_pool_signer, 0, owner_address, owner_address);
+        coin::deposit(pool_address, coin);
 
         let inactive_shares = table::new<ObservedLockupCycle, pool_u64::Pool>();
         table::add(
@@ -719,7 +805,6 @@ module supra_framework::pbo_delegation_pool {
             olc_with_index(0),
             pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR)
         );
-        coin::deposit(pool_address, coin);
 
         let delegator_address_copy = copy delegator_address;
         let principle_stake_copy = copy principle_stake;
@@ -731,8 +816,17 @@ module supra_framework::pbo_delegation_pool {
             let stake = vector::pop_back(&mut principle_stake);
             table::add(&mut principle_stake_table, delegator, stake);
         };
+        
 
-        move_to(&stake_pool_signer, DelegationPool {
+        //Create unlock schedule
+        let schedule = vector::empty();
+        vector::for_each_ref(&unlock_numerators,|e|{
+            let fraction = fixed_point32::create_from_rational(*e,unlock_denominator);
+            vector::push_back(&mut schedule,fraction);
+        });
+        
+            move_to(&stake_pool_signer, DelegationPool {
+            multisig_admin: multisig_admin,
             active_shares: pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR),
             observed_lockup_cycle: olc_with_index(0),
             inactive_shares,
@@ -740,7 +834,13 @@ module supra_framework::pbo_delegation_pool {
             stake_pool_signer_cap,
             total_coins_inactive: 0,
             operator_commission_percentage,
-            principle_lockup_time,
+            principle_unlock_schedule: UnlockSchedule{ 
+                schedule: schedule,
+                start_timestamp_secs: unlock_start_time,
+                period_duration: unlock_duration,
+                last_unlock_period: 0,
+                cumulative_unlocked_fraction: fixed_point32::create_from_rational(0,1),
+            },
             principle_stake: principle_stake_table,
             add_stake_events: account::new_event_handle<AddStakeEvent>(&stake_pool_signer),
             reactivate_stake_events: account::new_event_handle<ReactivateStakeEvent>(&stake_pool_signer),
@@ -760,11 +860,17 @@ module supra_framework::pbo_delegation_pool {
         };
         let (active_stake, _, _, _)= stake::get_stake(pool_address);
         // fail if coin in StakePool.active does not match with the balance in active_shares pool.
-        assert!( active_stake == pool_u64::total_coins(&borrow_global<DelegationPool>(pool_address).active_shares), error::invalid_state(ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL));
+        assert!( active_stake == pool_u64::total_coins(&borrow_global<DelegationPool>(pool_address).active_shares), error::invalid_state(EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL));
         // All delegation pool enable partial governace voting by default once the feature flag is enabled.
         if (features::partial_governance_voting_enabled() && features::delegation_pool_partial_governance_voting_enabled()) {
             enable_partial_governance_voting(pool_address);
         }
+    }
+    
+    #[view]
+    public fun get_admin(pool_address: address): option::Option<address> acquires DelegationPool
+    {
+            return borrow_global<DelegationPool>(pool_address).multisig_admin
     }
 
     #[view]
@@ -776,6 +882,7 @@ module supra_framework::pbo_delegation_pool {
             operator
         }
     }
+
 
     /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
     /// THe existing voter will be replaced. The function is permissionless.
@@ -1294,6 +1401,162 @@ module supra_framework::pbo_delegation_pool {
             },
         );
     }
+    
+    fun replace_in_smart_tables<Key: copy+drop,Val>(table: &mut SmartTable<Key,Val>,old_entry: Key, new_entry: Key) {
+        if(smart_table::contains(table,old_entry)) {
+            let val = smart_table::remove(table,old_entry);
+            smart_table::add(table,new_entry,val);
+        }
+    }
+    ///CAUTION: This is to be used only in the rare circumstances where multisig_admin is convinced that a delegator was the
+    /// rightful owner of `old_delegator` but has lost access and the delegator is also the rightful
+    /// owner of `new_delegator` , Only for those stakeholders which were added at the time of creation
+    /// This does not apply to anyone who added stake later or operator
+    public entry fun replace_delegator(multisig_admin: &signer, pool_address: address, 
+                                        old_delegator: address, 
+                                        new_delegator: address) acquires DelegationPool, GovernanceRecords
+    {
+    
+    //Ensure replacement address is different
+    assert!(old_delegator!=new_delegator,error::invalid_argument(ENEW_IS_SAME_AS_OLD_DELEGATOR));
+    //Ensure it is a valid `pool_addres`
+    assert!(exists<DelegationPool>(pool_address),error::invalid_argument(EDELEGATION_POOL_DOES_NOT_EXIST));
+
+    let pool: &mut DelegationPool = borrow_global_mut<DelegationPool>(pool_address);
+    let admin_addr = signer::address_of(multisig_admin);
+    //Ensure that authorized admin is calling
+    assert!(admin_addr==option::get_with_default(&pool.multisig_admin,@0x0),error::permission_denied(ENOT_AUTHORIZED));
+    
+    //Ensure `old_delegator` is part of original principle stakers before commencing the replacement
+    assert!(table::contains(&pool.principle_stake,old_delegator),error::unavailable(EDELEGATOR_DOES_NOT_EXIST));
+    
+    //replace in `active_shares` pool
+    {
+    let active_pool = &mut pool.active_shares;
+    let active_shares = pool_u64::shares(active_pool,old_delegator);
+    pool_u64::transfer_shares(active_pool,old_delegator,new_delegator,active_shares);
+    };
+
+    //replace in `inactive_shares` pool
+    let (withdrawal_exists,withdrawal_olc) = pending_withdrawal_exists(pool,old_delegator);
+    if(withdrawal_exists)    {
+        let inactive_pool = table::borrow_mut(&mut pool.inactive_shares,withdrawal_olc);
+        let inactive_shares = pool_u64::shares(inactive_pool,old_delegator);
+        pool_u64::transfer_shares(inactive_pool,old_delegator,new_delegator,inactive_shares);
+        
+
+        //replace in `pending_withdrawals`
+        {
+        let pending_withdrawals = &mut pool.pending_withdrawals;
+        let val = table::remove(pending_withdrawals,old_delegator);
+        table::add(pending_withdrawals,new_delegator,val);
+        };
+        
+        event::emit(DelegatorReplacemendEvent{pool_address,old_delegator,new_delegator},);
+
+    };
+    
+
+    //replace in governance records
+    {
+        if(features::partial_governance_voting_enabled()) {
+        let grecords = borrow_global_mut<GovernanceRecords>(pool_address);
+        replace_in_smart_tables(&mut grecords.vote_delegation,old_delegator,new_delegator);
+        replace_in_smart_tables(&mut grecords.delegated_votes,old_delegator,new_delegator);
+        let old_keys: vector<VotingRecordKey> = vector::empty();
+        let new_keys: vector<VotingRecordKey> = vector::empty();
+        smart_table::for_each_ref<VotingRecordKey,u64>(&grecords.votes,
+                                                    |key,_val|{
+        let VotingRecordKey { voter, proposal_id} = *key;
+        if(voter==old_delegator) {
+            vector::push_back(&mut new_keys,VotingRecordKey{voter:new_delegator,proposal_id:proposal_id});
+            vector::push_back(&mut old_keys,*key);
+        };
+
+        });
+        
+      vector::zip_ref(&old_keys,&new_keys,|old,new| {
+        replace_in_smart_tables(&mut grecords.votes,*old,*new);
+       });    }
+    };
+    // replace in principle_stake table
+    {
+        let val = table::remove(&mut pool.principle_stake,old_delegator);
+        table::add(&mut pool.principle_stake,new_delegator,val);
+    }
+        
+    
+    }
+
+#[view]
+public fun fixed_point32_add(a: FixedPoint32, b: FixedPoint32) : FixedPoint32 {
+    fixed_point32::create_from_raw_value(fixed_point32::get_raw_value(a) + fixed_point32::get_raw_value(b))
+}
+
+#[view]
+    /// Provides how much amount is unlockable based on `principle_unlock_schedule.cumulative_unlocked_fraction`
+    /// Note that `cumulative_unlocked_fraction` is not updated in this function so the information may not be
+    /// accurate as time passes
+    public fun cached_unlockable_balance(delegator_addr: address, pool_addr: address): u64 acquires DelegationPool {
+        assert!(exists<DelegationPool>(pool_addr),error::invalid_argument(EDELEGATION_POOL_DOES_NOT_EXIST));
+        let pool = borrow_global<DelegationPool>(pool_addr);
+        let delegator_active_balance = pool_u64::balance(&pool.active_shares,delegator_addr);
+        let unlockable_fraction = pool.principle_unlock_schedule.cumulative_unlocked_fraction;
+        let delegator_principle_stake = *table::borrow(&pool.principle_stake,delegator_addr);
+        
+        //To avoid problem even if fraction is slightly above 1
+        let unlockable_principle_stake = math64::min(fixed_point32::multiply_u64(delegator_principle_stake,unlockable_fraction),delegator_principle_stake);
+        let locked_amount = delegator_principle_stake - unlockable_principle_stake;
+        
+        assert!(delegator_active_balance>=locked_amount,error::invalid_state(EDELEGATOR_ACTIVE_BALANCE_TOO_LOW));
+        delegator_active_balance-locked_amount
+
+    }
+
+    public fun can_principle_unlock(delegator_addr: address, pool_address: address, amount: u64) : bool acquires DelegationPool
+    {
+
+        let principle_stake_table = &borrow_global<DelegationPool>(pool_address).principle_stake;
+        
+            if(!table::contains(principle_stake_table,delegator_addr)) { 
+                return true
+            };
+
+        let unlock_schedule = &mut borrow_global_mut<DelegationPool>(pool_address).principle_unlock_schedule;
+        
+        if (unlock_schedule.start_timestamp_secs > timestamp::now_seconds()) {
+            let unlockable_amount = cached_unlockable_balance(delegator_addr,pool_address);     
+            return amount<=unlockable_amount
+        };
+        
+
+        //subtraction safety due to check above
+        let unlock_periods_passed = (timestamp::now_seconds()-unlock_schedule.start_timestamp_secs)/unlock_schedule.period_duration;
+        let last_unlocked_period = unlock_schedule.last_unlock_period;
+        let schedule_length = vector::length(&unlock_schedule.schedule);
+        let cfraction = fixed_point32::create_from_rational(0,1);
+        while(last_unlocked_period < unlock_periods_passed)
+        {
+            let next_fraction = 
+            if(schedule_length > last_unlocked_period ) {
+                *vector::borrow(&unlock_schedule.schedule,schedule_length-1)
+            }
+            else {
+                *vector::borrow(&unlock_schedule.schedule,last_unlocked_period)
+            };
+            cfraction = fixed_point32_add(cfraction,next_fraction);
+
+             
+            last_unlocked_period = last_unlocked_period+1;
+        }; 
+        
+        unlock_schedule.last_unlock_period = unlock_periods_passed; 
+        let unlockable_amount = cached_unlockable_balance(delegator_addr,pool_address);
+        amount<=unlockable_amount
+        
+            
+        
+    }
 
     /// Unlock `amount` from the active + pending_active stake of `delegator` or
     /// at most how much active stake there is on the stake pool.
@@ -1307,12 +1570,10 @@ module supra_framework::pbo_delegation_pool {
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
 
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
         // fail if the amount after withdraw is less than the principle stake and the lockup time is not expired
-        if (table::contains(&pool.principle_stake, delegator_address) && pool.principle_lockup_time > timestamp::now_seconds()) {
-            assert!(pool_u64::balance(&pool.active_shares,delegator_address) - amount >= *table::borrow(&pool.principle_stake, delegator_address), error::invalid_argument(BALANCE_BELOW_PRINCIPLE_STAKE));
-        };
+        assert!(can_principle_unlock(delegator_address,pool_address,amount),error::invalid_argument(EAMOUNT_REQUESTED_NOT_UNLOCKABLE));
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
         amount = coins_to_transfer_to_ensure_min_stake(
             &pool.active_shares,
             pending_inactive_shares_pool(pool),
@@ -1334,7 +1595,7 @@ module supra_framework::pbo_delegation_pool {
             },
         );
         let (active_stake, _, pending_active, _)= stake::get_stake(pool_address);
-        assert!( active_stake + pending_active == pool_u64::total_coins(&pool.active_shares), error::invalid_state(ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL));
+        assert!( active_stake + pending_active == pool_u64::total_coins(&pool.active_shares), error::invalid_state(EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL));
     }
 
     /// Move `amount` of coins from pending_inactive to active.

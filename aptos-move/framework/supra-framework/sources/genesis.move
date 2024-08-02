@@ -2,6 +2,7 @@ module supra_framework::genesis {
     use std::error;
     use std::fixed_point32;
     use std::vector;
+    use std::option;
 
     use aptos_std::simple_map;
     use supra_framework::aptos_account;
@@ -103,7 +104,16 @@ module supra_framework::genesis {
 
     struct PboDelegatorConfiguration has copy, drop {
         delegator_config: DelegatorConfiguration,
-        principle_lockup_time: u64,
+        //Address of the multisig admin of the pool
+        multisig_admin: address,
+        //Numerator for unlock fraction
+        unlock_schedule_numerators: vector<u64>,
+        //Denominator for unlock fraction
+        unlock_schedule_denominator: u64,
+        //Time from `timestamp::now_seconds()` to start unlocking schedule
+        unlock_startup_time_from_now: u64,
+        //Time for each unlock
+        unlock_period_duration: u64,
     }
 
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
@@ -502,12 +512,16 @@ module supra_framework::genesis {
         });
         pbo_delegation_pool::initialize_delegation_pool(
             &owner_signer,
+            option::some(pbo_delegator_config.multisig_admin),
             pbo_delegator_config.delegator_config.validator.commission_percentage,
             pbo_delegator_config.delegator_config.delegation_pool_creation_seed,
             pbo_delegator_config.delegator_config.delegator_addresses,
             pbo_delegator_config.delegator_config.delegator_stakes,
             coinInitialization,
-            pbo_delegator_config.principle_lockup_time,
+            pbo_delegator_config.unlock_schedule_numerators,
+            pbo_delegator_config.unlock_schedule_denominator,
+            pbo_delegator_config.unlock_startup_time_from_now+timestamp::now_seconds(),
+            pbo_delegator_config.unlock_period_duration,
         );
 
         let pool_address = pbo_delegation_pool::get_owned_pool_address(pbo_delegator_config.delegator_config.owner_address);
