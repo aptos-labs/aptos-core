@@ -1450,6 +1450,7 @@ dependencies = [
  "crossbeam-channel",
  "ctrlc",
  "dashmap",
+ "fastrand 2.0.1",
  "itertools 0.12.1",
  "num_cpus",
  "once_cell",
