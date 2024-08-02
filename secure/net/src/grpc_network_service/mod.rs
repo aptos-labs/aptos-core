@@ -19,11 +19,13 @@ use std::{
 use std::sync::RwLock;
 use std::time::{Duration, SystemTime};
 use tokio::{runtime::Runtime, sync::oneshot};
+use tokio::net::TcpListener;
 use tokio::time::timeout;
 use tonic::{
     transport::{Channel, Server},
     Request, Response, Status,
 };
+use tonic::codegen::tokio_stream;
 use crate::network_controller::metrics::{REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER, REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER};
 
 const MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 80;
@@ -54,10 +56,33 @@ impl GRPCNetworkMessageServiceServerWrapper {
         rpc_timeout_ms: u64,
         server_shutdown_rx: oneshot::Receiver<()>,
     ) {
-        rt.spawn(async move {
-            self.start_async(server_addr, rpc_timeout_ms, server_shutdown_rx)
-                .await;
-        });
+        let self_arc = Arc::new(self);
+        for _ in 0..rt.metrics().num_workers() {
+            let inbound_handlers = self_arc.inbound_handlers.clone();
+            let server_addr = server_addr.clone();
+            let rpc_timeout_ms = rpc_timeout_ms.clone();
+            let self_clone = self_arc.clone();
+            std::thread::spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(start_async(self_clone, server_addr, rpc_timeout_ms));
+            });
+            // rt.spawn(async move {
+            //     Self::start_async(
+            //         GRPCNetworkMessageServiceServerWrapper::new(inbound_handlers, server_addr),
+            //         server_addr,
+            //         rpc_timeout_ms,
+            //         server_shutdown_rx,
+            //     )
+            //     .await;
+            // });
+        }
+        // rt.block_on(
+        //     self.start_async(server_addr, rpc_timeout_ms, server_shutdown_rx)
+        //         //.await;
+        // );
     }
 
     async fn start_async(
@@ -71,6 +96,24 @@ impl GRPCNetworkMessageServiceServerWrapper {
             .build()
             .unwrap();
 
+        let sock = socket2::Socket::new(
+            match server_addr {
+                SocketAddr::V4(_) => socket2::Domain::IPV4,
+                SocketAddr::V6(_) => socket2::Domain::IPV6,
+            },
+            socket2::Type::STREAM,
+            None,
+        ).unwrap();
+
+        sock.set_reuse_address(true).unwrap();
+        sock.set_reuse_port(true).unwrap();
+        sock.set_nonblocking(true).unwrap();
+        sock.bind(&server_addr.into()).unwrap();
+        sock.listen(8192).unwrap();
+
+        let incoming =
+            tokio_stream::wrappers::TcpListenerStream::new(TcpListener::from_std(sock.into()).unwrap());
+
         info!("Starting Server async at {:?}", server_addr);
         // NOTE: (1) serve_with_shutdown() starts the server, if successful the task does not return
         //           till the server is shutdown. Hence this should be called as a separate
@@ -78,20 +121,76 @@ impl GRPCNetworkMessageServiceServerWrapper {
         //           the server
         //       (2) There is no easy way to know if/when the server has started successfully. Hence
         //           we may need to implement a healthcheck service to check if the server is up
+
+
         Server::builder()
             .timeout(std::time::Duration::from_millis(rpc_timeout_ms))
             .add_service(
                 NetworkMessageServiceServer::new(self).max_decoding_message_size(MAX_MESSAGE_SIZE),
             )
             .add_service(reflection_service)
-            .serve_with_shutdown(server_addr, async {
-                server_shutdown_rx.await.ok();
-                info!("Received signal to shutdown server at {:?}", server_addr);
-            })
+            .serve_with_incoming(incoming)
+            // .serve_with_shutdown(server_addr, async {
+            //     server_shutdown_rx.await.ok();
+            //     info!("Received signal to shutdown server at {:?}", server_addr);
+            // })
             .await
             .unwrap();
         info!("Server shutdown at {:?}", server_addr);
     }
+}
+
+async fn start_async(
+    grpc_wrapper: Arc<GRPCNetworkMessageServiceServerWrapper>,
+    server_addr: SocketAddr,
+    rpc_timeout_ms: u64,
+) {
+    let reflection_service = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
+        .build()
+        .unwrap();
+
+    let sock = socket2::Socket::new(
+        match server_addr {
+            SocketAddr::V4(_) => socket2::Domain::IPV4,
+            SocketAddr::V6(_) => socket2::Domain::IPV6,
+        },
+        socket2::Type::STREAM,
+        None,
+    ).unwrap();
+
+    sock.set_reuse_address(true).unwrap();
+    sock.set_reuse_port(true).unwrap();
+    sock.set_nonblocking(true).unwrap();
+    sock.bind(&server_addr.into()).unwrap();
+    sock.listen(8192).unwrap();
+
+    let incoming =
+        tokio_stream::wrappers::TcpListenerStream::new(TcpListener::from_std(sock.into()).unwrap());
+
+    info!("Starting Server async at {:?}", server_addr);
+    // NOTE: (1) serve_with_shutdown() starts the server, if successful the task does not return
+    //           till the server is shutdown. Hence this should be called as a separate
+    //           non-blocking task. Signal handler 'server_shutdown_rx' is needed to shutdown
+    //           the server
+    //       (2) There is no easy way to know if/when the server has started successfully. Hence
+    //           we may need to implement a healthcheck service to check if the server is up
+
+
+    Server::builder()
+        .timeout(std::time::Duration::from_millis(rpc_timeout_ms))
+        .add_service(
+            NetworkMessageServiceServer::from_arc(grpc_wrapper).max_decoding_message_size(MAX_MESSAGE_SIZE),
+        )
+        .add_service(reflection_service)
+        .serve_with_incoming(incoming)
+        // .serve_with_shutdown(server_addr, async {
+        //     server_shutdown_rx.await.ok();
+        //     info!("Received signal to shutdown server at {:?}", server_addr);
+        // })
+        .await
+        .unwrap();
+    info!("Server shutdown at {:?}", server_addr);
 }
 
 #[tonic::async_trait]

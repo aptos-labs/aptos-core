@@ -3496,6 +3496,7 @@ dependencies = [
  "crossbeam-channel",
  "once_cell",
  "serde",
+ "socket2 0.5.5",
  "thiserror",
  "tokio",
  "tonic 0.11.0",
