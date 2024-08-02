@@ -20,7 +20,7 @@ pub mod metrics;
 mod page;
 mod response;
 pub mod runtime;
-mod set_failpoints;
+pub mod set_failpoints;
 pub mod state;
 #[cfg(test)]
 pub mod tests;
