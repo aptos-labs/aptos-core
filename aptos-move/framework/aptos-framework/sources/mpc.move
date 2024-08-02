@@ -149,6 +149,14 @@ module aptos_framework::mpc {
     fun publish_reconfig_work_result(trx: vector<u8>) acquires State {
         debug::print(&utf8(b"0720 - publish_reconfig_work_result: begin"));
         let state = borrow_global_mut<State>(@aptos_framework);
+        if (vector::length(&state.shared_secrets) == 0) {
+            debug::print(&utf8(b"0720 - publish_reconfig_work_result: we will have a new secret."));
+            let secret_state = SharedSecretState {
+                transcript_for_next_epoch: option::none(),
+                transcript_for_cur_epoch: option::none(),
+            };
+            vector::push_back(&mut state.shared_secrets, secret_state);
+        };
         let secret_state = vector::borrow_mut(&mut state.shared_secrets, 0);
         if (option::is_none(&secret_state.transcript_for_next_epoch)) {
             debug::print(&utf8(b"0720 - publish_reconfig_work_result: apply"));

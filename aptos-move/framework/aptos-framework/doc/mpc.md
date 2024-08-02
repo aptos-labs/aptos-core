@@ -519,6 +519,14 @@ When a MPC task is done, this is invoked by validator transactions.
 <pre><code><b>fun</b> <a href="mpc.md#0x1_mpc_publish_reconfig_work_result">publish_reconfig_work_result</a>(trx: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="mpc.md#0x1_mpc_State">State</a> {
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_reconfig_work_result: begin"));
     <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&state.shared_secrets) == 0) {
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_reconfig_work_result: we will have a new secret."));
+        <b>let</b> secret_state = <a href="mpc.md#0x1_mpc_SharedSecretState">SharedSecretState</a> {
+            transcript_for_next_epoch: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+            transcript_for_cur_epoch: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        };
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> state.shared_secrets, secret_state);
+    };
     <b>let</b> secret_state = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> state.shared_secrets, 0);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&secret_state.transcript_for_next_epoch)) {
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_reconfig_work_result: <b>apply</b>"));
