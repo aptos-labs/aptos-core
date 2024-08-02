@@ -4,7 +4,6 @@
 //! This module contains setup for basic block peephole optimizers.
 
 use move_binary_format::file_format::Bytecode;
-use std::mem;
 
 /// A basic block optimizer that optimizes a basic block of bytecode.
 pub trait BasicBlockOptimizer {
@@ -31,8 +30,8 @@ impl<T: FixedWindowOptimizer> BasicBlockOptimizer for FixedWindowProcessor<T> {
     fn optimize(&self, block: &[Bytecode]) -> Vec<Bytecode> {
         let mut old_block = block.to_vec();
         // Run single passes until code stops changing.
-        while let Some(mut new_block) = self.optimize_single_pass(&old_block) {
-            old_block = mem::take(&mut new_block);
+        while let Some(new_block) = self.optimize_single_pass(&old_block) {
+            old_block = new_block;
         }
         old_block
     }
