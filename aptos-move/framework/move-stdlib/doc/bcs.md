@@ -11,11 +11,13 @@ details on BCS.
 
 -  [Function `to_bytes`](#0x1_bcs_to_bytes)
 -  [Function `serialized_size`](#0x1_bcs_serialized_size)
+-  [Function `serialized_size_impl`](#0x1_bcs_serialized_size_impl)
 -  [Specification](#@Specification_0)
     -  [Function `serialized_size`](#@Specification_0_serialized_size)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="features.md#0x1_features">0x1::features</a>;
+</code></pre>
 
 
 
@@ -60,7 +62,35 @@ Aborts with <code>0x1c5</code> error code if there is a failure when calculating
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialized_size">serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64;
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialized_size">serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64 {
+    <b>if</b> (<a href="features.md#0x1_features_use_bcs_serialized_size_feature">features::use_bcs_serialized_size_feature</a>()) {
+        <a href="bcs.md#0x1_bcs_serialized_size_impl">serialized_size_impl</a>(v)
+    } <b>else</b> {
+        <a href="vector.md#0x1_vector_length">vector::length</a>(&<a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>(v))
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_bcs_serialized_size_impl"></a>
+
+## Function `serialized_size_impl`
+
+
+
+<pre><code><b>fun</b> <a href="bcs.md#0x1_bcs_serialized_size_impl">serialized_size_impl</a>&lt;MoveValue&gt;(v: &MoveValue): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialized_size_impl">serialized_size_impl</a>&lt;MoveValue&gt;(v: &MoveValue): u64;
 </code></pre>
 
 

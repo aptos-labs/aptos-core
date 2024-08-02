@@ -85,7 +85,7 @@ fn native_to_bytes(
  *   cost is charged.
  *
  **************************************************************************************************/
-fn native_serialized_size(
+fn native_serialized_size_impl(
     context: &mut SafeNativeContext,
     mut ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -134,7 +134,7 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let funcs = [
         ("to_bytes", native_to_bytes as RawSafeNative),
-        ("serialized_size", native_serialized_size),
+        ("serialized_size_impl", native_serialized_size_impl),
     ];
 
     builder.make_named_natives(funcs)

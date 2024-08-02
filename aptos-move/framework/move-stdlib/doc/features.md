@@ -129,6 +129,8 @@ return true.
 -  [Function `default_to_concurrent_fungible_balance_enabled`](#0x1_features_default_to_concurrent_fungible_balance_enabled)
 -  [Function `get_abort_if_multisig_payload_mismatch_feature`](#0x1_features_get_abort_if_multisig_payload_mismatch_feature)
 -  [Function `abort_if_multisig_payload_mismatch_enabled`](#0x1_features_abort_if_multisig_payload_mismatch_enabled)
+-  [Function `get_use_bcs_serialized_size_feature`](#0x1_features_get_use_bcs_serialized_size_feature)
+-  [Function `use_bcs_serialized_size_feature`](#0x1_features_use_bcs_serialized_size_feature)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -875,6 +877,20 @@ Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TREAT_FRIEND_AS_PRIVATE">TREAT_FRIEND_AS_PRIVATE</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_features_USE_BCS_SERIALIZED_SIZE"></a>
+
+Whether the use native bcs::serialized_size implementation to calculate
+serialized size of a Move value, or the old implementation which first
+runs bcs::to_bytes and the returns the length of the vector.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_USE_BCS_SERIALIZED_SIZE">USE_BCS_SERIALIZED_SIZE</a>: u64 = 77;
 </code></pre>
 
 
@@ -3147,6 +3163,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">abort_if_multisig_payload_mismatch_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_use_bcs_serialized_size_feature"></a>
+
+## Function `get_use_bcs_serialized_size_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_use_bcs_serialized_size_feature">get_use_bcs_serialized_size_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_use_bcs_serialized_size_feature">get_use_bcs_serialized_size_feature</a>(): u64 { <a href="features.md#0x1_features_USE_BCS_SERIALIZED_SIZE">USE_BCS_SERIALIZED_SIZE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_use_bcs_serialized_size_feature"></a>
+
+## Function `use_bcs_serialized_size_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_use_bcs_serialized_size_feature">use_bcs_serialized_size_feature</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_use_bcs_serialized_size_feature">use_bcs_serialized_size_feature</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_USE_BCS_SERIALIZED_SIZE">USE_BCS_SERIALIZED_SIZE</a>)
 }
 </code></pre>
 
