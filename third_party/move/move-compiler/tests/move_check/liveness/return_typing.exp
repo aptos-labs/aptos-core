@@ -1,0 +1,22 @@
+error[E04007]: incompatible types
+  ┌─ tests/move_check/liveness/return_typing.move:7:19
+  │
+6 │     fun test2(): u8 {
+  │                  -- Expected: 'u8'
+7 │         return(42);
+  │                   ^
+  │                   │
+  │                   Invalid return expression
+  │                   Given: '()'
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/liveness/return_typing.move:11:18
+   │
+10 │     fun test3(): u8 {
+   │                  -- Expected: 'u8'
+11 │         return 42;
+   │                  ^
+   │                  │
+   │                  Invalid return expression
+   │                  Given: '()'
+

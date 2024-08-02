@@ -1,0 +1,284 @@
+
+Diagnostics:
+warning: Unnecessary trailing semicolon
+  ┌─ tests/checking/liveness/trailing_semi_loops.move:3:16
+  │
+3 │         loop ();
+  │         -------^
+  │         │      │
+  │         │      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+  │         Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+  ┌─ tests/checking/liveness/trailing_semi_loops.move:9:26
+  │
+9 │         { (loop (): ()) };
+  │            -------       ^
+  │            │             │
+  │            │             A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+  │            Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:18:10
+   │
+15 │ ╭         loop {
+16 │ │             let x = 0;
+17 │ │             0 + x + 0;
+18 │ │         };
+   │ │          ^
+   │ │          │
+   │ │          A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │ ╰─────────' Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:35:18
+   │
+35 │             break;
+   │             -----^
+   │             │    │
+   │             │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │             Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:44:22
+   │
+44 │                 break;
+   │                 -----^
+   │                 │    │
+   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │                 Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:55:42
+   │
+55 │             if (cond) continue else break;
+   │             -----------------------------^
+   │             │                            │
+   │             │                            A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │             Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:63:42
+   │
+63 │             if (cond) abort 0 else return;
+   │             -----------------------------^
+   │             │                            │
+   │             │                            A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │             Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:78:14
+   │
+72 │ ╭             if (cond) {
+73 │ │                 x = 1;
+74 │ │                 break
+75 │ │             } else {
+76 │ │                 x = 2;
+77 │ │                 continue
+78 │ │             };
+   │ │              ^
+   │ │              │
+   │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │ ╰─────────────' Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:88:22
+   │
+88 │                 break;
+   │                 -----^
+   │                 │    │
+   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │                 Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:90:25
+   │
+90 │                 continue;
+   │                 --------^
+   │                 │       │
+   │                 │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │                 Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:91:14
+   │
+87 │ ╭             if (cond) {
+88 │ │                 break;
+89 │ │             } else {
+90 │ │                 continue;
+91 │ │             };
+   │ │              ^
+   │ │              │
+   │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │ ╰─────────────' Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+    ┌─ tests/checking/liveness/trailing_semi_loops.move:100:23
+    │
+100 │                 return;
+    │                 ------^
+    │                 │     │
+    │                 │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+    │                 Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+    ┌─ tests/checking/liveness/trailing_semi_loops.move:102:24
+    │
+102 │                 abort 0;
+    │                 -------^
+    │                 │      │
+    │                 │      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+    │                 Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+    ┌─ tests/checking/liveness/trailing_semi_loops.move:103:14
+    │
+ 99 │ ╭             if (cond) {
+100 │ │                 return;
+101 │ │             } else {
+102 │ │                 abort 0;
+103 │ │             };
+    │ │              ^
+    │ │              │
+    │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+    │ ╰─────────────' Any code after this expression will not be reached
+
+
+Diagnostics:
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:27:17
+   │
+27 │             let x: u64 = if (true) break else break;
+   │                 ^
+
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        loop {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end <SELF>_0
+module <SELF>_1 {
+    private fun main() {
+        loop {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end <SELF>_1
+module <SELF>_2 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            return Tuple();
+            Tuple()
+          } else {
+            Abort(0);
+            Tuple()
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_2
+module <SELF>_3 {
+    private fun main() {
+        loop {
+          0;
+          Tuple()
+        };
+        Tuple()
+    }
+} // end <SELF>_3
+module <SELF>_4 {
+    private fun main() {
+        loop {
+          {
+            let x: u64 = if true {
+              break
+            } else {
+              break
+            };
+            Tuple()
+          }
+        }
+    }
+} // end <SELF>_4
+module <SELF>_5 {
+    private fun main() {
+        loop {
+          break;
+          Tuple()
+        }
+    }
+} // end <SELF>_5
+module <SELF>_6 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            break;
+            Tuple()
+          } else {
+            Tuple()
+          }
+        }
+    }
+} // end <SELF>_6
+module <SELF>_7 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            continue
+          } else {
+            break
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_7
+module <SELF>_8 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            Abort(0)
+          } else {
+            return Tuple()
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_8
+module <SELF>_9 {
+    private fun main(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            if cond {
+              x: u64 = 1;
+              break
+            } else {
+              x: u64 = 2;
+              continue
+            };
+            Tuple()
+          };
+          x;
+          Tuple()
+        }
+    }
+} // end <SELF>_9
+module <SELF>_10 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            break;
+            Tuple()
+          } else {
+            continue;
+            Tuple()
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_10

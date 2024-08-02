@@ -5,14 +5,14 @@ error[E04014]: invalid loop control
   │         ^^^^^ Invalid usage of 'break'. 'break' can only be used inside a loop body
 
 error[E04014]: invalid loop control
-   ┌─ tests/move_check/inlining/break_continue_in_lambda.move:49:2
+   ┌─ tests/move_check/inlining/break_continue_in_lambda.move:50:2
    │
-49 │     break;
+50 │     break;
    │     ^^^^^ Invalid usage of 'break'. 'break' can only be used inside a loop body
 
 error[E04014]: invalid loop control
-   ┌─ tests/move_check/inlining/break_continue_in_lambda.move:53:2
+   ┌─ tests/move_check/inlining/break_continue_in_lambda.move:54:2
    │
-53 │     continue;
+54 │     continue;
    │     ^^^^^^^^ Invalid usage of 'continue'. 'continue' can only be used inside a loop body
 

@@ -1,0 +1,22 @@
+error[E04007]: incompatible types
+  ┌─ tests/move_check/liveness/abort_typing.move:7:18
+  │
+6 │     fun test2(): u8 {
+  │                  -- Expected: 'u8'
+7 │         abort(42);
+  │                  ^
+  │                  │
+  │                  Invalid return expression
+  │                  Given: '()'
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/liveness/abort_typing.move:11:17
+   │
+10 │     fun test3(): u8 {
+   │                  -- Expected: 'u8'
+11 │         abort 42;
+   │                 ^
+   │                 │
+   │                 Invalid return expression
+   │                 Given: '()'
+

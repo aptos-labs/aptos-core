@@ -1,0 +1,40 @@
+
+Diagnostics:
+warning: Unnecessary trailing semicolon
+  ┌─ tests/checking/liveness/abort_typing.move:7:18
+  │
+7 │         abort(42);
+  │         ---------^
+  │         │        │
+  │         │        A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+  │         Any code after this expression will not be reached
+
+error: cannot return nothing from a function with result type `u8`
+  ┌─ tests/checking/liveness/abort_typing.move:7:18
+  │
+7 │         abort(42);
+  │                  ^
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/abort_typing.move:11:17
+   │
+11 │         abort 42;
+   │         --------^
+   │         │       │
+   │         │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │         Any code after this expression will not be reached
+
+error: cannot return nothing from a function with result type `u8`
+   ┌─ tests/checking/liveness/abort_typing.move:11:17
+   │
+11 │         abort 42;
+   │                 ^
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/abort_typing.move:20:21
+   │
+20 │             abort 42;
+   │             --------^
+   │             │       │
+   │             │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+   │             Any code after this expression will not be reached
