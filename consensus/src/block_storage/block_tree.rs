@@ -21,7 +21,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use mirai_annotations::{checked_verify_eq, precondition};
 use std::{
-    collections::{vec_deque::VecDeque, BTreeMap, HashMap, HashSet},
+    collections::{vec_deque::VecDeque, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -288,7 +288,7 @@ impl BlockTree {
                 return None;
             }
         }
-        assert!(window.len() <= window_size as usize - 1);
+        assert!(window.len() < window_size as usize);
         Some(OrderedBlockWindow::new(window))
     }
 

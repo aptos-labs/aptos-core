@@ -42,6 +42,7 @@ use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
 };
+use claims::assert_ge;
 use fail::fail_point;
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_channel::oneshot;
@@ -759,11 +760,19 @@ impl BlockRetriever {
             result_blocks
         );
 
-        assert!(
-            (
-                result_blocks.last().unwrap().epoch(),
-                result_blocks.last().unwrap().round()
-            ) <= (target_epoch, target_round)
+        assert_ge!(
+            target_epoch,
+            result_blocks
+                .last()
+                .expect("Expected at least a result_block")
+                .epoch()
+        );
+        assert_ge!(
+            target_round,
+            result_blocks
+                .last()
+                .expect("Expected at least a result_block")
+                .round()
         );
         Ok(result_blocks)
     }

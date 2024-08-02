@@ -16,7 +16,6 @@ use aptos_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
-use num_traits::Saturating;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
