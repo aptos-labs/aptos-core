@@ -306,15 +306,27 @@ pub fn to_hex_lower<T: LowerHex>(obj: &T) -> String {
 }
 
 /// Retrieves the currency from the given parameters
-/// TODO: What do do about the type params?
-/// TODO: Handle other currencies, will need to be passed in as a config file or something on startup
-pub fn parse_currency(address: AccountAddress, module: &str, name: &str) -> ApiResult<Currency> {
-    match (address, module, name) {
-        (AccountAddress::ONE, APTOS_COIN_MODULE, APTOS_COIN_RESOURCE) => Ok(native_coin()),
-        _ => Err(ApiError::TransactionParseError(Some(format!(
-            "Invalid coin for transfer {}::{}::{}",
-            address, module, name
-        )))),
+pub fn parse_coin_currency(
+    server_context: &RosettaContext,
+    struct_tag: &StructTag,
+) -> ApiResult<Currency> {
+    if let Some(currency) = server_context.currencies.iter().find(|currency| {
+        if let Some(move_type) = currency
+            .metadata
+            .as_ref()
+            .and_then(|inner| inner.move_type.as_ref())
+        {
+            struct_tag.to_string() == *move_type
+        } else {
+            false
+        }
+    }) {
+        Ok(currency.clone())
+    } else {
+        Err(ApiError::TransactionParseError(Some(format!(
+            "Invalid coin for transfer {}",
+            struct_tag
+        ))))
     }
 }
 

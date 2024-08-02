@@ -15,7 +15,7 @@ use std::{
     collections::HashSet,
     fs::File,
     net::SocketAddr,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -87,8 +87,13 @@ async fn main() {
 
     println!("aptos-rosetta: Starting rosetta");
     // Ensure runtime for Rosetta is up and running
-    let _rosetta = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
-        .expect("aptos-rosetta: Should bootstrap rosetta server");
+    let _rosetta = bootstrap(
+        args.chain_id(),
+        args.api_config(),
+        args.rest_client(),
+        args.supported_currencies(),
+    )
+    .expect("aptos-rosetta: Should bootstrap rosetta server");
 
     println!("aptos-rosetta: Rosetta started");
     // Run until there is an interrupt
@@ -276,6 +281,10 @@ impl ServerArgs for OnlineLocalArgs {
 
     fn chain_id(&self) -> ChainId {
         self.online_args.offline_args.chain_id
+    }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        self.online_args.offline_args.supported_currencies()
     }
 }
 

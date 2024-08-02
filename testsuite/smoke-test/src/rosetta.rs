@@ -113,6 +113,7 @@ async fn setup_test(
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
+        HashSet::new(),
     )
     .await
     .unwrap();

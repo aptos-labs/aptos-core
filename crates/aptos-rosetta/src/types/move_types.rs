@@ -37,6 +37,7 @@ pub const OBJECT_CORE_RESOURCE: &str = "ObjectCore";
 pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
 pub const TRANSFER_FUNCTION: &str = "transfer";
 pub const TRANSFER_COINS_FUNCTION: &str = "transfer_coins";
+pub const BALANCE_FUNCTION: &str = "balance";
 
 // Staking Contract
 pub const RESET_LOCKUP_FUNCTION: &str = "reset_lockup";

@@ -40,7 +40,11 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use itertools::Itertools;
-use move_core_types::{language_storage::TypeTag, parser::parse_type_tag};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    parser::parse_type_tag,
+};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -2176,7 +2180,10 @@ pub enum InternalOperation {
 impl InternalOperation {
     /// Pulls the [`InternalOperation`] from the set of [`Operation`]
     /// TODO: this needs to be broken up
-    pub fn extract(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
+    pub fn extract(
+        server_context: &RosettaContext,
+        operations: &Vec<Operation>,
+    ) -> ApiResult<InternalOperation> {
         match operations.len() {
             // Single operation actions
             1 => {
@@ -2424,7 +2431,10 @@ impl InternalOperation {
                 ))))
             },
             // Double operation actions (only coin transfer)
-            2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
+            2 => Ok(Self::Transfer(Transfer::extract_transfer(
+                server_context,
+                operations,
+            )?)),
             // Anything else is not expected
             _ => Err(ApiError::InvalidOperations(Some(format!(
                 "Unrecognized operation combination {:?}",
@@ -2489,9 +2499,29 @@ impl InternalOperation {
                         },
                         // For FA only currencies, we use the FA functionality
                         (None, Some(fa_address_str)) => {
-                            let _fa_address = AccountAddress::from_str(fa_address_str)?;
+                            let fa_address = AccountAddress::from_str(fa_address_str)?;
 
-                            todo!("We need the FA function here, but it looks like it'll have to be hand crafted");
+                            (
+                                TransactionPayload::EntryFunction(EntryFunction::new(
+                                    ModuleId::new(
+                                        AccountAddress::ONE,
+                                        ident_str!("primary_fungible_store").to_owned(),
+                                    ),
+                                    ident_str!("transfer").to_owned(),
+                                    vec![TypeTag::Struct(Box::new(StructTag {
+                                        address: AccountAddress::ONE,
+                                        module: ident_str!(OBJECT_MODULE).into(),
+                                        name: ident_str!(OBJECT_CORE_RESOURCE).into(),
+                                        type_args: vec![],
+                                    }))],
+                                    vec![
+                                        bcs::to_bytes(&fa_address).unwrap(),
+                                        bcs::to_bytes(&transfer.receiver).unwrap(),
+                                        bcs::to_bytes(&transfer.amount.0).unwrap(),
+                                    ],
+                                )),
+                                transfer.sender,
+                            )
                         },
                         _ => {
                             return Err(ApiError::InvalidInput(Some(format!(
@@ -2613,7 +2643,10 @@ pub struct Transfer {
 }
 
 impl Transfer {
-    pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<Transfer> {
+    pub fn extract_transfer(
+        server_context: &RosettaContext,
+        operations: &Vec<Operation>,
+    ) -> ApiResult<Transfer> {
         // Only support 1:1 P2P transfer
         // This is composed of a Deposit and a Withdraw operation
         if operations.len() != 2 {
@@ -2685,10 +2718,10 @@ impl Transfer {
         }
 
         // Check that the currency is supported
-        // FIXME: provide a proper list of currencies
-        let expected = [native_coin()];
-
-        if !expected.contains(&withdraw_amount.currency) {
+        if !server_context
+            .currencies
+            .contains(&withdraw_amount.currency)
+        {
             return Err(ApiError::UnsupportedCurrency(Some(
                 withdraw_amount.currency.symbol.clone(),
             )));

@@ -91,12 +91,18 @@ pub fn bootstrap(
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
+    supported_currencies: HashSet<Currency>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = aptos_runtimes::spawn_named_runtime("rosetta".into(), None);
 
     debug!("Starting up Rosetta server with {:?}", api_config);
 
-    runtime.spawn(bootstrap_async(chain_id, api_config, rest_client));
+    runtime.spawn(bootstrap_async(
+        chain_id,
+        api_config,
+        rest_client,
+        supported_currencies,
+    ));
     Ok(runtime)
 }
 
@@ -105,6 +111,7 @@ pub async fn bootstrap_async(
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
+    supported_currencies: HashSet<Currency>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
 
@@ -134,8 +141,13 @@ pub async fn bootstrap_async(
             ))
         });
 
-        let context =
-            RosettaContext::new(rest_client.clone(), chain_id, block_cache, HashSet::new()).await;
+        let context = RosettaContext::new(
+            rest_client.clone(),
+            chain_id,
+            block_cache,
+            supported_currencies,
+        )
+        .await;
         api.serve(routes(context)).await;
     });
     Ok(handle)
