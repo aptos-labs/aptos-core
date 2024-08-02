@@ -8,7 +8,7 @@ use crate::{
     core_mempool::{
         index::TxnPointer,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
-        transaction_store::TransactionStore,
+        transaction_store::{sender_bucket, TransactionStore},
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
@@ -303,6 +303,13 @@ impl Mempool {
             aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
         let sender = txn.sender();
+        counters::SENDER_BUCKET_FREQUENCIES
+            .with_label_values(&[
+                sender_bucket(&sender, self.transactions.num_sender_buckets())
+                    .to_string()
+                    .as_str(),
+            ])
+            .inc();
         let txn_info = MempoolTransaction::new(
             txn.clone(),
             expiration_time,
