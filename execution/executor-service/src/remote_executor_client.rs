@@ -127,7 +127,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
                 let mut command_tx = vec![];
-                for _ in 0..num_threads/(2 * num_shards) {
+                for _ in 0..1 { //num_threads/(2 * num_shards) {
                     command_tx.push(Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone())));
                 }
                 let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
@@ -153,7 +153,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let cmd_tx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("rmt-exe-cli-cmd-tx-{}", index))
-                .num_threads(num_cpus::get() / 2)
+                .num_threads(24)
                 .build()
                 .unwrap(),
         );
