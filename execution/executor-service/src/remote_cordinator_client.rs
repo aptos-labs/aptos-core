@@ -46,7 +46,7 @@ impl RemoteCoordinatorClient {
         let command_rx = controller.create_inbound_channel(execute_command_type);
         let result_tx_threads = 4;
         let mut result_tx = vec![];
-        for _ in 0..(4 * result_tx_threads) {
+        for _ in 0..result_tx_threads {
             result_tx.push(Arc::new(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime()))));
         }
             //controller.create_outbound_channel(coordinator_address, execute_result_type);
@@ -323,7 +323,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
         //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
         let rand_thread = fastrand::i32(..) % self.result_tx.len() as i32;
-        let result_tx_clone = self.result_tx[0].clone();
+        let result_tx_clone = self.result_tx.clone();
         let shard_id_clone = self.shard_id.clone();
         self.result_tx_thread_pool.spawn(move || {
             let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
@@ -332,7 +332,8 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             let execute_result_type = format!("execute_result_{}", shard_id_clone);
             let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
             drop(bcs_ser_timer);
-            result_tx_clone.lock().unwrap().send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
+            info!("Sending results with rand thread: {}", rand_thread);
+            result_tx_clone[rand_thread].lock().unwrap().send(Message::create_with_metadata(output_message, 0, txn_idx_output.len() as u64, 0), &MessageType::new(execute_result_type));
         });
     }
 
