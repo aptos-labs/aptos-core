@@ -37,6 +37,7 @@ use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelp
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_vm::sharded_block_executor::sharded_executor_service::{CmdsAndMetaDataRef, TransactionIdxAndOutput};
+use aptos_secure_net::grpc_network_service;
 use crate::metrics::REMOTE_EXECUTOR_TIMER;
 
 pub static COORDINATOR_PORT: u16 = 52200;
@@ -175,6 +176,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> ShardedBlockExecutor<S, RemoteExecutorClient<S>> {
+        aptos_secure_net::grpc_network_service::set_remote_addresses(remote_shard_addresses.clone());
         ShardedBlockExecutor::new(RemoteExecutorClient::new(
             remote_shard_addresses,
             NetworkController::new(

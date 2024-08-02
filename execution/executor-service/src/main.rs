@@ -40,8 +40,8 @@ fn main() {
         &("remote-executor-service-".to_owned() + &args.shard_id.to_string()),
     );
 
-    // let mut coordinator_address = args.coordinator_address;
-    // coordinator_address.set_port(coordinator_address.port() + args.shard_id as u16); // adds offset based on shard_id to the port
+    let mut coordinator_address = args.coordinator_address;
+    coordinator_address.set_port(coordinator_address.port() + args.shard_id as u16); // adds offset based on shard_id to the port
     let _exe_service = ProcessExecutorService::new(
         args.shard_id,
         args.num_shards,
