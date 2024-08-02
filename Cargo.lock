@@ -3614,6 +3614,7 @@ dependencies = [
  "bcs 0.1.4",
  "crossbeam-channel",
  "dashmap",
+ "fastrand 2.0.1",
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",

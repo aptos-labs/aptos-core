@@ -279,6 +279,10 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+        let _timer;
+        if fastrand::u32(0..500) < 1 {
+            _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
+        }
         // let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         // First check if the cache has the state value.
         if let Some(version_and_value_opt) = self
