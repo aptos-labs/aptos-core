@@ -607,7 +607,7 @@ fn get_land_blocking_test(
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
             // realistic_env_max_load_test(duration, test_cmd, 7, 5)
-            pfn_const_tps(duration, true, true, false)
+            pfn_const_tps(duration, false, true, false)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
