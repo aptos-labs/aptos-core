@@ -22,17 +22,13 @@ pub struct LoadBalancingThresholdConfig {
     /// greater than `avg_mempool_traffic_threshold_in_tps`, then the PFN will forward mempool traffic to only those upstream peers
     /// with ping latency less than `x + latency_slack_between_top_upstream_peers`.
     pub latency_slack_between_top_upstream_peers: u64,
-    /// If the average received mempool traffic is greater than avg_mempool_traffic_threshold_in_tps, then PFNs will forward to at most
-    /// `max_number_of_upstream_peers` upstream FNs.
-    pub max_number_of_upstream_peers: u8,
 }
 
 impl Default for LoadBalancingThresholdConfig {
     fn default() -> LoadBalancingThresholdConfig {
         LoadBalancingThresholdConfig {
             avg_mempool_traffic_threshold_in_tps: 0,
-            latency_slack_between_top_upstream_peers: 50,
-            max_number_of_upstream_peers: 1,
+            latency_slack_between_top_upstream_peers: 10,
         }
     }
 }
@@ -96,10 +92,6 @@ pub struct MempoolConfig {
     pub num_sender_buckets: u8,
     /// Load balancing configuration for the mempool. This is used only by PFNs.
     pub load_balancing_thresholds: Vec<LoadBalancingThresholdConfig>,
-    /// When the load is low, PFNs send all the mempool traffic to only one upstream FN. When the load increases suddenly, PFNs will take
-    /// up to 10 minutes (shared_mempool_priority_update_interval_secs) to enable the load balancing. If this flag is enabled,
-    /// then the PFNs will always do load balancing irrespective of the load.
-    pub enable_max_load_balancing_at_any_load: bool,
 }
 
 impl Default for MempoolConfig {
@@ -132,38 +124,23 @@ impl Default for MempoolConfig {
             usecase_stats_num_top_to_track: 5,
             num_sender_buckets: 4,
             load_balancing_thresholds: vec![
+                LoadBalancingThresholdConfig { // Same as default
+                    avg_mempool_traffic_threshold_in_tps: 0,
+                    latency_slack_between_top_upstream_peers: 10,
+                },
                 LoadBalancingThresholdConfig {
-                    avg_mempool_traffic_threshold_in_tps: 500,
+                    avg_mempool_traffic_threshold_in_tps: 50,
+                    latency_slack_between_top_upstream_peers: 25,
+                },
+                LoadBalancingThresholdConfig {
+                    avg_mempool_traffic_threshold_in_tps: 200,
                     latency_slack_between_top_upstream_peers: 50,
-                    max_number_of_upstream_peers: 2,
                 },
                 LoadBalancingThresholdConfig {
                     avg_mempool_traffic_threshold_in_tps: 1000,
-                    latency_slack_between_top_upstream_peers: 50,
-                    max_number_of_upstream_peers: 3,
-                },
-                LoadBalancingThresholdConfig {
-                    avg_mempool_traffic_threshold_in_tps: 1500,
-                    latency_slack_between_top_upstream_peers: 75,
-                    max_number_of_upstream_peers: 4,
-                },
-                LoadBalancingThresholdConfig {
-                    avg_mempool_traffic_threshold_in_tps: 2500,
                     latency_slack_between_top_upstream_peers: 100,
-                    max_number_of_upstream_peers: 5,
-                },
-                LoadBalancingThresholdConfig {
-                    avg_mempool_traffic_threshold_in_tps: 3500,
-                    latency_slack_between_top_upstream_peers: 125,
-                    max_number_of_upstream_peers: 6,
-                },
-                LoadBalancingThresholdConfig {
-                    avg_mempool_traffic_threshold_in_tps: 4500,
-                    latency_slack_between_top_upstream_peers: 150,
-                    max_number_of_upstream_peers: 7,
                 },
             ],
-            enable_max_load_balancing_at_any_load: false,
         }
     }
 }

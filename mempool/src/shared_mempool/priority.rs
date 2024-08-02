@@ -278,14 +278,7 @@ impl PrioritizedPeersState {
 
         let num_top_peers = max(
             1,
-            min(
-                self.mempool_config.num_sender_buckets,
-                if self.mempool_config.enable_max_load_balancing_at_any_load {
-                    u8::MAX
-                } else {
-                    threshold_config.max_number_of_upstream_peers
-                },
-            ),
+            self.mempool_config.num_sender_buckets,
         );
         info!(
             "Time elapsed since last peer update: {:?}\n
