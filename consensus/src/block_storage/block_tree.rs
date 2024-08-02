@@ -321,6 +321,12 @@ impl BlockTree {
         if new_commit_cert.commit_info().round() > self.highest_commit_cert.commit_info().round() {
             self.highest_commit_cert = Arc::new(new_commit_cert);
             self.update_commit_root(self.highest_commit_cert.commit_info().id());
+        } else {
+            warn!(
+                "Trying to update highest commit cert with lower round: {} <= {}",
+                new_commit_cert.commit_info().round(),
+                self.highest_commit_cert.commit_info().round()
+            );
         }
     }
 
