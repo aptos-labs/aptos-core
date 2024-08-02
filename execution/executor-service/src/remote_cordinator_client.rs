@@ -46,7 +46,7 @@ impl RemoteCoordinatorClient {
         let command_rx = controller.create_inbound_channel(execute_command_type);
         let result_tx_threads = 4;
         let mut result_tx = vec![];
-        for _ in 0..result_tx_threads {
+        for _ in 0..(4 * result_tx_threads) {
             result_tx.push(Arc::new(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address, controller.get_outbound_rpc_runtime()))));
         }
             //controller.create_outbound_channel(coordinator_address, execute_result_type);
