@@ -1,34 +1,36 @@
 validator:
   enableNetworkPolicy: false
-  rust_log: debug,hyper=off
+  # Add debug here to enable debug logs
+  # rust_log: debug,hyper=off
+  rust_log: info,hyper=off
   # force enable the telemetry service to try to send telemetry
   force_enable_telemetry: true
 
 fullnode:
   # at most one VFN per validator, depending on numFullnodeGroups
   groups:
-  - name: fullnode
-    replicas: 1
-  rust_log: debug,hyper=off
+    - name: fullnode
+      replicas: 1
+  # Add debug herer to enable debug logs
+  # rust_log: debug,hyper=off
+  rust_log: info,hyper=off
   # force enable the telemetry service to try to send telemetry
   force_enable_telemetry: true
 
-# Make all services internal NodePort and open all ports
-# NodePort is required for ChaosMesh to function correctly: https://github.com/chaos-mesh/chaos-mesh/issues/3278#issuecomment-1134248492
 service:
   validator:
     external:
-      type: "NodePort"
+      type: "ClusterIP"
     internal:
-      type: "NodePort"
+      type: "ClusterIP"
     enableRestApi: true
     enableMetricsPort: true
 
   fullnode:
     external:
-      type: "NodePort"
+      type: "ClusterIP"
     internal:
-      type: "NodePort"
+      type: "ClusterIP"
     enableRestApi: true
     enableMetricsPort: true
 

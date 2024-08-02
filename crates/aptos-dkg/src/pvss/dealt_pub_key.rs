@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 macro_rules! dealt_pub_key_impl {
     ($GT_PROJ_NUM_BYTES:ident, $gt_proj_from_bytes:ident, $GTProjective:ident) => {
@@ -12,7 +13,7 @@ macro_rules! dealt_pub_key_impl {
         /// The size of a serialized *dealt public key*.
         pub(crate) const DEALT_PK_NUM_BYTES: usize = $GT_PROJ_NUM_BYTES;
 
-        /// The *dealt public key* associated with the the secret key that was dealt via the PVSS transcript.
+        /// The *dealt public key* associated with the secret key that was dealt via the PVSS transcript.
         #[derive(DeserializeKey, Clone, Debug, SerializeKey, PartialEq, Eq)]
         pub struct DealtPubKey {
             /// A group element $g_1^a \in G$, where $G$ is $G_1$, $G_2$ or $G_T$

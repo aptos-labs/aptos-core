@@ -232,7 +232,7 @@ impl ReleasePackage {
 
         for i in 0..self.code.len() {
             emitln!(writer, "let chunk{} = ", i);
-            Self::generate_blob(&writer, &self.code[i]);
+            Self::generate_blob_as_hex_string(&writer, &self.code[i]);
             emitln!(writer, ";");
             emitln!(writer, "vector::push_back(&mut code, chunk{});", i);
         }
@@ -253,7 +253,7 @@ impl ReleasePackage {
             };
             let chunk = metadata.drain(0..to_drain).collect::<Vec<_>>();
             emit!(writer, "let chunk{} = ", i);
-            Self::generate_blob(&writer, &chunk);
+            Self::generate_blob_as_hex_string(&writer, &chunk);
             emitln!(writer, ";")
         }
 
@@ -273,18 +273,12 @@ impl ReleasePackage {
         Ok(())
     }
 
-    fn generate_blob(writer: &CodeWriter, data: &[u8]) {
-        emitln!(writer, "vector[");
-        writer.indent();
-        for (i, b) in data.iter().enumerate() {
-            if (i + 1) % 20 == 0 {
-                emitln!(writer);
-            }
-            emit!(writer, "{}u8,", b);
+    fn generate_blob_as_hex_string(writer: &CodeWriter, data: &[u8]) {
+        emit!(writer, "x\"");
+        for b in data.iter() {
+            emit!(writer, "{:02x}", b);
         }
-        emitln!(writer);
-        writer.unindent();
-        emit!(writer, "]")
+        emit!(writer, "\"");
     }
 
     fn generate_next_execution_hash_blob(

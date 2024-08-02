@@ -10,12 +10,12 @@ module 0x42::globals {
         exists<R>(a)
     }
 
-    fun read(a: address): u64 {
+    fun read(a: address): u64 acquires R {
         let r = borrow_global<R>(a);
         r.f
     }
 
-    fun write(a: address, x: u64): u64 {
+    fun write(a: address, x: u64): u64 acquires R {
         let r = borrow_global_mut<R>(a);
         r.f = 2;
         9

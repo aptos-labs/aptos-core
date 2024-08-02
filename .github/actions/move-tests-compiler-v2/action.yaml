@@ -9,9 +9,10 @@ runs:
   using: composite
   steps:
     # Checkout the repository and setup the rust toolchain
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
-        fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0 # Fetch all git history for accurate target determination
     - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       with:
         GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
@@ -21,12 +22,21 @@ runs:
       with:
         tool: nextest
 
+    # Output the changed files
+    - name: Output the changed files
+      run: cargo x changed-files -vv
+      shell: bash
+
+    # Output the affected packages
+    - name: Output the affected packages
+      run: cargo x affected-packages -vv
+      shell: bash
+
     # Run Aptos Move tests with compiler V2
     - name: Run Aptos Move tests with compiler V2
-      run: cargo nextest run --release -E 'not (test(test_smart_data_structures_gas))' --profile ci --locked -p e2e-move-tests -p aptos-framework --retries 3 --no-fail-fast
+      run: cargo x targeted-compiler-v2-tests -vv --release --profile ci --locked --no-fail-fast
       shell: bash
       env:
-        MOVE_COMPILER_EXP: no-safety
         MOVE_COMPILER_V2: true
         RUST_MIN_STACK: 4297152
         MVP_TEST_ON_CI: true

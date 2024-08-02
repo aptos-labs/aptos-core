@@ -11,14 +11,12 @@ use crate::{
     runtime::VMRuntime,
     session::Session,
 };
-use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
-    CompiledModule,
-};
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata, resolver::MoveResolver,
+    metadata::Metadata,
 };
+use move_vm_types::resolver::MoveResolver;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -27,20 +25,33 @@ pub struct MoveVM {
 }
 
 impl MoveVM {
+    /// Creates a new VM instance, using default configurations. Panics if there are duplicated
+    /// natives.
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-    ) -> VMResult<Self> {
-        Self::new_with_config(natives, VMConfig::default())
+    ) -> Self {
+        let vm_config = VMConfig {
+            // Keep the paranoid mode on as we most likely want this for tests.
+            paranoid_type_checks: true,
+            ..VMConfig::default()
+        };
+        Self::new_with_config(natives, vm_config)
     }
 
+    /// Creates a new VM instance, with provided VM configurations. Panics if there are duplicated
+    /// natives.
     pub fn new_with_config(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
-    ) -> VMResult<Self> {
-        Ok(Self {
-            runtime: VMRuntime::new(natives, vm_config)
-                .map_err(|err| err.finish(Location::Undefined))?,
-        })
+    ) -> Self {
+        Self {
+            runtime: VMRuntime::new(natives, vm_config),
+        }
+    }
+
+    /// Returns VM configuration used to initialize the VM.
+    pub fn vm_config(&self) -> &VMConfig {
+        self.runtime.loader().vm_config()
     }
 
     /// Create a new Session backed by the given storage.
@@ -57,22 +68,26 @@ impl MoveVM {
     ///     cases where this may not be necessary, with the most notable one being the common module
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session<'r>(
-        &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
-    ) -> Session<'r, '_> {
+    pub fn new_session<'r>(&self, remote: &'r impl MoveResolver) -> Session<'r, '_> {
         self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
         &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
+        remote: &'r impl MoveResolver,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(remote),
+            data_cache: TransactionDataCache::new(
+                self.runtime
+                    .loader()
+                    .vm_config()
+                    .deserializer_config
+                    .clone(),
+                remote,
+            ),
             module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
             native_extensions,
         }
@@ -81,13 +96,20 @@ impl MoveVM {
     /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
     pub fn new_session_with_extensions_and_modules<'r>(
         &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
+        remote: &'r impl MoveResolver,
         module_storage: Arc<dyn ModuleStorage>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(remote),
+            data_cache: TransactionDataCache::new(
+                self.runtime
+                    .loader()
+                    .vm_config()
+                    .deserializer_config
+                    .clone(),
+                remote,
+            ),
             module_store: ModuleStorageAdapter::new(module_storage),
             native_extensions,
         }
@@ -97,13 +119,20 @@ impl MoveVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        remote: &impl MoveResolver<PartialVMError>,
+        remote: &impl MoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.runtime
             .loader()
             .load_module(
                 module_id,
-                &TransactionDataCache::new(remote),
+                &mut TransactionDataCache::new(
+                    self.runtime
+                        .loader()
+                        .vm_config()
+                        .deserializer_config
+                        .clone(),
+                    remote,
+                ),
                 &ModuleStorageAdapter::new(self.runtime.module_storage()),
             )
             .map(|arc_module| arc_module.arc_module())

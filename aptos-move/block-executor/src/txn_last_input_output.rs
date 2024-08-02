@@ -3,11 +3,13 @@
 
 use crate::{
     captured_reads::CapturedReads,
+    errors::ParallelBlockExecutionError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_aggregator::types::code_invariant_error;
+use aptos_logger::error;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     delayed_fields::PanicError, fee_statement::FeeStatement,
@@ -170,7 +172,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
         match self.outputs[txn_idx as usize]
             .load_full()
-            .expect("[BlockSTM]: Execution output must be recorded after execution")
+	    .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
             .as_ref()
         {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -183,7 +185,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn output_approx_size(&self, txn_idx: TxnIndex) -> Option<u64> {
         match self.outputs[txn_idx as usize]
             .load_full()
-            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
             .as_ref()
         {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -198,19 +200,23 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         matches!(
             self.outputs[txn_idx as usize]
                 .load_full()
-                .expect("[BlockSTM]: Execution output must be recorded after execution")
+                .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
                 .as_ref(),
             ExecutionStatus::SkipRest(_)
         )
     }
 
-    pub(crate) fn check_fatal_vm_error(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
+    pub(crate) fn check_fatal_vm_error(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Result<(), ParallelBlockExecutionError> {
         if let Some(status) = self.outputs[txn_idx as usize].load_full() {
             if let ExecutionStatus::Abort(err) = status.as_ref() {
-                return Err(code_invariant_error(format!(
+                error!(
                     "FatalVMError from parallel execution {:?} at txn {}",
                     err, txn_idx
-                )));
+                );
+                return Err(ParallelBlockExecutionError::FatalVMError);
             }
         }
         Ok(())

@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot use `R` with an operator which expects a value of type `&signer`
+  ┌─ tests/checking/typing/v1-signer/move_to_reference_to_args_flipped.move:4:20
+  │
+4 │         move_to<R>(R { f: false }, s)
+  │                    ^^^^^^^^^^^^^^
+
+error: cannot use `R<bool>` with an operator which expects a value of type `&signer`
+   ┌─ tests/checking/typing/v1-signer/move_to_reference_to_args_flipped.move:14:26
+   │
+14 │         move_to<R<bool>>(R { f: false }, s);
+   │                          ^^^^^^^^^^^^^^

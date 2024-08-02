@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    exponential_buckets, register_avg_counter_vec, register_histogram, register_histogram_vec,
+    register_int_counter, register_int_counter_vec, Histogram, HistogramVec, IntCounter,
+    IntCounterVec,
 };
+use aptos_mvhashmap::BlockStateStats;
 use aptos_types::fee_statement::FeeStatement;
 use once_cell::sync::Lazy;
 
@@ -211,6 +213,22 @@ pub static BLOCK_COMMITTED_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static BLOCK_VIEW_DISTINCT_KEYS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_avg_counter_vec(
+        "aptos_execution_block_view_distinct_keys",
+        "Size (number of keys) ",
+        &["mode", "object_type"],
+    )
+});
+
+pub static BLOCK_VIEW_BASE_VALUES_MEMORY_USAGE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_avg_counter_vec(
+        "aptos_execution_block_view_base_values_memory_usage",
+        "Memory usage (in bytes) for base values",
+        &["mode", "object_type"],
+    )
+});
+
 fn observe_gas(counter: &Lazy<HistogramVec>, mode_str: &str, fee_statement: &FeeStatement) {
     counter
         .with_label_values(&[mode_str, GasType::TOTAL_GAS])
@@ -274,4 +292,32 @@ pub(crate) fn update_txn_gas_counters(txn_fee_statements: &Vec<FeeStatement>, is
     for fee_statement in txn_fee_statements {
         observe_gas(&TXN_GAS, mode_str, fee_statement);
     }
+}
+
+pub(crate) fn update_state_counters(block_state_stats: BlockStateStats, is_parallel: bool) {
+    let mode_str = if is_parallel {
+        Mode::PARALLEL
+    } else {
+        Mode::SEQUENTIAL
+    };
+
+    BLOCK_VIEW_DISTINCT_KEYS
+        .with_label_values(&[mode_str, "resource"])
+        .observe(block_state_stats.num_resources as f64);
+    BLOCK_VIEW_DISTINCT_KEYS
+        .with_label_values(&[mode_str, "resource_group"])
+        .observe(block_state_stats.num_resource_groups as f64);
+    BLOCK_VIEW_DISTINCT_KEYS
+        .with_label_values(&[mode_str, "delayed_field"])
+        .observe(block_state_stats.num_delayed_fields as f64);
+    BLOCK_VIEW_DISTINCT_KEYS
+        .with_label_values(&[mode_str, "module"])
+        .observe(block_state_stats.num_modules as f64);
+
+    BLOCK_VIEW_BASE_VALUES_MEMORY_USAGE
+        .with_label_values(&[mode_str, "resource"])
+        .observe(block_state_stats.base_resources_size as f64);
+    BLOCK_VIEW_BASE_VALUES_MEMORY_USAGE
+        .with_label_values(&[mode_str, "delayed_field"])
+        .observe(block_state_stats.base_delayed_fields_size as f64);
 }

@@ -9,7 +9,7 @@ use crate::{
     state_computer::PipelineExecutionResult,
     state_replication::StateComputer,
 };
-use aptos_consensus_types::executed_block::ExecutedBlock;
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorError;
 use aptos_logger::debug;
@@ -25,7 +25,7 @@ use std::{
 /// the buffer manager and send them to the ExecutionPipeline.
 
 pub struct ExecutionRequest {
-    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_blocks: Vec<PipelinedBlock>,
     // Hold a CountedRequest to guarantee the executor doesn't get reset with pending tasks
     // stuck in the ExecutinoPipeline.
     pub lifetime_guard: CountedRequest<()>,
@@ -66,14 +66,15 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             lifetime_guard,
         } = req;
 
-        if ordered_blocks.is_empty() {
-            return ExecutionWaitRequest {
-                block_id: HashValue::zero(),
-                fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
-            };
-        }
-
-        let block_id = ordered_blocks.last().unwrap().id();
+        let block_id = match ordered_blocks.last() {
+            Some(block) => block.id(),
+            None => {
+                return ExecutionWaitRequest {
+                    block_id: HashValue::zero(),
+                    fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
+                }
+            },
+        };
 
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.
@@ -93,8 +94,12 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             let mut results = vec![];
             for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
                 debug!("try to receive compute result for block {}", block.id());
-                let PipelineExecutionResult { input_txns, result } = fut.await?;
-                results.push(block.replace_result(input_txns, result));
+                let PipelineExecutionResult {
+                    input_txns,
+                    result,
+                    execution_time,
+                } = fut.await?;
+                results.push(block.set_execution_result(input_txns, result, execution_time));
             }
             drop(lifetime_guard);
             Ok(results)

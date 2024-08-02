@@ -1,7 +1,7 @@
 # **Please** keep this file ordered alphabetically by directory paths.
 
 # Owners for the `.github` directory and all its subdirectories.
-/.github/ @aptos-labs/prod-eng @aptos-labs/security
+/.github/ @aptos-labs/prod-eng
 
 # Owners for the `/api` directory and all its subdirectories.
 /api/ @banool @gregnazario @0xmaayan
@@ -10,9 +10,12 @@
 /aptos-move/aptos-aggregator/ @georgemitenkov @gelash @zekun000
 /aptos-move/aptos-gas/ @vgao1996
 /aptos-move/aptos-vm/ @davidiw @wrwg @zekun000 @vgao1996 @georgemitenkov
+/aptos-move/aptos-vm/src/keyless_validation.rs @alinush @heliuchuan
 /aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
 /aptos-move/framework/ @davidiw @movekevin @wrwg
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
+/aptos-move/framework/aptos-framework/sources/jwks.move @zjma
+/aptos-move/framework/aptos-framework/sources/keyless_account.move @alinush
 /aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma @mstraka100
 /aptos-move/framework/**/*.spec.move @junkil-park
 /aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
@@ -39,7 +42,7 @@
 /consensus/src/quorum_store/ @bchocho @sasha8 @gelash
 
 # Owners for the `/crates/aptos` directory and all its subdirectories.
-/crates/aptos @gregnazario @0xjinn @banool
+/crates/aptos @gregnazario @banool
 
 # Owners for the `/crates/aptos-crypto*` directories.
 /crates/aptos-crypto-derive/ @alinush @zjma @mstraka100 @rex1fernando
@@ -76,18 +79,9 @@
 # Owners for the `/dashboards` directory and all its subdirectories.
 /dashboards/ @aptos-labs/prod-eng
 
-# Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @gregnazario @banool
-
-# Owner for docs tutorials for the token_standard and related tutorials.
-/developer-docs-site/docs/tutorials @areshand @gregnazario
-
 # Owners for the `/docker` directory and all its subdirectories.
 /docker/ @aptos-labs/prod-eng
-
-# Owners for the `SDKs`.
-/ecosystem/python/sdk @davidiw @gregnazario @banool @0xmaayan @0xjinn
-/ecosystem/typescript/sdk @gregnazario @banool @0xmaayan @0xjinn
+/docker/builder/docker-bake-rust-all.hcl @aptos-labs/prod-eng @aptos-labs/security
 
 # Owners for execution and storage.
 /execution/ @msmouse @lightmark @grao1991
@@ -96,7 +90,12 @@
 /mempool/ @bchocho
 
 # Owners for the network and all its subdirectories.
-/network/ @gregnazario @joshlind @brianolson
+/network/ @joshlind @brianolson
+
+# Owners for the scripts
+/scripts/ @aptos-labs/prod-eng
+/scripts/authenticator_regenerate.sh @alinush @hariria @heliuchuan
+/scripts/algebra-gas/ @zjma
 
 # Owners for the `/state-sync` directory and all its subdirectories.
 /state-sync/ @joshlind
@@ -110,4 +109,5 @@
 # Owners for the `aptos-dkg` crate.
 /crates/aptos-dkg @alinush @rex1fernando
 
+/types/src/keyless/ @alinush @heliuchuan
 /types/src/transaction/authenticator.rs @alinush @mstraka100

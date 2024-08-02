@@ -4,14 +4,20 @@
 use crate::common::{Payload, PayloadFilter};
 use anyhow::Result;
 use futures::channel::oneshot;
-use std::{fmt, fmt::Formatter};
+use std::{fmt, fmt::Formatter, time::Duration};
 
 pub enum GetPayloadCommand {
     /// Request to pull block to submit to consensus.
     GetPayloadRequest(
-        // max block size
+        // max number of transactions in the block
+        u64,
+        // max number of unique transactions in the block
         u64,
         // max byte size
+        u64,
+        // max number of inline transactions (transactions without a proof of store)
+        u64,
+        // max byte size of inline transactions (transactions without a proof of store)
         u64,
         // return non full
         bool,
@@ -19,6 +25,8 @@ pub enum GetPayloadCommand {
         PayloadFilter,
         // callback to respond to
         oneshot::Sender<Result<GetPayloadResponse>>,
+        // block timestamp
+        Duration,
     ),
 }
 
@@ -27,15 +35,19 @@ impl fmt::Display for GetPayloadCommand {
         match self {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
+                max_txns_after_filtering,
                 max_bytes,
+                max_inline_txns,
+                max_inline_bytes,
                 return_non_full,
                 excluded,
                 _,
+                block_timestamp,
             ) => {
                 write!(
                     f,
-                    "GetPayloadRequest [max_txns: {}, max_bytes: {}, return_non_full: {},  excluded: {}]",
-                    max_txns, max_bytes, return_non_full, excluded
+                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {}, max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}, block_timestamp: {:?}]",
+                    max_txns, max_txns_after_filtering, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded, block_timestamp
                 )
             },
         }

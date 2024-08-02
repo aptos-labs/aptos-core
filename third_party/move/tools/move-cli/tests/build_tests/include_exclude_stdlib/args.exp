@@ -16,7 +16,7 @@ error[E03002]: unbound module
   ┌─ ./sources/UseSigner.move:6:5
   │
 6 │     signer::address_of(account)
-  │     ^^^^^^ Unbound module alias 'signer'
+  │     ^^^^^^ Unbound module or type alias 'signer'
 
 Command `-d -v build`:
 INCLUDING DEPENDENCY MoveStdlib

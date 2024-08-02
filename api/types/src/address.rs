@@ -20,7 +20,7 @@ impl Address {
 
     /// Represent an account address in a way that is compliant with the v1 address
     /// standard. The standard is defined as part of AIP-40, read more here:
-    /// https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md
+    /// <https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md>
     ///
     /// In short, all special addresses MUST be represented in SHORT form, e.g.
     ///

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides reusable helpers in tests.
+use super::gather_state_updates_until_last_checkpoint;
 #[cfg(test)]
 use crate::state_store::StateStore;
 #[cfg(test)]
@@ -22,6 +23,8 @@ use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+#[cfg(test)]
+use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -29,16 +32,12 @@ use aptos_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
-    state_store::{
-        create_empty_sharded_state_updates, state_key::StateKey, state_value::StateValue,
-        ShardedStateUpdates,
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionToCommit, Version},
 };
 #[cfg(test)]
 use arr_macro::arr;
 use proptest::{collection::vec, prelude::*, sample::Index};
-use rayon::prelude::*;
 use std::{collections::HashMap, fmt::Debug};
 
 prop_compose! {
@@ -86,7 +85,7 @@ pub(crate) fn update_store(
             .unwrap();
         let ledger_batch = SchemaBatch::new();
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
-        let state_kv_metadata_batch = SchemaBatch::new();
+        let schema_batch = SchemaBatch::new();
         store
             .put_value_sets(
                 vec![&sharded_value_state_set],
@@ -95,7 +94,6 @@ pub(crate) fn update_store(
                 None,
                 &ledger_batch,
                 &sharded_state_kv_batches,
-                &state_kv_metadata_batch,
                 /*put_state_value_indices=*/ false,
                 /*skip_usage=*/ false,
                 /*last_checkpoint_index=*/ None,
@@ -108,7 +106,7 @@ pub(crate) fn update_store(
             .unwrap();
         store
             .state_kv_db
-            .commit(version, state_kv_metadata_batch, sharded_state_kv_batches)
+            .commit(version, schema_batch, sharded_state_kv_batches)
             .unwrap();
     }
     root_hash
@@ -126,7 +124,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     .insert(key.clone(), value.clone());
             });
         next_version += 1;
-        if txn_to_commit.is_state_checkpoint() {
+        if txn_to_commit.has_state_checkpoint_hash() {
             state.current = state
                 .current
                 .batch_update(
@@ -201,7 +199,7 @@ prop_compose! {
                 let event_root_hash = InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash();
 
                 // calculate state checkpoint hash and this must be the last txn
-                let state_checkpoint_hash = if txn.is_state_checkpoint() {
+                let state_checkpoint_hash = if txn.has_state_checkpoint_hash() {
                     Some(state_checkpoint_root_hash)
                 } else {
                     None
@@ -322,7 +320,7 @@ fn gen_snapshot_version(
     let last_checkpoint = txns_to_commit
         .iter()
         .enumerate()
-        .filter(|(_idx, x)| x.is_state_checkpoint())
+        .filter(|(_idx, x)| x.has_state_checkpoint_hash())
         .last()
         .map(|(idx, _)| idx);
     if let Some(idx) = last_checkpoint {
@@ -464,7 +462,7 @@ fn verify_snapshots(
     for snapshot_version in snapshot_versions {
         let start = (cur_version - start_version) as usize;
         let end = (snapshot_version - start_version) as usize;
-        assert!(txns_to_commit[end].is_state_checkpoint());
+        assert!(txns_to_commit[end].has_state_checkpoint_hash());
         let expected_root_hash = db
             .ledger_db
             .transaction_info_db()
@@ -827,7 +825,7 @@ pub fn verify_committed_transactions(
             assert_eq!(state_value_in_db, *state_value);
         }
 
-        if !txn_to_commit.is_state_checkpoint() {
+        if !txn_to_commit.has_state_checkpoint_hash() {
             // Fetch and verify transaction itself.
             let txn = txn_to_commit
                 .transaction()
@@ -926,6 +924,21 @@ pub(crate) fn put_transaction_infos(
         .unwrap();
     db.commit_transaction_accumulator(&txns_to_commit, version)
         .unwrap()
+}
+
+#[cfg(test)]
+pub(crate) fn put_transaction_auxiliary_data(
+    db: &AptosDB,
+    version: Version,
+    auxiliary_data: &[TransactionAuxiliaryData],
+) {
+    let txns_to_commit: Vec<_> = auxiliary_data
+        .iter()
+        .cloned()
+        .map(TransactionToCommit::dummy_with_transaction_auxiliary_data)
+        .collect();
+    db.commit_transaction_auxiliary_data(&txns_to_commit, version)
+        .unwrap();
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
@@ -1047,62 +1060,4 @@ pub fn test_sync_transactions_impl(
             .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
             .collect(),
     );
-}
-
-pub fn gather_state_updates_until_last_checkpoint(
-    first_version: Version,
-    latest_in_memory_state: &StateDelta,
-    txns_to_commit: &[TransactionToCommit],
-) -> Option<ShardedStateUpdates> {
-    if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
-        if latest_checkpoint_version >= first_version {
-            let idx = (latest_checkpoint_version - first_version) as usize;
-            assert!(
-                    txns_to_commit[idx].is_state_checkpoint(),
-                    "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
-                    latest_checkpoint_version,
-                    first_version + idx as u64
-                );
-            let mut sharded_state_updates = create_empty_sharded_state_updates();
-            sharded_state_updates.par_iter_mut().enumerate().for_each(
-                |(shard_id, state_updates_shard)| {
-                    txns_to_commit[..=idx].iter().for_each(|txn_to_commit| {
-                        state_updates_shard.extend(txn_to_commit.state_updates()[shard_id].clone());
-                    })
-                },
-            );
-            return Some(sharded_state_updates);
-        }
-    }
-
-    None
-}
-
-/// Test only methods for the DB
-impl AptosDB {
-    pub fn save_transactions_for_test(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-    ) -> Result<()> {
-        let state_updates_until_last_checkpoint = gather_state_updates_until_last_checkpoint(
-            first_version,
-            &latest_in_memory_state,
-            txns_to_commit,
-        );
-        self.save_transactions(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            sync_commit,
-            latest_in_memory_state,
-            state_updates_until_last_checkpoint,
-            None,
-        )
-    }
 }

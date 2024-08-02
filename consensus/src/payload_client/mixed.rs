@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
 use crate::payload_client::user;
@@ -10,15 +11,10 @@ use crate::{
 };
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use aptos_logger::debug;
-use aptos_types::{
-    dkg::{DKGTranscript, DKGTranscriptMetadata},
-    on_chain_config::ValidatorTxnConfig,
-    validator_txn::ValidatorTransaction,
-};
+use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
 use futures::future::BoxFuture;
-use move_core_types::account_address::AccountAddress;
 #[cfg(test)]
 use std::collections::HashSet;
 use std::{
@@ -50,15 +46,18 @@ impl MixedPayloadClient {
 
     /// When enabled in smoke tests, generate 2 random validator transactions, 1 valid, 1 invalid.
     fn extra_test_only_vtxns(&self) -> Vec<ValidatorTransaction> {
-        fail_point!("mixed_payload_client::extra_test_only_vtxns", |_| vec![
-            ValidatorTransaction::DKGResult(DKGTranscript {
+        fail_point!("mixed_payload_client::extra_test_only_vtxns", |_| {
+            use aptos_types::dkg::{DKGTranscript, DKGTranscriptMetadata};
+            use move_core_types::account_address::AccountAddress;
+
+            vec![ValidatorTransaction::DKGResult(DKGTranscript {
                 metadata: DKGTranscriptMetadata {
                     epoch: 999,
                     author: AccountAddress::ZERO,
                 },
                 transcript_bytes: vec![],
-            }),
-        ]);
+            })]
+        });
         vec![]
     }
 }
@@ -69,13 +68,17 @@ impl PayloadClient for MixedPayloadClient {
         &self,
         mut max_poll_time: Duration,
         mut max_items: u64,
+        mut max_unique_items: u64,
         mut max_bytes: u64,
+        max_inline_items: u64,
+        max_inline_bytes: u64,
         validator_txn_filter: vtxn_pool::TransactionFilter,
         user_txn_filter: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
+        block_timestamp: Duration,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
         // Pull validator txns first.
         let validator_txn_pull_timer = Instant::now();
@@ -100,6 +103,7 @@ impl PayloadClient for MixedPayloadClient {
         debug!("num_validator_txns={}", validator_txns.len());
         // Update constraints with validator txn pull results.
         max_items -= validator_txns.len() as u64;
+        max_unique_items -= validator_txns.len() as u64;
         max_bytes -= validator_txns
             .iter()
             .map(|txn| txn.size_in_bytes())
@@ -112,12 +116,16 @@ impl PayloadClient for MixedPayloadClient {
             .pull(
                 max_poll_time,
                 max_items,
+                max_unique_items,
                 max_bytes,
+                max_inline_items,
+                max_inline_bytes,
                 user_txn_filter,
                 wait_callback,
                 pending_ordering,
                 pending_uncommitted_blocks,
                 recent_max_fill_fraction,
+                block_timestamp,
             )
             .await?;
 
@@ -148,14 +156,18 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
             Duration::from_secs(1), // max_poll_time
-            99,                     // max_items
+            120,                    // max_items
+            99,                     // max_unique_items
             1048576,                // size limit: 1MB
+            50,
+            500000, // inline limit: 500KB
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()
@@ -169,14 +181,18 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
             Duration::from_micros(500), // max_poll_time
-            99,                         // max_items
+            120,                        // max_items
+            99,                         // max_unique_items
             1048576,                    // size limit: 1MB
+            50,
+            500000, // inline limit: 500KB
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()
@@ -190,14 +206,18 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
             Duration::from_secs(1), // max_poll_time
-            1,                      // max_items
+            2,                      // max_items
+            2,                      // max_unique_items
             1048576,                // size limit: 1MB
+            0,
+            0, // inline limit: 0
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()
@@ -205,13 +225,16 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
         unreachable!()
     };
 
-    assert_eq!(1, pulled_validator_txns.len());
+    assert_eq!(2, pulled_validator_txns.len());
     assert_eq!(0, pulled_user_txns.len());
 
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
             Duration::from_secs(1), // max_poll_time
-            99,                     // max_items
+            120,                    // max_items
+            99,                     // max_unique_items
+            all_validator_txns[0].size_in_bytes() as u64,
+            50,
             all_validator_txns[0].size_in_bytes() as u64,
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
@@ -219,6 +242,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()
@@ -250,14 +274,18 @@ async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
             Duration::from_millis(50), // max_poll_time
-            99,                        // max_items
+            120,                       // max_items
+            99,                        // max_unique_items
             1048576,                   // size limit: 1MB
+            50,
+            500000, // inline limit: 500KB
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
             false,
             0,
             0.,
+            aptos_infallible::duration_since_epoch(),
         )
         .await
         .unwrap()

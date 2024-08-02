@@ -1,0 +1,114 @@
+
+Diagnostics:
+error: type `NoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:19:11
+   │
+ 9 │     fun c<T: copy>() {}
+   │           - declaration of type parameter `T`
+   ·
+19 │         c<NoC>();
+   │           ^^^
+   │
+   = required by instantiating type parameter `T:copy` of function `c`
+
+error: type `Cup<u64>` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:20:11
+   │
+ 9 │     fun c<T: copy>() {}
+   │           - declaration of type parameter `T`
+   ·
+20 │         c<Cup<u64>>();
+   │           ^^^^^^^^
+   │
+   = required by instantiating type parameter `T:copy` of function `c`
+
+error: type `NoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:21:11
+   │
+ 9 │     fun c<T: copy>() {}
+   │           - declaration of type parameter `T`
+   ·
+21 │         c<Box<NoC>>();
+   │           ^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T:copy` of function `c`
+
+error: type `NoK` is missing required ability `key`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:22:11
+   │
+10 │     fun k<T: key>() {}
+   │           - declaration of type parameter `T`
+   ·
+22 │         k<NoK>();
+   │           ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `k`
+
+error: type `Cup<u64>` is missing required ability `key`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:23:11
+   │
+10 │     fun k<T: key>() {}
+   │           - declaration of type parameter `T`
+   ·
+23 │         k<Cup<u64>>();
+   │           ^^^^^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `k`
+
+error: type `Cup<u64>` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:24:11
+   │
+10 │     fun k<T: key>() {}
+   │           - declaration of type parameter `T`
+   ·
+24 │         k<Box<Cup<u64>>>();
+   │           ^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T:key` of function `k`
+
+error: type `NoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:25:13
+   │
+11 │     fun cds<T: copy + drop + store>() {}
+   │             - declaration of type parameter `T`
+   ·
+25 │         cds<NoC>();
+   │             ^^^
+   │
+   = required by instantiating type parameter `T:copy + drop + store` of function `cds`
+
+error: type `Cup<u64>` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:26:13
+   │
+11 │     fun cds<T: copy + drop + store>() {}
+   │             - declaration of type parameter `T`
+   ·
+26 │         cds<Cup<u64>>();
+   │             ^^^^^^^^
+   │
+   = required by instantiating type parameter `T:copy + drop + store` of function `cds`
+
+error: type `Cup<NoC>` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:27:13
+   │
+11 │     fun cds<T: copy + drop + store>() {}
+   │             - declaration of type parameter `T`
+   ·
+27 │         cds<Cup<NoC>>();
+   │             ^^^^^^^^
+   │
+   = required by instantiating type parameter `T:copy + drop + store` of function `cds`
+
+error: type `NoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_structs_invalid.move:28:13
+   │
+11 │     fun cds<T: copy + drop + store>() {}
+   │             - declaration of type parameter `T`
+   ·
+28 │         cds<Pair<u64, NoC>>();
+   │             ^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `Pair`
+   = required by instantiating type parameter `T:copy + drop + store` of function `cds`

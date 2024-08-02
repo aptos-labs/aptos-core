@@ -5,13 +5,17 @@
 pub mod account;
 pub mod aggregator_natives;
 pub mod code;
+pub mod consensus_config;
 pub mod create_signer;
 pub mod cryptography;
 pub mod debug;
+pub mod dispatchable_fungible_asset;
 pub mod event;
+pub mod function_info;
 pub mod hash;
 pub mod object;
 pub mod object_code_deployment;
+pub mod randomness;
 pub mod state_storage;
 pub mod string_utils;
 pub mod transaction_context;
@@ -20,7 +24,7 @@ pub mod util;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
-use aptos_native_interface::SafeNativeBuilder;
+use aptos_native_interface::{RawSafeNative, SafeNativeBuilder};
 use cryptography::ed25519;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
@@ -35,6 +39,7 @@ pub mod status {
 pub fn all_natives(
     framework_addr: AccountAddress,
     builder: &SafeNativeBuilder,
+    inject_create_signer_for_gov_sim: bool,
 ) -> NativeFunctionTable {
     let mut natives = vec![];
 
@@ -62,6 +67,7 @@ pub fn all_natives(
     add_natives_from_module!("type_info", type_info::make_all(builder));
     add_natives_from_module!("util", util::make_all(builder));
     add_natives_from_module!("from_bcs", util::make_all(builder));
+    add_natives_from_module!("randomness", randomness::make_all(builder));
     add_natives_from_module!(
         "ristretto255_bulletproofs",
         cryptography::bulletproofs::make_all(builder)
@@ -79,6 +85,22 @@ pub fn all_natives(
     add_natives_from_module!("object", object::make_all(builder));
     add_natives_from_module!("debug", debug::make_all(builder));
     add_natives_from_module!("string_utils", string_utils::make_all(builder));
+    add_natives_from_module!("consensus_config", consensus_config::make_all(builder));
+    add_natives_from_module!("function_info", function_info::make_all(builder));
+    add_natives_from_module!(
+        "dispatchable_fungible_asset",
+        dispatchable_fungible_asset::make_all(builder)
+    );
+
+    if inject_create_signer_for_gov_sim {
+        add_natives_from_module!(
+            "aptos_governance",
+            builder.make_named_natives([(
+                "create_signer",
+                create_signer::native_create_signer as RawSafeNative
+            )])
+        );
+    }
 
     make_table_from_iter(framework_addr, natives)
 }

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
@@ -6,19 +6,18 @@ module 0x8675309::M {
     private fun t0(x: u64,r: M::R) {
         Mod<u64>(0, 0);
         Mod<u64>(1, 0);
-        Mod<u64>(0, 1);
-        Mod<u8>(0, 1);
-        Mod<u8>(0, 1);
-        Mod<u128>(0, 1);
-        Mod<u128>(0, 1);
-        Mod<u64>(0, 1);
+        0;
+        0;
+        0;
+        0;
+        0;
+        0;
         Mod<u64>(Copy(x), Move(x));
-        Mod<u64>(select M::R.f(r), select M::R.f(r));
-        Mod<u64>(Mod<u64>(Mod<u64>(1, select M::R.f(r)), select M::R.f(r)), 0);
+        Mod<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        Mod<u64>(Mod<u64>(Mod<u64>(1, select M::R.f<M::R>(r)), select M::R.f<M::R>(r)), 0);
         {
           let M::R{ f: _ } = r;
           Tuple()
         }
     }
-    spec fun $t0(x: u64,r: M::R);
 } // end 0x8675309::M

@@ -79,7 +79,6 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
   GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-  GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
   AWS_REGION: us-west-2
   IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
   FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}
@@ -108,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ inputs.GIT_SHA }}
@@ -153,7 +152,7 @@ jobs:
 
       - name: "Install GCloud SDK"
         if: ${{ !inputs.SKIP_JOB }}
-        uses: "google-github-actions/setup-gcloud@v1"
+        uses: "google-github-actions/setup-gcloud@v2"
         with:
           version: ">= 418.0.0"
           install_components: "kubectl,gke-gcloud-auth-plugin"

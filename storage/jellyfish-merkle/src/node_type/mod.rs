@@ -14,8 +14,9 @@
 mod node_type_test;
 
 use crate::{
+    get_hash,
     metrics::{APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES},
-    TreeReader,
+    Key, TreeReader,
 };
 use anyhow::{ensure, Context, Result};
 use aptos_crypto::{
@@ -28,18 +29,18 @@ use aptos_types::{
     transaction::Version,
 };
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
-use itertools::Itertools;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::cast::FromPrimitive;
 #[cfg(any(test, feature = "fuzzing"))]
-use proptest::{collection::hash_map, prelude::*};
+use proptest::{collection::btree_map, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::hash_map::HashMap,
+    collections::HashMap,
     io::{prelude::*, Cursor, Read, SeekFrom, Write},
     mem::size_of,
+    sync::Arc,
 };
 use thiserror::Error;
 
@@ -199,6 +200,21 @@ impl Child {
         }
     }
 
+    pub fn for_node<K: Key>(
+        parent_key: &NodeKey,
+        child_index: Nibble,
+        child_node: &Node<K>,
+        hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
+        version: Version,
+    ) -> Self {
+        let key = parent_key.gen_child_node_key(version, child_index);
+        Self {
+            hash: get_hash(&key, child_node, hash_cache),
+            version,
+            node_type: child_node.node_type(),
+        }
+    }
+
     pub fn is_leaf(&self) -> bool {
         matches!(self.node_type, NodeType::Leaf)
     }
@@ -214,7 +230,31 @@ impl Child {
 
 /// [`Children`] is just a collection of children belonging to a [`InternalNode`], indexed from 0 to
 /// 15, inclusive.
-pub(crate) type Children = HashMap<Nibble, Child>;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Children(Arc<[(Nibble, Child)]>);
+
+impl Children {
+    pub fn from_sorted(children: impl IntoIterator<Item = (Nibble, Child)>) -> Self {
+        let children = children.into_iter().collect::<Vec<_>>();
+
+        Self(children.into())
+    }
+
+    fn get(&self, nibble: &Nibble) -> Option<&Child> {
+        self.0
+            .binary_search_by_key(nibble, |(nibble, _child)| *nibble)
+            .ok()
+            .map(|idx| &self.0[idx].1)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (&Nibble, &Child)> {
+        self.0.iter().map(|(nibble, child)| (nibble, child))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
 
 /// Represents a 4-level subtree with 16 children at the bottom level. Theoretically, this reduces
 /// IOPS to query a tree by 4x since we compress 4 levels in a standard Merkle tree into 1 node.
@@ -281,8 +321,8 @@ impl Arbitrary for InternalNode {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
-        hash_map(any::<Nibble>(), any::<Child>(), 1..=16)
-            .prop_map(InternalNode::new)
+        btree_map(any::<Nibble>(), any::<Child>(), 1..=16)
+            .prop_map(|children| InternalNode::new(Children::from_sorted(children)))
             .boxed()
     }
 }
@@ -298,7 +338,7 @@ impl InternalNode {
         // a leaf node. Otherwise, the leaf node should be a child of this internal node's parent.
         ensure!(!children.is_empty(), "Children must not be empty");
 
-        let leaf_count = children.values().map(Child::leaf_count).sum();
+        let leaf_count = children.iter().map(|(_, child)| child.leaf_count()).sum();
         Ok(Self {
             children,
             leaf_count,
@@ -324,16 +364,14 @@ impl InternalNode {
     }
 
     pub fn children_sorted(&self) -> impl Iterator<Item = (&Nibble, &Child)> {
-        self.children.iter().sorted_by_key(|(nibble, _)| **nibble)
+        self.children.iter()
     }
 
     pub fn serialize(&self, binary: &mut Vec<u8>) -> Result<()> {
         let (mut existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
         binary.write_u16::<LittleEndian>(existence_bitmap)?;
         binary.write_u16::<LittleEndian>(leaf_bitmap)?;
-        for _ in 0..existence_bitmap.count_ones() {
-            let next_child = existence_bitmap.trailing_zeros() as u8;
-            let child = &self.children[&Nibble::from(next_child)];
+        for (next_child, child) in self.children.iter() {
             serialize_u64_varint(child.version, binary);
             binary.extend(child.hash.to_vec());
             match child.node_type {
@@ -343,7 +381,7 @@ impl InternalNode {
                 },
                 NodeType::Null => unreachable!("Child cannot be Null"),
             };
-            existence_bitmap &= !(1 << next_child);
+            existence_bitmap &= !(1 << next_child.as_usize());
         }
         Ok(())
     }
@@ -368,7 +406,7 @@ impl InternalNode {
         }
 
         // Reconstruct children
-        let mut children = HashMap::new();
+        let mut children = Vec::new();
         for _ in 0..existence_bitmap.count_ones() {
             let next_child = existence_bitmap.trailing_zeros() as u8;
             let version = deserialize_u64_varint(&mut reader)?;
@@ -392,15 +430,15 @@ impl InternalNode {
                 NodeType::Internal { leaf_count }
             };
 
-            children.insert(
+            children.push((
                 Nibble::from(next_child),
                 Child::new(hash, version, node_type),
-            );
+            ));
             existence_bitmap &= !child_bit;
         }
         assert_eq!(existence_bitmap, 0);
 
-        Self::new_impl(children)
+        Self::new_impl(Children::from_sorted(children))
     }
 
     /// Gets the `n`-th child.
@@ -559,10 +597,12 @@ impl InternalNode {
         node_key: &NodeKey,
         n: Nibble,
         reader: Option<&R>,
-    ) -> Result<(Option<NodeKey>, Vec<NodeInProof>)> {
+        out_siblings: &mut Vec<NodeInProof>,
+        root_depth: usize,
+        target_depth: usize,
+    ) -> Result<Option<NodeKey>> {
         assert!(self.leaf_count > 1);
 
-        let mut siblings = vec![];
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
 
         // Nibble height from 3 to 0.
@@ -572,26 +612,32 @@ impl InternalNode {
             let width = 1 << h;
             let (child_half_start, sibling_half_start) = get_child_and_sibling_half_start(n, h);
             // Compute the root hash of the subtree rooted at the sibling of `r`.
-            if let Some(reader) = reader {
-                siblings.push(self.gen_node_in_proof(
-                    sibling_half_start,
-                    width,
-                    (existence_bitmap, leaf_bitmap),
-                    (reader, node_key),
-                )?);
-            } else {
-                siblings.push(
-                    self.merkle_hash(sibling_half_start, width, (existence_bitmap, leaf_bitmap))
+            let depth = root_depth + 3 - h as usize;
+            if depth >= target_depth {
+                if let Some(reader) = reader {
+                    out_siblings.push(self.gen_node_in_proof(
+                        sibling_half_start,
+                        width,
+                        (existence_bitmap, leaf_bitmap),
+                        (reader, node_key),
+                    )?);
+                } else {
+                    out_siblings.push(
+                        self.merkle_hash(
+                            sibling_half_start,
+                            width,
+                            (existence_bitmap, leaf_bitmap),
+                        )
                         .into(),
-                );
+                    );
+                }
             }
-
             let (range_existence_bitmap, range_leaf_bitmap) =
                 Self::range_bitmaps(child_half_start, width, (existence_bitmap, leaf_bitmap));
 
             if range_existence_bitmap == 0 {
                 // No child in this range.
-                return Ok((None, siblings));
+                return Ok(None);
             } else if width == 1
                 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
             {
@@ -600,27 +646,36 @@ impl InternalNode {
                 // `None` because it's existence indirectly proves the n-th child doesn't exist.
                 // Please read proof format for details.
                 let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
-                return Ok((
-                    {
-                        let only_child_version = self
-                            .child(only_child_index)
-                            // Should be guaranteed by the self invariants, but these are not easy to express at the moment
-                            .with_context(|| {
-                                format!(
-                                    "Corrupted internal node: child_bitmap indicates \
-                                     the existence of a non-exist child at index {:x}",
-                                    only_child_index
-                                )
-                            })
-                            .unwrap()
-                            .version;
-                        Some(node_key.gen_child_node_key(only_child_version, only_child_index))
-                    },
-                    siblings,
+                let only_child_version = self
+                    .child(only_child_index)
+                    // Should be guaranteed by the self invariants, but these are not easy to express at the moment
+                    .with_context(|| {
+                        format!(
+                            "Corrupted internal node: child_bitmap indicates \
+                                 the existence of a non-exist child at index {:x}",
+                            only_child_index
+                        )
+                    })
+                    .unwrap()
+                    .version;
+                return Ok(Some(
+                    node_key.gen_child_node_key(only_child_version, only_child_index),
                 ));
             }
         }
         unreachable!("Impossible to get here without returning even at the lowest level.")
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_child_with_siblings_for_test<K: crate::Key, R: TreeReader<K>>(
+        &self,
+        node_key: &NodeKey,
+        n: Nibble,
+        reader: Option<&R>,
+    ) -> Result<(Option<NodeKey>, Vec<NodeInProof>)> {
+        let mut sibilings = vec![];
+        self.get_child_with_siblings(node_key, n, reader, &mut sibilings, 0, 0)
+            .map(|n| (n, sibilings))
     }
 }
 

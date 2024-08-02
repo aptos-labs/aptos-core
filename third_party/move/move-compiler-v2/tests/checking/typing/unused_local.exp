@@ -6,14 +6,6 @@ warning: Unused local variable `x`. Consider removing or prefixing with an under
 5 │         let x: u64;
   │             ^
 
-warning: Function `0x8675309::M::t0` is unused: it has no current callers and is private to its module.
-  ┌─ tests/checking/typing/unused_local.move:4:5
-  │
-4 │ ╭     fun t0() {
-5 │ │         let x: u64;
-6 │ │     }
-  │ ╰─────^
-
 warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ tests/checking/typing/unused_local.move:9:14
   │
@@ -25,14 +17,6 @@ warning: Unused local variable `y`. Consider removing or prefixing with an under
   │
 9 │         let (x, y): (u64, u64);
   │                 ^
-
-warning: Function `0x8675309::M::t1` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:8:5
-   │
- 8 │ ╭     fun t1() {
- 9 │ │         let (x, y): (u64, u64);
-10 │ │     }
-   │ ╰─────^
 
 warning: Unused local variable `f`. Consider removing or prefixing with an underscore: `_f`
    ┌─ tests/checking/typing/unused_local.move:13:16
@@ -46,42 +30,11 @@ warning: Unused local variable `g`. Consider removing or prefixing with an under
 13 │         let S{ f, g }: S;
    │                   ^
 
-warning: Function `0x8675309::M::t2` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:12:5
-   │
-12 │ ╭     fun t2() {
-13 │ │         let S{ f, g }: S;
-14 │ │     }
-   │ ╰─────^
-
-warning: Function `0x8675309::M::unused_local_suppressed1` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:16:5
-   │
-16 │ ╭     fun unused_local_suppressed1() {
-17 │ │         let _x: u64;
-18 │ │     }
-   │ ╰─────^
-
-warning: Function `0x8675309::M::unused_local_suppressed2` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:20:5
-   │
-20 │ ╭     fun unused_local_suppressed2() {
-21 │ │         let _: u64;
-22 │ │     }
-   │ ╰─────^
-
 warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
    ┌─ tests/checking/typing/unused_local.move:25:22
    │
 25 │     fun unused_param(x: u64) {
    │                      ^
-
-warning: Function `0x8675309::M::unused_param` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:25:5
-   │
-25 │ ╭     fun unused_param(x: u64) {
-26 │ │     }
-   │ ╰─────^
 
 warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
    ┌─ tests/checking/typing/unused_local.move:28:20
@@ -95,26 +48,11 @@ warning: Unused parameter `y`. Consider removing or prefixing with an underscore
 28 │     fun two_unused(x: u64, y: bool) {
    │                            ^
 
-warning: Function `0x8675309::M::two_unused` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:28:5
-   │
-28 │ ╭     fun two_unused(x: u64, y: bool) {
-29 │ │     }
-   │ ╰─────^
-
 warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
    ┌─ tests/checking/typing/unused_local.move:31:35
    │
 31 │     fun unused_param1_used_param2(x: u64, y: bool): bool {
    │                                   ^
-
-warning: Function `0x8675309::M::unused_param1_used_param2` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:31:5
-   │
-31 │ ╭     fun unused_param1_used_param2(x: u64, y: bool): bool {
-32 │ │         y
-33 │ │     }
-   │ ╰─────^
 
 warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
    ┌─ tests/checking/typing/unused_local.move:35:43
@@ -122,55 +60,21 @@ warning: Unused parameter `y`. Consider removing or prefixing with an underscore
 35 │     fun unused_param2_used_param1(x: u64, y: bool): u64 {
    │                                           ^
 
-warning: Function `0x8675309::M::unused_param2_used_param1` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:35:5
-   │
-35 │ ╭     fun unused_param2_used_param1(x: u64, y: bool): u64 {
-36 │ │         x
-37 │ │     }
-   │ ╰─────^
-
-warning: Function `0x8675309::M::unused_param_suppressed1` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:39:5
-   │
-39 │ ╭     fun unused_param_suppressed1(_: u64) {
-40 │ │     }
-   │ ╰─────^
-
-warning: Function `0x8675309::M::unused_param_suppressed2` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:42:5
-   │
-42 │ ╭     fun unused_param_suppressed2(_x: u64) {
-43 │ │     }
-   │ ╰─────^
-
-warning: Function `0x8675309::M::unused_native_ok` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_local.move:45:5
-   │
-45 │     native fun unused_native_ok(x: u64, y: bool);
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
         g: bool,
     }
     private fun t0() {
-        {
-          let x: u64;
-          Tuple()
-        }
+        Tuple()
     }
     private fun t1() {
-        {
-          let (x: u64, y: u64);
-          Tuple()
-        }
+        Tuple()
     }
     private fun t2() {
         {
-          let M::S{ f: f: u64, g: g: bool };
+          let M::S{ f, g };
           Tuple()
         }
     }
@@ -178,16 +82,10 @@ module 0x8675309::M {
         Tuple()
     }
     private fun unused_local_suppressed1() {
-        {
-          let _x: u64;
-          Tuple()
-        }
+        Tuple()
     }
     private fun unused_local_suppressed2() {
-        {
-          let _;
-          Tuple()
-        }
+        Tuple()
     }
     private native fun unused_native_ok(x: u64,y: bool);
     private fun unused_param(x: u64) {
@@ -203,55 +101,6 @@ module 0x8675309::M {
         Tuple()
     }
     private fun unused_param_suppressed2(_x: u64) {
-        Tuple()
-    }
-    spec fun $t0() {
-        {
-          let x: u64;
-          Tuple()
-        }
-    }
-    spec fun $t1() {
-        {
-          let (x: u64, y: u64);
-          Tuple()
-        }
-    }
-    spec fun $t2() {
-        {
-          let M::S{ f: f: u64, g: g: bool };
-          Tuple()
-        }
-    }
-    spec fun $two_unused(x: u64,y: bool) {
-        Tuple()
-    }
-    spec fun $unused_local_suppressed1() {
-        {
-          let _x: u64;
-          Tuple()
-        }
-    }
-    spec fun $unused_local_suppressed2() {
-        {
-          let _;
-          Tuple()
-        }
-    }
-    spec fun $unused_native_ok(x: u64,y: bool);
-    spec fun $unused_param(x: u64) {
-        Tuple()
-    }
-    spec fun $unused_param1_used_param2(x: u64,y: bool): bool {
-        y
-    }
-    spec fun $unused_param2_used_param1(x: u64,y: bool): u64 {
-        x
-    }
-    spec fun $unused_param_suppressed1(_: u64) {
-        Tuple()
-    }
-    spec fun $unused_param_suppressed2(_x: u64) {
         Tuple()
     }
 } // end 0x8675309::M

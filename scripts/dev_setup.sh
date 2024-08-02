@@ -16,6 +16,7 @@
 # fast fail.
 set -eo pipefail
 
+NODE_MAJOR_VERSION=20
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
 KUBECTL_VERSION=1.18.6
@@ -50,6 +51,7 @@ function usage {
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
+  echo "-k skip pre-commit"
   echo "If no toolchain component is selected with -t, -o, -y, -d, or -p, the behavior is as if -t had been provided."
   echo "This command must be called from the root folder of the Aptos-core project."
 }
@@ -145,9 +147,9 @@ function install_protoc {
   (
     cd "$TMPFILE" || exit
     curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip" --retry 3
-    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
-    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
-    sudo chmod +x "/usr/local/bin/protoc"
+    "${PRE_COMMAND[@]}" unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
+    "${PRE_COMMAND[@]}" unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
+    "${PRE_COMMAND[@]}" chmod +x "/usr/local/bin/protoc"
   )
   rm -rf "$TMPFILE"
 
@@ -496,6 +498,12 @@ function install_cargo_sort {
   fi
 }
 
+function install_cargo_machete {
+  if ! command -v cargo-machete &>/dev/null; then
+    cargo install cargo-machete --locked
+  fi
+}
+
 function install_cargo_nextest {
   if ! command -v cargo-nextest &>/dev/null; then
     cargo install cargo-nextest --locked
@@ -535,7 +543,7 @@ function install_dotnet {
     # Below we need to (a) set TERM variable because the .net installer expects it and it is not set
     # in some environments (b) use bash not sh because the installer uses bash features.
     # NOTE: use wget to better follow the redirect
-    wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+    wget --tries 10 --retry-connrefused --waitretry=5 https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
     chmod +x dotnet-install.sh
     ./dotnet-install.sh --channel $DOTNET_VERSION --install-dir "${DOTNET_INSTALL_DIR}" --version latest
     rm dotnet-install.sh
@@ -648,9 +656,8 @@ function install_xsltproc {
 
 function install_nodejs {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    # install via nodesource: https://github.com/nodesource/distributions/issues/1709#issuecomment-1788473588
-    NODE_MAJOR=18
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" -o nodesource_setup.sh
+    "${PRE_COMMAND[@]}" -E bash nodesource_setup.sh
   fi
   install_pkg nodejs "$PACKAGE_MANAGER"
   install_pkg npm "$PACKAGE_MANAGER"
@@ -847,9 +854,10 @@ INSTALL_INDIVIDUAL=false
 INSTALL_PACKAGES=()
 INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
+SKIP_PRE_COMMIT=false
 
 #parse args
-while getopts "btoprvydaPJh:i:n" arg; do
+while getopts "btoprvydaPJh:i:nk" arg; do
   case "$arg" in
   b)
     BATCH_MODE="true"
@@ -891,6 +899,9 @@ while getopts "btoprvydaPJh:i:n" arg; do
     ;;
   n)
     OPT_DIR="true"
+    ;;
+  k)
+    SKIP_PRE_COMMIT="true"
     ;;
   *)
     usage
@@ -1005,6 +1016,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_rustup_components_and_nightly
 
   install_cargo_sort
+  install_cargo_machete
   install_cargo_nextest
   install_grcov
   install_pkg git "$PACKAGE_MANAGER"
@@ -1087,19 +1099,22 @@ if [[ "$INSTALL_JSTS" == "true" ]]; then
   install_solidity
 fi
 
-install_python3
-if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
-  pip3 install pre-commit
-  install_libudev-dev
-else
-  install_pkg python-pre-commit "$PACKAGE_MANAGER"
-fi
+install_libudev-dev
 
-# For now best effort install, will need to improve later
-if command -v pre-commit; then
-  pre-commit install
-else
-  ~/.local/bin/pre-commit install
+install_python3
+if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
+  if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
+    pip3 install pre-commit
+  else
+    install_pkg python-pre-commit "$PACKAGE_MANAGER"
+  fi
+
+  # For now best effort install, will need to improve later
+  if command -v pre-commit; then
+    pre-commit install
+  else
+    ~/.local/bin/pre-commit install
+  fi
 fi
 
 if [[ "${BATCH_MODE}" == "false" ]]; then

@@ -149,7 +149,7 @@ fn generate_sync_info(
         ),
         ledger_info,
     );
-    let commit_cert = quorum_cert.clone();
+    let commit_cert = quorum_cert.into_wrapped_ledger_info();
     let tc = TwoChainTimeoutCertificate::new(TwoChainTimeout::new(
         1,
         timeout_round,

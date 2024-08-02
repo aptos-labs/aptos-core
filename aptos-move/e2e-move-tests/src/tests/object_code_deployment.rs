@@ -5,7 +5,7 @@ use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveH
 use aptos_framework::{
     natives::{
         code::{PackageRegistry, UpgradePolicy},
-        object_code_deployment::PublisherRef,
+        object_code_deployment::ManagingRefs,
     },
     BuildOptions,
 };
@@ -74,7 +74,16 @@ impl TestContext {
         options
             .named_addresses
             .insert(MODULE_ADDRESS_NAME.to_string(), self.object_address);
+        self.execute_object_code_action_with_options(account, path, action, options)
+    }
 
+    fn execute_object_code_action_with_options(
+        &mut self,
+        account: &Account,
+        path: &str,
+        action: ObjectCodeAction,
+        options: BuildOptions,
+    ) -> TransactionStatus {
         match action {
             ObjectCodeAction::Deploy => self.harness.object_code_deployment_package(
                 account,
@@ -118,10 +127,13 @@ impl TestContext {
 }
 
 const MODULE_ADDRESS_NAME: &str = "object";
+const MUT_DEPS_MODULE_ADDRESS_NAME: &str = "object_mutable_deps";
+const IMMUT_DEPS_MODULE_ADDRESS_NAME: &str = "object_immutable_deps";
 const PACKAGE_REGISTRY_ACCESS_PATH: &str = "0x1::code::PackageRegistry";
 const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: &str = "EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED";
 const ENOT_CODE_OBJECT_OWNER: &str = "ENOT_CODE_OBJECT_OWNER";
 const ENOT_PACKAGE_OWNER: &str = "ENOT_PACKAGE_OWNER";
+const EDEP_WEAKER_POLICY: &str = "EDEP_WEAKER_POLICY";
 
 /// Tests the `publish` object code deployment function with feature flags enabled/disabled.
 /// Deployment should only happen when feature is enabled.
@@ -150,16 +162,16 @@ fn object_code_deployment_publish_package(enabled: Vec<FeatureFlag>, disabled: V
         assert_eq!(registry.packages[0].modules.len(), 1);
         assert_eq!(registry.packages[0].modules[0].name, "test");
 
-        let publisher_ref: PublisherRef = context
+        let code_object: ManagingRefs = context
             .harness
             .read_resource_from_resource_group(
                 &context.object_address,
                 parse_struct_tag("0x1::object::ObjectGroup").unwrap(),
-                parse_struct_tag("0x1::object_code_deployment::PublisherRef").unwrap(),
+                parse_struct_tag("0x1::object_code_deployment::ManagingRefs").unwrap(),
             )
             .unwrap();
-        // Verify the object created owns the `PublisherRef`
-        assert_eq!(publisher_ref, PublisherRef::new(context.object_address));
+        // Verify the object created owns the `ManagingRefs`
+        assert_eq!(code_object, ManagingRefs::new(context.object_address));
 
         let module_address = context.object_address.to_string();
         assert_success!(context.harness.run_entry_function(
@@ -244,8 +256,8 @@ fn object_code_deployment_upgrade_fail_when_publisher_ref_does_not_exist() {
     let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
-    // We should not be able to `upgrade` as `PublisherRef` does not exist.
-    // `PublisherRef` is only created when calling `publish` first, i.e. deploying a package.
+    // We should not be able to `upgrade` as `ManagingRefs` does not exist.
+    // `ManagingRefs` is only created when calling `publish` first, i.e. deploying a package.
     let status = context.execute_object_code_action(
         &acc,
         "object_code_deployment.data/pack_initial",
@@ -360,6 +372,75 @@ fn freeze_code_object_fail_when_not_owner() {
         context.execute_object_code_action(&different_account, "", ObjectCodeAction::Freeze);
 
     context.assert_feature_flag_error(status, ENOT_PACKAGE_OWNER);
+}
+
+#[test]
+fn freeze_code_object_fail_when_having_mutable_dependency() {
+    let mut context = TestContext::new(None, None);
+    let acc = context.account.clone();
+
+    assert_success!(context.execute_object_code_action(
+        &acc,
+        "object_code_deployment.data/pack_upgrade_compat",
+        ObjectCodeAction::Deploy,
+    ));
+    let mut options = BuildOptions::default();
+    options
+        .named_addresses
+        .insert(MODULE_ADDRESS_NAME.to_string(), context.object_address);
+    let sequence_number = context.harness.sequence_number(acc.address());
+    context.object_address =
+        create_object_code_deployment_address(*acc.address(), sequence_number + 1);
+    options.named_addresses.insert(
+        MUT_DEPS_MODULE_ADDRESS_NAME.to_string(),
+        context.object_address,
+    );
+    assert_success!(context.execute_object_code_action_with_options(
+        &acc,
+        "object_code_deployment.data/pack_mutable_deps",
+        ObjectCodeAction::Deploy,
+        options
+    ));
+
+    // Freezing a package with upgradeable dependencies is not allowed.
+    let status = context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
+    context.assert_feature_flag_error(status, EDEP_WEAKER_POLICY);
+}
+
+#[test]
+fn freeze_code_object_succeeds_when_all_dependencies_immutable() {
+    let mut context = TestContext::new(None, None);
+    let acc = context.account.clone();
+
+    // Deploy immutable dependency package
+    assert_success!(context.execute_object_code_action(
+        &acc,
+        "object_code_deployment.data/pack_initial_immutable",
+        ObjectCodeAction::Deploy,
+    ));
+    let mut options = BuildOptions::default();
+    options
+        .named_addresses
+        .insert(MODULE_ADDRESS_NAME.to_string(), context.object_address);
+    let sequence_number = context.harness.sequence_number(acc.address());
+    context.object_address =
+        create_object_code_deployment_address(*acc.address(), sequence_number + 1);
+    options.named_addresses.insert(
+        IMMUT_DEPS_MODULE_ADDRESS_NAME.to_string(),
+        context.object_address,
+    );
+
+    // Deploy mutable package with immutable dependency
+    assert_success!(context.execute_object_code_action_with_options(
+        &acc,
+        "object_code_deployment.data/pack_immutable_deps",
+        ObjectCodeAction::Deploy,
+        options
+    ));
+
+    // Attempt to freeze the initial package
+    let status = context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
+    assert_success!(status);
 }
 
 #[test]

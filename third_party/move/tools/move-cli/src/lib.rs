@@ -4,13 +4,12 @@
 
 use base::{
     build::Build, coverage::Coverage, disassemble::Disassemble, docgen::Docgen, errmap::Errmap,
-    movey_login::MoveyLogin, movey_upload::MoveyUpload, new::New, prove::Prove, test::Test,
+    new::New, prove::Prove, test::Test,
 };
 use move_package::BuildConfig;
 
 pub mod base;
-pub mod sandbox;
-pub mod utils;
+pub mod test;
 
 /// Default directory where saved Move resources live
 pub const DEFAULT_STORAGE_DIR: &str = "storage";
@@ -18,13 +17,10 @@ pub const DEFAULT_STORAGE_DIR: &str = "storage";
 /// Default directory for build output
 pub const DEFAULT_BUILD_DIR: &str = ".";
 
-/// Extension for resource and event files, which are in BCS format
-const BCS_EXTENSION: &str = "bcs";
-
 use anyhow::Result;
 use clap::Parser;
 use move_core_types::{
-    account_address::AccountAddress, errmap::ErrorMapping, identifier::Identifier,
+    account_address::AccountAddress, effects::ChangeSet, identifier::Identifier,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_test_utils::gas_schedule::CostTable;
@@ -67,28 +63,15 @@ pub enum Command {
     Disassemble(Disassemble),
     Docgen(Docgen),
     Errmap(Errmap),
-    MoveyUpload(MoveyUpload),
     New(New),
     Prove(Prove),
     Test(Test),
-    /// Execute a sandbox command.
-    #[clap(name = "sandbox")]
-    Sandbox {
-        /// Directory storing Move resources, events, and module bytecodes produced by module publishing
-        /// and script execution.
-        #[clap(long, default_value = DEFAULT_STORAGE_DIR, value_parser)]
-        storage_dir: PathBuf,
-        #[clap(subcommand)]
-        cmd: sandbox::cli::SandboxCommand,
-    },
-    #[clap(name = "movey-login")]
-    MoveyLogin(MoveyLogin),
 }
 
 pub fn run_cli(
     natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
     cost_table: &CostTable,
-    error_descriptions: &ErrorMapping,
     move_args: Move,
     cmd: Command,
 ) -> Result<()> {
@@ -101,39 +84,25 @@ pub fn run_cli(
         Command::Disassemble(c) => c.execute(move_args.package_path, move_args.build_config),
         Command::Docgen(c) => c.execute(move_args.package_path, move_args.build_config),
         Command::Errmap(c) => c.execute(move_args.package_path, move_args.build_config),
-        Command::MoveyUpload(c) => c.execute(move_args.package_path),
         Command::New(c) => c.execute_with_defaults(move_args.package_path),
         Command::Prove(c) => c.execute(move_args.package_path, move_args.build_config),
         Command::Test(c) => c.execute(
             move_args.package_path,
             move_args.build_config,
             natives,
+            genesis,
             Some(cost_table.clone()),
         ),
-        Command::Sandbox { storage_dir, cmd } => cmd.handle_command(
-            natives,
-            cost_table,
-            error_descriptions,
-            &move_args,
-            &storage_dir,
-        ),
-        Command::MoveyLogin(c) => c.execute(),
     }
 }
 
 pub fn move_cli(
     natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
     cost_table: &CostTable,
-    error_descriptions: &ErrorMapping,
 ) -> Result<()> {
     let args = MoveCLI::parse();
-    run_cli(
-        natives,
-        cost_table,
-        error_descriptions,
-        args.move_args,
-        args.cmd,
-    )
+    run_cli(natives, genesis, cost_table, args.move_args, args.cmd)
 }
 
 #[test]

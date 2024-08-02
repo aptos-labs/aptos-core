@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: function `0x2::X::f_private` cannot be called from function `0x2::M::f_script_call_private` because it is private to module `0x2::X`
+   ┌─ tests/visibility-checker/v1-typing/module_call_entry_function_was_invalid.move:8:9
+   │
+ 8 │     fun f_private() {}
+   │         ^^^^^^^^^ callee
+   ·
+26 │     public entry fun f_script_call_private() { X::f_private() }
+   │                                                -------------- called here

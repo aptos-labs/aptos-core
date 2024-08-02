@@ -1,0 +1,22 @@
+
+Diagnostics:
+error: function `0x2::X::foo` cannot be called from a script because it is not public
+   ┌─ tests/visibility-checker/v1-typing/main_call_visibility_friend.move:3:24
+   │
+ 3 │     public(friend) fun foo() {}
+   │                        ^^^ callee
+   ·
+13 │     0x2::X::foo();
+   │     ------------- called here
+14 │     0x2::X::bar();
+15 │     0x2::X::foo();
+   │     ------------- called here
+
+error: function `0x2::X::baz` cannot be called from a script because it is not public
+   ┌─ tests/visibility-checker/v1-typing/main_call_visibility_friend.move:7:9
+   │
+ 7 │     fun baz() {}
+   │         ^^^ callee
+   ·
+16 │     0x2::X::baz();
+   │     ------------- called here

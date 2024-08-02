@@ -12,8 +12,6 @@
 
 pub use crate::db::AptosDB;
 
-#[cfg(feature = "consensus-only-perf-test")]
-pub mod fake_aptosdb;
 // Used in this and other crates for testing.
 
 pub mod backup;

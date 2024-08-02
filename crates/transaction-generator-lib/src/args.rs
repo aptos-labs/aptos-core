@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType};
+use crate::{
+    publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind,
+    WorkflowProgress,
+};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +22,7 @@ pub enum TransactionTypeArg {
     PublishPackage,
     // Simple EntryPoints
     NoOp,
+    NoOpFeePayer,
     NoOp2Signers,
     NoOp5Signers,
     AccountResource32B,
@@ -31,6 +35,7 @@ pub enum TransactionTypeArg {
     ModifyGlobalResourceAggV2,
     ModifyGlobalFlagAggV2,
     ModifyGlobalBoundedAggV2,
+    ModifyGlobalMilestoneAggV2,
     // Complex EntryPoints
     CreateObjects10,
     CreateObjects10WithPayload10k,
@@ -48,7 +53,13 @@ pub enum TransactionTypeArg {
     TokenV1NFTMintAndTransferParallel,
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
+    // register if not registered already
+    CoinInitAndMint,
+    FungibleAssetMint,
     TokenV2AmbassadorMint,
+    TokenV2AmbassadorMintAndBurn1M,
+    LiquidityPoolSwap,
+    LiquidityPoolSwapStable,
     VectorPictureCreate30k,
     VectorPicture30k,
     VectorPictureRead30k,
@@ -56,20 +67,31 @@ pub enum TransactionTypeArg {
     VectorPicture40,
     VectorPictureRead40,
     SmartTablePicture30KWith200Change,
-    SmartTablePicture1MWith1KChange,
-    SmartTablePicture1BWith1KChange,
+    SmartTablePicture1MWith256Change,
+    SmartTablePicture1BWith256Change,
+    SmartTablePicture1MWith1KChangeExceedsLimit,
+    DeserializeU256,
 }
 
 impl TransactionTypeArg {
     pub fn materialize_default(&self) -> TransactionType {
-        self.materialize(1, false)
+        self.materialize(1, false, WorkflowProgress::when_done_default())
     }
 
     pub fn materialize(
         &self,
         module_working_set_size: usize,
         sender_use_account_pool: bool,
+        workflow_progress_type: WorkflowProgress,
     ) -> TransactionType {
+        let call_custom_module = |entry_point: EntryPoints| -> TransactionType {
+            TransactionType::CallCustomModules {
+                entry_point,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            }
+        };
+
         match self {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
@@ -101,282 +123,190 @@ impl TransactionTypeArg {
             TransactionTypeArg::Batch100Transfer => {
                 TransactionType::BatchTransfer { batch_size: 100 }
             },
-            TransactionTypeArg::AccountResource32B => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::BytesMakeOrChange {
+            TransactionTypeArg::AccountResource32B => {
+                call_custom_module(EntryPoints::BytesMakeOrChange {
                     data_length: Some(32),
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+                })
             },
-            TransactionTypeArg::AccountResource1KB => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::BytesMakeOrChange {
+            TransactionTypeArg::AccountResource1KB => {
+                call_custom_module(EntryPoints::BytesMakeOrChange {
                     data_length: Some(1024),
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+                })
             },
-            TransactionTypeArg::AccountResource10KB => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::BytesMakeOrChange {
+            TransactionTypeArg::AccountResource10KB => {
+                call_custom_module(EntryPoints::BytesMakeOrChange {
                     data_length: Some(10 * 1024),
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+                })
             },
-            TransactionTypeArg::ModifyGlobalResource => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::IncGlobal,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::ModifyGlobalResource => call_custom_module(EntryPoints::IncGlobal),
+            TransactionTypeArg::ModifyGlobalResourceAggV2 => {
+                call_custom_module(EntryPoints::IncGlobalAggV2)
             },
-            TransactionTypeArg::ModifyGlobalResourceAggV2 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::IncGlobalAggV2,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
-            TransactionTypeArg::ModifyGlobalFlagAggV2 => TransactionType::CallCustomModules {
+            TransactionTypeArg::ModifyGlobalFlagAggV2 => call_custom_module(
                 // 100 is max, so equivalent to flag
-                entry_point: EntryPoints::ModifyGlobalBoundedAggV2 { step: 100 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+                EntryPoints::ModifyGlobalBoundedAggV2 { step: 100 },
+            ),
+            TransactionTypeArg::ModifyGlobalBoundedAggV2 => {
+                call_custom_module(EntryPoints::ModifyGlobalBoundedAggV2 { step: 10 })
             },
-            TransactionTypeArg::ModifyGlobalBoundedAggV2 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::ModifyGlobalBoundedAggV2 { step: 10 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::ModifyGlobalMilestoneAggV2 => {
+                call_custom_module(EntryPoints::IncGlobalMilestoneAggV2 {
+                    milestone_every: 1000,
+                })
             },
-            TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Nop,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
-            TransactionTypeArg::NoOp2Signers => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Nop,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
-            TransactionTypeArg::NoOp5Signers => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Nop,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
-            TransactionTypeArg::Loop100k => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Loop {
-                    loop_count: Some(100000),
-                    loop_type: LoopType::NoOp,
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
-            TransactionTypeArg::Loop10kArithmetic => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Loop {
-                    loop_count: Some(10000),
-                    loop_type: LoopType::Arithmetic,
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
-            TransactionTypeArg::Loop1kBcs1k => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Loop {
-                    loop_count: Some(1000),
-                    loop_type: LoopType::BcsToBytes { len: 1024 },
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
-            TransactionTypeArg::CreateObjects10 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::CreateObjects {
-                    num_objects: 10,
-                    object_payload_size: 0,
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
+            TransactionTypeArg::NoOp => call_custom_module(EntryPoints::Nop),
+            TransactionTypeArg::NoOpFeePayer => call_custom_module(EntryPoints::NopFeePayer),
+            TransactionTypeArg::NoOp2Signers => call_custom_module(EntryPoints::Nop),
+            TransactionTypeArg::NoOp5Signers => call_custom_module(EntryPoints::Nop),
+            TransactionTypeArg::Loop100k => call_custom_module(EntryPoints::Loop {
+                loop_count: Some(100000),
+                loop_type: LoopType::NoOp,
+            }),
+            TransactionTypeArg::Loop10kArithmetic => call_custom_module(EntryPoints::Loop {
+                loop_count: Some(10000),
+                loop_type: LoopType::Arithmetic,
+            }),
+            TransactionTypeArg::Loop1kBcs1k => call_custom_module(EntryPoints::Loop {
+                loop_count: Some(1000),
+                loop_type: LoopType::BcsToBytes { len: 1024 },
+            }),
+            TransactionTypeArg::CreateObjects10 => call_custom_module(EntryPoints::CreateObjects {
+                num_objects: 10,
+                object_payload_size: 0,
+            }),
             TransactionTypeArg::CreateObjects10WithPayload10k => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::CreateObjects {
-                        num_objects: 10,
-                        object_payload_size: 10 * 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::CreateObjects {
+                    num_objects: 10,
+                    object_payload_size: 10 * 1024,
+                })
             },
             TransactionTypeArg::CreateObjectsConflict10WithPayload10k => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::CreateObjectsConflict {
-                        num_objects: 10,
-                        object_payload_size: 10 * 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::CreateObjectsConflict {
+                    num_objects: 10,
+                    object_payload_size: 10 * 1024,
+                })
             },
-            TransactionTypeArg::CreateObjects100 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::CreateObjects {
+            TransactionTypeArg::CreateObjects100 => {
+                call_custom_module(EntryPoints::CreateObjects {
                     num_objects: 100,
                     object_payload_size: 0,
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+                })
             },
             TransactionTypeArg::CreateObjects100WithPayload10k => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::CreateObjects {
-                        num_objects: 100,
-                        object_payload_size: 10 * 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::CreateObjects {
+                    num_objects: 100,
+                    object_payload_size: 10 * 1024,
+                })
             },
             TransactionTypeArg::CreateObjectsConflict100WithPayload10k => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::CreateObjectsConflict {
-                        num_objects: 100,
-                        object_payload_size: 10 * 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::CreateObjectsConflict {
+                    num_objects: 100,
+                    object_payload_size: 10 * 1024,
+                })
             },
             TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::ResourceGroupsGlobalWriteTag {
-                        string_length: 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::ResourceGroupsGlobalWriteTag {
+                    string_length: 1024,
+                })
             },
             TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::ResourceGroupsGlobalWriteAndReadTag {
-                        string_length: 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::ResourceGroupsGlobalWriteAndReadTag {
+                    string_length: 1024,
+                })
             },
             TransactionTypeArg::ResourceGroupsSenderWriteTag1KB => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::ResourceGroupsSenderWriteTag {
-                        string_length: 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::ResourceGroupsSenderWriteTag {
+                    string_length: 1024,
+                })
             },
             TransactionTypeArg::ResourceGroupsSenderMultiChange1KB => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::ResourceGroupsSenderMultiChange {
-                        string_length: 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::ResourceGroupsSenderMultiChange {
+                    string_length: 1024,
+                })
             },
             TransactionTypeArg::TokenV1NFTMintAndStoreSequential => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::TokenV1MintAndStoreNFTSequential,
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::TokenV1MintAndStoreNFTSequential)
             },
             TransactionTypeArg::TokenV1NFTMintAndTransferSequential => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::TokenV1MintAndTransferNFTSequential,
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::TokenV1MintAndTransferNFTSequential)
             },
             TransactionTypeArg::TokenV1NFTMintAndStoreParallel => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::TokenV1MintAndStoreNFTParallel,
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::TokenV1MintAndStoreNFTParallel)
             },
             TransactionTypeArg::TokenV1NFTMintAndTransferParallel => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::TokenV1MintAndTransferNFTParallel)
             },
-            TransactionTypeArg::TokenV1FTMintAndStore => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::TokenV1MintAndStoreFT,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::TokenV1FTMintAndStore => {
+                call_custom_module(EntryPoints::TokenV1MintAndStoreFT)
             },
-            TransactionTypeArg::TokenV1FTMintAndTransfer => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::TokenV1MintAndTransferFT,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::TokenV1FTMintAndTransfer => {
+                call_custom_module(EntryPoints::TokenV1MintAndTransferFT)
             },
-            TransactionTypeArg::TokenV2AmbassadorMint => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::TokenV2AmbassadorMint,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::CoinInitAndMint => call_custom_module(EntryPoints::CoinInitAndMint),
+            TransactionTypeArg::FungibleAssetMint => {
+                call_custom_module(EntryPoints::FungibleAssetMint)
             },
-            TransactionTypeArg::VectorPictureCreate30k => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::TokenV2AmbassadorMint => {
+                call_custom_module(EntryPoints::TokenV2AmbassadorMint { numbered: true })
             },
-            TransactionTypeArg::VectorPicture30k => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::VectorPicture { length: 30 * 1024 },
-                num_modules: module_working_set_size,
+            TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::CreateMintBurn {
+                    count: 10000,
+                    creation_balance: 200000,
+                },
+                num_modules: 1,
                 use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
             },
-            TransactionTypeArg::VectorPictureRead30k => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::VectorPictureRead { length: 30 * 1024 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::LiquidityPoolSwap => {
+                call_custom_module(EntryPoints::LiquidityPoolSwap { is_stable: false })
             },
-            TransactionTypeArg::VectorPictureCreate40 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::InitializeVectorPicture { length: 40 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::LiquidityPoolSwapStable => {
+                call_custom_module(EntryPoints::LiquidityPoolSwap { is_stable: true })
             },
-            TransactionTypeArg::VectorPicture40 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::VectorPicture { length: 40 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::VectorPictureCreate30k => {
+                call_custom_module(EntryPoints::InitializeVectorPicture { length: 30 * 1024 })
             },
-            TransactionTypeArg::VectorPictureRead40 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::VectorPictureRead { length: 40 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::VectorPicture30k => {
+                call_custom_module(EntryPoints::VectorPicture { length: 30 * 1024 })
+            },
+            TransactionTypeArg::VectorPictureRead30k => {
+                call_custom_module(EntryPoints::VectorPictureRead { length: 30 * 1024 })
+            },
+            TransactionTypeArg::VectorPictureCreate40 => {
+                call_custom_module(EntryPoints::InitializeVectorPicture { length: 40 })
+            },
+            TransactionTypeArg::VectorPicture40 => {
+                call_custom_module(EntryPoints::VectorPicture { length: 40 })
+            },
+            TransactionTypeArg::VectorPictureRead40 => {
+                call_custom_module(EntryPoints::VectorPictureRead { length: 40 })
             },
             TransactionTypeArg::SmartTablePicture30KWith200Change => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::SmartTablePicture {
-                        length: 30 * 1024,
-                        num_points_per_txn: 200,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+                call_custom_module(EntryPoints::SmartTablePicture {
+                    length: 30 * 1024,
+                    num_points_per_txn: 200,
+                })
             },
-            TransactionTypeArg::SmartTablePicture1MWith1KChange => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::SmartTablePicture {
-                        length: 1024 * 1024,
-                        num_points_per_txn: 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+            TransactionTypeArg::SmartTablePicture1MWith256Change => {
+                call_custom_module(EntryPoints::SmartTablePicture {
+                    length: 1024 * 1024,
+                    num_points_per_txn: 256,
+                })
             },
-            TransactionTypeArg::SmartTablePicture1BWith1KChange => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::SmartTablePicture {
-                        length: 1024 * 1024 * 1024,
-                        num_points_per_txn: 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+            TransactionTypeArg::SmartTablePicture1BWith256Change => {
+                call_custom_module(EntryPoints::SmartTablePicture {
+                    length: 1024 * 1024 * 1024,
+                    num_points_per_txn: 256,
+                })
             },
+            TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit => {
+                call_custom_module(EntryPoints::SmartTablePicture {
+                    length: 1024 * 1024,
+                    num_points_per_txn: 1024,
+                })
+            },
+            TransactionTypeArg::DeserializeU256 => call_custom_module(EntryPoints::DeserializeU256),
         }
     }
 
@@ -386,10 +316,17 @@ impl TransactionTypeArg {
         transaction_phases: &[usize],
         module_working_set_size: usize,
         sender_use_account_pool: bool,
+        workflow_progress_type: WorkflowProgress,
     ) -> Vec<Vec<(TransactionType, usize)>> {
         let arg_transaction_types = transaction_types
             .iter()
-            .map(|t| t.materialize(module_working_set_size, sender_use_account_pool))
+            .map(|t| {
+                t.materialize(
+                    module_working_set_size,
+                    sender_use_account_pool,
+                    workflow_progress_type,
+                )
+            })
             .collect::<Vec<_>>();
 
         let arg_transaction_weights = if transaction_weights.is_empty() {

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
     utility_coin::APTOS_COIN_TYPE,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -32,8 +31,7 @@ impl Aggregator {
 
     /// Helper function to return the state key where the actual value is stored.
     pub fn state_key(&self) -> StateKey {
-        let key_bytes = self.key.to_vec();
-        StateKey::table_item(TableHandle(self.handle), key_bytes)
+        StateKey::table_item(&TableHandle(self.handle), self.key.as_ref())
     }
 }
 
@@ -64,7 +62,7 @@ impl MoveStructType for CoinInfoResource {
     const MODULE_NAME: &'static IdentStr = ident_str!("coin");
     const STRUCT_NAME: &'static IdentStr = ident_str!("CoinInfo");
 
-    fn type_params() -> Vec<TypeTag> {
+    fn type_args() -> Vec<TypeTag> {
         vec![APTOS_COIN_TYPE.clone()]
     }
 }
@@ -110,10 +108,7 @@ impl CoinInfoResource {
 
     /// Returns a writeset corresponding to the creation of CoinInfo in Move.
     /// This can be passed to data store for testing total supply.
-    pub fn to_writeset(&self) -> anyhow::Result<WriteSet> {
-        let ap =
-            AccessPath::resource_access_path(AccountAddress::ONE, CoinInfoResource::struct_tag())?;
-
+    pub fn to_writeset(&self, supply: u128) -> anyhow::Result<WriteSet> {
         let value_state_key = self
             .supply
             .as_ref()
@@ -126,12 +121,12 @@ impl CoinInfoResource {
         // We store CoinInfo and aggregatable value separately.
         let write_set = vec![
             (
-                StateKey::access_path(ap),
+                StateKey::resource_typed::<CoinInfoResource>(&AccountAddress::ONE)?,
                 WriteOp::legacy_modification(bcs::to_bytes(&self).unwrap().into()),
             ),
             (
                 value_state_key,
-                WriteOp::legacy_modification(bcs::to_bytes(&0_u128).unwrap().into()),
+                WriteOp::legacy_modification(bcs::to_bytes(&supply).unwrap().into()),
             ),
         ];
         Ok(WriteSetMut::new(write_set).freeze().unwrap())

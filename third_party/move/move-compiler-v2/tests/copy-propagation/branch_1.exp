@@ -19,59 +19,6 @@ fun m::foo($t0: bool, $t1: u64): u64 {
  10: return $t2
 }
 
-============ after AvailableCopiesAnalysisProcessor: ================
-
-[variant baseline]
-fun m::foo($t0: bool, $t1: u64): u64 {
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     # before: {}, after: {$t3 := $t1}
-  0: $t3 := infer($t1)
-     # before: {$t3 := $t1}, after: {$t3 := $t1}
-  1: if ($t0) goto 2 else goto 6
-     # before: {$t3 := $t1}, after: {$t3 := $t1}
-  2: label L0
-     # before: {$t3 := $t1}, after: {$t3 := $t1}
-  3: $t4 := 0
-     # before: {$t3 := $t1}, after: {$t3 := $t4}
-  4: $t3 := infer($t4)
-     # before: {$t3 := $t4}, after: {$t3 := $t4}
-  5: goto 7
-     # before: {$t3 := $t1}, after: {$t3 := $t1}
-  6: label L1
-     # before: {}, after: {}
-  7: label L2
-     # before: {}, after: {}
-  8: $t5 := 1
-     # before: {}, after: {}
-  9: $t2 := +($t3, $t5)
-     # before: {}, after: {}
- 10: return $t2
-}
-
-============ after CopyPropagation: ================
-
-[variant baseline]
-fun m::foo($t0: bool, $t1: u64): u64 {
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-  0: $t3 := infer($t1)
-  1: if ($t0) goto 2 else goto 6
-  2: label L0
-  3: $t4 := 0
-  4: $t3 := infer($t4)
-  5: goto 7
-  6: label L1
-  7: label L2
-  8: $t5 := 1
-  9: $t2 := +($t3, $t5)
- 10: return $t2
-}
-
 ============ after DeadStoreElimination: ================
 
 [variant baseline]
@@ -80,11 +27,11 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t3: u64
      var $t4: u64
      var $t5: u64
-  0: $t3 := infer($t1)
+  0: $t3 := move($t1)
   1: if ($t0) goto 2 else goto 6
   2: label L0
   3: $t4 := 0
-  4: $t3 := infer($t4)
+  4: $t3 := move($t4)
   5: goto 7
   6: label L1
   7: label L2

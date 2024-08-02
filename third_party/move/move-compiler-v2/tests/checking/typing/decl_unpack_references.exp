@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         s1: M::S,
@@ -9,7 +9,7 @@ module 0x8675309::M {
     }
     private fun t0() {
         {
-          let M::R{ s1: M::S{ f: f: u64 }, s2: s2: M::S };
+          let M::R{ s1: M::S{ f }, s2 };
           f: u64 = 0;
           f;
           s2: M::S = pack M::S(0);
@@ -19,7 +19,7 @@ module 0x8675309::M {
     }
     private fun t1() {
         {
-          let M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S };
+          let M::R{ s1: M::S{ f }, s2 };
           f: &u64 = Borrow(Immutable)(0);
           f;
           s2: &M::S = Borrow(Immutable)(pack M::S(0));
@@ -29,7 +29,7 @@ module 0x8675309::M {
     }
     private fun t2() {
         {
-          let M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S };
+          let M::R{ s1: M::S{ f }, s2 };
           f: &mut u64 = Borrow(Mutable)(0);
           f;
           s2: &mut M::S = Borrow(Mutable)(pack M::S(0));
@@ -37,7 +37,4 @@ module 0x8675309::M {
           Tuple()
         }
     }
-    spec fun $t0();
-    spec fun $t1();
-    spec fun $t2();
 } // end 0x8675309::M

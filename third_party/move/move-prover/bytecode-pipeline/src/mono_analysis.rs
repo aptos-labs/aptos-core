@@ -330,7 +330,7 @@ impl<'a> Analyzer<'a> {
                     // make sure these two types unify before trying to instantiate them
                     let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
                     if adapter
-                        .unify(&NoUnificationContext, Variance::SpecVariance, false)
+                        .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
                         .is_none()
                     {
                         continue;
@@ -582,7 +582,7 @@ impl<'a> Analyzer<'a> {
     fn add_types_in_borrow_edge(&mut self, edge: &BorrowEdge) {
         match edge {
             BorrowEdge::Direct | BorrowEdge::Index(_) => (),
-            BorrowEdge::Field(qid, _) => {
+            BorrowEdge::Field(qid, _, _) => {
                 self.add_type_root(&qid.to_type());
             },
             BorrowEdge::Hyper(edges) => {

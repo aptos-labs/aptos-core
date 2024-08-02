@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: tuple type `(Foo, Foo)` is not allowed as a field type
+  ┌─ tests/checking/typing/recursive_structs_malformed.move:4:21
+  │
+4 │     struct Foo { f: (Foo, Foo) }
+  │                     ^^^^^^^^^^
+  │
+  = required by declaration of field `f`
+
+error: reference type `&Bar` is not allowed as a field type
+  ┌─ tests/checking/typing/recursive_structs_malformed.move:5:21
+  │
+5 │     struct Bar { f: &Bar }
+  │                     ^^^^
+  │
+  = required by declaration of field `f`
+
+error: tuple type `(&Baz, &mut Baz)` is not allowed as a type argument
+  ┌─ tests/checking/typing/recursive_structs_malformed.move:6:21
+  │
+6 │     struct Baz { f: vector<(&Baz, &mut Baz)> }
+  │                     ^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = required by instantiating vector type parameter

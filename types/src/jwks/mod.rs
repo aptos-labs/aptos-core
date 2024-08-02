@@ -1,6 +1,10 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
-use self::jwk::JWK;
+use self::{
+    jwk::JWK,
+    rsa::{INSECURE_TEST_RSA_JWK, RSA_JWK, SECURE_TEST_RSA_JWK},
+};
 use crate::{
     aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
@@ -23,10 +27,19 @@ use std::{
 };
 
 pub mod jwk;
+pub mod patch;
 pub mod rsa;
 pub mod unsupported;
 
 pub type Issuer = Vec<u8>;
+
+pub fn secure_test_rsa_jwk() -> RSA_JWK {
+    SECURE_TEST_RSA_JWK.clone()
+}
+
+pub fn insecure_test_rsa_jwk() -> RSA_JWK {
+    INSECURE_TEST_RSA_JWK.clone()
+}
 
 pub fn issuer_from_str(s: &str) -> Issuer {
     s.as_bytes().to_vec()
@@ -45,9 +58,46 @@ pub struct OIDCProvider {
     pub config_url: Vec<u8>,
 }
 
+impl OIDCProvider {
+    pub fn new(name: String, config_url: String) -> Self {
+        Self {
+            name: name.as_bytes().to_vec(),
+            config_url: config_url.as_bytes().to_vec(),
+        }
+    }
+}
+
+impl From<crate::on_chain_config::OIDCProvider> for OIDCProvider {
+    fn from(value: crate::on_chain_config::OIDCProvider) -> Self {
+        OIDCProvider {
+            name: value.name.as_bytes().to_vec(),
+            config_url: value.config_url.as_bytes().to_vec(),
+        }
+    }
+}
+
+impl TryFrom<OIDCProvider> for crate::on_chain_config::OIDCProvider {
+    type Error = anyhow::Error;
+
+    fn try_from(value: OIDCProvider) -> Result<Self, Self::Error> {
+        let OIDCProvider { name, config_url } = value;
+        let name = String::from_utf8(name)?;
+        let config_url = String::from_utf8(config_url)?;
+        Ok(crate::on_chain_config::OIDCProvider { name, config_url })
+    }
+}
+
+impl Debug for OIDCProvider {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OIDCProvider")
+            .field("name", &String::from_utf8(self.name.clone()))
+            .field("config_url", &String::from_utf8(self.config_url.clone()))
+            .finish()
+    }
+}
 /// Move type `0x1::jwks::SupportedOIDCProviders` in rust.
 /// See its doc in Move for more details.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SupportedOIDCProviders {
     pub providers: Vec<OIDCProvider>,
 }

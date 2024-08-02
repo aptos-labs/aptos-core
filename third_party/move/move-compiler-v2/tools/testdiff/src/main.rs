@@ -7,12 +7,16 @@
 
 use clap::Parser;
 use once_cell::sync::Lazy;
+use regex::{self, Regex};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Display, Formatter},
     path::PathBuf,
 };
 use walkdir::WalkDir;
+
+// This can be set manually to true when debugging extensions to this tool.
+const DEBUG: bool = false;
 
 #[derive(Parser, Clone, Debug)]
 #[clap(author, version, about)]
@@ -53,42 +57,63 @@ const V2_E2E_ROOT: &str = "move-compiler-v2/transactional-tests/tests";
 /// Ignored directories in the move_check tree.
 static IGNORED_UNIT_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
     let mut set = BTreeSet::new();
-    set.insert("parser".to_string());
     set.insert("expansion".to_string());
-    set.insert("unit_test".to_string());
-    set.insert("skip_attribute_check".to_string());
     set.insert("evm".to_string());
     set.insert("async".to_string());
     set.insert("dependencies".to_string());
     set
 });
 
-/// Remapping of test directories between v2 and v1 tree. This are paths
+/// Remapping of test directories between v2 and v1 tree. These are paths
 /// relative to the according roots.
-static UNIT_PATH_REMAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
-    let mut map = BTreeMap::new();
-    map.insert(
-        "reference-safety/v1-tests".to_string(),
-        "borrows".to_string(),
-    );
-    map.insert("friends/v1-tests".to_string(), "naming".to_string());
-    map.insert(
-        "uninit-use-checker/v1-commands".to_string(),
-        "commands".to_string(),
-    );
-    map.insert(
-        "uninit-use-checker/v1-locals".to_string(),
-        "locals".to_string(),
-    );
-    map.insert(
-        "uninit-use-checker/v1-borrows".to_string(),
-        "borrows".to_string(),
-    );
-    map.insert(
-        "uninit-use-checker/v1-borrow-tests".to_string(),
-        "borrow_tests".to_string(),
-    );
-    map
+static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
+    vec![
+        ("reference-safety/v1-tests", "borrows"),
+        ("reference-safety/v1-borrow-tests", "borrow_tests"),
+        ("reference-safety/v1-locals", "locals"),
+        ("reference-safety/v1-typing", "typing"),
+        ("friends/v1-tests", "naming"),
+        ("uninit-use-checker/v1-commands", "commands"),
+        ("uninit-use-checker/v1-locals", "locals"),
+        ("uninit-use-checker/v1-borrows", "borrows"),
+        ("uninit-use-checker/v1-borrow-tests", "borrow_tests"),
+        ("bytecode-generator/v1-commands", "commands"),
+        ("bytecode-generator/v1-typing", "typing"),
+        ("typing/v1-commands", "commands"),
+        ("typing/v1-naming", "naming"),
+        ("typing/v1-operators", "operators"),
+        ("typing/v1-signer", "signer"),
+        ("typing/v1-examples", "examples"),
+        ("live-var/v1-commands", "commands"),
+        ("live-var", "liveness"),
+        ("visibility-checker/v1-typing", "typing"),
+        ("visibility-checker/v1-naming", "naming"),
+        (
+            "cyclic-instantiation-checker/v1-tests",
+            "instantiation_loops",
+        ),
+        ("cyclic-instantiation-checker/v1-typing", "typing"),
+        ("abilities/v1", "typing"),
+        ("acquires-checker/v1-tests", "typing"),
+        ("acquires-checker/v1-borrow-tests", "borrow_tests"),
+        ("attributes", "parser"),
+        ("unit_test/notest", "unit_test"),
+        // Map file v2../unit_test/test/foo.exp
+        //   to file v1../unit_test/foo.unit_test.exp.
+        ("unit_test/test", "unit_test.unit_test"),
+        ("unused-assignment/v1-locals", "locals"),
+        ("unused-assignment/v1-liveness", "liveness"),
+        ("unused-assignment/v1-commands", "commands"),
+        ("checking-lang-v1/v1-typing", "typing"),
+        ("ability-check/v1-typing", "typing"),
+        ("ability-check/v1-signer", "signer"),
+        ("ability-check/v1-borrow-tests", "commands"),
+        ("ability-check/v1-locals", "locals"),
+        ("verification/noverify", "verification"),
+        // Map file v2../verification/verify/foo.exp
+        //   to file v1../verification/foo.verification.exp.
+        ("verification/verify", "verification.verification"),
+    ]
 });
 
 /// Represents a key how to identify a test. At this time, a unique key is given by the
@@ -127,6 +152,14 @@ fn run(opts: Options) -> anyhow::Result<()> {
     let mut missed = BTreeMap::new();
     for (key, mut v1_path) in v1 {
         if let Some(mut v2_path) = v2.remove(&key) {
+            if DEBUG {
+                eprintln!(
+                    "{} matches {} with key `{}`",
+                    v1_path.display(),
+                    v2_path.display(),
+                    key
+                );
+            };
             v1_path.set_extension("exp");
             v2_path.set_extension("exp");
             matched.push((key, v1_path, v2_path))
@@ -174,8 +207,11 @@ fn collect_tests(root: &str) -> anyhow::Result<BTreeSet<PathBuf>> {
     let mut result = BTreeSet::new();
     for entry in WalkDir::new(root) {
         let path = entry?.into_path();
-        if path.display().to_string().ends_with(".move") {
+        let path_str = path.display().to_string();
+        if path_str.ends_with(".move") {
             result.insert(path);
+        } else if path_str.ends_with(".unit_test") || path_str.ends_with(".verification") {
+            result.insert(PathBuf::from(format!("{}.{}", path_str, "move")));
         }
     }
     Ok(result)
@@ -187,8 +223,12 @@ fn classify_tests(
     for_v2: bool,
 ) -> BTreeMap<TestKey, PathBuf> {
     let mut result = BTreeMap::new();
+    let split_match = Regex::new("^([^.]*)\\.([^.]*)$").unwrap();
     for test in tests {
         let Some(mut parent) = test.parent().map(|p| p.to_owned()) else {
+            continue;
+        };
+        let Some(file_name) = test.file_name() else {
             continue;
         };
         let mut parent_str = parent.display().to_string();
@@ -204,8 +244,39 @@ fn classify_tests(
         if !opts.e2e_tests && IGNORED_UNIT_PATHS.iter().any(|p| parent_str.contains(p)) {
             continue;
         }
-        if let (Some(file_name), Some(parent_name)) = (test.file_name(), parent.file_name()) {
-            let key = TestKey::new(parent_name.to_string_lossy(), file_name.to_string_lossy());
+        if let Some(parent_name) = parent.file_name() {
+            let parent_str = parent_name.to_string_lossy().to_string();
+            let (parent_str, file_name_str) =
+                if let Some(captures) = split_match.captures(&parent_str) {
+                    // Treat a parent_str="base.ext"  as a directive
+                    // to map a file "foo.move" to "foo.unit_test.move"
+                    // with new_parent="base".
+                    // See "unit_test.unit_test" for an example.
+                    let base = captures.get(1).unwrap().as_str();
+                    let ext = captures.get(2).unwrap().as_str();
+                    let new_parent = base.to_string();
+                    let mut new_file_name = PathBuf::from(file_name);
+                    new_file_name.set_extension(ext); // replace .move with .ext
+                    let file_with_ext_move = new_file_name.to_string_lossy() + ".move";
+                    if DEBUG {
+                        eprintln!(
+                            "Parent {} matches, new_parent={}, file_with_ext={}",
+                            parent_str, new_parent, file_with_ext_move
+                        );
+                    }
+                    (new_parent, file_with_ext_move.to_string())
+                } else {
+                    (parent_str, file_name.to_string_lossy().to_string())
+                };
+            let key = TestKey::new(parent_str, file_name_str);
+            if DEBUG {
+                eprintln!(
+                    "Adding {} mapping {} to {}",
+                    if for_v2 { "v2" } else { "v1" },
+                    key,
+                    test.display()
+                );
+            }
             if let Some(old) = result.insert(key.clone(), test.clone()) {
                 warn(format!(
                     "test `{}` and `{}` share common key `{}`, discarding former one",

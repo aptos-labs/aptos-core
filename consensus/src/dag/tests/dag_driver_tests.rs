@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     dag::{
@@ -25,6 +26,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
+use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -34,9 +36,10 @@ use aptos_types::{
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
 };
 use async_trait::async_trait;
+use bytes::Bytes;
 use claims::{assert_ok, assert_ok_eq};
 use futures_channel::mpsc::unbounded;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, sync::oneshot};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -46,14 +49,33 @@ struct MockNetworkSender {
 
 #[async_trait]
 impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockNetworkSender {
-    async fn send_rb_rpc(
+    async fn send_rb_rpc_raw(
         &self,
         _receiver: Author,
-        _messagee: DAGMessage,
+        _messages: Bytes,
         _timeout: Duration,
     ) -> anyhow::Result<DAGRpcResult> {
         Ok(DAGRpcResult(Ok(DAGMessage::TestAck(TestAck(Vec::new())))))
     }
+
+    async fn send_rb_rpc(
+        &self,
+        _receiver: Author,
+        _message: DAGMessage,
+        _timeout: Duration,
+    ) -> anyhow::Result<DAGRpcResult> {
+        Ok(DAGRpcResult(Ok(DAGMessage::TestAck(TestAck(Vec::new())))))
+    }
+
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<Author>,
+        _message: DAGMessage,
+    ) -> anyhow::Result<HashMap<Author, Bytes>> {
+        Ok(peers.into_iter().map(|peer| (peer, Bytes::new())).collect())
+    }
+
+    fn sort_peers_by_latency(&self, _: &mut [Author]) {}
 }
 
 #[async_trait]
@@ -120,7 +142,10 @@ fn setup(
 
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
     let mock_ledger_info = generate_ledger_info_with_sig(signers, mock_ledger_info);
-    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
+    let storage = Arc::new(MockStorage::new_with_ledger_info(
+        mock_ledger_info.clone(),
+        epoch_state.clone(),
+    ));
     let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
@@ -129,8 +154,10 @@ fn setup(
         TEST_DAG_WINDOW,
     ));
 
+    let validators: Vec<_> = signers.iter().map(|s| s.author()).collect();
     let rb = Arc::new(ReliableBroadcast::new(
-        signers.iter().map(|s| s.author()).collect(),
+        validators[0],
+        validators,
         network_sender.clone(),
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),
@@ -140,7 +167,7 @@ fn setup(
     let time_service = TimeService::mock();
     let validators = signers.iter().map(|vs| vs.author()).collect();
     let (tx, _) = unbounded();
-    let order_rule = OrderRule::new(
+    let order_rule = Arc::new(Mutex::new(OrderRule::new(
         epoch_state.clone(),
         1,
         dag.clone(),
@@ -148,7 +175,7 @@ fn setup(
         Arc::new(TestNotifier { tx }),
         TEST_DAG_WINDOW as Round,
         None,
-    );
+    )));
 
     let fetch_requester = Arc::new(MockFetchRequester {});
 
@@ -181,6 +208,7 @@ fn setup(
             NoPipelineBackpressure::new(),
         ),
         false,
+        true,
     )
 }
 

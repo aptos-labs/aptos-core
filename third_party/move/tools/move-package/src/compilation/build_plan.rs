@@ -1,3 +1,4 @@
+// Copyright (c) Aptos Foundation
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
@@ -36,7 +37,16 @@ pub struct BuildPlan {
     resolution_graph: ResolvedGraph,
 }
 
-pub type CompilerDriverResult = anyhow::Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)>;
+/// A container for compiler results from either V1 or V2,
+/// with all info needed for building various artifacts.
+pub type CompilerDriverResult = anyhow::Result<(
+    // The names and contents of all source files.
+    FilesSourceText,
+    // The compilation artifacts, including V1 intermediate ASTs.
+    Vec<AnnotatedCompiledUnit>,
+    // For compilation with V2, compiled program model.
+    Option<model::GlobalEnv>,
+)>;
 
 #[cfg(feature = "evm-backend")]
 fn should_recompile(
@@ -116,7 +126,10 @@ impl BuildPlan {
         self.compile_with_driver(
             writer,
             config,
-            |compiler| compiler.build_and_report(),
+            |compiler| {
+                let (files, units) = compiler.build_and_report()?;
+                Ok((files, units, None))
+            },
             build_and_report_v2_driver,
         )
         .map(|(package, _)| package)
@@ -136,7 +149,7 @@ impl BuildPlan {
                 match units_res {
                     Ok((units, warning_diags)) => {
                         report_warnings(&files, warning_diags);
-                        Ok((files, units))
+                        Ok((files, units, None))
                     },
                     Err(error_diags) => {
                         assert!(!error_diags.is_empty());

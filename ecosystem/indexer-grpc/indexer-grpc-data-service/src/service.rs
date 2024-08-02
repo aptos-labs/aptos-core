@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
-    LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
-    SHORT_CONNECTION_COUNT,
+    BYTES_READY_TO_TRANSFER_FROM_SERVER, BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING,
+    CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION_PER_PROCESSOR,
+    NUM_TRANSACTIONS_STRIPPED, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
+    PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
 };
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -15,18 +15,21 @@ use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig,
     constants::{
         IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
-        MESSAGE_SIZE_LIMIT,
+        MESSAGE_SIZE_LIMIT, REQUEST_HEADER_APTOS_APPLICATION_NAME, REQUEST_HEADER_APTOS_EMAIL,
+        REQUEST_HEADER_APTOS_IDENTIFIER, REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
     },
     counters::{log_grpc_step, IndexerGrpcStep, NUM_MULTI_FETCH_OVERLAPPED_VERSIONS},
     file_store_operator::FileStoreOperator,
+    in_memory_cache::InMemoryCache,
     time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
-    transaction::v1::Transaction,
+    transaction::v1::{transaction::TxnData, Transaction},
 };
+use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
 use futures::Stream;
 use prost::Message;
 use redis::Client;
@@ -61,9 +64,6 @@ const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 
-const REQUEST_HEADER_APTOS_EMAIL_HEADER: &str = "x-aptos-email";
-const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-classification";
-const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
 const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
 const SERVICE_TYPE: &str = "data_service";
 
@@ -79,7 +79,25 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
+    pub txns_to_strip_filter: BooleanTransactionFilter,
     pub cache_storage_format: StorageFormat,
+    in_memory_cache: Arc<InMemoryCache>,
+}
+
+// Exclude in_memory-cache
+impl std::fmt::Debug for RawDataServerWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawDataServerWrapper")
+            .field("redis_client", &"Arc<redis::Client>")
+            .field("file_store_config", &self.file_store_config)
+            .field(
+                "data_service_response_channel_size",
+                &self.data_service_response_channel_size,
+            )
+            .field("txns_to_strip_filter", &self.txns_to_strip_filter)
+            .field("cache_storage_format", &self.cache_storage_format)
+            .finish()
+    }
 }
 
 impl RawDataServerWrapper {
@@ -87,7 +105,9 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
+        txns_to_strip_filter: BooleanTransactionFilter,
         cache_storage_format: StorageFormat,
+        in_memory_cache: Arc<InMemoryCache>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -97,7 +117,9 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
+            txns_to_strip_filter,
             cache_storage_format,
+            in_memory_cache,
         })
     }
 }
@@ -133,11 +155,7 @@ impl RawData for RawDataServerWrapper {
             _ => return Result::Err(Status::aborted("Invalid request token")),
         };
         CONNECTION_COUNT
-            .with_label_values(&[
-                &request_metadata.request_api_key_name,
-                &request_metadata.request_email,
-                &request_metadata.processor_name,
-            ])
+            .with_label_values(&request_metadata.get_label_values())
             .inc();
         let request = req.into_inner();
 
@@ -147,9 +165,12 @@ impl RawData for RawDataServerWrapper {
         let (tx, rx) = channel(self.data_service_response_channel_size);
         let current_version = match &request.starting_version {
             Some(version) => *version,
-            None => {
-                return Result::Err(Status::aborted("Starting version is not set"));
-            },
+            // Live mode if starting version isn't specified
+            None => self
+                .in_memory_cache
+                .latest_version()
+                .await
+                .saturating_sub(1),
         };
 
         let file_store_operator: Box<dyn FileStoreOperator> = self.file_store_config.create();
@@ -160,7 +181,7 @@ impl RawData for RawDataServerWrapper {
             SERVICE_TYPE,
             IndexerGrpcStep::DataServiceNewRequestReceived,
             Some(current_version as i64),
-            None,
+            transactions_count.map(|v| (v as i64 + current_version as i64 - 1)),
             None,
             None,
             None,
@@ -172,6 +193,8 @@ impl RawData for RawDataServerWrapper {
         let redis_client = self.redis_client.clone();
         let cache_storage_format = self.cache_storage_format;
         let request_metadata = Arc::new(request_metadata);
+        let txns_to_strip_filter = self.txns_to_strip_filter.clone();
+        let in_memory_cache = self.in_memory_cache.clone();
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -182,7 +205,9 @@ impl RawData for RawDataServerWrapper {
                     request_metadata,
                     transactions_count,
                     tx,
+                    txns_to_strip_filter,
                     current_version,
+                    in_memory_cache,
                 )
                 .await;
             }
@@ -214,7 +239,28 @@ async fn get_data_with_tasks(
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
+    in_memory_cache: Arc<InMemoryCache>,
 ) -> DataFetchSubTaskResult {
+    let start_time = Instant::now();
+    let in_memory_transactions = in_memory_cache.get_transactions(start_version).await;
+    if !in_memory_transactions.is_empty() {
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache,
+            Some(start_version as i64),
+            Some(in_memory_transactions.last().as_ref().unwrap().version as i64),
+            None,
+            None,
+            Some(start_time.elapsed().as_secs_f64()),
+            None,
+            Some(in_memory_transactions.len() as i64),
+            Some(&request_metadata),
+        );
+        return DataFetchSubTaskResult::BatchSuccess(chunk_transactions(
+            in_memory_transactions,
+            MESSAGE_SIZE_LIMIT,
+        ));
+    }
     let cache_coverage_status = cache_operator
         .check_cache_coverage_status(start_version)
         .await;
@@ -224,8 +270,18 @@ async fn get_data_with_tasks(
         Ok(CacheCoverageStatus::CacheHit(_)) => 1,
         Ok(CacheCoverageStatus::CacheEvicted) => match transactions_count {
             None => MAX_FETCH_TASKS_PER_REQUEST,
-            Some(transactions_count) => (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK)
-                .max(MAX_FETCH_TASKS_PER_REQUEST),
+            Some(transactions_count) => {
+                let num_tasks = transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK;
+                if num_tasks >= MAX_FETCH_TASKS_PER_REQUEST {
+                    // Limit the max tasks to MAX_FETCH_TASKS_PER_REQUEST
+                    MAX_FETCH_TASKS_PER_REQUEST
+                } else if num_tasks < 1 {
+                    // Limit the min tasks to 1
+                    1
+                } else {
+                    num_tasks
+                }
+            },
         },
         Err(_) => {
             error!("[Data Service] Failed to get cache coverage status.");
@@ -307,12 +363,9 @@ async fn get_data_in_task(
         Ok(TransactionsDataStatus::AheadOfCache) => {
             info!(
                 start_version = start_version,
-                request_name = request_metadata.processor_name.as_str(),
-                request_email = request_metadata.request_email.as_str(),
-                request_api_key_name = request_metadata.request_api_key_name.as_str(),
+                request_identifier = request_metadata.request_identifier.as_str(),
                 processor_name = request_metadata.processor_name.as_str(),
                 connection_id = request_metadata.request_connection_id.as_str(),
-                request_user_classification = request_metadata.request_user_classification.as_str(),
                 duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
                 service_type = SERVICE_TYPE,
                 "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
@@ -340,7 +393,9 @@ async fn data_fetcher_task(
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     transactions_count: Option<u64>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
+    txns_to_strip_filter: BooleanTransactionFilter,
     mut current_version: u64,
+    in_memory_cache: Arc<InMemoryCache>,
 ) {
     let mut connection_start_time = Some(std::time::Instant::now());
     let mut transactions_count = transactions_count;
@@ -434,6 +489,7 @@ async fn data_fetcher_task(
             file_store_operator.clone(),
             request_metadata.clone(),
             cache_storage_format,
+            in_memory_cache.clone(),
         )
         .await
         {
@@ -467,16 +523,27 @@ async fn data_fetcher_task(
             .map(|t| t.encoded_len())
             .sum::<usize>();
         BYTES_READY_TO_TRANSFER_FROM_SERVER
-            .with_label_values(&[
-                &request_metadata.request_api_key_name,
-                &request_metadata.request_email,
-                &request_metadata.processor_name,
-            ])
+            .with_label_values(&request_metadata.get_label_values())
             .inc_by(bytes_ready_to_transfer as u64);
         // 2. Push the data to the response channel, i.e. stream the data to the client.
         let current_batch_size = transaction_data.as_slice().len();
         let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
-        let resp_items = get_transactions_responses_builder(transaction_data, chain_id as u32);
+        let (resp_items, num_stripped) = get_transactions_responses_builder(
+            transaction_data,
+            chain_id as u32,
+            &txns_to_strip_filter,
+        );
+        NUM_TRANSACTIONS_STRIPPED
+            .with_label_values(&request_metadata.get_label_values())
+            .inc_by(num_stripped as u64);
+        let bytes_ready_to_transfer_after_stripping = resp_items
+            .iter()
+            .flat_map(|response| &response.transactions)
+            .map(|t| t.encoded_len())
+            .sum::<usize>();
+        BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING
+            .with_label_values(&request_metadata.get_label_values())
+            .inc_by(bytes_ready_to_transfer_after_stripping as u64);
         let data_latency_in_secs = resp_items
             .last()
             .unwrap()
@@ -491,39 +558,17 @@ async fn data_fetcher_task(
             .await
         {
             Ok(_) => {
-                PROCESSED_BATCH_SIZE
-                    .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
-                    .set(current_batch_size as i64);
-                // TODO: Reasses whether this metric useful
-                LATEST_PROCESSED_VERSION_OLD
-                    .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
+                // TODO: Reasses whether this metric is useful.
+                LATEST_PROCESSED_VERSION_PER_PROCESSOR
+                    .with_label_values(&request_metadata.get_label_values())
                     .set(end_of_batch_version as i64);
-                PROCESSED_VERSIONS_COUNT
-                    .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
+                PROCESSED_VERSIONS_COUNT_PER_PROCESSOR
+                    .with_label_values(&request_metadata.get_label_values())
                     .inc_by(current_batch_size as u64);
                 if let Some(data_latency_in_secs) = data_latency_in_secs {
-                    PROCESSED_LATENCY_IN_SECS
-                        .with_label_values(&[
-                            request_metadata.request_api_key_name.as_str(),
-                            request_metadata.request_email.as_str(),
-                            request_metadata.processor_name.as_str(),
-                        ])
+                    PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR
+                        .with_label_values(&request_metadata.get_label_values())
                         .set(data_latency_in_secs);
-                    PROCESSED_LATENCY_IN_SECS_ALL
-                        .with_label_values(&[request_metadata.request_user_classification.as_str()])
-                        .observe(data_latency_in_secs);
                 }
             },
             Err(SendTimeoutError::Timeout(_)) => {
@@ -540,24 +585,16 @@ async fn data_fetcher_task(
         current_version = end_of_batch_version + 1;
     }
     info!(
-        request_name = request_metadata.processor_name.as_str(),
-        request_email = request_metadata.request_email.as_str(),
-        request_api_key_name = request_metadata.request_api_key_name.as_str(),
+        request_identifier = request_metadata.request_identifier.as_str(),
         processor_name = request_metadata.processor_name.as_str(),
         connection_id = request_metadata.request_connection_id.as_str(),
-        request_user_classification = request_metadata.request_user_classification.as_str(),
-        request_user_classification = request_metadata.request_user_classification.as_str(),
         service_type = SERVICE_TYPE,
         "[Data Service] Client disconnected."
     );
     if let Some(start_time) = connection_start_time {
         if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
             SHORT_CONNECTION_COUNT
-                .with_label_values(&[
-                    request_metadata.request_api_key_name.as_str(),
-                    request_metadata.request_email.as_str(),
-                    request_metadata.processor_name.as_str(),
-                ])
+                .with_label_values(&request_metadata.get_label_values())
                 .inc();
         }
     }
@@ -589,14 +626,14 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // If this batch is fully contained within the previous batch, skip it
             if prev_start <= start_version && prev_end >= end_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"full"])
+                    .with_label_values(&[SERVICE_TYPE, "full"])
                     .inc_by(end_version - start_version);
                 continue;
             }
             // If this batch overlaps with the previous batch, combine them
             if prev_end >= start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"partial"])
+                    .with_label_values(&[SERVICE_TYPE, "partial"])
                     .inc_by(prev_end - start_version + 1);
                 tracing::debug!(
                     batch_first_version = first_version,
@@ -614,7 +651,7 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // Otherwise there is a gap
             if prev_end + 1 != start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"gap"])
+                    .with_label_values(&[SERVICE_TYPE, "gap"])
                     .inc_by(prev_end - start_version + 1);
 
                 tracing::error!(
@@ -645,19 +682,26 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
     transactions
 }
 
-/// Builds the response for the get transactions request. Partial batch is ok, i.e., a batch with transactions < 1000.
+/// Builds the response for the get transactions request. Partial batch is ok, i.e., a
+/// batch with transactions < 1000.
+///
+/// It also returns the number of txns that were stripped.
 fn get_transactions_responses_builder(
     transactions: Vec<Transaction>,
     chain_id: u32,
-) -> Vec<TransactionsResponse> {
-    let chunks = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
-    chunks
+    txns_to_strip_filter: &BooleanTransactionFilter,
+) -> (Vec<TransactionsResponse>, usize) {
+    let (stripped_transactions, num_stripped) =
+        strip_transactions(transactions, txns_to_strip_filter);
+    let chunks = chunk_transactions(stripped_transactions, MESSAGE_SIZE_LIMIT);
+    let responses = chunks
         .into_iter()
         .map(|chunk| TransactionsResponse {
             chain_id: Some(chain_id as u64),
             transactions: chunk,
         })
-        .collect()
+        .collect();
+    (responses, num_stripped)
 }
 
 // This is a CPU bound operation, so we spawn_blocking
@@ -817,11 +861,15 @@ fn get_request_metadata(
     req: &Request<GetTransactionsRequest>,
 ) -> tonic::Result<IndexerGrpcRequestMetadata> {
     let request_metadata_pairs = vec![
-        ("request_api_key_name", REQUEST_HEADER_APTOS_API_KEY_NAME),
-        ("request_email", REQUEST_HEADER_APTOS_EMAIL_HEADER),
         (
-            "request_user_classification",
-            REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER,
+            "request_identifier_type",
+            REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
+        ),
+        ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
+        ("request_email", REQUEST_HEADER_APTOS_EMAIL),
+        (
+            "request_application_name",
+            REQUEST_HEADER_APTOS_APPLICATION_NAME,
         ),
         ("request_token", GRPC_AUTH_TOKEN_HEADER),
         ("processor_name", GRPC_REQUEST_NAME_HEADER),
@@ -922,47 +970,350 @@ async fn channel_send_multiple_with_timeout(
     Ok(())
 }
 
-#[test]
-fn test_ensure_sequential_transactions_merges_and_sorts() {
-    let transactions1 = (1..5)
-        .map(|i| Transaction {
-            version: i,
-            ..Default::default()
-        })
-        .collect();
-    let transactions2 = (5..10)
-        .map(|i| Transaction {
-            version: i,
-            ..Default::default()
-        })
-        .collect();
-    // No overlap, just normal fetching flow
-    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
-    assert_eq!(transactions1.len(), 9);
-    assert_eq!(transactions1.first().unwrap().version, 1);
-    assert_eq!(transactions1.last().unwrap().version, 9);
+/// This function strips transactions that match the given filter. Stripping means we
+/// remove the payload, signature, events, and writesets. Note, the filter can be
+/// composed of many conditions, see `BooleanTransactionFilter` for more.
+///
+/// This returns the mutated txns and the number of txns that were stripped.
+fn strip_transactions(
+    transactions: Vec<Transaction>,
+    txns_to_strip_filter: &BooleanTransactionFilter,
+) -> (Vec<Transaction>, usize) {
+    let mut stripped_count = 0;
 
-    // This is a full overlap
-    let transactions2 = (5..7)
-        .map(|i| Transaction {
-            version: i,
-            ..Default::default()
+    let stripped_transactions: Vec<Transaction> = transactions
+        .into_iter()
+        .map(|mut txn| {
+            // Note: `is_allowed` means the txn matches the filter, in which case
+            // we strip it.
+            if txns_to_strip_filter.is_allowed(&txn) {
+                stripped_count += 1;
+                if let Some(info) = txn.info.as_mut() {
+                    info.changes = vec![];
+                }
+                if let Some(TxnData::User(user_transaction)) = txn.txn_data.as_mut() {
+                    user_transaction.events = vec![];
+                    if let Some(utr) = user_transaction.request.as_mut() {
+                        // Wipe the payload and signature.
+                        utr.payload = None;
+                        utr.signature = None;
+                    }
+                }
+            }
+            txn
         })
         .collect();
-    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
-    assert_eq!(transactions1.len(), 9);
-    assert_eq!(transactions1.first().unwrap().version, 1);
-    assert_eq!(transactions1.last().unwrap().version, 9);
 
-    // Partial overlap
-    let transactions2 = (5..12)
-        .map(|i| Transaction {
-            version: i,
+    (stripped_transactions, stripped_count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_protos::transaction::v1::{
+        transaction::TxnData, transaction_payload::Payload, EntryFunctionId, EntryFunctionPayload,
+        Event, MoveModuleId, Signature, Transaction, TransactionInfo, TransactionPayload,
+        UserTransaction, UserTransactionRequest, WriteSetChange,
+    };
+    use aptos_transaction_filter::{
+        boolean_transaction_filter::APIFilter, filters::UserTransactionFilterBuilder,
+        EntryFunctionFilterBuilder, UserTransactionPayloadFilterBuilder,
+    };
+
+    fn create_test_transaction(
+        module_address: String,
+        module_name: String,
+        function_name: String,
+    ) -> Transaction {
+        Transaction {
+            version: 1,
+            txn_data: Some(TxnData::User(UserTransaction {
+                request: Some(UserTransactionRequest {
+                    payload: Some(TransactionPayload {
+                        r#type: 1,
+                        payload: Some(Payload::EntryFunctionPayload(EntryFunctionPayload {
+                            function: Some(EntryFunctionId {
+                                module: Some(MoveModuleId {
+                                    address: module_address,
+                                    name: module_name,
+                                }),
+                                name: function_name,
+                            }),
+                            ..Default::default()
+                        })),
+                    }),
+                    signature: Some(Signature::default()),
+                    ..Default::default()
+                }),
+                events: vec![Event::default()],
+            })),
+            info: Some(TransactionInfo {
+                changes: vec![WriteSetChange::default()],
+                ..Default::default()
+            }),
             ..Default::default()
-        })
-        .collect();
-    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
-    assert_eq!(transactions1.len(), 11);
-    assert_eq!(transactions1.first().unwrap().version, 1);
-    assert_eq!(transactions1.last().unwrap().version, 11);
+        }
+    }
+
+    #[test]
+    fn test_ensure_sequential_transactions_merges_and_sorts() {
+        let transactions1 = (1..5)
+            .map(|i| Transaction {
+                version: i,
+                ..Default::default()
+            })
+            .collect();
+        let transactions2 = (5..10)
+            .map(|i| Transaction {
+                version: i,
+                ..Default::default()
+            })
+            .collect();
+        // No overlap, just normal fetching flow
+        let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+        assert_eq!(transactions1.len(), 9);
+        assert_eq!(transactions1.first().unwrap().version, 1);
+        assert_eq!(transactions1.last().unwrap().version, 9);
+
+        // This is a full overlap
+        let transactions2 = (5..7)
+            .map(|i| Transaction {
+                version: i,
+                ..Default::default()
+            })
+            .collect();
+        let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+        assert_eq!(transactions1.len(), 9);
+        assert_eq!(transactions1.first().unwrap().version, 1);
+        assert_eq!(transactions1.last().unwrap().version, 9);
+
+        // Partial overlap
+        let transactions2 = (5..12)
+            .map(|i| Transaction {
+                version: i,
+                ..Default::default()
+            })
+            .collect();
+        let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+        assert_eq!(transactions1.len(), 11);
+        assert_eq!(transactions1.first().unwrap().version, 1);
+        assert_eq!(transactions1.last().unwrap().version, 11);
+    }
+
+    const MODULE_ADDRESS: &str = "0x1234";
+    const MODULE_NAME: &str = "module";
+    const FUNCTION_NAME: &str = "function";
+
+    #[test]
+    fn test_transactions_are_stripped_correctly_sender_addresses() {
+        let sender_address = "0x1234".to_string();
+        // Create a transaction with a user transaction
+        let txn = Transaction {
+            version: 1,
+            txn_data: Some(TxnData::User(UserTransaction {
+                request: Some(UserTransactionRequest {
+                    sender: sender_address.clone(),
+                    payload: Some(TransactionPayload::default()),
+                    signature: Some(Signature::default()),
+                    ..Default::default()
+                }),
+                events: vec![Event::default()],
+            })),
+            info: Some(TransactionInfo {
+                changes: vec![WriteSetChange::default()],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        // Create filter for senders to ignore.
+        let sender_filters = vec![sender_address]
+            .into_iter()
+            .map(|address| {
+                BooleanTransactionFilter::from(APIFilter::UserTransactionFilter(
+                    UserTransactionFilterBuilder::default()
+                        .sender(address)
+                        .build()
+                        .unwrap(),
+                ))
+            })
+            .collect();
+        let filter = BooleanTransactionFilter::new_or(sender_filters);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn], &filter);
+        assert_eq!(num_stripped, 1);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_eq!(user_transaction.events.len(), 0);
+        assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
+
+    #[test]
+    fn test_transactions_are_stripped_correctly_module_address() {
+        let txn = create_test_transaction(
+            MODULE_ADDRESS.to_string(),
+            MODULE_NAME.to_string(),
+            FUNCTION_NAME.to_string(),
+        );
+        // Testing filter with only address set
+        let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
+            APIFilter::UserTransactionFilter(
+                UserTransactionFilterBuilder::default()
+                    .payload(
+                        UserTransactionPayloadFilterBuilder::default()
+                            .function(
+                                EntryFunctionFilterBuilder::default()
+                                    .address(MODULE_ADDRESS.to_string())
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        )]);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn.clone()], &filter);
+        assert_eq!(num_stripped, 1);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_eq!(user_transaction.events.len(), 0);
+        assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
+
+    #[test]
+    fn test_transactions_are_stripped_correctly_module_name() {
+        let txn = create_test_transaction(
+            MODULE_ADDRESS.to_string(),
+            MODULE_NAME.to_string(),
+            FUNCTION_NAME.to_string(),
+        );
+        // Testing filter with only module set
+        let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
+            APIFilter::UserTransactionFilter(
+                UserTransactionFilterBuilder::default()
+                    .payload(
+                        UserTransactionPayloadFilterBuilder::default()
+                            .function(
+                                EntryFunctionFilterBuilder::default()
+                                    .module(MODULE_NAME.to_string())
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        )]);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn.clone()], &filter);
+        assert_eq!(num_stripped, 1);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_eq!(user_transaction.events.len(), 0);
+        assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
+
+    #[test]
+    fn test_transactions_are_stripped_correctly_function_name() {
+        let txn = create_test_transaction(
+            MODULE_ADDRESS.to_string(),
+            MODULE_NAME.to_string(),
+            FUNCTION_NAME.to_string(),
+        );
+        // Testing filter with only function set
+        let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
+            APIFilter::UserTransactionFilter(
+                UserTransactionFilterBuilder::default()
+                    .payload(
+                        UserTransactionPayloadFilterBuilder::default()
+                            .function(
+                                EntryFunctionFilterBuilder::default()
+                                    .function(FUNCTION_NAME.to_string())
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        )]);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn.clone()], &filter);
+        assert_eq!(num_stripped, 1);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_eq!(user_transaction.events.len(), 0);
+        assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
+    #[test]
+    fn test_transactions_are_not_stripped() {
+        let txn = create_test_transaction(
+            MODULE_ADDRESS.to_string(),
+            MODULE_NAME.to_string(),
+            FUNCTION_NAME.to_string(),
+        );
+        // Testing filter with wrong filter
+        let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
+            APIFilter::UserTransactionFilter(
+                UserTransactionFilterBuilder::default()
+                    .payload(
+                        UserTransactionPayloadFilterBuilder::default()
+                            .function(
+                                EntryFunctionFilterBuilder::default()
+                                    .function("0xrandom".to_string())
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        )]);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn.clone()], &filter);
+        assert_eq!(num_stripped, 0);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_ne!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_ne!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_ne!(user_transaction.events.len(), 0);
+        assert_ne!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
 }

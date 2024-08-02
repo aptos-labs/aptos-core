@@ -128,7 +128,7 @@ async fn test_basic_peer_updater_loop() {
 
     // Verify peers and metadata is empty
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
-    assert!(peers_and_metadata.get_all_peers().unwrap().is_empty());
+    assert!(peers_and_metadata.get_all_peers().is_empty());
 
     // Add a connected fullnode peer
     let fullnode_peer = mock_monitoring_server.add_new_peer(NetworkId::Public, PeerRole::Unknown);

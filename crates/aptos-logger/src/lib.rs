@@ -169,3 +169,4 @@ pub use metadata::{Level, Metadata};
 pub use security::SecurityEvent;
 
 mod counters;
+pub use counters::{ERROR_LOG_COUNT, INFO_LOG_COUNT, WARN_LOG_COUNT};

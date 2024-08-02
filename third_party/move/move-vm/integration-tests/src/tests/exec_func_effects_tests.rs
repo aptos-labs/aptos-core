@@ -13,7 +13,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{move_vm::MoveVM, session::SerializedReturnValues};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::convert::TryInto;
@@ -96,6 +96,7 @@ fn run(
     let mut session = vm.new_session(&storage);
 
     let fun_name = Identifier::new(fun_name).unwrap();
+    let traversal_storage = TraversalStorage::new();
 
     session
         .execute_function_bypass_visibility(
@@ -104,6 +105,7 @@ fn run(
             vec![],
             serialize_values(&vec![arg_val0]),
             &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&traversal_storage),
         )
         .and_then(|ret_values| {
             let change_set = session.finish()?;
@@ -117,7 +119,7 @@ type ModuleCode = (ModuleId, String);
 fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage) {
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, modules);
-    (MoveVM::new(vec![]).unwrap(), storage)
+    (MoveVM::new(vec![]), storage)
 }
 
 fn compile_modules(storage: &mut InMemoryStorage, modules: &[ModuleCode]) {

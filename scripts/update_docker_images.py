@@ -10,7 +10,7 @@ OS = "linux"
 
 IMAGES = {
     "debian": "debian:bullseye",
-    "rust": "rust:1.75.0-bullseye",
+    "rust": "rust:1.78.0-bullseye",
 }
 
 
@@ -38,10 +38,10 @@ def update() -> int:
                 "inspect",
                 image_name,
                 "--format",
-                " {{.Manifest.Digest}}",
+                "{{json .Manifest.Digest}}",
             ]
         )
-        digest = digest.strip().decode("utf-8")
+        digest = digest.decode("utf-8").strip(' "')
 
         if digest == None:
             print(f"Unable to find digest for {image_name}")

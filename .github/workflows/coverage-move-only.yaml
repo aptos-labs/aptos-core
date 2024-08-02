@@ -30,7 +30,7 @@ concurrency:
 jobs:
   rust-move-unit-coverage:
     timeout-minutes: 60
-    runs-on: high-perf-docker
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -46,11 +46,11 @@ jobs:
           echo "/home/runner/.dotnet" | tee -a $GITHUB_PATH
           echo "/home/runner/.dotnet/tools" | tee -a $GITHUB_PATH
       - run: rustup component add llvm-tools-preview
-      - uses: taiki-e/install-action@6f1ebcd9e21315fc37d7f7bc851dfcc8356d7da3 # pin@v1.5.6
+      - uses: taiki-e/install-action@4fedbddde88aab767a45a011661f832d68202716 # pin@v2.33.28
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov --ignore-run-fail -p aptos-framework -p "move*" -p e2e-move-tests --lcov --jobs 32 --output-path lcov_unit.info
+      - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info --ignore-run-fail -p aptos-framework -p "move*"
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - uses: actions/upload-artifact@v3
@@ -61,7 +61,10 @@ jobs:
         with:
           name: lcov_unit
       - name: Upload coverage to Codecov
+        continue-on-error: true # Don't fail if the codecov upload fails
         uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: lcov_unit.info
           fail_ci_if_error: true

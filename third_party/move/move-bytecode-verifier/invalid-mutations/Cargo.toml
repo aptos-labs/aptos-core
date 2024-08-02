@@ -12,7 +12,7 @@ publish = false
 [dependencies]
 move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
-proptest = "1.0.0"
+proptest = { workspace = true }
 
 [features]
 default = []

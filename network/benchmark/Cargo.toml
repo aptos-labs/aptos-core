@@ -18,7 +18,6 @@ aptos-config = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-network = { workspace = true }
-aptos-runtimes = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 async-channel = { workspace = true }

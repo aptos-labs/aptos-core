@@ -1,0 +1,50 @@
+
+Diagnostics:
+error: phantom type `T` can only be used as an argument for another phantom type parameter
+  ┌─ tests/ability-check/v1-typing/phantom_param_struct_decl_invalid.move:4:12
+  │
+4 │         a: T,
+  │            ^
+  │
+  = required by declaration of field `a`
+
+error: phantom type `T` can only be used as an argument for another phantom type parameter
+   ┌─ tests/ability-check/v1-typing/phantom_param_struct_decl_invalid.move:12:15
+   │
+10 │     struct S2<T> { a: T }
+   │               - declaration of type parameter `T`
+11 │     struct S3<phantom T> {
+12 │         a: S2<T>
+   │               ^
+   │
+   = required by instantiating type parameter `T` of struct `S2`
+
+error: phantom type `T` can only be used as an argument for another phantom type parameter
+   ┌─ tests/ability-check/v1-typing/phantom_param_struct_decl_invalid.move:17:18
+   │
+10 │     struct S2<T> { a: T }
+   │               - declaration of type parameter `T`
+   ·
+17 │         a: S2<S2<T>>
+   │                  ^
+   │
+   = required by instantiating type parameter `T` of struct `S2`
+
+error: phantom type `T2` can only be used as an argument for another phantom type parameter
+   ┌─ tests/ability-check/v1-typing/phantom_param_struct_decl_invalid.move:23:12
+   │
+23 │         b: T2,
+   │            ^^
+   │
+   = required by declaration of field `b`
+
+error: type `T` is missing required ability `copy`
+   ┌─ tests/ability-check/v1-typing/phantom_param_struct_decl_invalid.move:30:15
+   │
+28 │     struct S6<phantom T: copy> { a: bool }
+   │                       - declaration of type parameter `T`
+29 │     struct S7<phantom T> {
+30 │         a: S6<T>
+   │               ^
+   │
+   = required by instantiating type parameter `phantom T:copy` of struct `S6`

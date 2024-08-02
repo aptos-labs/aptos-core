@@ -6,7 +6,7 @@
 //! and otherwise delegate to the derived serializers.
 //!
 //! This is currently only implemented for type tags, but can be easily
-//! generalized, as the the only type-tag specific thing is the allowed nesting.
+//! generalized, as the only type-tag specific thing is the allowed nesting.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::RefCell;
@@ -14,7 +14,7 @@ use std::cell::RefCell;
 pub(crate) const MAX_TYPE_TAG_NESTING: u8 = 9;
 
 thread_local! {
-    static TYPE_TAG_DEPTH: RefCell<u8> = RefCell::new(0);
+    static TYPE_TAG_DEPTH: RefCell<u8> = const { RefCell::new(0) };
 }
 
 pub(crate) fn type_tag_recursive_serialize<S, T>(t: &T, s: S) -> Result<S::Ok, S::Error>

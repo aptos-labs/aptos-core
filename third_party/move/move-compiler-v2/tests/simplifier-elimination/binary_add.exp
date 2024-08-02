@@ -1,0 +1,68 @@
+
+Diagnostics:
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/binary_add.move:7:9
+  │
+7 │         0 + 0;
+  │         ^^^^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/binary_add.move:8:9
+  │
+8 │         1 + 0;
+  │         ^^^^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/binary_add.move:9:9
+  │
+9 │         0 + 1;
+  │         ^^^^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/binary_add.move:10:9
+   │
+10 │         0 + (1: u8);
+   │         ^^^^^^^^^^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/binary_add.move:11:9
+   │
+11 │         (0: u8) + 1;
+   │         ^^^^^^^^^^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/binary_add.move:12:9
+   │
+12 │         0 + (1: u128);
+   │         ^^^^^^^^^^^^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/binary_add.move:13:9
+   │
+13 │         (0: u128) + 1;
+   │         ^^^^^^^^^^^^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/binary_add.move:14:9
+   │
+14 │         (0) + (1);
+   │         ^^^^^^^^^
+
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    private fun t0(x: u64,r: M::R) {
+        Add<u64>(Copy(x), Move(x));
+        Add<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        Add<u64>(Add<u64>(Add<u64>(1, select M::R.f<M::R>(r)), select M::R.f<M::R>(r)), 0);
+        {
+          let M::R{ f: _ } = r;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M
+
+
+============ bytecode verification succeeded ========

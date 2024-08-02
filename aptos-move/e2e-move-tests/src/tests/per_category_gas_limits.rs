@@ -170,7 +170,7 @@ fn out_of_gas_while_charging_storage_fee() {
 }
 
 fn state_key_size() -> NumBytes {
-    let key_size = StateKey::table_item(TableHandle(AccountAddress::ONE), vec![0u8]).size();
+    let key_size = StateKey::table_item(&TableHandle(AccountAddress::ONE), &[0u8]).size();
     (key_size as u64).into()
 }
 

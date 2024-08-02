@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot use `&R` with an operator which expects a value of type `R`
+  ┌─ tests/checking/typing/v1-signer/move_to_reference_to_resource.move:4:23
+  │
+4 │         move_to<R>(s, move r)
+  │                       ^^^^^^
+
+error: cannot use `&mut R<bool>` with an operator which expects a value of type `R<bool>`
+   ┌─ tests/checking/typing/v1-signer/move_to_reference_to_resource.move:14:29
+   │
+14 │         move_to<R<bool>>(s, move r)
+   │                             ^^^^^^

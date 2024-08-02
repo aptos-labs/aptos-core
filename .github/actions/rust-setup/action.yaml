@@ -1,3 +1,5 @@
+name: "Rust Setup"
+description: "Setup the rust toolchain and cache"
 inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git"

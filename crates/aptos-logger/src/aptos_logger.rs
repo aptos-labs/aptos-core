@@ -13,7 +13,8 @@ use crate::{
     sample,
     sample::SampleRate,
     telemetry_log_writer::{TelemetryLog, TelemetryLogWriter},
-    Event, Filter, Key, Level, LevelFilter, Metadata,
+    Event, Filter, Key, Level, LevelFilter, Metadata, ERROR_LOG_COUNT, INFO_LOG_COUNT,
+    WARN_LOG_COUNT,
 };
 use aptos_infallible::RwLock;
 use backtrace::Backtrace;
@@ -23,8 +24,8 @@ use once_cell::sync::Lazy;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
-    env, fmt,
-    fmt::Debug,
+    env,
+    fmt::{self, Debug},
     io::{Stdout, Write},
     ops::{Deref, DerefMut},
     str::FromStr,
@@ -604,6 +605,12 @@ impl LoggerService {
             match event {
                 LoggerServiceEvent::LogEntry(entry) => {
                     PROCESSED_STRUCT_LOG_COUNT.inc();
+                    match entry.metadata.level() {
+                        Level::Error => ERROR_LOG_COUNT.inc(),
+                        Level::Warn => WARN_LOG_COUNT.inc(),
+                        Level::Info => INFO_LOG_COUNT.inc(),
+                        _ => {},
+                    }
 
                     if let Some(printer) = &mut self.printer {
                         if self
@@ -626,7 +633,7 @@ impl LoggerService {
                             .telemetry_filter
                             .enabled(&entry.metadata)
                         {
-                            let s = (self.facade.formatter)(&entry).expect("Unable to format");
+                            let s = json_format(&entry).expect("Unable to format");
                             let _ = writer.write(s);
                         }
                     }
@@ -802,15 +809,17 @@ impl LoggerFilterUpdater {
 
 #[cfg(test)]
 mod tests {
-    use super::{AptosData, LogEntry};
+    use super::{text_format, AptosData, LogEntry};
     use crate::{
         aptos_logger::{json_format, TruncatedLogString, RUST_LOG_TELEMETRY},
         debug, error, info,
         logger::Logger,
+        telemetry_log_writer::TelemetryLog,
         trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
-        Schema, Value, Visitor,
+        Schema, Value, Visitor, Writer,
     };
     use chrono::{DateTime, Utc};
+    use futures::StreamExt;
     #[cfg(test)]
     use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
@@ -818,10 +827,34 @@ mod tests {
         env,
         sync::{
             mpsc::{self, Receiver, SyncSender},
-            Arc,
+            Arc, Mutex,
         },
         thread,
+        time::Duration,
     };
+    use tokio::time;
+
+    pub struct MockWriter {
+        pub logs: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl Writer for MockWriter {
+        fn write(&self, log: String) {
+            let mut logs = self.logs.lock().unwrap();
+            logs.push(log);
+        }
+
+        fn write_buferred(&mut self, log: String) {
+            self.write(log);
+        }
+    }
+
+    impl MockWriter {
+        pub fn new() -> (Self, Arc<Mutex<Vec<String>>>) {
+            let logs = Arc::new(Mutex::new(Vec::new()));
+            (Self { logs: logs.clone() }, logs)
+        }
+    }
 
     #[derive(serde::Serialize)]
     #[serde(rename_all = "snake_case")]
@@ -1033,6 +1066,60 @@ mod tests {
             .is_async(true)
             .build_logger();
         (logger_builder, logger)
+    }
+
+    fn new_text_logger() -> (
+        Arc<AptosData>,
+        Arc<Mutex<Vec<String>>>,
+        futures::channel::mpsc::Receiver<TelemetryLog>,
+    ) {
+        let (tx, rx) = futures::channel::mpsc::channel(100);
+        let (mock_writer, logs) = MockWriter::new();
+
+        let logger = AptosDataBuilder::new()
+            .level(Level::Debug)
+            .telemetry_level(Level::Debug)
+            .remote_log_tx(tx)
+            .custom_format(text_format)
+            .printer(Box::new(mock_writer))
+            .is_async(true)
+            .build_logger();
+
+        (logger, logs, rx)
+    }
+
+    #[tokio::test]
+    async fn telemetry_logs_always_json_formatted() {
+        let (logger, local_logs, mut rx) = new_text_logger();
+
+        let metadata = Metadata::new(
+            Level::Info,
+            env!("CARGO_CRATE_NAME"),
+            module_path!(),
+            concat!(file!(), ':', line!()),
+        );
+
+        let event = &Event::new(&metadata, Some(format_args!("This is a log message")), &[]);
+        logger.record(event);
+        logger.flush();
+
+        {
+            let local_logs = local_logs.lock().unwrap();
+            assert!(serde_json::from_str::<JsonValue>(&local_logs[0]).is_err());
+        }
+
+        let timeout_duration = Duration::from_secs(5);
+        if let Ok(Some(TelemetryLog::Log(telemetry_log))) =
+            time::timeout(timeout_duration, rx.next()).await
+        {
+            assert!(
+                serde_json::from_str::<JsonValue>(&telemetry_log).is_ok(),
+                "Telemetry logs not in JSON format: {}",
+                telemetry_log
+            );
+        } else {
+            panic!("Timed out waiting for telemetry log");
+        }
     }
 
     #[test]

@@ -2,45 +2,43 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    aptos_vm::AptosVM, block_executor::AptosTransactionOutput, data_cache::AsMoveResolver,
-};
+use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    state_store::StateView,
+    state_store::{StateView, StateViewId},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
+use aptos_vm_types::{
+    environment::Environment,
+    resolver::{ExecutorView, ResourceGroupView},
+};
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use std::sync::Arc;
 
-pub(crate) struct AptosExecutorTask<'a, S> {
+pub(crate) struct AptosExecutorTask {
     vm: AptosVM,
-    base_view: &'a S,
+    id: StateViewId,
 }
 
-impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
-    type Argument = &'a S;
+impl ExecutorTask for AptosExecutorTask {
+    type Environment = Arc<Environment>;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(argument: &'a S) -> Self {
-        // AptosVM has to be initialized using configs from storage.
-        let vm = AptosVM::new(&argument.as_move_resolver());
-
-        Self {
-            vm,
-            base_view: argument,
-        }
+    fn init(env: Self::Environment, state_view: &impl StateView) -> Self {
+        let vm = AptosVM::new_with_environment(env, state_view, false);
+        let id = state_view.id();
+        Self { vm, id }
     }
 
-    // This function is called by the BlockExecutor for each transaction is intends
+    // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). It can be as a part of sequential
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
@@ -53,7 +51,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
-        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
+        let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
@@ -61,23 +59,12 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)
         {
-            Ok((vm_status, vm_output, sender)) => {
+            Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {
-                    match sender {
-                        Some(s) => speculative_trace!(
-                            &log_context,
-                            format!(
-                                "Transaction discarded, sender: {}, error: {:?}",
-                                s, vm_status
-                            ),
-                        ),
-                        None => {
-                            speculative_trace!(
-                                &log_context,
-                                format!("Transaction malformed, error: {:?}", vm_status),
-                            )
-                        },
-                    };
+                    speculative_trace!(
+                        &log_context,
+                        format!("Transaction discarded, status: {:?}", vm_status),
+                    );
                 }
                 if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(
@@ -89,7 +76,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     ExecutionStatus::DelayedFieldsCodeInvariantError(
                         vm_status.message().cloned().unwrap_or_default(),
                     )
-                } else if AptosVM::should_restart_execution(vm_output.change_set()) {
+                } else if AptosVM::should_restart_execution(vm_output.events()) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()

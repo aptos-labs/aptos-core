@@ -20,7 +20,6 @@ use aptos_api_types::{
     MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
 };
 use aptos_types::event::EventKey;
-use aptos_vm::data_cache::AsMoveResolver;
 use poem_openapi::{
     param::{Path, Query},
     OpenApi,
@@ -78,7 +77,7 @@ impl EventsApi {
         // Ensure that account exists
         let api = self.clone();
         api_spawn_blocking(move || {
-            let account = Account::new(api.context.clone(), address.0, None, None, None)?;
+            let account = Account::new(api.context.clone(), address.0, None, None, None, true)?;
             account.verify_account_or_object_resource()?;
             api.list(
                 account.latest_ledger_info,
@@ -145,7 +144,7 @@ impl EventsApi {
 
         let api = self.clone();
         api_spawn_blocking(move || {
-            let account = Account::new(api.context.clone(), address.0, None, None, None)?;
+            let account = Account::new(api.context.clone(), address.0, None, None, None, true)?;
             let key = account.find_event_key(event_handle.0, field_name.0.into())?;
             api.list(account.latest_ledger_info, accept_type, page, key)
         })
@@ -185,11 +184,7 @@ impl EventsApi {
                 let events = self
                     .context
                     .latest_state_view_poem(&latest_ledger_info)?
-                    .as_move_resolver()
-                    .as_converter(
-                        self.context.db.clone(),
-                        self.context.table_info_reader.clone(),
-                    )
+                    .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                     .try_into_versioned_events(&events)
                     .context("Failed to convert events from storage into response")
                     .map_err(|err| {

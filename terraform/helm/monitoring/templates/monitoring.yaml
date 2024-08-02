@@ -1,0 +1,369 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-grafana
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+data:
+  prometheus.yml: |-
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        isDefault: true
+        access: proxy
+        url: http://localhost:9090
+
+  dashboards.yml: |-
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      folder: 'aptos'
+      type: file
+      options:
+        path: /etc/grafana/dashboards/aptos
+  grafana.ini: |-
+{{ (tpl (.Files.Get "files/grafana.ini") .) | indent 4 }}
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.monitoring.prometheus.storage.class }}
+  resources:
+    requests:
+      storage: {{ .Values.monitoring.prometheus.storage.size }}
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+data:
+{{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | indent 2 }}
+  prometheus.yml: |-
+{{ (tpl (.Files.Get "files/prometheus.yml") .) | indent 4 }}
+  alertmanager.yml: |-
+{{ (tpl (.Files.Get "files/alertmanager.yml") .) | indent 4 }}
+  haproxy.cfg: |-
+{{ (tpl (.Files.Get "files/haproxy-mon.cfg") .) | indent 4 }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-dashboards
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+binaryData:
+{{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | indent 2 }}
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  annotations:
+{{- toYaml .Values.monitoring.serviceAccount.annotations | nindent 4 }}
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - extensions
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+subjects:
+- kind: ServiceAccount
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  namespace: {{ .Release.Namespace }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    {{- if .Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: mon.{{ .Values.service.domain }}
+    {{- end }}
+spec:
+  selector:
+    {{- include "aptos-monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+  ports:
+  - name: grafana-http
+    port: 80
+    targetPort: 3000
+  type: LoadBalancer
+  {{- with .Values.service.monitoring.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "aptos-monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+  ports:
+  - name: prometheus-http
+    port: 9090
+  type: ClusterIP
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+spec:
+  serviceName: {{ include "aptos-monitoring.fullname" . }}
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "aptos-monitoring.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: monitoring
+  template:
+    metadata:
+      labels:
+        {{- include "aptos-monitoring.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: monitoring
+      annotations:
+        checksum/prometheus.yml: {{ tpl (.Files.Get "files/prometheus.yml") . | sha256sum }}
+        checksum/alertmanager.yml: {{ tpl (.Files.Get "files/alertmanager.yml") . | sha256sum }}
+        checksum/rules.yml: {{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | sha256sum }}
+        checksum/dashboards.json: {{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | sha256sum }}
+    spec:
+      {{- with .Values.monitoring }}
+      containers:
+      - name: prometheus
+        image: {{ .prometheus.image.repo }}:{{ .prometheus.image.tag }}
+        imagePullPolicy: {{ .prometheus.image.pullPolicy }}
+        command:
+         - sh
+         - -c
+         - |
+           {{- if .prometheus.deleteWal }}
+           rm -r /prometheus/data/wal/*
+           {{- end }}
+           prometheus \
+            --web.enable-lifecycle \
+            --web.external-url=http://mon.{{ $.Values.service.domain }} \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.retention.time={{ .prometheus.tsdb_retention_time }} \
+            --storage.tsdb.min-block-duration={{ .prometheus.tsdb_min_block_duration }} \
+            --storage.tsdb.max-block-duration={{ .prometheus.tsdb_max_block_duration }}
+        resources:
+          {{- toYaml .prometheus.resources | nindent 10 }}
+        ports:
+        - containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+        volumeMounts:
+        - name: monitoring-config
+          mountPath: /etc/prometheus
+        - name: prometheus-data
+          mountPath: /prometheus
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      - name: alertmanager
+        image: {{ .alertmanager.image.repo }}:{{ .alertmanager.image.tag }}
+        imagePullPolicy: {{ .alertmanager.image.pullPolicy }}
+        args:
+        - "--config.file=/etc/alertmanager/alertmanager.yml"
+        - "--storage.path=/alertmanager"
+        resources:
+          {{- toYaml .alertmanager.resources | nindent 10 }}
+        ports:
+        - containerPort: 9093
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+        volumeMounts:
+        - name: monitoring-config
+          mountPath: /etc/alertmanager
+        - name: alertmanager-data
+          mountPath: /alertmanager
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      - name: grafana
+        image: {{ .grafana.image.repo }}:{{ .grafana.image.tag }}
+        imagePullPolicy: {{ .grafana.image.pullPolicy }}
+        env:
+        {{- range $k, $v := .grafana.env }}
+        - name: {{ quote $k }}
+          value: {{ quote $v }}
+        {{- end }}
+        command: ["/bin/sh", "-c"]
+        args: ["cp /dashboards/* /etc/grafana/dashboards/aptos && gunzip -f /etc/grafana/dashboards/aptos/*.json.gz && exec /run.sh"]
+        resources:
+          {{- toYaml .grafana.resources | nindent 10 }}
+        ports:
+        - containerPort: 3000
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+        volumeMounts:
+        - name: grafana-config
+          mountPath: /etc/grafana
+        - name: grafana-provisioning
+          mountPath: /etc/grafana/provisioning
+        - name: grafana-dashboards-archive
+          mountPath: /dashboards
+        - name: grafana-dashboards
+          mountPath: /etc/grafana/dashboards/aptos
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 472
+          runAsGroup: 472
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      {{- end }}
+      volumes:
+      - name: grafana-config
+        configMap:
+          name: {{ include "aptos-monitoring.fullname" . }}-grafana
+          items:
+          - key: grafana.ini
+            path: grafana.ini
+      - name: grafana-provisioning
+        configMap:
+          name: {{ include "aptos-monitoring.fullname" . }}-grafana
+          items:
+          - key: prometheus.yml
+            path: datasources/prometheus.yml
+          - key: dashboards.yml
+            path: dashboards/dashboards.yml
+      - name: grafana-dashboards-archive
+        configMap:
+          name: {{ include "aptos-monitoring.fullname" . }}-dashboards
+      - name: grafana-dashboards
+        emptyDir: {}
+      - name: monitoring-config
+        configMap:
+          name: {{ include "aptos-monitoring.fullname" . }}
+      - name: prometheus-data
+        persistentVolumeClaim:
+          claimName: {{ include "aptos-monitoring.fullname" . }}-prometheus
+      - name: pushgateway-data
+        emptyDir: {}
+      - name: alertmanager-data
+        emptyDir: {}
+      - name: grafana-data
+        emptyDir: {}
+      serviceAccountName: {{ include "aptos-monitoring.fullname" . }}-prometheus
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{.Values.imagePullSecret}}
+      {{- end }}

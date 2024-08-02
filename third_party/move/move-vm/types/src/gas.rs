@@ -8,6 +8,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes, NumTypeNodes},
+    identifier::IdentStr,
     language_storage::ModuleId,
 };
 
@@ -30,6 +31,12 @@ pub enum SimpleInstruction {
     MutBorrowField,
     ImmBorrowFieldGeneric,
     MutBorrowFieldGeneric,
+    ImmBorrowVariantField,
+    MutBorrowVariantField,
+    ImmBorrowVariantFieldGeneric,
+    MutBorrowVariantFieldGeneric,
+    TestVariant,
+    TestVariantGeneric,
 
     CastU8,
     CastU64,
@@ -88,6 +95,12 @@ impl SimpleInstruction {
             MutBorrowField => MUT_BORROW_FIELD,
             ImmBorrowFieldGeneric => IMM_BORROW_FIELD_GENERIC,
             MutBorrowFieldGeneric => MUT_BORROW_FIELD_GENERIC,
+            ImmBorrowVariantField => IMM_BORROW_VARIANT_FIELD,
+            MutBorrowVariantField => MUT_BORROW_VARIANT_FIELD,
+            ImmBorrowVariantFieldGeneric => IMM_BORROW_VARIANT_FIELD_GENERIC,
+            MutBorrowVariantFieldGeneric => MUT_BORROW_VARIANT_FIELD_GENERIC,
+            TestVariant => TEST_VARIANT,
+            TestVariantGeneric => TEST_VARIANT_GENERIC,
 
             CastU8 => CAST_U8,
             CastU64 => CAST_U64,
@@ -175,11 +188,29 @@ pub trait GasMeter {
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()>;
 
+    fn charge_pack_variant(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+    ) -> PartialVMResult<()> {
+        // Currently mapped to pack, can be specialized if needed
+        self.charge_pack(is_generic, args)
+    }
+
     fn charge_unpack(
         &mut self,
         is_generic: bool,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()>;
+
+    fn charge_unpack_variant(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+    ) -> PartialVMResult<()> {
+        // Currently mapped to pack, can be specialized if needed
+        self.charge_unpack(is_generic, args)
+    }
 
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
@@ -299,6 +330,14 @@ pub trait GasMeter {
     ) -> PartialVMResult<()>;
 
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+    fn charge_dependency(
+        &mut self,
+        is_new: bool,
+        addr: &AccountAddress,
+        name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()>;
 }
 
 /// A dummy gas meter that does not meter anything.
@@ -532,6 +571,16 @@ impl GasMeter for UnmeteredGasMeter {
     }
 
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_dependency(
+        &mut self,
+        _is_new: bool,
+        _addr: &AccountAddress,
+        _name: &IdentStr,
+        _size: NumBytes,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 }

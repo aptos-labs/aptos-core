@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::helpers::TEST_DAG_WINDOW;
 use crate::{
@@ -7,6 +8,7 @@ use crate::{
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
         dag_state_sync::DagStateSynchronizer,
         dag_store::DagStore,
+        errors::DagFetchError,
         storage::DAGStorage,
         tests::{
             dag_test::MockStorage,
@@ -15,7 +17,7 @@ use crate::{
         types::{CertifiedNodeMessage, RemoteFetchRequest},
         CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, TDAGNetworkSender,
     },
-    test_utils::EmptyStateComputer,
+    pipeline::execution_client::DummyExecutionClient,
 };
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
@@ -29,13 +31,23 @@ use aptos_types::{
     validator_verifier::random_validator_verifier,
 };
 use async_trait::async_trait;
+use bytes::Bytes;
 use claims::assert_none;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 struct MockDAGNetworkSender {}
 
 #[async_trait]
 impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
+    async fn send_rb_rpc_raw(
+        &self,
+        _receiver: Author,
+        _message: Bytes,
+        _timeout: Duration,
+    ) -> anyhow::Result<DAGRpcResult> {
+        unimplemented!()
+    }
+
     async fn send_rb_rpc(
         &self,
         _receiver: Author,
@@ -44,6 +56,16 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
     ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
+
+    fn to_bytes_by_protocol(
+        &self,
+        _peers: Vec<Author>,
+        _message: DAGMessage,
+    ) -> anyhow::Result<HashMap<Author, Bytes>> {
+        unimplemented!()
+    }
+
+    fn sort_peers_by_latency(&self, _: &mut [Author]) {}
 }
 
 #[async_trait]
@@ -84,7 +106,7 @@ impl TDagFetcher for MockDagFetcher {
         remote_request: RemoteFetchRequest,
         _responders: Vec<Author>,
         new_dag: Arc<DagStore>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), DagFetchError> {
         let response = FetchRequestHandler::new(self.target_dag.clone(), self.epoch_state.clone())
             .process(remote_request)
             .await
@@ -112,13 +134,13 @@ impl OrderedNotifier for MockNotifier {
 
 fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagStateSynchronizer {
     let time_service = TimeService::mock();
-    let state_computer = Arc::new(EmptyStateComputer {});
+    let execution_client = Arc::new(DummyExecutionClient {});
     let payload_manager = Arc::new(MockPayloadManager {});
 
     DagStateSynchronizer::new(
         epoch_state,
         time_service,
-        state_computer,
+        execution_client,
         storage,
         payload_manager,
         TEST_DAG_WINDOW as Round,

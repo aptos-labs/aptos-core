@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
     dag_network::{RpcWithFallback, TDAGNetworkSender},
@@ -12,6 +13,7 @@ use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
+use bytes::Bytes;
 use claims::{assert_err, assert_ok};
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -31,6 +33,15 @@ struct MockDAGNetworkSender {
 
 #[async_trait]
 impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
+    async fn send_rb_rpc_raw(
+        &self,
+        _receiver: Author,
+        _message: Bytes,
+        _timeout: Duration,
+    ) -> anyhow::Result<DAGRpcResult> {
+        unimplemented!()
+    }
+
     async fn send_rb_rpc(
         &self,
         _receiver: Author,
@@ -39,6 +50,16 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
     ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
+
+    fn to_bytes_by_protocol(
+        &self,
+        _peers: Vec<Author>,
+        _message: DAGMessage,
+    ) -> anyhow::Result<HashMap<Author, Bytes>> {
+        unimplemented!()
+    }
+
+    fn sort_peers_by_latency(&self, _: &mut [Author]) {}
 }
 
 #[async_trait]

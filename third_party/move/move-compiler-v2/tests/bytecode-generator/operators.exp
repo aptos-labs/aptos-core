@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::operators {
     private fun arithm(x: u64,y: u64): u64 {
         Add<u64>(x, Mod<u64>(Mul<u64>(Div<u64>(y, Sub<u64>(x, y)), y), x))
@@ -17,24 +17,6 @@ module 0x42::operators {
     }
     private fun order(x: u64,y: u64): bool {
         And(And(And(Lt<u64>(x, y), Le<u64>(x, y)), Not(Gt<u64>(x, y))), Not(Ge<u64>(x, y)))
-    }
-    spec fun $arithm(x: u64,y: u64): u64 {
-        Add(x, Mod(Mul(Div(y, Sub(x, y)), y), x))
-    }
-    spec fun $bits(x: u64,y: u8): u64 {
-        BitAnd(Shl(x, y), x)
-    }
-    spec fun $bools(x: bool,y: bool): bool {
-        Or(Or(Or(And(x, y), And(x, Not(y))), And(Not(x), y)), And(Not(x), Not(y)))
-    }
-    spec fun $equality<T>(x: #0,y: #0): bool {
-        Eq<#0>(x, y)
-    }
-    spec fun $inequality<T>(x: #0,y: #0): bool {
-        Neq<#0>(x, y)
-    }
-    spec fun $order(x: u64,y: u64): bool {
-        And(And(And(Lt(x, y), Le(x, y)), Not(Gt(x, y))), Not(Ge(x, y)))
     }
 } // end 0x42::operators
 
@@ -176,3 +158,6 @@ fun operators::order($t0: u64, $t1: u64): bool {
  23: label L8
  24: return $t2
 }
+
+
+============ bytecode verification succeeded ========

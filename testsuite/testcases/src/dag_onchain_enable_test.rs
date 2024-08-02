@@ -4,7 +4,7 @@
 use crate::{generate_onchain_config_blob, NetworkLoadTest};
 use anyhow::Ok;
 use aptos::test::CliTestFramework;
-use aptos_forge::{NetworkTest, NodeExt, SwarmExt, Test};
+use aptos_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, SwarmExt, Test};
 use aptos_logger::info;
 use aptos_sdk::bcs;
 use aptos_types::{
@@ -13,8 +13,8 @@ use aptos_types::{
         ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
     },
 };
-use std::time::Duration;
-use tokio::runtime::Runtime;
+use async_trait::async_trait;
+use std::{sync::Arc, time::Duration};
 
 const MAX_NODE_LAG_SECS: u64 = 360;
 
@@ -26,91 +26,194 @@ impl Test for DagOnChainEnableTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for DagOnChainEnableTest {
-    fn test(
+    async fn test(
         &self,
-        swarm: &mut dyn aptos_forge::Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn aptos_forge::Swarm>>>,
         _report: &mut aptos_forge::TestReport,
         duration: std::time::Duration,
     ) -> anyhow::Result<()> {
-        let runtime = Runtime::new().unwrap();
-
         let faucet_endpoint: reqwest::Url = "http://localhost:8081".parse().unwrap();
-        let rest_client = swarm.validators().next().unwrap().rest_client();
+        let (rest_client, rest_api_endpoint) = {
+            let swarm = swarm.read().await;
+            let first_validator = swarm.validators().next().unwrap();
+            let rest_client = first_validator.rest_client();
+            let rest_api_endpoint = first_validator.rest_api_endpoint();
+            (rest_client, rest_api_endpoint)
+        };
+        let mut cli = CliTestFramework::new(
+            rest_api_endpoint,
+            faucet_endpoint,
+            /*num_cli_accounts=*/ 0,
+        )
+        .await;
 
-        let mut cli = runtime.block_on(async {
-            CliTestFramework::new(
-                swarm.validators().next().unwrap().rest_api_endpoint(),
-                faucet_endpoint,
-                /*num_cli_accounts=*/ 0,
+        tokio::time::sleep(duration / 3).await;
+
+        let root_cli_index = {
+            let root_account = swarm.read().await.chain_info().root_account();
+            cli.add_account_with_address_to_cli(
+                root_account.private_key().clone(),
+                root_account.address(),
             )
-            .await
-        });
+        };
 
-        std::thread::sleep(duration / 2);
-
-        runtime.block_on(async {
-
-            let root_cli_index = cli.add_account_with_address_to_cli(
-                swarm.chain_info().root_account().private_key().clone(),
-                swarm.chain_info().root_account().address(),
-            );
-
-            let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
-                &rest_client
-                    .get_account_resource_bcs::<Vec<u8>>(
-                        CORE_CODE_ADDRESS,
-                        "0x1::consensus_config::ConsensusConfig",
-                    )
-                    .await
-                    .unwrap()
-                    .into_inner(),
-            )
-            .unwrap();
-
-            assert!(matches!(current_consensus_config, OnChainConsensusConfig::V2(_)));
-
-            // Change to V2
-            let new_consensus_config = OnChainConsensusConfig::V3 {
-                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
-                vtxn: ValidatorTxnConfig::default_disabled(),
-            };
-
-            let update_consensus_config_script = format!(
-                r#"
-        script {{
-            use aptos_framework::aptos_governance;
-            use aptos_framework::consensus_config;
-            fun main(core_resources: &signer) {{
-                let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-                let config_bytes = {};
-                consensus_config::set(&framework_signer, config_bytes);
-            }}
-        }}
-        "#,
-                generate_onchain_config_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
-            );
-
-            cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
+        let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+            &rest_client
+                .get_account_resource_bcs::<Vec<u8>>(
+                    CORE_CODE_ADDRESS,
+                    "0x1::consensus_config::ConsensusConfig",
+                )
                 .await
-        })?;
+                .unwrap()
+                .into_inner(),
+        )
+        .unwrap();
 
-        std::thread::sleep(duration / 2);
+        assert!(matches!(
+            current_consensus_config,
+            OnChainConsensusConfig::V3 { .. }
+        ));
+
+        // Change to V2
+        let new_consensus_config = OnChainConsensusConfig::V3 {
+            alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+            vtxn: ValidatorTxnConfig::default_disabled(),
+        };
+
+        let update_consensus_config_script = format!(
+            r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::consensus_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            consensus_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+            generate_onchain_config_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+        );
+
+        cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
+            .await?;
+
+        tokio::time::sleep(duration / 3).await;
+
+        let root_cli_index = {
+            let root_account = swarm.read().await.chain_info().root_account();
+            cli.add_account_with_address_to_cli(
+                root_account.private_key().clone(),
+                root_account.address(),
+            )
+        };
+
+        let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+            &rest_client
+                .get_account_resource_bcs::<Vec<u8>>(
+                    CORE_CODE_ADDRESS,
+                    "0x1::consensus_config::ConsensusConfig",
+                )
+                .await
+                .unwrap()
+                .into_inner(),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            current_consensus_config,
+            OnChainConsensusConfig::V3 { .. }
+        ));
+
+        // Change to DAG
+        let new_consensus_config = OnChainConsensusConfig::V3 {
+            alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+            vtxn: ValidatorTxnConfig::default_disabled(),
+        };
+
+        let update_consensus_config_script = format!(
+            r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::consensus_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            consensus_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+            generate_onchain_config_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+        );
+
+        cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
+            .await?;
+
+        let initial_consensus_config = current_consensus_config;
+
+        tokio::time::sleep(duration / 3).await;
+
+        let root_cli_index = {
+            let root_account = swarm.read().await.chain_info().root_account();
+            cli.add_account_with_address_to_cli(
+                root_account.private_key().clone(),
+                root_account.address(),
+            )
+        };
+
+        let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+            &rest_client
+                .get_account_resource_bcs::<Vec<u8>>(
+                    CORE_CODE_ADDRESS,
+                    "0x1::consensus_config::ConsensusConfig",
+                )
+                .await
+                .unwrap()
+                .into_inner(),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            current_consensus_config,
+            OnChainConsensusConfig::V3 { .. }
+        ));
+
+        // Change back to initial
+        let update_consensus_config_script = format!(
+            r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::consensus_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            consensus_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+            generate_onchain_config_blob(&bcs::to_bytes(&initial_consensus_config).unwrap())
+        );
+
+        cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
+            .await?;
 
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");
-        runtime.block_on(async {
-            swarm
-                .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
-                .await
-        })?;
+        swarm
+            .read()
+            .await
+            .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
+            .await?;
 
         Ok(())
     }
 }
 
+#[async_trait]
 impl NetworkTest for DagOnChainEnableTest {
-    fn run(&self, ctx: &mut aptos_forge::NetworkContext<'_>) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: tuple type `(T, bool)` is not allowed as a field type
+   ┌─ tests/checking/naming/unused_type_parameter_struct_invalid_fields.move:13:12
+   │
+13 │         f: (T, bool),
+   │            ^^^^^^^^^
+   │
+   = required by declaration of field `f`
+
+error: reference type `&T` is not allowed as a field type
+   ┌─ tests/checking/naming/unused_type_parameter_struct_invalid_fields.move:14:12
+   │
+14 │         g: &T,
+   │            ^^
+   │
+   = required by declaration of field `g`

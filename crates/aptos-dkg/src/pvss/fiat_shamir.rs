@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 //! For what it's worth, I don't understand why the `merlin` library wants the user to first define
 //! a trait with their 'append' operations and them implement that trait on `merlin::Transcript`.
@@ -14,6 +15,7 @@ use crate::{
 use aptos_crypto::ValidCryptoMaterial;
 use blstrs::Scalar;
 use ff::PrimeField;
+use serde::Serialize;
 
 pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST";
 
@@ -26,8 +28,14 @@ pub trait FiatShamirProtocol<T: Transcript> {
     /// Append the public parameters `pp`.
     fn append_public_parameters(&mut self, pp: &T::PublicParameters);
 
+    /// Append the signing pub keys.
+    fn append_signing_pub_keys(&mut self, spks: &Vec<T::SigningPubKey>);
+
     /// Append the encryption keys `eks`.
     fn append_encryption_keys(&mut self, eks: &Vec<T::EncryptPubKey>);
+
+    /// Append the aux data.
+    fn append_auxs<A: Serialize>(&mut self, aux: &Vec<A>);
 
     /// Appends the transcript
     fn append_transcript(&mut self, trx: &T);
@@ -38,6 +46,8 @@ pub trait FiatShamirProtocol<T: Transcript> {
     /// Returns one or more scalars `r` useful for doing linear combinations (e.g., combining
     /// pairings in the SCRAPE multipairing check using coefficients $1, r, r^2, r^3, \ldots$
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar>;
+
+    #[allow(dead_code)]
     fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<Scalar>;
 }
 
@@ -54,11 +64,28 @@ impl<T: Transcript> FiatShamirProtocol<T> for merlin::Transcript {
         self.append_message(b"pp", pp.to_bytes().as_slice());
     }
 
+    fn append_signing_pub_keys(&mut self, spks: &Vec<T::SigningPubKey>) {
+        self.append_u64(b"signing-pub-keys", spks.len() as u64);
+
+        for spk in spks {
+            self.append_message(b"spk", spk.to_bytes().as_slice())
+        }
+    }
+
     fn append_encryption_keys(&mut self, eks: &Vec<T::EncryptPubKey>) {
         self.append_u64(b"encryption-keys", eks.len() as u64);
 
         for ek in eks {
             self.append_message(b"ek", ek.to_bytes().as_slice())
+        }
+    }
+
+    fn append_auxs<A: Serialize>(&mut self, auxs: &Vec<A>) {
+        self.append_u64(b"auxs", auxs.len() as u64);
+
+        for aux in auxs {
+            let aux_bytes = bcs::to_bytes(aux).expect("aux data serialization should succeed");
+            self.append_message(b"aux", aux_bytes.as_slice())
         }
     }
 
@@ -136,11 +163,13 @@ impl<T: Transcript> FiatShamirProtocol<T> for merlin::Transcript {
 /// Securely derives a Fiat-Shamir challenge via Merlin.
 /// Returns (n+1-t) random scalars for the SCRAPE LDT test (i.e., the random polynomial itself).
 /// Additionally returns `num_scalars` random scalars for some linear combinations.
-pub(crate) fn fiat_shamir<T: Transcript>(
+pub(crate) fn fiat_shamir<T: Transcript, A: Serialize>(
     trx: &T,
     sc: &ThresholdConfig,
     pp: &T::PublicParameters,
+    spks: &Vec<T::SigningPubKey>,
     eks: &Vec<T::EncryptPubKey>,
+    auxs: &Vec<A>,
     dst: &'static [u8],
     num_scalars: usize,
 ) -> (Vec<Scalar>, Vec<Scalar>) {
@@ -148,7 +177,9 @@ pub(crate) fn fiat_shamir<T: Transcript>(
 
     <merlin::Transcript as FiatShamirProtocol<T>>::pvss_domain_sep(&mut fs_t, sc);
     <merlin::Transcript as FiatShamirProtocol<T>>::append_public_parameters(&mut fs_t, pp);
+    <merlin::Transcript as FiatShamirProtocol<T>>::append_signing_pub_keys(&mut fs_t, spks);
     <merlin::Transcript as FiatShamirProtocol<T>>::append_encryption_keys(&mut fs_t, eks);
+    <merlin::Transcript as FiatShamirProtocol<T>>::append_auxs(&mut fs_t, auxs);
     <merlin::Transcript as FiatShamirProtocol<T>>::append_transcript(&mut fs_t, trx);
 
     (

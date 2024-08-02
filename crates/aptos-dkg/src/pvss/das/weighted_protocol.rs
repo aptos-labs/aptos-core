@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     algebra::polynomials::shamir_secret_share,
@@ -23,7 +24,6 @@ use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryp
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
 use group::{Curve, Group};
-use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Neg, Sub};
 
@@ -182,34 +182,37 @@ impl traits::Transcript for Transcript {
         pp: &Self::PublicParameters,
         spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
-        aux: &Vec<A>,
+        auxs: &Vec<A>,
     ) -> anyhow::Result<()> {
         self.check_sizes(sc)?;
         let n = sc.get_total_num_players();
         if eks.len() != n {
             bail!("Expected {} encryption keys, but got {}", n, eks.len());
         }
+        let W = sc.get_total_weight();
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
         let (f, extra) = fiat_shamir::fiat_shamir(
             self,
             sc.get_threshold_config(),
             pp,
+            spks,
             eks,
+            auxs,
             &DAS_WEIGHTED_PVSS_FIAT_SHAMIR_DST[..],
-            2,
+            2 + W * 3, // 3W+1 for encryption check, 1 for SoK verification.
         );
 
+        let sok_vrfy_challenge = &extra[W * 3 + 1];
         let g_2 = pp.get_commitment_base();
         let g_1 = pp.get_encryption_public_params().pubkey_base();
-        let W = sc.get_total_weight();
         batch_verify_soks::<G1Projective, A>(
             self.soks.as_slice(),
             g_1,
             &self.V[W],
             spks,
-            aux,
-            &extra[0],
+            auxs,
+            sok_vrfy_challenge,
         )?;
 
         let ldt = LowDegreeTest::new(
@@ -225,8 +228,7 @@ impl traits::Transcript for Transcript {
         // Correctness of encryptions check
         //
 
-        // TODO: 128-bit scalars from Merlin transcript
-        let alphas_betas_and_gammas = random_scalars(3 * W + 1, &mut thread_rng());
+        let alphas_betas_and_gammas = &extra[0..W * 3 + 1];
         let (alphas_and_betas, gammas) = alphas_betas_and_gammas.split_at(2 * W + 1);
         let (alphas, betas) = alphas_and_betas.split_at(W + 1);
         assert_eq!(alphas.len(), W + 1);

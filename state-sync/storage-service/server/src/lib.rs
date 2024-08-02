@@ -9,7 +9,6 @@ use crate::{
     network::StorageServiceNetworkEvents,
     subscription::SubscriptionStreamRequests,
 };
-use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{StateSyncConfig, StorageServiceConfig},
@@ -59,7 +58,6 @@ const CACHED_SUMMARY_UPDATE_CHANNEL_SIZE: usize = 1;
 /// The server-side actor for the storage service. Handles inbound storage
 /// service requests from clients.
 pub struct StorageServiceServer<T> {
-    bounded_executor: BoundedExecutor,
     network_requests: StorageServiceNetworkEvents,
     storage: T,
     storage_service_config: StorageServiceConfig,
@@ -85,12 +83,15 @@ pub struct StorageServiceServer<T> {
 
     // The listener for notifications from state sync
     storage_service_listener: Option<StorageServiceNotificationListener>,
+
+    // The runtime on which to spawn tasks
+    runtime: Handle,
 }
 
 impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     pub fn new(
         config: StateSyncConfig,
-        executor: Handle,
+        runtime: Handle,
         storage: T,
         time_service: TimeService,
         peers_and_metadata: Arc<PeersAndMetadata>,
@@ -102,10 +103,6 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let storage_service_config = config.storage_service;
 
         // Create the required components
-        let bounded_executor = BoundedExecutor::new(
-            storage_service_config.max_concurrent_requests as usize,
-            executor,
-        );
         let cached_storage_server_summary =
             Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
         let optimistic_fetches = Arc::new(DashMap::new());
@@ -121,7 +118,6 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let storage_service_listener = Some(storage_service_listener);
 
         Self {
-            bounded_executor,
             network_requests,
             storage,
             storage_service_config,
@@ -132,6 +128,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
             subscriptions,
             request_moderator,
             storage_service_listener,
+            runtime,
         }
     }
 
@@ -182,45 +179,43 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
             .expect("The storage service listener must be present!");
 
         // Spawn the task
-        self.bounded_executor
-            .spawn(async move {
-                // Create a ticker for the refresh interval
-                let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
-                let ticker = time_service.interval(duration);
-                futures::pin_mut!(ticker);
+        self.runtime.spawn(async move {
+            // Create a ticker for the refresh interval
+            let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
+            let ticker = time_service.interval(duration);
+            futures::pin_mut!(ticker);
 
-                // Continuously refresh the cache
-                loop {
-                    futures::select! {
-                        _ = ticker.select_next_some() => {
-                            // Refresh the cache periodically
-                            refresh_cached_storage_summary(
-                                cached_storage_server_summary.clone(),
-                                storage.clone(),
-                                config,
-                                cache_update_notifiers.clone(),
-                            )
-                        },
-                        notification = storage_service_listener.select_next_some() => {
-                            trace!(LogSchema::new(LogEntry::ReceivedCommitNotification)
-                                .message(&format!(
-                                    "Received commit notification for highest synced version: {:?}.",
-                                    notification.highest_synced_version
-                                ))
-                            );
+            // Continuously refresh the cache
+            loop {
+                futures::select! {
+                    _ = ticker.select_next_some() => {
+                        // Refresh the cache periodically
+                        refresh_cached_storage_summary(
+                            cached_storage_server_summary.clone(),
+                            storage.clone(),
+                            config,
+                            cache_update_notifiers.clone(),
+                        )
+                    },
+                    notification = storage_service_listener.select_next_some() => {
+                        trace!(LogSchema::new(LogEntry::ReceivedCommitNotification)
+                            .message(&format!(
+                                "Received commit notification for highest synced version: {:?}.",
+                                notification.highest_synced_version
+                            ))
+                        );
 
-                            // Refresh the cache because of a commit notification
-                            refresh_cached_storage_summary(
-                                cached_storage_server_summary.clone(),
-                                storage.clone(),
-                                config,
-                                cache_update_notifiers.clone(),
-                            )
-                        },
-                    }
+                        // Refresh the cache because of a commit notification
+                        refresh_cached_storage_summary(
+                            cached_storage_server_summary.clone(),
+                            storage.clone(),
+                            config,
+                            cache_update_notifiers.clone(),
+                        )
+                    },
                 }
-            })
-            .await;
+            }
+        });
     }
 
     /// Spawns a non-terminating task that handles optimistic fetches
@@ -232,7 +227,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         >,
     ) {
         // Clone all required components for the task
-        let bounded_executor = self.bounded_executor.clone();
+        let runtime = self.runtime.clone();
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.storage_service_config;
         let optimistic_fetches = self.optimistic_fetches.clone();
@@ -243,7 +238,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let time_service = self.time_service.clone();
 
         // Spawn the task
-        self.bounded_executor
+        self.runtime
             .spawn(async move {
                 // Create a ticker for the refresh interval
                 let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
@@ -256,7 +251,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                         _ = ticker.select_next_some() => {
                             // Handle the optimistic fetches periodically
                             handle_active_optimistic_fetches(
-                                bounded_executor.clone(),
+                                runtime.clone(),
                                 cached_storage_server_summary.clone(),
                                 config,
                                 optimistic_fetches.clone(),
@@ -274,7 +269,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
 
                             // Handle the optimistic fetches because of a cache update
                             handle_active_optimistic_fetches(
-                                bounded_executor.clone(),
+                                runtime.clone(),
                                 cached_storage_server_summary.clone(),
                                 config,
                                 optimistic_fetches.clone(),
@@ -287,8 +282,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                         },
                     }
                 }
-            })
-            .await;
+            });
     }
 
     /// Spawns a non-terminating task that handles subscriptions
@@ -300,7 +294,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         >,
     ) {
         // Clone all required components for the task
-        let bounded_executor = self.bounded_executor.clone();
+        let runtime = self.runtime.clone();
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.storage_service_config;
         let optimistic_fetches = self.optimistic_fetches.clone();
@@ -311,7 +305,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let time_service = self.time_service.clone();
 
         // Spawn the task
-        self.bounded_executor
+        self.runtime
             .spawn(async move {
                 // Create a ticker for the refresh interval
                 let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
@@ -324,7 +318,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                         _ = ticker.select_next_some() => {
                             // Handle the subscriptions periodically
                             handle_active_subscriptions(
-                                bounded_executor.clone(),
+                                runtime.clone(),
                                 cached_storage_server_summary.clone(),
                                 config,
                                 optimistic_fetches.clone(),
@@ -342,7 +336,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
 
                             // Handle the subscriptions because of a cache update
                             handle_active_subscriptions(
-                                bounded_executor.clone(),
+                                                                runtime.clone(),
                                 cached_storage_server_summary.clone(),
                                 config,
                                 optimistic_fetches.clone(),
@@ -355,8 +349,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
                         },
                     }
                 }
-            })
-            .await;
+            });
     }
 
     /// Spawns a non-terminating task that refreshes the unhealthy
@@ -368,26 +361,24 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let time_service = self.time_service.clone();
 
         // Spawn the task
-        self.bounded_executor
-            .spawn(async move {
-                // Create a ticker for the refresh interval
-                let duration = Duration::from_millis(config.request_moderator_refresh_interval_ms);
-                let ticker = time_service.interval(duration);
-                futures::pin_mut!(ticker);
+        self.runtime.spawn(async move {
+            // Create a ticker for the refresh interval
+            let duration = Duration::from_millis(config.request_moderator_refresh_interval_ms);
+            let ticker = time_service.interval(duration);
+            futures::pin_mut!(ticker);
 
-                // Periodically refresh the peer states
-                loop {
-                    ticker.next().await;
+            // Periodically refresh the peer states
+            loop {
+                ticker.next().await;
 
-                    // Refresh the unhealthy peer states
-                    if let Err(error) = request_moderator.refresh_unhealthy_peer_states() {
-                        error!(LogSchema::new(LogEntry::RequestModeratorRefresh)
-                            .error(&error)
-                            .message("Failed to refresh the request moderator!"));
-                    }
+                // Refresh the unhealthy peer states
+                if let Err(error) = request_moderator.refresh_unhealthy_peer_states() {
+                    error!(LogSchema::new(LogEntry::RequestModeratorRefresh)
+                        .error(&error)
+                        .message("Failed to refresh the request moderator!"));
                 }
-            })
-            .await;
+            }
+        });
     }
 
     /// Starts the storage service server thread
@@ -408,26 +399,24 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
             let lru_response_cache = self.lru_response_cache.clone();
             let request_moderator = self.request_moderator.clone();
             let time_service = self.time_service.clone();
-            self.bounded_executor
-                .spawn_blocking(move || {
-                    Handler::new(
-                        cached_storage_server_summary,
-                        optimistic_fetches,
-                        lru_response_cache,
-                        request_moderator,
-                        storage,
-                        subscriptions,
-                        time_service,
-                    )
-                    .process_request_and_respond(
-                        config,
-                        network_request.peer_network_id,
-                        network_request.protocol_id,
-                        network_request.storage_service_request,
-                        network_request.response_sender,
-                    );
-                })
-                .await;
+            self.runtime.spawn_blocking(move || {
+                Handler::new(
+                    cached_storage_server_summary,
+                    optimistic_fetches,
+                    lru_response_cache,
+                    request_moderator,
+                    storage,
+                    subscriptions,
+                    time_service,
+                )
+                .process_request_and_respond(
+                    config,
+                    network_request.peer_network_id,
+                    network_request.protocol_id,
+                    network_request.storage_service_request,
+                    network_request.response_sender,
+                );
+            });
         }
     }
 
@@ -457,7 +446,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
 /// Handles the active optimistic fetches and logs any
 /// errors that were encountered.
 async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
-    bounded_exector: BoundedExecutor,
+    runtime: Handle,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -468,7 +457,7 @@ async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     time_service: TimeService,
 ) {
     if let Err(error) = optimistic_fetch::handle_active_optimistic_fetches(
-        bounded_exector,
+        runtime,
         cached_storage_server_summary,
         config,
         optimistic_fetches,
@@ -489,7 +478,7 @@ async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 /// Handles the active subscriptions and logs any
 /// errors that were encountered.
 async fn handle_active_subscriptions<T: StorageReaderInterface>(
-    bounded_exector: BoundedExecutor,
+    runtime: Handle,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -500,7 +489,7 @@ async fn handle_active_subscriptions<T: StorageReaderInterface>(
     time_service: TimeService,
 ) {
     if let Err(error) = subscription::handle_active_subscriptions(
-        bounded_exector,
+        runtime,
         cached_storage_server_summary,
         config,
         optimistic_fetches,

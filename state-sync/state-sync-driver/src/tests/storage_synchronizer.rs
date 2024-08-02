@@ -750,9 +750,11 @@ async fn test_save_states_completion() {
     // Save multiple state chunks (including the last chunk)
     storage_synchronizer
         .save_state_values(0, create_state_value_chunk_with_proof(false))
+        .await
         .unwrap();
     storage_synchronizer
         .save_state_values(1, create_state_value_chunk_with_proof(true))
+        .await
         .unwrap();
 
     // Verify we get a commit notification
@@ -808,6 +810,7 @@ async fn test_save_states_dropped_error_listener() {
     let notification_id = 0;
     storage_synchronizer
         .save_state_values(notification_id, create_state_value_chunk_with_proof(true))
+        .await
         .unwrap();
 
     // The handler should panic as the commit listener was dropped
@@ -849,13 +852,14 @@ async fn test_save_states_invalid_chunk() {
     let notification_id = 0;
     storage_synchronizer
         .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
+        .await
         .unwrap();
     verify_error_notification(&mut error_listener, notification_id).await;
 }
 
-#[test]
+#[tokio::test]
 #[should_panic]
-fn test_save_states_without_initialize() {
+async fn test_save_states_without_initialize() {
     // Create the storage synchronizer
     let (_, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
         create_mock_executor(),
@@ -864,7 +868,10 @@ fn test_save_states_without_initialize() {
 
     // Attempting to save the states should panic as the state
     // synchronizer was not initialized!
-    let _ = storage_synchronizer.save_state_values(0, create_state_value_chunk_with_proof(false));
+    storage_synchronizer
+        .save_state_values(0, create_state_value_chunk_with_proof(false))
+        .await
+        .unwrap();
 }
 
 /// Creates a storage synchronizer for testing

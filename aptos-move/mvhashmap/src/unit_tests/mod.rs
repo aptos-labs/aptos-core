@@ -16,7 +16,13 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     delta_math::DeltaHistory,
 };
-use aptos_types::executable::ExecutableTestType;
+use aptos_types::{
+    executable::ExecutableTestType,
+    on_chain_config::CurrentTimeMicroseconds,
+    state_store::state_value::{StateValue, StateValueMetadata},
+    write_set::WriteOpKind,
+};
+use bytes::Bytes;
 use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
 use std::sync::Arc;
 mod proptest_types;
@@ -53,6 +59,67 @@ fn unsync_map_data_basic() {
         map.fetch_data(&ap),
         ValueWithLayout::Exchanged(arc_value_for(14, 1), None)
     );
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TestMetadataValue {
+    metadata: u64,
+}
+
+impl TransactionWrite for TestMetadataValue {
+    fn bytes(&self) -> Option<&Bytes> {
+        unimplemented!("Irrelevant for the test")
+    }
+
+    fn write_op_kind(&self) -> WriteOpKind {
+        unimplemented!("Irrelevant for the test")
+    }
+
+    fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {
+        unimplemented!("Irrelevant for the test")
+    }
+
+    fn as_state_value(&self) -> Option<StateValue> {
+        unimplemented!("Irrelevant for the test")
+    }
+
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
+        Some(StateValueMetadata::legacy(
+            self.metadata,
+            &CurrentTimeMicroseconds {
+                microseconds: self.metadata,
+            },
+        ))
+    }
+
+    fn set_bytes(&mut self, _bytes: Bytes) {
+        unimplemented!("Irrelevant for the test")
+    }
+}
+
+#[test]
+fn write_metadata() {
+    let ap = KeyType(b"/foo/b".to_vec());
+
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestMetadataValue, ExecutableTestType, ()> =
+        MVHashMap::new();
+
+    let metadata_5 = TestMetadataValue { metadata: 5 };
+    let metadata_6 = TestMetadataValue { metadata: 6 };
+
+    assert!(mvtbl
+        .data()
+        .write_metadata(ap.clone(), 10, 1, metadata_5.clone()));
+    assert!(mvtbl.data().write_metadata(ap.clone(), 10, 1, metadata_6));
+    assert!(mvtbl
+        .data()
+        .write_metadata(ap.clone(), 10, 1, metadata_5.clone()));
+    // Should be equal to recorded metadata and return false (no change).
+    assert!(!mvtbl
+        .data()
+        .write_metadata(ap.clone(), 10, 1, metadata_5.clone()));
+
+    assert!(mvtbl.data().write_metadata(ap.clone(), 11, 1, metadata_5));
 }
 
 #[test]

@@ -1,0 +1,150 @@
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+     var $t3: u32
+  0: $t2 := 1
+  1: $t3 := infer($t2)
+  2: if ($t0) goto 3 else goto 8
+  3: label L0
+  4: $t3 := infer($t3)
+  5: $t3 := infer($t3)
+  6: $t1 := infer($t3)
+  7: goto 11
+  8: label L1
+  9: $t3 := infer($t3)
+ 10: $t1 := 9
+ 11: label L2
+ 12: return $t1
+}
+
+
+Diagnostics:
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/variable-coalescing/dead_assignment_3.move:10:13
+   │
+10 │             y = y;
+   │             ^^^^^
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+     var $t3: u32
+  0: $t2 := 1
+  1: $t3 := move($t2)
+  2: if ($t0) goto 3 else goto 6
+  3: label L0
+  4: $t1 := move($t3)
+  5: goto 8
+  6: label L1
+  7: $t1 := 9
+  8: label L2
+  9: return $t1
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+     var $t3: u32
+     # live vars: $t0
+     # events: b:$t0, b:$t2
+  0: $t2 := 1
+     # live vars: $t0, $t2
+     # events: e:$t2, b:$t3
+  1: $t3 := move($t2)
+     # live vars: $t0, $t3
+     # events: e:$t0
+  2: if ($t0) goto 3 else goto 6
+     # live vars: $t3
+  3: label L0
+     # live vars: $t3
+     # events: b:$t1
+  4: $t1 := move($t3)
+     # live vars: $t1
+  5: goto 8
+     # live vars: $t3
+     # events: e:$t3
+  6: label L1
+     # live vars:
+  7: $t1 := 9
+     # live vars: $t1
+  8: label L2
+     # live vars: $t1
+     # events: e:$t1
+  9: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+     var $t3: u32 [unused]
+  0: $t2 := 1
+  1: $t2 := move($t2)
+  2: if ($t0) goto 3 else goto 6
+  3: label L0
+  4: $t1 := move($t2)
+  5: goto 8
+  6: label L1
+  7: $t1 := 9
+  8: label L2
+  9: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+     var $t3: u32 [unused]
+  0: $t2 := 1
+  1: if ($t0) goto 2 else goto 5
+  2: label L0
+  3: $t1 := move($t2)
+  4: goto 7
+  5: label L1
+  6: $t1 := 9
+  7: label L2
+  8: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+public test(Arg0: bool): u32 /* def_idx: 0 */ {
+L1:	loc0: u32
+L2:	loc1: u32
+B0:
+	0: LdU32(1)
+	1: MoveLoc[0](Arg0: bool)
+	2: StLoc[0](Arg0: bool)
+	3: StLoc[1](loc0: u32)
+	4: MoveLoc[0](Arg0: bool)
+	5: BrFalse(9)
+B1:
+	6: MoveLoc[1](loc0: u32)
+	7: StLoc[2](loc1: u32)
+	8: Branch(11)
+B2:
+	9: LdU32(9)
+	10: StLoc[2](loc1: u32)
+B3:
+	11: MoveLoc[2](loc1: u32)
+	12: Ret
+}
+}
+============ bytecode verification succeeded ========

@@ -4,10 +4,11 @@
 use crate::view::{LatestView, ViewState};
 use aptos_aggregator::{
     resolver::TDelayedFieldView,
-    types::{code_invariant_error, DelayedFieldValue, PanicError, ReadPosition},
+    types::{code_invariant_error, DelayedFieldValue, ReadPosition},
 };
 use aptos_mvhashmap::{types::TxnIndex, versioned_delayed_fields::TVersionedDelayedFieldView};
 use aptos_types::{
+    delayed_fields::PanicError,
     executable::Executable,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,

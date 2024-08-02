@@ -1,0 +1,39 @@
+
+Diagnostics:
+error: cannot return `bool` from a function with result type `u64`
+  ┌─ tests/checking/error_context/return.move:4:9
+  │
+4 │         true
+  │         ^^^^
+
+error: cannot return `bool` from a function with result type `u64`
+  ┌─ tests/checking/error_context/return.move:8:23
+  │
+8 │         if (c) return false;
+  │                       ^^^^^
+
+error: cannot return `integer` from a function which returns nothing
+   ┌─ tests/checking/error_context/return.move:13:9
+   │
+13 │         1
+   │         ^
+
+error: cannot return `bool` from a function which returns nothing
+   ┌─ tests/checking/error_context/return.move:17:23
+   │
+17 │         if (c) return true;
+   │                       ^^^^
+
+error: cannot return nothing from a function with result type `bool`
+   ┌─ tests/checking/error_context/return.move:20:26
+   │
+20 │       fun return_5(): bool {
+   │ ╭──────────────────────────^
+21 │ │     }
+   │ ╰─────^
+
+error: the function returns `&mut` but `&` was provided
+   ┌─ tests/checking/error_context/return.move:24:9
+   │
+24 │         r
+   │         ^

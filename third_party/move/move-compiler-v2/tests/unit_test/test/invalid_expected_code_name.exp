@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: Invalid #[expected_failure(...)] attribute, expected 1 failure kind but found 0. Expected one of: abort_code, arithmetic_error, vector_error, out_of_gas, major_status
+  ┌─ tests/unit_test/test/invalid_expected_code_name.move:4:7
+  │
+4 │     #[expected_failure(cod=1)]
+  │       ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Invalid #[expected_failure(...)] attribute, expected 1 failure kind but found 0. Expected one of: abort_code, arithmetic_error, vector_error, out_of_gas, major_status
+  ┌─ tests/unit_test/test/invalid_expected_code_name.move:8:7
+  │
+8 │     #[expected_failure(code=1)]
+  │       ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Invalid #[expected_failure(...)] attribute, expected 1 failure kind but found 0. Expected one of: abort_code, arithmetic_error, vector_error, out_of_gas, major_status
+   ┌─ tests/unit_test/test/invalid_expected_code_name.move:12:7
+   │
+12 │     #[expected_failure(abort_cod=1)]
+   │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,9 @@
+processed 3 tasks
+
+task 1 'run'. lines 25-25:
+return values: 2, 1
+
+task 2 'run'. lines 27-27:
+return values: 55, 44
+
+==> Compiler v2 delivered same results!

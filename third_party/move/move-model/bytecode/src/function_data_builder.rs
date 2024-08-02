@@ -6,6 +6,7 @@
 //! bytecode.
 
 use crate::{
+    annotations::Annotations,
     function_target::{FunctionData, FunctionTarget},
     stackless_bytecode::{AttrId, Bytecode, HavocKind, Label, Operation, PropKind},
 };
@@ -100,6 +101,16 @@ impl<'env> FunctionDataBuilder<'env> {
         types.push(ty);
         self.data.result_type = Type::tuple(types);
         idx
+    }
+
+    /// Get annotations.
+    pub fn get_annotations(&self) -> &Annotations {
+        &self.data.annotations
+    }
+
+    /// Get annotations for mutation.
+    pub fn get_annotations_mut(&mut self) -> &mut Annotations {
+        &mut self.data.annotations
     }
 
     /// Sets the default location as well as information about the verification condition

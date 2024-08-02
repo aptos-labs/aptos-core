@@ -1,39 +1,38 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
     }
     private fun t0(cond: bool,s: &M::S,s_mut: &mut M::S) {
-        Borrow(Immutable)(select M::S.f(if cond {
+        Borrow(Immutable)(select M::S.f<&M::S>(if cond {
           s
         } else {
           s
         }));
-        Borrow(Immutable)(select M::S.f(if cond {
-          s_mut
+        Borrow(Immutable)(select M::S.f<&M::S>(if cond {
+          Freeze(false)(s_mut)
         } else {
           s
         }));
-        Borrow(Immutable)(select M::S.f(if cond {
+        Borrow(Immutable)(select M::S.f<&M::S>(if cond {
           s
         } else {
-          s_mut
+          Freeze(false)(s_mut)
         }));
-        Borrow(Immutable)(select M::S.f(if cond {
+        Borrow(Immutable)(select M::S.f<&mut M::S>(if cond {
           s_mut
         } else {
           s_mut
         }));
-        Borrow(Mutable)(select M::S.f(if cond {
+        Borrow(Mutable)(select M::S.f<&mut M::S>(if cond {
           s_mut
         } else {
           s_mut
         }));
-        Borrow(Immutable)(select M::S.f({
+        Borrow(Immutable)(select M::S.f<&M::S>({
           let s: M::S = pack M::S(0);
           Borrow(Immutable)(s)
         }));
         Tuple()
     }
-    spec fun $t0(cond: bool,s: &M::S,s_mut: &mut M::S);
 } // end 0x8675309::M

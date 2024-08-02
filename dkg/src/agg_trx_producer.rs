@@ -1,14 +1,17 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     transcript_aggregation::TranscriptAggregationState, types::DKGTranscriptRequest, DKGMessage,
 };
 use aptos_channels::aptos_channel::Sender;
+use aptos_logger::info;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{dkg::DKGTrait, epoch_state::EpochState};
 use futures::future::AbortHandle;
 use futures_util::future::Abortable;
-use std::sync::Arc;
+use move_core_types::account_address::AccountAddress;
+use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 /// A sub-process of the whole DKG process.
@@ -18,6 +21,8 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub trait TAggTranscriptProducer<S: DKGTrait>: Send + Sync {
     fn start_produce(
         &self,
+        start_time: Duration,
+        my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         dkg_config: S::PublicParams,
         agg_trx_tx: Option<Sender<(), S::Transcript>>,
@@ -40,17 +45,41 @@ impl AggTranscriptProducer {
 impl<DKG: DKGTrait + 'static> TAggTranscriptProducer<DKG> for AggTranscriptProducer {
     fn start_produce(
         &self,
+        start_time: Duration,
+        my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         params: DKG::PublicParams,
         agg_trx_tx: Option<Sender<(), DKG::Transcript>>,
     ) -> AbortHandle {
+        let epoch = epoch_state.epoch;
         let rb = self.reliable_broadcast.clone();
         let req = DKGTranscriptRequest::new(epoch_state.epoch);
-        let agg_state = Arc::new(TranscriptAggregationState::<DKG>::new(params, epoch_state));
+        let agg_state = Arc::new(TranscriptAggregationState::<DKG>::new(
+            start_time,
+            my_addr,
+            params,
+            epoch_state,
+        ));
         let task = async move {
-            let agg_trx = rb.broadcast(req, agg_state).await;
-            if let Some(tx) = agg_trx_tx {
-                let _ = tx.push((), agg_trx); // If the `DKGManager` was dropped, this send will fail by design.
+            let agg_trx = rb
+                .broadcast(req, agg_state)
+                .await
+                .expect("broadcast cannot fail");
+            info!(
+                epoch = epoch,
+                my_addr = my_addr,
+                "[DKG] aggregated transcript locally"
+            );
+            if let Err(e) = agg_trx_tx
+                .expect("[DKG] agg_trx_tx should be available")
+                .push((), agg_trx)
+            {
+                // If the `DKGManager` was dropped, this send will fail by design.
+                info!(
+                    epoch = epoch,
+                    my_addr = my_addr,
+                    "[DKG] Failed to send aggregated transcript to DKGManager, maybe DKGManager stopped and channel dropped: {:?}", e
+                );
             }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -66,6 +95,8 @@ pub struct DummyAggTranscriptProducer {}
 impl<DKG: DKGTrait> TAggTranscriptProducer<DKG> for DummyAggTranscriptProducer {
     fn start_produce(
         &self,
+        _start_time: Duration,
+        _my_addr: AccountAddress,
         _epoch_state: Arc<EpochState>,
         _dkg_config: DKG::PublicParams,
         _agg_trx_tx: Option<Sender<(), DKG::Transcript>>,

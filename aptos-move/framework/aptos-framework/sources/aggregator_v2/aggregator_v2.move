@@ -8,8 +8,19 @@
 /// dependency.
 /// However, reading the aggregator value (i.e. calling `read(X)`) is a resource-intensive
 /// operation that also reduced parallelism, and should be avoided as much as possible.
+/// If you need to capture the value, without revealing it, use snapshot function instead,
+/// which has no parallelism impact.
+///
+/// From parallelism considerations, there are three different levels of effects:
+/// * enable full parallelism (cannot create conflicts):
+///     max_value, create_*, snapshot, derive_string_concat
+/// * enable speculative parallelism (generally parallel via branch prediction)
+///     try_add, add, try_sub, sub, is_at_least
+/// * create read/write conflicts, as if you were using a regular field
+///     read, read_snapshot, read_derived_string
 module aptos_framework::aggregator_v2 {
     use std::error;
+    use std::features;
     use std::string::String;
 
     /// The value of aggregator overflows. Raised by uncoditional add() call
@@ -66,6 +77,12 @@ module aptos_framework::aggregator_v2 {
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement>;
 
+    public fun create_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement, max_value: IntElement): Aggregator<IntElement> {
+        let aggregator = create_aggregator(max_value);
+        add(&mut aggregator, start_value);
+        aggregator
+    }
+
     /// Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
     /// due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
     ///
@@ -73,34 +90,81 @@ module aptos_framework::aggregator_v2 {
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_unbounded_aggregator<IntElement: copy + drop>(): Aggregator<IntElement>;
 
+    public fun create_unbounded_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement): Aggregator<IntElement> {
+        let aggregator = create_unbounded_aggregator();
+        add(&mut aggregator, start_value);
+        aggregator
+    }
+
     /// Adds `value` to aggregator.
     /// If addition would exceed the max_value, `false` is returned, and aggregator value is left unchanged.
+    ///
+    /// Parallelism info: This operation enables speculative parallelism.
     public native fun try_add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
 
-    // Adds `value` to aggregator, uncoditionally.
-    // If addition would exceed the max_value, EAGGREGATOR_OVERFLOW exception will be thrown.
+    /// Adds `value` to aggregator, unconditionally.
+    /// If addition would exceed the max_value, EAGGREGATOR_OVERFLOW exception will be thrown.
+    ///
+    /// Parallelism info: This operation enables speculative parallelism.
     public fun add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         assert!(try_add(aggregator, value), error::out_of_range(EAGGREGATOR_OVERFLOW));
     }
 
     /// Subtracts `value` from aggregator.
     /// If subtraction would result in a negative value, `false` is returned, and aggregator value is left unchanged.
+    ///
+    /// Parallelism info: This operation enables speculative parallelism.
     public native fun try_sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
 
-    // Subtracts `value` to aggregator, uncoditionally.
+    // Subtracts `value` to aggregator, unconditionally.
     // If subtraction would result in a negative value, EAGGREGATOR_UNDERFLOW exception will be thrown.
+    ///
+    /// Parallelism info: This operation enables speculative parallelism.
     public fun sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
+    native fun is_at_least_impl<IntElement>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool;
+
+    /// Returns true if aggregator value is larger than or equal to the given `min_amount`, false otherwise.
+    ///
+    /// This operation is more efficient and much more parallelization friendly than calling `read(agg) > min_amount`.
+    /// Until traits are deployed, `is_at_most`/`is_equal` utility methods can be derived from this one (assuming +1 doesn't overflow):
+    /// - for `is_at_most(agg, max_amount)`, you can do `!is_at_least(max_amount + 1)`
+    /// - for `is_equal(agg, value)`, you can do `is_at_least(value) && !is_at_least(value + 1)`
+    ///
+    /// Parallelism info: This operation enables speculative parallelism.
+    public fun is_at_least<IntElement>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool {
+        assert!(features::aggregator_v2_is_at_least_api_enabled(), EAGGREGATOR_API_V2_NOT_ENABLED);
+        is_at_least_impl(aggregator, min_amount)
+    }
+
+    // TODO waiting for integer traits
+    // public fun is_at_most<IntElement>(aggregator: &Aggregator<IntElement>, max_amount: IntElement): bool {
+    //     !is_at_least(max_amount + 1)
+    // }
+
+    // TODO waiting for integer traits
+    // public fun is_equal<IntElement>(aggregator: &Aggregator<IntElement>, value: IntElement): bool {
+    //     is_at_least(value) && !is_at_least(value + 1)
+    // }
+
     /// Returns a value stored in this aggregator.
     /// Note: This operation is resource-intensive, and reduces parallelism.
-    /// (Especially if called in a transaction that also modifies the aggregator,
-    /// or has other read/write conflicts)
+    /// If you need to capture the value, without revealing it, use snapshot function instead,
+    /// which has no parallelism impact.
+    /// If called in a transaction that also modifies the aggregator, or has other read/write conflicts,
+    /// it will sequentialize that transaction. (i.e. up to concurrency_level times slower)
+    /// If called in a separate transaction (i.e. after transaction that modifies aggregator), it might be
+    /// up to two times slower.
+    ///
+    /// Parallelism info: This operation *prevents* speculative parallelism.
     public native fun read<IntElement>(aggregator: &Aggregator<IntElement>): IntElement;
 
     /// Returns a wrapper of a current value of an aggregator
     /// Unlike read(), it is fast and avoids sequential dependencies.
+    ///
+    /// Parallelism info: This operation enables parallelism.
     public native fun snapshot<IntElement>(aggregator: &Aggregator<IntElement>): AggregatorSnapshot<IntElement>;
 
     /// Creates a snapshot of a given value.
@@ -111,12 +175,16 @@ module aptos_framework::aggregator_v2 {
     /// Note: This operation is resource-intensive, and reduces parallelism.
     /// (Especially if called in a transaction that also modifies the aggregator,
     /// or has other read/write conflicts)
+    ///
+    /// Parallelism info: This operation *prevents* speculative parallelism.
     public native fun read_snapshot<IntElement>(snapshot: &AggregatorSnapshot<IntElement>): IntElement;
 
     /// Returns a value stored in this DerivedStringSnapshot.
     /// Note: This operation is resource-intensive, and reduces parallelism.
     /// (Especially if called in a transaction that also modifies the aggregator,
     /// or has other read/write conflicts)
+    ///
+    /// Parallelism info: This operation *prevents* speculative parallelism.
     public native fun read_derived_string(snapshot: &DerivedStringSnapshot): String;
 
     /// Creates a DerivedStringSnapshot of a given value.
@@ -127,6 +195,8 @@ module aptos_framework::aggregator_v2 {
     /// snapshot passed needs to have integer type - currently supported types are u64 and u128.
     /// Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
     /// If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
+    ///
+    /// Parallelism info: This operation enables parallelism.
     public native fun derive_string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): DerivedStringSnapshot;
 
     // ===== DEPRECATE/NOT YET IMPLEMENTED ====
@@ -180,30 +250,6 @@ module aptos_framework::aggregator_v2 {
         let derived = derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
         assert!(read_derived_string(&derived) == std::string::utf8(b"before42after"), 0);
     }
-
-    // Tests commented out, as flag used in rust cannot be disabled.
-
-    // #[test(fx = @std)]
-    // #[expected_failure(abort_code = 0x030006, location = Self)]
-    // fun test_snapshot_feature_not_enabled(fx: &signer) {
-    //     use std::features;
-    //     use aptos_framework::reconfiguration;
-    //     let feature = features::get_aggregator_v2_api_feature();
-    //     features::change_feature_flags(fx, vector[], vector[feature]);
-    //     reconfiguration::reconfigure_for_test();
-    //     create_snapshot(42);
-    // }
-
-    // #[test(fx = @std)]
-    // #[expected_failure(abort_code = 0x030006, location = Self)]
-    // fun test_aggregator_feature_not_enabled(fx: &signer) {
-    //     use std::features;
-    //     use aptos_framework::reconfiguration;
-    //     let feature = features::get_aggregator_v2_api_feature();
-    //     features::change_feature_flags(fx, vector[], vector[feature]);
-    //     reconfiguration::reconfigure_for_test();
-    //     create_aggregator(42);
-    // }
 
     #[test]
     #[expected_failure(abort_code = 0x030007, location = Self)]

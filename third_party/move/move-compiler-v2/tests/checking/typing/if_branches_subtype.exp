@@ -1,23 +1,23 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun t0(cond: bool,u: &u64,u_mut: &mut u64) {
         {
-          let _ = if cond {
+          let _: &u64 = if cond {
             u
           } else {
-            u_mut
+            Freeze(false)(u_mut)
           };
           {
-            let _ = if cond {
-              u_mut
+            let _: &u64 = if cond {
+              Freeze(false)(u_mut)
             } else {
               u
             };
             {
-              let _ = if cond {
-                u_mut
+              let _: &u64 = if cond {
+                Freeze(false)(u_mut)
               } else {
-                u_mut
+                Freeze(false)(u_mut)
               };
               Tuple()
             }
@@ -26,70 +26,22 @@ module 0x8675309::M {
     }
     private fun t1(cond: bool,u: &u64,u_mut: &mut u64) {
         {
-          let (_, _) = if cond {
+          let (_: &u64, _: &u64): (&u64, &u64) = if cond {
             Tuple(u, u)
           } else {
-            Tuple(u_mut, u_mut)
+            Tuple(Freeze(false)(u_mut), Freeze(false)(u_mut))
           };
           {
-            let (_, _) = if cond {
-              Tuple(u_mut, u)
+            let (_: &u64, _: &u64): (&u64, &u64) = if cond {
+              Tuple(Freeze(false)(u_mut), u)
             } else {
-              Tuple(u, u_mut)
+              Tuple(u, Freeze(false)(u_mut))
             };
             {
-              let (_, _) = if cond {
-                Tuple(u, u_mut)
+              let (_: &u64, _: &u64): (&u64, &u64) = if cond {
+                Tuple(u, Freeze(false)(u_mut))
               } else {
-                Tuple(u_mut, u)
-              };
-              Tuple()
-            }
-          }
-        }
-    }
-    spec fun $t0(cond: bool,u: u64,u_mut: u64) {
-        {
-          let _ = if cond {
-            u
-          } else {
-            u_mut
-          };
-          {
-            let _ = if cond {
-              u_mut
-            } else {
-              u
-            };
-            {
-              let _ = if cond {
-                u_mut
-              } else {
-                u_mut
-              };
-              Tuple()
-            }
-          }
-        }
-    }
-    spec fun $t1(cond: bool,u: u64,u_mut: u64) {
-        {
-          let (_, _) = if cond {
-            Tuple(u, u)
-          } else {
-            Tuple(u_mut, u_mut)
-          };
-          {
-            let (_, _) = if cond {
-              Tuple(u_mut, u)
-            } else {
-              Tuple(u, u_mut)
-            };
-            {
-              let (_, _) = if cond {
-                Tuple(u, u_mut)
-              } else {
-                Tuple(u_mut, u)
+                Tuple(Freeze(false)(u_mut), u)
               };
               Tuple()
             }

@@ -1,20 +1,19 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: bool,
     }
     private fun t0(x: bool,r: M::R) {
-        Or(true, false);
-        Or(false, true);
-        Or(true, false);
-        Or(true, true);
+        true;
+        true;
+        true;
+        true;
         Or(Copy(x), Move(x));
-        Or(select M::R.f(r), select M::R.f(r));
-        Or(Or(true, false), Or(true, false));
+        Or(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        true;
         {
           let M::R{ f: _ } = r;
           Tuple()
         }
     }
-    spec fun $t0(x: bool,r: M::R);
 } // end 0x8675309::M

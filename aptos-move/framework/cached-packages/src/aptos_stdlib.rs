@@ -44,7 +44,7 @@ pub fn publish_module_source(module_name: &str, module_src: &str) -> Transaction
 pub fn object_code_deployment_upgrade(
     metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
-    publisher_ref: AccountAddress,
+    code_object: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -59,7 +59,7 @@ pub fn object_code_deployment_upgrade(
         vec![
             bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
-            bcs::to_bytes(&publisher_ref).unwrap(),
+            bcs::to_bytes(&code_object).unwrap(),
         ],
     ))
 }

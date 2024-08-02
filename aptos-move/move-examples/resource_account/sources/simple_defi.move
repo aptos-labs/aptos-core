@@ -109,8 +109,8 @@ module resource_account::simple_defi {
     public entry fun test_exchange_to_and_exchange_from(origin_account: signer, resource_account: signer, framework: signer) acquires ModuleData {
         use aptos_framework::aptos_coin;
 
-        set_up_test(&origin_account, &resource_account);
         let (aptos_coin_burn_cap, aptos_coin_mint_cap) = aptos_coin::initialize_for_test(&framework);
+        set_up_test(&origin_account, &resource_account);
 
         // exchange from 5 aptos coins to 5 chloe's coins & assert the results are expected
         let five_a_coins = coin::mint(5, &aptos_coin_mint_cap);

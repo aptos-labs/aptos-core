@@ -1,74 +1,63 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x12391283::M {
     use std::vector;
     private fun test_1(): u64 {
         {
-          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          let accu: u64 = 0;
           {
-            let (v: vector<u8>, init: u64) = Tuple(gas_schedule_blob, Cast(0));
-            {
-              let accu: u64 = init;
-              {
-                let (v: vector<u8>) = Tuple(v);
-                vector::reverse<u8>(Borrow(Mutable)(v));
-                loop {
-                  if Not(vector::is_empty<u8>(Borrow(Immutable)(v))) {
-                    {
-                      let e: u8 = vector::pop_back<u8>(Borrow(Mutable)(v));
-                      {
-                        let (elem: u8) = Tuple(e);
-                        accu: u64 = {
-                          let (sum: u64, addend: u8) = Tuple(accu, elem);
-                          Add<u64>(sum, Cast(addend))
-                        }
-                      };
-                      Tuple()
+            let (v: vector<u8>): (vector<u8>) = Tuple([Number(115), Number(115), Number(95), Number(112), Number(97), Number(99), Number(107), Number(101), Number(100), Number(32), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0)]);
+            vector::reverse<u8>(Borrow(Mutable)(v));
+            loop {
+              if Not(vector::is_empty<u8>(Borrow(Immutable)(v))) {
+                {
+                  let e: u8 = vector::pop_back<u8>(Borrow(Mutable)(v));
+                  {
+                    let (elem: u8): (u8) = Tuple(e);
+                    accu: u64 = {
+                      let (sum: u64, addend: u8): (u64, u8) = Tuple(accu, elem);
+                      Add<u64>(sum, Cast<u64>(addend))
                     }
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              };
-              accu
-            }
-          }
+                  };
+                  Tuple()
+                }
+              } else {
+                break
+              }
+            };
+            Tuple()
+          };
+          accu
         }
     }
     private fun test_2(): u64 {
         {
-          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          let accu: u64 = 0;
           {
-            let (v: vector<u8>, init: u64) = Tuple(gas_schedule_blob, Cast(0));
-            {
-              let accu: u64 = init;
-              {
-                let (v: vector<u8>) = Tuple(v);
-                vector::reverse<u8>(Borrow(Mutable)(v));
-                loop {
-                  if Not(vector::is_empty<u8>(Borrow(Immutable)(v))) {
-                    {
-                      let e: u8 = vector::pop_back<u8>(Borrow(Mutable)(v));
-                      {
-                        let (elem: u8) = Tuple(e);
-                        accu: u64 = {
-                          let (sum: u64, addend: u8) = Tuple(accu, elem);
-                          Add<u64>(sum, Cast(addend))
-                        }
-                      };
-                      Tuple()
+            let (v: vector<u8>): (vector<u8>) = Tuple([Number(115), Number(115), Number(95), Number(112), Number(97), Number(99), Number(107), Number(101), Number(100), Number(32), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0)]);
+            vector::reverse<u8>(Borrow(Mutable)(v));
+            loop {
+              if Not(vector::is_empty<u8>(Borrow(Immutable)(v))) {
+                {
+                  let e: u8 = vector::pop_back<u8>(Borrow(Mutable)(v));
+                  {
+                    let (elem: u8): (u8) = Tuple(e);
+                    accu: u64 = {
+                      let (sum: u64, addend: u8): (u64, u8) = Tuple(accu, elem);
+                      Add<u64>(sum, Cast<u64>(addend))
                     }
-                  } else {
-                    break
-                  }
-                };
-                Tuple()
-              };
-              accu
-            }
-          }
+                  };
+                  Tuple()
+                }
+              } else {
+                break
+              }
+            };
+            Tuple()
+          };
+          accu
         }
     }
-    spec fun $test_1(): u64;
-    spec fun $test_2(): u64;
 } // end 0x12391283::M
+
+
+============ bytecode verification succeeded ========

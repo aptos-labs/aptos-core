@@ -3,9 +3,11 @@
 
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
 use aptos_gas_schedule::VMGasParameters;
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
+use aptos_types::{
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
+};
 use aptos_vm_types::{
-    change_set::VMChangeSet,
+    change_set::ChangeSetInterface,
     resolver::ExecutorView,
     storage::{
         io_pricing::IoPricing,
@@ -66,6 +68,9 @@ pub trait GasAlgebra {
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()>;
 
+    /// Counts a dependency against the limits.
+    fn count_dependency(&mut self, size: NumBytes) -> PartialVMResult<()>;
+
     /// Returns the amount of gas used under the execution category.
     fn execution_gas_used(&self) -> InternalGas;
 
@@ -105,8 +110,19 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Charges an intrinsic cost for executing the transaction.
     ///
     /// The cost stays constant for transactions below a certain size, but will grow proportionally
-    /// for bigger ones.
+    /// for bigger ones. THe multiplier can be used to increase the unit cost for exceptional
+    /// transactions like keyless.
     fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
+
+    /// Charges an additional cost for keyless transactions to compensate for the
+    /// expensive computation required.
+    fn charge_keyless(&mut self) -> VMResult<()>;
+
+    /// Charges IO gas for the transaction itself.
+    fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
+
+    /// Charges IO gas for an emitted event.
+    fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()>;
 
     /// Charges IO gas for an item in the write set.
     ///
@@ -124,7 +140,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// unless you are doing something special, such as injecting additional logging logic.
     fn process_storage_fee_for_all(
         &mut self,
-        change_set: &mut VMChangeSet,
+        change_set: &mut impl ChangeSetInterface,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
         executor_view: &dyn ExecutorView,
@@ -157,12 +173,9 @@ pub trait AptosGasMeter: MoveGasMeter {
         }
 
         // Events (no event fee in v2)
-        let event_fee = change_set
-            .events()
-            .iter()
-            .fold(Fee::new(0), |acc, (event, _)| {
-                acc + pricing.legacy_storage_fee_per_event(params, event)
-            });
+        let event_fee = change_set.events_iter().fold(Fee::new(0), |acc, event| {
+            acc + pricing.legacy_storage_fee_per_event(params, event)
+        });
         let event_discount = pricing.legacy_storage_discount_for_events(params, event_fee);
         let event_net_fee = event_fee
             .checked_sub(event_discount)

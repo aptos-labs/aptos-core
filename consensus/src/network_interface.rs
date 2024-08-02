@@ -8,12 +8,13 @@ use crate::{
     dag::DAGNetworkMessage,
     pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::RandGenMessage,
+    rand::rand_gen::network_messages::RandGenMessage,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
+    order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -25,9 +26,10 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
+use bytes::Bytes;
 pub use pipeline::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -75,6 +77,9 @@ pub enum ConsensusMsg {
     RandGenMessage(RandGenMessage),
     /// Quorum Store: Response to the batch request.
     BatchResponseV2(Box<BatchResponse>),
+    /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
+    /// on a block.
+    OrderVoteMsg(Box<OrderVoteMsg>),
 }
 
 /// Network type for consensus
@@ -90,6 +95,7 @@ impl ConsensusMsg {
             ConsensusMsg::SyncInfo(_) => "SyncInfo",
             ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
             ConsensusMsg::VoteMsg(_) => "VoteMsg",
+            ConsensusMsg::OrderVoteMsg(_) => "OrderVoteMsg",
             ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
             ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
             ConsensusMsg::BatchMsg(_) => "BatchMsg",
@@ -145,16 +151,12 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
     }
 
     /// Send a single message to the destination peers
-    pub fn send_to_many(
-        &self,
-        peers: impl Iterator<Item = PeerId>,
-        message: ConsensusMsg,
-    ) -> Result<(), Error> {
+    pub fn send_to_many(&self, peers: Vec<PeerId>, message: ConsensusMsg) -> Result<(), Error> {
         let peer_network_ids: Vec<PeerNetworkId> = peers
+            .into_iter()
             .map(|peer| self.get_peer_network_id_for_peer(peer))
             .collect();
-        self.network_client
-            .send_to_peers(message, &peer_network_ids)
+        self.network_client.send_to_peers(message, peer_network_ids)
     }
 
     /// Send a RPC to the destination peer
@@ -170,9 +172,43 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
             .await
     }
 
+    pub async fn send_rpc_raw(
+        &self,
+        peer: PeerId,
+        message: Bytes,
+        rpc_timeout: Duration,
+    ) -> Result<ConsensusMsg, Error> {
+        let peer_network_id = self.get_peer_network_id_for_peer(peer);
+        self.network_client
+            .send_to_peer_rpc_raw(message, rpc_timeout, peer_network_id)
+            .await
+    }
+
+    pub fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<PeerId>,
+        message: ConsensusMsg,
+    ) -> anyhow::Result<HashMap<PeerId, Bytes>> {
+        let peer_network_ids: Vec<PeerNetworkId> = peers
+            .into_iter()
+            .map(|peer| self.get_peer_network_id_for_peer(peer))
+            .collect();
+        Ok(self
+            .network_client
+            .to_bytes_by_protocol(peer_network_ids, message)?
+            .into_iter()
+            .map(|(peer_network_id, bytes)| (peer_network_id.peer_id(), bytes))
+            .collect())
+    }
+
     // TODO: we shouldn't need to expose this. Migrate the code to handle
     // peer and network ids.
     fn get_peer_network_id_for_peer(&self, peer: PeerId) -> PeerNetworkId {
         PeerNetworkId::new(NetworkId::Validator, peer)
+    }
+
+    pub fn sort_peers_by_latency(&self, peers: &mut [PeerId]) {
+        self.network_client
+            .sort_peers_by_latency(NetworkId::Validator, peers);
     }
 }

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
@@ -538,7 +539,7 @@ fn serialize_value(
 ) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
     let serialization_result = if layout_info.has_identifier_mappings {
         // Value contains delayed fields, so we should be able to serialize it.
-        serialize_and_allow_delayed_values(val, layout_info.layout.as_ref())
+        serialize_and_allow_delayed_values(val, layout_info.layout.as_ref())?
             .map(|bytes| (bytes.into(), Some(layout_info.layout.clone())))
     } else {
         // No delayed fields, make sure serialization fails if there are any

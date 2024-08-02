@@ -9,7 +9,9 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
+    keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
+    on_chain_config::{FeatureFlag, Features},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
     transaction::authenticator::{
@@ -18,7 +20,6 @@ use crate::{
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
-    zkid::{ZkIdPublicKey, ZkIdSignature},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -36,20 +37,23 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
-    fmt,
-    fmt::{Debug, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
 };
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+pub mod block_epilogue;
 mod block_output;
 mod change_set;
 mod module;
 mod multisig;
 mod script;
 pub mod signature_verified_transaction;
+pub mod use_case;
+pub mod user_transaction_context;
 pub mod webauthn;
 
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
@@ -475,10 +479,13 @@ pub struct SignedTransaction {
     /// Prevents serializing the same authenticator multiple times to determine size.
     #[serde(skip)]
     authenticator_size: OnceCell<usize>,
+
+    /// A cached hash of the transaction.
+    #[serde(skip)]
+    committed_hash: OnceCell<HashValue>,
 }
 
-/// PartialEq ignores the "bytes" field as this is a OnceCell that may or
-/// may not be initialized during runtime comparison.
+/// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
 impl PartialEq for SignedTransaction {
     fn eq(&self, other: &Self) -> bool {
         self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
@@ -534,6 +541,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -548,6 +556,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -559,18 +568,14 @@ impl SignedTransaction {
         fee_payer_address: AccountAddress,
         fee_payer_signer: AccountAuthenticator,
     ) -> Self {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::fee_payer(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-                fee_payer_address,
-                fee_payer_signer,
-            ),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
+        let authenticator = TransactionAuthenticator::fee_payer(
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+            fee_payer_address,
+            fee_payer_signer,
+        );
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_multisig(
@@ -579,12 +584,7 @@ impl SignedTransaction {
         signature: MultiEd25519Signature,
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::multi_ed25519(public_key, signature);
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_multi_agent(
@@ -593,16 +593,12 @@ impl SignedTransaction {
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
     ) -> Self {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::multi_agent(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            ),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
+        let authenticator = TransactionAuthenticator::multi_agent(
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+        );
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_secp256k1_ecdsa(
@@ -610,61 +606,33 @@ impl SignedTransaction {
         public_key: secp256k1_ecdsa::PublicKey,
         signature: secp256k1_ecdsa::Signature,
     ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::single_sender(
-            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::secp256k1_ecdsa(public_key),
-                AnySignature::secp256k1_ecdsa(signature),
-            )),
-        );
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::secp256k1_ecdsa(public_key),
+            AnySignature::secp256k1_ecdsa(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
     }
 
-    pub fn new_zkid(
+    pub fn new_keyless(
         raw_txn: RawTransaction,
-        public_key: ZkIdPublicKey,
-        signature: ZkIdSignature,
+        public_key: KeylessPublicKey,
+        signature: KeylessSignature,
     ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::single_sender(
-            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::zkid(public_key),
-                AnySignature::zkid(signature),
-            )),
-        );
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::keyless(public_key),
+            AnySignature::keyless(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
     }
 
     pub fn new_single_sender(
         raw_txn: RawTransaction,
         authenticator: AccountAuthenticator,
     ) -> SignedTransaction {
-        SignedTransaction {
+        Self::new_signed_transaction(
             raw_txn,
-            authenticator: TransactionAuthenticator::single_sender(authenticator),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn new_with_authenticator(
-        raw_txn: RawTransaction,
-        authenticator: TransactionAuthenticator,
-    ) -> Self {
-        Self {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
+            TransactionAuthenticator::single_sender(authenticator),
+        )
     }
 
     pub fn authenticator(&self) -> TransactionAuthenticator {
@@ -751,9 +719,11 @@ impl SignedTransaction {
         )
     }
 
-    /// Returns the hash when the transaction is commited onchain.
-    pub fn committed_hash(self) -> HashValue {
-        Transaction::UserTransaction(self).hash()
+    /// Returns the hash when the transaction is committed onchain.
+    pub fn committed_hash(&self) -> HashValue {
+        *self
+            .committed_hash
+            .get_or_init(|| Transaction::UserTransaction(self.clone()).hash())
     }
 }
 
@@ -891,6 +861,7 @@ impl From<KeptVMStatus> for ExecutionStatus {
                 location: loc,
                 function: func,
                 code_offset: offset,
+                message: _,
             } => ExecutionStatus::ExecutionFailure {
                 location: loc,
                 function: func,
@@ -904,6 +875,46 @@ impl From<KeptVMStatus> for ExecutionStatus {
 impl ExecutionStatus {
     pub fn is_success(&self) -> bool {
         matches!(self, ExecutionStatus::Success)
+    }
+
+    // Used by simulation API for showing detail error message. Should not be used by production code.
+    pub fn conmbine_vm_status_for_simulation(
+        aux_data: &TransactionAuxiliaryData,
+        partial_status: TransactionStatus,
+    ) -> Self {
+        match partial_status {
+            TransactionStatus::Keep(exec_status) => {
+                if let Some(aux_error) = aux_data.get_detail_error_message() {
+                    let status_code = aux_error.status_code;
+                    match exec_status {
+                        ExecutionStatus::MiscellaneousError(_) => {
+                            ExecutionStatus::MiscellaneousError(Some(status_code))
+                        },
+                        _ => exec_status,
+                    }
+                } else {
+                    exec_status
+                }
+            },
+            TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
+            _ => ExecutionStatus::MiscellaneousError(None),
+        }
+    }
+
+    pub fn remove_error_detail(self) -> Self {
+        match self {
+            ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info: _,
+            } => ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info: None,
+            },
+            ExecutionStatus::MiscellaneousError(_) => ExecutionStatus::MiscellaneousError(None),
+            _ => self,
+        }
     }
 }
 
@@ -954,11 +965,17 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
+    pub fn from_vm_status(
+        vm_status: VMStatus,
+        charge_invariant_violation: bool,
+        features: &Features,
+    ) -> (Self, TransactionAuxiliaryData) {
         let status_code = vm_status.status_code();
+        let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard() {
+        let status = match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
+                // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
                 },
@@ -973,13 +990,30 @@ impl TransactionStatus {
                     TransactionStatus::Discard(code)
                 }
             },
+        };
+
+        if features.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH) {
+            (status.remove_error_detail(), txn_aux)
+        } else {
+            (status, txn_aux)
         }
     }
-}
 
-impl From<VMStatus> for TransactionStatus {
-    fn from(vm_status: VMStatus) -> Self {
-        TransactionStatus::from_vm_status(vm_status, true)
+    pub fn remove_error_detail(self) -> Self {
+        match self {
+            TransactionStatus::Keep(status) => {
+                TransactionStatus::Keep(status.remove_error_detail())
+            },
+            _ => self,
+        }
+    }
+
+    pub fn from_executed_vm_status(vm_status: VMStatus) -> Self {
+        if vm_status == VMStatus::Executed {
+            TransactionStatus::Keep(ExecutionStatus::Success)
+        } else {
+            panic!("Auto-conversion should not be called with non-executed status.")
+        }
     }
 }
 
@@ -1036,6 +1070,88 @@ impl VMValidatorResult {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct VMErrorDetail {
+    pub status_code: StatusCode,
+    pub message: Option<String>,
+}
+
+impl VMErrorDetail {
+    pub fn new(status_code: StatusCode, message: Option<String>) -> Self {
+        Self {
+            status_code,
+            message,
+        }
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        self.status_code
+    }
+
+    pub fn message(&self) -> &Option<String> {
+        &self.message
+    }
+}
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct TransactionAuxiliaryDataV1 {
+    pub detail_error_message: Option<VMErrorDetail>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum TransactionAuxiliaryData {
+    None,
+    V1(TransactionAuxiliaryDataV1),
+}
+
+impl Default for TransactionAuxiliaryData {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl TransactionAuxiliaryData {
+    pub fn from_vm_status(vm_status: &VMStatus) -> Self {
+        let detail_error_message = match vm_status.clone().keep_or_discard() {
+            Ok(KeptVMStatus::MiscellaneousError) => {
+                let status_code = vm_status.status_code();
+                Some(VMErrorDetail::new(status_code, None))
+            },
+            Ok(KeptVMStatus::ExecutionFailure {
+                location: _,
+                function: _,
+                code_offset: _,
+                message,
+            }) => {
+                let status_code = vm_status.status_code();
+                Some(VMErrorDetail::new(status_code, message))
+            },
+            Err(status_code) => {
+                // emulate the behavior of
+                if status_code.status_type() == StatusType::InvariantViolation {
+                    Some(VMErrorDetail::new(status_code, None))
+                } else {
+                    None
+                }
+            },
+            _ => None,
+        };
+
+        Self::V1(TransactionAuxiliaryDataV1 {
+            detail_error_message,
+        })
+    }
+
+    pub fn get_detail_error_message(&self) -> Option<&VMErrorDetail> {
+        match self {
+            Self::V1(data) => data.detail_error_message.as_ref(),
+            _ => None,
+        }
+    }
+}
+
 /// The output of executing a transaction.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionOutput {
@@ -1048,8 +1164,12 @@ pub struct TransactionOutput {
     /// The amount of gas used during execution.
     gas_used: u64,
 
-    /// The execution status.
+    /// The execution status. The detailed error info will not be stored here instead will be stored in the auxiliary data.
     status: TransactionStatus,
+
+    /// The transaction auxiliary data that includes detail error info that is not used for calculating the hash
+    #[serde(skip)]
+    auxiliary_data: TransactionAuxiliaryData,
 }
 
 impl TransactionOutput {
@@ -1058,12 +1178,15 @@ impl TransactionOutput {
         events: Vec<ContractEvent>,
         gas_used: u64,
         status: TransactionStatus,
+        auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {
+        // TODO: add feature flag to enable
         TransactionOutput {
             write_set,
             events,
             gas_used,
             status,
+            auxiliary_data,
         }
     }
 
@@ -1096,14 +1219,38 @@ impl TransactionOutput {
         &self.status
     }
 
-    pub fn unpack(self) -> (WriteSet, Vec<ContractEvent>, u64, TransactionStatus) {
+    pub fn auxiliary_data(&self) -> &TransactionAuxiliaryData {
+        &self.auxiliary_data
+    }
+
+    pub fn unpack(
+        self,
+    ) -> (
+        WriteSet,
+        Vec<ContractEvent>,
+        u64,
+        TransactionStatus,
+        TransactionAuxiliaryData,
+    ) {
         let Self {
             write_set,
             events,
             gas_used,
             status,
+            auxiliary_data,
         } = self;
-        (write_set, events, gas_used, status)
+        (write_set, events, gas_used, status, auxiliary_data)
+    }
+
+    // This function is supposed to be called in various tests only
+    pub fn fill_error_status(&mut self) {
+        if let TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)) = self.status {
+            if let Some(detail) = self.auxiliary_data.get_detail_error_message() {
+                self.status = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                    detail.status_code(),
+                )));
+            }
+        }
     }
 
     pub fn ensure_match_transaction_info(
@@ -1311,7 +1458,7 @@ impl TransactionInfoV0 {
         self.state_change_hash
     }
 
-    pub fn is_state_checkpoint(&self) -> bool {
+    pub fn has_state_checkpoint_hash(&self) -> bool {
         self.state_checkpoint_hash().is_some()
     }
 
@@ -1355,6 +1502,7 @@ pub struct TransactionToCommit {
     pub write_set: WriteSet,
     pub events: Vec<ContractEvent>,
     pub is_reconfig: bool,
+    pub transaction_auxiliary_data: TransactionAuxiliaryData,
 }
 
 impl TransactionToCommit {
@@ -1365,6 +1513,7 @@ impl TransactionToCommit {
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
+        transaction_auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {
         TransactionToCommit {
             transaction,
@@ -1373,6 +1522,7 @@ impl TransactionToCommit {
             write_set,
             events,
             is_reconfig,
+            transaction_auxiliary_data,
         }
     }
 
@@ -1385,6 +1535,7 @@ impl TransactionToCommit {
             write_set: Default::default(),
             events: vec![],
             is_reconfig: false,
+            transaction_auxiliary_data: TransactionAuxiliaryData::default(),
         }
     }
 
@@ -1404,6 +1555,16 @@ impl TransactionToCommit {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_transaction_auxiliary_data(
+        transaction_auxiliary_data: TransactionAuxiliaryData,
+    ) -> Self {
+        Self {
+            transaction_auxiliary_data,
+            ..Self::dummy()
+        }
+    }
+
     pub fn transaction(&self) -> &Transaction {
         &self.transaction
     }
@@ -1412,8 +1573,8 @@ impl TransactionToCommit {
         &self.transaction_info
     }
 
-    pub fn is_state_checkpoint(&self) -> bool {
-        self.transaction_info().is_state_checkpoint()
+    pub fn has_state_checkpoint_hash(&self) -> bool {
+        self.transaction_info().has_state_checkpoint_hash()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -1443,6 +1604,10 @@ impl TransactionToCommit {
 
     pub fn is_reconfig(&self) -> bool {
         self.is_reconfig
+    }
+
+    pub fn transaction_auxiliary_data(&self) -> &TransactionAuxiliaryData {
+        &self.transaction_auxiliary_data
     }
 }
 
@@ -1796,6 +1961,12 @@ pub enum Transaction {
     /// Transaction to update the block metadata resource at the beginning of a block,
     /// when on-chain randomness is enabled.
     BlockMetadataExt(BlockMetadataExt),
+
+    /// Transaction to let the executor update the global state tree and record the root hash
+    /// in the TransactionInfo
+    /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
+    /// Replaces StateCheckpoint, with optionally having more data.
+    BlockEpilogue(BlockEpiloguePayload),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -1817,7 +1988,14 @@ impl Transaction {
 
     pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
-            Transaction::BlockMetadata(v1) => Some(v1),
+            Transaction::BlockMetadata(bm) => Some(bm),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_block_metadata_ext(&self) -> Option<&BlockMetadataExt> {
+        match self {
+            Transaction::BlockMetadataExt(bme) => Some(bme),
             _ => None,
         }
     }
@@ -1835,7 +2013,8 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
-            Transaction::ValidatorTransaction(_) => "validator_transaction",
+            Transaction::BlockEpilogue(_) => "block_epilogue",
+            Transaction::ValidatorTransaction(vt) => vt.type_name(),
             Transaction::BlockMetadataExt(_) => "block_metadata_ext",
         }
     }
@@ -1843,6 +2022,28 @@ impl Transaction {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Transaction::StateCheckpoint(HashValue::zero())
+    }
+
+    pub fn is_non_reconfig_block_ending(&self) -> bool {
+        match self {
+            Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_) => true,
+            Transaction::UserTransaction(_)
+            | Transaction::GenesisTransaction(_)
+            | Transaction::BlockMetadata(_)
+            | Transaction::BlockMetadataExt(_)
+            | Transaction::ValidatorTransaction(_) => false,
+        }
+    }
+
+    pub fn is_block_start(&self) -> bool {
+        match self {
+            Transaction::BlockMetadata(_) | Transaction::BlockMetadataExt(_) => true,
+            Transaction::StateCheckpoint(_)
+            | Transaction::BlockEpilogue(_)
+            | Transaction::UserTransaction(_)
+            | Transaction::GenesisTransaction(_)
+            | Transaction::ValidatorTransaction(_) => false,
+        }
     }
 }
 

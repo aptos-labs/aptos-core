@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         s1: M::S,
@@ -12,7 +12,7 @@ module 0x8675309::M {
           let f: u64;
           {
             let s2: M::S;
-            M::R{ s1: M::S{ f: f: u64 }, s2: s2: M::S } = pack M::R(pack M::S(0), pack M::S(1));
+            M::R{ s1: M::S{ f }, s2 } = pack M::R(pack M::S(0), pack M::S(1));
             f;
             s2;
             f: u64 = 0;
@@ -28,7 +28,7 @@ module 0x8675309::M {
           let f: &u64;
           {
             let s2: &M::S;
-            M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S } = Borrow(Immutable)(pack M::R(pack M::S(0), pack M::S(1)));
+            M::R{ s1: M::S{ f }, s2 } = Borrow(Immutable)(pack M::R(pack M::S(0), pack M::S(1)));
             f;
             s2;
             f: &u64 = Borrow(Immutable)(0);
@@ -44,7 +44,7 @@ module 0x8675309::M {
           let f: &mut u64;
           {
             let s2: &mut M::S;
-            M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S } = Borrow(Mutable)(pack M::R(pack M::S(0), pack M::S(1)));
+            M::R{ s1: M::S{ f }, s2 } = Borrow(Mutable)(pack M::R(pack M::S(0), pack M::S(1)));
             f;
             s2;
             f: &mut u64 = Borrow(Mutable)(0);
@@ -55,7 +55,4 @@ module 0x8675309::M {
           }
         }
     }
-    spec fun $t0();
-    spec fun $t1();
-    spec fun $t2();
 } // end 0x8675309::M

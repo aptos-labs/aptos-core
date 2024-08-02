@@ -11,6 +11,7 @@ use crate::{
     network_interface::ConsensusMsg,
 };
 use anyhow::{bail, ensure};
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
     bls12381::Signature,
@@ -578,15 +579,22 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
                 .check_voting_power(partial_signatures.signatures().keys(), true)
                 .is_ok()
         {
-            let aggregated_signature = self
+            let aggregated_signature = match self
                 .epoch_state
                 .verifier
                 .aggregate_signatures(partial_signatures)
-                .expect("Signature aggregation should succeed");
+            {
+                Ok(signature) => signature,
+                Err(_) => return Err(anyhow::anyhow!("Signature aggregation failed")),
+            };
             observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
             let certificate = NodeCertificate::new(self.metadata.clone(), aggregated_signature);
 
-            _ = tx.take().expect("must exist").send(certificate);
+            // Invariant Violation: The one-shot channel sender must exist to send the NodeCertificate
+            _ = tx
+                .take()
+                .expect("The one-shot channel sender must exist to send the NodeCertificate")
+                .send(certificate);
         }
 
         if partial_signatures.signatures().len() == self.epoch_state.verifier.len() {
@@ -771,9 +779,23 @@ impl FetchResponse {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DAGNetworkMessage {
-    pub epoch: u64,
+    epoch: u64,
     #[serde(with = "serde_bytes")]
-    pub data: Vec<u8>,
+    data: Vec<u8>,
+}
+
+impl DAGNetworkMessage {
+    pub fn new(epoch: u64, data: Vec<u8>) -> Self {
+        Self { epoch, data }
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
 }
 
 impl core::fmt::Debug for DAGNetworkMessage {
@@ -870,7 +892,7 @@ impl TConsensusMsg for DAGMessage {
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
             epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
+            data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes"),
         })
     }
 }
@@ -912,7 +934,7 @@ impl TConsensusMsg for DAGRpcResult {
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
             epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
+            data: bcs::to_bytes(&self).expect("ConsensusMsg should serialize to bytes!"),
         })
     }
 }
@@ -979,5 +1001,10 @@ impl DagSnapshotBitmask {
 
     pub fn len(&self) -> usize {
         self.bitmask.len()
+    }
+
+    pub fn bitvec(&self, round: Round) -> Option<BitVec> {
+        let round_idx = round.checked_sub(self.first_round)? as usize;
+        self.bitmask.get(round_idx).map(|bitvec| bitvec.into())
     }
 }

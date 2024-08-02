@@ -1,18 +1,18 @@
 
 Diagnostics:
-error: field `xx` not declared in struct `M::S`
+error: field `xx` not declared in struct `S`
    ┌─ tests/checking/specs/structs_err.move:26:7
    │
 26 │       s.xx
    │       ^
 
-error: expected `bool` but found `u64`
+error: expected `bool` but found a value of type `u64`
    ┌─ tests/checking/specs/structs_err.move:31:7
    │
 31 │       s.x
    │       ^^^
 
-error: expected `bool` but found `u64`
+error: expected `bool` but found a value of type `u64`
    ┌─ tests/checking/specs/structs_err.move:36:18
    │
 36 │       S{x: x, y: y, z: z}
@@ -24,14 +24,14 @@ error: missing fields `y`, `z`
 40 │       S{x: x}
    │       ^^^^^^^
 
-error: expected `bool` but found `u64`
+error: cannot return `G<u64>` from a function with result type `G<bool>`
    ┌─ tests/checking/specs/structs_err.move:45:7
    │
 45 │       G{x: x, y: y}
    │       ^^^^^^^^^^^^^
 
-error: generic count mismatch (expected 1 but found 2)
+error: expected 1 type argument but 2 were provided
    ┌─ tests/checking/specs/structs_err.move:50:7
    │
 50 │       G<u64, bool>{x: x, y: y}
-   │       ^^^^^^^^^^^^^^^^^^^^^^^^
+   │       ^

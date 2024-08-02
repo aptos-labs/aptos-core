@@ -14,7 +14,6 @@ use crate::{
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         execution_schedule_phase::ExecutionSchedulePhase,
         execution_wait_phase::ExecutionWaitPhase,
-        ordering_state_computer::OrderingStateComputer,
         persisting_phase::PersistingPhase,
         pipeline_phase::PipelinePhase,
         signing_phase::SigningPhase,
@@ -27,9 +26,9 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
+use aptos_config::{config::ConsensusObserverConfig, network_id::NetworkId};
 use aptos_consensus_types::{
-    block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
+    block::block_test_utils::certificate_for_genesis, pipelined_block::PipelinedBlock,
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
@@ -65,7 +64,7 @@ pub fn prepare_buffer_manager(
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
-    aptos_channels::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
@@ -114,7 +113,7 @@ pub fn prepare_buffer_manager(
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
 
-    let (self_loop_tx, self_loop_rx) = aptos_channels::new_test(1000);
+    let (self_loop_tx, self_loop_rx) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(
         author,
         consensus_network_client,
@@ -129,13 +128,7 @@ pub fn prepare_buffer_manager(
     );
 
     let (result_tx, result_rx) = create_channel::<OrderedBlocks>();
-    let (reset_tx, _) = create_channel::<ResetRequest>();
-
-    let persisting_proxy = Arc::new(OrderingStateComputer::new(
-        result_tx,
-        Arc::new(EmptyStateComputer),
-        reset_tx,
-    ));
+    let state_computer = Arc::new(EmptyStateComputer::new(result_tx));
 
     let (block_tx, block_rx) = create_channel::<OrderedBlocks>();
     let (buffer_reset_tx, buffer_reset_rx) = create_channel::<ResetRequest>();
@@ -155,7 +148,7 @@ pub fn prepare_buffer_manager(
         Arc::new(Mutex::new(safety_rules)),
         network,
         msg_rx,
-        persisting_proxy,
+        state_computer,
         block_rx,
         buffer_reset_rx,
         Arc::new(EpochState {
@@ -163,6 +156,9 @@ pub fn prepare_buffer_manager(
             verifier: validators.clone(),
         }),
         bounded_executor,
+        false,
+        ConsensusObserverConfig::default(),
+        None,
     );
 
     (
@@ -186,7 +182,7 @@ pub fn launch_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
-    aptos_channels::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     HashValue,
     Runtime,
     Vec<ValidatorSigner>,
@@ -255,17 +251,28 @@ async fn loopback_commit_vote(
     };
 }
 
-async fn assert_results(batches: Vec<Vec<ExecutedBlock>>, result_rx: &mut Receiver<OrderedBlocks>) {
-    for (i, batch) in enumerate(batches) {
+async fn assert_results(
+    batches: Vec<Vec<PipelinedBlock>>,
+    result_rx: &mut Receiver<OrderedBlocks>,
+) {
+    let total_batches = batches.iter().flatten().count();
+    let mut blocks: Vec<PipelinedBlock> = Vec::new();
+    while blocks.len() < total_batches {
         let OrderedBlocks { ordered_blocks, .. } = result_rx.next().await.unwrap();
-        assert_eq!(
-            ordered_blocks.last().unwrap().id(),
-            batch.last().unwrap().id(),
-            "Inconsistent Block IDs (expected {} got {}) for {}-th block",
-            batch.last().unwrap().id(),
-            ordered_blocks.last().unwrap().id(),
-            i,
-        );
+        blocks.extend(ordered_blocks.into_iter());
+    }
+
+    for (i, batch) in enumerate(batches) {
+        for (idx, ordered_block) in blocks.drain(..batch.len()).enumerate() {
+            assert_eq!(
+                ordered_block.id(),
+                batch[idx].id(),
+                "Inconsistent Block IDs (expected {} got {}) for {}-th block",
+                batch[idx].id(),
+                ordered_block.id(),
+                i,
+            );
+        }
     }
 }
 
@@ -321,8 +328,9 @@ fn buffer_manager_happy_path_test() {
                 .ok();
         }
 
-        // commit decision will be sent too, so 3 * 2
-        for _ in 0..6 {
+        // Only commit votes are sent, so 3 commit votes are expected
+        // Commit decision is no longer broadcasted
+        for _ in 0..3 {
             if let Some(msg) = self_loop_rx.next().await {
                 loopback_commit_vote(msg, &msg_tx, &verifier).await;
             }

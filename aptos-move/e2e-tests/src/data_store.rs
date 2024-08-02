@@ -6,8 +6,8 @@
 
 use crate::account::AccountData;
 use aptos_types::{
-    access_path::AccessPath,
     account_config::CoinInfoResource,
+    on_chain_config::{Features, OnChainConfig},
     state_store::{
         errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
         state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
@@ -106,7 +106,7 @@ impl FakeDataStore {
     /// Adds CoinInfo to this data store.
     pub fn add_coin_info(&mut self) {
         let coin_info = CoinInfoResource::random(u128::MAX);
-        let write_set = coin_info.to_writeset().expect("access path in test");
+        let write_set = coin_info.to_writeset(0).expect("access path in test");
         self.add_write_set(&write_set)
     }
 
@@ -114,10 +114,17 @@ impl FakeDataStore {
     ///
     /// Does not do any sort of verification on the module.
     pub fn add_module(&mut self, module_id: &ModuleId, blob: Vec<u8>) {
-        let access_path = AccessPath::from(module_id);
         self.set(
-            StateKey::access_path(access_path),
+            StateKey::module_id(module_id),
             StateValue::new_legacy(blob.into()),
+        );
+    }
+
+    pub fn set_features(&mut self, features: Features) {
+        let bytes = bcs::to_bytes(&features).expect("Features should always be serializable");
+        self.set(
+            StateKey::resource(Features::address(), &Features::struct_tag()).unwrap(),
+            StateValue::new_legacy(bytes.into()),
         );
     }
 }
@@ -140,5 +147,40 @@ impl TStateView for FakeDataStore {
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
         InMemoryStateView::new(self.state_data.clone())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_types::on_chain_config::{FeatureFlag, Features};
+    use claims::*;
+
+    #[test]
+    fn test_features_can_be_set() {
+        let mut data_store = FakeDataStore::default();
+        assert_none!(Features::fetch_config(&data_store));
+
+        data_store.set_features(Features::default());
+        let features = assert_some!(Features::fetch_config(&data_store));
+        assert_eq!(features, Features::default())
+    }
+
+    #[test]
+    fn test_features_can_be_reset() {
+        use claims::*;
+
+        let mut data_store = FakeDataStore::default();
+        data_store.add_write_set(GENESIS_CHANGE_SET_HEAD.write_set());
+
+        // Reset the feature.
+        let mut features = assert_some!(Features::fetch_config(&data_store));
+        assert!(features.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA));
+        features.disable(FeatureFlag::STORAGE_SLOT_METADATA);
+        data_store.set_features(features.clone());
+
+        let reset_features = assert_some!(Features::fetch_config(&data_store));
+        assert!(!reset_features.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA));
+        assert_eq!(reset_features, features)
     }
 }

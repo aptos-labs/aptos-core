@@ -3,17 +3,15 @@
 
 use crate::bounded_math::SignedU128;
 use aptos_logger::error;
-// TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
-pub use aptos_types::delayed_fields::PanicError;
+use aptos_types::delayed_fields::PanicError;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
-pub use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use move_vm_types::{
     delayed_values::{
-        delayed_field_id::TryFromMoveValue,
+        delayed_field_id::{DelayedFieldID, TryFromMoveValue},
         derived_string_snapshot::{
             bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
             is_derived_string_struct_layout,
@@ -245,6 +243,17 @@ impl DelayedFieldValue {
                 )
             },
         })
+    }
+
+    /// Approximate memory consumption of current DelayedFieldValue
+    pub fn get_approximate_memory_size(&self) -> usize {
+        // 32 + len
+        std::mem::size_of::<DelayedFieldValue>()
+            + match &self {
+                DelayedFieldValue::Aggregator(_) | DelayedFieldValue::Snapshot(_) => 0,
+                // additional allocated memory for the data:
+                DelayedFieldValue::Derived(v) => v.len(),
+            }
     }
 }
 

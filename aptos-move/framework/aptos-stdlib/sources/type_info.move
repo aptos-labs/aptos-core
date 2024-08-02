@@ -2,7 +2,6 @@ module aptos_std::type_info {
     use std::bcs;
     use std::features;
     use std::string::{Self, String};
-    use std::vector;
 
     //
     // Error codes
@@ -65,12 +64,14 @@ module aptos_std::type_info {
     /// nesting patterns, as well as `test_size_of_val_vectors()` for an
     /// analysis of vector size dynamism.
     public fun size_of_val<T>(val_ref: &T): u64 {
-        // Return vector length of vectorized BCS representation.
-        vector::length(&bcs::to_bytes(val_ref))
+        bcs::serialized_size(val_ref)
     }
 
     #[test_only]
     use aptos_std::table::Table;
+
+    #[test_only]
+    use std::vector;
 
     #[test]
     fun test_type_of() {
@@ -91,7 +92,7 @@ module aptos_std::type_info {
     #[test(fx = @std)]
     fun test_chain_id(fx: signer) {
         // We need to enable the feature in order for the native call to be allowed.
-        features::change_feature_flags(&fx, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
 
         // The testing environment chain ID is 4u8.
         assert!(chain_id() == 4u8, 1);

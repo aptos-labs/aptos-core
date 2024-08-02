@@ -3,40 +3,65 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Implements a live-variable analysis processor, annotating lifetime information about locals.
-//! See also https://en.wikipedia.org/wiki/Live-variable_analysis
+//! See also <https://en.wikipedia.org/wiki/Live-variable_analysis>
 //!
-//! After transformation, this also runs copy inference transformation, which inserts
-//! copies as needed, and reports errors for invalid copies.
+//! Prerequisite annotations: none
+//! Side effect: the `LiveVarAnnotation` will be added to the function target annotations.
 //!
 //! This processor assumes that the CFG of the code has no critical edges.
+//!
+//! Notes on some terminology used in this module:
+//! Primary use of a variable is when there are no other uses intervening between the definition
+//! and the use. Secondary use is when there are intervening uses.
+//!
+//! Some examples:
+//! ```move
+//! 1. let x = 1;
+//! 2. let y = x;
+//! 3. let z = x;
+//!  ```
+//! In the above program, the definition of `x` at line 1 is used at lines 2 and 3.
+//! The use of `x` at line 2 is "primary" (i.e., there is no other use of `x` between
+//! the definition and its use here).
+//! The use of `x` at line 3 is "secondary" (because of the intervening use at line 2).
+//!
+//! Let's take another example:
+//! ```move
+//! 1. let x = 1;
+//! 2. if (p)
+//! 3.   { let y = x; }
+//! 4. else
+//! 5.   { let z = x; }
+//!  ```
+//! In the above example, both uses of `x` at lines 3 and 5 are "primary" uses.
+//!
+//! Tracking only primary uses is less expensive and is better for error reporting purposes
+//! (where the use closest to the definition is the most relevant).
 
-use super::ability_checker::check_copy;
-use crate::pipeline::ability_checker::has_ability;
 use abstract_domain_derive::AbstractDomain;
-use codespan_reporting::diagnostic::Severity;
+use im::{ordmap::Entry as ImEntry, ordset::OrdSet};
 use itertools::Itertools;
-use move_binary_format::file_format::{Ability, CodeOffset};
+use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::TempIndex,
     model::{FunctionEnv, Loc},
-    ty::Type,
 };
 use move_stackless_bytecode::{
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult, MapDomain},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AssignKind, AttrId, Bytecode, Operation},
+    stackless_bytecode::{AttrId, Bytecode},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
-    iter::{empty, once},
+    iter::once,
 };
 
 /// Annotation which is attached to function data.
 #[derive(Default, Clone)]
-pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
+pub struct LiveVarAnnotation(pub BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
 impl LiveVarAnnotation {
     /// Get the live var info at the given code offset
@@ -45,6 +70,11 @@ impl LiveVarAnnotation {
         code_offset: CodeOffset,
     ) -> Option<&LiveVarInfoAtCodeOffset> {
         self.0.get(&code_offset)
+    }
+
+    /// Get the live var info at the given code offset, expecting it to be defined.
+    pub fn get_info_at(&self, code_offset: CodeOffset) -> &LiveVarInfoAtCodeOffset {
+        self.get_live_var_info_at(code_offset).expect("live_var_at")
     }
 }
 
@@ -79,6 +109,11 @@ impl LiveVarInfoAtCodeOffset {
         result
     }
 
+    /// Check whether temp is used after bc
+    pub fn is_temp_used_after(&self, temp: &TempIndex, bc: &Bytecode) -> bool {
+        self.after.contains_key(temp) && !bc.dests().contains(temp)
+    }
+
     /// Creates a set of the temporaries alive before this program point.
     pub fn before_set(&self) -> BTreeSet<TempIndex> {
         self.before.keys().cloned().collect()
@@ -92,17 +127,31 @@ impl LiveVarInfoAtCodeOffset {
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct LiveVarInfo {
-    /// The usage of a given temporary after this program point, inclusive of locations where
-    /// the usage happens. This set contains at least one element.
-    pub usages: BTreeSet<Loc>,
+    /// The usage of a given temporary after this program point, inclusive of
+    /// (location, code offset) pairs where the usage happens.
+    /// This set contains at least one element.
+    usages: OrdSet<(Loc, CodeOffset)>,
+}
+
+impl LiveVarInfo {
+    /// Return the tracked usage locations of this variable.
+    pub fn usage_locations(&self) -> OrdSet<Loc> {
+        self.usages.iter().map(|(loc, _)| loc.clone()).collect()
+    }
+
+    /// Return the code offsets where this variable is used.
+    pub fn usage_offsets(&self) -> OrdSet<CodeOffset> {
+        self.usages.iter().map(|(_, offset)| *offset).collect()
+    }
 }
 
 // =================================================================================================
 // Processor
 
 pub struct LiveVarAnalysisProcessor {
-    // If set, run copy and move inference. Otherwise only compute livevar annotation.
-    pub with_copy_inference: bool,
+    /// If true, track all usages of a live variable, (i.e., primary and secondary uses).
+    /// If false, track only the primary usages of a live variable.
+    track_all_usages: bool,
 }
 
 impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
@@ -117,20 +166,28 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
             return data;
         }
         let target = FunctionTarget::new(fun_env, &data);
-        let offset_to_live_refs = LiveVarAnnotation(self.analyze(&target));
-        if self.with_copy_inference {
-            let mut transformer = CopyTransformation { fun_env, data };
-            transformer.transform(&offset_to_live_refs);
-            // Now run the analyze a 2nd time, as we modified the code
-            let target = FunctionTarget::new(fun_env, &transformer.data);
-            let offset_to_live_refs = LiveVarAnnotation(self.analyze(&target));
-            // Annotate the result on the function data.
-            transformer.data.annotations.set(offset_to_live_refs, true);
-            transformer.data
-        } else {
-            data.annotations.set(offset_to_live_refs, true);
-            data
-        }
+        let mut live_info = self.analyze(&target);
+        // Let us make all parameters "live" before the entry point code offset.
+        let entry_offset: CodeOffset = 0;
+        live_info
+            .entry(entry_offset)
+            .and_modify(|live_info_at_entry| {
+                for (i, param) in fun_env.get_parameters().into_iter().enumerate() {
+                    let param_info = LiveVarInfo {
+                        // Use the location info for the parameter.
+                        usages: once((param.2, entry_offset)).collect(),
+                    };
+                    live_info_at_entry
+                        .before
+                        .entry(i)
+                        .and_modify(|before| {
+                            before.join(&param_info);
+                        })
+                        .or_insert(param_info);
+                }
+            });
+        data.annotations.set(LiveVarAnnotation(live_info), true);
+        data
     }
 
     fn name(&self) -> String {
@@ -139,6 +196,16 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
 }
 
 impl LiveVarAnalysisProcessor {
+    /// Create a new instance of live variable analysis.
+    /// `track_all_usages` determines whether both primary and secondary usages of a variable are
+    /// tracked (when true), or only the primary usages (when false). Also, if set, all usages
+    /// of temporaries in specifications are tracked, which are considered as secondary because
+    /// they are not part of the execution semantics.
+    /// Unless all usages are needed, it is recommended to set `track_all_usages` to false.
+    pub fn new(track_all_usages: bool) -> Self {
+        Self { track_all_usages }
+    }
+
     /// Run the live var analysis.
     fn analyze(
         &self,
@@ -148,7 +215,10 @@ impl LiveVarAnalysisProcessor {
         // Perform backward analysis from all blocks just in case some block
         // cannot reach an exit block
         let cfg = StacklessControlFlowGraph::new_backward(code, /*from_all_blocks*/ true);
-        let analyzer = LiveVarAnalysis { func_target };
+        let analyzer = LiveVarAnalysis {
+            func_target,
+            track_all_usages: self.track_all_usages,
+        };
         let state_map = analyzer.analyze_function(
             LiveVarState {
                 livevars: MapDomain::default(),
@@ -158,7 +228,7 @@ impl LiveVarAnalysisProcessor {
         );
         // Prepare the result as a map from CodeOffset to LiveVarInfo
         let mut code_map =
-            analyzer.state_per_instruction(state_map, code, &cfg, |before, after| {
+            analyzer.state_per_instruction_with_default(state_map, code, &cfg, |before, after| {
                 LiveVarInfoAtCodeOffset {
                     before: before.livevars.clone().into_iter().collect(),
                     after: after.livevars.clone().into_iter().collect(),
@@ -224,11 +294,33 @@ struct LiveVarState {
     livevars: MapDomain<TempIndex, LiveVarInfo>,
 }
 
+impl LiveVarState {
+    /// Inserts or updates (by joining with previous information) the livevar info for `t`.
+    fn insert_or_update(&mut self, t: TempIndex, info: LiveVarInfo, track_all_usages: bool) {
+        match self.livevars.entry(t) {
+            ImEntry::Vacant(entry) => {
+                entry.insert(info);
+            },
+            ImEntry::Occupied(mut entry) => {
+                let value = entry.get_mut();
+                if track_all_usages {
+                    value.join(&info);
+                } else {
+                    entry.insert(info); // primary use takes precedence
+                }
+            },
+        }
+    }
+}
+
 impl AbstractDomain for LiveVarInfo {
     fn join(&mut self, other: &Self) -> JoinResult {
-        let count = self.usages.len();
-        self.usages.extend(other.usages.iter().cloned());
-        if self.usages.len() != count {
+        if self.usages.ptr_eq(&other.usages) {
+            return JoinResult::Unchanged;
+        }
+        let old_count = self.usages.len();
+        self.usages = self.usages.clone().union(other.usages.clone());
+        if self.usages.len() != old_count {
             JoinResult::Changed
         } else {
             JoinResult::Unchanged
@@ -238,6 +330,8 @@ impl AbstractDomain for LiveVarInfo {
 
 struct LiveVarAnalysis<'a> {
     func_target: &'a FunctionTarget<'a>,
+    /// See documentation of `LiveVarAnalysisProcessor::track_all_usages`.
+    track_all_usages: bool,
 }
 
 /// Implements the necessary transfer function to instantiate the data flow framework
@@ -246,12 +340,12 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
 
     const BACKWARD: bool = true;
 
-    fn execute(&self, state: &mut LiveVarState, instr: &Bytecode, _idx: CodeOffset) {
+    fn execute(&self, state: &mut LiveVarState, instr: &Bytecode, offset: CodeOffset) {
         use Bytecode::*;
         match instr {
             Assign(id, dst, src, _) => {
                 state.livevars.remove(dst);
-                state.livevars.insert(*src, self.livevar_info(id));
+                state.insert_or_update(*src, self.livevar_info(id, offset), self.track_all_usages);
             },
             Load(_, dst, _) => {
                 state.livevars.remove(dst);
@@ -261,20 +355,32 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
                     state.livevars.remove(dst);
                 }
                 for src in srcs {
-                    state.livevars.insert(*src, self.livevar_info(id));
+                    state.insert_or_update(
+                        *src,
+                        self.livevar_info(id, offset),
+                        self.track_all_usages,
+                    );
                 }
             },
             Ret(id, srcs) => {
                 for src in srcs {
-                    state.livevars.insert(*src, self.livevar_info(id));
+                    state.livevars.insert(*src, self.livevar_info(id, offset));
                 }
             },
-            Abort(id, src) | Branch(id, _, _, src) => {
-                state.livevars.insert(*src, self.livevar_info(id));
+            Abort(id, src) => {
+                state.livevars.insert(*src, self.livevar_info(id, offset));
             },
-            Prop(id, _, exp) => {
-                for (idx, _) in exp.used_temporaries(self.func_target.global_env()) {
-                    state.livevars.insert(idx, self.livevar_info(id));
+            Branch(id, _, _, src) => {
+                state.insert_or_update(*src, self.livevar_info(id, offset), self.track_all_usages);
+            },
+            Prop(id, _, exp) if self.track_all_usages => {
+                for idx in exp.used_temporaries() {
+                    state.insert_or_update(idx, self.livevar_info(id, offset), true);
+                }
+            },
+            SpecBlock(id, spec) if self.track_all_usages => {
+                for idx in spec.used_temporaries() {
+                    state.insert_or_update(idx, self.livevar_info(id, offset), true);
                 }
             },
             _ => {},
@@ -286,258 +392,10 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
 impl<'a> DataflowAnalysis for LiveVarAnalysis<'a> {}
 
 impl<'a> LiveVarAnalysis<'a> {
-    fn livevar_info(&self, id: &AttrId) -> LiveVarInfo {
+    fn livevar_info(&self, id: &AttrId, offset: CodeOffset) -> LiveVarInfo {
         LiveVarInfo {
-            usages: once(self.func_target.get_bytecode_loc(*id)).collect(),
+            usages: once((self.func_target.get_bytecode_loc(*id), offset)).collect(),
         }
-    }
-}
-
-// =================================================================================================
-// Bytecode Transformation
-
-/// State for copy inference transformation.
-struct CopyTransformation<'a> {
-    fun_env: &'a FunctionEnv<'a>,
-    data: FunctionData,
-}
-
-impl<'a> CopyTransformation<'a> {
-    /// Runs copy inference transformation. This transformation inserts implicit copies. It also
-    /// checks correctness of copies, whether explicit or implicit.
-    fn transform(&mut self, alive: &LiveVarAnnotation) {
-        let code = std::mem::take(&mut self.data.code);
-        for (i, bc) in code.into_iter().enumerate() {
-            self.transform_bytecode(
-                alive
-                    .get_live_var_info_at(i as CodeOffset)
-                    .expect("live var info"),
-                bc,
-            )
-        }
-    }
-
-    /// Transforms a bytecode. This handles `Assign` and `Call` instructions.
-    /// For the former, it infers the `AssignKind` (copy or move) and for the later,
-    /// it implicitly copies arguments if needed. Implicit copy is needed
-    /// if a non-primitive value is used after the given program point.
-    fn transform_bytecode(&mut self, alive: &LiveVarInfoAtCodeOffset, bc: Bytecode) {
-        use Bytecode::*;
-        match bc {
-            Assign(id, dst, src, kind) => match kind {
-                AssignKind::Inferred => {
-                    if self.check_implicit_copy(alive, id, false, src) {
-                        self.data.code.push(Assign(id, dst, src, AssignKind::Copy))
-                    } else {
-                        self.data.code.push(Assign(id, dst, src, AssignKind::Move))
-                    }
-                },
-                AssignKind::Copy | AssignKind::Store => {
-                    self.check_explicit_copy(id, src);
-                    self.data.code.push(Assign(id, dst, src, AssignKind::Copy))
-                },
-                AssignKind::Move => {
-                    self.check_explicit_move(alive, id, src);
-                    self.data.code.push(Assign(id, dst, src, AssignKind::Move))
-                },
-            },
-            Call(_, _, Operation::BorrowLoc, _, _)
-            | Call(_, _, Operation::BorrowField(..), _, _)
-            | Call(_, _, Operation::ReadRef, _, _) => {
-                // Borrow and ReadRef does not consume its operand and need no copy
-                self.data.code.push(bc)
-            },
-            Call(id, dsts, Operation::WriteRef, srcs, ai) => {
-                // The reference parameter is not consumed and does not need copy
-                let mut new_srcs = self.copy_arg_if_needed(alive, id, vec![srcs[1]]);
-                new_srcs.insert(0, srcs[0]);
-                self.data
-                    .code
-                    .push(Call(id, dsts, Operation::WriteRef, new_srcs, ai))
-            },
-            Call(id, dsts, oper, srcs, ai) => {
-                let srcs = self.copy_arg_if_needed(alive, id, srcs);
-                self.data.code.push(Call(id, dsts, oper, srcs, ai))
-            },
-            _ => self.data.code.push(bc),
-        }
-    }
-
-    /// Walks over the argument list and inserts copies if needed.
-    fn copy_arg_if_needed(
-        &mut self,
-        alive: &LiveVarInfoAtCodeOffset,
-        id: AttrId,
-        srcs: Vec<TempIndex>,
-    ) -> Vec<TempIndex> {
-        use Bytecode::*;
-        let mut new_srcs = vec![];
-        for (i, src) in srcs.iter().enumerate() {
-            let is_prim = matches!(self.target().get_local_type(*src), Type::Primitive(_));
-            if !is_prim
-                && (self.check_implicit_copy(alive, id, true, *src)
-                    || self.check_implicit_copy_in_arglist(id, *src, &srcs[i + 1..srcs.len()]))
-            {
-                let temp = self.clone_local(*src);
-                self.data
-                    .code
-                    .push(Assign(id, temp, *src, AssignKind::Copy));
-                new_srcs.push(temp)
-            } else {
-                new_srcs.push(*src)
-            }
-        }
-        new_srcs
-    }
-
-    /// Checks whether an implicit copy is needed because the value is used afterwards.
-    /// This produces an error if copy is not allowed.
-    fn check_implicit_copy(
-        &self,
-        alive: &LiveVarInfoAtCodeOffset,
-        id: AttrId,
-        _is_updated: bool,
-        temp: TempIndex,
-    ) -> bool {
-        let target = self.target();
-        let ty = target.get_local_type(temp);
-        if !ty.is_reference()
-            && has_ability(&target, ty, Ability::Copy)
-            && has_ability(&target, ty, Ability::Drop)
-        {
-            // TODO(#11223): Until we have info about whether a var may have had a reference
-            // taken, be very conservative here and always copy if the type has both drop
-            // and copy ability. Notice we also need drop ability as with too many copies we
-            // may end up with the need to destroy a value, which requires drop.
-            // If conditions don't hold, reference analysis should give us an error if we move
-            // the value and references still exist.
-            true
-        } else {
-            let needed = alive.after.contains_key(&temp);
-            if needed {
-                check_copy(
-                    &target,
-                    ty,
-                    &target.get_bytecode_loc(id),
-                    &format!(
-                        "cannot copy {} implicitly",
-                        target.get_local_name_for_error_message(temp)
-                    ),
-                );
-            }
-            needed
-        }
-    }
-
-    fn make_hints_from_usage(
-        &self,
-        info: &'a LiveVarInfo,
-    ) -> impl Iterator<Item = (Loc, String)> + 'a {
-        info.usages
-            .iter()
-            .map(|loc| (loc.clone(), "used here".to_owned()))
-    }
-
-    /// Checks whether the given temp has copy ability
-    /// add diagnostics if not
-    fn check_copy_for_temp(&self, target: &FunctionTarget, temp: TempIndex, id: AttrId) {
-        check_copy(
-            target,
-            target.get_local_type(temp),
-            &target.get_bytecode_loc(id),
-            &format!(
-                "cannot copy {} implicitly",
-                target.get_local_name_for_error_message(temp)
-            ),
-        );
-    }
-
-    /// Checks whether an implicit copy is needed because the value is used again in
-    /// an argument list. This cannot be determined from the livevar analysis result
-    /// because the 2nd usage appears at the same program point.
-    fn check_implicit_copy_in_arglist(
-        &self,
-        id: AttrId,
-        temp: TempIndex,
-        args: &[TempIndex],
-    ) -> bool {
-        if args.contains(&temp) {
-            // If this is a &mut, produce an error
-            let target = self.target();
-            if target.get_local_type(temp).is_mutable_reference() {
-                self.error_with_hints(
-                    &target.get_bytecode_loc(id),
-                    format!(
-                        "implicit copy of mutable reference in {} which \
-                    is used later in argument list",
-                        target.get_local_name_for_error_message(temp)
-                    ),
-                    "implicitly copied here",
-                    empty(),
-                );
-                false
-            } else {
-                self.check_copy_for_temp(&target, temp, id);
-                true
-            }
-        } else {
-            false
-        }
-    }
-
-    /// Checks whether an explicit copy is allowed.
-    fn check_explicit_copy(&self, id: AttrId, temp: TempIndex) {
-        let target = self.target();
-        if !target.get_local_type(temp).is_mutable_reference() {
-            // Copy of mutable refs is checked in reference analysis
-            self.check_copy_for_temp(&target, temp, id)
-        }
-    }
-
-    /// Checks whether an explicit move is allowed.
-    fn check_explicit_move(&self, alive: &LiveVarInfoAtCodeOffset, id: AttrId, temp: TempIndex) {
-        if let Some(info) = alive.after.get(&temp) {
-            let target = self.target();
-            self.error_with_hints(
-                &target.get_bytecode_loc(id),
-                format!(
-                    "cannot move {} since it is used later",
-                    target.get_local_name_for_error_message(temp)
-                ),
-                "attempted to move here",
-                self.make_hints_from_usage(info),
-            );
-        }
-    }
-
-    /// Makes a new temporary with the same type as the given one.
-    fn clone_local(&mut self, temp: TempIndex) -> TempIndex {
-        let ty = self.target().get_local_type(temp).clone();
-        self.data.local_types.push(ty);
-        self.data.local_types.len() - 1
-    }
-
-    /// Produces an error with primary message and secondary hints.
-    fn error_with_hints(
-        &self,
-        loc: &Loc,
-        msg: impl AsRef<str>,
-        primary: impl AsRef<str>,
-        hints: impl Iterator<Item = (Loc, String)>,
-    ) {
-        self.fun_env.module_env.env.diag_with_primary_and_labels(
-            Severity::Error,
-            loc,
-            msg.as_ref(),
-            primary.as_ref(),
-            hints.collect(),
-        )
-    }
-
-    /// Constructs a function target for temporary use. Since we need to mutate `self.data`
-    /// we cannot store the target in `self`, so construct it as needed.
-    fn target(&self) -> FunctionTarget<'_> {
-        FunctionTarget::new(self.fun_env, &self.data)
     }
 }
 

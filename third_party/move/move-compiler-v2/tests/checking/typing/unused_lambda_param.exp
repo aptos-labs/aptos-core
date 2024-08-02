@@ -1,71 +1,26 @@
 
 Diagnostics:
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused anonymous function parameter `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ tests/checking/typing/unused_lambda_param.move:7:18
   │
 7 │         test(0, |x| 1);
   │                  ^
 
-warning: Function `0xc0ffee::m::unused_lambda` is unused: it has no current callers and is private to its module.
-  ┌─ tests/checking/typing/unused_lambda_param.move:6:5
-  │
-6 │ ╭     fun unused_lambda() {
-7 │ │         test(0, |x| 1);
-8 │ │     }
-  │ ╰─────^
-
-warning: Function `0xc0ffee::m::unused_lambda_suppressed1` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_lambda_param.move:10:5
-   │
-10 │ ╭     fun unused_lambda_suppressed1() {
-11 │ │         test(0, |_x| 1);
-12 │ │     }
-   │ ╰─────^
-
-warning: Function `0xc0ffee::m::unused_lambda_suppressed2` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/typing/unused_lambda_param.move:14:5
-   │
-14 │ ╭     fun unused_lambda_suppressed2() {
-15 │ │         test(0, |_| 1);
-16 │ │     }
-   │ ╰─────^
-
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
     private fun unused_lambda() {
-        {
-          let (p: u64) = Tuple(0);
-          {
-            let (x: u64) = Tuple(p);
-            1
-          }
-        };
+        1;
         Tuple()
     }
     private fun unused_lambda_suppressed1() {
-        {
-          let (p: u64) = Tuple(0);
-          {
-            let (_x: u64) = Tuple(p);
-            1
-          }
-        };
+        1;
         Tuple()
     }
     private fun unused_lambda_suppressed2() {
-        {
-          let (p: u64) = Tuple(0);
-          {
-            let (_) = Tuple(p);
-            1
-          }
-        };
+        1;
         Tuple()
     }
-    spec fun $test(p: u64,f: |u64|u64): u64 {
-        (f)(p)
-    }
-    spec fun $unused_lambda();
-    spec fun $unused_lambda_suppressed1();
-    spec fun $unused_lambda_suppressed2();
 } // end 0xc0ffee::m

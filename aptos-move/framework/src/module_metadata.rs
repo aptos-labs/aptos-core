@@ -3,25 +3,25 @@
 
 use crate::extended_checks::ResourceGroupScope;
 use aptos_types::{
-    on_chain_config::{FeatureFlag, Features, TimedFeatures},
+    on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
     transaction::AbortInfo,
 };
 use lru::LruCache;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Ability, AbilitySet, CompiledScript, IdentifierIndex, SignatureToken,
-        StructFieldInformation, TableIndex,
+        Ability, AbilitySet, CompiledScript, FunctionDefinition, FunctionHandle, IdentifierIndex,
+        SignatureToken, StructDefinition, StructFieldInformation, StructHandle, TableIndex,
     },
-    normalized::{Function, Struct},
     CompiledModule,
 };
 use move_core_types::{
     errmap::ErrorDescription,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
 };
+use move_model::metadata::{CompilationMetadata, COMPILATION_METADATA_KEY};
 use move_vm_runtime::move_vm::MoveVM;
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, env, sync::Arc};
@@ -78,12 +78,13 @@ pub struct KnownAttribute {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum KnownAttributeKind {
     // An older compiler placed view functions at 0. This was then published to
-    // Testnet and now we need to recognize this as a legacy index.
+    // Testnet, and now we need to recognize this as a legacy index.
     LegacyViewFunction = 0,
     ViewFunction = 1,
     ResourceGroup = 2,
     ResourceGroupMember = 3,
     Event = 4,
+    Randomness = 5,
 }
 
 impl KnownAttribute {
@@ -146,6 +147,34 @@ impl KnownAttribute {
 
     pub fn is_event(&self) -> bool {
         self.kind == KnownAttributeKind::Event as u8
+    }
+
+    pub fn randomness(claimed_gas: Option<u64>) -> Self {
+        Self {
+            kind: KnownAttributeKind::Randomness as u8,
+            args: if let Some(amount) = claimed_gas {
+                vec![amount.to_string()]
+            } else {
+                vec![]
+            },
+        }
+    }
+
+    pub fn is_randomness(&self) -> bool {
+        self.kind == KnownAttributeKind::Randomness as u8
+    }
+
+    pub fn try_as_randomness_annotation(&self) -> Option<RandomnessAnnotation> {
+        if self.kind == KnownAttributeKind::Randomness as u8 {
+            if let Some(arg) = self.args.first() {
+                let max_gas = arg.parse::<u64>().ok();
+                Some(RandomnessAnnotation::new(max_gas))
+            } else {
+                Some(RandomnessAnnotation::default())
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -211,8 +240,12 @@ pub fn get_vm_metadata_v0(
 }
 
 /// Check if the metadata has unknown key/data types
-pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> {
+pub fn check_metadata_format(
+    module: &CompiledModule,
+    features: &Features,
+) -> Result<(), MalformedError> {
     let mut exist = false;
+    let mut compilation_key_exist = false;
     for data in module.metadata.iter() {
         if data.key == *APTOS_METADATA_KEY || data.key == *APTOS_METADATA_KEY_V1 {
             if exist {
@@ -227,6 +260,15 @@ pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedErr
                 bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value)
                     .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
             }
+        } else if features.is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE)
+            && data.key == *COMPILATION_METADATA_KEY
+        {
+            if compilation_key_exist {
+                return Err(MalformedError::DuplicateKey);
+            }
+            compilation_key_exist = true;
+            bcs::from_bytes::<CompilationMetadata>(&data.value)
+                .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
         } else {
             return Err(MalformedError::UnknownKey(data.key.clone()));
         }
@@ -254,6 +296,28 @@ pub fn get_metadata_from_compiled_module(
         // Old format available, upgrade to new one on the fly
         let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
         Some(data_v0.upgrade())
+    } else {
+        None
+    }
+}
+
+/// Extract compilation metadata from a compiled module
+pub fn get_compilation_metadata_from_compiled_module(
+    module: &CompiledModule,
+) -> Option<CompilationMetadata> {
+    if let Some(data) = find_metadata(module, COMPILATION_METADATA_KEY) {
+        bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
+    } else {
+        None
+    }
+}
+
+/// Extract compilation metadata from a compiled script
+pub fn get_compilation_metadata_from_compiled_script(
+    module: &CompiledScript,
+) -> Option<CompilationMetadata> {
+    if let Some(data) = find_metadata_in_script(module, COMPILATION_METADATA_KEY) {
+        bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
     } else {
         None
     }
@@ -333,13 +397,33 @@ pub struct AttributeValidationError {
     pub attribute: u8,
 }
 
-pub fn is_valid_view_function(
-    functions: &BTreeMap<Identifier, Function>,
+pub fn is_valid_unbiasable_function(
+    functions: &BTreeMap<&IdentStr, (&FunctionHandle, &FunctionDefinition)>,
     fun: &str,
 ) -> Result<(), AttributeValidationError> {
     if let Ok(ident_fun) = Identifier::new(fun) {
-        if let Some(mod_fun) = functions.get(&ident_fun) {
-            if !mod_fun.return_.is_empty() {
+        if let Some((_func_handle, func_def)) = functions.get(ident_fun.as_ident_str()) {
+            if func_def.is_entry && !func_def.visibility.is_public() {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(AttributeValidationError {
+        key: fun.to_string(),
+        attribute: KnownAttributeKind::Randomness as u8,
+    })
+}
+
+pub fn is_valid_view_function(
+    module: &CompiledModule,
+    functions: &BTreeMap<&IdentStr, (&FunctionHandle, &FunctionDefinition)>,
+    fun: &str,
+) -> Result<(), AttributeValidationError> {
+    if let Ok(ident_fun) = Identifier::new(fun) {
+        if let Some((func_handle, _func_def)) = functions.get(ident_fun.as_ident_str()) {
+            let sig = module.signature_at(func_handle.return_);
+            if !sig.0.is_empty() {
                 return Ok(());
             }
         }
@@ -352,14 +436,18 @@ pub fn is_valid_view_function(
 }
 
 pub fn is_valid_resource_group(
-    structs: &BTreeMap<Identifier, Struct>,
+    structs: &BTreeMap<&IdentStr, (&StructHandle, &StructDefinition)>,
     struct_: &str,
 ) -> Result<(), AttributeValidationError> {
     if let Ok(ident_struct) = Identifier::new(struct_) {
-        if let Some(mod_struct) = structs.get(&ident_struct) {
-            if mod_struct.abilities == AbilitySet::EMPTY
-                && mod_struct.type_parameters.is_empty()
-                && mod_struct.fields.len() == 1
+        if let Some((struct_handle, struct_def)) = structs.get(ident_struct.as_ident_str()) {
+            let num_fields = match &struct_def.field_information {
+                StructFieldInformation::Native | StructFieldInformation::DeclaredVariants(_) => 0,
+                StructFieldInformation::Declared(fields) => fields.len(),
+            };
+            if struct_handle.abilities == AbilitySet::EMPTY
+                && struct_handle.type_parameters.is_empty()
+                && num_fields == 1
             {
                 return Ok(());
             }
@@ -373,12 +461,12 @@ pub fn is_valid_resource_group(
 }
 
 pub fn is_valid_resource_group_member(
-    structs: &BTreeMap<Identifier, Struct>,
+    structs: &BTreeMap<&IdentStr, (&StructHandle, &StructDefinition)>,
     struct_: &str,
 ) -> Result<(), AttributeValidationError> {
     if let Ok(ident_struct) = Identifier::new(struct_) {
-        if let Some(mod_struct) = structs.get(&ident_struct) {
-            if mod_struct.abilities.has_ability(Ability::Key) {
+        if let Some((struct_handle, _struct_def)) = structs.get(ident_struct.as_ident_str()) {
+            if struct_handle.abilities.has_ability(Ability::Key) {
                 return Ok(());
             }
         }
@@ -393,14 +481,16 @@ pub fn is_valid_resource_group_member(
 pub fn verify_module_metadata(
     module: &CompiledModule,
     features: &Features,
-    _timed_features: &TimedFeatures,
+    timed_features: &TimedFeatures,
 ) -> Result<(), MetaDataValidationError> {
-    if features.is_enabled(FeatureFlag::SAFER_METADATA) {
+    if features.is_enabled(FeatureFlag::SAFER_METADATA)
+        && timed_features.is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
+    {
         check_module_complexity(module)?;
     }
 
     if features.are_resource_groups_enabled() {
-        check_metadata_format(module)?;
+        check_metadata_format(module, features)?;
     }
     let metadata = if let Some(metadata) = get_metadata_from_compiled_module(module) {
         metadata
@@ -411,13 +501,19 @@ pub fn verify_module_metadata(
     let functions = module
         .function_defs
         .iter()
-        .map(|func_def| Function::new(module, func_def))
+        .map(|func_def| {
+            let func_handle = module.function_handle_at(func_def.function);
+            let name = module.identifier_at(func_handle.name);
+            (name, (func_handle, func_def))
+        })
         .collect::<BTreeMap<_, _>>();
 
     for (fun, attrs) in &metadata.fun_attributes {
         for attr in attrs {
             if attr.is_view_function() {
-                is_valid_view_function(&functions, fun)?
+                is_valid_view_function(module, &functions, fun)?;
+            } else if attr.is_randomness() {
+                is_valid_unbiasable_function(&functions, fun)?;
             } else {
                 return Err(AttributeValidationError {
                     key: fun.clone(),
@@ -431,7 +527,11 @@ pub fn verify_module_metadata(
     let structs = module
         .struct_defs
         .iter()
-        .map(|d| Struct::new(module, d))
+        .map(|struct_def| {
+            let struct_handle = module.struct_handle_at(struct_def.struct_handle);
+            let name = module.identifier_at(struct_handle.name);
+            (name, (struct_handle, struct_def))
+        })
         .collect::<BTreeMap<_, _>>();
 
     for (struct_, attrs) in &metadata.struct_attributes {
@@ -603,5 +703,18 @@ fn check_budget(meter: usize) -> Result<(), MetaDataValidationError> {
         ))
     } else {
         Ok(())
+    }
+}
+
+/// The randomness consuming options specified by developers for their entry function.
+/// Examples: `#[randomness(max_gas = 99999)]`, `#[randomness]`.
+#[derive(Default)]
+pub struct RandomnessAnnotation {
+    pub max_gas: Option<u64>,
+}
+
+impl RandomnessAnnotation {
+    pub fn new(max_gas: Option<u64>) -> Self {
+        Self { max_gas }
     }
 }

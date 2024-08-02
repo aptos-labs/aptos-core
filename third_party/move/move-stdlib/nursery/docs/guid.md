@@ -1,5 +1,5 @@
 
-<a name="0x1_guid"></a>
+<a id="0x1_guid"></a>
 
 # Module `0x1::guid`
 
@@ -31,7 +31,7 @@ A module for generating globally unique identifiers
 
 
 
-<a name="0x1_guid_Generator"></a>
+<a id="0x1_guid_Generator"></a>
 
 ## Resource `Generator`
 
@@ -59,7 +59,7 @@ A generator for new GUIDs.
 
 </details>
 
-<a name="0x1_guid_GUID"></a>
+<a id="0x1_guid_GUID"></a>
 
 ## Struct `GUID`
 
@@ -87,7 +87,7 @@ A globally unique identifier derived from the sender's address and a counter
 
 </details>
 
-<a name="0x1_guid_ID"></a>
+<a id="0x1_guid_ID"></a>
 
 ## Struct `ID`
 
@@ -121,7 +121,7 @@ A non-privileged identifier that can be freely created by anyone. Useful for loo
 
 </details>
 
-<a name="0x1_guid_CreateCapability"></a>
+<a id="0x1_guid_CreateCapability"></a>
 
 ## Resource `CreateCapability`
 
@@ -149,12 +149,12 @@ A capability to create a privileged identifier on behalf of the given address
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_guid_EGUID_GENERATOR_NOT_PUBLISHED"></a>
+<a id="0x1_guid_EGUID_GENERATOR_NOT_PUBLISHED"></a>
 
 GUID generator must be published ahead of first usage of <code>create_with_capability</code> function.
 
@@ -164,7 +164,7 @@ GUID generator must be published ahead of first usage of <code>create_with_capab
 
 
 
-<a name="0x1_guid_gen_create_capability"></a>
+<a id="0x1_guid_gen_create_capability"></a>
 
 ## Function `gen_create_capability`
 
@@ -193,7 +193,7 @@ Generates a capability to create the privileged GUID on behalf of the signer
 
 </details>
 
-<a name="0x1_guid_create_id"></a>
+<a id="0x1_guid_create_id"></a>
 
 ## Function `create_id`
 
@@ -218,7 +218,7 @@ Create a non-privileged id from <code>addr</code> and <code>creation_num</code>
 
 </details>
 
-<a name="0x1_guid_create_with_capability"></a>
+<a id="0x1_guid_create_with_capability"></a>
 
 ## Function `create_with_capability`
 
@@ -243,7 +243,7 @@ Create a non-privileged id from <code>addr</code> and <code>creation_num</code>
 
 </details>
 
-<a name="0x1_guid_create"></a>
+<a id="0x1_guid_create"></a>
 
 ## Function `create`
 
@@ -273,7 +273,7 @@ if it does not already have one
 
 </details>
 
-<a name="0x1_guid_create_impl"></a>
+<a id="0x1_guid_create_impl"></a>
 
 ## Function `create_impl`
 
@@ -300,7 +300,7 @@ if it does not already have one
 
 </details>
 
-<a name="0x1_guid_publish_generator"></a>
+<a id="0x1_guid_publish_generator"></a>
 
 ## Function `publish_generator`
 
@@ -325,7 +325,7 @@ Publish a Generator resource under <code>account</code>
 
 </details>
 
-<a name="0x1_guid_id"></a>
+<a id="0x1_guid_id"></a>
 
 ## Function `id`
 
@@ -350,7 +350,7 @@ Get the non-privileged ID associated with a GUID
 
 </details>
 
-<a name="0x1_guid_creator_address"></a>
+<a id="0x1_guid_creator_address"></a>
 
 ## Function `creator_address`
 
@@ -375,7 +375,7 @@ Return the account address that created the GUID
 
 </details>
 
-<a name="0x1_guid_id_creator_address"></a>
+<a id="0x1_guid_id_creator_address"></a>
 
 ## Function `id_creator_address`
 
@@ -400,7 +400,7 @@ Return the account address that created the guid::ID
 
 </details>
 
-<a name="0x1_guid_creation_num"></a>
+<a id="0x1_guid_creation_num"></a>
 
 ## Function `creation_num`
 
@@ -425,7 +425,7 @@ Return the creation number associated with the GUID
 
 </details>
 
-<a name="0x1_guid_id_creation_num"></a>
+<a id="0x1_guid_id_creation_num"></a>
 
 ## Function `id_creation_num`
 
@@ -450,7 +450,7 @@ Return the creation number associated with the guid::ID
 
 </details>
 
-<a name="0x1_guid_eq_id"></a>
+<a id="0x1_guid_eq_id"></a>
 
 ## Function `eq_id`
 
@@ -475,7 +475,7 @@ Return true if the GUID's ID is <code>id</code>
 
 </details>
 
-<a name="0x1_guid_get_next_creation_num"></a>
+<a id="0x1_guid_get_next_creation_num"></a>
 
 ## Function `get_next_creation_num`
 

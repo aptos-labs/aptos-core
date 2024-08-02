@@ -176,7 +176,7 @@ async fn test_cachable_requests_eviction() {
     let mut db_reader = mock::create_mock_db_reader();
     let mut expectation_sequence = Sequence::new();
     db_reader
-        .expect_get_state_leaf_count()
+        .expect_get_state_item_count()
         .times(max_lru_cache_size as usize)
         .with(always())
         .returning(move |_| Ok(165));

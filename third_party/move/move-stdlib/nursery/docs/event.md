@@ -1,5 +1,5 @@
 
-<a name="0x1_event"></a>
+<a id="0x1_event"></a>
 
 # Module `0x1::event`
 
@@ -26,7 +26,7 @@ events emitted to a handle and emit events to the event store.
 
 
 
-<a name="0x1_event_GUIDWrapper"></a>
+<a id="0x1_event_GUIDWrapper"></a>
 
 ## Struct `GUIDWrapper`
 
@@ -60,7 +60,7 @@ Wrapper for a GUID for layout compatibility with legacy EventHandle id's
 
 </details>
 
-<a name="0x1_event_EventHandle"></a>
+<a id="0x1_event_EventHandle"></a>
 
 ## Struct `EventHandle`
 
@@ -96,7 +96,7 @@ A handle for an event such that:
 
 </details>
 
-<a name="0x1_event_EventHandleGenerator"></a>
+<a id="0x1_event_EventHandleGenerator"></a>
 
 ## Resource `EventHandleGenerator`
 
@@ -130,7 +130,7 @@ Deprecated. Only kept around so Diem clients know how to deserialize existing Ev
 
 </details>
 
-<a name="0x1_event_new_event_handle"></a>
+<a id="0x1_event_new_event_handle"></a>
 
 ## Function `new_event_handle`
 
@@ -160,7 +160,7 @@ Use EventHandleGenerator to generate a unique event handle for <code>sig</code>
 
 </details>
 
-<a name="0x1_event_emit_event"></a>
+<a id="0x1_event_emit_event"></a>
 
 ## Function `emit_event`
 
@@ -186,7 +186,7 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 
 </details>
 
-<a name="0x1_event_guid"></a>
+<a id="0x1_event_guid"></a>
 
 ## Function `guid`
 
@@ -211,7 +211,7 @@ Return the GUIID associated with this EventHandle
 
 </details>
 
-<a name="0x1_event_write_to_event_store"></a>
+<a id="0x1_event_write_to_event_store"></a>
 
 ## Function `write_to_event_store`
 
@@ -234,7 +234,7 @@ Log <code>msg</code> as the <code>count</code>th event associated with the event
 
 </details>
 
-<a name="0x1_event_destroy_handle"></a>
+<a id="0x1_event_destroy_handle"></a>
 
 ## Function `destroy_handle`
 
@@ -259,7 +259,7 @@ Destroy a unique handle.
 
 </details>
 
-<a name="@Module_Specification_0"></a>
+<a id="@Module_Specification_0"></a>
 
 ## Module Specification
 
@@ -277,7 +277,7 @@ Determines equality between the guids of two event handles. Since fields of intr
 structs cannot be accessed, this function is provided.
 
 
-<a name="0x1_event_spec_guid_eq"></a>
+<a id="0x1_event_spec_guid_eq"></a>
 
 
 <pre><code><b>fun</b> <a href="event.md#0x1_event_spec_guid_eq">spec_guid_eq</a>&lt;T&gt;(h1: <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt;, h2: <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt;): bool {

@@ -1,0 +1,61 @@
+
+Diagnostics:
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/file-format-generator/globals.move:18:27
+   │
+18 │     fun write(a: address, x: u64): u64 acquires R {
+   │                           ^
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.globals {
+struct R has store, key {
+	f: u64
+}
+
+check(Arg0: address): bool /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: Exists[0](R)
+	2: Ret
+}
+publish(Arg0: &signer) /* def_idx: 1 */ {
+L1:	loc0: R
+B0:
+	0: LdU64(1)
+	1: Pack[0](R)
+	2: StLoc[1](loc0: R)
+	3: MoveLoc[0](Arg0: &signer)
+	4: MoveLoc[1](loc0: R)
+	5: MoveTo[0](R)
+	6: Ret
+}
+read(Arg0: address): u64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: ImmBorrowGlobal[0](R)
+	2: ImmBorrowField[0](R.f: u64)
+	3: ReadRef
+	4: Ret
+}
+write(Arg0: address, Arg1: u64): u64 /* def_idx: 3 */ {
+L2:	loc0: &mut R
+L3:	loc1: &mut u64
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: MutBorrowGlobal[0](R)
+	2: LdU64(2)
+	3: StLoc[1](Arg1: u64)
+	4: StLoc[2](loc0: &mut R)
+	5: MoveLoc[2](loc0: &mut R)
+	6: MutBorrowField[0](R.f: u64)
+	7: StLoc[3](loc1: &mut u64)
+	8: MoveLoc[1](Arg1: u64)
+	9: MoveLoc[3](loc1: &mut u64)
+	10: WriteRef
+	11: LdU64(9)
+	12: Ret
+}
+}
+============ bytecode verification succeeded ========

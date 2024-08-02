@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: local `x` of type `T` does not have the `drop` ability
+  ┌─ tests/ability-check/operator_drop.move:4:9
+  │
+4 │         x == y
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `y` of type `T` does not have the `drop` ability
+  ┌─ tests/ability-check/operator_drop.move:4:9
+  │
+4 │         x == y
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `x` of type `T` does not have the `drop` ability
+  ┌─ tests/ability-check/operator_drop.move:8:9
+  │
+8 │         x != y
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `y` of type `T` does not have the `drop` ability
+  ┌─ tests/ability-check/operator_drop.move:8:9
+  │
+8 │         x != y
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)

@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{
-        account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
-        TransactionOptions, TransactionSummary,
+    common::{
+        init::Network,
+        types::{
+            account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
+            TransactionOptions, TransactionSummary,
+        },
     },
     config::GlobalConfig,
     CliResult,
@@ -428,6 +431,22 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
     Ok(input_buf)
 }
 
+/// Lists the content of a directory
+pub fn read_dir_files(
+    path: &Path,
+    predicate: impl Fn(&Path) -> bool,
+) -> CliTypedResult<Vec<PathBuf>> {
+    let to_cli_err = |err| CliError::IO(path.display().to_string(), err);
+    let mut result = vec![];
+    for entry in std::fs::read_dir(path).map_err(to_cli_err)? {
+        let path = entry.map_err(to_cli_err)?.path();
+        if predicate(path.as_path()) {
+            result.push(path)
+        }
+    }
+    Ok(result)
+}
+
 /// Fund account (and possibly create it) from a faucet. This function waits for the
 /// transaction on behalf of the caller.
 pub async fn fund_account(
@@ -481,9 +500,19 @@ pub async fn profile_or_submit(
     payload: TransactionPayload,
     txn_options_ref: &TransactionOptions,
 ) -> CliTypedResult<TransactionSummary> {
+    if txn_options_ref.profile_gas && txn_options_ref.benchmark {
+        return Err(CliError::UnexpectedError(
+            "Cannot perform benchmarking and gas profiling at the same time.".to_string(),
+        ));
+    }
+
     // Profile gas if needed.
     if txn_options_ref.profile_gas {
         txn_options_ref.profile_gas(payload).await
+    } else if txn_options_ref.benchmark {
+        txn_options_ref.benchmark_locally(payload).await
+    } else if txn_options_ref.local {
+        txn_options_ref.simulate_locally(payload).await
     } else {
         // Otherwise submit the transaction.
         txn_options_ref
@@ -535,5 +564,33 @@ pub fn view_json_option_str(option_ref: &serde_json::Value) -> CliTypedResult<Op
             "JSON field does not have an inner `vec` field: {}",
             option_ref
         )))
+    }
+}
+
+pub fn explorer_account_link(hash: AccountAddress, network: Option<Network>) -> String {
+    // For now, default to what the browser is already on, though the link could be wrong
+    if let Some(network) = network {
+        format!(
+            "https://explorer.aptoslabs.com/account/{}?network={}",
+            hash, network
+        )
+    } else {
+        format!("https://explorer.aptoslabs.com/account/{}", hash)
+    }
+}
+
+pub fn explorer_transaction_link(
+    hash: aptos_crypto::HashValue,
+    network: Option<Network>,
+) -> String {
+    // For now, default to what the browser is already on, though the link could be wrong
+    if let Some(network) = network {
+        format!(
+            "https://explorer.aptoslabs.com/txn/{}?network={}",
+            hash.to_hex_literal(),
+            network
+        )
+    } else {
+        format!("https://explorer.aptoslabs.com/txn/{}", hash)
     }
 }

@@ -1,0 +1,64 @@
+
+Diagnostics:
+warning: unused type parameter
+  ┌─ tests/checking/naming/unused_type_parameter_struct.move:2:15
+  │
+2 │     struct S0<T> {}
+  │               ^
+  │               │
+  │               Unused type parameter `T`. Consider declaring it as phantom
+
+warning: unused type parameter
+  ┌─ tests/checking/naming/unused_type_parameter_struct.move:4:15
+  │
+4 │     struct S1<T1, T2> {}
+  │               ^^
+  │               │
+  │               Unused type parameter `T1`. Consider declaring it as phantom
+
+warning: unused type parameter
+  ┌─ tests/checking/naming/unused_type_parameter_struct.move:4:19
+  │
+4 │     struct S1<T1, T2> {}
+  │                   ^^
+  │                   │
+  │                   Unused type parameter `T2`. Consider declaring it as phantom
+
+warning: unused type parameter
+  ┌─ tests/checking/naming/unused_type_parameter_struct.move:6:15
+  │
+6 │     struct S2<T1, phantom T2> {
+  │               ^^
+  │               │
+  │               Unused type parameter `T1`. Consider declaring it as phantom
+
+warning: unused type parameter
+   ┌─ tests/checking/naming/unused_type_parameter_struct.move:12:18
+   │
+12 │     struct S4<T, U> {
+   │                  ^
+   │                  │
+   │                  Unused type parameter `U`. Consider declaring it as phantom
+
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    struct S0 {
+        dummy_field: bool,
+    }
+    struct S1 {
+        dummy_field: bool,
+    }
+    struct S2 {
+        f: test::S3<#1>,
+    }
+    struct S3 {
+        dummy_field: bool,
+    }
+    struct S4 {
+        f: vector<#0>,
+    }
+    struct S5 {
+        f: vector<#0>,
+        g: vector<#1>,
+    }
+} // end 0x42::test

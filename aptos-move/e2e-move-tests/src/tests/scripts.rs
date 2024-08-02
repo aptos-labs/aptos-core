@@ -5,9 +5,117 @@ use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
     account_address::AccountAddress,
+    on_chain_config::FeatureFlag,
     transaction::{Script, TransactionArgument},
 };
 use move_core_types::language_storage::TypeTag;
+
+#[test]
+fn test_script_with_object_parameter() {
+    let mut h = MoveHarness::new();
+
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let root = h.aptos_framework_account();
+
+    let mut build_options = aptos_framework::BuildOptions::default();
+    build_options
+        .named_addresses
+        .insert("example_addr".to_string(), *alice.address());
+
+    let result = h.publish_package_with_options(
+        &alice,
+        &common::test_dir_path("../../../move-examples/fungible_asset/managed_fungible_asset"),
+        build_options.clone(),
+    );
+
+    assert_success!(result);
+    let result = h.publish_package_with_options(
+        &alice,
+        &common::test_dir_path("../../../move-examples/fungible_asset/managed_fungible_token"),
+        build_options.clone(),
+    );
+    assert_success!(result);
+
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
+            "0x{}::coin::create_coin_conversion_map",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    let metadata = h
+        .execute_view_function(
+            str::parse(&format!(
+                "0x{}::managed_fungible_token::get_metadata",
+                (*alice.address()).to_hex()
+            ))
+            .unwrap(),
+            vec![],
+            vec![],
+        )
+        .values
+        .unwrap()
+        .pop()
+        .unwrap();
+    let metadata = bcs::from_bytes::<AccountAddress>(metadata.as_slice()).unwrap();
+
+    let result = h.run_entry_function(
+        &alice,
+        str::parse(&format!(
+            "0x{}::managed_fungible_asset::mint_to_primary_stores",
+            (*alice.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&metadata).unwrap(),
+            bcs::to_bytes(&vec![alice.address()]).unwrap(),
+            bcs::to_bytes(&vec![100u64]).unwrap(), // amount
+        ],
+    );
+    assert_success!(result);
+
+    let package = build_package(
+        common::test_dir_path("script_with_object_param.data/pack"),
+        build_options,
+    )
+    .expect("building package must succeed");
+
+    let code = package.extract_script_code().into_iter().next().unwrap();
+    let script = Script::new(code, vec![], vec![
+        TransactionArgument::Serialized(bcs::to_bytes(&metadata).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&vec![alice.address()]).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&vec![bob.address()]).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&vec![30u64]).unwrap()),
+    ]);
+
+    let txn = TransactionBuilder::new(alice.clone())
+        .script(script.clone())
+        .sequence_number(13)
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign();
+
+    let status = h.run(txn);
+    assert_success!(status);
+
+    h.enable_features(vec![], vec![FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS]);
+
+    let txn = TransactionBuilder::new(alice.clone())
+        .script(script.clone())
+        .sequence_number(14)
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign();
+
+    let status = h.run(txn);
+    assert!(status.is_discarded());
+}
 
 #[test]
 fn test_script_with_type_parameter() {

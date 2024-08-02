@@ -1,0 +1,137 @@
+
+Diagnostics:
+warning: Unused local variable `a`. Consider removing or prefixing with an underscore: `_a`
+  ┌─ tests/variable-coalescing/immut_refs_2.move:4:13
+  │
+4 │         let a = &p;
+  │             ^
+
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := infer($t0)
+  2: $t4 := infer($t3)
+  3: $t5 := infer($t4)
+  4: $t1 := infer($t5)
+  5: return $t1
+}
+
+
+Diagnostics:
+warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+  ┌─ tests/variable-coalescing/immut_refs_2.move:4:17
+  │
+4 │         let a = &p;
+  │                 ^^
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := borrow_local($t0)
+  1: drop($t2)
+  2: $t3 := move($t0)
+  3: $t4 := move($t3)
+  4: $t5 := move($t4)
+  5: $t1 := move($t5)
+  6: return $t1
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+     # events: b:$t2
+  0: $t2 := borrow_local($t0)
+     # live vars: $t0, $t2
+     # events: e:$t2
+  1: drop($t2)
+     # live vars: $t0
+     # events: b:$t3
+  2: $t3 := move($t0)
+     # live vars: $t3
+     # events: e:$t3, b:$t4
+  3: $t4 := move($t3)
+     # live vars: $t4
+     # events: e:$t4, b:$t5
+  4: $t5 := move($t4)
+     # live vars: $t5
+     # events: e:$t5, b:$t1
+  5: $t1 := move($t5)
+     # live vars: $t1
+     # events: e:$t1
+  6: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: &u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+  0: $t2 := borrow_local($t0)
+  1: drop($t2)
+  2: $t3 := move($t0)
+  3: $t3 := move($t3)
+  4: $t3 := move($t3)
+  5: $t3 := move($t3)
+  6: return $t3
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: &u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+  0: $t2 := borrow_local($t0)
+  1: drop($t2)
+  2: $t3 := move($t0)
+  3: return $t3
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: &u64
+L2:	loc1: u64
+B0:
+	0: ImmBorrowLoc[0](Arg0: u64)
+	1: StLoc[1](loc0: &u64)
+	2: MoveLoc[1](loc0: &u64)
+	3: Pop
+	4: MoveLoc[0](Arg0: u64)
+	5: StLoc[2](loc1: u64)
+	6: MoveLoc[2](loc1: u64)
+	7: Ret
+}
+}
+============ bytecode verification succeeded ========

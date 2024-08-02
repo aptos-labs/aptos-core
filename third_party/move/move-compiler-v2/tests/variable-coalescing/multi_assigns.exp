@@ -1,0 +1,93 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t1 := 1
+  1: $t2 := 2
+  2: $t1 := infer($t2)
+  3: $t0 := infer($t1)
+  4: return $t0
+}
+
+
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/variable-coalescing/multi_assigns.move:3:17
+  │
+3 │         let x = 1;
+  │                 ^
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 2
+  1: $t1 := move($t2)
+  2: $t0 := move($t1)
+  3: return $t0
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     # live vars:
+     # events: b:$t2
+  0: $t2 := 2
+     # live vars: $t2
+     # events: e:$t2, b:$t1
+  1: $t1 := move($t2)
+     # live vars: $t1
+     # events: e:$t1, b:$t0
+  2: $t0 := move($t1)
+     # live vars: $t0
+     # events: e:$t0
+  3: return $t0
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+  0: $t2 := 2
+  1: $t2 := move($t2)
+  2: $t2 := move($t2)
+  3: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+  0: $t2 := 2
+  1: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(): u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(2)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========

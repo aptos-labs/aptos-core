@@ -50,11 +50,13 @@ pub fn parse_timestamp(ts: u64, version: i64) -> chrono::NaiveDateTime {
             ts, version
         )
     });
+    #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(seconds as i64, ns)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 pub fn parse_timestamp_secs(ts: u64, version: i64) -> chrono::NaiveDateTime {
+    #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(
         std::cmp::min(ts, MAX_TIMESTAMP_SECS as u64) as i64,
         0,
@@ -222,7 +224,7 @@ mod tests {
     #[test]
     fn test_parse_timestamp() {
         let ts = parse_timestamp(1649560602763949, 1);
-        assert_eq!(ts.timestamp(), 1649560602);
+        assert_eq!(ts.and_utc().timestamp(), 1649560602);
         assert_eq!(ts.nanosecond(), 763949000);
         assert_eq!(ts.year(), 2022);
 
@@ -230,7 +232,7 @@ mod tests {
         assert_eq!(ts2.year(), 9999);
 
         let ts3 = parse_timestamp_secs(1659386386, 2);
-        assert_eq!(ts3.timestamp(), 1659386386);
+        assert_eq!(ts3.and_utc().timestamp(), 1659386386);
     }
 
     #[test]

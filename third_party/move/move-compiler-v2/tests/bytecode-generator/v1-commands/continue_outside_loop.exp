@@ -1,0 +1,14 @@
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        continue
+    }
+} // end <SELF>_0
+
+
+Diagnostics:
+error: missing enclosing loop statement
+  ┌─ tests/bytecode-generator/v1-commands/continue_outside_loop.move:3:5
+  │
+3 │     continue
+  │     ^^^^^^^^

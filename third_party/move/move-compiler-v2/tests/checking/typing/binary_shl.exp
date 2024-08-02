@@ -1,21 +1,20 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
         b: u8,
     }
     private fun t0(x: u64,b: u8,r: M::R) {
-        Shl<u64>(0, 0);
-        Shl<u64>(1, 0);
-        Shl<u64>(0, 1);
-        Shl<u64>(0, 1);
-        Add<u8>(0, 1);
-        Shl<u128>(0, 1);
-        Shl<u64>(0, 1);
+        0;
+        1;
+        0;
+        0;
+        1;
+        0;
+        0;
         Shl<u64>(Copy(x), Copy(b));
-        Shl<u64>(select M::R.f(r), select M::R.b(r));
-        Shl<u64>(Shl<u64>(Shl<u64>(1, select M::R.b(r)), select M::R.b(r)), 0);
+        Shl<u64>(select M::R.f<M::R>(r), select M::R.b<M::R>(r));
+        Shl<u64>(Shl<u64>(Shl<u64>(1, select M::R.b<M::R>(r)), select M::R.b<M::R>(r)), 0);
         M::R{ f: _, b: _ } = r
     }
-    spec fun $t0(x: u64,b: u8,r: M::R);
 } // end 0x8675309::M

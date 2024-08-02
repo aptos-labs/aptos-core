@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: #0,
@@ -10,12 +10,6 @@ module 0x8675309::M {
         Tuple(0, pack M::S(false), pack M::R<M::R<u64>>(pack M::R<u64>(1)))
     }
     private fun t1(s: &M::S,r: &mut M::R<u64>): (u64, &M::S, &mut M::R<u64>) {
-        Tuple(0, s, r)
-    }
-    spec fun $t0(): (u64, M::S, M::R<M::R<u64>>) {
-        Tuple(0, pack M::S(false), pack M::R<M::R<u256>>(pack M::R<u256>(1)))
-    }
-    spec fun $t1(s: M::S,r: M::R<u64>): (u64, &M::S, &mut M::R<u64>) {
         Tuple(0, s, r)
     }
 } // end 0x8675309::M

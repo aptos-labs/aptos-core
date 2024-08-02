@@ -1,40 +1,13 @@
-// ---- Model Dump
-module 0x42::m {
-    private fun bar(): u64 {
-        42
-    }
-    spec fun $bar(): u64 {
-        42
-    }
-    spec fun $foo(): u64 {
-        m::$bar()
-    }
-} // end 0x42::m
-module 0x42::n {
-    use 0x42::m; // resolved as: 0x42::m
-    public fun test() {
-        if Eq<u64>({
-          let ();
-          m::bar()
-        }, 42) {
-          Tuple()
-        } else {
-          Abort(1)
-        };
-        Tuple()
-    }
-    spec fun $test() {
-        Tuple()
-    }
-} // end 0x42::n
-
 
 Diagnostics:
-error: function `0x42::m::bar` cannot be called from `0x42::n::test` because it is private to module `0x42::m`
-   ┌─ tests/checking/inlining/private_call.move:4:9
+error: function `0x42::m::bar` cannot be called from function `0x42::n::test` because it is private to module `0x42::m`
+   ┌─ tests/checking/inlining/private_call.move:7:9
    │
  4 │         bar()
-   │         ^^^^^
+   │         ----- called here
+   ·
+ 7 │     fun bar(): u64 { 42 }
+   │         ^^^ callee
    ·
 14 │         assert!(m::foo() == 42, 1);
-   │                 -------- in a call inlined at this callsite
+   │                 -------- from a call inlined at this callsite

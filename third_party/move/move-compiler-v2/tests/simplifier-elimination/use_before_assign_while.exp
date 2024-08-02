@@ -1,0 +1,124 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    private fun tborrow1(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            if cond {
+              {
+                let y: &u64 = Borrow(Immutable)(x);
+                _: &u64 = Move(y);
+                x: u64 = 0
+              }
+            } else {
+              break
+            }
+          }
+        }
+    }
+    private fun tborrow2(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            if cond {
+              {
+                let y: &u64 = Borrow(Immutable)(x);
+                _: &u64 = Move(y);
+                if cond {
+                  x: u64 = 0
+                } else {
+                  Tuple()
+                };
+                break
+              }
+            } else {
+              break
+            }
+          }
+        }
+    }
+    private fun tcopy(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            if cond {
+              {
+                let y: u64 = Add<u64>(Move(x), 1);
+                if cond {
+                  continue
+                } else {
+                  Tuple()
+                };
+                x: u64 = 0;
+                y;
+                Tuple()
+              }
+            } else {
+              break
+            }
+          }
+        }
+    }
+    private fun tmove(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            if cond {
+              {
+                let y: u64 = Add<u64>(Move(x), 1);
+                x: u64 = 0;
+                y;
+                Tuple()
+              }
+            } else {
+              break
+            }
+          }
+        }
+    }
+} // end 0x8675309::M
+
+
+Diagnostics:
+error: use of possibly unassigned local `x`
+  ┌─ tests/simplifier-elimination/use_before_assign_while.move:4:32
+  │
+4 │         while (cond) { let y = move x + 1; x = 0; y; }
+  │                                ^^^^^^
+
+error: use of possibly unassigned local `x`
+  ┌─ tests/simplifier-elimination/use_before_assign_while.move:9:32
+  │
+9 │         while (cond) { let y = move x + 1; if (cond) { continue }; x = 0; y; }
+  │                                ^^^^^^
+
+error: use of possibly unassigned local `x`
+   ┌─ tests/simplifier-elimination/use_before_assign_while.move:14:32
+   │
+14 │         while (cond) { let y = &x; _ = move y; x = 0 }
+   │                                ^^
+
+error: use of unassigned local `x`
+   ┌─ tests/simplifier-elimination/use_before_assign_while.move:19:32
+   │
+19 │         while (cond) { let y = &x; _ = move y; if (cond) { x = 0 }; break }
+   │                                ^^
+
+
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/simplifier-elimination/use_before_assign_while.move:19:60
+   │
+19 │         while (cond) { let y = &x; _ = move y; if (cond) { x = 0 }; break }
+   │                                                            ^^^^^
+
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/simplifier-elimination/use_before_assign_while.move:9:32
+  │
+9 │         while (cond) { let y = move x + 1; if (cond) { continue }; x = 0; y; }
+  │                                ^^^^^^
+  │                                │
+  │                                attempted to move here
+  │                                used here

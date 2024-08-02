@@ -20,7 +20,10 @@ use aptos_types::{
         state_value::{PersistedStateValueMetadata, StateValueMetadata},
     },
     transaction,
-    transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
+    transaction::{
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
+        block_epilogue::BlockEpiloguePayload,
+    },
     validator_txn::ValidatorTransaction,
     vm_status::AbortLocation,
     write_set,
@@ -54,9 +57,9 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
 
     tracer.trace_value(samples, &hashed_message)?;
     tracer.trace_value(samples, &public_key)?;
-    tracer.trace_value::<MultiEd25519PublicKey>(samples, &public_key.into())?;
+    tracer.trace_value::<MultiEd25519PublicKey>(samples, &public_key.clone().into())?;
     tracer.trace_value(samples, &signature)?;
-    tracer.trace_value::<MultiEd25519Signature>(samples, &signature.into())?;
+    tracer.trace_value::<MultiEd25519Signature>(samples, &signature.clone().into())?;
 
     let secp256k1_private_key = secp256k1_ecdsa::PrivateKey::generate(&mut rng);
     let secp256k1_public_key = aptos_crypto::PrivateKey::public_key(&secp256k1_private_key);
@@ -80,6 +83,8 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &bls12381_public_key)?;
     tracer.trace_value(samples, &bls12381_signature)?;
 
+    crate::trace_keyless_structs(tracer, samples, public_key, signature)?;
+
     Ok(())
 }
 
@@ -100,10 +105,12 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<BlockMetadataExt>(&samples)?;
+    tracer.trace_type::<BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
+    tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<transaction::ExecutionStatus>(&samples)?;
     tracer.trace_type::<TransactionAuthenticator>(&samples)?;
@@ -114,7 +121,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
     tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
-    tracer.trace_type::<aptos_types::zkid::ZkpOrOpenIdSig>(&samples)?;
+    tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;

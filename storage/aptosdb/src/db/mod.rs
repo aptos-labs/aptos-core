@@ -7,8 +7,9 @@ use crate::{
     common::MAX_NUM_EPOCH_ENDING_LEDGER_INFO,
     event_store::EventStore,
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb, LedgerDb,
-        LedgerDbSchemaBatches,
+        ledger_metadata_db::LedgerMetadataDb,
+        transaction_auxiliary_data_db::TransactionAuxiliaryDataDb,
+        transaction_info_db::TransactionInfoDb, LedgerDb, LedgerDbSchemaBatches,
     },
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
@@ -19,6 +20,7 @@ use crate::{
     schema::{
         block_info::BlockInfoSchema,
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
@@ -30,16 +32,17 @@ use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
-use aptos_db_indexer::Indexer;
+use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, db_anyhow as anyhow, db_ensure as ensure,
-    db_other_bail as bail, state_delta::StateDelta, AptosDbError, DbReader, DbWriter,
-    ExecutedTrees, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, db_ensure as ensure, db_other_bail as bail,
+    state_delta::StateDelta, AptosDbError, DbReader, DbWriter, ExecutedTrees, Order, Result,
+    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -49,7 +52,6 @@ use aptos_types::{
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
         TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
@@ -57,24 +59,22 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
+        state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
         ShardedStateUpdates,
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
-use aptos_vm::data_cache::AsMoveResolver;
-use move_resource_viewer::MoveValueAnnotator;
 use rayon::prelude::*;
 use std::{
+    cell::Cell,
     fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,
@@ -109,8 +109,11 @@ include!("include/aptosdb_writer.rs");
 // Other private methods.
 include!("include/aptosdb_internal.rs");
 // Testonly methods.
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 include!("include/aptosdb_testonly.rs");
+
+#[cfg(feature = "consensus-only-perf-test")]
+pub mod fake_aptosdb;
 
 impl AptosDB {
     pub fn open(
@@ -121,6 +124,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -131,6 +135,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             false,
+            internal_indexer_db,
         )
     }
 
@@ -142,6 +147,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -152,6 +158,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             true,
+            internal_indexer_db,
         )
     }
 

@@ -1,0 +1,36 @@
+
+Diagnostics:
+warning: Unused local variable `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/simplifier-elimination/use_before_assign.move:4:9
+  │
+4 │     let y = x;
+  │         ^
+
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        {
+          let x: u64;
+          {
+            let y: u64 = x;
+            Tuple()
+          }
+        }
+    }
+} // end <SELF>_0
+
+
+Diagnostics:
+error: use of unassigned local `x`
+  ┌─ tests/simplifier-elimination/use_before_assign.move:4:13
+  │
+4 │     let y = x;
+  │             ^
+
+
+Diagnostics:
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/simplifier-elimination/use_before_assign.move:4:13
+  │
+4 │     let y = x;
+  │             ^

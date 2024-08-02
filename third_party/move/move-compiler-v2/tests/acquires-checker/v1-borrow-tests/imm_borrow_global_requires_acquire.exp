@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: missing acquires annotation for `T1`
+  ┌─ tests/acquires-checker/v1-borrow-tests/imm_borrow_global_requires_acquire.move:4:16
+  │
+4 │     public fun test(addr: address) {
+  │                ^^^^
+5 │         borrow_global<T1>(addr);
+  │         ----------------------- acquired here

@@ -81,7 +81,7 @@ pub fn create_mock_reader_writer_with_version(
 ) -> DbReaderWriter {
     let mut reader = reader.unwrap_or_else(create_mock_db_reader);
     reader
-        .expect_get_latest_version()
+        .expect_get_synced_version()
         .returning(move || Ok(highest_synced_version));
     reader
         .expect_get_latest_epoch_state()
@@ -235,7 +235,9 @@ mock! {
 
         fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-        fn get_latest_version(&self) -> Result<Version>;
+        fn get_synced_version(&self) -> Result<Version>;
+
+        fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 
@@ -287,7 +289,7 @@ mock! {
             ledger_version: Version,
         ) -> Result<TransactionAccumulatorSummary>;
 
-        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+        fn get_state_item_count(&self, version: Version) -> Result<usize>;
 
         fn get_state_value_chunk_with_proof(
             &self,
@@ -475,7 +477,7 @@ mock! {
 
         fn pending_storage_data(&self) -> bool;
 
-        fn save_state_values(
+        async fn save_state_values(
             &mut self,
             notification_id: NotificationId,
             state_value_chunk_with_proof: StateValueChunkWithProof,

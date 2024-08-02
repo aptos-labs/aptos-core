@@ -1,24 +1,34 @@
 
 Diagnostics:
-error: tuples have different arity (0 != 3) (from assignment or declaration context)
-  ┌─ tests/checking/typing/assign_wrong_arity.move:7:9
+error: tuple type `()` is not allowed as a local variable type
+  ┌─ tests/checking/typing/assign_wrong_arity.move:5:13
   │
-7 │         x = (0, 1, 2);
-  │         ^
+5 │         let x;
+  │             ^
+  │
+  = required by declaration of local `x`
 
-error: expected `()` but found `integer` (from assignment or declaration context)
+error: tuple type `(integer, integer, integer)` is not allowed as a local variable type
+  ┌─ tests/checking/typing/assign_wrong_arity.move:5:13
+  │
+5 │         let x;
+  │             ^
+  │
+  = required by declaration of local `x`
+
+error: cannot assign `integer` to left-hand side of type `()`
   ┌─ tests/checking/typing/assign_wrong_arity.move:8:9
   │
 8 │         () = 0;
   │         ^^
 
-error: expected 4 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 4
    ┌─ tests/checking/typing/assign_wrong_arity.move:11:9
    │
 11 │         (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
    │         ^^^^^^^^^^^^
 
-error: expected 2 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 2
    ┌─ tests/checking/typing/assign_wrong_arity.move:12:9
    │
 12 │         (x, b, R{f}) = (0, false);

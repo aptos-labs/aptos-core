@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         dummy_field: bool,
@@ -16,31 +16,21 @@ module 0x8675309::M {
         Tuple()
     }
     private fun t0() {
-        M::imm<u64>(Borrow(Mutable)(0));
+        M::imm<u64>(Freeze(false)(Borrow(Mutable)(0)));
         M::imm<u64>(Borrow(Immutable)(0));
-        M::imm<M::S>(Borrow(Mutable)(pack M::S(false)));
+        M::imm<M::S>(Freeze(false)(Borrow(Mutable)(pack M::S(false))));
         M::imm<M::S>(Borrow(Immutable)(pack M::S(false)));
         Tuple()
     }
     private fun t1() {
-        M::imm_mut<u64>(Borrow(Mutable)(0), Borrow(Mutable)(0));
-        M::mut_imm<u64>(Borrow(Mutable)(0), Borrow(Mutable)(0));
-        M::imm_imm<u64>(Borrow(Mutable)(0), Borrow(Mutable)(0));
+        M::imm_mut<u64>(Freeze(false)(Borrow(Mutable)(0)), Borrow(Mutable)(0));
+        M::mut_imm<u64>(Borrow(Mutable)(0), Freeze(false)(Borrow(Mutable)(0)));
+        M::imm_imm<u64>(Freeze(false)(Borrow(Mutable)(0)), Freeze(false)(Borrow(Mutable)(0)));
         Tuple()
     }
-    spec fun $imm<T>(_x: #0) {
+    private inline fun t2(f: |(&u64, &mut u64)|) {
+        (f)(Borrow(Mutable)(0), Borrow(Mutable)(0));
+        (f)(Borrow(Immutable)(0), Borrow(Mutable)(0));
         Tuple()
     }
-    spec fun $imm_imm<T>(_x: #0,_y: #0) {
-        Tuple()
-    }
-    spec fun $imm_mut<T>(_x: #0,_y: #0) {
-        Tuple()
-    }
-    spec fun $mut_imm<T>(_x: #0,_y: #0) {
-        Tuple()
-    }
-    spec fun $t0();
-    spec fun $t1();
-    spec fun $t2(f: |(&u64, &mut u64)|());
 } // end 0x8675309::M

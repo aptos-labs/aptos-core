@@ -1,24 +1,23 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0(x: u64,r: M::R) {
-        Gt<u64>(0, 0);
-        Gt<u64>(1, 0);
-        Gt<u64>(0, 1);
-        Gt<u8>(0, 1);
-        Gt<u8>(0, 1);
-        Gt<u128>(0, 1);
-        Gt<u128>(0, 1);
-        Gt<u64>(0, 1);
+        false;
+        true;
+        false;
+        false;
+        false;
+        false;
+        false;
+        false;
         Gt<u64>(Copy(x), Move(x));
-        Gt<u64>(select M::R.f(r), select M::R.f(r));
-        And(Gt<u64>(1, select M::R.f(r)), Gt<u64>(select M::R.f(r), 0));
+        Gt<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        And(Gt<u64>(1, select M::R.f<M::R>(r)), Gt<u64>(select M::R.f<M::R>(r), 0));
         {
           let M::R{ f: _ } = r;
           Tuple()
         }
     }
-    spec fun $t0(x: u64,r: M::R);
 } // end 0x8675309::M

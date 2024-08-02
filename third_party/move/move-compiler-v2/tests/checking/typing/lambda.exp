@@ -1,43 +1,50 @@
 
 Diagnostics:
-error: `M::reduce` is a function and not a macro
+error: `reduce` is a function and not a macro
    ┌─ tests/checking/typing/lambda.move:34:37
    │
 34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
    │                                     ^^^^^^
 
-error: expected `&T` but found `(&T, u64)`
+error: expected `|(&T, u64)|_` but found a value of type `|&T|`
    ┌─ tests/checking/typing/lambda.move:40:13
    │
 40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `&T` but found `u64`
+error: expected `|u64|_` but found a value of type `|&T|`
    ┌─ tests/checking/typing/lambda.move:48:13
    │
 48 │             action(i); // expected to have wrong argument type
    │             ^^^^^^^^^
 
-error: invalid call of `+`: expected `u64` but found `()` for argument 2
+error: cannot use `()` with an operator which expects a value of type `u64`
    ┌─ tests/checking/typing/lambda.move:56:21
    │
 56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
    │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `|integer|()` but found `u64`
+error: cannot return `u64` from a function with result type `|integer|`
    ┌─ tests/checking/typing/lambda.move:61:9
    │
 61 │         x(1) // expected to be not a function
    │         ^^^^
 
-error: invalid call of `M::foreach`: expected `integer` but found `&?19` for argument 2
-   ┌─ tests/checking/typing/lambda.move:67:21
+error: reference type `&integer` is not allowed as a type argument (type was inferred)
+   ┌─ tests/checking/typing/lambda.move:67:35
    │
 67 │         foreach(&v, |e| sum = sum + e) // expected to cannot infer type
-   │                     ^^^^^^^^^^^^^^^^^
-
-error: invalid call of `M::foreach`: expected `()` but found `integer` for argument 2
-   ┌─ tests/checking/typing/lambda.move:73:21
+   │                                   ^
    │
+   = required by instantiating type parameter `T` of function `+`
+
+error: tuple type `()` is not allowed as a type argument (type was inferred)
+   ┌─ tests/checking/typing/lambda.move:73:37
+   │
+ 4 │     public inline fun foreach<T>(v: &vector<T>, action: |&T|) { // expected to be not implemented
+   │                               - declaration of type parameter `T`
+   ·
 73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
-   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                     ^
+   │
+   = required by instantiating type parameter `T` of function `foreach`

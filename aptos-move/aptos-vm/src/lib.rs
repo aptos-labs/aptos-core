@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
+#![deny(deprecated)]
 
 //! # The VM runtime
 //!
@@ -108,7 +109,11 @@ pub mod data_cache;
 pub mod aptos_vm;
 pub mod block_executor;
 mod errors;
-mod gas;
+pub mod gas;
+#[cfg(not(feature = "testing"))]
+mod keyless_validation;
+#[cfg(feature = "testing")]
+pub mod keyless_validation;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
@@ -118,7 +123,6 @@ pub mod transaction_metadata;
 mod transaction_validation;
 pub mod validator_txns;
 pub mod verifier;
-mod zkid_validation;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};

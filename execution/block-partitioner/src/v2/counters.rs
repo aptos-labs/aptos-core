@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, Histogram, HistogramVec,

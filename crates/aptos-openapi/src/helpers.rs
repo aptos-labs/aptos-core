@@ -12,7 +12,7 @@
 //!     too unrelated, or even worse, in a totally different crate (the move
 //!     types are a great example of this).
 //!   - The type is not expressible via OpenAPI. For example, an enum that
-//!     has some enum variants with values and others without values.This is
+//!     has some enum variants with values and others without values. This is
 //!     not allowed in OpenAPI, types must be either unions (variants with
 //!     values) or enums (variants without values).
 //!   - We would prefer to serialize the data differently than its standard
@@ -136,6 +136,8 @@ macro_rules! impl_poem_type {
                 ::poem::http::HeaderValue::from_str(&string).ok()
             }
         }
+
+        impl ::poem_openapi::types::IsObjectType for $ty {}
     };
 }
 
@@ -156,7 +158,6 @@ macro_rules! impl_poem_parameter {
             }
         }
 
-        #[async_trait::async_trait]
         impl ::poem_openapi::types::ParseFromMultipartField for $ty {
             async fn parse_from_multipart(field: Option<::poem::web::Field>) -> ::poem_openapi::types::ParseResult<Self> {
                 match field {

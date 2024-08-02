@@ -33,14 +33,20 @@ fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
-============ after AvailableCopiesAnalysisProcessor: ================
+
+Diagnostics:
+warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+  ┌─ tests/copy-propagation/call_1.move:7:17
+  │
+7 │         let a = p;
+  │                 ^
+
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 fun m::id($t0: u64): u64 {
      var $t1: u64
-     # before: {}, after: {$t1 := $t0}
-  0: $t1 := infer($t0)
-     # before: {$t1 := $t0}, after: {$t1 := $t0}
+  0: $t1 := move($t0)
   1: return $t1
 }
 
@@ -48,73 +54,15 @@ fun m::id($t0: u64): u64 {
 [variant baseline]
 fun m::test($t0: u64): u64 {
      var $t1: u64
-     var $t2: u64
+     var $t2: u64 [unused]
      var $t3: u64
      var $t4: u64
      var $t5: u64
      var $t6: u64
-     # before: {}, after: {$t2 := $t0}
-  0: $t2 := infer($t0)
-     # before: {$t2 := $t0}, after: {$t2 := $t0, $t3 := $t0}
-  1: $t3 := infer($t0)
-     # before: {$t2 := $t0, $t3 := $t0}, after: {$t2 := $t0, $t3 := $t0, $t4 := $t3}
-  2: $t4 := infer($t3)
-     # before: {$t2 := $t0, $t3 := $t0, $t4 := $t3}, after: {$t2 := $t0, $t3 := $t0, $t4 := $t3}
-  3: $t6 := m::id($t4)
-     # before: {$t2 := $t0, $t3 := $t0, $t4 := $t3}, after: {$t2 := $t0, $t3 := $t0, $t4 := $t3}
-  4: $t5 := m::id($t6)
-     # before: {$t2 := $t0, $t3 := $t0, $t4 := $t3}, after: {$t2 := $t0, $t3 := $t0, $t4 := $t3}
-  5: $t1 := m::id($t5)
-     # before: {$t2 := $t0, $t3 := $t0, $t4 := $t3}, after: {$t2 := $t0, $t3 := $t0, $t4 := $t3}
-  6: return $t1
-}
-
-============ after CopyPropagation: ================
-
-[variant baseline]
-fun m::id($t0: u64): u64 {
-     var $t1: u64
-  0: $t1 := infer($t0)
-  1: return $t0
-}
-
-
-[variant baseline]
-fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-  0: $t2 := infer($t0)
-  1: $t3 := infer($t0)
-  2: $t4 := infer($t0)
-  3: $t6 := m::id($t0)
-  4: $t5 := m::id($t6)
-  5: $t1 := m::id($t5)
-  6: return $t1
-}
-
-============ after DeadStoreElimination: ================
-
-[variant baseline]
-fun m::id($t0: u64): u64 {
-     var $t1: u64
-  0: return $t0
-}
-
-
-[variant baseline]
-fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-  0: $t6 := m::id($t0)
-  1: $t5 := m::id($t6)
-  2: $t1 := m::id($t5)
-  3: return $t1
+  0: $t3 := move($t0)
+  1: $t4 := move($t3)
+  2: $t6 := m::id($t4)
+  3: $t5 := m::id($t6)
+  4: $t1 := m::id($t5)
+  5: return $t1
 }

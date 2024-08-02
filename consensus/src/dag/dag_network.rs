@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::{types::DAGMessage, DAGRpcResult};
 use aptos_consensus_types::common::Author;
@@ -62,6 +63,9 @@ impl Responders {
     }
 
     fn next_to_request(&mut self) -> Option<Vec<Author>> {
+        // We want to immediately stop if the number generator is not returning any value.
+        // expect will panic if the generator is not returning any value.
+        #[allow(clippy::unwrap_in_result)]
         let count = self.generator.next().expect("should return a number");
 
         if self.peers.is_empty() {

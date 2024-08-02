@@ -1,0 +1,51 @@
+// -- Model dump before bytecode pipeline
+module 0x2::Y {
+    friend fun f_friend() {
+        Tuple()
+    }
+} // end 0x2::Y
+module 0x2::X {
+    public fun f_public() {
+        Tuple()
+    }
+} // end 0x2::X
+module 0x2::M {
+    use 0x2::X; // resolved as: 0x2::X
+    use 0x2::Y; // resolved as: 0x2::Y
+    friend fun f_friend() {
+        Tuple()
+    }
+    public fun f_public() {
+        Tuple()
+    }
+    friend fun f_friend_call_friend() {
+        Y::f_friend()
+    }
+    friend fun f_friend_call_public() {
+        X::f_public()
+    }
+    friend fun f_friend_call_self_friend() {
+        M::f_friend()
+    }
+    friend fun f_friend_call_self_private() {
+        M::f_private()
+    }
+    friend fun f_friend_call_self_public() {
+        M::f_public()
+    }
+    private fun f_private() {
+        Tuple()
+    }
+    private fun f_private_call_friend() {
+        Y::f_friend()
+    }
+    private fun f_private_call_self_friend() {
+        M::f_friend()
+    }
+    public fun f_public_call_friend() {
+        Y::f_friend()
+    }
+    public fun f_public_call_self_friend() {
+        M::f_friend()
+    }
+} // end 0x2::M

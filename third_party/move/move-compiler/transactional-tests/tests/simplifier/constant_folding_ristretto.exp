@@ -1,0 +1,19 @@
+processed 1 task
+
+task 0 'publish'. lines 1-8:
+
+
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module cafe.Ristretto {
+
+
+public test() /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+}
+== END Bytecode ==
+}

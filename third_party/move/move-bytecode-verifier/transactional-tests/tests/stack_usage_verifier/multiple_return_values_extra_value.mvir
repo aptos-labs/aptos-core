@@ -9,7 +9,7 @@ module 0x1.Test {
 
     public test(i: &u64, x: Self.T): u64 * Self.T * bool {
     label b0:
-        // too many "return values", return wont consume them, positive stack size
+        // too many "return values", return won't consume them, positive stack size
         return *move(i), move(x), false, 0x0;
     }
 

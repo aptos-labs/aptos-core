@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::pack_unpack {
     struct S {
         f1: u8,
@@ -39,48 +39,6 @@ module 0x42::pack_unpack {
         }
     }
     private fun pack6(x: u8,y: u8,z: u8): pack_unpack::S {
-        {
-          let $f3: u8 = x;
-          {
-            let $f2: u8 = y;
-            pack pack_unpack::S(z, $f2, $f3)
-          }
-        }
-    }
-    spec fun $pack1(x: u8,y: u8,z: u8): pack_unpack::S {
-        pack pack_unpack::S(x, y, z)
-    }
-    spec fun $pack2(x: u8,y: u8,z: u8): pack_unpack::S {
-        {
-          let $f1: u8 = x;
-          {
-            let $f3: u8 = y;
-            pack pack_unpack::S($f1, z, $f3)
-          }
-        }
-    }
-    spec fun $pack3(x: u8,y: u8,z: u8): pack_unpack::S {
-        {
-          let $f2: u8 = x;
-          pack pack_unpack::S(y, $f2, z)
-        }
-    }
-    spec fun $pack4(x: u8,y: u8,z: u8): pack_unpack::S {
-        {
-          let $f2: u8 = x;
-          {
-            let $f3: u8 = y;
-            pack pack_unpack::S(z, $f2, $f3)
-          }
-        }
-    }
-    spec fun $pack5(x: u8,y: u8,z: u8): pack_unpack::S {
-        {
-          let $f3: u8 = x;
-          pack pack_unpack::S(y, z, $f3)
-        }
-    }
-    spec fun $pack6(x: u8,y: u8,z: u8): pack_unpack::S {
         {
           let $f3: u8 = x;
           {
@@ -155,3 +113,6 @@ fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
   2: $t3 := pack pack_unpack::S($t2, $t5, $t4)
   3: return $t3
 }
+
+
+============ bytecode verification succeeded ========

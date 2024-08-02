@@ -15,20 +15,27 @@ pub enum ConsensusAlgorithmConfig {
         quorum_store_enabled: bool,
     },
     DAG(DagConsensusConfigV1),
+    JolteonV2 {
+        main: ConsensusConfigV1,
+        quorum_store_enabled: bool,
+        order_vote_enabled: bool,
+    },
 }
 
 impl ConsensusAlgorithmConfig {
     pub fn default_for_genesis() -> Self {
-        Self::Jolteon {
+        Self::JolteonV2 {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
+            order_vote_enabled: true,
         }
     }
 
     pub fn default_if_missing() -> Self {
-        Self::Jolteon {
+        Self::JolteonV2 {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
+            order_vote_enabled: false,
         }
     }
 
@@ -37,28 +44,44 @@ impl ConsensusAlgorithmConfig {
             ConsensusAlgorithmConfig::Jolteon {
                 quorum_store_enabled,
                 ..
+            }
+            | ConsensusAlgorithmConfig::JolteonV2 {
+                quorum_store_enabled,
+                ..
             } => *quorum_store_enabled,
-            ConsensusAlgorithmConfig::DAG(_) => false,
+            ConsensusAlgorithmConfig::DAG(_) => true,
+        }
+    }
+
+    pub fn order_vote_enabled(&self) -> bool {
+        match self {
+            ConsensusAlgorithmConfig::JolteonV2 {
+                order_vote_enabled, ..
+            } => *order_vote_enabled,
+            _ => false,
         }
     }
 
     pub fn is_dag_enabled(&self) -> bool {
         match self {
-            ConsensusAlgorithmConfig::Jolteon { .. } => false,
+            ConsensusAlgorithmConfig::Jolteon { .. }
+            | ConsensusAlgorithmConfig::JolteonV2 { .. } => false,
             ConsensusAlgorithmConfig::DAG(_) => true,
         }
     }
 
     pub fn leader_reputation_exclude_round(&self) -> u64 {
         match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. } => main.exclude_round,
+            ConsensusAlgorithmConfig::Jolteon { main, .. }
+            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.exclude_round,
             _ => unimplemented!("method not supported"),
         }
     }
 
     pub fn max_failed_authors_to_store(&self) -> usize {
         match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. } => main.max_failed_authors_to_store,
+            ConsensusAlgorithmConfig::Jolteon { main, .. }
+            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.max_failed_authors_to_store,
             _ => unimplemented!("method not supported"),
         }
     }
@@ -66,6 +89,7 @@ impl ConsensusAlgorithmConfig {
     pub fn proposer_election_type(&self) -> &ProposerElectionType {
         match self {
             ConsensusAlgorithmConfig::Jolteon { main, .. } => &main.proposer_election_type,
+            ConsensusAlgorithmConfig::JolteonV2 { main, .. } => &main.proposer_election_type,
             _ => unimplemented!("method not supported"),
         }
     }
@@ -80,6 +104,7 @@ impl ConsensusAlgorithmConfig {
     pub fn unwrap_jolteon_config_v1(&self) -> &ConsensusConfigV1 {
         match self {
             ConsensusAlgorithmConfig::Jolteon { main, .. } => main,
+            ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main,
             _ => unreachable!("not a jolteon config"),
         }
     }
@@ -214,6 +239,14 @@ impl OnChainConsensusConfig {
         }
     }
 
+    pub fn order_vote_enabled(&self) -> bool {
+        match &self {
+            OnChainConsensusConfig::V1(_config) => false,
+            OnChainConsensusConfig::V2(_) => false,
+            OnChainConsensusConfig::V3 { alg, .. } => alg.order_vote_enabled(),
+        }
+    }
+
     pub fn is_dag_enabled(&self) -> bool {
         match self {
             OnChainConsensusConfig::V1(_) => false,
@@ -236,6 +269,54 @@ impl OnChainConsensusConfig {
             },
             OnChainConsensusConfig::V3 { vtxn, .. } => vtxn.clone(),
         }
+    }
+
+    pub fn is_vtxn_enabled(&self) -> bool {
+        self.effective_validator_txn_config().enabled()
+    }
+
+    pub fn disable_validator_txns(&mut self) {
+        match self {
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
+                // vtxn not supported. No-op.
+            },
+            OnChainConsensusConfig::V3 { vtxn, .. } => {
+                *vtxn = ValidatorTxnConfig::V0;
+            },
+        }
+    }
+
+    pub fn enable_validator_txns(&mut self) {
+        let new_self = match std::mem::take(self) {
+            OnChainConsensusConfig::V1(config) => OnChainConsensusConfig::V3 {
+                alg: ConsensusAlgorithmConfig::JolteonV2 {
+                    main: config,
+                    quorum_store_enabled: false,
+                    order_vote_enabled: false,
+                },
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            OnChainConsensusConfig::V2(config) => OnChainConsensusConfig::V3 {
+                alg: ConsensusAlgorithmConfig::JolteonV2 {
+                    main: config,
+                    quorum_store_enabled: true,
+                    order_vote_enabled: false,
+                },
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            OnChainConsensusConfig::V3 {
+                vtxn: ValidatorTxnConfig::V0,
+                alg,
+            } => OnChainConsensusConfig::V3 {
+                alg,
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            item @ OnChainConsensusConfig::V3 {
+                vtxn: ValidatorTxnConfig::V1 { .. },
+                ..
+            } => item,
+        };
+        *self = new_self;
     }
 }
 

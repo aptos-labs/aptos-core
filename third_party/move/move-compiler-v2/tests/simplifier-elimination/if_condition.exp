@@ -1,0 +1,58 @@
+
+Diagnostics:
+warning: If condition is always true, so else branch code eliminated as dead code
+  ┌─ tests/simplifier-elimination/if_condition.move:3:13
+  │
+3 │         if (true) () else ();
+  │             ^^^^          -- else branch eliminated
+  │             │
+  │             condition is always true
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/if_condition.move:3:19
+  │
+3 │         if (true) () else ();
+  │                   ^^
+
+warning: If condition is always false, so then branch code eliminated as dead code
+  ┌─ tests/simplifier-elimination/if_condition.move:4:13
+  │
+4 │         if (false) () else ()
+  │             ^^^^^  -- then branch eliminated
+  │             │
+  │             condition is always false
+
+warning: If condition is always true, so else branch code eliminated as dead code
+  ┌─ tests/simplifier-elimination/if_condition.move:8:29
+  │
+8 │         if ({ let x = true; x }) () else ();
+  │                             ^            -- else branch eliminated
+  │                             │
+  │                             condition is always true
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/if_condition.move:8:34
+  │
+8 │         if ({ let x = true; x }) () else ();
+  │                                  ^^
+
+warning: If condition is always false, so then branch code eliminated as dead code
+  ┌─ tests/simplifier-elimination/if_condition.move:9:30
+  │
+9 │         if ({ let x = false; x }) () else ()
+  │                              ^    -- then branch eliminated
+  │                              │
+  │                              condition is always false
+
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    private fun t0() {
+        Tuple()
+    }
+    private fun t1() {
+        Tuple()
+    }
+} // end 0x8675309::M
+
+
+============ bytecode verification succeeded ========

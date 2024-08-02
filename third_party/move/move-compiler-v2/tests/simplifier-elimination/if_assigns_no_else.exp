@@ -1,0 +1,29 @@
+
+Diagnostics:
+warning: If condition is always true, so else branch code eliminated as dead code
+  ┌─ tests/simplifier-elimination/if_assigns_no_else.move:4:9
+  │
+4 │     if (true) x = 42;
+  │     ----^^^^--------
+  │     │   │
+  │     │   condition is always true
+  │     else branch eliminated
+
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        {
+          let x: u64;
+          x: u64 = 42;
+          if Eq<u64>(x, 42) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_0
+
+
+============ bytecode verification succeeded ========

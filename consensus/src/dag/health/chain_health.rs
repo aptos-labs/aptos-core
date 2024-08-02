@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
@@ -83,7 +84,7 @@ impl TChainHealth for ChainHealthBackoff {
 
         chain_health_backoff.map(|value| {
             (
-                value.max_sending_block_txns_override,
+                value.max_sending_block_txns_after_filtering_override,
                 value.max_sending_block_bytes_override,
             )
         })

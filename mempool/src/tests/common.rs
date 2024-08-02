@@ -4,7 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::MempoolSyncMsg,
+    network::{BroadcastPeerPriority, MempoolSyncMsg},
 };
 use anyhow::{format_err, Result};
 use aptos_compression::client::CompressionClient;
@@ -123,6 +123,8 @@ pub(crate) fn add_txns_to_mempool(
             transaction.account_seqno,
             TimelineState::NotReady,
             false,
+            None,
+            Some(BroadcastPeerPriority::Primary),
         );
         transactions.push(txn);
     }
@@ -134,8 +136,13 @@ pub(crate) fn txn_bytes_len(transaction: TestTransaction) -> u64 {
     txn.txn_bytes_len() as u64
 }
 
-pub(crate) fn add_txn(pool: &mut CoreMempool, transaction: TestTransaction) -> Result<()> {
-    add_signed_txn(pool, transaction.make_signed_transaction())
+pub(crate) fn add_txn(
+    pool: &mut CoreMempool,
+    transaction: TestTransaction,
+) -> Result<SignedTransaction> {
+    let txn = transaction.make_signed_transaction();
+    add_signed_txn(pool, txn.clone())?;
+    Ok(txn)
 }
 
 pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransaction) -> Result<()> {
@@ -146,6 +153,8 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
             0,
             TimelineState::NotReady,
             false,
+            None,
+            Some(BroadcastPeerPriority::Primary),
         )
         .code
     {
@@ -178,9 +187,10 @@ impl ConsensusMock {
         max_txns: u64,
         max_bytes: u64,
     ) -> Vec<SignedTransaction> {
-        let block = mempool.get_batch(max_txns, max_bytes, true, true, self.0.clone());
+        let block = mempool.get_batch(max_txns, max_bytes, true, self.0.clone());
         block.iter().for_each(|t| {
-            let txn_summary = TransactionSummary::new(t.sender(), t.sequence_number());
+            let txn_summary =
+                TransactionSummary::new(t.sender(), t.sequence_number(), t.committed_hash());
             let txn_info = TransactionInProgress::new(t.gas_unit_price());
             self.0.insert(txn_summary, txn_info);
         });

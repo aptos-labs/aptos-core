@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::MempoolError, payload_manager::PayloadManager, state_computer::ExecutionProxy,
-    state_replication::StateComputer, transaction_deduper::NoOpDeduper,
-    transaction_filter::TransactionFilter, transaction_shuffler::NoOpShuffler,
-    txn_notifier::TxnNotifier,
+    error::MempoolError, payload_manager::DirectMempoolPayloadManager,
+    state_computer::ExecutionProxy, state_replication::StateComputer,
+    transaction_deduper::NoOpDeduper, transaction_filter::TransactionFilter,
+    transaction_shuffler::NoOpShuffler, txn_notifier::TxnNotifier,
 };
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
-use aptos_consensus_types::{block::Block, block_data::BlockData, executed_block::ExecutedBlock};
+use aptos_consensus_types::{block::Block, block_data::BlockData, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorResult,
@@ -64,8 +65,8 @@ struct DummyTxnNotifier {}
 impl TxnNotifier for DummyTxnNotifier {
     async fn notify_failed_txn(
         &self,
-        _txns: Vec<SignedTransaction>,
-        _compute_results: &StateComputeResult,
+        _txns: &[SignedTransaction],
+        _statuses: &[TransactionStatus],
     ) -> anyhow::Result<(), MempoolError> {
         Ok(())
     }
@@ -120,11 +121,10 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         Ok(StateComputeResult::new_dummy())
     }
 
-    fn commit_blocks_ext(
+    fn commit_blocks(
         &self,
         _block_ids: Vec<HashValue>,
         _ledger_info_with_sigs: LedgerInfoWithSignatures,
-        _save_state_snapshots: bool,
     ) -> ExecutorResult<()> {
         Ok(())
     }
@@ -135,6 +135,8 @@ impl BlockExecutorTrait for DummyBlockExecutor {
 #[tokio::test]
 #[cfg(test)]
 async fn schedule_compute_should_discover_validator_txns() {
+    use crate::payload_manager::DirectMempoolPayloadManager;
+
     let executor = Arc::new(DummyBlockExecutor::new());
 
     let execution_policy = ExecutionProxy::new(
@@ -161,7 +163,7 @@ async fn schedule_compute_should_discover_validator_txns() {
 
     execution_policy.new_epoch(
         &epoch_state,
-        Arc::new(PayloadManager::DirectMempool),
+        Arc::new(DirectMempoolPayloadManager::new()),
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
@@ -218,7 +220,7 @@ async fn commit_should_discover_validator_txns() {
             3
         ]);
 
-    let blocks = vec![Arc::new(ExecutedBlock::new(
+    let blocks = vec![Arc::new(PipelinedBlock::new(
         block,
         vec![],
         state_compute_result,
@@ -227,7 +229,7 @@ async fn commit_should_discover_validator_txns() {
 
     execution_policy.new_epoch(
         &epoch_state,
-        Arc::new(PayloadManager::DirectMempool),
+        Arc::new(DirectMempoolPayloadManager::new()),
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
@@ -237,7 +239,7 @@ async fn commit_should_discover_validator_txns() {
     let (tx, rx) = oneshot::channel::<()>();
 
     let callback = Box::new(
-        move |_a: &[Arc<ExecutedBlock>], _b: LedgerInfoWithSignatures| {
+        move |_a: &[Arc<PipelinedBlock>], _b: LedgerInfoWithSignatures| {
             tx.send(()).unwrap();
         },
     );

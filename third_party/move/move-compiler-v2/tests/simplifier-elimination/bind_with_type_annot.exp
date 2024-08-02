@@ -1,0 +1,61 @@
+
+Diagnostics:
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/bind_with_type_annot.move:6:25
+  │
+6 │         let x: u64 = 0; x;
+  │                         ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:68
+  │
+7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
+  │                                                                    ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:71
+  │
+7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
+  │                                                                       ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:74
+  │
+7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
+  │                                                                          ^
+
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    private fun t0() {
+        {
+          let (x: u64, b: bool, M::R{ f }): (u64, bool, M::R) = Tuple(0, false, pack M::R(0));
+          Tuple()
+        }
+    }
+} // end 0x8675309::M
+
+
+Diagnostics:
+warning: Unused assignment to `f`. Consider removing or prefixing with an underscore: `_f`
+  ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:20
+  │
+7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
+  │                    ^^^^
+
+warning: Unused assignment to `b`. Consider removing or prefixing with an underscore: `_b`
+  ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:13
+  │
+7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
+  │             ^^^^^^^^^^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:13
+  │
+7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
+  │             ^^^^^^^^^^^^
+
+
+============ bytecode verification succeeded ========

@@ -8,6 +8,7 @@ to synchronize configuration changes for the validators.
 
 
 -  [Struct `NewEpochEvent`](#0x1_reconfiguration_NewEpochEvent)
+-  [Struct `NewEpoch`](#0x1_reconfiguration_NewEpoch)
 -  [Resource `Configuration`](#0x1_reconfiguration_Configuration)
 -  [Resource `DisableReconfiguration`](#0x1_reconfiguration_DisableReconfiguration)
 -  [Constants](#@Constants_0)
@@ -37,6 +38,7 @@ to synchronize configuration changes for the validators.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="storage_gas.md#0x1_storage_gas">0x1::storage_gas</a>;
@@ -56,7 +58,39 @@ with new configuration information. This is also called a
 "reconfiguration event"
 
 
-<pre><code><b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>epoch: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_reconfiguration_NewEpoch"></a>
+
+## Struct `NewEpoch`
+
+Event that signals consensus to start a new epoch,
+with new configuration information. This is also called a
+"reconfiguration event"
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -360,6 +394,8 @@ Signal validators to start using new configuration. Must be called from friend c
         <b>return</b>
     };
 
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_start">reconfiguration_state::on_reconfig_start</a>();
+
     // Reconfiguration "forces the <a href="block.md#0x1_block">block</a>" <b>to</b> end, <b>as</b> mentioned above. Therefore, we must process the collected fees
     // explicitly so that staking can distribute them.
     //
@@ -385,12 +421,21 @@ Signal validators to start using new configuration. Must be called from friend c
     };
     config_ref.epoch = config_ref.epoch + 1;
 
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> {
+                epoch: config_ref.epoch,
+            },
+        );
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
         &<b>mut</b> config_ref.events,
         <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
             epoch: config_ref.epoch,
         },
     );
+
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">reconfiguration_state::on_reconfig_finish</a>();
 }
 </code></pre>
 
@@ -468,6 +513,13 @@ reconfiguration event.
     <b>assert</b>!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_ECONFIGURATION">ECONFIGURATION</a>));
     config_ref.epoch = 1;
 
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> {
+                epoch: config_ref.epoch,
+            },
+        );
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
         &<b>mut</b> config_ref.events,
         <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
@@ -672,7 +724,8 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> verify_duration_estimate = 600;
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
 <b>let</b> success = !(<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>())
     && <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() != <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).last_reconfiguration_time;

@@ -36,7 +36,7 @@ use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use enum_dispatch::enum_dispatch;
-use std::{cmp, sync::Arc};
+use std::{cmp, cmp::min, sync::Arc};
 
 macro_rules! invalid_client_request {
     ($client_request:expr, $stream_engine:expr) => {
@@ -68,11 +68,14 @@ macro_rules! invalid_stream_request {
 /// The interface offered by each data stream engine.
 #[enum_dispatch]
 pub trait DataStreamEngine {
-    /// Creates a batch of data client requests (up to `max_number_of_requests`)
-    /// that can be sent to the aptos data client to progress the stream.
+    /// Creates a batch of data client requests that can be sent to the
+    /// Aptos data client to progress the stream. The number of requests
+    /// created is bound by the `max_number_of_requests`.
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
+        max_in_flight_requests: u64,
+        num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
         unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error>;
@@ -225,14 +228,26 @@ impl DataStreamEngine for StateStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
+        max_in_flight_requests: u64,
+        num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
         _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
+        // Check if we should wait for the number of states to be returned
         if self.number_of_states.is_none() && self.state_num_requested {
-            return Ok(vec![]); // Wait for the number of states to be returned
+            return Ok(vec![]);
         }
 
+        // If we have the number of states, send the requests
         if let Some(number_of_states) = self.number_of_states {
+            // Calculate the number of requests to send
+            let num_requests_to_send = calculate_num_requests_to_send(
+                max_number_of_requests,
+                max_in_flight_requests,
+                num_in_flight_requests,
+            );
+
+            // Calculate the end index
             let end_state_index = number_of_states
                 .checked_sub(1)
                 .ok_or_else(|| Error::IntegerOverflow("End state index has overflown!".into()))?;
@@ -241,29 +256,33 @@ impl DataStreamEngine for StateStreamEngine {
             let client_requests = create_data_client_request_batch(
                 self.next_request_index,
                 end_state_index,
-                max_number_of_requests,
+                num_requests_to_send,
                 global_data_summary.optimal_chunk_sizes.state_chunk_size,
                 self.clone().into(),
             )?;
-            self.update_request_tracking(&client_requests)?;
 
-            Ok(client_requests)
-        } else {
-            info!(
-                (LogSchema::new(LogEntry::AptosDataClient)
-                    .event(LogEvent::Pending)
-                    .message(&format!(
-                        "Requested the number of states at version: {:?}",
-                        self.request.version
-                    )))
-            );
-            self.state_num_requested = true;
-            Ok(vec![DataClientRequest::NumberOfStates(
-                NumberOfStatesRequest {
-                    version: self.request.version,
-                },
-            )])
+            // Return the requests
+            self.update_request_tracking(&client_requests)?;
+            return Ok(client_requests);
         }
+
+        // Otherwise, we need to request the number of states
+        info!(
+            (LogSchema::new(LogEntry::AptosDataClient)
+                .event(LogEvent::Pending)
+                .message(&format!(
+                    "Requested the number of states at version: {:?}",
+                    self.request.version
+                )))
+        );
+
+        // Return the request
+        self.state_num_requested = true;
+        Ok(vec![DataClientRequest::NumberOfStates(
+            NumberOfStatesRequest {
+                version: self.request.version,
+            },
+        )])
     }
 
     fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
@@ -661,12 +680,13 @@ impl ContinuousTransactionStreamEngine {
         Ok(data_client_request)
     }
 
-    /// Creates a new set of subscription stream requests to extend
-    /// the currently active subscription stream. The number of requests
-    /// created will be bound by the specified `max_number_of_requests`.
+    /// Creates a new set of subscription stream requests
+    /// to extend the currently active subscription stream.
     fn create_subscription_stream_requests(
         &mut self,
         max_number_of_requests: u64,
+        max_in_flight_requests: u64,
+        num_in_flight_requests: u64,
     ) -> Result<Vec<DataClientRequest>, Error> {
         // Get the active subscription stream
         let mut active_subscription_stream = match self.active_subscription_stream.take() {
@@ -683,9 +703,27 @@ impl ContinuousTransactionStreamEngine {
         let (known_version, known_epoch) =
             active_subscription_stream.get_known_version_and_epoch_at_stream_start();
 
+        // TODO(joshlind): identify a way to avoid overriding this here.
+        // Determine the maximum number of in-flight requests. This is overridden
+        // if dynamic prefetching is enabled (to avoid making too few/many subscriptions).
+        let prefetching_config = &self.data_streaming_config.dynamic_prefetching;
+        let max_in_flight_requests = if prefetching_config.enable_dynamic_prefetching {
+            // Use the max number of in-flight subscriptions from the prefetching config
+            prefetching_config.max_in_flight_subscription_requests
+        } else {
+            max_in_flight_requests // Otherwise, use the given maximum
+        };
+
+        // Calculate the number of requests to send
+        let num_requests_to_send = calculate_num_requests_to_send(
+            max_number_of_requests,
+            max_in_flight_requests,
+            num_in_flight_requests,
+        );
+
         // Create the subscription stream requests
         let mut subscription_stream_requests = vec![];
-        for _ in 0..max_number_of_requests {
+        for _ in 0..num_requests_to_send {
             // Get the current subscription stream ID and index
             let subscription_stream_id = active_subscription_stream.get_subscription_stream_id();
             let subscription_stream_index =
@@ -1094,16 +1132,23 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
+        max_in_flight_requests: u64,
+        num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
         unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
+        // Check if we're waiting for a blocking response type
         if self.end_of_epoch_requested || self.optimistic_fetch_requested {
-            return Ok(vec![]); // We are waiting for a blocking response type
+            return Ok(vec![]);
         }
 
         // If there's an active subscription stream we should utilize it
         if self.active_subscription_stream.is_some() {
-            return self.create_subscription_stream_requests(max_number_of_requests);
+            return self.create_subscription_stream_requests(
+                max_number_of_requests,
+                max_in_flight_requests,
+                num_in_flight_requests,
+            );
         }
 
         // If we don't have a syncing target, try to select one
@@ -1153,6 +1198,13 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                 return Ok(vec![]);
             }
 
+            // Calculate the number of requests to send
+            let num_requests_to_send = calculate_num_requests_to_send(
+                max_number_of_requests,
+                max_in_flight_requests,
+                num_in_flight_requests,
+            );
+
             // Create the client requests for the target
             let optimal_chunk_sizes = match &self.request {
                 StreamRequest::ContinuouslyStreamTransactions(_) => {
@@ -1175,7 +1227,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             let client_requests = create_data_client_request_batch(
                 next_request_version,
                 target_ledger_info.ledger_info().version(),
-                max_number_of_requests,
+                num_requests_to_send,
                 optimal_chunk_sizes,
                 self.clone().into(),
             )?;
@@ -1187,7 +1239,11 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             if self.data_streaming_config.enable_subscription_streaming {
                 // Start a new subscription stream and send the first set of requests
                 self.start_active_subscription_stream(unique_id_generator)?;
-                self.create_subscription_stream_requests(max_number_of_requests)?
+                self.create_subscription_stream_requests(
+                    max_number_of_requests,
+                    max_in_flight_requests,
+                    num_in_flight_requests,
+                )?
             } else {
                 // Send a single optimistic fetch request
                 let optimistic_fetch_request = self.create_optimistic_fetch_request()?;
@@ -1196,6 +1252,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             }
         };
 
+        // Return the requests
         Ok(client_requests)
     }
 
@@ -1451,19 +1508,29 @@ impl DataStreamEngine for EpochEndingStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
+        max_in_flight_requests: u64,
+        num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
         _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
+        // Calculate the number of requests to send
+        let num_requests_to_send = calculate_num_requests_to_send(
+            max_number_of_requests,
+            max_in_flight_requests,
+            num_in_flight_requests,
+        );
+
         // Create the client requests
         let client_requests = create_data_client_request_batch(
             self.next_request_epoch,
             self.end_epoch,
-            max_number_of_requests,
+            num_requests_to_send,
             global_data_summary.optimal_chunk_sizes.epoch_chunk_size,
             self.clone().into(),
         )?;
-        self.update_request_tracking(&client_requests)?;
 
+        // Return the requests
+        self.update_request_tracking(&client_requests)?;
         Ok(client_requests)
     }
 
@@ -1697,9 +1764,12 @@ impl DataStreamEngine for TransactionStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
+        max_in_flight_requests: u64,
+        num_in_flight_requests: u64,
         global_data_summary: &GlobalDataSummary,
         _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
+        // Calculate the request end version and optimal chunk sizes
         let (request_end_version, optimal_chunk_sizes) = match &self.request {
             StreamRequest::GetAllTransactions(request) => (
                 request.end_version,
@@ -1722,16 +1792,24 @@ impl DataStreamEngine for TransactionStreamEngine {
             request => invalid_stream_request!(request),
         };
 
+        // Calculate the number of requests to send
+        let num_requests_to_send = calculate_num_requests_to_send(
+            max_number_of_requests,
+            max_in_flight_requests,
+            num_in_flight_requests,
+        );
+
         // Create the client requests
         let client_requests = create_data_client_request_batch(
             self.next_request_version,
             request_end_version,
-            max_number_of_requests,
+            num_requests_to_send,
             optimal_chunk_sizes,
             self.clone().into(),
         )?;
-        self.update_request_tracking(&client_requests)?;
 
+        // Return the requests
+        self.update_request_tracking(&client_requests)?;
         Ok(client_requests)
     }
 
@@ -1917,6 +1995,21 @@ fn verify_client_request_indices(
     }
 
     Ok(())
+}
+
+/// Calculates the number of requests to send based
+/// on the number of remaining in-flight request slots
+/// and the maximum number of requests to send.
+fn calculate_num_requests_to_send(
+    max_number_of_requests: u64,
+    max_in_flight_requests: u64,
+    num_in_flight_requests: u64,
+) -> u64 {
+    // Calculate the number of remaining in-flight request slots
+    let remaining_in_flight_slots = max_in_flight_requests.saturating_sub(num_in_flight_requests);
+
+    // Bound the number of requests to send by the maximum
+    min(remaining_in_flight_slots, max_number_of_requests)
 }
 
 /// Creates a batch of data client requests for the given stream engine

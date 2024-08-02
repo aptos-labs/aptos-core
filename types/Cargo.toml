@@ -17,7 +17,9 @@ anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-dkg = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
+aptos-infallible = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
@@ -26,24 +28,32 @@ arr_macro = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
-chrono = { workspace = true }
-derivative = { workspace = true }
+fixed = { workspace = true }
+fxhash = { workspace = true }
+hashbrown = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
+move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num-bigint = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
 passkey-types = { workspace = true }
+poem-openapi = { workspace = true }
+poem-openapi-derive = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
+quick_cache = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+ring = { workspace = true }
+rsa = { workspace = true }
 serde = { workspace = true }
 serde-big-array = { workspace = true }
 serde_bytes = { workspace = true }
@@ -53,14 +63,17 @@ serde_yaml = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
-tiny-keccak = { workspace = true }
 
 [dev-dependencies]
+ahash = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }
+aptos-proptest-helpers = { workspace = true }
 async-trait = { workspace = true }
 ciborium = { workspace = true }
 claims = { workspace = true }
 coset = { workspace = true }
+criterion = { workspace = true }
+derivative = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 p256 = { workspace = true }
 passkey-authenticator = { workspace = true }
@@ -68,6 +81,7 @@ passkey-client = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
@@ -75,3 +89,14 @@ url = { workspace = true }
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing"]
+
+[[bench]]
+name = "keyless"
+harness = false
+
+[[bench]]
+name = "state_key"
+harness = false
+
+[package.metadata.cargo-machete]
+ignored = ['poem-openapi']

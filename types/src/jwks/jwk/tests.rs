@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwks::{
@@ -34,6 +35,24 @@ fn convert_jwk_move_struct_to_jwk() {
     };
     assert!(JWK::try_from(&JWKMoveStruct {
         variant: unknown_jwk_variant
+    })
+    .is_err());
+
+    let jwk_with_mauled_data_0 = MoveAny {
+        type_name: RSA_JWK::MOVE_TYPE_NAME.to_string(),
+        data: vec![],
+    };
+    assert!(JWK::try_from(&JWKMoveStruct {
+        variant: jwk_with_mauled_data_0
+    })
+    .is_err());
+
+    let jwk_with_mauled_data_1 = MoveAny {
+        type_name: UnsupportedJWK::MOVE_TYPE_NAME.to_string(),
+        data: vec![],
+    };
+    assert!(JWK::try_from(&JWKMoveStruct {
+        variant: jwk_with_mauled_data_1
     })
     .is_err());
 }

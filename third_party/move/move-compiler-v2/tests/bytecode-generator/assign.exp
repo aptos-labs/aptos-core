@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::assign {
     struct T {
         h: u64,
@@ -8,7 +8,7 @@ module 0x42::assign {
         g: assign::T,
     }
     private fun assign_field(s: &mut assign::S,f: u64) {
-        select assign::S.f(s) = f;
+        select assign::S.f<&mut assign::S>(s) = f;
         Tuple()
     }
     private fun assign_int(x: &mut u64) {
@@ -16,17 +16,13 @@ module 0x42::assign {
         Tuple()
     }
     private fun assign_pattern(s: assign::S,f: u64,h: u64): u64 {
-        assign::S{ f: f: u64, g: assign::T{ h: h: u64 } } = s;
+        assign::S{ f, g: assign::T{ h } } = s;
         Add<u64>(f, h)
     }
     private fun assign_struct(s: &mut assign::S) {
         s = pack assign::S(42, pack assign::T(42));
         Tuple()
     }
-    spec fun $assign_field(s: &mut assign::S,f: u64);
-    spec fun $assign_int(x: &mut u64);
-    spec fun $assign_pattern(s: assign::S,f: u64,h: u64): u64;
-    spec fun $assign_struct(s: &mut assign::S);
 } // end 0x42::assign
 
 ============ initial bytecode ================
@@ -73,3 +69,6 @@ fun assign::assign_struct($t0: &mut assign::S) {
   4: write_ref($t0, $t1)
   5: return ()
 }
+
+
+============ bytecode verification succeeded ========

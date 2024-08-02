@@ -36,8 +36,8 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - aptos-release-v*
       # experimental branches
       - performance_benchmark
-      - quorum-store
       - preview
+      - preview-networking
       # grpc release branches
       - aptos-indexer-grpc-devnet
       - aptos-indexer-grpc-testnet
@@ -52,8 +52,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
-  GCP_DOCKER_ARTIFACT_REPO_US: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO_US }}
   AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   # In case of pull_request events by default github actions merges main into the PR branch and then runs the tests etc
   # on the prospective merge result instead of only on the tip of the PR.
@@ -126,6 +124,18 @@ jobs:
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
+
+  # This job determines which tests to run
+  test-target-determinator:
+    needs: [permission-check]
+    runs-on: ubuntu-latest
+    outputs:
+      run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run the test target determinator
+        id: determine_test_targets
+        uses: ./.github/actions/test-target-determinator
 
   # This is a PR required job.
   rust-images:
@@ -302,7 +312,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: aptos-node-v1.8.3 # test against a previous testnet release
+      IMAGE_TAG: 1c2ee7082d6eff8c811ee25d6f5a7d00860a75d5 #aptos-node-v1.16.0
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
@@ -317,23 +327,24 @@ jobs:
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
-      - file_change_determinator
+      - test-target-determinator
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test')
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
+        github.event.pull_request.auto_merge != null
       )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: aptos-node-v1.8.3 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
+      IMAGE_TAG: 1c2ee7082d6eff8c811ee25d6f5a7d00860a75d5 #aptos-node-v1.16.0
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.test-target-determinator.outputs.run_framework_upgrade_test == 'false') }}
 
   forge-consensus-only-perf-test:
     needs:

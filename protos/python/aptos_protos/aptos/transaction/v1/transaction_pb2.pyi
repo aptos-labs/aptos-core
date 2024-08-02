@@ -90,6 +90,8 @@ class Transaction(_message.Message):
         "state_checkpoint",
         "user",
         "validator",
+        "block_epilogue",
+        "size_info",
     ]
 
     class TransactionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -100,12 +102,14 @@ class Transaction(_message.Message):
         TRANSACTION_TYPE_STATE_CHECKPOINT: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_USER: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_VALIDATOR: _ClassVar[Transaction.TransactionType]
+        TRANSACTION_TYPE_BLOCK_EPILOGUE: _ClassVar[Transaction.TransactionType]
     TRANSACTION_TYPE_UNSPECIFIED: Transaction.TransactionType
     TRANSACTION_TYPE_GENESIS: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_METADATA: Transaction.TransactionType
     TRANSACTION_TYPE_STATE_CHECKPOINT: Transaction.TransactionType
     TRANSACTION_TYPE_USER: Transaction.TransactionType
     TRANSACTION_TYPE_VALIDATOR: Transaction.TransactionType
+    TRANSACTION_TYPE_BLOCK_EPILOGUE: Transaction.TransactionType
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     INFO_FIELD_NUMBER: _ClassVar[int]
@@ -117,6 +121,8 @@ class Transaction(_message.Message):
     STATE_CHECKPOINT_FIELD_NUMBER: _ClassVar[int]
     USER_FIELD_NUMBER: _ClassVar[int]
     VALIDATOR_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_EPILOGUE_FIELD_NUMBER: _ClassVar[int]
+    SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     version: int
     info: TransactionInfo
@@ -128,6 +134,8 @@ class Transaction(_message.Message):
     state_checkpoint: StateCheckpointTransaction
     user: UserTransaction
     validator: ValidatorTransaction
+    block_epilogue: BlockEpilogueTransaction
+    size_info: TransactionSizeInfo
     def __init__(
         self,
         timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...,
@@ -141,6 +149,8 @@ class Transaction(_message.Message):
         state_checkpoint: _Optional[_Union[StateCheckpointTransaction, _Mapping]] = ...,
         user: _Optional[_Union[UserTransaction, _Mapping]] = ...,
         validator: _Optional[_Union[ValidatorTransaction, _Mapping]] = ...,
+        block_epilogue: _Optional[_Union[BlockEpilogueTransaction, _Mapping]] = ...,
+        size_info: _Optional[_Union[TransactionSizeInfo, _Mapping]] = ...,
     ) -> None: ...
 
 class BlockMetadataTransaction(_message.Message):
@@ -191,8 +201,205 @@ class StateCheckpointTransaction(_message.Message):
     def __init__(self) -> None: ...
 
 class ValidatorTransaction(_message.Message):
-    __slots__ = []
-    def __init__(self) -> None: ...
+    __slots__ = ["observed_jwk_update", "dkg_update", "events"]
+
+    class ObservedJwkUpdate(_message.Message):
+        __slots__ = ["quorum_certified_update"]
+
+        class ExportedProviderJWKs(_message.Message):
+            __slots__ = ["issuer", "version", "jwks"]
+
+            class JWK(_message.Message):
+                __slots__ = ["unsupported_jwk", "rsa"]
+
+                class RSA(_message.Message):
+                    __slots__ = ["kid", "kty", "alg", "e", "n"]
+                    KID_FIELD_NUMBER: _ClassVar[int]
+                    KTY_FIELD_NUMBER: _ClassVar[int]
+                    ALG_FIELD_NUMBER: _ClassVar[int]
+                    E_FIELD_NUMBER: _ClassVar[int]
+                    N_FIELD_NUMBER: _ClassVar[int]
+                    kid: str
+                    kty: str
+                    alg: str
+                    e: str
+                    n: str
+                    def __init__(
+                        self,
+                        kid: _Optional[str] = ...,
+                        kty: _Optional[str] = ...,
+                        alg: _Optional[str] = ...,
+                        e: _Optional[str] = ...,
+                        n: _Optional[str] = ...,
+                    ) -> None: ...
+
+                class UnsupportedJWK(_message.Message):
+                    __slots__ = ["id", "payload"]
+                    ID_FIELD_NUMBER: _ClassVar[int]
+                    PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+                    id: bytes
+                    payload: bytes
+                    def __init__(
+                        self,
+                        id: _Optional[bytes] = ...,
+                        payload: _Optional[bytes] = ...,
+                    ) -> None: ...
+                UNSUPPORTED_JWK_FIELD_NUMBER: _ClassVar[int]
+                RSA_FIELD_NUMBER: _ClassVar[int]
+                unsupported_jwk: ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK
+                rsa: ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA
+                def __init__(
+                    self,
+                    unsupported_jwk: _Optional[
+                        _Union[
+                            ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK,
+                            _Mapping,
+                        ]
+                    ] = ...,
+                    rsa: _Optional[
+                        _Union[
+                            ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA,
+                            _Mapping,
+                        ]
+                    ] = ...,
+                ) -> None: ...
+            ISSUER_FIELD_NUMBER: _ClassVar[int]
+            VERSION_FIELD_NUMBER: _ClassVar[int]
+            JWKS_FIELD_NUMBER: _ClassVar[int]
+            issuer: str
+            version: int
+            jwks: _containers.RepeatedCompositeFieldContainer[
+                ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK
+            ]
+            def __init__(
+                self,
+                issuer: _Optional[str] = ...,
+                version: _Optional[int] = ...,
+                jwks: _Optional[
+                    _Iterable[
+                        _Union[
+                            ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK,
+                            _Mapping,
+                        ]
+                    ]
+                ] = ...,
+            ) -> None: ...
+
+        class ExportedAggregateSignature(_message.Message):
+            __slots__ = ["signer_indices", "sig"]
+            SIGNER_INDICES_FIELD_NUMBER: _ClassVar[int]
+            SIG_FIELD_NUMBER: _ClassVar[int]
+            signer_indices: _containers.RepeatedScalarFieldContainer[int]
+            sig: bytes
+            def __init__(
+                self,
+                signer_indices: _Optional[_Iterable[int]] = ...,
+                sig: _Optional[bytes] = ...,
+            ) -> None: ...
+
+        class QuorumCertifiedUpdate(_message.Message):
+            __slots__ = ["update", "multi_sig"]
+            UPDATE_FIELD_NUMBER: _ClassVar[int]
+            MULTI_SIG_FIELD_NUMBER: _ClassVar[int]
+            update: ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs
+            multi_sig: ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature
+            def __init__(
+                self,
+                update: _Optional[
+                    _Union[
+                        ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs,
+                        _Mapping,
+                    ]
+                ] = ...,
+                multi_sig: _Optional[
+                    _Union[
+                        ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature,
+                        _Mapping,
+                    ]
+                ] = ...,
+            ) -> None: ...
+        QUORUM_CERTIFIED_UPDATE_FIELD_NUMBER: _ClassVar[int]
+        quorum_certified_update: ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate
+        def __init__(
+            self,
+            quorum_certified_update: _Optional[
+                _Union[
+                    ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate,
+                    _Mapping,
+                ]
+            ] = ...,
+        ) -> None: ...
+
+    class DkgUpdate(_message.Message):
+        __slots__ = ["dkg_transcript"]
+
+        class DkgTranscript(_message.Message):
+            __slots__ = ["epoch", "author", "payload"]
+            EPOCH_FIELD_NUMBER: _ClassVar[int]
+            AUTHOR_FIELD_NUMBER: _ClassVar[int]
+            PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+            epoch: int
+            author: str
+            payload: bytes
+            def __init__(
+                self,
+                epoch: _Optional[int] = ...,
+                author: _Optional[str] = ...,
+                payload: _Optional[bytes] = ...,
+            ) -> None: ...
+        DKG_TRANSCRIPT_FIELD_NUMBER: _ClassVar[int]
+        dkg_transcript: ValidatorTransaction.DkgUpdate.DkgTranscript
+        def __init__(
+            self,
+            dkg_transcript: _Optional[
+                _Union[ValidatorTransaction.DkgUpdate.DkgTranscript, _Mapping]
+            ] = ...,
+        ) -> None: ...
+    OBSERVED_JWK_UPDATE_FIELD_NUMBER: _ClassVar[int]
+    DKG_UPDATE_FIELD_NUMBER: _ClassVar[int]
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    observed_jwk_update: ValidatorTransaction.ObservedJwkUpdate
+    dkg_update: ValidatorTransaction.DkgUpdate
+    events: _containers.RepeatedCompositeFieldContainer[Event]
+    def __init__(
+        self,
+        observed_jwk_update: _Optional[
+            _Union[ValidatorTransaction.ObservedJwkUpdate, _Mapping]
+        ] = ...,
+        dkg_update: _Optional[_Union[ValidatorTransaction.DkgUpdate, _Mapping]] = ...,
+        events: _Optional[_Iterable[_Union[Event, _Mapping]]] = ...,
+    ) -> None: ...
+
+class BlockEpilogueTransaction(_message.Message):
+    __slots__ = ["block_end_info"]
+    BLOCK_END_INFO_FIELD_NUMBER: _ClassVar[int]
+    block_end_info: BlockEndInfo
+    def __init__(
+        self, block_end_info: _Optional[_Union[BlockEndInfo, _Mapping]] = ...
+    ) -> None: ...
+
+class BlockEndInfo(_message.Message):
+    __slots__ = [
+        "block_gas_limit_reached",
+        "block_output_limit_reached",
+        "block_effective_block_gas_units",
+        "block_approx_output_size",
+    ]
+    BLOCK_GAS_LIMIT_REACHED_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_OUTPUT_LIMIT_REACHED_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_EFFECTIVE_BLOCK_GAS_UNITS_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_APPROX_OUTPUT_SIZE_FIELD_NUMBER: _ClassVar[int]
+    block_gas_limit_reached: bool
+    block_output_limit_reached: bool
+    block_effective_block_gas_units: int
+    block_approx_output_size: int
+    def __init__(
+        self,
+        block_gas_limit_reached: bool = ...,
+        block_output_limit_reached: bool = ...,
+        block_effective_block_gas_units: _Optional[int] = ...,
+        block_approx_output_size: _Optional[int] = ...,
+    ) -> None: ...
 
 class UserTransaction(_message.Message):
     __slots__ = ["request", "events"]
@@ -1016,12 +1223,12 @@ class AnyPublicKey(_message.Message):
         TYPE_ED25519: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256R1_ECDSA: _ClassVar[AnyPublicKey.Type]
-        TYPE_ZKID: _ClassVar[AnyPublicKey.Type]
+        TYPE_KEYLESS: _ClassVar[AnyPublicKey.Type]
     TYPE_UNSPECIFIED: AnyPublicKey.Type
     TYPE_ED25519: AnyPublicKey.Type
     TYPE_SECP256K1_ECDSA: AnyPublicKey.Type
     TYPE_SECP256R1_ECDSA: AnyPublicKey.Type
-    TYPE_ZKID: AnyPublicKey.Type
+    TYPE_KEYLESS: AnyPublicKey.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     type: AnyPublicKey.Type
@@ -1033,7 +1240,14 @@ class AnyPublicKey(_message.Message):
     ) -> None: ...
 
 class AnySignature(_message.Message):
-    __slots__ = ["type", "signature", "ed25519", "secp256k1_ecdsa", "webauthn", "zkid"]
+    __slots__ = [
+        "type",
+        "signature",
+        "ed25519",
+        "secp256k1_ecdsa",
+        "webauthn",
+        "keyless",
+    ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = []
@@ -1041,24 +1255,24 @@ class AnySignature(_message.Message):
         TYPE_ED25519: _ClassVar[AnySignature.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnySignature.Type]
         TYPE_WEBAUTHN: _ClassVar[AnySignature.Type]
-        TYPE_ZKID: _ClassVar[AnySignature.Type]
+        TYPE_KEYLESS: _ClassVar[AnySignature.Type]
     TYPE_UNSPECIFIED: AnySignature.Type
     TYPE_ED25519: AnySignature.Type
     TYPE_SECP256K1_ECDSA: AnySignature.Type
     TYPE_WEBAUTHN: AnySignature.Type
-    TYPE_ZKID: AnySignature.Type
+    TYPE_KEYLESS: AnySignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     ED25519_FIELD_NUMBER: _ClassVar[int]
     SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
     WEBAUTHN_FIELD_NUMBER: _ClassVar[int]
-    ZKID_FIELD_NUMBER: _ClassVar[int]
+    KEYLESS_FIELD_NUMBER: _ClassVar[int]
     type: AnySignature.Type
     signature: bytes
     ed25519: Ed25519
     secp256k1_ecdsa: Secp256k1Ecdsa
     webauthn: WebAuthn
-    zkid: ZkId
+    keyless: Keyless
     def __init__(
         self,
         type: _Optional[_Union[AnySignature.Type, str]] = ...,
@@ -1066,7 +1280,7 @@ class AnySignature(_message.Message):
         ed25519: _Optional[_Union[Ed25519, _Mapping]] = ...,
         secp256k1_ecdsa: _Optional[_Union[Secp256k1Ecdsa, _Mapping]] = ...,
         webauthn: _Optional[_Union[WebAuthn, _Mapping]] = ...,
-        zkid: _Optional[_Union[ZkId, _Mapping]] = ...,
+        keyless: _Optional[_Union[Keyless, _Mapping]] = ...,
     ) -> None: ...
 
 class Ed25519(_message.Message):
@@ -1087,7 +1301,7 @@ class WebAuthn(_message.Message):
     signature: bytes
     def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
-class ZkId(_message.Message):
+class Keyless(_message.Message):
     __slots__ = ["signature"]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     signature: bytes
@@ -1178,4 +1392,41 @@ class AccountSignature(_message.Message):
         multi_ed25519: _Optional[_Union[MultiEd25519Signature, _Mapping]] = ...,
         single_key_signature: _Optional[_Union[SingleKeySignature, _Mapping]] = ...,
         multi_key_signature: _Optional[_Union[MultiKeySignature, _Mapping]] = ...,
+    ) -> None: ...
+
+class TransactionSizeInfo(_message.Message):
+    __slots__ = ["transaction_bytes", "event_size_info", "write_op_size_info"]
+    TRANSACTION_BYTES_FIELD_NUMBER: _ClassVar[int]
+    EVENT_SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
+    WRITE_OP_SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
+    transaction_bytes: int
+    event_size_info: _containers.RepeatedCompositeFieldContainer[EventSizeInfo]
+    write_op_size_info: _containers.RepeatedCompositeFieldContainer[WriteOpSizeInfo]
+    def __init__(
+        self,
+        transaction_bytes: _Optional[int] = ...,
+        event_size_info: _Optional[_Iterable[_Union[EventSizeInfo, _Mapping]]] = ...,
+        write_op_size_info: _Optional[
+            _Iterable[_Union[WriteOpSizeInfo, _Mapping]]
+        ] = ...,
+    ) -> None: ...
+
+class EventSizeInfo(_message.Message):
+    __slots__ = ["type_tag_bytes", "total_bytes"]
+    TYPE_TAG_BYTES_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_BYTES_FIELD_NUMBER: _ClassVar[int]
+    type_tag_bytes: int
+    total_bytes: int
+    def __init__(
+        self, type_tag_bytes: _Optional[int] = ..., total_bytes: _Optional[int] = ...
+    ) -> None: ...
+
+class WriteOpSizeInfo(_message.Message):
+    __slots__ = ["key_bytes", "value_bytes"]
+    KEY_BYTES_FIELD_NUMBER: _ClassVar[int]
+    VALUE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    key_bytes: int
+    value_bytes: int
+    def __init__(
+        self, key_bytes: _Optional[int] = ..., value_bytes: _Optional[int] = ...
     ) -> None: ...

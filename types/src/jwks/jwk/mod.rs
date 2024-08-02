@@ -1,4 +1,7 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+#![allow(clippy::match_result_ok)]
 
 use crate::{
     jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK},
@@ -8,6 +11,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::value::{MoveStruct, MoveValue};
+use poem_openapi_derive::Union;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -39,8 +43,14 @@ impl AsMoveValue for JWKMoveStruct {
     }
 }
 
+impl From<RSA_JWK> for JWKMoveStruct {
+    fn from(rsa_jwk: RSA_JWK) -> Self {
+        JWKMoveStruct::from(JWK::RSA(rsa_jwk))
+    }
+}
+
 /// The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 pub enum JWK {
     RSA(RSA_JWK),
     Unsupported(UnsupportedJWK),
@@ -96,12 +106,12 @@ impl TryFrom<&JWKMoveStruct> for JWK {
         match value.variant.type_name.as_str() {
             RSA_JWK::MOVE_TYPE_NAME => {
                 let rsa_jwk =
-                    MoveAny::unpack(RSA_JWK::MOVE_TYPE_NAME, value.variant.clone()).unwrap();
+                    MoveAny::unpack(RSA_JWK::MOVE_TYPE_NAME, value.variant.clone()).map_err(|e|anyhow!("converting from jwk move struct to jwk failed with move any to rsa unpacking error: {e}"))?;
                 Ok(Self::RSA(rsa_jwk))
             },
             UnsupportedJWK::MOVE_TYPE_NAME => {
                 let unsupported_jwk =
-                    MoveAny::unpack(UnsupportedJWK::MOVE_TYPE_NAME, value.variant.clone()).unwrap();
+                    MoveAny::unpack(UnsupportedJWK::MOVE_TYPE_NAME, value.variant.clone()).map_err(|e|anyhow!("converting from jwk move struct to jwk failed with move any to unsupported unpacking error: {e}"))?;
                 Ok(Self::Unsupported(unsupported_jwk))
             },
             _ => Err(anyhow!(

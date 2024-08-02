@@ -1,0 +1,18 @@
+
+Diagnostics:
+error: missing acquires annotation for `ObjectCore`
+   ┌─ tests/acquires-checker/escape_autoref.move:10:9
+   │
+10 │     fun owner_correct(o: Object): address {
+   │         ^^^^^^^^^^^^^
+11 │         let addr = o.inner;
+12 │         borrow_global<ObjectCore>(addr).owner
+   │         ------------------------------- acquired here
+
+error: missing acquires annotation for `ObjectCore`
+   ┌─ tests/acquires-checker/escape_autoref.move:16:9
+   │
+16 │     fun owner_read_ref_missing(o: Object): address {
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+17 │         borrow_global<ObjectCore>(o.inner).owner
+   │         ---------------------------------- acquired here

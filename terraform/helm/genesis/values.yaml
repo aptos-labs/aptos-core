@@ -1,3 +1,5 @@
+# -- Used to toggle on and off the automatic genesis job
+enabled: true
 chain:
   # -- Internal: name of the testnet to connect to
   name: testnet
@@ -78,6 +80,8 @@ genesis:
     enabled: false
     # comma separated list of cluster names
     domain_suffixes: ""
+  genesis_blob_upload_url: "https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url"
+  cluster_name: "unknown"
 
 serviceAccount:
   # -- Specifies whether a service account should be created

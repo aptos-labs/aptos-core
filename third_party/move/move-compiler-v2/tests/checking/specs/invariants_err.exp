@@ -1,40 +1,25 @@
 
 Diagnostics:
-error: expected `bool` but found `num`
-  ┌─ tests/checking/specs/invariants_err.move:9:15
+error: data invariants cannot depend on global state but found dependency to `M::S`
+  ┌─ tests/checking/specs/invariants_err.move:9:9
   │
-9 │     invariant x + 1;
-  │               ^^^^^
+9 │         invariant exists<S>(@0x0);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: `old(..)` expression not allowed in this context
-   ┌─ tests/checking/specs/invariants_err.move:11:15
+error: data invariants cannot depend on global state but found dependency to `M::S`
+   ┌─ tests/checking/specs/invariants_err.move:10:9
    │
-11 │     invariant old(x) > 0;
-   │               ^^^^^^
+10 │         invariant global<S>(@0x0).x == x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: invalid reference to post state
-   ┌─ tests/checking/specs/invariants_err.move:11:5
+error: data invariants cannot depend on global state but found dependency to `M::spec_var`
+   ┌─ tests/checking/specs/invariants_err.move:11:9
    │
-11 │     invariant old(x) > 0;
-   │     ^^^^^^^^^^^^^^^^^^^^^
-   │     │         │
-   │     │         expression referring to post state
-   │     not allowed to refer to post state
+11 │         invariant spec_var > 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: data invariants cannot depend on global state (directly or indirectly uses a global spec var or resource storage).
-   ┌─ tests/checking/specs/invariants_err.move:13:5
+error: data invariants cannot depend on global state but found dependency to `M::spec_var`
+   ┌─ tests/checking/specs/invariants_err.move:13:9
    │
-13 │     invariant exists<S>(@0x0);
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: data invariants cannot depend on global state (directly or indirectly uses a global spec var or resource storage).
-   ┌─ tests/checking/specs/invariants_err.move:14:5
-   │
-14 │     invariant global<S>(@0x0).x == x;
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: data invariants cannot depend on global state (directly or indirectly uses a global spec var or resource storage).
-   ┌─ tests/checking/specs/invariants_err.move:15:5
-   │
-15 │     invariant spec_var > 0;
-   │     ^^^^^^^^^^^^^^^^^^^^^^^
+13 │         invariant rec_fun(true);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
