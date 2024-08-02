@@ -7,9 +7,10 @@ use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_ff::Field;
 use ark_relations::r1cs::{ConstraintSynthesizer, SynthesisError};
-//use rand::{RngCore, Rng};
+use rand::{RngCore, Rng};
 use ark_std::{
-    rand::{Rng, RngCore, SeedableRng},
+    rand::SeedableRng,
+    //rand::{Rng, RngCore, SeedableRng},
     test_rng, UniformRand,
 };
 use ark_std::{marker::PhantomData, vec::Vec};
@@ -83,16 +84,6 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         elem.unwrap()
     }
 
-    fn generate_random_g2_elem<R: RngCore>(rng: &mut R) -> E::G2Affine {
-        let mut elem = None;
-        while elem.is_none() {
-            let mut bytes: [u8; 64] = [0; 64];
-            rng.fill_bytes(&mut bytes);
-            elem = E::G2Affine::from_random_bytes(&bytes);
-        }
-        elem.unwrap()
-    }
-
     fn circuit_agnostic_setup_with_trapdoor<R: RngCore>(
         rng: &mut R,
         num_public_inputs: u32,
@@ -103,12 +94,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         let delta = Self::generate_random_scalar(rng);
 
         let g1_generator = Self::generate_random_g1_elem(rng);
-        // TODO (michael): Generating the `g2_generator` with this function causes verification to later fail. This only occurs with this element - not `g1_generator` or any of the scalar elements for the associated `generate_random_g1_elem` or `generate_random_scalar` functions. We should figure out why, seems like an obscure arkworks bug
-        // When ``let g2_generator = E::G2::rand(rng);` is used, and `g2_generator.into_affine() is called to convert the G2 element into a G2Affine element, Groth16 verification later passes
-        // In addition, if `generate_random_g2_elem` is called, then the resulting G2Affine element converted into a G2 element, then back into a G2Affine element with into_affine(), the verification will still fail. This suggests the problem is with how the element is initially generated
-        //let g2_generator = Self::generate_random_g2_elem(rng);
-        //let g2_generator: E::G2 = Self::generate_random_g2_elem(rng).into();
-        //let g2_generator = E::G2::rand(rng);
+
         let g2_generator_base = E::G2::generator();
         let g2_generator_scalar = Self::generate_random_scalar(rng);
         let g2_generator = g2_generator_base * g2_generator_scalar;
@@ -308,7 +294,7 @@ fn generate_keys_and_inputs<E: Pairing>(wasm_file_path: String, r1cs_file_path: 
 /// Generates and verifies a simulated proof using a hardcoded simulation prover and verifier key
 /// pair and a hardcoded public input. These values were generated with the Keyless circuit at commit
 /// `b715e935effe282bb998bb06c826b33d290d94ed` of `aptos-core`
-/*#[cfg(test)]
+#[cfg(test)]
 fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
@@ -360,7 +346,7 @@ where
         let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
-}*/
+}
 
 fn test_prove_and_verify_circuit_agnostic<E>(n_iters: usize)
 where
@@ -374,8 +360,8 @@ where
     let public_input = ark_ff::BigInt::new(public_input_values);
     let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
     // TODO: Make this rng seedable
-    //let mut rng = rand::thread_rng();
-    let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
+    let mut rng = rand::thread_rng();
+    //let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
 
     let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
@@ -393,17 +379,14 @@ where
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
         let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
-        /*let mut a_bytes: [u8; 32] = [0; 32];
-        rng.fill_bytes(&mut a_bytes);
-        let a = E::ScalarField::from_random_bytes(&a_bytes).unwrap();*/
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
 
-/*#[test]
+#[test]
 fn prove_and_verify() {
     test_prove_and_verify::<Bn254>(25);
-}*/
+}
 
 #[test]
 fn prove_and_verify_circuit_agnostic() {
