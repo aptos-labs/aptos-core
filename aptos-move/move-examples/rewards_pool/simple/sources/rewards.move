@@ -9,19 +9,21 @@ module rewards::rewards {
     use aptos_framework::coin::Coin;
 
     /// Caller is not authorised to perform the action.
-    const ENOT_AUTHORISED: u64 = 1;
+    const ENOT_AUTHORIZED: u64 = 1;
     /// No rewards to claim.
     const ENO_REWARDS_TO_CLAIM: u64 = 2;
 
     struct RewardStore has key {
         admin: address,
         rewards: SmartTable<address, Coin<AptosCoin>>,
+        pending_admin: address,
     }
 
     fun init_module(rewards_signer: &signer) {
         move_to(rewards_signer, RewardStore {
             admin: @rewards,
             rewards: smart_table::new(),
+            pending_admin: @0x0,
         });
     }
 
@@ -39,8 +41,8 @@ module rewards::rewards {
 
     /// Allow admin to upload rewards for multiple recipients.
     public entry fun add_rewards(admin: &signer, recipients: vector<address>, amounts: vector<u64>) acquires RewardStore {
+        assert_admin(admin);
         let rewards_store = borrow_global_mut<RewardStore>(@rewards);
-        assert!(rewards_store.admin == signer::address_of(admin), ENOT_AUTHORISED);
         vector::zip(recipients, amounts, |recipient, amount| {
             // Extract rewards from the admin's account.
             let reward = coin::withdraw<AptosCoin>(admin, amount);
@@ -54,9 +56,9 @@ module rewards::rewards {
     }
 
     public entry fun cancel_rewards(admin: &signer, recipients: vector<address>) acquires RewardStore {
+        assert_admin(admin);
         let rewards_store = borrow_global_mut<RewardStore>(@rewards);
         let admin_addr = signer::address_of(admin);
-        assert!(rewards_store.admin == admin_addr, ENOT_AUTHORISED);
         vector::for_each(recipients, |recipient| {
             let rewards = smart_table::remove(&mut rewards_store.rewards, recipient);
             aptos_account::deposit_coins(admin_addr, rewards);
@@ -72,11 +74,34 @@ module rewards::rewards {
         aptos_account::deposit_coins(user_address, rewards);
     }
 
+    /// Set the pending admin to the provided address. New admin still needs to accept the role to avoid setting admin
+    /// to the wrong address.
+    public entry fun transfer_admin(admin: &signer, new_admin: address) acquires RewardStore {
+        assert_admin(admin);
+        let rewards_store = borrow_global_mut<RewardStore>(@rewards);
+        rewards_store.pending_admin = new_admin;
+    }
+
+    /// Accept the admin role. This can only be called by the pending admin.
+    public entry fun accept_admin(new_admin: &signer) acquires RewardStore {
+        let rewards_store = borrow_global_mut<RewardStore>(@rewards);
+        let admin_addr = signer::address_of(new_admin);
+        assert!(rewards_store.pending_admin == admin_addr, ENOT_AUTHORIZED);
+        rewards_store.admin = admin_addr;
+        rewards_store.pending_admin = @0x0;
+    }
+
+    fun assert_admin(admin: &signer) acquires RewardStore {
+        let rewards_store = borrow_global<RewardStore>(@rewards);
+        assert!(rewards_store.admin == signer::address_of(admin), ENOT_AUTHORIZED);
+    }
+
     #[test_only]
     public fun init_for_test(admin: &signer) {
         move_to(admin, RewardStore {
             admin: signer::address_of(admin),
             rewards: smart_table::new(),
+            pending_admin: @0x0,
         });
     }
 }

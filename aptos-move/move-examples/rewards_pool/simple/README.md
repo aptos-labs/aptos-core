@@ -1,14 +1,16 @@
 # Deployment
-This rewards can be directly deployed to an account. It's upgradable by default but can be made immutable by adding upgrade_policy = "immutable" to the top section in the Move.toml file.
-To deploy:
-1. Create a profile for the rewards account. This is where the code will be deployed to and this account will also be the admin who can add/cancel rewards.
-```bash
-aptos move init --profile rewards
-```
-2. Run the following command in the simple directory:
-```bash
-aptos move publish --named-addresses rewards=rewards --profile rewards
-```
+This describes the deployment flow where the contract is upgradable and controlled via an admin account.
+1. Create a mainnet profile for mainnet. This account can be thrown away after the full deployment.
+   aptos init --profile deployer
+2. Deploy with the following command. The output should include the address of the deployed contract.
+   aptos move create-object-and-publish-package --address-name rewards --profile deployer
+3. Test and make sure the admin account can add rewards
+4. Create a multisig account via RimoSafe UI: https://www.rimosafe.com/. The multisig can be created with Ledger accounts via Petra.
+5. Transfer upgrade permission to the multisig with the contract address and multisig address replaced in the command below:
+   aptos move run-function --function-id 0x1::object::transfer_raw --args address:contract_address address:multisig_address --profile deployer
+6. Transfer admin to the multisig with
+   aptos move run-function --function-id contract_address::rewards::transfer_admin --args address:multisig_address --profile deployer
+7. Via RimoSafe UI, accept the admin transfer by proposing and executing a call to contract_address::rewards::accept_admin (no args necessary)
 
 # Testing
 ```bash
