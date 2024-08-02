@@ -157,7 +157,7 @@ impl MPCManager {
 
     fn intake_new_state(&mut self, mpc_state: MPCState) {
         debug!(epoch = self.epoch_state.epoch, "intake_new_state: begin");
-        let MPCState { shared_secrets, tasks } = mpc_state;
+        let MPCState { shared_secrets, tasks } = mpc_state.clone();
         for (idx, onchain_task_state) in tasks.into_iter().enumerate() {
             debug!(epoch = self.epoch_state.epoch, idx = idx, "intake_new_state: processing on-chain task");
             let TaskState { task, result } = onchain_task_state;
@@ -183,6 +183,8 @@ impl MPCManager {
                 self.reconfig_work_state = None;
             }
         }
+
+        self.cached_on_chain_state = Some(mpc_state);
         debug!(epoch = self.epoch_state.epoch, "intake_new_state: end");
     }
 
