@@ -323,7 +323,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
         //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
         let rand_thread = fastrand::i32(..) % self.result_tx.len() as i32;
-        let result_tx_clone = self.result_tx[rand_thread as usize].clone();
+        let result_tx_clone = self.result_tx[0].clone();
         let shard_id_clone = self.shard_id.clone();
         self.result_tx_thread_pool.spawn(move || {
             let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
