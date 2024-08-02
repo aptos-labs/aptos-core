@@ -176,7 +176,7 @@ impl
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
-    UserTransaction(Box<UserTransaction>),
+    UserTransaction(UserTransaction),
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
     StateCheckpointTransaction(StateCheckpointTransaction),
@@ -292,12 +292,12 @@ impl
             u64,
         ),
     ) -> Self {
-        Transaction::UserTransaction(Box::new(UserTransaction {
+        Transaction::UserTransaction(UserTransaction {
             info,
             request: (txn, payload).into(),
             events,
             timestamp: timestamp.into(),
-        }))
+        })
     }
 }
 
@@ -621,6 +621,13 @@ impl ValidatorTransaction {
             ValidatorTransaction::DkgResult(t) => t.timestamp,
         }
     }
+
+    pub fn events(&self) -> &[Event] {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(t) => &t.events,
+            ValidatorTransaction::DkgResult(t) => &t.events,
+        }
+    }
 }
 
 impl
@@ -690,9 +697,9 @@ impl From<QuorumCertifiedUpdate> for ExportedQuorumCertifiedUpdate {
 /// A more API-friendly representation of the on-chain `aptos_types::aggregate_signature::AggregateSignature`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ExportedAggregateSignature {
-    signer_indices: Vec<usize>,
+    pub signer_indices: Vec<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sig: Option<HexEncodedBytes>,
+    pub sig: Option<HexEncodedBytes>,
 }
 
 impl From<AggregateSignature> for ExportedAggregateSignature {
@@ -744,9 +751,9 @@ pub struct DKGResultTransaction {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ExportedDKGTranscript {
-    epoch: U64,
-    author: Address,
-    payload: HexEncodedBytes,
+    pub epoch: U64,
+    pub author: Address,
+    pub payload: HexEncodedBytes,
 }
 
 impl From<DKGTranscript> for ExportedDKGTranscript {

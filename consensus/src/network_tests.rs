@@ -8,7 +8,7 @@ use crate::{
     test_utils::{self, consensus_runtime, placeholder_ledger_info, timed_block_on},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
@@ -21,14 +21,13 @@ use aptos_consensus_types::{
 use aptos_infallible::{Mutex, RwLock};
 use aptos_network::{
     application::storage::PeersAndMetadata,
-    peer_manager::{
-        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
-        PeerManagerRequestSender,
-    },
+    peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
-        network::{NewNetworkEvents, SerializedRequest},
-        rpc::InboundRpcRequest,
-        wire::handshake::v1::ProtocolIdSet,
+        network::{NewNetworkEvents, ReceivedMessage, RpcError, SerializedRequest},
+        wire::{
+            handshake::v1::ProtocolIdSet,
+            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+        },
     },
     ProtocolId,
 };
@@ -65,16 +64,15 @@ pub struct NetworkPlayground {
     /// These events will usually be handled by the event loop spawned in
     /// `ConsensusNetworkImpl`.
     ///
-    node_consensus_txs: Arc<
-        Mutex<
-            HashMap<TwinId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
-        >,
-    >,
+    node_consensus_txs:
+        Arc<Mutex<HashMap<TwinId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>>,
     /// Nodes' outbound handlers forward their outbound non-rpc messages to this
     /// queue.
     outbound_msgs_tx: mpsc::Sender<(TwinId, PeerManagerRequest)>,
     /// NetworkPlayground reads all nodes' outbound messages through this queue.
     outbound_msgs_rx: mpsc::Receiver<(TwinId, PeerManagerRequest)>,
+    /// Allow test code to timeout RPC messages between peers.
+    timeout_config: Arc<RwLock<TimeoutConfig>>,
     /// Allow test code to drop direct-send messages between peers.
     drop_config: Arc<RwLock<DropConfig>>,
     /// Allow test code to drop direct-send messages between peers per round.
@@ -96,6 +94,7 @@ impl NetworkPlayground {
             node_consensus_txs: Arc::new(Mutex::new(HashMap::new())),
             outbound_msgs_tx,
             outbound_msgs_rx,
+            timeout_config: Arc::new(RwLock::new(TimeoutConfig::default())),
             drop_config: Arc::new(RwLock::new(DropConfig::default())),
             drop_config_round: DropConfigRound::default(),
             executor,
@@ -122,17 +121,13 @@ impl NetworkPlayground {
     /// Rpc messages are immediately sent to the destination for handling, so
     /// they don't block.
     async fn start_node_outbound_handler(
+        timeout_config: Arc<RwLock<TimeoutConfig>>,
         drop_config: Arc<RwLock<DropConfig>>,
         src_twin_id: TwinId,
         mut network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         mut outbound_msgs_tx: mpsc::Sender<(TwinId, PeerManagerRequest)>,
         node_consensus_txs: Arc<
-            Mutex<
-                HashMap<
-                    TwinId,
-                    aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-                >,
-            >,
+            Mutex<HashMap<TwinId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
         >,
         author_to_twin_ids: Arc<RwLock<AuthorToTwinIds>>,
     ) {
@@ -160,19 +155,34 @@ impl NetworkPlayground {
                         None => continue, // drop rpc
                     };
 
+                    if timeout_config
+                        .read()
+                        .is_message_timedout(&src_twin_id, dst_twin_id)
+                    {
+                        outbound_req.res_tx.send(Err(RpcError::TimedOut)).unwrap();
+                        continue;
+                    }
+
                     let node_consensus_tx =
                         node_consensus_txs.lock().get(dst_twin_id).unwrap().clone();
-
-                    let inbound_req = InboundRpcRequest {
-                        protocol_id: outbound_req.protocol_id,
-                        data: outbound_req.data,
-                        res_tx: outbound_req.res_tx,
-                    };
 
                     node_consensus_tx
                         .push(
                             (src_twin_id.author, ProtocolId::ConsensusRpcBcs),
-                            PeerManagerNotification::RecvRpc(src_twin_id.author, inbound_req),
+                            ReceivedMessage {
+                                message: NetworkMessage::RpcRequest(RpcRequest {
+                                    protocol_id: outbound_req.protocol_id,
+                                    request_id: 123,
+                                    priority: 0,
+                                    raw_request: outbound_req.data.into(),
+                                }),
+                                sender: PeerNetworkId::new(
+                                    NetworkId::Validator,
+                                    src_twin_id.author,
+                                ),
+                                receive_timestamp_micros: 0,
+                                rpc_replier: Some(Arc::new(outbound_req.res_tx)),
+                            },
                         )
                         .unwrap();
                 },
@@ -189,16 +199,18 @@ impl NetworkPlayground {
     pub fn add_node(
         &mut self,
         twin_id: TwinId,
-        consensus_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        consensus_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         conn_mgr_reqs_rx: aptos_channels::Receiver<aptos_network::ConnectivityRequest>,
     ) {
         self.node_consensus_txs.lock().insert(twin_id, consensus_tx);
         self.drop_config.write().add_node(twin_id);
+        self.timeout_config.write().add_node(twin_id);
 
         self.extend_author_to_twin_ids(twin_id.author, twin_id);
 
         let fut1 = NetworkPlayground::start_node_outbound_handler(
+            Arc::clone(&self.timeout_config),
             Arc::clone(&self.drop_config),
             twin_id,
             network_reqs_rx,
@@ -217,7 +229,7 @@ impl NetworkPlayground {
         &mut self,
         src_twin_id: TwinId,
         dst_twin_id: TwinId,
-        msg_notif: PeerManagerNotification,
+        rmsg: ReceivedMessage,
     ) -> (Author, ConsensusMsg) {
         let node_consensus_tx = self
             .node_consensus_txs
@@ -227,21 +239,24 @@ impl NetworkPlayground {
             .clone();
 
         // copy message data
-        let msg_copy = match &msg_notif {
-            PeerManagerNotification::RecvMessage(src, msg) => {
-                let msg: ConsensusMsg = msg.to_message().unwrap();
-                (*src, msg)
+        let source_address = rmsg.sender.peer_id();
+        let consensus_msg = match &rmsg.message {
+            NetworkMessage::DirectSendMsg(dmsg) => dmsg
+                .protocol_id
+                .from_bytes(dmsg.raw_msg.as_slice())
+                .unwrap(),
+            wrong_message => {
+                panic!(
+                    "[network playground] Unexpected ReceivedMessage: {:?}",
+                    wrong_message
+                );
             },
-            msg_notif => panic!(
-                "[network playground] Unexpected PeerManagerNotification: {:?}",
-                msg_notif
-            ),
         };
         let _ = node_consensus_tx.push(
             (src_twin_id.author, ProtocolId::ConsensusDirectSendBcs),
-            msg_notif,
+            rmsg,
         );
-        msg_copy
+        (source_address, consensus_msg)
     }
 
     /// Wait for exactly `num_messages` to be enqueued and delivered. Return a
@@ -262,7 +277,7 @@ impl NetworkPlayground {
             let (src_twin_id, net_req) = self.outbound_msgs_rx.next().await
                 .expect("[network playground] waiting for messages, but message queue has shutdown unexpectedly");
 
-            // Convert PeerManagerRequest to corresponding PeerManagerNotification,
+            // Convert PeerManagerRequest to corresponding ReceivedMessage,
             // and extract destination peer
             let (dst, msg) = match &net_req {
                 PeerManagerRequest::SendDirectSend(dst_inner, msg_inner) => {
@@ -280,11 +295,17 @@ impl NetworkPlayground {
 
                 // Deliver and copy message if it's not dropped
                 if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {
-                    let msg_notif =
-                        PeerManagerNotification::RecvMessage(src_twin_id.author, msg.clone());
-                    let msg_copy = self
-                        .deliver_message(src_twin_id, *dst_twin_id, msg_notif)
-                        .await;
+                    let rmsg = ReceivedMessage {
+                        message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                            protocol_id: msg.protocol_id,
+                            priority: 0,
+                            raw_msg: msg.mdata.clone().into(),
+                        }),
+                        sender: PeerNetworkId::new(NetworkId::Validator, src_twin_id.author),
+                        receive_timestamp_micros: 0,
+                        rpc_replier: None,
+                    };
+                    let msg_copy = self.deliver_message(src_twin_id, *dst_twin_id, rmsg).await;
 
                     // Only insert msg_copy once for twins (if delivered)
                     if idx == 0 && msg_inspector(&msg_copy) {
@@ -374,10 +395,14 @@ impl NetworkPlayground {
         ret
     }
 
+    pub fn timeout_config(&self) -> Arc<RwLock<TimeoutConfig>> {
+        self.timeout_config.clone()
+    }
+
     pub async fn start(mut self) {
         // Take the next queued message
         while let Some((src_twin_id, net_req)) = self.outbound_msgs_rx.next().await {
-            // Convert PeerManagerRequest to corresponding PeerManagerNotification,
+            // Convert PeerManagerRequest to corresponding ReceivedMessage,
             // and extract destination peer
             let (dst, msg) = match &net_req {
                 PeerManagerRequest::SendDirectSend(dst_inner, msg_inner) => {
@@ -392,14 +417,21 @@ impl NetworkPlayground {
             let dst_twin_ids = self.get_twin_ids(dst);
 
             for dst_twin_id in dst_twin_ids.iter() {
-                let msg_notif =
-                    PeerManagerNotification::RecvMessage(src_twin_id.author, msg.clone());
+                let rmsg = ReceivedMessage {
+                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                        protocol_id: msg.protocol_id,
+                        priority: 0,
+                        raw_msg: msg.mdata.clone().into(),
+                    }),
+                    sender: PeerNetworkId::new(NetworkId::Validator, src_twin_id.author),
+                    receive_timestamp_micros: 0,
+                    rpc_replier: None,
+                };
                 let consensus_msg = msg.to_message().unwrap();
 
                 // Deliver and copy message it if it's not dropped
                 if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {
-                    self.deliver_message(src_twin_id, *dst_twin_id, msg_notif)
-                        .await;
+                    self.deliver_message(src_twin_id, *dst_twin_id, rmsg).await;
                 }
             }
         }
@@ -453,6 +485,23 @@ impl DropConfig {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct TimeoutConfig(HashMap<TwinId, HashSet<TwinId>>);
+
+impl TimeoutConfig {
+    pub fn is_message_timedout(&self, src: &TwinId, dst: &TwinId) -> bool {
+        self.0.get(src).map_or(false, |set| set.contains(dst))
+    }
+
+    pub fn timeout_message_for(&mut self, src: &TwinId, dst: &TwinId) -> bool {
+        self.0.entry(*src).or_default().insert(*dst)
+    }
+
+    fn add_node(&mut self, src: TwinId) {
+        self.0.insert(src, HashSet::new());
+    }
+}
+
 /// Table of per round message dropping rules
 #[derive(Default)]
 struct DropConfigRound(HashMap<u64, DropConfig>);
@@ -496,7 +545,6 @@ mod tests {
             storage::PeersAndMetadata,
         },
         protocols::{
-            direct_send::Message,
             network,
             network::{NetworkEvents, NewNetworkSender},
         },
@@ -814,10 +862,16 @@ mod tests {
 
         let peer_id = PeerId::random();
         let protocol_id = ProtocolId::ConsensusDirectSendBcs;
-        let bad_msg = PeerManagerNotification::RecvMessage(peer_id, Message {
-            protocol_id,
-            mdata: Bytes::from_static(b"\xde\xad\xbe\xef"),
-        });
+        let bad_msg = ReceivedMessage {
+            message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                protocol_id,
+                priority: 0,
+                raw_msg: Bytes::from_static(b"\xde\xad\xbe\xef").into(),
+            }),
+            sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
+            receive_timestamp_micros: 0,
+            rpc_replier: None,
+        };
 
         peer_mgr_notifs_tx
             .push((peer_id, protocol_id), bad_msg)
@@ -829,11 +883,17 @@ mod tests {
 
         let protocol_id = ProtocolId::ConsensusRpcJson;
         let (res_tx, _res_rx) = oneshot::channel();
-        let liveness_check_msg = PeerManagerNotification::RecvRpc(peer_id, InboundRpcRequest {
-            protocol_id,
-            data: Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()),
-            res_tx,
-        });
+        let liveness_check_msg = ReceivedMessage {
+            message: NetworkMessage::RpcRequest(RpcRequest {
+                protocol_id,
+                request_id: 0, // TODO: seq?
+                priority: 0,
+                raw_request: Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()).into(),
+            }),
+            sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
+            receive_timestamp_micros: 0,
+            rpc_replier: Some(Arc::new(res_tx)),
+        };
 
         peer_mgr_notifs_tx
             .push((peer_id, protocol_id), liveness_check_msg)

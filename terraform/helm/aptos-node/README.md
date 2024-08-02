@@ -32,29 +32,27 @@ Aptos blockchain node deployment
 | fullnode.storage.class | string | `nil` | Kubernetes storage class to use for fullnode persistent storage |
 | fullnode.storage.size | string | `"2048Gi"` | Size of fullnode persistent storage |
 | fullnode.tolerations | list | `[]` |  |
-| genesis_blob_upload_url | string | `"https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url"` |  |
+| genesis_blob_upload_url | string | `"https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url?cluster_name=unknown&era=1"` |  |
 | haproxy.affinity | object | `{}` |  |
 | haproxy.config.send_proxy_protocol | bool | `false` | Whether to send Proxy Protocol v2 |
+| haproxy.config.user | string | `"nobody"` | System user to run HA |
 | haproxy.enabled | bool | `true` | Enable HAProxy deployment in front of validator and fullnodes |
 | haproxy.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for HAProxy images |
 | haproxy.image.repo | string | `"haproxy"` | Image repo to use for HAProxy images |
-| haproxy.image.tag | string | `"2.2.29@sha256:8019a233a37045a27970dbc990e9ea485799200c40f658e4620b7fdf55641a3c"` | Image tag to use for HAProxy images |
-| haproxy.limits.validator.connectionsPerIPPerMin | int | `12` | Limit the number of connections per IP address per min |
-| haproxy.limits.validator.maxBytesOutRate10sec | int | `134217728` |  |
-| haproxy.limits.validator.rateLimitSession | int | `256` |  |
-| haproxy.limits.validator.tcpBufSize | int | `524288` |  |
+| haproxy.image.tag | string | `"3.0.2@sha256:3fa2e323a2f422239a39eff345b41ab20a7a91aa4ad8c3c82b9ae85dd241214b"` | Image tag to use for HAProxy images |
 | haproxy.nodeSelector | object | `{}` |  |
 | haproxy.replicas | int | `1` | Number of HAProxy replicas |
-| haproxy.resources.limits.cpu | int | `3` |  |
-| haproxy.resources.limits.memory | string | `"6Gi"` |  |
-| haproxy.resources.requests.cpu | int | `3` |  |
-| haproxy.resources.requests.memory | string | `"6Gi"` |  |
+| haproxy.resources.limits.cpu | int | `7` |  |
+| haproxy.resources.limits.memory | string | `"16Gi"` |  |
+| haproxy.resources.requests.cpu | int | `7` |  |
+| haproxy.resources.requests.memory | string | `"16Gi"` |  |
 | haproxy.tls_secret | string | `nil` | Name of the Kubernetes TLS secret to use for HAProxy |
 | haproxy.tolerations | list | `[]` |  |
 | imageTag | string | `"devnet"` | Default image tag to use for all validator and fullnode images |
 | labels | string | `nil` |  |
 | loadTestGenesis | bool | `false` | Load test-data for starting a test network |
 | manageImages | bool | `true` | If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout) |
+| metrics.destination | string | `"dev"` | The upstream sink for metrics. Supported values are "dev" and "prod" |
 | migrations.enable_vfn_explicit_pvc | bool | `false` | See templates/fullnode.yaml |
 | multicluster | object | `{"enabled":false,"targetClusters":["forge-multiregion-1","forge-multiregion-2","forge-multiregion-3"]}` | Options for multicluster mode. This is *experimental only*. |
 | numFullnodeGroups | int | `1` | Total number of fullnode groups to deploy |

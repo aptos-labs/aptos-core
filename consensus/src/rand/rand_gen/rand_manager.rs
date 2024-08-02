@@ -23,7 +23,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, error, info, spawn_named, warn};
+use aptos_logger::{error, info, spawn_named, trace, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -212,7 +212,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         message: RandMessage<S, D>,
     ) {
         let msg = message.into_network_message();
-        let _ = sender.send(Ok(protocol.to_bytes(&msg).unwrap().into()));
+        let _ = sender.send(Ok(protocol
+            .to_bytes(&msg)
+            .expect("Message should be serializable into protocol")
+            .into()));
     }
 
     async fn verification_task(
@@ -348,7 +351,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         mut reset_rx: Receiver<ResetRequest>,
         bounded_executor: BoundedExecutor,
-        highest_ordered_round: Round,
+        highest_known_round: Round,
     ) {
         info!("RandManager started");
         let (verified_msg_tx, mut verified_msg_rx) = unbounded();
@@ -357,7 +360,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let fast_rand_config = self.fast_config.clone();
         self.rand_store
             .lock()
-            .update_highest_known_round(highest_ordered_round);
+            .update_highest_known_round(highest_known_round);
         spawn_named!(
             "rand manager verification",
             Self::verification_task(
@@ -409,7 +412,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             }
                         }
                         RandMessage::Share(share) => {
-                            debug!(LogSchema::new(LogEvent::ReceiveProactiveRandShare)
+                            trace!(LogSchema::new(LogEvent::ReceiveProactiveRandShare)
                                 .author(self.author)
                                 .epoch(share.epoch())
                                 .round(share.metadata().round)
@@ -420,7 +423,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             }
                         }
                         RandMessage::FastShare(share) => {
-                            debug!(LogSchema::new(LogEvent::ReceiveRandShareFastPath)
+                            trace!(LogSchema::new(LogEvent::ReceiveRandShareFastPath)
                                 .author(self.author)
                                 .epoch(share.epoch())
                                 .round(share.metadata().round)

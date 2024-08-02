@@ -2,7 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::{BlockReader, BlockStore};
+#![allow(clippy::unwrap_used)]
+use crate::{
+    block_storage::{BlockReader, BlockStore},
+    payload_manager::DirectMempoolPayloadManager,
+};
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Round},
@@ -25,8 +29,7 @@ mod mock_state_computer;
 mod mock_storage;
 
 use crate::{
-    block_storage::pending_blocks::PendingBlocks, payload_manager::PayloadManager,
-    pipeline::execution_client::DummyExecutionClient,
+    block_storage::pending_blocks::PendingBlocks, pipeline::execution_client::DummyExecutionClient,
     util::mock_time_service::SimulatedTimeService,
 };
 use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
@@ -90,7 +93,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
-        Arc::from(PayloadManager::DirectMempool),
+        Arc::from(DirectMempoolPayloadManager::new()),
         false,
         Arc::new(Mutex::new(PendingBlocks::new())),
     ))

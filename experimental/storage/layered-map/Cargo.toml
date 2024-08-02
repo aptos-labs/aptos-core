@@ -13,12 +13,22 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 bitvec = "1.0.1"
+itertools = { workspace = true }
 once_cell = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
+itertools = { workspace = true }
+jemallocator = { workspace = true }
 proptest = { workspace = true }
+rand = { workspace = true }
+
+[[bench]]
+name = "sorting"
+harness = false

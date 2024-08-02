@@ -137,8 +137,19 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
+            name: Experiment::PEEPHOLE_OPTIMIZATION.to_string(),
+            description: "Whether to run peephole optimization on generated file format"
+                .to_string(),
+            default: Inherited(Experiment::OPTIMIZE.to_string()),
+        },
+        Experiment {
             name: Experiment::UNUSED_STRUCT_PARAMS_CHECK.to_string(),
             description: "Whether to check for unused struct type parameters".to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
+        },
+        Experiment {
+            name: Experiment::UNUSED_ASSIGNMENT_CHECK.to_string(),
+            description: "Whether to check for unused assignments".to_string(),
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
@@ -207,6 +218,7 @@ impl Experiment {
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const OPTIMIZE: &'static str = "optimize";
+    pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
@@ -214,6 +226,7 @@ impl Experiment {
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
+    pub const UNUSED_ASSIGNMENT_CHECK: &'static str = "unused-assignment-check";
     pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";
     pub const USAGE_CHECK: &'static str = "usage-check";
     pub const VARIABLE_COALESCING: &'static str = "variable-coalescing";

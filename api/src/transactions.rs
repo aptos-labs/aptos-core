@@ -986,7 +986,7 @@ impl TransactionsApi {
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
         // Verify the account exists
-        let account = Account::new(self.context.clone(), address, None, None, None)?;
+        let account = Account::new(self.context.clone(), address, None, None, None, true)?;
         account.get_account_resource()?;
 
         let latest_ledger_info = account.latest_ledger_info;
@@ -995,7 +995,7 @@ impl TransactionsApi {
             address.into(),
             page.start_option(),
             page.limit(&latest_ledger_info)?,
-            latest_ledger_info.version(),
+            account.ledger_version,
             &latest_ledger_info,
         )?;
         match accept_type {
@@ -1370,7 +1370,10 @@ impl TransactionsApi {
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
-        let exe_status = ExecutionStatus::convert_vm_status_for_simulation(vm_status.clone());
+        let exe_status = ExecutionStatus::conmbine_vm_status_for_simulation(
+            output.auxiliary_data(),
+            output.status().clone(),
+        );
 
         let stats_key = match txn.payload() {
             TransactionPayload::Script(_) => {
@@ -1432,8 +1435,7 @@ impl TransactionsApi {
                 let mut user_transactions = Vec::new();
                 for transaction in transactions.into_iter() {
                     match transaction {
-                        Transaction::UserTransaction(user_txn) => {
-                            let mut txn = *user_txn;
+                        Transaction::UserTransaction(mut user_txn) => {
                             match &vm_status {
                                 VMStatus::Error {
                                     message: Some(msg), ..
@@ -1441,13 +1443,13 @@ impl TransactionsApi {
                                 | VMStatus::ExecutionFailure {
                                     message: Some(msg), ..
                                 } => {
-                                    txn.info.vm_status +=
+                                    user_txn.info.vm_status +=
                                         format!("\nExecution failed with message: {}", msg)
                                             .as_str();
                                 },
                                 _ => (),
                             }
-                            user_transactions.push(txn);
+                            user_transactions.push(user_txn);
                         },
                         _ => {
                             return Err(SubmitTransactionError::internal_with_code(

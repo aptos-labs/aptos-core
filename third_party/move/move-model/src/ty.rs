@@ -14,10 +14,9 @@ use crate::{
     symbol::Symbol,
 };
 use itertools::Itertools;
-use move_binary_format::{
-    file_format::{Ability, AbilitySet, TypeParameterIndex},
-    normalized::Type as MType,
-};
+use move_binary_format::file_format::{Ability, AbilitySet, TypeParameterIndex};
+#[allow(deprecated)]
+use move_binary_format::normalized::Type as MType;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     u256::U256,
@@ -682,6 +681,7 @@ impl PrimitiveType {
     }
 
     /// Attempt to convert this type into a normalized::Type
+    #[allow(deprecated)]
     pub fn into_normalized_type(self) -> Option<MType> {
         use PrimitiveType::*;
         Some(match self {
@@ -1183,6 +1183,7 @@ impl Type {
     }
 
     /// Attempt to convert this type into a normalized::Type
+    #[allow(deprecated)]
     pub fn into_struct_type(self, env: &GlobalEnv) -> Option<MType> {
         use Type::*;
         match self {
@@ -1192,6 +1193,7 @@ impl Type {
     }
 
     /// Attempt to convert this type into a normalized::Type
+    #[allow(deprecated)]
     pub fn into_normalized_type(self, env: &GlobalEnv) -> Option<MType> {
         use Type::*;
         match self {

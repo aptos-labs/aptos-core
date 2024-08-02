@@ -4,6 +4,7 @@
 use aptos_types::transaction::authenticator::EphemeralPublicKey;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
+pub mod account_recovery_db;
 pub mod jwt;
 pub mod vuf;
 

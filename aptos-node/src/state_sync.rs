@@ -20,7 +20,6 @@ use aptos_network::application::{
     interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
     storage::PeersAndMetadata,
 };
-use aptos_schemadb::DB;
 use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntimes},
     metadata_storage::PersistentMetadataStorage,
@@ -132,7 +131,6 @@ pub fn start_state_sync_and_get_notification_handles(
     waypoint: Waypoint,
     event_subscription_service: EventSubscriptionService,
     db_rw: DbReaderWriter,
-    internal_indexer_db: Option<Arc<DB>>,
 ) -> anyhow::Result<(
     AptosDataClient,
     StateSyncRuntimes,
@@ -197,7 +195,6 @@ pub fn start_state_sync_and_get_notification_handles(
         aptos_data_client.clone(),
         streaming_service_client,
         TimeService::real(),
-        internal_indexer_db,
     );
 
     // Create a new state sync runtime handle

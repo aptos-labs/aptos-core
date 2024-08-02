@@ -9,13 +9,12 @@ use crate::{
     block::BlockRetriever,
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
-    types::Store,
 };
 use aptos_config::config::ApiConfig;
-use aptos_logger::{debug, warn};
+use aptos_logger::debug;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use aptos_warp_webserver::{logger, Error, WebServer};
-use std::{collections::BTreeMap, convert::Infallible, sync::Arc};
+use std::{convert::Infallible, sync::Arc};
 use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
@@ -44,8 +43,6 @@ pub struct RosettaContext {
     pub chain_id: ChainId,
     /// Block index cache
     pub block_cache: Option<Arc<BlockRetriever>>,
-    pub owner_addresses: Vec<AccountAddress>,
-    pub pool_address_to_owner: BTreeMap<AccountAddress, AccountAddress>,
 }
 
 impl RosettaContext {
@@ -53,40 +50,11 @@ impl RosettaContext {
         rest_client: Option<Arc<aptos_rest_client::Client>>,
         chain_id: ChainId,
         block_cache: Option<Arc<BlockRetriever>>,
-        owner_addresses: Vec<AccountAddress>,
     ) -> Self {
-        let mut pool_address_to_owner = BTreeMap::new();
-        if let Some(ref rest_client) = rest_client {
-            // We have to now fill in all of the mappings of owner to pool address
-            for owner_address in owner_addresses.iter() {
-                if let Ok(store) = rest_client
-                    .get_account_resource_bcs::<Store>(
-                        *owner_address,
-                        "0x1::staking_contract::Store",
-                    )
-                    .await
-                {
-                    let store = store.into_inner();
-                    let pool_addresses: Vec<_> = store
-                        .staking_contracts
-                        .iter()
-                        .map(|(_, pool)| pool.pool_address)
-                        .collect();
-                    for pool_address in pool_addresses {
-                        pool_address_to_owner.insert(pool_address, *owner_address);
-                    }
-                } else {
-                    warn!("Did not find a pool for owner: {}", owner_address);
-                }
-            }
-        }
-
         RosettaContext {
             rest_client,
             chain_id,
             block_cache,
-            owner_addresses,
-            pool_address_to_owner,
         }
     }
 
@@ -112,18 +80,12 @@ pub fn bootstrap(
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
-    owner_addresses: Vec<AccountAddress>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = aptos_runtimes::spawn_named_runtime("rosetta".into(), None);
 
     debug!("Starting up Rosetta server with {:?}", api_config);
 
-    runtime.spawn(bootstrap_async(
-        chain_id,
-        api_config,
-        rest_client,
-        owner_addresses,
-    ));
+    runtime.spawn(bootstrap_async(chain_id, api_config, rest_client));
     Ok(runtime)
 }
 
@@ -132,7 +94,6 @@ pub async fn bootstrap_async(
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
-    owner_addresses: Vec<AccountAddress>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
 
@@ -153,6 +114,8 @@ pub async fn bootstrap_async(
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
         let rest_client = rest_client.map(Arc::new);
+
+        // TODO: The BlockRetriever has no cache, and should probably be renamed from block_cache
         let block_cache = rest_client.as_ref().map(|rest_client| {
             Arc::new(BlockRetriever::new(
                 api_config.max_transactions_page_size,
@@ -160,8 +123,7 @@ pub async fn bootstrap_async(
             ))
         });
 
-        let context =
-            RosettaContext::new(rest_client.clone(), chain_id, block_cache, owner_addresses).await;
+        let context = RosettaContext::new(rest_client.clone(), chain_id, block_cache).await;
         api.serve(routes(context)).await;
     });
     Ok(handle)

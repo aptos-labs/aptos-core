@@ -1011,12 +1011,49 @@ fn strip_transactions(
 mod tests {
     use super::*;
     use aptos_protos::transaction::v1::{
-        transaction::TxnData, Event, Signature, Transaction, TransactionInfo, TransactionPayload,
+        transaction::TxnData, transaction_payload::Payload, EntryFunctionId, EntryFunctionPayload,
+        Event, MoveModuleId, Signature, Transaction, TransactionInfo, TransactionPayload,
         UserTransaction, UserTransactionRequest, WriteSetChange,
     };
     use aptos_transaction_filter::{
         boolean_transaction_filter::APIFilter, filters::UserTransactionFilterBuilder,
+        EntryFunctionFilterBuilder, UserTransactionPayloadFilterBuilder,
     };
+
+    fn create_test_transaction(
+        module_address: String,
+        module_name: String,
+        function_name: String,
+    ) -> Transaction {
+        Transaction {
+            version: 1,
+            txn_data: Some(TxnData::User(UserTransaction {
+                request: Some(UserTransactionRequest {
+                    payload: Some(TransactionPayload {
+                        r#type: 1,
+                        payload: Some(Payload::EntryFunctionPayload(EntryFunctionPayload {
+                            function: Some(EntryFunctionId {
+                                module: Some(MoveModuleId {
+                                    address: module_address,
+                                    name: module_name,
+                                }),
+                                name: function_name,
+                            }),
+                            ..Default::default()
+                        })),
+                    }),
+                    signature: Some(Signature::default()),
+                    ..Default::default()
+                }),
+                events: vec![Event::default()],
+            })),
+            info: Some(TransactionInfo {
+                changes: vec![WriteSetChange::default()],
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn test_ensure_sequential_transactions_merges_and_sorts() {
@@ -1062,6 +1099,10 @@ mod tests {
         assert_eq!(transactions1.first().unwrap().version, 1);
         assert_eq!(transactions1.last().unwrap().version, 11);
     }
+
+    const MODULE_ADDRESS: &str = "0x1234";
+    const MODULE_NAME: &str = "module";
+    const FUNCTION_NAME: &str = "function";
 
     #[test]
     fn test_transactions_are_stripped_correctly_sender_addresses() {
@@ -1111,5 +1152,168 @@ mod tests {
         assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
         assert_eq!(user_transaction.events.len(), 0);
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
+
+    #[test]
+    fn test_transactions_are_stripped_correctly_module_address() {
+        let txn = create_test_transaction(
+            MODULE_ADDRESS.to_string(),
+            MODULE_NAME.to_string(),
+            FUNCTION_NAME.to_string(),
+        );
+        // Testing filter with only address set
+        let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
+            APIFilter::UserTransactionFilter(
+                UserTransactionFilterBuilder::default()
+                    .payload(
+                        UserTransactionPayloadFilterBuilder::default()
+                            .function(
+                                EntryFunctionFilterBuilder::default()
+                                    .address(MODULE_ADDRESS.to_string())
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        )]);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn.clone()], &filter);
+        assert_eq!(num_stripped, 1);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_eq!(user_transaction.events.len(), 0);
+        assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
+
+    #[test]
+    fn test_transactions_are_stripped_correctly_module_name() {
+        let txn = create_test_transaction(
+            MODULE_ADDRESS.to_string(),
+            MODULE_NAME.to_string(),
+            FUNCTION_NAME.to_string(),
+        );
+        // Testing filter with only module set
+        let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
+            APIFilter::UserTransactionFilter(
+                UserTransactionFilterBuilder::default()
+                    .payload(
+                        UserTransactionPayloadFilterBuilder::default()
+                            .function(
+                                EntryFunctionFilterBuilder::default()
+                                    .module(MODULE_NAME.to_string())
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        )]);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn.clone()], &filter);
+        assert_eq!(num_stripped, 1);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_eq!(user_transaction.events.len(), 0);
+        assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
+
+    #[test]
+    fn test_transactions_are_stripped_correctly_function_name() {
+        let txn = create_test_transaction(
+            MODULE_ADDRESS.to_string(),
+            MODULE_NAME.to_string(),
+            FUNCTION_NAME.to_string(),
+        );
+        // Testing filter with only function set
+        let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
+            APIFilter::UserTransactionFilter(
+                UserTransactionFilterBuilder::default()
+                    .payload(
+                        UserTransactionPayloadFilterBuilder::default()
+                            .function(
+                                EntryFunctionFilterBuilder::default()
+                                    .function(FUNCTION_NAME.to_string())
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        )]);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn.clone()], &filter);
+        assert_eq!(num_stripped, 1);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_eq!(user_transaction.events.len(), 0);
+        assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
+    #[test]
+    fn test_transactions_are_not_stripped() {
+        let txn = create_test_transaction(
+            MODULE_ADDRESS.to_string(),
+            MODULE_NAME.to_string(),
+            FUNCTION_NAME.to_string(),
+        );
+        // Testing filter with wrong filter
+        let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
+            APIFilter::UserTransactionFilter(
+                UserTransactionFilterBuilder::default()
+                    .payload(
+                        UserTransactionPayloadFilterBuilder::default()
+                            .function(
+                                EntryFunctionFilterBuilder::default()
+                                    .function("0xrandom".to_string())
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .build()
+                            .unwrap(),
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        )]);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn.clone()], &filter);
+        assert_eq!(num_stripped, 0);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_ne!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_ne!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_ne!(user_transaction.events.len(), 0);
+        assert_ne!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
 }

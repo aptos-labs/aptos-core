@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    expansion::translate::is_valid_struct_constant_or_schema_name,
     parser::ast::{
         self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName,
         ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
@@ -171,7 +172,8 @@ pub struct StructDefinition {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructLayout {
-    Singleton(Fields<Type>),
+    // the second field is true iff the struct has positional fields
+    Singleton(Fields<Type>, bool),
     Variants(Vec<StructVariant>),
     Native(Loc),
 }
@@ -182,6 +184,7 @@ pub struct StructVariant {
     pub loc: Loc,
     pub name: VariantName,
     pub fields: Fields<Type>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -192,6 +195,7 @@ pub struct StructVariant {
 pub enum Visibility {
     Public(Loc),
     Friend(Loc),
+    Package(Loc),
     Internal,
 }
 
@@ -376,6 +380,19 @@ pub enum ModuleAccess_ {
     // ModuleAccess(module_ident, member_ident, optional_variant_ident)
     ModuleAccess(ModuleIdent, Name, Option<Name>),
 }
+
+impl ModuleAccess_ {
+    fn get_name(&self) -> &Name {
+        match self {
+            ModuleAccess_::Name(n) | ModuleAccess_::ModuleAccess(_, n, _) => n,
+        }
+    }
+
+    pub fn is_valid_struct_constant_or_schema_name(&self) -> bool {
+        is_valid_struct_constant_or_schema_name(self.get_name().value.as_str())
+    }
+}
+
 pub type ModuleAccess = Spanned<ModuleAccess_>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -398,6 +415,7 @@ pub type Type = Spanned<Type_>;
 pub enum LValue_ {
     Var(ModuleAccess, Option<Vec<Type>>),
     Unpack(ModuleAccess, Option<Vec<Type>>, Fields<LValue>),
+    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueList),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
@@ -487,7 +505,7 @@ pub enum Exp_ {
 
     Borrow(bool, Box<Exp>),
     ExpDotted(Box<ExpDotted>),
-    Index(Box<Exp>, Box<Exp>), // spec only (no mutation needed right now)
+    Index(Box<Exp>, Box<Exp>), // spec only unless language >= v2
 
     Cast(Box<Exp>, Type),
     Annotate(Box<Exp>, Type),
@@ -727,11 +745,14 @@ impl AbilitySet {
 impl Visibility {
     pub const FRIEND: &'static str = P::Visibility::FRIEND;
     pub const INTERNAL: &'static str = P::Visibility::INTERNAL;
+    pub const PACKAGE: &'static str = P::Visibility::PACKAGE;
     pub const PUBLIC: &'static str = P::Visibility::PUBLIC;
 
     pub fn loc(&self) -> Option<Loc> {
         match self {
-            Visibility::Public(loc) | Visibility::Friend(loc) => Some(*loc),
+            Visibility::Public(loc) | Visibility::Friend(loc) | Visibility::Package(loc) => {
+                Some(*loc)
+            },
             Visibility::Internal => None,
         }
     }
@@ -849,6 +870,7 @@ impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", match &self {
             Visibility::Public(_) => Visibility::PUBLIC,
+            Visibility::Package(_) => Visibility::PACKAGE,
             Visibility::Friend(_) => Visibility::FRIEND,
             Visibility::Internal => Visibility::INTERNAL,
         })
@@ -1081,7 +1103,7 @@ impl AstDebug for (StructName, &StructDefinition) {
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
-        if let StructLayout::Singleton(fields) = fields {
+        if let StructLayout::Singleton(fields, _) = fields {
             w.block(|w| {
                 w.list(fields, ",", |w, (_, f, idx_st)| {
                     let (idx, st) = idx_st;
@@ -1650,7 +1672,9 @@ impl AstDebug for Exp_ {
                 rhs.ast_debug(w);
             },
             E::Mutate(lhs, rhs) => {
-                w.write("*");
+                if !matches!(lhs.value, E::Index(_, _)) {
+                    w.write("*");
+                }
                 lhs.ast_debug(w);
                 w.write(" = ");
                 rhs.ast_debug(w);
@@ -1780,6 +1804,17 @@ impl AstDebug for LValue_ {
                     b.ast_debug(w);
                 });
                 w.write("}");
+            },
+            L::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(&args.value, |w, b| b.ast_debug(w));
+                w.write(")");
             },
         }
     }

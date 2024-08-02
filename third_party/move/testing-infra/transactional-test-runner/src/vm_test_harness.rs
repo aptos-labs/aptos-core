@@ -31,7 +31,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     value::MoveValue,
 };
 use move_model::metadata::LanguageVersion;
@@ -48,6 +47,7 @@ use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
     InMemoryStorage,
 };
+use move_vm_types::resolver::ResourceResolver;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -68,7 +68,6 @@ struct SimpleVMTestAdapter<'a> {
 #[derive(Debug, Parser)]
 pub struct AdapterPublishArgs {
     #[clap(long)]
-    /// is skip the struct_and_pub_function_linking compatibility check
     pub skip_check_struct_and_pub_function_linking: bool,
     #[clap(long)]
     /// is skip the struct_layout compatibility check
@@ -209,12 +208,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let sender = *id.address();
         let verbose = extra_args.verbose;
         let result = self.perform_session_action(gas_budget, |session, gas_status| {
-            let compat = Compatibility::new(
-                !extra_args.skip_check_struct_and_pub_function_linking,
-                !extra_args.skip_check_struct_layout,
-                !extra_args.skip_check_friend_linking,
-            );
-
+            let compat = if extra_args.skip_check_struct_and_pub_function_linking {
+                Compatibility::no_check()
+            } else {
+                Compatibility::new(
+                    !extra_args.skip_check_struct_layout,
+                    !extra_args.skip_check_friend_linking,
+                )
+            };
             session.publish_module_bundle_with_compat_config(
                 vec![module_bytes],
                 sender,
@@ -349,7 +350,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             name: resource.to_owned(),
             type_args,
         };
-        match self.storage.get_resource(&address, &tag).unwrap() {
+        match self
+            .storage
+            .get_resource_bytes_with_metadata_and_layout(&address, &tag, &[], None)
+            .unwrap()
+            .0
+        {
             None => Ok("[No Resource Exists]".to_owned()),
             Some(data) => {
                 let annotated =

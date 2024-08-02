@@ -106,6 +106,14 @@ error: use of unassigned local `x`
 
 
 Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/simplifier-elimination/use_before_assign_while.move:19:60
+   │
+19 │         while (cond) { let y = &x; _ = move y; if (cond) { x = 0 }; break }
+   │                                                            ^^^^^
+
+
+Diagnostics:
 error: cannot move local `x` since it is still in use
   ┌─ tests/simplifier-elimination/use_before_assign_while.move:9:32
   │

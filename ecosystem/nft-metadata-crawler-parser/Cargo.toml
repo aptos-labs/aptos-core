@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-metrics-core = { workspace = true }
 async-trait = { workspace = true }
+axum = { workspace = true }
 backoff = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
@@ -29,6 +30,7 @@ diesel = { workspace = true, features = [
     "serde_json",
 ] }
 diesel_migrations = { workspace = true }
+enum_dispatch = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
 google-cloud-storage = { workspace = true }
@@ -42,4 +44,3 @@ sha256 = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
-warp = { workspace = true }

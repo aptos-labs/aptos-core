@@ -17,7 +17,6 @@ hex = { workspace = true }
 itertools = { workspace = true }
 module-generation = { path = "../module-generation" }
 num_cpus = { workspace = true }
-once_cell = { workspace = true }
 # Cannot use workspace version as aptos-core currently cannot be upgraded
 # to newer rand. See https://github.com/aptos-labs/aptos-core/issues/13031
 rand = { version = "0.8.5" }

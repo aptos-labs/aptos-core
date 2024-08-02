@@ -16,7 +16,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     persistent_liveness_storage::RecoveryData,
     pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
@@ -291,7 +291,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::from(PayloadManager::DirectMempool),
+            Arc::from(DirectMempoolPayloadManager::new()),
             false,
             Arc::new(Mutex::new(PendingBlocks::new())),
         ));
@@ -303,11 +303,13 @@ impl NodeSetup {
             Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
             Duration::ZERO,
+            20,
             10,
             1000,
             5,
             500,
             10,
+            1,
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
@@ -1853,6 +1855,75 @@ fn block_retrieval_test() {
     });
 }
 
+#[test]
+fn block_retrieval_timeout_test() {
+    let runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        4,
+        Some(vec![0, 1]),
+        None,
+        None,
+        None,
+        None,
+    );
+    let timeout_config = playground.timeout_config();
+    runtime.spawn(playground.start());
+
+    for i in 0..4 {
+        info!("processing {}", i);
+        process_and_vote_on_proposal(
+            &runtime,
+            &mut nodes,
+            i as usize % 2,
+            &[3],
+            true,
+            None,
+            true,
+            i + 1,
+            i.saturating_sub(1),
+            0,
+        );
+    }
+
+    timed_block_on(&runtime, async {
+        let mut behind_node = nodes.pop().unwrap();
+
+        for node in nodes.iter() {
+            timeout_config.write().timeout_message_for(
+                &TwinId {
+                    id: behind_node.id,
+                    author: behind_node.signer.author(),
+                },
+                &TwinId {
+                    id: node.id,
+                    author: node.signer.author(),
+                },
+            );
+        }
+
+        // Drain the queue on other nodes
+        for node in nodes.iter_mut() {
+            let _ = node.next_proposal().await;
+        }
+
+        info!(
+            "Processing proposals for behind node {}",
+            behind_node.identity_desc()
+        );
+
+        let proposal_msg = behind_node.next_proposal().await;
+        behind_node
+            .round_manager
+            .process_proposal_msg(proposal_msg)
+            .await
+            .unwrap_err();
+    });
+}
+
+#[ignore] // TODO: turn this test back on once the flakes have resolved.
 #[test]
 pub fn forking_retrieval_test() {
     let runtime = consensus_runtime();

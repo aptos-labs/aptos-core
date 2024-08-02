@@ -3,7 +3,7 @@
 
 use crate::{
     counters::{MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXN_SHUFFLE_SECONDS},
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
@@ -15,7 +15,7 @@ use fail::fail_point;
 use std::sync::Arc;
 
 pub struct BlockPreparer {
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     txn_filter: Arc<TransactionFilter>,
     txn_deduper: Arc<dyn TransactionDeduper>,
     txn_shuffler: Arc<dyn TransactionShuffler>,
@@ -23,7 +23,7 @@ pub struct BlockPreparer {
 
 impl BlockPreparer {
     pub fn new(
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         txn_filter: Arc<TransactionFilter>,
         txn_deduper: Arc<dyn TransactionDeduper>,
         txn_shuffler: Arc<dyn TransactionShuffler>,
@@ -61,7 +61,7 @@ impl BlockPreparer {
             };
 
             if let Some(max_txns_from_block_to_execute) = max_txns_from_block_to_execute {
-                shuffled_txns.truncate(max_txns_from_block_to_execute);
+                shuffled_txns.truncate(max_txns_from_block_to_execute as usize);
             }
             MAX_TXNS_FROM_BLOCK_TO_EXECUTE.observe(shuffled_txns.len() as f64);
             Ok(shuffled_txns)

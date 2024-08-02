@@ -9,12 +9,12 @@
 //!
 //! This is broken down in the following flow:
 //!
-//! * Preprocess (based on operations) gets information to fetch from metadata (onchchain)
-//! * Metadata fetches onchain information e.g. sequence number
+//! * Preprocess (based on operations) gets information to fetch from metadata (on-chain)
+//! * Metadata fetches on-chain information e.g. sequence number
 //! * Payloads generates an unsigned transaction
-//! * Application outside signs the payload from the transactino
+//! * Application outside signs the payload from the transaction
 //! * Combine puts the signed transaction payload with the unsigned transaction
-//! * Submit submits the signed transaciton to the blockchain
+//! * Submit submits the signed transaction to the blockchain
 //!
 //! There are also 2 other sometimes used APIs
 //! * Derive (get an account from the private key)
@@ -139,7 +139,9 @@ pub fn submit_route(
 
 /// Construction combine command (OFFLINE)
 ///
-/// This combines signatures, and a raw txn
+/// This combines signatures, and a raw transaction
+///
+/// This currently only supports the original Ed25519 with single signer.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructioncombine)
 async fn construction_combine(
@@ -149,6 +151,7 @@ async fn construction_combine(
     debug!("/construction/combine {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
+    // Decode the unsigned transaction from BCS in the input
     let unsigned_txn: RawTransaction =
         decode_bcs(&request.unsigned_transaction, "UnsignedTransaction")?;
 
@@ -162,16 +165,19 @@ async fn construction_combine(
 
     let signature = &request.signatures[0];
 
+    // Only support Ed25519
     if signature.signature_type != SignatureType::Ed25519
         || signature.public_key.curve_type != CurveType::Edwards25519
     {
         return Err(ApiError::InvalidSignatureType);
     }
 
+    // Decode the key and signature accordingly
     let public_key: Ed25519PublicKey =
         decode_key(&signature.public_key.hex_bytes, "Ed25519PublicKey")?;
     let signature: Ed25519Signature = decode_key(&signature.hex_bytes, "Ed25519Signature")?;
 
+    // Combine them into a signed transaction, and encode it as BCS to return
     let signed_txn = SignedTransaction::new(unsigned_txn, public_key, signature);
 
     Ok(ConstructionCombineResponse {
@@ -185,6 +191,9 @@ async fn construction_combine(
 /// Note: This only works for new accounts.  After the account is created, all APIs should provide
 /// both account and key.
 ///
+/// Note: if the accounts are handled ONLY by Rosetta, then this will always work.  It only stops working
+/// if it is one of many other types of keys / a rotated account.
+///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionderive)
 async fn construction_derive(
     request: ConstructionDeriveRequest,
@@ -193,6 +202,8 @@ async fn construction_derive(
     debug!("/construction/derive {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
+    // The input must be an Ed25519 Public key and will only derive the Address for the original
+    // Aptos Ed25519 authentication scheme
     let public_key: Ed25519PublicKey =
         decode_key(&request.public_key.hex_bytes, "Ed25519PublicKey")?;
     let address = AuthenticationKey::ed25519(&public_key).account_address();
@@ -214,6 +225,8 @@ async fn construction_hash(
     debug!("/construction/hash {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
+    // Decode the SignedTransaction and hash it accordingly.  This in theory works for any transaction
+    // but it is expected to only be UserTransactions
     let signed_transaction: SignedTransaction =
         decode_bcs(&request.signed_transaction, "SignedTransaction")?;
 
@@ -222,11 +235,13 @@ async fn construction_hash(
     })
 }
 
-/// Fills in the operator for actions that require it but don't have one
+/// Fills in the operator for actions that require it but don't have one on an [InternalOperation]
+/// TODO: move this onto [InternalOperation] and not in this file
 async fn fill_in_operator(
     rest_client: &aptos_rest_client::Client,
     mut internal_operation: InternalOperation,
 ) -> ApiResult<InternalOperation> {
+    // TODO: Refactor so there's not duplicate code below
     match &mut internal_operation {
         InternalOperation::SetOperator(op) => {
             // If there was no old operator set, and there is only one, we should use that
@@ -290,6 +305,13 @@ async fn fill_in_operator(
     Ok(internal_operation)
 }
 
+/// Simulates a transaction for gas estimation purposes
+///
+/// Only the original Ed25519 accounts on Aptos are supported
+///
+/// Will only simulate if it does not have max gas amount
+///
+/// Will only estimate gas price
 async fn simulate_transaction(
     rest_client: &aptos_rest_client::Client,
     chain_id: ChainId,
@@ -301,6 +323,7 @@ async fn simulate_transaction(
     let mut transaction_factory = TransactionFactory::new(chain_id);
 
     // If we have a gas unit price, let's not estimate
+    // TODO: Split into separate function
     if let Some(gas_unit_price) = options.gas_price_per_unit.as_ref() {
         transaction_factory = transaction_factory.with_gas_unit_price(gas_unit_price.0);
     } else {
@@ -342,7 +365,6 @@ async fn simulate_transaction(
         .build();
 
     // Read and fill in public key as necessary, this is required for simulation!
-    // TODO: Only single signer supported
     let public_key =
         if let Some(public_key) = options.public_keys.as_ref().and_then(|inner| inner.first()) {
             Ed25519PublicKey::from_encoded_string(&public_key.hex_bytes).map_err(|err| {
@@ -424,7 +446,7 @@ async fn simulate_transaction(
 
 /// Construction metadata command
 ///
-/// Retrieve sequence number for submitting transactions
+/// Retrieves sequence number, gas price, max gas, gas estimate for the transaction
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionmetadata)
 async fn construction_metadata(
@@ -443,10 +465,10 @@ async fn construction_metadata(
         return Err(ApiError::ChainIdMismatch);
     }
 
+    // Retrieve the sequence number from the rest server if one wasn't provided
     let sequence_number = if let Some(sequence_number) = request.options.sequence_number {
         sequence_number.0
     } else {
-        // Retrieve the sequence number from the rest server if one wasn't provided
         response.inner().sequence_number
     };
 
@@ -490,6 +512,8 @@ async fn construction_parse(
 ) -> ApiResult<ConstructionParseResponse> {
     debug!("/construction/parse {:?}", request);
     check_network(request.network_identifier, &server_context)?;
+
+    // For signed transactions, we can pull the signers and the raw transaction
     let metadata;
     let (account_identifier_signers, unsigned_txn) = if request.signed {
         let signed_txn: SignedTransaction = decode_bcs(&request.transaction, "SignedTransaction")?;
@@ -509,6 +533,7 @@ async fn construction_parse(
             signed_txn.into_raw_transaction(),
         )
     } else {
+        // For unsigned transactions,w e can only pull the transaction
         let unsigned_txn: RawTransaction = decode_bcs(&request.transaction, "UnsignedTransaction")?;
         metadata = Some(ConstructionParseMetadata {
             unsigned_transaction: Some(unsigned_txn.clone()),
@@ -516,9 +541,12 @@ async fn construction_parse(
         });
         (None, unsigned_txn)
     };
+
+    // The sender however should always be present, even if not signed
     let sender = unsigned_txn.sender();
 
-    // This is messy, but all we can do
+    // This is messy, but all we can do is to manually go through and check the entry functions associated to convert to Rosetta operations
+    // TODO: We should centralize all this operation -> entry function / entry function -> operation code
     let operations = match unsigned_txn.into_payload() {
         TransactionPayload::EntryFunction(inner) => {
             let (module, function_name, type_args, args) = inner.into_inner();
@@ -602,6 +630,7 @@ async fn construction_parse(
     })
 }
 
+/// Parses 0x1::aptos_account::create(auth_key: address)
 fn parse_create_account_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -632,6 +661,7 @@ fn parse_create_account_operation(
     }
 }
 
+/// Parses 0x1::coin::transfer<CoinType>(receiver: address, amount: u64)
 fn parse_transfer_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -640,7 +670,6 @@ fn parse_transfer_operation(
     let mut operations = Vec::new();
 
     // Check coin is the native coin
-
     let currency = match type_args.first() {
         Some(TypeTag::Struct(struct_tag)) => {
             let StructTag {
@@ -660,7 +689,6 @@ fn parse_transfer_operation(
     };
 
     // Retrieve the args for the operations
-
     let receiver: AccountAddress = if let Some(receiver) = args.first() {
         bcs::from_bytes(receiver)?
     } else {
@@ -693,6 +721,7 @@ fn parse_transfer_operation(
     Ok(operations)
 }
 
+/// Parses 0x1::aptos_account::transfer(receiver: address, amount: u64)
 fn parse_account_transfer_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -708,7 +737,7 @@ fn parse_account_transfer_operation(
     let mut operations = Vec::new();
 
     // Retrieve the args for the operations
-
+    // TODO: This is the same as coin::transfer, we should combine them
     let receiver: AccountAddress = if let Some(receiver) = args.first() {
         bcs::from_bytes(receiver)?
     } else {
@@ -741,6 +770,7 @@ fn parse_account_transfer_operation(
     Ok(operations)
 }
 
+/// Parses a specific BCS function argument to the given type
 pub fn parse_function_arg<T: DeserializeOwned>(
     name: &str,
     args: &[Vec<u8>],
@@ -758,6 +788,7 @@ pub fn parse_function_arg<T: DeserializeOwned>(
     ))))
 }
 
+/// Parses 0x1::staking_contract::switch_operator_with_same_commission(old_operator: address, new_operator: address)
 pub fn parse_set_operator_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -782,6 +813,7 @@ pub fn parse_set_operator_operation(
     )])
 }
 
+/// Parses 0x1::staking_contract::update_voter(operator: address, new_voter: address)
 pub fn parse_set_voter_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -805,6 +837,7 @@ pub fn parse_set_voter_operation(
     )])
 }
 
+/// Parses 0x1::staking_contract::create_staking_contract(operator: address, voter: address, amount: u64, commission_percentage: u64)
 pub fn parse_create_stake_pool_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -832,6 +865,7 @@ pub fn parse_create_stake_pool_operation(
     )])
 }
 
+/// Parses 0x1::staking_contract::reset_lockup(operator: address)
 pub fn parse_reset_lockup_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -853,6 +887,7 @@ pub fn parse_reset_lockup_operation(
     )])
 }
 
+/// Parses 0x1::staking_contract::unlock_stake(operator: address, amount: u64)
 pub fn parse_unlock_stake_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -877,6 +912,7 @@ pub fn parse_unlock_stake_operation(
     )])
 }
 
+/// Parses 0x1::staking_contract::update_commission(operator: address, new_commission_percentage: u64)
 pub fn parse_update_commission_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -901,6 +937,7 @@ pub fn parse_update_commission_operation(
     )])
 }
 
+/// Parses 0x1::staking_contract::distribute(staker: address, operator: address)
 pub fn parse_distribute_staking_rewards_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -925,6 +962,7 @@ pub fn parse_distribute_staking_rewards_operation(
     )])
 }
 
+/// Parses 0x1::delegation_pool::add_stake(pool_address: address, amount: u64)
 pub fn parse_delegation_pool_add_stake_operation(
     delegator: AccountAddress,
     type_args: &[TypeTag],
@@ -949,6 +987,7 @@ pub fn parse_delegation_pool_add_stake_operation(
     )])
 }
 
+/// Parses 0x1::delegation_pool::unlock(pool_address: address, amount: u64)
 pub fn parse_delegation_pool_unlock_operation(
     delegator: AccountAddress,
     type_args: &[TypeTag],
@@ -973,6 +1012,7 @@ pub fn parse_delegation_pool_unlock_operation(
     )])
 }
 
+/// Parses 0x1::delegation_pool::withdraw(pool_address: address, amount: u64)
 pub fn parse_delegation_pool_withdraw_operation(
     delegator: AccountAddress,
     type_args: &[TypeTag],
@@ -999,7 +1039,7 @@ pub fn parse_delegation_pool_withdraw_operation(
 
 /// Construction payloads command (OFFLINE)
 ///
-/// Constructs payloads for given known operations
+/// Constructs payloads for given known operations.  This converts Rosetta [Operation]s to a [RawTransaction]
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionpayloads)
 async fn construction_payloads(
@@ -1009,8 +1049,11 @@ async fn construction_payloads(
     debug!("/construction/payloads {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    // Retrieve the real operation we're doing
+    // Retrieve the real operation we're doing, this identifies the sub-operations to a function
     let mut operation = InternalOperation::extract(&request.operations)?;
+
+    // For some reason, metadata is optional on the Rosetta spec, we enforce it here, otherwise we
+    // can't build the [RawTransaction] offline.
     let metadata = if let Some(ref metadata) = request.metadata {
         metadata
     } else {
@@ -1018,6 +1061,8 @@ async fn construction_payloads(
     };
 
     // This is a hack to ensure that the payloads actually have overridden operators if not provided
+    // It ensures that the operations provided match the metadata provided.
+    // TODO: Move this to a separate function
     match &mut operation {
         InternalOperation::CreateAccount(_) => {
             if operation != metadata.internal_operation {
@@ -1225,6 +1270,7 @@ async fn construction_payloads(
     }
     let unsigned_transaction = txn_builder.build();
 
+    // Build a signing message so that an external signer can sign with Ed25519 without knowing BCS
     let signing_message = hex::encode(signing_message(&unsigned_transaction).map_err(|err| {
         ApiError::InvalidInput(Some(format!(
             "Invalid transaction, can't build into a signing message {}",
@@ -1246,7 +1292,8 @@ async fn construction_payloads(
 
 /// Construction preprocess command (OFFLINE)
 ///
-/// This creates the request needed to fetch metadata
+/// This creates the request needed to fetch metadata.  It basically verifies that the inputs are
+/// valid for calling on-chain data.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionpreprocess)
 async fn construction_preprocess(
@@ -1256,9 +1303,13 @@ async fn construction_preprocess(
     debug!("/construction/preprocess {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
+    // Determine the actual operation from the collection of Rosetta [Operation]
     let internal_operation = InternalOperation::extract(&request.operations)?;
+
+    // Provide the accounts that need public keys (there's only one supported today)
     let required_public_keys = vec![AccountIdentifier::base_account(internal_operation.sender())];
 
+    // Verify that the max gas value is valid
     if let Some(max_gas) = request
         .metadata
         .as_ref()
@@ -1270,11 +1321,14 @@ async fn construction_preprocess(
             )));
         }
     }
+
+    // Verify that expiration time is valid
     if let Some(expiry_time_secs) = request
         .metadata
         .as_ref()
         .and_then(|inner| inner.expiry_time_secs)
     {
+        // Probably should be greater than now + some amount of time, but for now it's valid
         if expiry_time_secs.0
             <= SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -1291,12 +1345,12 @@ async fn construction_preprocess(
     }
 
     // Check gas input options
-
     let public_keys = request
         .metadata
         .as_ref()
         .and_then(|inner| inner.public_keys.as_ref());
 
+    // A public key can be provided for simulation, otherwise, a max gas amount would be given.
     if request
         .metadata
         .as_ref()
@@ -1313,6 +1367,8 @@ async fn construction_preprocess(
         )));
     }
 
+    // Convert it to an input to the metadata call
+    // TODO: Refactor so that it only does `request.metadata.as_ref()` once
     Ok(ConstructionPreprocessResponse {
         options: MetadataOptions {
             internal_operation,
@@ -1360,6 +1416,7 @@ async fn construction_submit(
 
     let rest_client = server_context.rest_client()?;
 
+    // Submits the transaction, and returns the hash of the transaction
     let txn: SignedTransaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
     let hash = txn.committed_hash();
     rest_client.submit_bcs(&txn).await?;

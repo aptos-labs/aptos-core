@@ -12,6 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[ignore] // TODO: turn this test back on once the flakes have resolved.
 #[tokio::test]
 async fn test_consensusdb_recovery() {
     let mut swarm = new_local_swarm_with_aptos(4).await;

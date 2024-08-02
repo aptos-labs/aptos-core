@@ -96,7 +96,7 @@ async fn get_last_non_reconfig_block_ending_txn_name(rest_client: &Client) -> Op
 
 #[tokio::test]
 async fn block_epilogue_upgrade_test() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
         .with_aptos()
         // Start with V1
         .with_init_genesis_config(Arc::new(|genesis_config| {

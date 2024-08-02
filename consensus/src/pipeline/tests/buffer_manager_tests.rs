@@ -255,8 +255,9 @@ async fn assert_results(
     batches: Vec<Vec<PipelinedBlock>>,
     result_rx: &mut Receiver<OrderedBlocks>,
 ) {
+    let total_batches = batches.iter().flatten().count();
     let mut blocks: Vec<PipelinedBlock> = Vec::new();
-    for _ in 0..batches.len() {
+    while blocks.len() < total_batches {
         let OrderedBlocks { ordered_blocks, .. } = result_rx.next().await.unwrap();
         blocks.extend(ordered_blocks.into_iter());
     }

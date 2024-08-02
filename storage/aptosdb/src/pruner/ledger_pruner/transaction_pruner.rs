@@ -10,6 +10,11 @@ use crate::{
     },
     transaction_store::TransactionStore,
 };
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
+use aptos_db_indexer_schemas::{
+    metadata::{MetadataKey as IndexerMetadataKey, MetadataValue as IndexerMetadataValue},
+    schema::indexer_metadata::InternalIndexerMetadataSchema,
+};
 use aptos_logger::info;
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
@@ -20,6 +25,7 @@ use std::sync::Arc;
 pub struct TransactionPruner {
     transaction_store: Arc<TransactionStore>,
     ledger_db: Arc<LedgerDb>,
+    internal_indexer_db: Option<InternalIndexerDB>,
 }
 
 impl DBSubPruner for TransactionPruner {
@@ -34,8 +40,6 @@ impl DBSubPruner for TransactionPruner {
         self.ledger_db
             .transaction_db()
             .prune_transaction_by_hash_indices(&candidate_transactions, &batch)?;
-        self.transaction_store
-            .prune_transaction_by_account(&candidate_transactions, &batch)?;
         self.ledger_db.transaction_db().prune_transactions(
             current_progress,
             target_version,
@@ -45,6 +49,21 @@ impl DBSubPruner for TransactionPruner {
             &DbMetadataKey::TransactionPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
+        if let Some(indexer_db) = self.internal_indexer_db.as_ref() {
+            if indexer_db.transaction_enabled() {
+                let index_batch = SchemaBatch::new();
+                self.transaction_store
+                    .prune_transaction_by_account(&candidate_transactions, &index_batch)?;
+                index_batch.put::<InternalIndexerMetadataSchema>(
+                    &IndexerMetadataKey::TransactionPrunerProgress,
+                    &IndexerMetadataValue::Version(target_version),
+                )?;
+                indexer_db.get_inner_db_ref().write_schemas(index_batch)?;
+            } else {
+                self.transaction_store
+                    .prune_transaction_by_account(&candidate_transactions, &batch)?;
+            }
+        }
         self.ledger_db.transaction_db().write_schemas(batch)
     }
 }
@@ -54,6 +73,7 @@ impl TransactionPruner {
         transaction_store: Arc<TransactionStore>,
         ledger_db: Arc<LedgerDb>,
         metadata_progress: Version,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
             ledger_db.transaction_db_raw(),
@@ -64,6 +84,7 @@ impl TransactionPruner {
         let myself = TransactionPruner {
             transaction_store,
             ledger_db,
+            internal_indexer_db,
         };
 
         info!(

@@ -17,14 +17,11 @@ use crate::{
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value::StateValueSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
-        state_value_index::StateValueIndexSchema,
         version_data::VersionDataSchema,
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
-    state_restore::{
-        StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter,
-    },
+    state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
     state_store::buffered_state::BufferedState,
     utils::{
         iterators::PrefixedStateValueIterator,
@@ -38,6 +35,11 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
+use aptos_db_indexer_schemas::{
+    metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
+    schema::indexer_metadata::InternalIndexerMetadataSchema,
+};
 use aptos_executor::components::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
@@ -48,7 +50,7 @@ use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
-    db_ensure as ensure,
+    db_ensure as ensure, db_other_bail as bail,
     state_delta::StateDelta,
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
@@ -105,6 +107,7 @@ pub(crate) struct StateStore {
     buffered_state: Mutex<BufferedState>,
     buffered_state_target_items: usize,
     smt_ancestors: Mutex<SmtAncestors<StateValue>>,
+    internal_indexer_db: Option<InternalIndexerDB>,
 }
 
 impl Deref for StateStore {
@@ -288,6 +291,7 @@ impl StateStore {
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
         skip_usage: bool,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Self {
         if !hack_for_tests && !empty_buffered_state_for_restore {
             Self::sync_commit_progress(
@@ -326,6 +330,7 @@ impl StateStore {
             buffered_state: Mutex::new(buffered_state),
             buffered_state_target_items,
             smt_ancestors: Mutex::new(smt_ancestors),
+            internal_indexer_db,
         }
     }
 
@@ -574,12 +579,13 @@ impl StateStore {
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
+        // this can only handle non-sharded db scenario.
+        // For sharded db, should look at API side using internal indexer to handle this request
         PrefixedStateValueIterator::new(
             &self.state_kv_db,
             key_prefix.clone(),
             first_key_opt.cloned(),
             desired_version,
-            self.state_kv_db.enabled_sharding(),
         )
     }
 
@@ -599,7 +605,6 @@ impl StateStore {
         first_version: Version,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        state_kv_metadata_batch: &SchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -637,7 +642,6 @@ impl StateStore {
             value_state_sets.to_vec(),
             first_version,
             sharded_state_kv_batches,
-            state_kv_metadata_batch,
             enable_sharding,
         )?;
 
@@ -653,7 +657,6 @@ impl StateStore {
         sharded_state_cache: Option<&ShardedStateCache>,
         ledger_batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        state_kv_metadata_batch: &SchemaBatch,
         enable_sharding: bool,
         skip_usage: bool,
         last_checkpoint_index: Option<usize>,
@@ -682,7 +685,6 @@ impl StateStore {
             value_state_sets,
             first_version,
             sharded_state_kv_batches,
-            state_kv_metadata_batch,
             enable_sharding,
         )
     }
@@ -692,7 +694,6 @@ impl StateStore {
         value_state_sets: Vec<&ShardedStateUpdates>,
         first_version: Version,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        state_kv_metadata_batch: &SchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
         sharded_state_kv_batches
@@ -718,23 +719,6 @@ impl StateStore {
                     })
                     .collect::<Result<_>>()
             })?;
-
-        // Eventually this index will move to indexer side. For now we temporarily write this into
-        // metadata db to unblock the sharded DB migration.
-        // TODO(grao): Remove when we are ready.
-        if enable_sharding {
-            value_state_sets
-                .par_iter()
-                .enumerate()
-                .try_for_each(|(i, updates)| {
-                    let version = first_version + i as Version;
-                    updates.iter().flatten().try_for_each(|(k, _)| {
-                        state_kv_metadata_batch
-                            .put::<StateValueIndexSchema>(&(k.clone(), version), &())
-                    })
-                })?;
-        }
-
         Ok(())
     }
 
@@ -1182,29 +1166,111 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let sharded_schema_batch = new_sharded_kv_schema_batch();
 
         batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateSnapshotRestoreProgress(version),
+            &DbMetadataKey::StateSnapshotKvRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
 
+        if self.internal_indexer_db.is_some()
+            && self
+                .internal_indexer_db
+                .as_ref()
+                .unwrap()
+                .statekeys_enabled()
+        {
+            let keys = node_batch.iter().map(|(key, _)| key.0.clone()).collect();
+            self.internal_indexer_db
+                .as_ref()
+                .unwrap()
+                .write_keys_to_indexer_db(&keys, version, progress)?;
+        }
         self.shard_state_value_batch(
             &sharded_schema_batch,
             node_batch,
             self.state_kv_db.enabled_sharding(),
         )?;
-
         self.state_kv_db
             .commit(version, batch, sharded_schema_batch)
     }
 
-    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
-        self.ledger_db.metadata_db().put_usage(version, usage)
+    fn kv_finish(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
+        self.ledger_db.metadata_db().put_usage(version, usage)?;
+        if let Some(internal_indexer_db) = self.internal_indexer_db.as_ref() {
+            if version > 0 {
+                let batch = SchemaBatch::new();
+                batch.put::<InternalIndexerMetadataSchema>(
+                    &MetadataKey::LatestVersion,
+                    &MetadataValue::Version(version - 1),
+                )?;
+                if internal_indexer_db.statekeys_enabled() {
+                    batch.put::<InternalIndexerMetadataSchema>(
+                        &MetadataKey::StateVersion,
+                        &MetadataValue::Version(version - 1),
+                    )?;
+                }
+                if internal_indexer_db.transaction_enabled() {
+                    batch.put::<InternalIndexerMetadataSchema>(
+                        &MetadataKey::TransactionVersion,
+                        &MetadataValue::Version(version - 1),
+                    )?;
+                }
+                if internal_indexer_db.event_enabled() {
+                    batch.put::<InternalIndexerMetadataSchema>(
+                        &MetadataKey::EventVersion,
+                        &MetadataValue::Version(version - 1),
+                    )?;
+                }
+                internal_indexer_db
+                    .get_inner_db_ref()
+                    .write_schemas(batch)?;
+            }
+        }
+
+        Ok(())
     }
 
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
-        Ok(self
+        let main_db_progress = self
             .state_kv_db
             .metadata_db()
-            .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
-            .map(|v| v.expect_state_snapshot_progress()))
+            .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotKvRestoreProgress(version))?
+            .map(|v| v.expect_state_snapshot_progress());
+
+        // verify if internal indexer db and main db are consistent before starting the restore
+        if self.internal_indexer_db.is_some()
+            && self
+                .internal_indexer_db
+                .as_ref()
+                .unwrap()
+                .statekeys_enabled()
+        {
+            let progress_opt = self
+                .internal_indexer_db
+                .as_ref()
+                .unwrap()
+                .get_restore_progress(version)?;
+
+            match (main_db_progress, progress_opt) {
+                (None, None) => (),
+                (None, Some(_)) => (),
+                (Some(main_progres), Some(indexer_progress)) => {
+                    if main_progres.key_hash > indexer_progress.key_hash {
+                        bail!(
+                            "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
+                            main_progres,
+                            indexer_progress,
+                        );
+                    }
+                },
+                _ => {
+                    bail!(
+                        "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
+                        main_db_progress,
+                        progress_opt,
+                    );
+                },
+            }
+        }
+
+        Ok(main_db_progress)
     }
 }

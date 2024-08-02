@@ -6,18 +6,21 @@ use super::*;
 use crate::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::{
-        self, ConnectionRequest, ConnectionRequestSender, PeerManagerNotification,
-        PeerManagerRequest, PeerManagerRequestSender,
+        self, ConnectionRequest, ConnectionRequestSender, PeerManagerRequest,
+        PeerManagerRequestSender,
     },
     protocols::{
-        network::{NetworkSender, NewNetworkEvents, NewNetworkSender},
-        rpc::InboundRpcRequest,
-        wire::handshake::v1::{ProtocolId::HealthCheckerRpc, ProtocolIdSet},
+        network::{NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage},
+        wire::{
+            handshake::v1::{ProtocolId::HealthCheckerRpc, ProtocolIdSet},
+            messaging::v1::{NetworkMessage, RpcRequest},
+        },
     },
     transport::ConnectionMetadata,
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::network_id::NetworkId;
 use aptos_time_service::{MockTimeService, TimeService};
 use futures::future;
 use maplit::hashmap;
@@ -29,7 +32,7 @@ const PING_TIMEOUT: Duration = Duration::from_millis(500);
 struct TestHarness {
     mock_time: MockTimeService,
     peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-    peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: tokio::sync::mpsc::Sender<ConnectionNotification>,
     peers_and_metadata: Arc<PeersAndMetadata>,
@@ -132,21 +135,24 @@ impl TestHarness {
         ping: u32,
     ) -> oneshot::Receiver<Result<Bytes, RpcError>> {
         let protocol_id = ProtocolId::HealthCheckerRpc;
-        let data = bcs::to_bytes(&HealthCheckerMsg::Ping(Ping(ping)))
-            .unwrap()
-            .into();
+        let data = bcs::to_bytes(&HealthCheckerMsg::Ping(Ping(ping))).unwrap();
         let (res_tx, res_rx) = oneshot::channel();
-        let inbound_rpc_req = InboundRpcRequest {
-            protocol_id,
-            data,
-            res_tx,
-        };
         let key = (peer_id, ProtocolId::HealthCheckerRpc);
         let (delivered_tx, delivered_rx) = oneshot::channel();
         self.peer_mgr_notifs_tx
             .push_with_feedback(
                 key,
-                PeerManagerNotification::RecvRpc(peer_id, inbound_rpc_req),
+                ReceivedMessage {
+                    message: NetworkMessage::RpcRequest(RpcRequest {
+                        protocol_id,
+                        request_id: 0,
+                        priority: 0,
+                        raw_request: data,
+                    }),
+                    sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
+                    receive_timestamp_micros: 0,
+                    rpc_replier: Some(Arc::new(res_tx)),
+                },
                 Some(delivered_tx),
             )
             .unwrap();

@@ -1,0 +1,30 @@
+// -- Model dump before bytecode pipeline
+module 0x815::m {
+    enum CommonFields {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            z: u32,
+        }
+    }
+    private fun caller(): bool {
+        m::match()
+    }
+    private fun match(): bool {
+        {
+          let c: m::CommonFields = pack m::CommonFields::Foo(0, 0);
+          match (c) {
+            m::CommonFields::Foo{ x, y: _ } => {
+              Gt<u64>(x, 0)
+            }
+            _: m::CommonFields => {
+              false
+            }
+          }
+
+        }
+    }
+} // end 0x815::m

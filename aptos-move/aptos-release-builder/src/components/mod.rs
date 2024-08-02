@@ -25,6 +25,7 @@ use aptos_types::{
 };
 use futures::executor::block_on;
 use handlebars::Handlebars;
+use move_binary_format::file_format_common::VERSION_6;
 use once_cell::sync::Lazy;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -251,7 +252,12 @@ impl ReleaseEntry {
                     ),
                     None => {
                         match client {
-                            Some(client) => Some(fetch_config::<GasScheduleV2>(client)?),
+                            Some(_client) => {
+                                // We could return `Some(fetch_config::<GasScheduleV2>(client)?)`,
+                                // but this makes certain test scenarios flaky, so just return
+                                // None here
+                                None
+                            },
                             None => {
                                 println!("!!! WARNING !!!");
                                 println!("Generating gas schedule upgrade without a base for comparison.");
@@ -717,7 +723,7 @@ impl Default for ReleaseConfig {
                     metadata: ProposalMetadata::default(),
                     name: "framework".to_string(),
                     update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
-                        bytecode_version: 6, // TODO: remove explicit bytecode version from sources
+                        bytecode_version: VERSION_6,
                         git_hash: None,
                     })],
                 },

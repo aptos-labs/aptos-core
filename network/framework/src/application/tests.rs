@@ -10,13 +10,18 @@ use crate::{
         storage::PeersAndMetadata,
     },
     peer_manager::{
-        ConnectionNotification, ConnectionRequestSender, PeerManagerNotification,
-        PeerManagerRequest, PeerManagerRequestSender,
+        ConnectionNotification, ConnectionRequestSender, PeerManagerRequest,
+        PeerManagerRequestSender,
     },
     protocols::{
-        network::{Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
-        rpc::InboundRpcRequest,
-        wire::handshake::v1::{ProtocolId, ProtocolIdSet},
+        network::{
+            Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender,
+            ReceivedMessage,
+        },
+        wire::{
+            handshake::v1::{ProtocolId, ProtocolIdSet},
+            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+        },
     },
     transport::ConnectionMetadata,
 };
@@ -27,7 +32,6 @@ use aptos_config::{
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
-use futures::channel::oneshot;
 use futures_util::StreamExt;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
@@ -1011,7 +1015,7 @@ fn create_network_sender_and_events(
     HashMap<NetworkId, NetworkSender<DummyMessage>>,
     NetworkServiceEvents<DummyMessage>,
     HashMap<NetworkId, aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
-    HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 ) {
     let mut network_senders = HashMap::new();
     let mut network_and_events = HashMap::new();
@@ -1178,7 +1182,7 @@ async fn wait_for_network_event(
     >,
     inbound_request_senders: &mut HashMap<
         NetworkId,
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     >,
     network_events: &mut NetworkEvents<DummyMessage>,
     is_rpc_request: bool,
@@ -1206,12 +1210,18 @@ async fn wait_for_network_event(
                     assert_eq!(outbound_rpc_request.timeout, message_wait_time);
 
                     // Create and return the peer manager notification
-                    let inbound_rpc_request = InboundRpcRequest {
-                        protocol_id: outbound_rpc_request.protocol_id,
-                        data: outbound_rpc_request.data,
-                        res_tx: oneshot::channel().0,
+                    let rmsg = ReceivedMessage {
+                        message: NetworkMessage::RpcRequest(RpcRequest{
+                            protocol_id: outbound_rpc_request.protocol_id,
+                            request_id: 0,
+                            priority: 0,
+                            raw_request: outbound_rpc_request.data.into(),
+                        }),
+                        sender: PeerNetworkId::new(expected_network_id, peer_id),
+                        receive_timestamp_micros: 0,
+                        rpc_replier: Some(Arc::new(outbound_rpc_request.res_tx)),
                     };
-                    (outbound_rpc_request.protocol_id, PeerManagerNotification::RecvRpc(peer_id, inbound_rpc_request))
+                    (outbound_rpc_request.protocol_id, rmsg)
                 }
                 PeerManagerRequest::SendDirectSend(peer_id, message) => {
                     // Verify the request is correct
@@ -1220,7 +1230,17 @@ async fn wait_for_network_event(
                     assert_eq!(Some(message.protocol_id), expected_direct_send_protocol_id);
 
                     // Create and return the peer manager notification
-                    (message.protocol_id, PeerManagerNotification::RecvMessage(peer_id, message))
+                    let rmsg = ReceivedMessage {
+                        message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                            protocol_id: message.protocol_id,
+                            priority: 0,
+                            raw_msg: message.mdata.into(),
+                        }),
+                        sender: PeerNetworkId::new(expected_network_id, peer_id),
+                        receive_timestamp_micros: 0,
+                        rpc_replier: None,
+                    };
+                    (message.protocol_id, rmsg)
                 }
             };
 

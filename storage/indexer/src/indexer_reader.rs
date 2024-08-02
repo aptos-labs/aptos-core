@@ -17,6 +17,7 @@ use aptos_types::{
 };
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct IndexerReaders {
     table_info_reader: Option<Arc<IndexerAsyncV2>>,
     db_indexer_reader: Option<Arc<DBIndexer>>,
@@ -46,6 +47,13 @@ impl IndexerReader for IndexerReaders {
         anyhow::bail!("Table info reader is not available")
     }
 
+    fn get_latest_internal_indexer_ledger_version(&self) -> anyhow::Result<Option<Version>> {
+        if let Some(db_indexer) = &self.db_indexer_reader {
+            return Ok(db_indexer.indexer_db.get_persisted_version()?);
+        }
+        anyhow::bail!("DB indexer reader is not available")
+    }
+
     fn get_events(
         &self,
         event_key: &EventKey,
@@ -55,7 +63,7 @@ impl IndexerReader for IndexerReaders {
         ledger_version: Version,
     ) -> anyhow::Result<Vec<EventWithVersion>> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
-            if db_indexer_reader.event_enabled() {
+            if db_indexer_reader.indexer_db.event_enabled() {
                 return Ok(db_indexer_reader.get_events(
                     event_key,
                     start,
@@ -64,7 +72,7 @@ impl IndexerReader for IndexerReaders {
                     ledger_version,
                 )?);
             } else {
-                anyhow::bail!("Event index is not enabled")
+                anyhow::bail!("Internal event index is not enabled")
             }
         }
         anyhow::bail!("DB Indexer reader is not available")
@@ -79,7 +87,7 @@ impl IndexerReader for IndexerReaders {
         ledger_version: Version,
     ) -> anyhow::Result<Vec<EventWithVersion>> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
-            if db_indexer_reader.event_enabled() {
+            if db_indexer_reader.indexer_db.event_enabled() {
                 return Ok(db_indexer_reader.get_events_by_event_key(
                     event_key,
                     start_seq_num,
@@ -88,7 +96,7 @@ impl IndexerReader for IndexerReaders {
                     ledger_version,
                 )?);
             } else {
-                anyhow::bail!("Event index is not enabled")
+                anyhow::bail!("Internal event index is not enabled")
             }
         }
         anyhow::bail!("DB indexer reader is not available")
@@ -103,7 +111,7 @@ impl IndexerReader for IndexerReaders {
         ledger_version: Version,
     ) -> anyhow::Result<AccountTransactionsWithProof> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
-            if db_indexer_reader.transaction_enabled() {
+            if db_indexer_reader.indexer_db.transaction_enabled() {
                 return Ok(db_indexer_reader.get_account_transactions(
                     address,
                     start_seq_num,
@@ -112,7 +120,7 @@ impl IndexerReader for IndexerReaders {
                     ledger_version,
                 )?);
             } else {
-                anyhow::bail!("Transaction by account index is not enabled")
+                anyhow::bail!("Interal transaction by account index is not enabled")
             }
         }
         anyhow::bail!("DB indexer reader is not available")
@@ -122,13 +130,13 @@ impl IndexerReader for IndexerReaders {
         &self,
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
-        version: Version,
+        ledger_version: Version,
     ) -> anyhow::Result<Box<dyn Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_>> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
-            if db_indexer_reader.statekeys_enabled() {
+            if db_indexer_reader.indexer_db.statekeys_enabled() {
                 return Ok(Box::new(
                     db_indexer_reader
-                        .get_prefixed_state_value_iterator(key_prefix, cursor, version)
+                        .get_prefixed_state_value_iterator(key_prefix, cursor, ledger_version)
                         .map_err(|err| {
                             anyhow!(format!(
                                 "failed to get prefixed state value iterator {}",
@@ -140,7 +148,7 @@ impl IndexerReader for IndexerReaders {
                         dyn Iterator<Item = anyhow::Result<(StateKey, StateValue)>>,
                     >);
             } else {
-                anyhow::bail!("StateKeys index is not enabled")
+                anyhow::bail!("Internal statekeys index is not enabled")
             }
         }
         anyhow::bail!("DB indexer reader is not available")

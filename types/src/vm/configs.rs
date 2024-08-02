@@ -43,6 +43,9 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
     let use_signature_checker_v2 = features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2);
     let sig_checker_v2_fix_script_ty_param_count =
         features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX);
+    let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
+    let enable_resource_access_control =
+        features.is_enabled(FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL);
 
     VerifierConfig {
         max_loop_depth: Some(5),
@@ -54,6 +57,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
         max_dependency_depth: Some(256),
         max_push_size: Some(10000),
         max_struct_definitions: None,
+        max_struct_variants: None,
         max_fields_in_struct: None,
         max_function_definitions: None,
         max_back_edges_per_function: None,
@@ -63,13 +67,14 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
         max_per_mod_meter_units: Some(1000 * 80000),
         use_signature_checker_v2,
         sig_checker_v2_fix_script_ty_param_count,
+        enable_enum_types,
+        enable_resource_access_control,
     }
 }
 
 pub fn aptos_prod_vm_config(
     features: &Features,
     timed_features: &TimedFeatures,
-    delayed_field_optimization_enabled: bool,
     ty_builder: TypeBuilder,
 ) -> VMConfig {
     let check_invariant_in_swap_loc =
@@ -89,6 +94,10 @@ pub fn aptos_prod_vm_config(
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(features);
 
+    // Compatibility checker v2 is enabled either by its own flag or if enum types are enabled.
+    let use_compatibility_checker_v2 = verifier_config.enable_enum_types
+        || features.is_enabled(FeatureFlag::USE_COMPATIBILITY_CHECKER_V2);
+
     VMConfig {
         verifier_config,
         deserializer_config,
@@ -98,8 +107,12 @@ pub fn aptos_prod_vm_config(
         type_max_cost,
         type_base_cost,
         type_byte_cost,
-        delayed_field_optimization_enabled,
+        // By default, do not use delayed field optimization. Instead, clients should enable it
+        // manually where applicable.
+        delayed_field_optimization_enabled: false,
         ty_builder,
+        disallow_dispatch_for_native: false,
+        use_compatibility_checker_v2,
     }
 }
 
