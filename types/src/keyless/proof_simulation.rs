@@ -1,39 +1,39 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::keyless::Groth16Proof;
+use crate::keyless::Groth16Proof;
 use ark_ec::Group;
 use ark_groth16::{prepare_verifying_key, Groth16};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_ff::Field;
-use ark_relations::r1cs::{ConstraintSynthesizer, SynthesisError};
+use ark_relations::r1cs::{/*ConstraintSynthesizer,*/ SynthesisError};
 use rand::{RngCore, Rng};
 use ark_std::{
-    rand::SeedableRng,
+    //rand::SeedableRng,
     //rand::{Rng, RngCore, SeedableRng},
-    test_rng, UniformRand,
+    //test_rng, UniformRand,
 };
 use ark_std::{marker::PhantomData, vec::Vec};
 use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP};
 use ark_groth16::data_structures::{VerifyingKey, Proof};
 use ark_serialize::*;
 //use ark_std::rand::Rng;
-use ark_relations::r1cs::Result as R1CSResult;
+//use ark_relations::r1cs::Result as R1CSResult;
 use ark_ec::{AffineRepr,CurveGroup};
 use ark_ff::PrimeField;
 use std::ops::AddAssign;
-use ark_bn254::Bn254;
-use ark_circom::CircomConfig;
-use ark_circom::CircomBuilder;
-use std::fs::File;
-use std::collections::HashMap;
-use std::str::FromStr;
-use num_bigint_v4::BigInt;
+//use ark_bn254::Bn254;
+//use ark_circom::CircomConfig;
+//use ark_circom::CircomBuilder;
+//use std::fs::File;
+//use std::collections::HashMap;
+//use std::str::FromStr;
+//use num_bigint_v4::BigInt;
 use ark_ff::MontBackend;
 use ark_bn254::FrConfig;
-use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
-use crate::keyless::Groth16VerificationKey;
+//use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
+//use crate::keyless::Groth16VerificationKey;
 
 /// The SNARK of [[Groth16]](https://eprint.iacr.org/2016/260.pdf), where "proving" implements the
 /// simulation algorithm instead, using the trapdoor output by the modified setup algorithm also
@@ -216,13 +216,20 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         public_inputs: &[E::ScalarField],
         pk: &Trapdoor<E>,
         rng: &mut impl Rng,
-    ) -> Result<Proof<E>, SynthesisError> //R1CSResult<Proof<E>>
+    ) -> Result<Groth16Proof, SynthesisError> //R1CSResult<Proof<E>>
     where
     {
         let a = Self::generate_random_scalar(rng);
         let b = Self::generate_random_scalar(rng);
 
-        Self::create_proof_with_trapdoor(pk, a, b, public_inputs)
+        let proof = Self::create_proof_with_trapdoor(pk, a, b, public_inputs)?;
+        let mut x = vec![];
+        let ax = proof.a.x().unwrap().serialize_uncompressed(x);
+        let mut y = vec![];
+        let ay = proof.a.y().unwrap().serialize_uncompressed(y);
+        // TODO: Get proof into Groth16Proof form
+
+        Ok(proof.into())
     }
 
     /// Creates proof using the trapdoor
