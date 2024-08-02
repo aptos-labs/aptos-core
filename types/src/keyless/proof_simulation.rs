@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use ark_ec::Group;
 use ark_groth16::{prepare_verifying_key, Groth16};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
@@ -85,7 +86,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
     fn generate_random_g2_elem<R: RngCore>(rng: &mut R) -> E::G2Affine {
         let mut elem = None;
         while elem.is_none() {
-            let mut bytes: [u8; 32] = [0; 32];
+            let mut bytes: [u8; 64] = [0; 64];
             rng.fill_bytes(&mut bytes);
             elem = E::G2Affine::from_random_bytes(&bytes);
         }
@@ -105,9 +106,12 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         // TODO (michael): Generating the `g2_generator` with this function causes verification to later fail. This only occurs with this element - not `g1_generator` or any of the scalar elements for the associated `generate_random_g1_elem` or `generate_random_scalar` functions. We should figure out why, seems like an obscure arkworks bug
         // When ``let g2_generator = E::G2::rand(rng);` is used, and `g2_generator.into_affine() is called to convert the G2 element into a G2Affine element, Groth16 verification later passes
         // In addition, if `generate_random_g2_elem` is called, then the resulting G2Affine element converted into a G2 element, then back into a G2Affine element with into_affine(), the verification will still fail. This suggests the problem is with how the element is initially generated
-        let g2_generator = Self::generate_random_g2_elem(rng);
+        //let g2_generator = Self::generate_random_g2_elem(rng);
         //let g2_generator: E::G2 = Self::generate_random_g2_elem(rng).into();
         //let g2_generator = E::G2::rand(rng);
+        let g2_generator_base = E::G2::generator();
+        let g2_generator_scalar = Self::generate_random_scalar(rng);
+        let g2_generator = g2_generator_base * g2_generator_scalar;
 
         let alpha_g1 = g1_generator * alpha;
         let beta_g2 = g2_generator * beta;
@@ -141,7 +145,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
             delta,
             gamma,
             g1: g1_generator,
-            g2: g2_generator,
+            g2: g2_generator.into_affine(),
         };
 
         Ok((pk, vk))
@@ -167,7 +171,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         C: ConstraintSynthesizer<E::ScalarField>,
     {
         let mut alpha_bytes: [u8; 32];
-        rng.fill_bytes(&mut alpha_bytes);
+       rng.fill_bytes(&mut alpha_bytes);
         let alpha = E::ScalarField::from_random_bytes(&alpha_bytes).unwrap();
         let mut beta_bytes: [u8; 32];
         rng.fill_bytes(&mut beta_bytes);
