@@ -11,6 +11,7 @@ use crate::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_executor_types::StateComputeResult;
+use aptos_logger::warn;
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
@@ -124,7 +125,9 @@ impl PipelinedBlock {
             }
         }
 
-        assert!(self
+        // We might be retrying execution, so it might have already been set.
+        // Because we use this for statistics, it's ok that we drop the newer value.
+        if self
             .execution_summary
             .set(ExecutionSummary {
                 payload_len: self
@@ -135,7 +138,10 @@ impl PipelinedBlock {
                 to_retry,
                 execution_time,
             })
-            .is_ok());
+            .is_err()
+        {
+            warn!("Execution result recomputed, leaving stale ExecutionSummary")
+        }
 
         self
     }
