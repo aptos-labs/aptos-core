@@ -7,7 +7,7 @@ use crate::debug::DebugContext;
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use crate::{
     interpreter::Interpreter,
-    loader::{Function, Loader},
+    loader::{LoadedFunction, Loader},
 };
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use ::{
@@ -67,7 +67,7 @@ static DEBUG_CONTEXT: Lazy<Mutex<DebugContext>> = Lazy::new(|| Mutex::new(DebugC
 // Only include in debug builds
 #[cfg(any(debug_assertions, feature = "debugging"))]
 pub(crate) fn trace(
-    function_desc: &Function,
+    function: &LoadedFunction,
     locals: &Locals,
     pc: u16,
     instr: &Bytecode,
@@ -77,7 +77,11 @@ pub(crate) fn trace(
     if *TRACING_ENABLED {
         let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
         buf_writer
-            .write_fmt(format_args!("{},{}\n", function_desc.pretty_string(), pc,))
+            .write_fmt(format_args!(
+                "{},{}\n",
+                function.name_as_pretty_string(),
+                pc,
+            ))
             .unwrap();
         if *SINGLE_STEP_FLUSHING {
             buf_writer.flush().unwrap();
@@ -87,7 +91,7 @@ pub(crate) fn trace(
         DEBUG_CONTEXT
             .lock()
             .unwrap()
-            .debug_loop(function_desc, locals, pc, instr, loader, interp);
+            .debug_loop(function, locals, pc, instr, loader, interp);
     }
 }
 

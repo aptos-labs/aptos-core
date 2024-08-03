@@ -2,10 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    interpreter::Interpreter,
-    loader::{Function, Loader},
-};
+use crate::{interpreter::Interpreter, loader::Loader, LoadedFunction};
 use move_binary_format::file_format::Bytecode;
 use move_vm_types::values::{self, Locals};
 use std::{
@@ -100,7 +97,7 @@ impl DebugContext {
 
     pub(crate) fn debug_loop(
         &mut self,
-        function_desc: &Function,
+        function: &LoadedFunction,
         locals: &Locals,
         pc: u16,
         instr: &Bytecode,
@@ -108,7 +105,7 @@ impl DebugContext {
         interp: &Interpreter,
     ) {
         let instr_string = format!("{:?}", instr);
-        let function_string = function_desc.pretty_string();
+        let function_string = function.name_as_pretty_string();
         let breakpoint_hit = self.breakpoints.contains(&function_string)
             || self
                 .breakpoints
@@ -165,7 +162,7 @@ impl DebugContext {
                                 interp.debug_print_stack_trace(&mut s, resolver).unwrap();
                                 println!("{}", s);
                                 println!("Current frame: {}\n", function_string);
-                                let code = function_desc.code();
+                                let code = function.code();
                                 println!("        Code:");
                                 for (i, instr) in code.iter().enumerate() {
                                     if i as u16 == pc {
@@ -175,7 +172,7 @@ impl DebugContext {
                                     }
                                 }
                                 println!("        Locals:");
-                                if function_desc.local_count() > 0 {
+                                if !function.local_tys().is_empty() {
                                     let mut s = String::new();
                                     values::debug::print_locals(&mut s, locals).unwrap();
                                     println!("{}", s);
