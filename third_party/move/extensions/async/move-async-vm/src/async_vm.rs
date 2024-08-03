@@ -22,6 +22,7 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
     session::{SerializedReturnValues, Session},
+    DummyCodeStorage,
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
 use move_vm_types::{
@@ -182,13 +183,13 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         let state_type_tag = TypeTag::Struct(Box::new(actor.state_tag.clone()));
         let state_type = self
             .vm_session
-            .load_type(&state_type_tag)
+            .load_type(&state_type_tag, &DummyCodeStorage)
             .map_err(vm_error_to_async)?;
 
         // Check whether the actor state already exists.
         let state = self
             .vm_session
-            .load_resource(actor_addr, &state_type)
+            .load_resource(&DummyCodeStorage, actor_addr, &state_type)
             .map(|(gv, _)| gv)
             .map_err(partial_vm_error_to_async)?;
         if state.exists().map_err(partial_vm_error_to_async)? {
@@ -211,6 +212,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 Vec::<Vec<u8>>::new(),
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
@@ -278,12 +280,12 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         let state_type_tag = TypeTag::Struct(Box::new(actor.state_tag.clone()));
         let state_type = self
             .vm_session
-            .load_type(&state_type_tag)
+            .load_type(&state_type_tag, &DummyCodeStorage)
             .map_err(vm_error_to_async)?;
 
         let actor_state_global = self
             .vm_session
-            .load_resource(actor_addr, &state_type)
+            .load_resource(&DummyCodeStorage, actor_addr, &state_type)
             .map(|(gv, _)| gv)
             .map_err(partial_vm_error_to_async)?;
         let actor_state = actor_state_global
@@ -309,6 +311,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 args,
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
 
@@ -357,7 +360,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
     fn to_bcs(&mut self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
         let type_layout = self
             .vm_session
-            .get_type_layout(tag)
+            .get_type_layout(tag, &DummyCodeStorage)
             .map_err(|e| e.to_partial())?;
         value
             .simple_serialize(&type_layout)
