@@ -149,17 +149,18 @@ fn test_db_indexer_data() {
 
     let db_indexer = DBIndexer::new(internal_indexer_db.clone(), aptos_db.clone());
     // assert the data matches the expected data
-    let mut version = internal_indexer_db.get_persisted_version().unwrap();
-    assert_eq!(version, 0);
-    while version < total_version {
-        version = db_indexer.process_a_batch(Some(version)).unwrap();
+    let version = internal_indexer_db.get_persisted_version().unwrap();
+    assert_eq!(version, None);
+    let mut start_version = version.map_or(0, |v| v + 1);
+    while start_version < total_version {
+        start_version = db_indexer.process_a_batch(start_version).unwrap();
     }
     // wait for the commit to finish
     thread::sleep(Duration::from_millis(100));
     // indexer has process all the transactions
     assert_eq!(
         internal_indexer_db.get_persisted_version().unwrap(),
-        total_version
+        Some(total_version)
     );
 
     let txn_iter = internal_indexer_db

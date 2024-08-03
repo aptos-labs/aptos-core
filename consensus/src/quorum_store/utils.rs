@@ -75,6 +75,8 @@ impl<I: Ord + Hash> TimeExpirations<I> {
     }
 
     /// Expire and return items corresponding to expiration <= given certified time.
+    /// Unwrap is safe because peek() is called in loop condition.
+    #[allow(clippy::unwrap_used)]
     pub(crate) fn expire(&mut self, certified_time: u64) -> HashSet<I> {
         let mut ret = HashSet::new();
         while let Some((Reverse(t), _)) = self.expiries.peek() {
@@ -254,6 +256,7 @@ impl ProofQueue {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn batch_summaries_len(&self) -> usize {
         self.batch_summaries.len()
     }

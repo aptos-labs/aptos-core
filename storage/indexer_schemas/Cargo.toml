@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-schemadb = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }

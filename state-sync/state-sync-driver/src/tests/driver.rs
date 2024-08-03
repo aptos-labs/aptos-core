@@ -406,7 +406,6 @@ async fn create_driver_for_tests(
             aptos_data_client,
             streaming_service_client,
             time_service.clone(),
-            None,
         );
 
     // The driver will notify reconfiguration subscribers of the initial configs.

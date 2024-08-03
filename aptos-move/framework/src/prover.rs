@@ -123,6 +123,7 @@ impl ProverOptions {
         language_version: Option<LanguageVersion>,
         skip_attribute_checks: bool,
         known_attributes: &BTreeSet<String>,
+        experiments: &[String],
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
@@ -136,6 +137,7 @@ impl ProverOptions {
             language_version,
             skip_attribute_checks,
             known_attributes.clone(),
+            experiments.to_vec(),
         )?;
         let mut options = self.convert_options();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test

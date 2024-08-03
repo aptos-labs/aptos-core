@@ -656,10 +656,10 @@ impl DbReader for AptosDB {
             .map_err(Into::into)
     }
 
-    fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
-        gauged_api("get_state_leaf_count", || {
+    fn get_state_item_count(&self, version: Version) -> Result<usize> {
+        gauged_api("get_state_item_count", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
-            self.state_store.get_value_count(version)
+            self.ledger_db.metadata_db().get_usage(version).map(|usage| usage.items())
         })
     }
 

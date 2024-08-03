@@ -1,0 +1,56 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    enum E1 {
+        V1,
+        V2,
+        V3 {
+            0: u8,
+            1: bool,
+        }
+    }
+    struct S0 {
+        dummy_field: bool,
+    }
+    struct S1 {
+        0: u8,
+    }
+    struct S2 {
+        0: u8,
+        1: bool,
+    }
+    struct S3 {
+        0: #0,
+        1: u8,
+    }
+    struct S4 {
+        dummy_field: bool,
+    }
+    struct S5 {
+        x: #0,
+        y: u8,
+    }
+    private fun S0_inhabited(): test::S0 {
+        pack test::S0(false)
+    }
+    private fun S1_inhabited(): test::S1 {
+        pack test::S1(0)
+    }
+    private fun S2_inhabited(): test::S2 {
+        pack test::S2(0, false)
+    }
+    private fun S3_test<T>(x: #0): test::S3<#0> {
+        pack test::S3<T>(x, 0)
+    }
+    private fun nested_0(): test::S3<test::S4> {
+        pack test::S3<test::S4>(pack test::S4(false), 0)
+    }
+    private fun nested_1(): test::S5<test::S0> {
+        pack test::S5<test::S0>(pack test::S0(false), 0)
+    }
+    private fun test_variant() {
+        pack test::E1::V1();
+        pack test::E1::V2();
+        pack test::E1::V3(42, true);
+        Tuple()
+    }
+} // end 0x42::test

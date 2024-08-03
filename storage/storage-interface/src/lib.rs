@@ -419,8 +419,8 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
         ) -> Result<TransactionAccumulatorSummary>;
 
-        /// Returns total number of leaves in state store at given version.
-        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+        /// Returns total number of state items in state store at given version.
+        fn get_state_item_count(&self, version: Version) -> Result<usize>;
 
         /// Get a chunk of state store value, addressed by the index.
         fn get_state_value_chunk_with_proof(

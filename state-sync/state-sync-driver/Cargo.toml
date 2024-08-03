@@ -19,7 +19,6 @@ aptos-consensus-notifications = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
 aptos-data-streaming-service = { workspace = true }
-aptos-db-indexer-schemas = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-infallible = { workspace = true }

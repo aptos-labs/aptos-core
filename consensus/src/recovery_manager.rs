@@ -7,7 +7,7 @@ use crate::{
     error::error_kind,
     monitor,
     network::NetworkSender,
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
     round_manager::VerifiedEvent,
@@ -33,7 +33,7 @@ pub struct RecoveryManager {
     execution_client: Arc<dyn TExecutionClient>,
     last_committed_round: Round,
     max_blocks_to_request: u64,
-    payload_manager: Arc<PayloadManager>,
+    payload_manager: Arc<dyn TPayloadManager>,
     order_vote_enabled: bool,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
@@ -46,7 +46,7 @@ impl RecoveryManager {
         execution_client: Arc<dyn TExecutionClient>,
         last_committed_round: Round,
         max_blocks_to_request: u64,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {

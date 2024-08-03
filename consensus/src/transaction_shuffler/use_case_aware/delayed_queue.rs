@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_shuffler::use_case_aware::{
-    types::{InputIdx, OutputIdx, UseCaseAwareTransaction, UseCaseKey},
+    types::{InputIdx, OutputIdx},
     utils::StrictMap,
     Config,
 };
+use aptos_types::transaction::use_case::{UseCaseAwareTransaction, UseCaseKey};
 use move_core_types::account_address::AccountAddress;
 use std::{
     collections::{hash_map, BTreeMap, HashMap, VecDeque},
@@ -197,7 +198,10 @@ impl UseCase {
         let account_delay_key = account.delay_key();
         self.account_by_delay
             .strict_insert(account_delay_key, address);
-        let (_, head_address) = self.account_by_delay.first_key_value().unwrap();
+        let (_, head_address) = self
+            .account_by_delay
+            .first_key_value()
+            .expect("Must exist.");
         if head_address == &address {
             self.input_idx = account_delay_key.input_idx;
         }
@@ -209,9 +213,10 @@ impl UseCase {
 /// associated or not.
 ///     2. all txns that are examined and delayed previously.
 ///
-///     * A delayed txn is attached to an account and the account is attached to a priority queue in a use
+/// Note:
+///     A delayed txn is attached to an account and the account is attached to a priority queue in a use
 /// case, which has an entry in the main priority queue.
-///     * Empty accounts and use cases are still tracked for the delay so that a next txn in the
+///     Empty accounts and use cases are still tracked for the delay so that a next txn in the
 /// input stream is properly delayed if associated with such an account or use case.
 #[derive(Debug, Default)]
 pub(crate) struct DelayedQueue<Txn> {

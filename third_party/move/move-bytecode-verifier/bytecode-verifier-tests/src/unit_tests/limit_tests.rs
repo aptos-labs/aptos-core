@@ -243,6 +243,10 @@ fn big_vec_unpacks() {
                 code,
             }),
         }],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
 
     // save module and verify that it can ser/de

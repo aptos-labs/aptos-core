@@ -114,6 +114,10 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
 
+    if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
+        indexer_reader.wait_for_internal_indexer(2).unwrap();
+    }
+
     let ledger_version_1_resources = context
         .get(&account_resources(
             &context.root_account().await.address().to_hex_literal(),
@@ -148,10 +152,11 @@ async fn test_get_account_resources_by_ledger_version() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resources_by_too_large_ledger_version() {
     let mut context = new_test_context(current_function_name!());
+    let account = context.root_account().await;
     let resp = context
         .expect_status_code(404)
         .get(&account_resources_with_ledger_version(
-            &context.root_account().await.address().to_hex_literal(),
+            &account.address().to_hex_literal(),
             1000000000000000000,
         ))
         .await;
@@ -179,6 +184,10 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
     let txn =
         root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
     context.commit_block(&vec![txn.clone()]).await;
+
+    if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
+        indexer_reader.wait_for_internal_indexer(2).unwrap();
+    }
 
     let modules = context
         .get(&account_modules(

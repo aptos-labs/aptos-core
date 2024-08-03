@@ -2,4 +2,9 @@ images:
   aptos-ubuntu-x64:
     platform: "linux"
     arch: "x64"
-    ami: "ami-03b93e88e2d195770"
+    ami: "ami-07ce6402e4a205d44"
+  aptos-ubuntu-x64-latest:
+    platform: "linux"
+    arch: "x64"
+    owner: "058264343338" # aptos-ci AWS account id
+    name: "aptos-runs-on-*"

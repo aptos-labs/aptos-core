@@ -201,6 +201,11 @@ fn write_struct_def(ctx: &mut Context, sdef: &StructDefinition) -> String {
             return out;
         },
         StructFieldInformation::Declared(fields) => fields,
+        StructFieldInformation::DeclaredVariants(..) => {
+            // TODO(#13806): consider implement if interface generator will be
+            //   reused once v1 compiler retires
+            panic!("variants not yet supported by interface generator")
+        },
     };
     for field in fields {
         push_line!(

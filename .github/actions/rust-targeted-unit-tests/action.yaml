@@ -9,14 +9,6 @@ runs:
   using: composite
   steps:
     # The source code must be checked out by the workflow that invokes this action.
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-      with:
-        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
-
-    # Install nextest
-    - uses: taiki-e/install-action@v1.5.6
-      with:
-        tool: nextest
 
     # Run a postgres database
     - name: Run postgres database

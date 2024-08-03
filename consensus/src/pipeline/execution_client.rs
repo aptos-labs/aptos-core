@@ -8,7 +8,7 @@ use crate::{
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    payload_manager::PayloadManager,
+    payload_manager::TPayloadManager,
     pipeline::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
@@ -60,7 +60,7 @@ pub trait TExecutionClient: Send + Sync {
         &self,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
@@ -89,6 +89,9 @@ pub trait TExecutionClient: Send + Sync {
 
     /// Synchronize to a commit that not present locally.
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
+
+    /// Resets the internal state of the rand and buffer managers.
+    async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()>;
 
     /// Shutdown the current processor at the end of the epoch.
     async fn end_epoch(&self);
@@ -291,7 +294,7 @@ impl TExecutionClient for ExecutionProxyClient {
         &self,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        payload_manager: Arc<PayloadManager>,
+        payload_manager: Arc<dyn TPayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
@@ -343,19 +346,19 @@ impl TExecutionClient for ExecutionProxyClient {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
-        let execute_tx = self.handle.read().execute_tx.clone();
-
-        if execute_tx.is_none() {
-            debug!("Failed to send to buffer manager, maybe epoch ends");
-            return Ok(());
-        }
+        let mut execute_tx = match self.handle.read().execute_tx.clone() {
+            Some(tx) => tx,
+            None => {
+                debug!("Failed to send to buffer manager, maybe epoch ends");
+                return Ok(());
+            },
+        };
 
         for block in blocks {
             block.set_insertion_time();
         }
 
         if execute_tx
-            .unwrap()
             .send(OrderedBlocks {
                 ordered_blocks: blocks
                     .iter()
@@ -393,6 +396,16 @@ impl TExecutionClient for ExecutionProxyClient {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
 
+        // Reset the rand and buffer managers to the target round
+        self.reset(&target).await?;
+
+        // TODO: handle the sync error, should re-push the ordered blocks to buffer manager
+        // when it's reset but sync fails.
+        self.execution_proxy.sync_to(target).await?;
+        Ok(())
+    }
+
+    async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()> {
         let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
             let handle = self.handle.read();
             (
@@ -426,9 +439,6 @@ impl TExecutionClient for ExecutionProxyClient {
             rx.await.map_err(|_| Error::ResetDropped)?;
         }
 
-        // TODO: handle the sync error, should re-push the ordered blocks to buffer manager
-        // when it's reset but sync fails.
-        self.execution_proxy.sync_to(target).await?;
         Ok(())
     }
 
@@ -475,7 +485,7 @@ impl TExecutionClient for DummyExecutionClient {
         &self,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        _payload_manager: Arc<PayloadManager>,
+        _payload_manager: Arc<dyn TPayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
@@ -504,6 +514,10 @@ impl TExecutionClient for DummyExecutionClient {
     }
 
     async fn sync_to(&self, _: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        Ok(())
+    }
+
+    async fn reset(&self, _: &LedgerInfoWithSignatures) -> Result<()> {
         Ok(())
     }
 

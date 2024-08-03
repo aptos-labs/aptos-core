@@ -234,7 +234,10 @@ impl ProofCoordinator {
                     - self
                         .batch_info_to_time
                         .remove(signed_batch_info.batch_info())
-                        .expect("Batch created without recording the time!");
+                        .ok_or(
+                            // Batch created without recording the time!
+                            SignedBatchInfoError::NoTimeStamps,
+                        )?;
                 counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
                 return Ok(Some(proof));
             }

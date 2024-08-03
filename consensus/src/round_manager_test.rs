@@ -16,7 +16,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     persistent_liveness_storage::RecoveryData,
     pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
@@ -291,7 +291,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::from(PayloadManager::DirectMempool),
+            Arc::from(DirectMempoolPayloadManager::new()),
             false,
             Arc::new(Mutex::new(PendingBlocks::new())),
         ));
@@ -309,6 +309,7 @@ impl NodeSetup {
             5,
             500,
             10,
+            1,
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,

@@ -20,11 +20,12 @@ use aptos_network::{
     application::{
         interface::NetworkServiceEvents, metadata::ConnectionState, storage::PeersAndMetadata,
     },
-    peer_manager::PeerManagerNotification,
     protocols::{
-        network::{NetworkEvents, NewNetworkEvents},
-        rpc::InboundRpcRequest,
-        wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
+        network::{NetworkEvents, NewNetworkEvents, ReceivedMessage},
+        wire::{
+            handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
+            messaging::v1::{NetworkMessage, RpcRequest},
+        },
     },
     transport::{ConnectionId, ConnectionMetadata},
 };
@@ -468,7 +469,7 @@ async fn verify_node_information(
 /// mock client requests to a peer monitoring service server.
 struct MockClient {
     peer_manager_notifiers:
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 }
 
 impl MockClient {
@@ -554,12 +555,17 @@ impl MockClient {
             .to_bytes(&PeerMonitoringServiceMessage::Request(request))
             .unwrap();
         let (request_sender, request_receiver) = oneshot::channel();
-        let inbound_rpc = InboundRpcRequest {
-            protocol_id,
-            data: request_data.into(),
-            res_tx: request_sender,
+        let request_notification = ReceivedMessage {
+            message: NetworkMessage::RpcRequest(RpcRequest {
+                protocol_id,
+                request_id: 42,
+                priority: 0,
+                raw_request: request_data.clone(),
+            }),
+            sender: PeerNetworkId::new(network_id, peer_id),
+            receive_timestamp_micros: 0,
+            rpc_replier: Some(Arc::new(request_sender)),
         };
-        let request_notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Send the request to the peer monitoring service
         self.peer_manager_notifiers
@@ -729,7 +735,7 @@ mod database_mock {
                 ledger_version: Version,
             ) -> Result<TransactionAccumulatorSummary>;
 
-            fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+            fn get_state_item_count(&self, version: Version) -> Result<usize>;
 
             fn get_state_value_chunk_with_proof(
                 &self,

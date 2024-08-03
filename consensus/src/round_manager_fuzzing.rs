@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     block_storage::{pending_blocks::PendingBlocks, BlockStore},
     liveness::{
@@ -14,7 +16,7 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     network::NetworkSender,
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::DummyExecutionClient,
     round_manager::RoundManager,
@@ -56,10 +58,10 @@ use tokio::runtime::Runtime;
 
 // This generates a proposal for round 1
 pub fn generate_corpus_proposal() -> Vec<u8> {
-    let mut round_manager = create_node_for_fuzzing();
+    let round_manager = create_node_for_fuzzing();
     block_on(async {
         let proposal = round_manager
-            .generate_proposal(NewRoundEvent {
+            .generate_proposal_for_test(NewRoundEvent {
                 round: 1,
                 reason: NewRoundReason::QCReady,
                 timeout: std::time::Duration::new(5, 0),
@@ -90,7 +92,7 @@ fn build_empty_store(
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
-        Arc::from(PayloadManager::DirectMempool),
+        Arc::from(DirectMempoolPayloadManager::new()),
         false,
         Arc::new(Mutex::new(PendingBlocks::new())),
     ))
@@ -188,6 +190,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         1,
         1024,
         10,
+        1,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
