@@ -66,7 +66,10 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    DummyCodeStorage,
+};
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -480,6 +483,7 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
         vec![bcs::to_bytes(&AccountAddress::ONE)?],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )?;
     let (mut change_set, module_write_set) = sess.finish(&change_set_configs)?;
     change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
