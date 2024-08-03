@@ -36,7 +36,7 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -157,6 +157,7 @@ fn execute_function_in_module(
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )?;
 
         Ok(())

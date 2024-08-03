@@ -5,6 +5,7 @@
 use crate::{
     loader::{Loader, ModuleStorageAdapter},
     logging::expect_no_verification_errors,
+    ModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -50,7 +51,7 @@ impl AccountDataCache {
     }
 }
 
-fn load_module_impl(
+fn fetch_module_impl(
     remote: &dyn MoveResolver,
     account_map: &BTreeMap<AccountAddress, AccountDataCache>,
     module_id: &ModuleId,
@@ -171,7 +172,7 @@ impl<'r> TransactionDataCache<'r> {
         Ok(change_set)
     }
 
-    pub(crate) fn num_mutated_accounts(&self, sender: &AccountAddress) -> u64 {
+    pub(crate) fn num_mutated_resources(&self, sender: &AccountAddress) -> u64 {
         // The sender's account will always be mutated.
         let mut total_mutated_accounts: u64 = 1;
         for (addr, entry) in self.account_map.iter() {
@@ -200,6 +201,7 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn load_resource(
         &mut self,
         loader: &Loader,
+        module_storage: &dyn ModuleStorage,
         addr: AccountAddress,
         ty: &Type,
         module_store: &ModuleStorageAdapter,
@@ -219,28 +221,48 @@ impl<'r> TransactionDataCache<'r> {
                 },
             };
             // TODO(Gas): Shall we charge for this?
-            let (ty_layout, has_aggregator_lifting) =
-                loader.type_to_type_layout_with_identifier_mappings(ty, module_store)?;
+            let (ty_layout, has_aggregator_lifting) = loader
+                .type_to_type_layout_with_identifier_mappings(ty, module_store, module_storage)?;
 
-            let module = module_store.module_at(&ty_tag.module_id());
-            let metadata: &[Metadata] = match &module {
-                Some(module) => &module.module().metadata,
-                None => &[],
-            };
-
-            // If we need to process aggregator lifting, we pass type layout to remote.
-            // Remote, in turn ensures that all aggregator values are lifted if the resolved
-            // resource comes from storage.
-            let (data, bytes_loaded) = self.remote.get_resource_bytes_with_metadata_and_layout(
-                &addr,
-                &ty_tag,
-                metadata,
-                if has_aggregator_lifting {
-                    Some(&ty_layout)
-                } else {
-                    None
+            let (data, bytes_loaded) = match loader {
+                Loader::V1(_) => {
+                    let maybe_module = module_store.module_at(&ty_tag.module_id());
+                    let metadata: &[Metadata] = match &maybe_module {
+                        Some(m) => &m.module().metadata,
+                        None => &[],
+                    };
+                    // If we need to process aggregator lifting, we pass type layout to remote.
+                    // Remote, in turn ensures that all aggregator values are lifted if the resolved
+                    // resource comes from storage.
+                    self.remote.get_resource_bytes_with_metadata_and_layout(
+                        &addr,
+                        &ty_tag,
+                        metadata,
+                        if has_aggregator_lifting {
+                            Some(&ty_layout)
+                        } else {
+                            None
+                        },
+                    )?
                 },
-            )?;
+                Loader::V2(_) => {
+                    let metadata = module_storage
+                        .fetch_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())?;
+                    // If we need to process aggregator lifting, we pass type layout to remote.
+                    // Remote, in turn ensures that all aggregator values are lifted if the resolved
+                    // resource comes from storage.
+                    self.remote.get_resource_bytes_with_metadata_and_layout(
+                        &addr,
+                        &ty_tag,
+                        metadata,
+                        if has_aggregator_lifting {
+                            Some(&ty_layout)
+                        } else {
+                            None
+                        },
+                    )?
+                },
+            };
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
             let gv = match data {
@@ -277,8 +299,8 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
-        load_module_impl(self.remote, &self.account_map, module_id)
+    pub(crate) fn fetch_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
+        fetch_module_impl(self.remote, &self.account_map, module_id)
     }
 
     pub(crate) fn load_compiled_script_to_cache(
@@ -317,7 +339,7 @@ impl<'r> TransactionDataCache<'r> {
             btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
             btree_map::Entry::Vacant(entry) => {
                 // bytes fetching, allow loading to fail if the flag is set
-                let bytes = match load_module_impl(self.remote, &self.account_map, entry.key())
+                let bytes = match fetch_module_impl(self.remote, &self.account_map, entry.key())
                     .map_err(|err| err.finish(Location::Undefined))
                 {
                     Ok(bytes) => bytes,
