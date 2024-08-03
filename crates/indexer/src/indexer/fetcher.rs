@@ -242,7 +242,7 @@ async fn fetch_nexts(
     let mut block_height_bcs = aptos_api_types::U64::from(block_height);
 
     let state_view = context.latest_state_view().unwrap();
-    let converter = state_view.as_converter(context.db.clone(), context.table_info_reader.clone());
+    let converter = state_view.as_converter(context.db.clone(), context.indexer_reader.clone());
 
     let mut transactions = vec![];
     for (ind, raw_txn) in raw_txns.into_iter().enumerate() {
@@ -292,8 +292,9 @@ async fn fetch_nexts(
                         bet.info.epoch = Some(epoch_bcs);
                     },
                     Transaction::ValidatorTransaction(ref mut st) => {
-                        st.info.block_height = Some(block_height_bcs);
-                        st.info.epoch = Some(epoch_bcs);
+                        let info = st.transaction_info_mut();
+                        info.block_height = Some(block_height_bcs);
+                        info.epoch = Some(epoch_bcs);
                     },
                 };
                 txn

@@ -4,9 +4,10 @@
 
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
-use crate::{
-    ledger_db::LedgerDb, schema::transaction_by_account::TransactionByAccountSchema,
-    utils::iterators::AccountTransactionVersionIter,
+use crate::ledger_db::LedgerDb;
+use aptos_db_indexer_schemas::{
+    schema::transaction_by_account::TransactionByAccountSchema,
+    utils::AccountTransactionVersionIter,
 };
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{AptosDbError, Result};

@@ -167,7 +167,7 @@ impl TwoChainTimeoutCertificate {
             .rounds()
             .iter()
             .max()
-            .expect("Empty rounds");
+            .ok_or_else(|| anyhow::anyhow!("Empty rounds"))?;
         ensure!(
             hqc_round == *signed_hqc,
             "Inconsistent hqc round, qc has round {}, highest signed round {}",

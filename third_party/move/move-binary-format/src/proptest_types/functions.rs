@@ -9,7 +9,10 @@ use crate::{
         FunctionDefinition, FunctionHandle, FunctionHandleIndex, FunctionInstantiation,
         FunctionInstantiationIndex, IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature,
         SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
-        StructDefinition, StructDefinitionIndex, StructHandle, TableIndex, Visibility,
+        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandle,
+        StructVariantHandle, StructVariantHandleIndex, StructVariantInstantiation,
+        StructVariantInstantiationIndex, TableIndex, VariantFieldHandle, VariantFieldHandleIndex,
+        VariantFieldInstantiation, VariantFieldInstantiationIndex, VariantIndex, Visibility,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -30,60 +33,54 @@ use std::{
     hash::Hash,
 };
 
-#[derive(Debug, Default)]
-struct SignatureState {
-    signatures: Vec<Signature>,
-    signature_map: HashMap<Signature, SignatureIndex>,
+#[derive(Debug)]
+struct HandleState<HandleT, IndexT> {
+    handles: Vec<HandleT>,
+    map: HashMap<HandleT, IndexT>,
 }
+
+impl<HandleT, IndexT> Default for HandleState<HandleT, IndexT> {
+    fn default() -> Self {
+        Self {
+            handles: vec![],
+            map: HashMap::new(),
+        }
+    }
+}
+
+impl<HandleT, IndexT> HandleState<HandleT, IndexT>
+where
+    HandleT: Hash + PartialEq + Eq + Clone,
+    IndexT: Clone,
+{
+    fn add(&mut self, handle: HandleT, make_index: impl Fn(TableIndex) -> IndexT) -> IndexT {
+        debug_assert!(self.handles.len() < TableSize::max_value() as usize);
+        if let Some(idx) = self.map.get(&handle) {
+            return idx.clone();
+        }
+        let idx = make_index(self.handles.len() as TableIndex);
+        self.handles.push(handle.clone());
+        self.map.insert(handle, idx.clone());
+        idx
+    }
+
+    fn handles(self) -> Vec<HandleT> {
+        self.handles
+    }
+}
+
+type SignatureState = HandleState<Signature, SignatureIndex>;
+type FieldHandleState = HandleState<FieldHandle, FieldHandleIndex>;
+type VariantFieldHandleState = HandleState<VariantFieldHandle, VariantFieldHandleIndex>;
+type StructVariantHandleState = HandleState<StructVariantHandle, StructVariantHandleIndex>;
 
 impl SignatureState {
-    fn new(signatures: Vec<Signature>) -> Self {
+    fn from(sigs: Vec<Signature>) -> Self {
         let mut state = Self::default();
-        for sig in signatures {
-            state.add_signature(sig);
+        for sig in sigs {
+            state.add(sig, SignatureIndex);
         }
         state
-    }
-
-    fn signatures(self) -> Vec<Signature> {
-        self.signatures
-    }
-
-    fn add_signature(&mut self, sig: Signature) -> SignatureIndex {
-        debug_assert!(self.signatures.len() < TableSize::max_value() as usize);
-        if let Some(idx) = self.signature_map.get(&sig) {
-            return *idx;
-        }
-        let idx = SignatureIndex(self.signatures.len() as u16);
-        self.signatures.push(sig.clone());
-        self.signature_map.insert(sig, idx);
-        idx
-    }
-}
-
-#[derive(Debug, Default)]
-#[allow(unused)]
-struct FieldHandleState {
-    field_handles: Vec<FieldHandle>,
-    field_map: HashMap<FieldHandle, FieldHandleIndex>,
-}
-
-impl FieldHandleState {
-    #[allow(unused)]
-    pub fn field_handles(self) -> Vec<FieldHandle> {
-        self.field_handles
-    }
-
-    #[allow(unused)]
-    fn add_field_handle(&mut self, fh: FieldHandle) -> FieldHandleIndex {
-        debug_assert!(self.field_handles.len() < TableSize::max_value() as usize);
-        if let Some(idx) = self.field_map.get(&fh) {
-            return *idx;
-        }
-        let idx = FieldHandleIndex(self.field_handles.len() as u16);
-        self.field_handles.push(fh.clone());
-        self.field_map.insert(fh, idx);
-        idx
     }
 }
 
@@ -150,17 +147,17 @@ impl<'a> FnHandleMaterializeState<'a> {
             module_handles_len,
             identifiers_len,
             struct_handles,
-            signatures: SignatureState::new(signatures),
+            signatures: SignatureState::from(signatures),
             function_handles: HashSet::new(),
         }
     }
 
     pub fn signatures(self) -> Vec<Signature> {
-        self.signatures.signatures()
+        self.signatures.handles()
     }
 
     fn add_signature(&mut self, sig: Signature) -> SignatureIndex {
-        self.signatures.add_signature(sig)
+        self.signatures.add(sig, SignatureIndex)
     }
 }
 
@@ -245,12 +242,15 @@ pub struct FnDefnMaterializeState<'a> {
     struct_defs: &'a [StructDefinition],
     signatures: SignatureState,
     function_handles: Vec<FunctionHandle>,
-    struct_def_to_field_count: HashMap<usize, usize>,
     def_function_handles: HashSet<(ModuleHandleIndex, IdentifierIndex)>,
     field_handles: FieldHandleState,
+    variant_field_handles: VariantFieldHandleState,
     type_instantiations: InstantiationState<StructDefInstantiation>,
     function_instantiations: InstantiationState<FunctionInstantiation>,
     field_instantiations: InstantiationState<FieldInstantiation>,
+    variant_field_instantiations: InstantiationState<VariantFieldInstantiation>,
+    struct_variant_handles: StructVariantHandleState,
+    struct_variant_instantiations: InstantiationState<StructVariantInstantiation>,
 }
 
 impl<'a> FnDefnMaterializeState<'a> {
@@ -262,7 +262,6 @@ impl<'a> FnDefnMaterializeState<'a> {
         struct_defs: &'a [StructDefinition],
         signatures: Vec<Signature>,
         function_handles: Vec<FunctionHandle>,
-        struct_def_to_field_count: HashMap<usize, usize>,
     ) -> Self {
         Self {
             self_module_handle_idx,
@@ -270,14 +269,17 @@ impl<'a> FnDefnMaterializeState<'a> {
             constant_pool_len,
             struct_handles,
             struct_defs,
-            signatures: SignatureState::new(signatures),
+            signatures: SignatureState::from(signatures),
             function_handles,
-            struct_def_to_field_count,
             def_function_handles: HashSet::new(),
             field_handles: FieldHandleState::default(),
+            variant_field_handles: VariantFieldHandleState::default(),
             type_instantiations: InstantiationState::new(),
             function_instantiations: InstantiationState::new(),
             field_instantiations: InstantiationState::new(),
+            variant_field_instantiations: InstantiationState::new(),
+            struct_variant_handles: StructVariantHandleState::default(),
+            struct_variant_instantiations: InstantiationState::new(),
         }
     }
 
@@ -290,19 +292,27 @@ impl<'a> FnDefnMaterializeState<'a> {
         Vec<StructDefInstantiation>,
         Vec<FunctionInstantiation>,
         Vec<FieldInstantiation>,
+        Vec<VariantFieldHandle>,
+        Vec<VariantFieldInstantiation>,
+        Vec<StructVariantHandle>,
+        Vec<StructVariantInstantiation>,
     ) {
         (
-            self.signatures.signatures(),
+            self.signatures.handles(),
             self.function_handles,
-            self.field_handles.field_handles(),
+            self.field_handles.handles(),
             self.type_instantiations.instantiations(),
             self.function_instantiations.instantiations(),
             self.field_instantiations.instantiations(),
+            self.variant_field_handles.handles(),
+            self.variant_field_instantiations.instantiations(),
+            self.struct_variant_handles.handles(),
+            self.struct_variant_instantiations.instantiations(),
         )
     }
 
     fn add_signature(&mut self, sig: Signature) -> SignatureIndex {
-        self.signatures.add_signature(sig)
+        self.signatures.add(sig, SignatureIndex)
     }
 
     fn add_function_handle(&mut self, handle: FunctionHandle) -> FunctionHandleIndex {
@@ -331,7 +341,7 @@ impl<'a> FnDefnMaterializeState<'a> {
         abilities: impl IntoIterator<Item = AbilitySet>,
     ) -> SignatureIndex {
         let sig = self.get_signature_from_type_params(abilities);
-        self.signatures.add_signature(sig)
+        self.signatures.add(sig, SignatureIndex)
     }
 
     fn get_function_instantiation(&mut self, fh_idx: usize) -> FunctionInstantiationIndex {
@@ -345,14 +355,18 @@ impl<'a> FnDefnMaterializeState<'a> {
     }
 
     fn get_type_instantiation(&mut self, sd_idx: usize) -> StructDefInstantiationIndex {
-        let sd = &self.struct_defs[sd_idx];
-        let struct_handle = &self.struct_handles[sd.struct_handle.0 as usize];
-        let sig_idx = self.add_signature_from_type_params(struct_handle.type_param_constraints());
+        let sig_idx = self.get_struct_instantiation_sig(sd_idx);
         let si = StructDefInstantiation {
             def: StructDefinitionIndex(sd_idx as TableIndex),
             type_parameters: sig_idx,
         };
         StructDefInstantiationIndex(self.type_instantiations.add_instantiation(si))
+    }
+
+    fn get_struct_instantiation_sig(&mut self, sd_idx: usize) -> SignatureIndex {
+        let sd = &self.struct_defs[sd_idx];
+        let struct_handle = &self.struct_handles[sd.struct_handle.0 as usize];
+        self.add_signature_from_type_params(struct_handle.type_param_constraints())
     }
 }
 
@@ -496,11 +510,16 @@ enum BytecodeGen {
 
     MutBorrowField((PropIndex, PropIndex)),
     ImmBorrowField((PropIndex, PropIndex)),
+    MutBorrowVariantField((PropIndex, PropIndex, PropIndex)),
+    ImmBorrowVariantField((PropIndex, PropIndex, PropIndex)),
 
     Call(PropIndex),
 
     Pack(PropIndex),
     Unpack(PropIndex),
+    PackVariant((PropIndex, PropIndex)),
+    UnpackVariant((PropIndex, PropIndex)),
+
     Exists(PropIndex),
     MutBorrowGlobal(PropIndex),
     ImmBorrowGlobal(PropIndex),
@@ -536,9 +555,15 @@ impl BytecodeGen {
             any::<PropIndex>().prop_map(LdConst),
             (any::<PropIndex>(), any::<PropIndex>()).prop_map(ImmBorrowField),
             (any::<PropIndex>(), any::<PropIndex>()).prop_map(MutBorrowField),
+            (any::<PropIndex>(), any::<PropIndex>(), any::<PropIndex>())
+                .prop_map(ImmBorrowVariantField),
+            (any::<PropIndex>(), any::<PropIndex>(), any::<PropIndex>())
+                .prop_map(MutBorrowVariantField),
             any::<PropIndex>().prop_map(Call),
             any::<PropIndex>().prop_map(Pack),
             any::<PropIndex>().prop_map(Unpack),
+            (any::<PropIndex>(), any::<PropIndex>()).prop_map(PackVariant),
+            (any::<PropIndex>(), any::<PropIndex>()).prop_map(UnpackVariant),
             any::<PropIndex>().prop_map(Exists),
             any::<PropIndex>().prop_map(ImmBorrowGlobal),
             any::<PropIndex>().prop_map(MutBorrowGlobal),
@@ -580,58 +605,16 @@ impl BytecodeGen {
                 ))
             },
             BytecodeGen::MutBorrowField((def, field)) => {
-                let sd_idx = def.index(state.struct_defs.len());
-                let field_count = state.struct_def_to_field_count.get(&sd_idx)?;
-                if *field_count == 0 {
-                    return None;
-                }
-                let fh_idx = state.field_handles.add_field_handle(FieldHandle {
-                    owner: StructDefinitionIndex(sd_idx as TableIndex),
-                    field: field.index(*field_count) as TableIndex,
-                });
-
-                let struct_handle =
-                    &state.struct_handles[state.struct_defs[sd_idx].struct_handle.0 as usize];
-                if struct_handle.type_parameters.is_empty() {
-                    Bytecode::MutBorrowField(fh_idx)
-                } else {
-                    let sig_idx = state
-                        .add_signature_from_type_params(struct_handle.type_param_constraints());
-                    let fi_idx = state
-                        .field_instantiations
-                        .add_instantiation(FieldInstantiation {
-                            handle: fh_idx,
-                            type_parameters: sig_idx,
-                        });
-                    Bytecode::MutBorrowFieldGeneric(FieldInstantiationIndex(fi_idx))
-                }
+                Self::materialize_borrow(state, def, false, None, field)?
             },
             BytecodeGen::ImmBorrowField((def, field)) => {
-                let sd_idx = def.index(state.struct_defs.len());
-                let field_count = state.struct_def_to_field_count.get(&sd_idx)?;
-                if *field_count == 0 {
-                    return None;
-                }
-                let fh_idx = state.field_handles.add_field_handle(FieldHandle {
-                    owner: StructDefinitionIndex(sd_idx as TableIndex),
-                    field: field.index(*field_count) as TableIndex,
-                });
-
-                let struct_handle =
-                    &state.struct_handles[state.struct_defs[sd_idx].struct_handle.0 as usize];
-                if struct_handle.type_parameters.is_empty() {
-                    Bytecode::ImmBorrowField(fh_idx)
-                } else {
-                    let sig_idx = state
-                        .add_signature_from_type_params(struct_handle.type_param_constraints());
-                    let fi_idx = state
-                        .field_instantiations
-                        .add_instantiation(FieldInstantiation {
-                            handle: fh_idx,
-                            type_parameters: sig_idx,
-                        });
-                    Bytecode::ImmBorrowFieldGeneric(FieldInstantiationIndex(fi_idx))
-                }
+                Self::materialize_borrow(state, def, true, None, field)?
+            },
+            BytecodeGen::MutBorrowVariantField((def, variant, field)) => {
+                Self::materialize_borrow(state, def, false, Some(variant), field)?
+            },
+            BytecodeGen::ImmBorrowVariantField((def, variant, field)) => {
+                Self::materialize_borrow(state, def, true, Some(variant), field)?
             },
             BytecodeGen::Call(idx) => {
                 let func_handles_len = state.function_handles.len();
@@ -643,34 +626,15 @@ impl BytecodeGen {
                     Bytecode::CallGeneric(state.get_function_instantiation(fh_idx))
                 }
             },
-            BytecodeGen::Pack(idx) => {
-                let struct_defs_len = state.struct_defs.len();
-                let sd_idx = idx.index(struct_defs_len);
-
-                let sd = &state.struct_defs[sd_idx];
-                if state.struct_handles[sd.struct_handle.0 as usize]
-                    .type_parameters
-                    .is_empty()
-                {
-                    Bytecode::Pack(StructDefinitionIndex(sd_idx as TableIndex))
-                } else {
-                    Bytecode::PackGeneric(state.get_type_instantiation(sd_idx))
-                }
+            BytecodeGen::Pack(def) => Self::materialize_pack_unpack(state, true, def, None)?,
+            BytecodeGen::Unpack(def) => Self::materialize_pack_unpack(state, false, def, None)?,
+            BytecodeGen::PackVariant((def, variant)) => {
+                Self::materialize_pack_unpack(state, true, def, Some(variant))?
             },
-            BytecodeGen::Unpack(idx) => {
-                let struct_defs_len = state.struct_defs.len();
-                let sd_idx = idx.index(struct_defs_len);
-
-                let sd = &state.struct_defs[sd_idx];
-                if state.struct_handles[sd.struct_handle.0 as usize]
-                    .type_parameters
-                    .is_empty()
-                {
-                    Bytecode::Unpack(StructDefinitionIndex(sd_idx as TableIndex))
-                } else {
-                    Bytecode::UnpackGeneric(state.get_type_instantiation(sd_idx))
-                }
+            BytecodeGen::UnpackVariant((def, variant)) => {
+                Self::materialize_pack_unpack(state, false, def, Some(variant))?
             },
+
             BytecodeGen::Exists(idx) => {
                 let struct_defs_len = state.struct_defs.len();
                 let sd_idx = idx.index(struct_defs_len);
@@ -793,72 +757,72 @@ impl BytecodeGen {
                 if num > u16::MAX as u64 {
                     return None;
                 }
-                let sigs_len = state.signatures.signatures.len();
+                let sigs_len = state.signatures.handles.len();
                 if sigs_len == 0 {
                     return None;
                 }
                 let sig_idx = idx.index(sigs_len);
-                let sig = &state.signatures.signatures[sig_idx];
+                let sig = &state.signatures.handles[sig_idx];
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
                 Bytecode::VecPack(SignatureIndex(sig_idx as TableIndex), num)
             },
             BytecodeGen::VecLen(idx) => {
-                let sigs_len = state.signatures.signatures.len();
+                let sigs_len = state.signatures.handles.len();
                 if sigs_len == 0 {
                     return None;
                 }
                 let sig_idx = idx.index(sigs_len);
-                let sig = &state.signatures.signatures[sig_idx];
+                let sig = &state.signatures.handles[sig_idx];
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
                 Bytecode::VecLen(SignatureIndex(sig_idx as TableIndex))
             },
             BytecodeGen::VecImmBorrow(idx) => {
-                let sigs_len = state.signatures.signatures.len();
+                let sigs_len = state.signatures.handles.len();
                 if sigs_len == 0 {
                     return None;
                 }
                 let sig_idx = idx.index(sigs_len);
-                let sig = &state.signatures.signatures[sig_idx];
+                let sig = &state.signatures.handles[sig_idx];
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
                 Bytecode::VecImmBorrow(SignatureIndex(sig_idx as TableIndex))
             },
             BytecodeGen::VecMutBorrow(idx) => {
-                let sigs_len = state.signatures.signatures.len();
+                let sigs_len = state.signatures.handles.len();
                 if sigs_len == 0 {
                     return None;
                 }
                 let sig_idx = idx.index(sigs_len);
-                let sig = &state.signatures.signatures[sig_idx];
+                let sig = &state.signatures.handles[sig_idx];
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
                 Bytecode::VecMutBorrow(SignatureIndex(sig_idx as TableIndex))
             },
             BytecodeGen::VecPushBack(idx) => {
-                let sigs_len = state.signatures.signatures.len();
+                let sigs_len = state.signatures.handles.len();
                 if sigs_len == 0 {
                     return None;
                 }
                 let sig_idx = idx.index(sigs_len);
-                let sig = &state.signatures.signatures[sig_idx];
+                let sig = &state.signatures.handles[sig_idx];
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
                 Bytecode::VecPushBack(SignatureIndex(sig_idx as TableIndex))
             },
             BytecodeGen::VecPopBack(idx) => {
-                let sigs_len = state.signatures.signatures.len();
+                let sigs_len = state.signatures.handles.len();
                 if sigs_len == 0 {
                     return None;
                 }
                 let sig_idx = idx.index(sigs_len);
-                let sig = &state.signatures.signatures[sig_idx];
+                let sig = &state.signatures.handles[sig_idx];
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
@@ -868,24 +832,24 @@ impl BytecodeGen {
                 if num > u16::MAX as u64 {
                     return None;
                 }
-                let sigs_len = state.signatures.signatures.len();
+                let sigs_len = state.signatures.handles.len();
                 if sigs_len == 0 {
                     return None;
                 }
                 let sig_idx = idx.index(sigs_len);
-                let sig = &state.signatures.signatures[sig_idx];
+                let sig = &state.signatures.handles[sig_idx];
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
                 Bytecode::VecUnpack(SignatureIndex(sig_idx as TableIndex), num)
             },
             BytecodeGen::VecSwap(idx) => {
-                let sigs_len = state.signatures.signatures.len();
+                let sigs_len = state.signatures.handles.len();
                 if sigs_len == 0 {
                     return None;
                 }
                 let sig_idx = idx.index(sigs_len);
-                let sig = &state.signatures.signatures[sig_idx];
+                let sig = &state.signatures.handles[sig_idx];
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
@@ -894,6 +858,202 @@ impl BytecodeGen {
         };
 
         Some(bytecode)
+    }
+
+    fn materialize_pack_unpack(
+        state: &mut FnDefnMaterializeState,
+        is_pack: bool,
+        def: PropIndex,
+        variant: Option<PropIndex>,
+    ) -> Option<Bytecode> {
+        let struct_defs_len = state.struct_defs.len();
+        let struct_idx = def.index(struct_defs_len);
+        let struct_def_idx = StructDefinitionIndex(struct_idx as TableIndex);
+        let struct_def = &state.struct_defs[struct_idx];
+        let struct_handle = &state.struct_handles[struct_def.struct_handle.0 as usize];
+        let make_opc = |handle: StructDefinitionIndex| {
+            if is_pack {
+                Bytecode::Pack(handle)
+            } else {
+                Bytecode::Unpack(handle)
+            }
+        };
+        let make_gen_opc = |handle: StructDefInstantiationIndex| {
+            if is_pack {
+                Bytecode::PackGeneric(handle)
+            } else {
+                Bytecode::UnpackGeneric(handle)
+            }
+        };
+        let make_variant_opc = |handle: StructVariantHandleIndex| {
+            if is_pack {
+                Bytecode::PackVariant(handle)
+            } else {
+                Bytecode::UnpackVariant(handle)
+            }
+        };
+        let make_gen_variant_opc = |handle: StructVariantInstantiationIndex| {
+            if is_pack {
+                Bytecode::PackVariantGeneric(handle)
+            } else {
+                Bytecode::UnpackVariantGeneric(handle)
+            }
+        };
+        match (&struct_def.field_information, variant) {
+            (StructFieldInformation::Declared(..), None) => {
+                if struct_handle.type_parameters.is_empty() {
+                    Some(make_opc(struct_def_idx))
+                } else {
+                    let sig_idx = state
+                        .add_signature_from_type_params(struct_handle.type_param_constraints());
+                    let si_idx =
+                        state
+                            .type_instantiations
+                            .add_instantiation(StructDefInstantiation {
+                                def: struct_def_idx,
+                                type_parameters: sig_idx,
+                            });
+                    Some(make_gen_opc(StructDefInstantiationIndex(
+                        si_idx as TableIndex,
+                    )))
+                }
+            },
+            (StructFieldInformation::DeclaredVariants(..), Some(var_index)) => {
+                let variant =
+                    var_index.index(struct_def.field_information.variant_count()) as VariantIndex;
+                // Create a new variant handle. Currently, this is not internalized as some
+                // other handles.
+                let sv_idx = state.struct_variant_handles.add(
+                    StructVariantHandle {
+                        struct_index: struct_def_idx,
+                        variant,
+                    },
+                    StructVariantHandleIndex,
+                );
+                if struct_handle.type_parameters.is_empty() {
+                    Some(make_variant_opc(sv_idx))
+                } else {
+                    let sig_idx = state
+                        .add_signature_from_type_params(struct_handle.type_param_constraints());
+                    let si_idx = StructVariantInstantiationIndex(
+                        state.struct_variant_instantiations.add_instantiation(
+                            StructVariantInstantiation {
+                                handle: sv_idx,
+                                type_parameters: sig_idx,
+                            },
+                        ) as TableIndex,
+                    );
+                    Some(make_gen_variant_opc(si_idx))
+                }
+            },
+            _ => {
+                // All other cases pack/unpack not available
+                None
+            },
+        }
+    }
+
+    fn materialize_borrow(
+        state: &mut FnDefnMaterializeState,
+        def: PropIndex,
+        is_imm_borrow: bool,
+        variant: Option<PropIndex>,
+        field: PropIndex,
+    ) -> Option<Bytecode> {
+        let sd_idx = def.index(state.struct_defs.len());
+        let struct_def = &state.struct_defs[sd_idx];
+        let struct_handle = &state.struct_handles[struct_def.struct_handle.0 as usize];
+        let make_opc = |handle: FieldHandleIndex| {
+            if is_imm_borrow {
+                Bytecode::ImmBorrowField(handle)
+            } else {
+                Bytecode::MutBorrowField(handle)
+            }
+        };
+        let make_gen_opc = |handle: FieldInstantiationIndex| {
+            if is_imm_borrow {
+                Bytecode::ImmBorrowFieldGeneric(handle)
+            } else {
+                Bytecode::MutBorrowFieldGeneric(handle)
+            }
+        };
+        let make_variant_opc = |handle: VariantFieldHandleIndex| {
+            if is_imm_borrow {
+                Bytecode::ImmBorrowVariantField(handle)
+            } else {
+                Bytecode::MutBorrowVariantField(handle)
+            }
+        };
+        let make_gen_variant_opc = |handle: VariantFieldInstantiationIndex| {
+            if is_imm_borrow {
+                Bytecode::ImmBorrowVariantFieldGeneric(handle)
+            } else {
+                Bytecode::MutBorrowVariantFieldGeneric(handle)
+            }
+        };
+        match (&struct_def.field_information, variant) {
+            (StructFieldInformation::Declared(..), None) => {
+                let field_count = struct_def.field_information.field_count(None);
+                if field_count == 0 {
+                    return None;
+                }
+                let fh_idx = state.field_handles.add(
+                    FieldHandle {
+                        owner: StructDefinitionIndex(sd_idx as TableIndex),
+                        field: field.index(field_count) as TableIndex,
+                    },
+                    FieldHandleIndex,
+                );
+                if struct_handle.type_parameters.is_empty() {
+                    Some(make_opc(fh_idx))
+                } else {
+                    let sig_idx = state
+                        .add_signature_from_type_params(struct_handle.type_param_constraints());
+                    let fi_idx = state
+                        .field_instantiations
+                        .add_instantiation(FieldInstantiation {
+                            handle: fh_idx,
+                            type_parameters: sig_idx,
+                        });
+                    Some(make_gen_opc(FieldInstantiationIndex(fi_idx as TableIndex)))
+                }
+            },
+            (StructFieldInformation::DeclaredVariants(..), Some(var_index)) => {
+                let variant =
+                    var_index.index(struct_def.field_information.variant_count()) as VariantIndex;
+                let field_count = struct_def.field_information.field_count(Some(variant));
+                if field_count == 0 {
+                    return None;
+                }
+                let fh_idx = state.variant_field_handles.add(
+                    VariantFieldHandle {
+                        struct_index: StructDefinitionIndex(sd_idx as TableIndex),
+                        variants: vec![variant],
+                        field: field.index(field_count) as TableIndex,
+                    },
+                    VariantFieldHandleIndex,
+                );
+                if struct_handle.type_parameters.is_empty() {
+                    Some(make_variant_opc(fh_idx))
+                } else {
+                    let sig_idx = state
+                        .add_signature_from_type_params(struct_handle.type_param_constraints());
+                    let fi_idx = state.variant_field_instantiations.add_instantiation(
+                        VariantFieldInstantiation {
+                            handle: fh_idx,
+                            type_parameters: sig_idx,
+                        },
+                    );
+                    Some(make_gen_variant_opc(VariantFieldInstantiationIndex(
+                        fi_idx as TableIndex,
+                    )))
+                }
+            },
+            _ => {
+                // All other cases borrow not available
+                None
+            },
+        }
     }
 
     /// Checks if the given type is well defined in the given context.

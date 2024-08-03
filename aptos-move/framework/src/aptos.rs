@@ -126,6 +126,7 @@ impl ReleaseTarget {
                 skip_attribute_checks: false,
                 check_test_code: false,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
+                experiments: vec![],
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages

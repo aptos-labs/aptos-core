@@ -119,7 +119,7 @@ type ModuleCode = (ModuleId, String);
 fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage) {
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, modules);
-    (MoveVM::new(vec![]).unwrap(), storage)
+    (MoveVM::new(vec![]), storage)
 }
 
 fn compile_modules(storage: &mut InMemoryStorage, modules: &[ModuleCode]) {

@@ -5,9 +5,13 @@
 
 # A script to check whether a local commit related to Move is ready for a PR.
 
+# Note that if tests aren't running for you try `cargo update` and maybe
+# `cargo install cargo-nextest`.
+
 set -e
 
-MOVE_PR_PROFILE=ci
+MOVE_PR_PROFILE="${MOVE_PR_PROFILE:-ci}"
+MOVE_PR_NEXTEST_PROFILE="${MOVE_PR_NEXTEST_PROFILE:-smoke-test}"
 
 BASE=$(git rev-parse --show-toplevel)
 
@@ -67,7 +71,6 @@ EOF
     a)
       INTEGRATION_TEST=1
       COMPILER_V2_TEST=1
-      CHECK=1
       GEN_ARTIFACTS=1
       GIT_CHECKS=1
   esac
@@ -91,8 +94,10 @@ MOVE_CRATES="\
   -p move-bytecode-verifier\
   -p move-binary-format\
   -p move-compiler\
+  -p move-compiler-transactional-tests\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
+  -p move-ir-compiler-transactional-tests\
   -p move-prover-boogie-backend\
   -p move-prover\
   -p move-transactional-test-runner\
@@ -104,6 +109,7 @@ MOVE_CRATES="\
 # MOVE_COMPILER_V2 env var.
 MOVE_CRATES_V2_ENV_DEPENDENT="\
   -p aptos-transactional-test-harness \
+  -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
   -p move-async-vm \
   -p move-cli \
@@ -143,23 +149,25 @@ if [ ! -z "$CHECK" ]; then
   )
 fi
 
+CARGO_OP_PARAMS="--profile $MOVE_PR_PROFILE"
+CARGO_NEXTEST_PARAMS="--profile $MOVE_PR_NEXTEST_PROFILE --cargo-profile $MOVE_PR_PROFILE"
+
 # Artifact generation needs to be run before testing as tests may depend on its result
 if [ ! -z "$GEN_ARTIFACTS" ]; then
-  for dir in $ARTIFACT_CRATE_PATHS; do
-    echo "*************** [move-pr] Generating artifacts for crate $dir"
+    for dir in $ARTIFACT_CRATE_PATHS; do
+        echo "*************** [move-pr] Generating artifacts for crate $dir"
+        (
+            cd $MOVE_BASE/$dir
+            cargo run $CARGO_OP_PARAMS
+        )
+    done
+
+    # Add hoc treatment
     (
-      cd $MOVE_BASE/$dir
-      cargo run --profile $MOVE_PR_PROFILE
+        cd $BASE
+        cargo build $CARGO_OP_PARAMS -p aptos-cached-packages
     )
-  done
-  # Add hoc treatment
-  (
-    cd $BASE
-    cargo build --profile $MOVE_PR_PROFILE -p aptos-cached-packages
-  )
 fi
-
-
 
 if [ ! -z "$TEST" ]; then
   echo "*************** [move-pr] Running tests"
@@ -167,7 +175,7 @@ if [ ! -z "$TEST" ]; then
     # It is important to run all tests from one cargo command to keep cargo features
     # stable.
     cd $BASE
-    cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+    cargo nextest run $CARGO_NEXTEST_PARAMS \
      $MOVE_CRATES
   )
 fi
@@ -176,7 +184,9 @@ if [ ! -z "$INTEGRATION_TEST" ]; then
   echo "*************** [move-pr] Running integration tests"
   (
     cd $BASE
-    MOVE_COMPILER_V2=false cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+    MOVE_COMPILER_V2=false cargo build $CARGO_OP_PARAMS \
+       $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
+    MOVE_COMPILER_V2=false cargo nextest run $CARGO_NEXTEST_PARAMS \
        $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
@@ -185,17 +195,13 @@ if [ ! -z "$COMPILER_V2_TEST" ]; then
   echo "*************** [move-pr] Running integration tests with compiler v2"
   (
     cd $BASE
-    # Need to ensure that aptos-cached-packages is build without the v2 flag,
-    # to avoid regenerating incompatible markdown docs. We really need to
-    # first build and then test the exact same package set, otherwise
-    # rebuild will be triggered via feature unification.
-    MOVE_COMPILER_V2=false cargo build --profile $MOVE_PR_PROFILE \
-     $MOVE_CRATES_V2_ENV_DEPENDENT
-    MOVE_COMPILER_V2=true cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
-     $MOVE_CRATES_V2_ENV_DEPENDENT
+    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc MOVE_COMPILER_V2=true cargo build $CARGO_OP_PARAMS \
+       $MOVE_CRATES_V2_ENV_DEPENDENT
+    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc \
+       MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
+       $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
-
 
 if [ ! -z "$GIT_CHECKS" ]; then
    echo "*************** [move-pr] Running git checks"

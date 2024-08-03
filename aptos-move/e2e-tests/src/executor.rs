@@ -34,18 +34,14 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
-    on_chain_config::{
-        AptosVersion, FeatureFlag, Features, OnChainConfig, TimedFeatureOverride,
-        TimedFeaturesBuilder, ValidatorSet,
-    },
+    on_chain_config::{AptosVersion, OnChainConfig, ValidatorSet},
     state_store::{state_key::StateKey, state_value::StateValue, StateView, TStateView},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, EntryFunction, ExecutionStatus, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -53,13 +49,16 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    gas::{get_gas_parameters, make_prod_gas_meter},
-    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
-    verifier, AptosVM, VMValidator,
+    gas::make_prod_gas_meter,
+    move_vm_ext::{MoveVmExt, SessionId},
+    AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters};
+use aptos_vm_types::{
+    environment::Environment,
+    storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
+};
 use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress,
@@ -69,8 +68,6 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
-#[cfg(any(test, feature = "fuzzing"))]
-use rayon::ThreadPool;
 use serde::Serialize;
 use std::{
     collections::BTreeSet,
@@ -123,13 +120,11 @@ pub struct FakeExecutor {
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
-    /// If set, determines whether or not to execute a comparison test with the parallel
-    /// block executor.
+    /// If set, determines whether to execute a comparison test with the parallel block executor.
     /// If not set, environment variable E2E_PARALLEL_EXEC must be set
     /// s.t. the comparison test is executed (BothComparison).
     executor_mode: Option<ExecutorMode>,
-    features: Features,
-    chain_id: u8,
+    env: Arc<Environment>,
     allow_block_executor_fallback: bool,
 }
 
@@ -162,8 +157,7 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
-            features: Features::default(),
-            chain_id: chain_id.id(),
+            env: Environment::testing(chain_id),
             allow_block_executor_fallback: true,
         };
         executor.apply_write_set(write_set);
@@ -174,7 +168,7 @@ impl FakeExecutor {
     pub fn from_genesis_with_existing_thread_pool(
         write_set: &WriteSet,
         chain_id: ChainId,
-        executor_thread_pool: Arc<ThreadPool>,
+        executor_thread_pool: Arc<rayon::ThreadPool>,
     ) -> Self {
         let mut executor = FakeExecutor {
             data_store: FakeDataStore::default(),
@@ -185,8 +179,7 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
-            features: Features::default(),
-            chain_id: chain_id.id(),
+            env: Environment::testing(chain_id),
             allow_block_executor_fallback: true,
         };
         executor.apply_write_set(write_set);
@@ -269,8 +262,7 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
-            features: Features::default(),
-            chain_id: ChainId::test().id(),
+            env: Environment::testing(ChainId::test()),
             allow_block_executor_fallback: true,
         }
     }
@@ -540,7 +532,7 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block::<
+        BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
@@ -681,11 +673,9 @@ impl FakeExecutor {
         let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
 
         // TODO(Gas): revisit this.
-        let resolver = self.data_store.as_move_resolver();
-        let vm = AptosVM::new(
-            &resolver, /*override_is_delayed_field_optimization_capable=*/ None,
-        );
+        let vm = AptosVM::new(self.get_state_view());
 
+        let resolver = self.data_store.as_move_resolver();
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
             &txn,
@@ -752,10 +742,7 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(
-            &self.get_state_view().as_move_resolver(),
-            /*override_is_delayed_field_optimization_capable=*/ None,
-        );
+        let vm = AptosVM::new(self.get_state_view());
         vm.validate_transaction(txn, &self.data_store)
     }
 
@@ -861,11 +848,6 @@ impl FakeExecutor {
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
     ) -> u128 {
-        // FIXME: should probably read the timestamp from storage.
-        let timed_features = TimedFeaturesBuilder::enable_all()
-            .with_override_profile(TimedFeatureOverride::Testing)
-            .build();
-
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
             | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
@@ -882,7 +864,8 @@ impl FakeExecutor {
                 StorageGasParameters::latest(),
             ),
             GasMeterType::UnmeteredGasMeter => (
-                AptosGasParameters::zeros(),
+                // In case of unmetered execution, we still want to enforce limits.
+                AptosGasParameters::initial(),
                 StorageGasParameters::unlimited(),
             ),
         };
@@ -890,13 +873,9 @@ impl FakeExecutor {
         let vm = MoveVmExt::new(
             LATEST_GAS_FEATURE_VERSION,
             Ok(&gas_params),
-            self.chain_id,
-            self.features.clone(),
-            timed_features,
+            self.env.clone(),
             &resolver,
-            false,
-        )
-        .unwrap();
+        );
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -995,27 +974,19 @@ impl FakeExecutor {
         let a2 = Arc::clone(&a1);
 
         let (write_set, _events) = {
-            // FIXME: should probably read the timestamp from storage.
-            let timed_features = TimedFeaturesBuilder::enable_all()
-                .with_override_profile(TimedFeatureOverride::Testing)
-                .build();
-
             let resolver = self.data_store.as_move_resolver();
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new_with_gas_hook(
+            let vm = MoveVmExt::new_with_extended_options(
                 LATEST_GAS_FEATURE_VERSION,
                 Ok(&AptosGasParameters::zeros()),
-                self.chain_id,
-                self.features.clone(),
-                timed_features,
-                Some(move |expression| {
+                self.env.clone(),
+                Some(Arc::new(move |expression| {
                     a2.lock().unwrap().push(expression);
-                }),
+                })),
+                false,
                 &resolver,
-                /*aggregator_v2_type_tagging=*/ false,
-            )
-            .unwrap();
+            );
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
@@ -1036,7 +1007,6 @@ impl FakeExecutor {
                         false,
                         10000000000000,
                     ),
-                    // coeff_buffer: BTreeMap::new(),
                     shared_buffer: Arc::clone(&a1),
                 }),
                 &mut TraversalContext::new(&storage),
@@ -1046,14 +1016,14 @@ impl FakeExecutor {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
-            let change_set = session
+            let (change_set, module_write_set) = session
                 .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                     LATEST_GAS_FEATURE_VERSION,
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set()
-                .expect("Failed to convert to ChangeSet")
+                .try_combine_into_storage_change_set(module_write_set)
+                .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
         self.data_store.add_write_set(&write_set);
@@ -1074,24 +1044,14 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         let (write_set, events) = {
-            // FIXME: should probably read the timestamp from storage.
-            let timed_features = TimedFeaturesBuilder::enable_all()
-                .with_override_profile(TimedFeatureOverride::Testing)
-                .build();
-
             let resolver = self.data_store.as_move_resolver();
 
-            // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 LATEST_GAS_FEATURE_VERSION,
-                Ok(&AptosGasParameters::zeros()),
-                self.chain_id,
-                self.features.clone(),
-                timed_features,
+                Ok(&AptosGasParameters::initial()),
+                self.env.clone(),
                 &resolver,
-                false,
-            )
-            .unwrap();
+            );
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
             let storage = TraversalStorage::new();
             session
@@ -1100,6 +1060,7 @@ impl FakeExecutor {
                     &Self::name(function_name),
                     type_params,
                     args,
+                    // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
                     &mut TraversalContext::new(&storage),
                 )
@@ -1111,14 +1072,14 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let change_set = session
+            let (change_set, module_write_set) = session
                 .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                     LATEST_GAS_FEATURE_VERSION,
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set()
-                .expect("Failed to convert to ChangeSet")
+                .try_combine_into_storage_change_set(module_write_set)
+                .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
         self.data_store.add_write_set(&write_set);
@@ -1135,73 +1096,6 @@ impl FakeExecutor {
         self.exec_module(&Self::module(module_name), function_name, type_params, args)
     }
 
-    pub fn try_exec_entry_with_state_view(
-        &mut self,
-        senders: Vec<AccountAddress>,
-        entry_fn: &EntryFunction,
-        state_view: &impl AptosMoveResolver,
-        features: Features,
-    ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-        let (gas_params, storage_gas_params, gas_feature_version) =
-            get_gas_parameters(&features, state_view);
-
-        let timed_features = TimedFeaturesBuilder::enable_all()
-            .with_override_profile(TimedFeatureOverride::Testing)
-            .build();
-        let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
-        let vm = MoveVmExt::new(
-            LATEST_GAS_FEATURE_VERSION,
-            gas_params.as_ref(),
-            self.chain_id,
-            features,
-            timed_features,
-            state_view,
-            false,
-        )
-        .unwrap();
-
-        let mut session = vm.new_session(state_view, SessionId::void(), None);
-        let func =
-            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-            &mut session,
-            senders,
-            entry_fn.args().to_vec(),
-            &func,
-            struct_constructors,
-        )?;
-
-        let mut gas_meter = make_prod_gas_meter(
-            gas_feature_version,
-            gas_params.unwrap().clone().vm,
-            storage_gas_params.unwrap(),
-            false,
-            10_000_000_000_000.into(),
-        );
-
-        let storage = TraversalStorage::new();
-        session
-            .execute_entry_function(
-                func,
-                args,
-                &mut gas_meter,
-                &mut TraversalContext::new(&storage),
-            )
-            .map_err(|e| e.into_vm_status())?;
-
-        let mut change_set = session
-            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ))
-            .expect("Failed to generate txn effects");
-        change_set.try_materialize_aggregator_v1_delta_set(state_view)?;
-        let (write_set, events) = change_set
-            .try_into_storage_change_set()
-            .expect("Failed to convert to ChangeSet")
-            .into_inner();
-        Ok((write_set, events))
-    }
-
     pub fn try_exec(
         &mut self,
         module_name: &str,
@@ -1210,19 +1104,12 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let resolver = self.data_store.as_move_resolver();
-
-        // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             LATEST_GAS_FEATURE_VERSION,
-            Ok(&AptosGasParameters::zeros()),
-            self.chain_id,
-            self.features.clone(),
-            // FIXME: should probably read the timestamp from storage.
-            TimedFeaturesBuilder::enable_all().build(),
+            Ok(&AptosGasParameters::initial()),
+            self.env.clone(),
             &resolver,
-            false,
-        )
-        .unwrap();
+        );
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
         let storage = TraversalStorage::new();
         session
@@ -1231,20 +1118,20 @@ impl FakeExecutor {
                 &Self::name(function_name),
                 type_params,
                 args,
+                // TODO(Gas): we probably want to switch to metered execution in the future
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&storage),
             )
             .map_err(|e| e.into_vm_status())?;
 
-        let change_set = session
+        let (change_set, module_write_set) = session
             .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                 LATEST_GAS_FEATURE_VERSION,
             ))
             .expect("Failed to generate txn effects");
-        // TODO: Support deltas in fake executor.
         let (write_set, events) = change_set
-            .try_into_storage_change_set()
-            .expect("Failed to convert to ChangeSet")
+            .try_combine_into_storage_change_set(module_write_set)
+            .expect("Failed to convert to storage ChangeSet")
             .into_inner();
         Ok((write_set, events))
     }
@@ -1255,14 +1142,14 @@ impl FakeExecutor {
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
     ) -> ViewFunctionOutput {
-        // No gas limit
+        let max_gas_amount = u64::MAX;
         AptosVM::execute_view_function(
             self.get_state_view(),
             fun.module_id,
             fun.member_id,
             type_args,
             arguments,
-            u64::MAX,
+            max_gas_amount,
         )
     }
 }

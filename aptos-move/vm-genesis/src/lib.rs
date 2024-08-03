@@ -33,16 +33,16 @@ use aptos_types::{
         randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
+        APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{GenesisMoveVM, SessionExt},
 };
-use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
+use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -122,24 +122,15 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     assert!(!genesis_config.is_test, "This is mainnet!");
     validate_genesis_config(genesis_config);
 
-    // Create a Move VM session so we can invoke on-chain genesis intializations.
+    // Create a Move VM session, so we can invoke on-chain genesis initializations.
     let mut state_view = GenesisStateView::new();
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
-    let move_vm = MoveVmExt::new(
-        LATEST_GAS_FEATURE_VERSION,
-        Ok(&AptosGasParameters::zeros()),
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
-    let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
+
+    let vm = GenesisMoveVM::new(chain_id);
+    let resolver = state_view.as_move_resolver();
+    let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default_for_genesis();
@@ -170,21 +161,24 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
-    let mut change_set = session.finish(&configs).unwrap();
+    let configs = vm.genesis_change_set_configs();
+    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
+    assert_ok!(
+        module_write_set.is_empty_or_invariant_violation(),
+        "Modules cannot be published in this session"
+    );
 
-    // Publish the framework, using a different session id, in case both scripts creates tables
+    // Publish the framework, using a different session id, in case both scripts create tables.
     let state_view = GenesisStateView::new();
-    let data_cache = state_view.as_move_resolver();
+    let resolver = state_view.as_move_resolver();
 
-    let mut id2_arr = [0u8; 32];
-    id2_arr[31] = 1;
-    let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), None);
+    let mut new_id = [0u8; 32];
+    new_id[31] = 1;
+    let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&configs).unwrap();
+    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
     change_set
-        .squash_additional_change_set(additional_change_set, &configs)
+        .squash_additional_change_set(additional_change_set)
         .unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -200,7 +194,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     verify_genesis_write_set(change_set.events());
 
     let change_set = change_set
-        .try_into_storage_change_set()
+        .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
@@ -239,24 +233,15 @@ pub fn encode_genesis_change_set(
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
-    // Create a Move VM session so we can invoke on-chain genesis intializations.
+    // Create a Move VM session so we can invoke on-chain genesis initializations.
     let mut state_view = GenesisStateView::new();
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
-    let move_vm = MoveVmExt::new(
-        LATEST_GAS_FEATURE_VERSION,
-        Ok(&AptosGasParameters::zeros()),
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
-    let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
+
+    let resolver = state_view.as_move_resolver();
+    let vm = GenesisMoveVM::new(chain_id);
+    let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
     // On-chain genesis process.
     initialize(
@@ -307,21 +292,24 @@ pub fn encode_genesis_change_set(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
-    let mut change_set = session.finish(&configs).unwrap();
+    let configs = vm.genesis_change_set_configs();
+    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
+    assert_ok!(
+        module_write_set.is_empty_or_invariant_violation(),
+        "Modules cannot be published in this session"
+    );
 
     let state_view = GenesisStateView::new();
-    let data_cache = state_view.as_move_resolver();
+    let resolver = state_view.as_move_resolver();
 
-    // Publish the framework, using a different session id, in case both scripts creates tables
-    let mut id2_arr = [0u8; 32];
-    id2_arr[31] = 1;
-    let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), None);
+    // Publish the framework, using a different id, in case both scripts create tables.
+    let mut new_id = [0u8; 32];
+    new_id[31] = 1;
+    let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&configs).unwrap();
+    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
     change_set
-        .squash_additional_change_set(additional_change_set, &configs)
+        .squash_additional_change_set(additional_change_set)
         .unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -336,8 +324,9 @@ pub fn encode_genesis_change_set(
         .concrete_write_set_iter()
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
+
     change_set
-        .try_into_storage_change_set()
+        .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
 }
 
@@ -387,10 +376,7 @@ fn exec_function(
     let storage = TraversalStorage::new();
     session
         .execute_function_bypass_visibility(
-            &ModuleId::new(
-                account_config::CORE_CODE_ADDRESS,
-                Identifier::new(module_name).unwrap(),
-            ),
+            &ModuleId::new(CORE_CODE_ADDRESS, Identifier::new(module_name).unwrap()),
             &Identifier::new(function_name).unwrap(),
             ty_args,
             args,
@@ -1080,20 +1066,11 @@ pub fn test_genesis_module_publishing() {
     {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
 
-    let move_vm = MoveVmExt::new(
-        LATEST_GAS_FEATURE_VERSION,
-        Ok(&AptosGasParameters::zeros()),
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
-    let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
+    let vm = GenesisMoveVM::new(ChainId::test());
+    let resolver = state_view.as_move_resolver();
+
+    let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
     publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
 }
 

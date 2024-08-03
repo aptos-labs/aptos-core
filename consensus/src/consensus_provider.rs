@@ -41,6 +41,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
 
 /// Helper function to start consensus based on configuration and return the runtime
+#[allow(clippy::unwrap_used)]
 pub fn start_consensus(
     node_config: &NodeConfig,
     network_client: NetworkClient<ConsensusMsg>,
@@ -76,7 +77,10 @@ pub fn start_consensus(
     let (self_sender, self_receiver) =
         aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
+    let bounded_executor = BoundedExecutor::new(
+        node_config.consensus.num_bounded_executor_tasks as usize,
+        runtime.handle().clone(),
+    );
     let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
 
     let execution_client = Arc::new(ExecutionProxyClient::new(
@@ -133,7 +137,15 @@ pub fn start_consensus_observer(
     let runtime = aptos_runtimes::spawn_named_runtime("observer".into(), None);
 
     // Create the consensus observer client
-    let consensus_observer_client = ConsensusObserverClient::new(observer_network_client.clone());
+    let consensus_observer_client = if let Some(consensus_publisher) = &consensus_publisher {
+        // Get the consensus observer client from the consensus publisher
+        consensus_publisher.get_consensus_observer_client()
+    } else {
+        // Otherwise, create a new client (the publisher is not enabled)
+        Arc::new(ConsensusObserverClient::new(
+            observer_network_client.clone(),
+        ))
+    };
 
     // Create the consensus observer network events
     let observer_network_events =
@@ -187,7 +199,7 @@ pub fn start_consensus_observer(
     // Create the consensus observer
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let consensus_observer = ConsensusObserver::new(
-        node_config.consensus_observer,
+        node_config.clone(),
         consensus_observer_client,
         aptos_db.reader.clone(),
         execution_client,

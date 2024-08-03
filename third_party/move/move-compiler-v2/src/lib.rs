@@ -33,7 +33,9 @@ use crate::{
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
-        unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
+        unreachable_code_remover::UnreachableCodeRemover,
+        unused_assignment_checker::UnusedAssignmentChecker,
+        variable_coalescing::VariableCoalescing,
     },
 };
 use anyhow::bail;
@@ -183,7 +185,10 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             &options.known_attributes
         },
         options.language_version.unwrap_or_default(),
+        options.warn_deprecated,
+        options.warn_of_deprecation_use_in_aptos_libs,
         options.compile_test_code,
+        options.compile_verify_code,
     )?;
     // Store address aliases
     let map = addrs
@@ -305,7 +310,10 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         );
     }
 
-    let check_seqs_in_binops = options.language_version.unwrap_or_default() < LanguageVersion::V2_0
+    let check_seqs_in_binops = !options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_0)
         && options.experiment_on(Experiment::SEQS_IN_BINOPS_CHECK);
 
     if !for_v1_model && check_seqs_in_binops {
@@ -389,6 +397,11 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if options.experiment_on(Experiment::UNINITIALIZED_CHECK) {
         let keep_annotations = options.experiment_on(Experiment::KEEP_UNINIT_ANNOTATIONS);
         pipeline.add_processor(Box::new(UninitializedUseChecker { keep_annotations }));
+    }
+
+    if options.experiment_on(Experiment::UNUSED_ASSIGNMENT_CHECK) {
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+        pipeline.add_processor(Box::new(UnusedAssignmentChecker {}));
     }
 
     // Reference check is always run, but the processor decides internally

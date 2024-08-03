@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, ProofWithData},
+    common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
@@ -24,12 +24,13 @@ use std::{
     cmp::min,
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
+    time::Duration,
 };
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
-    ReceiveBatches(Vec<BatchInfo>),
+    ReceiveBatches(Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -166,10 +167,19 @@ impl ProofManager {
             self.proofs_for_consensus.remaining_txns_and_proofs();
     }
 
-    pub(crate) fn receive_batches(&mut self, batches: Vec<BatchInfo>) {
+    pub(crate) fn receive_batches(
+        &mut self,
+        batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
+    ) {
         if self.allow_batches_without_pos_in_proposal {
+            let batches = batch_summaries
+                .iter()
+                .map(|(batch_info, _)| batch_info.clone())
+                .collect();
             self.batch_queue.add_batches(batches);
         }
+        self.proofs_for_consensus
+            .add_batch_summaries(batch_summaries);
     }
 
     pub(crate) fn handle_commit_notification(
@@ -196,12 +206,14 @@ impl ProofManager {
         match msg {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
+                max_txns_after_filtering,
                 max_bytes,
                 max_inline_txns,
                 max_inline_bytes,
                 return_non_full,
                 filter,
                 callback,
+                block_timestamp,
             ) => {
                 let excluded_batches: HashSet<_> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -211,21 +223,33 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let (proof_block, proof_queue_fully_utilized) = self
-                    .proofs_for_consensus
-                    .pull_proofs(&excluded_batches, max_txns, max_bytes, return_non_full);
+                let (proof_block, cur_unique_txns, proof_queue_fully_utilized) =
+                    self.proofs_for_consensus.pull_proofs(
+                        &excluded_batches,
+                        max_txns,
+                        max_txns_after_filtering,
+                        max_bytes,
+                        return_non_full,
+                        block_timestamp,
+                    );
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
                 counters::PROOF_QUEUE_FULLY_UTILIZED
                     .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
                 let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
-                let cur_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
+                let cur_all_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
                 let cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
 
                 if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
                     inline_block = self.batch_queue.pull_batches(
-                        min(max_txns - cur_txns, max_inline_txns),
+                        min(
+                            min(
+                                max_txns.saturating_sub(cur_all_txns),
+                                max_txns_after_filtering.saturating_sub(cur_unique_txns),
+                            ),
+                            max_inline_txns,
+                        ),
                         min(max_bytes - cur_bytes, max_inline_bytes),
                         excluded_batches
                             .iter()
@@ -275,6 +299,21 @@ impl ProofManager {
 
     /// return true when quorum store is back pressured
     pub(crate) fn qs_back_pressure(&self) -> BackPressure {
+        if self.remaining_total_txn_num > self.back_pressure_total_txn_limit
+            || self.remaining_total_proof_num > self.back_pressure_total_proof_limit
+        {
+            sample!(
+                SampleRate::Duration(Duration::from_millis(200)),
+                info!(
+                    "Quorum store is back pressured with {} txns, limit: {}, proofs: {}, limit: {}",
+                    self.remaining_total_txn_num,
+                    self.back_pressure_total_txn_limit,
+                    self.remaining_total_proof_num,
+                    self.back_pressure_total_proof_limit
+                );
+            );
+        }
+
         BackPressure {
             txn_count: self.remaining_total_txn_num > self.back_pressure_total_txn_limit,
             proof_count: self.remaining_total_proof_num > self.back_pressure_total_proof_limit,

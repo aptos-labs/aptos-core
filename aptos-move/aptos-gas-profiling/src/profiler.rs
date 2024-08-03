@@ -11,7 +11,7 @@ use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet, resolver::ExecutorView, storage::space_pricing::ChargeAndRefund,
+    change_set::ChangeSetInterface, resolver::ExecutorView, storage::space_pricing::ChargeAndRefund,
 };
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
@@ -568,7 +568,7 @@ where
 
     fn process_storage_fee_for_all(
         &mut self,
-        change_set: &mut VMChangeSet,
+        change_set: &mut impl ChangeSetInterface,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
         executor_view: &dyn ExecutorView,
@@ -612,7 +612,7 @@ where
         // Events (no event fee in v2)
         let mut event_fee = Fee::new(0);
         let mut event_fees = vec![];
-        for (event, _) in change_set.events().iter() {
+        for event in change_set.events_iter() {
             let fee = pricing.legacy_storage_fee_per_event(params, event);
             event_fees.push(EventStorage {
                 ty: event.type_tag().clone(),

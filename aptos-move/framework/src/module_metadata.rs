@@ -3,22 +3,21 @@
 
 use crate::extended_checks::ResourceGroupScope;
 use aptos_types::{
-    on_chain_config::{FeatureFlag, Features, TimedFeatures},
+    on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
     transaction::AbortInfo,
 };
 use lru::LruCache;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Ability, AbilitySet, CompiledScript, IdentifierIndex, SignatureToken,
-        StructFieldInformation, TableIndex,
+        Ability, AbilitySet, CompiledScript, FunctionDefinition, FunctionHandle, IdentifierIndex,
+        SignatureToken, StructDefinition, StructFieldInformation, StructHandle, TableIndex,
     },
-    normalized::{Function, Struct},
     CompiledModule,
 };
 use move_core_types::{
     errmap::ErrorDescription,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
 };
@@ -313,6 +312,17 @@ pub fn get_compilation_metadata_from_compiled_module(
     }
 }
 
+/// Extract compilation metadata from a compiled script
+pub fn get_compilation_metadata_from_compiled_script(
+    module: &CompiledScript,
+) -> Option<CompilationMetadata> {
+    if let Some(data) = find_metadata_in_script(module, COMPILATION_METADATA_KEY) {
+        bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
+    } else {
+        None
+    }
+}
+
 // This is mostly a copy paste of the existing function
 // get_metadata_from_compiled_module. In the API types there is a unifying trait for
 // modules and scripts called Bytecode that could help eliminate this duplication,
@@ -388,12 +398,12 @@ pub struct AttributeValidationError {
 }
 
 pub fn is_valid_unbiasable_function(
-    functions: &BTreeMap<Identifier, Function>,
+    functions: &BTreeMap<&IdentStr, (&FunctionHandle, &FunctionDefinition)>,
     fun: &str,
 ) -> Result<(), AttributeValidationError> {
     if let Ok(ident_fun) = Identifier::new(fun) {
-        if let Some(f) = functions.get(&ident_fun) {
-            if f.is_entry && !f.visibility.is_public() {
+        if let Some((_func_handle, func_def)) = functions.get(ident_fun.as_ident_str()) {
+            if func_def.is_entry && !func_def.visibility.is_public() {
                 return Ok(());
             }
         }
@@ -406,12 +416,14 @@ pub fn is_valid_unbiasable_function(
 }
 
 pub fn is_valid_view_function(
-    functions: &BTreeMap<Identifier, Function>,
+    module: &CompiledModule,
+    functions: &BTreeMap<&IdentStr, (&FunctionHandle, &FunctionDefinition)>,
     fun: &str,
 ) -> Result<(), AttributeValidationError> {
     if let Ok(ident_fun) = Identifier::new(fun) {
-        if let Some(mod_fun) = functions.get(&ident_fun) {
-            if !mod_fun.return_.is_empty() {
+        if let Some((func_handle, _func_def)) = functions.get(ident_fun.as_ident_str()) {
+            let sig = module.signature_at(func_handle.return_);
+            if !sig.0.is_empty() {
                 return Ok(());
             }
         }
@@ -424,14 +436,18 @@ pub fn is_valid_view_function(
 }
 
 pub fn is_valid_resource_group(
-    structs: &BTreeMap<Identifier, Struct>,
+    structs: &BTreeMap<&IdentStr, (&StructHandle, &StructDefinition)>,
     struct_: &str,
 ) -> Result<(), AttributeValidationError> {
     if let Ok(ident_struct) = Identifier::new(struct_) {
-        if let Some(mod_struct) = structs.get(&ident_struct) {
-            if mod_struct.abilities == AbilitySet::EMPTY
-                && mod_struct.type_parameters.is_empty()
-                && mod_struct.fields.len() == 1
+        if let Some((struct_handle, struct_def)) = structs.get(ident_struct.as_ident_str()) {
+            let num_fields = match &struct_def.field_information {
+                StructFieldInformation::Native | StructFieldInformation::DeclaredVariants(_) => 0,
+                StructFieldInformation::Declared(fields) => fields.len(),
+            };
+            if struct_handle.abilities == AbilitySet::EMPTY
+                && struct_handle.type_parameters.is_empty()
+                && num_fields == 1
             {
                 return Ok(());
             }
@@ -445,12 +461,12 @@ pub fn is_valid_resource_group(
 }
 
 pub fn is_valid_resource_group_member(
-    structs: &BTreeMap<Identifier, Struct>,
+    structs: &BTreeMap<&IdentStr, (&StructHandle, &StructDefinition)>,
     struct_: &str,
 ) -> Result<(), AttributeValidationError> {
     if let Ok(ident_struct) = Identifier::new(struct_) {
-        if let Some(mod_struct) = structs.get(&ident_struct) {
-            if mod_struct.abilities.has_ability(Ability::Key) {
+        if let Some((struct_handle, _struct_def)) = structs.get(ident_struct.as_ident_str()) {
+            if struct_handle.abilities.has_ability(Ability::Key) {
                 return Ok(());
             }
         }
@@ -465,9 +481,11 @@ pub fn is_valid_resource_group_member(
 pub fn verify_module_metadata(
     module: &CompiledModule,
     features: &Features,
-    _timed_features: &TimedFeatures,
+    timed_features: &TimedFeatures,
 ) -> Result<(), MetaDataValidationError> {
-    if features.is_enabled(FeatureFlag::SAFER_METADATA) {
+    if features.is_enabled(FeatureFlag::SAFER_METADATA)
+        && timed_features.is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
+    {
         check_module_complexity(module)?;
     }
 
@@ -483,13 +501,17 @@ pub fn verify_module_metadata(
     let functions = module
         .function_defs
         .iter()
-        .map(|func_def| Function::new(module, func_def))
+        .map(|func_def| {
+            let func_handle = module.function_handle_at(func_def.function);
+            let name = module.identifier_at(func_handle.name);
+            (name, (func_handle, func_def))
+        })
         .collect::<BTreeMap<_, _>>();
 
     for (fun, attrs) in &metadata.fun_attributes {
         for attr in attrs {
             if attr.is_view_function() {
-                is_valid_view_function(&functions, fun)?;
+                is_valid_view_function(module, &functions, fun)?;
             } else if attr.is_randomness() {
                 is_valid_unbiasable_function(&functions, fun)?;
             } else {
@@ -505,7 +527,11 @@ pub fn verify_module_metadata(
     let structs = module
         .struct_defs
         .iter()
-        .map(|d| Struct::new(module, d))
+        .map(|struct_def| {
+            let struct_handle = module.struct_handle_at(struct_def.struct_handle);
+            let name = module.identifier_at(struct_handle.name);
+            (name, (struct_handle, struct_def))
+        })
         .collect::<BTreeMap<_, _>>();
 
     for (struct_, attrs) in &metadata.struct_attributes {

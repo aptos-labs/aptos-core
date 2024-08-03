@@ -23,6 +23,7 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
         gauged_api("get_prefixed_state_value_iterator", || {
+            ensure!(!self.state_kv_db.enabled_sharding(), "This API is not supported with sharded DB");
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             Ok(Box::new(
@@ -64,6 +65,7 @@ impl DbReader for AptosDB {
         ledger_version: Version,
     ) -> Result<Option<TransactionWithProof>> {
         gauged_api("get_account_transaction", || {
+            ensure!(!self.state_kv_db.enabled_sharding(), "This API is not supported with sharded DB");
             self.transaction_store
                 .get_account_transaction_version(address, seq_num, ledger_version)?
                 .map(|txn_version| {
@@ -82,6 +84,7 @@ impl DbReader for AptosDB {
         ledger_version: Version,
     ) -> Result<AccountTransactionsWithProof> {
         gauged_api("get_account_transactions", || {
+            ensure!(!self.state_kv_db.enabled_sharding(), "This API is not supported with sharded DB");
             error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
             let txns_with_proofs = self
@@ -284,6 +287,7 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// TODO(bowu): Deprecate after internal index migration
     fn get_events(
         &self,
         event_key: &EventKey,
@@ -652,10 +656,10 @@ impl DbReader for AptosDB {
             .map_err(Into::into)
     }
 
-    fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
-        gauged_api("get_state_leaf_count", || {
+    fn get_state_item_count(&self, version: Version) -> Result<usize> {
+        gauged_api("get_state_item_count", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
-            self.state_store.get_value_count(version)
+            self.ledger_db.metadata_db().get_usage(version).map(|usage| usage.items())
         })
     }
 
@@ -723,6 +727,19 @@ impl DbReader for AptosDB {
             }
             self.state_store.get_usage(version)
         })
+    }
+
+
+    fn get_event_by_version_and_index(
+        &self,
+        version: Version,
+        index: u64,
+    ) -> Result<ContractEvent> {
+        gauged_api("get_event_by_version_and_index", || {
+            self.error_if_ledger_pruned("Event", version)?;
+            self.event_store.get_event_by_version_and_index(version, index)
+        })
+
     }
 }
 
@@ -829,6 +846,7 @@ impl AptosDB {
         })
     }
 
+    /// TODO(bowu): Deprecate after internal index migration
     fn get_events_by_event_key(
         &self,
         event_key: &EventKey,
@@ -837,6 +855,7 @@ impl AptosDB {
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
+        ensure!(!self.state_kv_db.enabled_sharding(), "This API is deprecated for sharded DB");
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
         let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
 

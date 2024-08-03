@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
 data:
-  haproxy.cfg: |-
+  haproxy.cfg: |
 {{ (tpl ($.Files.Get "files/haproxy.cfg") $) | indent 4 }}
   blocked.ips: ""
 
@@ -144,6 +144,9 @@ spec:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/name: haproxy
         app.kubernetes.io/instance: haproxy-{{$i}}
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
       annotations:
         checksum/haproxy.cfg: {{ tpl ($.Files.Get "files/haproxy.cfg") $ | sha256sum }}
     spec:
@@ -151,7 +154,12 @@ spec:
       containers:
       - name: haproxy
         image: {{ .image.repo }}:{{ .image.tag }}
-        command: ["sh", "-c", "ulimit -n 1048576 && exec haproxy -f /usr/local/etc/haproxy/haproxy.cfg"]
+        args:
+          - /bin/sh
+          - -c
+          - |-
+            ulimit -n 1048576
+            exec haproxy -f /usr/local/etc/haproxy/haproxy.cfg
         imagePullPolicy: {{ .image.pullPolicy }}
         resources:
           {{- toYaml .resources | nindent 10 }}

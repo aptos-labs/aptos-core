@@ -40,7 +40,7 @@ async fn test_aptos_node_after_get_bin() {
         )
         .unwrap();
 
-    for fullnode in swarm.full_nodes_mut() {
+    for fullnode in swarm.full_nodes() {
         fullnode
             .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
             .await

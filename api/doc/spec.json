@@ -13990,6 +13990,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "ed25519_signature"
+                ],
                 "example": "ed25519_signature"
               }
             }
@@ -14009,6 +14012,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multi_ed25519_signature"
+                ],
                 "example": "multi_ed25519_signature"
               }
             }
@@ -14028,6 +14034,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multi_key_signature"
+                ],
                 "example": "multi_key_signature"
               }
             }
@@ -14047,6 +14056,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "single_key_signature"
+                ],
                 "example": "single_key_signature"
               }
             }
@@ -14330,6 +14342,73 @@
           }
         }
       },
+      "DKGResultTransaction": {
+        "type": "object",
+        "required": [
+          "version",
+          "hash",
+          "state_change_hash",
+          "event_root_hash",
+          "gas_used",
+          "success",
+          "vm_status",
+          "accumulator_root_hash",
+          "changes",
+          "events",
+          "timestamp",
+          "dkg_transcript"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_change_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "gas_used": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the transaction was successful"
+          },
+          "vm_status": {
+            "type": "string",
+            "description": "The VM status of the transaction, can tell useful information in a failure"
+          },
+          "accumulator_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "changes": {
+            "type": "array",
+            "description": "Final state of resources changed by the transaction",
+            "items": {
+              "$ref": "#/components/schemas/WriteSetChange"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "dkg_transcript": {
+            "$ref": "#/components/schemas/ExportedDKGTranscript"
+          }
+        }
+      },
       "DecodedTableData": {
         "type": "object",
         "description": "Decoded table data",
@@ -14598,6 +14677,84 @@
           }
         }
       },
+      "ExportedAggregateSignature": {
+        "type": "object",
+        "description": "A more API-friendly representation of the on-chain `aptos_types::aggregate_signature::AggregateSignature`.",
+        "required": [
+          "signer_indices"
+        ],
+        "properties": {
+          "signer_indices": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint64"
+            }
+          },
+          "sig": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
+      "ExportedDKGTranscript": {
+        "type": "object",
+        "required": [
+          "epoch",
+          "author",
+          "payload"
+        ],
+        "properties": {
+          "epoch": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "author": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
+      "ExportedProviderJWKs": {
+        "type": "object",
+        "description": "A more API-friendly representation of the on-chain `aptos_types::jwks::ProviderJWKs`.",
+        "required": [
+          "issuer",
+          "version",
+          "jwks"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "jwks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JWK"
+            }
+          }
+        }
+      },
+      "ExportedQuorumCertifiedUpdate": {
+        "type": "object",
+        "description": "A more API-friendly representation of the on-chain `aptos_types::jwks::QuorumCertifiedUpdate`.",
+        "required": [
+          "update",
+          "multi_sig"
+        ],
+        "properties": {
+          "update": {
+            "$ref": "#/components/schemas/ExportedProviderJWKs"
+          },
+          "multi_sig": {
+            "$ref": "#/components/schemas/ExportedAggregateSignature"
+          }
+        }
+      },
       "FeePayerSignature": {
         "type": "object",
         "description": "Fee payer signature for fee payer transactions\n\nThis allows you to have transactions across multiple accounts and with a fee payer",
@@ -14697,6 +14854,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "write_set_payload"
+                ],
                 "example": "write_set_payload"
               }
             }
@@ -14854,6 +15014,85 @@
           },
           "signature": {
             "$ref": "#/components/schemas/Signature"
+          }
+        }
+      },
+      "JWK": {
+        "type": "object",
+        "description": "The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.",
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/RSA_JWK"
+          },
+          {
+            "$ref": "#/components/schemas/UnsupportedJWK"
+          }
+        ]
+      },
+      "JWKUpdateTransaction": {
+        "type": "object",
+        "required": [
+          "version",
+          "hash",
+          "state_change_hash",
+          "event_root_hash",
+          "gas_used",
+          "success",
+          "vm_status",
+          "accumulator_root_hash",
+          "changes",
+          "events",
+          "timestamp",
+          "quorum_certified_update"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_change_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "gas_used": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the transaction was successful"
+          },
+          "vm_status": {
+            "type": "string",
+            "description": "The VM status of the transaction, can tell useful information in a failure"
+          },
+          "accumulator_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "changes": {
+            "type": "array",
+            "description": "Final state of resources changed by the transaction",
+            "items": {
+              "$ref": "#/components/schemas/WriteSetChange"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "quorum_certified_update": {
+            "$ref": "#/components/schemas/ExportedQuorumCertifiedUpdate"
           }
         }
       },
@@ -15315,6 +15554,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "entry_function_payload"
+                ],
                 "example": "entry_function_payload"
               }
             }
@@ -15399,6 +15641,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "ed25519"
+                ],
                 "example": "ed25519"
               }
             }
@@ -15418,6 +15663,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "keyless"
+                ],
                 "example": "keyless"
               }
             }
@@ -15437,6 +15685,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "secp256k1_ecdsa"
+                ],
                 "example": "secp256k1_ecdsa"
               }
             }
@@ -15456,6 +15707,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "secp256r1_ecdsa"
+                ],
                 "example": "secp256r1_ecdsa"
               }
             }
@@ -15464,6 +15718,34 @@
             "$ref": "#/components/schemas/Secp256r1Ecdsa"
           }
         ]
+      },
+      "RSA_JWK": {
+        "type": "object",
+        "description": "Move type `0x1::jwks::RSA_JWK` in rust.\nSee its doc in Move for more details.",
+        "required": [
+          "kid",
+          "kty",
+          "alg",
+          "e",
+          "n"
+        ],
+        "properties": {
+          "kid": {
+            "type": "string"
+          },
+          "kty": {
+            "type": "string"
+          },
+          "alg": {
+            "type": "string"
+          },
+          "e": {
+            "type": "string"
+          },
+          "n": {
+            "type": "string"
+          }
+        }
       },
       "RawTableItemRequest": {
         "type": "object",
@@ -15583,6 +15865,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "ed25519"
+                ],
                 "example": "ed25519"
               }
             }
@@ -15602,6 +15887,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "keyless"
+                ],
                 "example": "keyless"
               }
             }
@@ -15621,6 +15909,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "secp256k1_ecdsa"
+                ],
                 "example": "secp256k1_ecdsa"
               }
             }
@@ -15640,6 +15931,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "web_authn"
+                ],
                 "example": "web_authn"
               }
             }
@@ -15859,6 +16153,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "module_bundle_payload"
+                ],
                 "example": "module_bundle_payload"
               }
             }
@@ -15878,6 +16175,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "entry_function_payload"
+                ],
                 "example": "entry_function_payload"
               }
             }
@@ -15897,6 +16197,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multisig_payload"
+                ],
                 "example": "multisig_payload"
               }
             }
@@ -15916,6 +16219,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "script_payload"
+                ],
                 "example": "script_payload"
               }
             }
@@ -15966,6 +16272,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "single_sender"
+                ],
                 "example": "single_sender"
               }
             }
@@ -15985,6 +16294,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "ed25519_signature"
+                ],
                 "example": "ed25519_signature"
               }
             }
@@ -16004,6 +16316,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "fee_payer_signature"
+                ],
                 "example": "fee_payer_signature"
               }
             }
@@ -16023,6 +16338,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multi_agent_signature"
+                ],
                 "example": "multi_agent_signature"
               }
             }
@@ -16042,6 +16360,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "multi_ed25519_signature"
+                ],
                 "example": "multi_ed25519_signature"
               }
             }
@@ -16061,6 +16382,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "block_epilogue_transaction"
+                ],
                 "example": "block_epilogue_transaction"
               }
             }
@@ -16080,6 +16404,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "block_metadata_transaction"
+                ],
                 "example": "block_metadata_transaction"
               }
             }
@@ -16099,6 +16426,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "genesis_transaction"
+                ],
                 "example": "genesis_transaction"
               }
             }
@@ -16118,6 +16448,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "pending_transaction"
+                ],
                 "example": "pending_transaction"
               }
             }
@@ -16137,6 +16470,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "state_checkpoint_transaction"
+                ],
                 "example": "state_checkpoint_transaction"
               }
             }
@@ -16156,6 +16492,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "user_transaction"
+                ],
                 "example": "user_transaction"
               }
             }
@@ -16175,6 +16514,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "validator_transaction"
+                ],
                 "example": "validator_transaction"
               }
             }
@@ -16235,6 +16577,30 @@
         "format": "uint64",
         "description": "A string containing a 64-bit unsigned integer.\n\nWe represent u64 values as a string to ensure compatibility with languages such\nas JavaScript that do not parse u64s in JSON natively.\n",
         "example": "32425224034"
+      },
+      "UnsupportedJWK": {
+        "type": "object",
+        "description": "Move type `0x1::jwks::UnsupportedJWK` in rust.\nSee its doc in Move for more details.",
+        "required": [
+          "id",
+          "payload"
+        ],
+        "properties": {
+          "id": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          },
+          "payload": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          }
+        }
       },
       "UserTransaction": {
         "type": "object",
@@ -16330,66 +16696,65 @@
       },
       "ValidatorTransaction": {
         "type": "object",
-        "required": [
-          "version",
-          "hash",
-          "state_change_hash",
-          "event_root_hash",
-          "gas_used",
-          "success",
-          "vm_status",
-          "accumulator_root_hash",
-          "changes",
-          "events",
-          "timestamp"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ValidatorTransaction_JWKUpdateTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/ValidatorTransaction_DKGResultTransaction"
+          }
         ],
-        "properties": {
-          "version": {
-            "$ref": "#/components/schemas/U64"
-          },
-          "hash": {
-            "$ref": "#/components/schemas/HashValue"
-          },
-          "state_change_hash": {
-            "$ref": "#/components/schemas/HashValue"
-          },
-          "event_root_hash": {
-            "$ref": "#/components/schemas/HashValue"
-          },
-          "state_checkpoint_hash": {
-            "$ref": "#/components/schemas/HashValue"
-          },
-          "gas_used": {
-            "$ref": "#/components/schemas/U64"
-          },
-          "success": {
-            "type": "boolean",
-            "description": "Whether the transaction was successful"
-          },
-          "vm_status": {
-            "type": "string",
-            "description": "The VM status of the transaction, can tell useful information in a failure"
-          },
-          "accumulator_root_hash": {
-            "$ref": "#/components/schemas/HashValue"
-          },
-          "changes": {
-            "type": "array",
-            "description": "Final state of resources changed by the transaction",
-            "items": {
-              "$ref": "#/components/schemas/WriteSetChange"
-            }
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Event"
-            }
-          },
-          "timestamp": {
-            "$ref": "#/components/schemas/U64"
+        "discriminator": {
+          "propertyName": "validator_transaction_type",
+          "mapping": {
+            "observed_jwk_update": "#/components/schemas/ValidatorTransaction_JWKUpdateTransaction",
+            "dkg_result": "#/components/schemas/ValidatorTransaction_DKGResultTransaction"
           }
         }
+      },
+      "ValidatorTransaction_DKGResultTransaction": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "validator_transaction_type"
+            ],
+            "properties": {
+              "validator_transaction_type": {
+                "type": "string",
+                "enum": [
+                  "dkg_result"
+                ],
+                "example": "dkg_result"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/DKGResultTransaction"
+          }
+        ]
+      },
+      "ValidatorTransaction_JWKUpdateTransaction": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "validator_transaction_type"
+            ],
+            "properties": {
+              "validator_transaction_type": {
+                "type": "string",
+                "enum": [
+                  "observed_jwk_update"
+                ],
+                "example": "observed_jwk_update"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/JWKUpdateTransaction"
+          }
+        ]
       },
       "VersionedEvent": {
         "type": "object",
@@ -16562,6 +16927,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "delete_module"
+                ],
                 "example": "delete_module"
               }
             }
@@ -16581,6 +16949,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "delete_resource"
+                ],
                 "example": "delete_resource"
               }
             }
@@ -16600,6 +16971,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "delete_table_item"
+                ],
                 "example": "delete_table_item"
               }
             }
@@ -16619,6 +16993,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "write_module"
+                ],
                 "example": "write_module"
               }
             }
@@ -16638,6 +17015,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "write_resource"
+                ],
                 "example": "write_resource"
               }
             }
@@ -16657,6 +17037,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "write_table_item"
+                ],
                 "example": "write_table_item"
               }
             }
@@ -16688,6 +17071,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "direct_write_set"
+                ],
                 "example": "direct_write_set"
               }
             }
@@ -16707,6 +17093,9 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": [
+                  "script_write_set"
+                ],
                 "example": "script_write_set"
               }
             }

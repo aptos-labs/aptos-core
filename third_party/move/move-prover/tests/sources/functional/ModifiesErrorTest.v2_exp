@@ -1,4 +1,64 @@
 Move prover returns: exiting with verification errors
+warning: Unused assignment to `x0`. Consider removing or prefixing with an underscore: `_x0`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:37:18
+   │
+37 │         let x0 = A::read_at(addr2);
+   │                  ^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x1`. Consider removing or prefixing with an underscore: `_x1`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:40:18
+   │
+40 │         let x1 = A::read_at(addr2);
+   │                  ^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x0`. Consider removing or prefixing with an underscore: `_x0`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:51:18
+   │
+51 │         let x0 = A::read_at(addr2);
+   │                  ^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x1`. Consider removing or prefixing with an underscore: `_x1`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:53:18
+   │
+53 │         let x1 = A::read_at(addr2);
+   │                  ^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x0`. Consider removing or prefixing with an underscore: `_x0`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:64:18
+   │
+64 │         let x0 = A::read_at(addr2);
+   │                  ^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x1`. Consider removing or prefixing with an underscore: `_x1`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:66:18
+   │
+66 │         let x1 = A::read_at(addr2);
+   │                  ^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x0`. Consider removing or prefixing with an underscore: `_x0`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:78:18
+   │
+78 │         let x0 = A::read_at(addr2);
+   │                  ^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x1`. Consider removing or prefixing with an underscore: `_x1`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:80:18
+   │
+80 │         let x1 = A::read_at(addr2);
+   │                  ^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x0`. Consider removing or prefixing with an underscore: `_x0`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:91:18
+   │
+91 │         let x0 = A::read_at(addr);
+   │                  ^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x1`. Consider removing or prefixing with an underscore: `_x1`
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:93:18
+   │
+93 │         let x1 = A::read_at(addr);
+   │                  ^^^^^^^^^^^^^^^^
+
 error: caller does not have permission to modify `B::T` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:38:17
    │

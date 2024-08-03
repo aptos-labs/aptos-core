@@ -1,0 +1,40 @@
+# This is a configuration file for cargo deny, the tool we use to prevent accidentally
+# onboarding dependencies with licenses we don't want to use. To test this config, try
+# running a command like this:
+#
+# cargo deny check licenses --hide-inclusion-graph
+
+[licenses]
+version = 2
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CDDL-1.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "OpenSSL",
+    "Unicode-DFS-2016",
+    "Unlicense",
+    "Zlib",
+]
+
+# Since the tool cannot determine the license of this crate, we need to clarify it.
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 }
+]
+
+[licenses.private]
+ignore = true
+ignore-sources = [
+    # This is for the macros crate from diesel_async_migrations. It is MIT licensed, but
+    # uses an irregular license file name.
+    "https://github.com/niroco/diesel_async_migrations"
+]

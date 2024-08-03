@@ -153,14 +153,8 @@ data "aws_iam_policy_document" "alb-ingress" {
   }
 }
 
-resource "aws_iam_openid_connect_provider" "cluster" {
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["9e99a48a9960b14926bb7f3b02e22da2b0ab7280"] # Thumbprint of Root CA for EKS OIDC, Valid until 2037
-  url             = data.aws_eks_cluster.aptos.identity[0].oidc[0].issuer
-}
-
 locals {
-  oidc_provider = replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")
+  oidc_provider = module.eks.oidc_provider
 }
 
 data "aws_iam_policy_document" "k8s-aws-integrations-assume-role" {

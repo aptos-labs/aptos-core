@@ -17,6 +17,8 @@ use warp::{filters::BoxedFilter, reply::Reply, Filter};
 static DB_STATE: &str = "db_state";
 static STATE_RANGE_PROOF: &str = "state_range_proof";
 static STATE_SNAPSHOT: &str = "state_snapshot";
+static STATE_ITEM_COUNT: &str = "state_item_count";
+static STATE_SNAPSHOT_CHUNK: &str = "state_snapshot_chunk";
 static STATE_ROOT_PROOF: &str = "state_root_proof";
 static EPOCH_ENDING_LEDGER_INFOS: &str = "epoch_ending_ledger_infos";
 static TRANSACTIONS: &str = "transactions";
@@ -47,7 +49,30 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
     let state_snapshot = warp::path!(Version)
         .map(move |version| {
             reply_with_bytes_sender(&bh, STATE_SNAPSHOT, move |bh, sender| {
-                bh.get_account_iter(version)?
+                bh.get_state_item_iter(version, 0, usize::MAX)?
+                    .try_for_each(|record_res| sender.send_size_prefixed_bcs_bytes(record_res?))
+            })
+        })
+        .recover(handle_rejection);
+
+    // GET state_item_count/<version>
+    let bh = backup_handler.clone();
+    let state_item_count = warp::path!(Version)
+        .map(move |version| {
+            reply_with_bcs_bytes(
+                STATE_ITEM_COUNT,
+                &(bh.get_state_item_count(version)? as u64),
+            )
+        })
+        .map(unwrap_or_500)
+        .recover(handle_rejection);
+
+    // GET state_snapshot_chunk/<version>/<start_idx>/<limit>
+    let bh = backup_handler.clone();
+    let state_snapshot_chunk = warp::path!(Version / usize / usize)
+        .map(move |version, start_idx, limit| {
+            reply_with_bytes_sender(&bh, STATE_SNAPSHOT_CHUNK, move |bh, sender| {
+                bh.get_state_item_iter(version, start_idx, limit)?
                     .try_for_each(|record_res| sender.send_size_prefixed_bcs_bytes(record_res?))
             })
         })
@@ -101,6 +126,8 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
         .and(warp::path(DB_STATE).and(db_state))
         .or(warp::path(STATE_RANGE_PROOF).and(state_range_proof))
         .or(warp::path(STATE_SNAPSHOT).and(state_snapshot))
+        .or(warp::path(STATE_ITEM_COUNT).and(state_item_count))
+        .or(warp::path(STATE_SNAPSHOT_CHUNK).and(state_snapshot_chunk))
         .or(warp::path(STATE_ROOT_PROOF).and(state_root_proof))
         .or(warp::path(EPOCH_ENDING_LEDGER_INFOS).and(epoch_ending_ledger_infos))
         .or(warp::path(TRANSACTIONS).and(transactions))

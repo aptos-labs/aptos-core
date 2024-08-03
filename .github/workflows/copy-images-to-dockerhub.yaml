@@ -52,7 +52,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
 
       - name: Release Images
         env:

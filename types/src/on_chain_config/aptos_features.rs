@@ -86,6 +86,12 @@ pub enum FeatureFlag {
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
     LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
+    DISALLOW_USER_NATIVES = 71,
+    ALLOW_SERIALIZED_SCRIPT_ARGS = 72,
+    USE_COMPATIBILITY_CHECKER_V2 = 73,
+    ENABLE_ENUM_TYPES = 74,
+    ENABLE_RESOURCE_ACCESS_CONTROL = 75,
+    REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
 }
 
 impl FeatureFlag {
@@ -95,7 +101,10 @@ impl FeatureFlag {
             FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
             FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
+            // Feature flag V6 is used to enable metadata v1 format and needs to stay on, even
+            // if we enable a higher version.
             FeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::VM_BINARY_FORMAT_V7,
             FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
             FeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::RESOURCE_GROUPS,
@@ -150,8 +159,14 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
-            // FeatureFlag::LIMIT_VM_TYPE_SIZE, // TODO: Enable when type builder rolls out
+            FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
+            FeatureFlag::DISALLOW_USER_NATIVES,
+            FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
+            FeatureFlag::USE_COMPATIBILITY_CHECKER_V2,
+            FeatureFlag::ENABLE_ENUM_TYPES,
+            FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
+            FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
         ]
     }
 }
@@ -243,12 +258,6 @@ impl Features {
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
     }
 
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    pub fn is_aggregator_v2_api_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
-    }
-
     /// Whether the Aggregator V2 delayed fields feature is enabled.
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
@@ -289,10 +298,6 @@ impl Features {
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
-    }
-
-    pub fn is_limit_type_size_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE)
     }
 
     pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {

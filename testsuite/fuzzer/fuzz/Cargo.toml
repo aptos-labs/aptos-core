@@ -19,7 +19,6 @@ libfuzzer-sys = "0.4"
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
-move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true, features = ["fuzzing"] }
 once_cell = { workspace = true }
 rayon = { workspace = true }
@@ -63,5 +62,11 @@ doc = false
 [[bin]]
 name = "move_aptosvm_publish_and_run"
 path = "fuzz_targets/move/aptosvm_publish_and_run.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_aptosvm_publish"
+path = "fuzz_targets/move/aptosvm_publish.rs"
 test = false
 doc = false

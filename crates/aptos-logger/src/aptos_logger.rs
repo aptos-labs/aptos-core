@@ -13,7 +13,8 @@ use crate::{
     sample,
     sample::SampleRate,
     telemetry_log_writer::{TelemetryLog, TelemetryLogWriter},
-    Event, Filter, Key, Level, LevelFilter, Metadata,
+    Event, Filter, Key, Level, LevelFilter, Metadata, ERROR_LOG_COUNT, INFO_LOG_COUNT,
+    WARN_LOG_COUNT,
 };
 use aptos_infallible::RwLock;
 use backtrace::Backtrace;
@@ -604,6 +605,12 @@ impl LoggerService {
             match event {
                 LoggerServiceEvent::LogEntry(entry) => {
                     PROCESSED_STRUCT_LOG_COUNT.inc();
+                    match entry.metadata.level() {
+                        Level::Error => ERROR_LOG_COUNT.inc(),
+                        Level::Warn => WARN_LOG_COUNT.inc(),
+                        Level::Info => INFO_LOG_COUNT.inc(),
+                        _ => {},
+                    }
 
                     if let Some(printer) = &mut self.printer {
                         if self

@@ -66,7 +66,10 @@ fn end_to_end() {
                         start_version: 0,
                         num_transactions: first_ver_to_backup as usize,
                     },
-                    GlobalBackupOpt { max_chunk_size },
+                    GlobalBackupOpt {
+                        max_chunk_size,
+                        concurrent_data_requests: 2,
+                    },
                     client.clone(),
                     Arc::clone(&store),
                 )
@@ -83,7 +86,10 @@ fn end_to_end() {
                     start_version: first_ver_to_backup,
                     num_transactions: num_txns_to_backup,
                 },
-                GlobalBackupOpt { max_chunk_size },
+                GlobalBackupOpt {
+                    max_chunk_size,
+                    concurrent_data_requests: 2,
+                },
                 client,
                 Arc::clone(&store),
             )
@@ -101,6 +107,7 @@ fn end_to_end() {
                 rocksdb_opt: RocksdbOpt::default(),
                 concurrent_downloads: ConcurrentDownloadsOpt::default(),
                 replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
+                enable_state_indices: false,
             }
             .try_into()
             .unwrap(),

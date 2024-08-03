@@ -4,6 +4,7 @@
 
 use crate::cached_state_view::ShardedStateCache;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+pub use aptos_types::indexer::indexer_db_reader::Order;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::NewBlockEvent,
@@ -95,12 +96,6 @@ impl From<aptos_secure_net::Error> for Error {
             error: format!("{}", error),
         }
     }
-}
-
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum Order {
-    Ascending,
-    Descending,
 }
 
 macro_rules! delegate_read {
@@ -424,8 +419,8 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
         ) -> Result<TransactionAccumulatorSummary>;
 
-        /// Returns total number of leaves in state store at given version.
-        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+        /// Returns total number of state items in state store at given version.
+        fn get_state_item_count(&self, version: Version) -> Result<usize>;
 
         /// Get a chunk of state store value, addressed by the index.
         fn get_state_value_chunk_with_proof(
@@ -455,6 +450,12 @@ pub trait DbReader: Send + Sync {
 
         /// Returns state storage usage at the end of an epoch.
         fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
+
+        fn get_event_by_version_and_index(
+            &self,
+            version: Version,
+            index: u64,
+        ) -> Result<ContractEvent>;
     ); // end delegated
 
     /// Returns the latest ledger info.

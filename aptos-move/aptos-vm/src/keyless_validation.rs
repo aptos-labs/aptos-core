@@ -33,9 +33,16 @@ macro_rules! value_deserialization_error {
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<T, VMStatus> {
+    let metadata = resolver.get_module_metadata(&T::struct_tag().module_id());
     let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &T::struct_tag())
+        .get_resource_bytes_with_metadata_and_layout(
+            &CORE_CODE_ADDRESS,
+            &T::struct_tag(),
+            &metadata,
+            None,
+        )
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
+        .0
         .ok_or_else(|| {
             value_deserialization_error!(format!(
                 "get_resource failed on {}::{}::{}",
@@ -121,19 +128,21 @@ fn get_jwk_for_authenticator(
 
 /// Ensures that **all** keyless authenticators in the transaction are valid.
 pub(crate) fn validate_authenticators(
-    pvk: &PreparedVerifyingKey<Bn254>,
+    pvk: &Option<PreparedVerifyingKey<Bn254>>,
     authenticators: &Vec<(KeylessPublicKey, KeylessSignature)>,
     features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
+    let mut with_zk = false;
     for (_, sig) in authenticators {
         // Feature-gating for keyless TXNs (whether ZK or ZKless, whether passkey-based or not)
-        if matches!(sig.cert, EphemeralCertificate::ZeroKnowledgeSig { .. })
-            && !features.is_zk_keyless_enabled()
-        {
-            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-        }
+        if matches!(sig.cert, EphemeralCertificate::ZeroKnowledgeSig { .. }) {
+            if !features.is_zk_keyless_enabled() {
+                return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+            }
 
+            with_zk = true;
+        }
         if matches!(sig.cert, EphemeralCertificate::OpenIdSig { .. })
             && !features.is_zkless_keyless_enabled()
         {
@@ -144,6 +153,11 @@ pub(crate) fn validate_authenticators(
         {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
+    }
+
+    // If there are ZK authenticators, the Groth16 VK must have been set on-chain.
+    if with_zk && pvk.is_none() {
+        return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
     }
 
     let config = &get_configs_onchain(resolver)?;
@@ -234,7 +248,8 @@ pub(crate) fn validate_authenticators(
                                 }
                             }
 
-                            let result = zksig.verify_groth16_proof(public_inputs_hash, pvk);
+                            let result = zksig
+                                .verify_groth16_proof(public_inputs_hash, pvk.as_ref().unwrap());
 
                             result.map_err(|_| {
                                 // println!("[aptos-vm][groth16] ZKP verification failed");

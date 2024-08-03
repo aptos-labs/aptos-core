@@ -44,3 +44,11 @@ pub const TYPE_NAME_GET_SPEC: &str = "type_name::$get";
 
 /// The well-known name of the first parameter of a method.
 pub const RECEIVER_PARAM_NAME: &str = "self";
+
+/// The well-known abort codes used by the compiler. These are marked
+/// by lowest 6 bytes of a sha256 of the string "Move 2 Abort Code",
+/// appended with two bytes for the error type.
+/// TODO: add a check at runtime that user is not clashing with reserved
+/// codes?
+pub const WELL_KNOWN_ABORT_CODE_BASE: u64 = 0xD8CA26CBD9BE << 16;
+pub const INCOMPLETE_MATCH_ABORT_CODE: u64 = WELL_KNOWN_ABORT_CODE_BASE | 0x1;

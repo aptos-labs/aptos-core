@@ -18,13 +18,12 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
-use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
-    DbReader, Order, MAX_REQUEST_LIMIT,
+    AptosDbError, DbReader, Order, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -34,6 +33,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
+    indexer::indexer_db_reader::IndexerReader,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
     state_store::{
@@ -76,7 +76,7 @@ pub struct Context {
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
     view_function_stats: Arc<FunctionStats>,
     simulate_txn_stats: Arc<FunctionStats>,
-    pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    pub indexer_reader: Option<Arc<dyn IndexerReader>>,
     pub wait_for_hash_active_connections: Arc<AtomicUsize>,
 }
 
@@ -92,7 +92,7 @@ impl Context {
         db: Arc<dyn DbReader>,
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
-        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> Self {
         let (view_function_stats, simulate_txn_stats) = {
             let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
@@ -129,7 +129,7 @@ impl Context {
             })),
             view_function_stats,
             simulate_txn_stats,
-            table_info_reader,
+            indexer_reader,
             wait_for_hash_active_connections: Arc::new(AtomicUsize::new(0)),
         }
     }
@@ -252,6 +252,35 @@ impl Context {
         ))
     }
 
+    pub fn get_latest_ledger_info_and_verify_internal_indexer_lookup_version<E: StdApiError>(
+        &self,
+        requested_ledger_version: Option<Version>,
+    ) -> Result<(LedgerInfo, Version), E> {
+        if self.indexer_reader.is_none() {
+            return Err(E::internal_with_code_no_info(
+                "Indexer reader doesn't exist",
+                AptosErrorCode::InternalError,
+            ));
+        }
+
+        let (latest_ledger_info, latest_internal_indexer_ledger_version) =
+            self.get_latest_internal_indexer_ledger_version_and_main_db_info()?;
+        if let Some(version) = requested_ledger_version {
+            let request_ledger_version = Version::from(version);
+            if latest_internal_indexer_ledger_version < request_ledger_version {
+                return Err(version_not_found(
+                    request_ledger_version,
+                    &latest_ledger_info,
+                ));
+            } else if request_ledger_version < latest_ledger_info.oldest_ledger_version.0 {
+                return Err(version_pruned(request_ledger_version, &latest_ledger_info));
+            }
+            Ok((latest_ledger_info, request_ledger_version))
+        } else {
+            Ok((latest_ledger_info, latest_internal_indexer_ledger_version))
+        }
+    }
+
     pub fn get_latest_ledger_info_and_verify_lookup_version<E: StdApiError>(
         &self,
         requested_ledger_version: Option<Version>,
@@ -275,6 +304,25 @@ impl Context {
         }
 
         Ok((latest_ledger_info, requested_ledger_version))
+    }
+
+    pub fn get_latest_internal_indexer_ledger_version_and_main_db_info<E: StdApiError>(
+        &self,
+    ) -> Result<(LedgerInfo, Version), E> {
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            if let Some(latest_version) = indexer_reader
+                .get_latest_internal_indexer_ledger_version()
+                .map_err(|err| E::internal_with_code_no_info(err, AptosErrorCode::InternalError))?
+            {
+                let latest_ledger_info = self.get_latest_ledger_info()?;
+                return Ok((latest_ledger_info, latest_version));
+            }
+        }
+
+        Err(E::internal_with_code_no_info(
+            "Indexer reader doesn't exist, or doesn't have data.",
+            AptosErrorCode::InternalError,
+        ))
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
@@ -350,19 +398,26 @@ impl Context {
         address: AccountAddress,
         version: u64,
     ) -> Result<HashMap<StateKey, StateValue>> {
-        let mut iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            None,
-            version,
-        )?;
+        let mut iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        None,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(&StateKeyPrefix::from(address), None, version)?
+        };
 
         let kvs = iter
             .by_ref()
             .take(MAX_REQUEST_LIMIT as usize)
-            .map(|res| match res {
-                Ok((k, v)) => Ok((k, v)),
-                Err(res) => Err(anyhow::Error::from(res)),
-            })
             .collect::<Result<_>>()?;
         if iter.next().transpose()?.is_some() {
             bail!("Too many state items under account ({:?}).", address);
@@ -377,11 +432,26 @@ impl Context {
         version: u64,
         limit: u64,
     ) -> Result<(Vec<(StructTag, Vec<u8>)>, Option<StateKey>)> {
-        let account_iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            prev_state_key,
-            version,
-        )?;
+        let account_iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        prev_state_key,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(
+                    &StateKeyPrefix::from(address),
+                    prev_state_key,
+                    version,
+                )?
+        };
         // TODO: Consider rewriting this to consider resource groups:
         // * If a resource group is found, expand
         // * Return Option<Result<(PathType, StructTag, Vec<u8>)>>
@@ -408,7 +478,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e.into())),
+                Err(e) => Some(Err(e)),
             })
             .take(limit as usize + 1);
         let kvs = resource_iter
@@ -418,7 +488,7 @@ impl Context {
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
         let state_view = self.state_view_at_version(version)?;
-        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
@@ -453,11 +523,26 @@ impl Context {
         version: u64,
         limit: u64,
     ) -> Result<(Vec<(ModuleId, Vec<u8>)>, Option<StateKey>)> {
-        let account_iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            prev_state_key,
-            version,
-        )?;
+        let account_iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        prev_state_key,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(
+                    &StateKeyPrefix::from(address),
+                    prev_state_key,
+                    version,
+                )?
+        };
         let mut module_iter = account_iter
             .filter_map(|res| match res {
                 Ok((k, v)) => match k.inner() {
@@ -473,7 +558,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e.into())),
+                Err(e) => Some(Err(e)),
             })
             .take(limit as usize + 1);
         let kvs = module_iter
@@ -618,7 +703,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -650,7 +735,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -730,15 +815,31 @@ impl Context {
             .saturating_sub(limit as u64)
         };
 
-        let txns = self
-            .db
-            .get_account_transactions(
+        let txns_res = if !db_sharding_enabled(&self.node_config) {
+            self.db.get_account_transactions(
                 address,
                 start_seq_number,
                 limit as u64,
                 true,
                 ledger_version,
             )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or(anyhow!("Indexer reader is None"))
+                .map_err(|err| {
+                    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
+                })?
+                .get_account_transactions(
+                    address,
+                    start_seq_number,
+                    limit as u64,
+                    true,
+                    ledger_version,
+                )
+                .map_err(|e| AptosDbError::Other(e.to_string()))
+        };
+        let txns = txns_res
             .context("Failed to retrieve account transactions")
             .map_err(|err| {
                 E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
@@ -813,28 +914,25 @@ impl Context {
         limit: u16,
         ledger_version: u64,
     ) -> Result<Vec<EventWithVersion>> {
-        if let Some(start) = start {
-            Ok(self.db.get_events(
-                event_key,
-                start,
-                Order::Ascending,
-                limit as u64,
-                ledger_version,
-            )?)
+        let (start, order) = if let Some(start) = start {
+            (start, Order::Ascending)
         } else {
-            Ok(self
-                .db
-                .get_events(
-                    event_key,
-                    u64::MAX,
-                    Order::Descending,
-                    limit as u64,
-                    ledger_version,
-                )
-                .map(|mut result| {
-                    result.reverse();
-                    result
-                })?)
+            (u64::MAX, Order::Descending)
+        };
+        let mut res = if !db_sharding_enabled(&self.node_config) {
+            self.db
+                .get_events(event_key, start, order, limit as u64, ledger_version)?
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or(anyhow!("Internal indexer reader doesn't exist"))?
+                .get_events(event_key, start, order, limit as u64, ledger_version)?
+        };
+        if order == Order::Descending {
+            res.reverse();
+            Ok(res)
+        } else {
+            Ok(res)
         }
     }
 
@@ -1443,4 +1541,8 @@ impl FunctionStats {
             stats.invalidate_all();
         }
     }
+}
+
+fn db_sharding_enabled(node_config: &NodeConfig) -> bool {
+    node_config.storage.rocksdb_configs.enable_storage_sharding
 }

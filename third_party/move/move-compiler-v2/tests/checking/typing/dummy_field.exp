@@ -1,0 +1,38 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    struct T {
+        dummy_field: bool,
+    }
+    struct R {
+        dummy_field: bool,
+    }
+    public entry fun test(addr: address)
+        acquires test::R(*)
+     {
+        {
+          let test::R{ dummy_field: _dummy_field } = MoveFrom<test::R>(addr);
+          Tuple()
+        }
+    }
+    private fun test2(): bool {
+        {
+          let r: test::R = pack test::R(true);
+          select test::R.dummy_field<test::R>(r)
+        }
+    }
+    public entry fun test3(addr: address)
+        acquires test::T(*)
+     {
+        {
+          let test::T{ dummy_field: _ } = MoveFrom<test::T>(addr);
+          Tuple()
+        }
+    }
+    public entry fun test4(s: &signer) {
+        {
+          let r: test::T = pack test::T(false);
+          MoveTo<test::T>(s, r);
+          Tuple()
+        }
+    }
+} // end 0x42::test

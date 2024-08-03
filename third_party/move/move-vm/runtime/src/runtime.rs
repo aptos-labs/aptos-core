@@ -46,14 +46,20 @@ impl Clone for VMRuntime {
 }
 
 impl VMRuntime {
+    /// Creates a new runtime instance with provided native functions and VM
+    /// configurations. If there are duplicated natives, panics.
     pub(crate) fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
-    ) -> PartialVMResult<Self> {
-        Ok(VMRuntime {
-            loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
+    ) -> Self {
+        VMRuntime {
+            loader: Loader::new(
+                NativeFunctions::new(natives)
+                    .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e)),
+                vm_config,
+            ),
             module_cache: Arc::new(ModuleCache::new()),
-        })
+        }
     }
 
     pub(crate) fn publish_module_bundle(
@@ -118,11 +124,21 @@ impl VMRuntime {
                     self.loader
                         .load_module(&module_id, data_store, module_store)?;
                 let old_module = old_module_ref.module();
-                let old_m = normalized::Module::new(old_module);
-                let new_m = normalized::Module::new(module);
-                compat
-                    .check(&old_m, &new_m)
-                    .map_err(|e| e.finish(Location::Undefined))?;
+                if self.loader.vm_config().use_compatibility_checker_v2 {
+                    compat
+                        .check(old_module, module)
+                        .map_err(|e| e.finish(Location::Undefined))?
+                } else {
+                    #[allow(deprecated)]
+                    let old_m = normalized::Module::new(old_module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    #[allow(deprecated)]
+                    let new_m = normalized::Module::new(module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    compat
+                        .legacy_check(&old_m, &new_m)
+                        .map_err(|e| e.finish(Location::Undefined))?
+                }
             }
             if !bundle_unverified.insert(module_id) {
                 return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)

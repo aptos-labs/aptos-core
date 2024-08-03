@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    expansion::translate::is_valid_struct_constant_or_schema_name,
     parser::ast::{
         self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName,
-        ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, ENTRY_MODIFIER,
+        ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
+        ENTRY_MODIFIER,
     },
     shared::{
         ast_debug::*,
@@ -165,13 +167,24 @@ pub struct StructDefinition {
     pub loc: Loc,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub fields: StructFields,
+    pub layout: StructLayout,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum StructFields {
-    Defined(Fields<Type>),
+pub enum StructLayout {
+    // the second field is true iff the struct has positional fields
+    Singleton(Fields<Type>, bool),
+    Variants(Vec<StructVariant>),
     Native(Loc),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StructVariant {
+    pub attributes: Attributes,
+    pub loc: Loc,
+    pub name: VariantName,
+    pub fields: Fields<Type>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -182,6 +195,7 @@ pub enum StructFields {
 pub enum Visibility {
     Public(Loc),
     Friend(Loc),
+    Package(Loc),
     Internal,
 }
 
@@ -363,8 +377,22 @@ pub struct AbilitySet(UniqueSet<Ability>);
 #[allow(clippy::large_enum_variant)]
 pub enum ModuleAccess_ {
     Name(Name),
-    ModuleAccess(ModuleIdent, Name),
+    // ModuleAccess(module_ident, member_ident, optional_variant_ident)
+    ModuleAccess(ModuleIdent, Name, Option<Name>),
 }
+
+impl ModuleAccess_ {
+    fn get_name(&self) -> &Name {
+        match self {
+            ModuleAccess_::Name(n) | ModuleAccess_::ModuleAccess(_, n, _) => n,
+        }
+    }
+
+    pub fn is_valid_struct_constant_or_schema_name(&self) -> bool {
+        is_valid_struct_constant_or_schema_name(self.get_name().value.as_str())
+    }
+}
+
 pub type ModuleAccess = Spanned<ModuleAccess_>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -387,6 +415,7 @@ pub type Type = Spanned<Type_>;
 pub enum LValue_ {
     Var(ModuleAccess, Option<Vec<Type>>),
     Unpack(ModuleAccess, Option<Vec<Type>>, Fields<LValue>),
+    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueList),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
@@ -443,6 +472,7 @@ pub enum Exp_ {
     Vector(Loc, Option<Vec<Type>>, Spanned<Vec<Exp>>),
 
     IfElse(Box<Exp>, Box<Exp>, Box<Exp>),
+    Match(Box<Exp>, Vec<Spanned<(LValueList, Option<Exp>, Exp)>>),
     While(Box<Exp>, Box<Exp>),
     Loop(Box<Exp>),
     Block(Sequence),
@@ -475,7 +505,7 @@ pub enum Exp_ {
 
     Borrow(bool, Box<Exp>),
     ExpDotted(Box<ExpDotted>),
-    Index(Box<Exp>, Box<Exp>), // spec only (no mutation needed right now)
+    Index(Box<Exp>, Box<Exp>), // spec only unless language >= v2
 
     Cast(Box<Exp>, Type),
     Annotate(Box<Exp>, Type),
@@ -715,11 +745,14 @@ impl AbilitySet {
 impl Visibility {
     pub const FRIEND: &'static str = P::Visibility::FRIEND;
     pub const INTERNAL: &'static str = P::Visibility::INTERNAL;
+    pub const PACKAGE: &'static str = P::Visibility::PACKAGE;
     pub const PUBLIC: &'static str = P::Visibility::PUBLIC;
 
     pub fn loc(&self) -> Option<Loc> {
         match self {
-            Visibility::Public(loc) | Visibility::Friend(loc) => Some(*loc),
+            Visibility::Public(loc) | Visibility::Friend(loc) | Visibility::Package(loc) => {
+                Some(*loc)
+            },
             Visibility::Internal => None,
         }
     }
@@ -818,7 +851,17 @@ impl fmt::Display for ModuleAccess_ {
         use ModuleAccess_::*;
         match self {
             Name(n) => write!(f, "{}", n),
-            ModuleAccess(m, n) => write!(f, "{}::{}", m, n),
+            ModuleAccess(m, n, opt_v) => write!(
+                f,
+                "{}::{}{}",
+                m,
+                n,
+                if let Some(v) = opt_v {
+                    format!("::{}", v)
+                } else {
+                    "".to_string()
+                }
+            ),
         }
     }
 }
@@ -827,6 +870,7 @@ impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", match &self {
             Visibility::Public(_) => Visibility::PUBLIC,
+            Visibility::Package(_) => Visibility::PACKAGE,
             Visibility::Friend(_) => Visibility::FRIEND,
             Visibility::Internal => Visibility::INTERNAL,
         })
@@ -1046,20 +1090,20 @@ impl AstDebug for (StructName, &StructDefinition) {
                 loc: _loc,
                 abilities,
                 type_parameters,
-                fields,
+                layout: fields,
             },
         ) = self;
 
         attributes.ast_debug(w);
 
-        if let StructFields::Native(_) = fields {
+        if let StructLayout::Native(_) = fields {
             w.write("native ");
         }
 
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
-        if let StructFields::Defined(fields) = fields {
+        if let StructLayout::Singleton(fields, _) = fields {
             w.block(|w| {
                 w.list(fields, ",", |w, (_, f, idx_st)| {
                     let (idx, st) = idx_st;
@@ -1443,7 +1487,16 @@ impl AstDebug for ModuleAccess_ {
     fn ast_debug(&self, w: &mut AstWriter) {
         w.write(&match self {
             ModuleAccess_::Name(n) => format!("{}", n),
-            ModuleAccess_::ModuleAccess(m, n) => format!("{}::{}", m, n),
+            ModuleAccess_::ModuleAccess(m, n, opt_v) => format!(
+                "{}::{}{}",
+                m,
+                n,
+                if let Some(v) = opt_v {
+                    format!("::{}", v)
+                } else {
+                    "".to_string()
+                }
+            ),
         })
     }
 }
@@ -1569,6 +1622,20 @@ impl AstDebug for Exp_ {
                 w.write("loop ");
                 e.ast_debug(w);
             },
+            E::Match(e, arms) => {
+                w.write("match (");
+                e.ast_debug(w);
+                w.write(") {");
+                for arm in arms {
+                    arm.value.0.ast_debug(w);
+                    if let Some(cond) = &arm.value.1 {
+                        w.write(" if ");
+                        cond.ast_debug(w);
+                    }
+                    w.write(" => ");
+                    arm.value.2.ast_debug(w)
+                }
+            },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
             E::Lambda(sp!(_, bs), e) => {
                 w.write("|");
@@ -1605,7 +1672,9 @@ impl AstDebug for Exp_ {
                 rhs.ast_debug(w);
             },
             E::Mutate(lhs, rhs) => {
-                w.write("*");
+                if !matches!(lhs.value, E::Index(_, _)) {
+                    w.write("*");
+                }
                 lhs.ast_debug(w);
                 w.write(" = ");
                 rhs.ast_debug(w);
@@ -1735,6 +1804,17 @@ impl AstDebug for LValue_ {
                     b.ast_debug(w);
                 });
                 w.write("}");
+            },
+            L::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(&args.value, |w, b| b.ast_debug(w));
+                w.write(")");
             },
         }
     }

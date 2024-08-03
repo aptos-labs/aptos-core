@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: missing field `0`
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:12:7
+   │
+12 │         let S0() = x;
+   │             ^^^^
+
+error: field `1` not declared in `test::S0`
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:16:14
+   │
+16 │         let S0(_x, _y) = x;
+   │                    ^^
+
+error: field `1` not declared in `test::S0`
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:20:21
+   │
+20 │         let S1(_x, S0(_y, _z)) = x;
+   │                           ^^
+
+error: field `1` not declared in `test::S0`
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:26:18
+   │
+26 │             E1::V1(S0(_x, _y)) => {},
+   │                           ^^
+
+error: field `1` not declared in `test::S0`
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:27:25
+   │
+27 │             E1::V2(S1(_x, S0(_y, _z))) => {}
+   │                                  ^^

@@ -109,8 +109,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
         for (epoch, batch_id) in epoch_batch_id {
             assert!(current_epoch >= epoch);
             if epoch < current_epoch {
-                self.delete_batch_id(epoch)
-                    .expect("Could not delete from db");
+                self.delete_batch_id(epoch)?;
             } else {
                 ret = Some(batch_id);
             }
@@ -123,41 +122,53 @@ impl QuorumStoreStorage for QuorumStoreDB {
     }
 }
 
-pub(crate) struct MockQuorumStoreDB {}
+#[cfg(test)]
+pub(crate) use mock::MockQuorumStoreDB;
 
-impl MockQuorumStoreDB {
-    #[cfg(test)]
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+#[cfg(test)]
+pub mod mock {
+    use super::*;
+    pub struct MockQuorumStoreDB {}
 
-impl QuorumStoreStorage for MockQuorumStoreDB {
-    fn delete_batches(&self, _: Vec<HashValue>) -> Result<(), DbError> {
-        Ok(())
-    }
-
-    fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
-        Ok(HashMap::new())
+    impl MockQuorumStoreDB {
+        pub fn new() -> Self {
+            Self {}
+        }
     }
 
-    fn save_batch(&self, _: PersistedValue) -> Result<(), DbError> {
-        Ok(())
+    impl Default for MockQuorumStoreDB {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
-    fn get_batch(&self, _: &HashValue) -> Result<Option<PersistedValue>, DbError> {
-        Ok(None)
-    }
+    impl QuorumStoreStorage for MockQuorumStoreDB {
+        fn delete_batches(&self, _: Vec<HashValue>) -> Result<(), DbError> {
+            Ok(())
+        }
 
-    fn delete_batch_id(&self, _: u64) -> Result<(), DbError> {
-        Ok(())
-    }
+        fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
+            Ok(HashMap::new())
+        }
 
-    fn clean_and_get_batch_id(&self, _: u64) -> Result<Option<BatchId>, DbError> {
-        Ok(Some(BatchId::new_for_test(0)))
-    }
+        fn save_batch(&self, _: PersistedValue) -> Result<(), DbError> {
+            Ok(())
+        }
 
-    fn save_batch_id(&self, _: u64, _: BatchId) -> Result<(), DbError> {
-        Ok(())
+        fn get_batch(&self, _: &HashValue) -> Result<Option<PersistedValue>, DbError> {
+            Ok(None)
+        }
+
+        fn delete_batch_id(&self, _: u64) -> Result<(), DbError> {
+            Ok(())
+        }
+
+        fn clean_and_get_batch_id(&self, _: u64) -> Result<Option<BatchId>, DbError> {
+            Ok(Some(BatchId::new_for_test(0)))
+        }
+
+        fn save_batch_id(&self, _: u64, _: BatchId) -> Result<(), DbError> {
+            Ok(())
+        }
     }
 }

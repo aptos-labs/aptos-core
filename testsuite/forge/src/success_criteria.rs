@@ -13,7 +13,7 @@ use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
 use prometheus_http_query::response::Sample;
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
@@ -159,13 +159,13 @@ impl LatencyBreakdownThreshold {
 
 #[derive(Default, Clone, Debug)]
 pub struct SuccessCriteria {
-    pub min_avg_tps: usize,
+    pub min_avg_tps: f64,
     latency_thresholds: Vec<(Duration, LatencyType)>,
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
     check_no_errors: bool,
-    max_expired_tps: Option<usize>,
-    max_failed_submission_tps: Option<usize>,
+    max_expired_tps: Option<f64>,
+    max_failed_submission_tps: Option<f64>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
     system_metrics_threshold: Option<SystemMetricsThreshold>,
@@ -174,6 +174,10 @@ pub struct SuccessCriteria {
 
 impl SuccessCriteria {
     pub fn new(min_avg_tps: usize) -> Self {
+        Self::new_float(min_avg_tps as f64)
+    }
+
+    pub fn new_float(min_avg_tps: f64) -> Self {
         Self {
             min_avg_tps,
             latency_thresholds: Vec::new(),
@@ -198,12 +202,12 @@ impl SuccessCriteria {
         self
     }
 
-    pub fn add_max_expired_tps(mut self, max_expired_tps: usize) -> Self {
+    pub fn add_max_expired_tps(mut self, max_expired_tps: f64) -> Self {
         self.max_expired_tps = Some(max_expired_tps);
         self
     }
 
-    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: usize) -> Self {
+    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: f64) -> Self {
         self.max_failed_submission_tps = Some(max_failed_submission_tps);
         self
     }
@@ -269,7 +273,7 @@ impl SuccessCriteriaChecker {
 
     pub async fn check_for_success(
         success_criteria: &SuccessCriteria,
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         report: &mut TestReport,
         stats: &TxnStats,
         window: Duration,
@@ -308,34 +312,42 @@ impl SuccessCriteriaChecker {
 
         if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
             swarm
+                .read()
+                .await
                 .wait_for_all_nodes_to_catchup_to_next(timeout)
                 .await
                 .context("Failed waiting for all nodes to catchup to next version")?;
         }
 
         if success_criteria.check_no_restarts {
-            swarm
+            let swarm_read = swarm.read().await;
+            swarm_read
                 .ensure_no_validator_restart()
                 .await
                 .context("Failed ensuring no validator restarted")?;
-            swarm
+            swarm_read
                 .ensure_no_fullnode_restart()
                 .await
                 .context("Failed ensuring no fullnode restarted")?;
         }
 
         if success_criteria.check_no_errors {
-            Self::check_no_errors(swarm).await?;
+            Self::check_no_errors(swarm.clone()).await?;
         }
 
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
-            Self::check_system_metrics(swarm, start_time, end_time, system_metrics_threshold)
-                .await?;
+            Self::check_system_metrics(
+                swarm.clone(),
+                start_time,
+                end_time,
+                system_metrics_threshold,
+            )
+            .await?;
         }
 
         if let Some(chain_progress_threshold) = &success_criteria.chain_progress_check {
             Self::check_chain_progress(
-                swarm,
+                swarm.clone(),
                 report,
                 chain_progress_threshold,
                 start_version,
@@ -349,17 +361,21 @@ impl SuccessCriteriaChecker {
     }
 
     async fn check_chain_progress(
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         report: &mut TestReport,
         chain_progress_threshold: &StateProgressThreshold,
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<()> {
         // Choose client with newest ledger version to fetch NewBlockEvents from:
-        let (_max_v, client) = swarm
-            .get_client_with_newest_ledger_version()
-            .await
-            .context("No clients replied in check_chain_progress")?;
+        let (_max_v, client) = {
+            swarm
+                .read()
+                .await
+                .get_client_with_newest_ledger_version()
+                .await
+                .context("No clients replied in check_chain_progress")?
+        };
 
         let epochs = FetchMetadata::fetch_new_block_events(&client, None, None)
             .await
@@ -446,12 +462,12 @@ impl SuccessCriteriaChecker {
     }
 
     pub fn check_tps(
-        min_avg_tps: usize,
+        min_avg_tps: f64,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         let avg_tps = stats_rate.committed;
-        if avg_tps < min_avg_tps as f64 {
+        if avg_tps < min_avg_tps {
             bail!(
                 "TPS requirement{} failed. Average TPS {}, minimum TPS requirement {}. Full stats: {}",
                 traffic_name_addition,
@@ -469,14 +485,14 @@ impl SuccessCriteriaChecker {
     }
 
     fn check_max_value(
-        max_config: Option<usize>,
+        max_config: Option<f64>,
         stats_rate: &TxnStatsRate,
         value: f64,
         value_desc: &str,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         if let Some(max) = max_config {
-            if value > max as f64 {
+            if value > max {
                 bail!(
                     "{} requirement{} failed. {} TPS: average {}, maximum requirement {}. Full stats: {}",
                     value_desc,
@@ -499,9 +515,9 @@ impl SuccessCriteriaChecker {
     }
 
     pub fn check_throughput(
-        min_avg_tps: usize,
-        max_expired_config: Option<usize>,
-        max_failed_submission_config: Option<usize>,
+        min_avg_tps: f64,
+        max_expired_config: Option<f64>,
+        max_failed_submission_config: Option<f64>,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
@@ -565,7 +581,9 @@ impl SuccessCriteriaChecker {
         }
     }
 
-    async fn check_no_errors(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+    async fn check_no_errors(
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+    ) -> anyhow::Result<()> {
         let error_count = fetch_error_metrics(swarm).await?;
         if error_count > 0 {
             bail!(
@@ -579,7 +597,7 @@ impl SuccessCriteriaChecker {
     }
 
     async fn check_system_metrics(
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         start_time: i64,
         end_time: i64,
         threshold: SystemMetricsThreshold,

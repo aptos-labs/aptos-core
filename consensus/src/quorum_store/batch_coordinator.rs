@@ -76,7 +76,12 @@ impl BatchCoordinator {
             let peer_id = persist_requests[0].author();
             let batches = persist_requests
                 .iter()
-                .map(|persisted_value| persisted_value.batch_info().clone())
+                .map(|persisted_value| {
+                    (
+                        persisted_value.batch_info().clone(),
+                        persisted_value.summary(),
+                    )
+                })
                 .collect();
             let signed_batch_infos = batch_store.persist(persist_requests);
             if !signed_batch_infos.is_empty() {

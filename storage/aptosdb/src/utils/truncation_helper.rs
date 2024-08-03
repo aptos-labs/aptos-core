@@ -13,9 +13,12 @@ use crate::{
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
         stale_state_value_index::StaleStateValueIndexSchema,
+        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value::StateValueSchema,
+        state_value_by_key_hash::StateValueByKeyHashSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
         transaction_info::TransactionInfoSchema,
         version_data::VersionDataSchema,
         write_set::WriteSetSchema,
@@ -123,7 +126,12 @@ pub(crate) fn truncate_state_kv_db_single_shard(
     target_version: Version,
 ) -> Result<()> {
     let batch = SchemaBatch::new();
-    delete_state_value_and_index(state_kv_db.db_shard(shard_id), target_version + 1, &batch)?;
+    delete_state_value_and_index(
+        state_kv_db.db_shard(shard_id),
+        target_version + 1,
+        &batch,
+        state_kv_db.enabled_sharding(),
+    )?;
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
 
@@ -339,6 +347,11 @@ fn delete_per_version_data(
     start_version: Version,
     batch: &LedgerDbSchemaBatches,
 ) -> Result<()> {
+    delete_per_version_data_impl::<TransactionAccumulatorRootHashSchema>(
+        ledger_db.transaction_accumulator_db_raw(),
+        start_version,
+        &batch.transaction_accumulator_db_batches,
+    )?;
     delete_per_version_data_impl::<TransactionInfoSchema>(
         ledger_db.transaction_info_db_raw(),
         start_version,
@@ -373,15 +386,15 @@ where
 {
     let mut iter = ledger_db.iter::<S>()?;
     iter.seek_to_last();
-    if let Some((lastest_version, _)) = iter.next().transpose()? {
-        if lastest_version >= start_version {
+    if let Some((latest_version, _)) = iter.next().transpose()? {
+        if latest_version >= start_version {
             info!(
                 start_version = start_version,
-                latest_version = lastest_version,
+                latest_version = latest_version,
                 cf_name = S::COLUMN_FAMILY_NAME,
                 "Truncate per version data."
             );
-            for version in start_version..=lastest_version {
+            for version in start_version..=latest_version {
                 batch.delete::<S>(&version)?;
             }
         }
@@ -401,9 +414,15 @@ fn delete_event_data(
                 latest_version = latest_version,
                 "Truncate event data."
             );
-            ledger_db
-                .event_db()
-                .prune_events(start_version, latest_version + 1, batch)?;
+            ledger_db.event_db().prune_events(
+                start_version,
+                latest_version + 1,
+                batch,
+                // Assuming same data will be overwritten into indices, we don't bother to deal
+                // with the existence or placement of indices
+                // TODO: prune data from internal indices
+                None,
+            )?;
         }
     }
     Ok(())
@@ -413,14 +432,29 @@ fn delete_state_value_and_index(
     state_kv_db_shard: &DB,
     start_version: Version,
     batch: &SchemaBatch,
+    enable_sharding: bool,
 ) -> Result<()> {
-    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>()?;
-    iter.seek(&start_version)?;
+    if enable_sharding {
+        let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexByKeyHashSchema>()?;
+        iter.seek(&start_version)?;
 
-    for item in iter {
-        let (index, _) = item?;
-        batch.delete::<StaleStateValueIndexSchema>(&index)?;
-        batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
+        for item in iter {
+            let (index, _) = item?;
+            batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
+            batch.delete::<StateValueByKeyHashSchema>(&(
+                index.state_key_hash,
+                index.stale_since_version,
+            ))?;
+        }
+    } else {
+        let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>()?;
+        iter.seek(&start_version)?;
+
+        for item in iter {
+            let (index, _) = item?;
+            batch.delete::<StaleStateValueIndexSchema>(&index)?;
+            batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
+        }
     }
 
     Ok(())

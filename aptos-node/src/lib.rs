@@ -196,6 +196,7 @@ pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_observer_runtime: Option<Runtime>,
+    _consensus_publisher_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
@@ -207,6 +208,7 @@ pub struct AptosHandle {
     _peer_monitoring_service_runtime: Runtime,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
+    _indexer_db_runtime: Option<Runtime>,
 }
 
 /// Start an Aptos node
@@ -510,7 +512,6 @@ where
 
     // Configure the validator network
     let validator_network = node_config.validator_network.as_mut().unwrap();
-    validator_network.max_concurrent_network_reqs = 1;
     validator_network.connectivity_check_interval_ms = 10000;
     validator_network.max_connection_delay_ms = 10000;
     validator_network.ping_interval_ms = 10000;
@@ -518,7 +519,6 @@ where
 
     // Configure the fullnode network
     let fullnode_network = node_config.full_node_networks.get_mut(0).unwrap();
-    fullnode_network.max_concurrent_network_reqs = 1;
     fullnode_network.connectivity_check_interval_ms = 10000;
     fullnode_network.max_connection_delay_ms = 10000;
     fullnode_network.ping_interval_ms = 10000;
@@ -607,7 +607,7 @@ pub fn setup_environment_and_start_node(
     let mut admin_service = services::start_admin_service(&node_config);
 
     // Set up the storage database and any RocksDB checkpoints
-    let (db_rw, backup_service, genesis_waypoint) =
+    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
 
     admin_service.set_aptos_db(db_rw.clone().into());
@@ -688,7 +688,8 @@ pub fn setup_environment_and_start_node(
         indexer_table_info_runtime,
         indexer_runtime,
         indexer_grpc_runtime,
-    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
+        internal_indexer_db_runtime,
+    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id, indexer_db_opt)?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
@@ -731,7 +732,7 @@ pub fn setup_environment_and_start_node(
     debug!("State sync initialization complete.");
 
     // Create the consensus observer publisher (if enabled)
-    let consensus_observer_publisher =
+    let (consensus_publisher_runtime, consensus_publisher) =
         consensus::create_consensus_publisher(&node_config, &consensus_observer_network_interfaces);
 
     // Create the consensus runtime (if enabled)
@@ -743,7 +744,7 @@ pub fn setup_environment_and_start_node(
         consensus_notifier.clone(),
         consensus_to_mempool_sender.clone(),
         vtxn_pool,
-        consensus_observer_publisher.clone(),
+        consensus_publisher.clone(),
         &mut admin_service,
     );
 
@@ -751,7 +752,7 @@ pub fn setup_environment_and_start_node(
     let consensus_observer_runtime = consensus::create_consensus_observer_runtime(
         &node_config,
         consensus_observer_network_interfaces,
-        consensus_observer_publisher,
+        consensus_publisher,
         consensus_notifier,
         consensus_to_mempool_sender,
         db_rw,
@@ -763,6 +764,7 @@ pub fn setup_environment_and_start_node(
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_observer_runtime: consensus_observer_runtime,
+        _consensus_publisher_runtime: consensus_publisher_runtime,
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
@@ -774,6 +776,7 @@ pub fn setup_environment_and_start_node(
         _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
+        _indexer_db_runtime: internal_indexer_db_runtime,
     })
 }
 

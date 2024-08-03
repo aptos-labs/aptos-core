@@ -6,12 +6,12 @@ use crate::{
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction::TransactionSchema,
-        transaction_by_account::TransactionByAccountSchema,
         transaction_by_hash::TransactionByHashSchema,
     },
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_crypto::hash::{CryptoHash, HashValue};
+use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::{Transaction, TransactionToCommit, Version};

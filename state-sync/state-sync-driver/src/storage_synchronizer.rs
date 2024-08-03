@@ -841,6 +841,7 @@ fn spawn_state_snapshot_receiver<
                     let all_states_synced = states_with_proof.is_last_chunk();
                     let last_committed_state_index = states_with_proof.last_index;
                     let num_state_values = states_with_proof.raw_values.len();
+
                     let result = state_snapshot_receiver.add_chunk(
                         states_with_proof.raw_values,
                         states_with_proof.proof.clone(),

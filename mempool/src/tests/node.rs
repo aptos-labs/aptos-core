@@ -4,14 +4,14 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::MempoolSyncMsg,
+    network::{BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
     tests::common::TestTransaction,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{Identity, NodeConfig, PeerRole, RoleType},
-    network_id::{NetworkContext, NetworkId, PeerNetworkId},
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{x25519::PrivateKey, Uniform};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
@@ -22,12 +22,11 @@ use aptos_network::{
         interface::{NetworkClient, NetworkServiceEvents},
         storage::PeersAndMetadata,
     },
-    peer_manager::{
-        conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
-        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
-    },
+    peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
-        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
+        network::{
+            NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage,
+        },
         wire::handshake::v1::ProtocolId::MempoolDirectSend,
     },
     transport::ConnectionMetadata,
@@ -383,6 +382,8 @@ impl Node {
                 0,
                 TimelineState::NotReady,
                 false,
+                None,
+                Some(BroadcastPeerPriority::Primary),
             );
         }
     }
@@ -402,16 +403,9 @@ impl Node {
         metadata
             .application_protocols
             .insert(ProtocolId::MempoolDirectSend);
-        let notif = ConnectionNotification::NewPeer(metadata.clone(), NetworkContext::mock());
         self.peers_and_metadata
             .insert_connection_metadata(peer_network_id, metadata)
             .unwrap();
-        self.send_connection_event(peer_network_id.network_id(), notif);
-    }
-
-    /// Sends a connection event, and waits for the notification to arrive
-    fn send_connection_event(&mut self, network_id: NetworkId, notif: ConnectionNotification) {
-        self.send_network_notif(network_id, notif);
         self.wait_for_event(SharedMempoolNotification::PeerStateChange);
     }
 
@@ -456,21 +450,15 @@ impl Node {
             .get_next_network_req(runtime)
     }
 
-    /// Send network request `PeerManagerNotification` from a remote peer to the local node
+    /// Send network request `ReceivedMessage` from a remote peer to the local node
     pub fn send_network_req(
         &mut self,
         network_id: NetworkId,
         protocol: ProtocolId,
-        notif: PeerManagerNotification,
+        notif: ReceivedMessage,
     ) {
         self.get_network_interface(network_id)
             .send_network_req(protocol, notif);
-    }
-
-    /// Sends a `ConnectionNotification` to the local node
-    pub fn send_network_notif(&mut self, network_id: NetworkId, notif: ConnectionNotification) {
-        self.get_network_interface(network_id)
-            .send_connection_notif(notif)
     }
 }
 
@@ -480,10 +468,7 @@ pub struct NodeNetworkInterface {
     /// Peer request receiver for messages
     pub(crate) network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Peer notification sender for sending outgoing messages to other peers
-    pub(crate) network_notifs_tx:
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-    /// Sender for connecting / disconnecting peers
-    pub(crate) network_conn_event_notifs_tx: conn_notifs_channel::Sender,
+    pub(crate) network_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
 }
 
 impl NodeNetworkInterface {
@@ -491,26 +476,11 @@ impl NodeNetworkInterface {
         runtime.block_on(self.network_reqs_rx.next()).unwrap()
     }
 
-    fn send_network_req(&mut self, protocol: ProtocolId, message: PeerManagerNotification) {
-        let remote_peer_id = match &message {
-            PeerManagerNotification::RecvRpc(peer_id, _) => *peer_id,
-            PeerManagerNotification::RecvMessage(peer_id, _) => *peer_id,
-        };
+    fn send_network_req(&mut self, protocol: ProtocolId, message: ReceivedMessage) {
+        let remote_peer_id = message.sender.peer_id();
 
         self.network_notifs_tx
             .push((remote_peer_id, protocol), message)
-            .unwrap()
-    }
-
-    /// Send a notification specifying, where a remote peer has it's state changed
-    fn send_connection_notif(&mut self, notif: ConnectionNotification) {
-        let peer_id = match &notif {
-            ConnectionNotification::NewPeer(metadata, _) => metadata.remote_peer_id,
-            ConnectionNotification::LostPeer(metadata, _, _) => metadata.remote_peer_id,
-        };
-
-        self.network_conn_event_notifs_tx
-            .push(peer_id, notif)
             .unwrap()
     }
 }
@@ -571,18 +541,16 @@ fn setup_node_network_interface(
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let (network_notifs_tx, network_notifs_rx) =
         aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
-    let (network_conn_event_notifs_tx, conn_status_rx) = conn_notifs_channel::new();
     let network_sender = NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
-    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx, None, true);
+    let network_events = NetworkEvents::new(network_notifs_rx, None, true);
 
     (
         NodeNetworkInterface {
             network_reqs_rx,
             network_notifs_tx,
-            network_conn_event_notifs_tx,
         },
         (peer_network_id.network_id(), network_sender, network_events),
     )
