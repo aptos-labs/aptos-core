@@ -55,6 +55,7 @@ bollard = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["env", "unstable-styles"] }
 clap_complete = { workspace = true }
+colored = { workspace = true }
 dashmap = { workspace = true }
 diesel = { workspace = true, features = [
     "postgres_backend",

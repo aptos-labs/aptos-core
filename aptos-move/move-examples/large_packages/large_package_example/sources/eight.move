@@ -9,7 +9,22 @@
 /// Long winded text that goes on and on and on
 /// Long winded text that goes on and on and on
 module large_package_example::eight {
-    public fun long_function(_a_very_long_name: u8, _b_very_long_name: u8, _c_very_long_name: u8, _d_very_long_name: u8, _e_very_long_name: u8): address {
+
+    struct State has key {
+        value: u64
+    }
+
+    public entry fun hello(s: &signer, value: u64) {
+        move_to(s, State { value })
+    }
+
+    public fun long_function(
+        _a_very_long_name: u8,
+        _b_very_long_name: u8,
+        _c_very_long_name: u8,
+        _d_very_long_name: u8,
+        _e_very_long_name: u8
+    ): address {
         @0x1
     }
 

@@ -2235,3 +2235,13 @@ pub struct OverrideSizeCheckOption {
     #[clap(long)]
     pub(crate) override_size_check: bool,
 }
+
+#[derive(Parser)]
+pub struct ChunkedPublishOption {
+    /// Whether to publish a package in a chunked mode. This may require more than one transaction
+    /// for publishing the Move package.
+    ///
+    /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
+    #[clap(long)]
+    pub(crate) chunked_publish: bool,
+}

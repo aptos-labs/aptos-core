@@ -306,6 +306,7 @@ dependencies = [
  "chrono",
  "clap 4.4.14",
  "clap_complete",
+ "colored",
  "dashmap",
  "diesel",
  "diesel-async",
