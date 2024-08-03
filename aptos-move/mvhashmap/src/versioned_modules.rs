@@ -131,12 +131,12 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
     /// Adds a new executable to the multi-version data-structure. The executable is either
     /// storage-version (and fixed) or uniquely identified by the (cryptographic) hash of the
     /// module published during the block.
-    pub fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
-        let mut v = self.values.get_mut(key).expect("Path must exist");
-        v.executables
-            .entry(descriptor_hash)
-            .or_insert_with(|| Arc::new(executable));
-    }
+    //pub fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
+    //    let mut v = self.values.get_mut(key).expect("Path must exist");
+    //    v.executables
+    //        .entry(descriptor_hash)
+    //        .or_insert_with(|| Arc::new(executable));
+    //}
 
     /// Fetches the latest module stored at the given key, either as in an executable form,
     /// if already cached, or in a raw module format that the VM can convert to an executable.
@@ -150,12 +150,12 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
         use MVModulesOutput::*;
 
         match self.values.get(key) {
-            Some(v) => v
-                .read(txn_idx)
-                .map(|(module, hash)| match v.executables.get(&hash) {
-                    Some(x) => Executable((x.clone(), ExecutableDescriptor::Published(hash))),
-                    None => Module((module, hash)),
-                }),
+            Some(v) => v.read(txn_idx).map(
+                |(module, hash)| Module((module, hash)), //match v.executables.get(&hash) {
+                                                         // Some(x) => Executable((x.clone(), ExecutableDescriptor::Published(hash))),
+                                                         //None => Module((module, hash)),
+                                                         //}
+            ),
             None => Err(NotFound),
         }
     }

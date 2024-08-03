@@ -881,6 +881,7 @@ impl Loader {
             );
         }
 
+        // Sync point.
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
             move_bytecode_verifier::verify_module_with_config(

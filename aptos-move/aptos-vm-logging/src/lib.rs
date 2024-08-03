@@ -90,6 +90,7 @@ pub fn init_speculative_logs(num_txns: usize) {
 /// to speculative buffer. Logs directly and logs a separate (new error) if the speculative
 /// events storage is not initialized or appropriately sized.
 pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String) {
+    return;
     let txn_idx = context.get_txn_idx();
 
     if !context.speculation_supported() || speculation_disabled() {

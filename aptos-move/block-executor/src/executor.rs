@@ -19,7 +19,7 @@ use crate::{
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
     types::ReadWriteSummary,
-    view::{LatestView, ParallelState, SequentialState, ViewState},
+    view::{LatestView, ParallelState, SequentialState, VMInitView, ViewState},
 };
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
@@ -45,7 +45,10 @@ use aptos_types::{
     },
     write_set::{TransactionWrite, WriteOp},
 };
-use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
+use aptos_vm_logging::{
+    alert, clear_speculative_txn_logs, disable_speculative_logging, init_speculative_logs,
+    prelude::*,
+};
 use aptos_vm_types::change_set::randomly_check_layout_matches;
 use bytes::Bytes;
 use claims::assert_none;
@@ -121,7 +124,6 @@ where
 
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
-        
 
         if idx_to_execute <= 2 {
             let cur = Instant::now();
@@ -138,6 +140,7 @@ where
         if idx_to_execute <= 2 {
             let cur = Instant::now();
             println!("critical path, executed transaction with vertsion, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
+            sync_view.print_debug_info();
         }
 
         let mut read_set = sync_view.take_parallel_reads();
@@ -152,10 +155,6 @@ where
             })
         };
 
-        if idx_to_execute <= 2 {
-            let cur = Instant::now();
-            println!("critical path, about to execute execution flag writing, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
-        }
         let mut ret_mode = if let Some(is_validated) =
             scheduler.try_set_execution_flag_writing(idx_to_execute, validation_function)
         {
@@ -168,11 +167,15 @@ where
             return Ok(None);
         };
 
-
-       if idx_to_execute <= 2 {                                                                                                          
-           let cur = Instant::now();
-           println!("critical path, executed execution flag writing, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
-       }
+        let cur = Instant::now();
+        if idx_to_execute <= 2 {
+            println!(
+                "critical path, won execution flag writing, thread_id={}, txn={} at time {:?}",
+                *thread_id,
+                idx_to_execute,
+                cur - *start_time_all
+            );
+        }
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -331,6 +334,16 @@ where
             },
         };
 
+        let updates = Instant::now();
+        if idx_to_execute <= 2 {
+            println!(
+                "critical path, applied updates, thread_id={}, txn={} took {:?}",
+                *thread_id,
+                idx_to_execute,
+                updates - cur,
+            );
+        }
+
         // Remove entries from previous write/delta set that were not overwritten.
         for (k, kind) in prev_modified_keys {
             use KeyKind::*;
@@ -368,6 +381,16 @@ where
             return Err(PanicOr::Or(
                 ParallelBlockExecutionError::ModulePathReadWriteError,
             ));
+        }
+
+        let removed = Instant::now();
+        if idx_to_execute <= 2 {
+            println!(
+                "critical path, applied removes, thread_id={}, txn={} took {:?}",
+                *thread_id,
+                idx_to_execute,
+                removed - updates,
+            );
         }
 
         Ok(Some(ret_mode))
@@ -827,10 +850,19 @@ where
         worker_id: &usize,
         start_time_all: &Instant,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
-        // Make executor for each task. TODO: fast concurrent executor.
-        let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(env.clone(), base_view);
-        drop(init_timer);
+        let vm_init_view: VMInitView<'_, T, S, X> = VMInitView::new(base_view, versioned_cache);
+        let executor = if *worker_id == 0 {
+            // Make executor for each task. TODO: fast concurrent executor.
+            let pre_init = Instant::now();
+            let executor = E::init(env.clone(), &vm_init_view);
+
+            println!("Init timer took {:?}", Instant::now() - pre_init);
+            // drop(init_timer);
+
+            executor
+        } else {
+            E::init(env.clone(), &vm_init_view)
+        };
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
 
@@ -876,10 +908,10 @@ where
                         block,
                         num_workers,
                     )? {
-                            if last_idx <= 2 {
-                                let cur = Instant::now();
-                                println!("critical path, thread_id={}, transaction_id={}, commited at time={:?}", *worker_id, last_idx, cur-*start_time_all);
-                            }
+                        if last_idx <= 2 {
+                            let cur = Instant::now();
+                            println!("critical path, thread_id={}, transaction_id={}, commited at time={:?}", *worker_id, last_idx, cur-*start_time_all);
+                        }
                         last_commit_idx.replace(last_idx);
                     };
                     scheduler.queueing_commits_mark_done();
@@ -893,13 +925,13 @@ where
                 if let Some(mut last_commit_idx) = last_commit_idx {
                     //need to process next task
                     last_commit_idx += 1;
-                    
+
                     if last_commit_idx <= 2 {
                         let cur = Instant::now();
                         println!("critical path, thread_id={}, transaction_id={}, trying fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
                     }
                     if let Some(incarnation) = scheduler.try_fallback(last_commit_idx) {
-                        if last_commit_idx <= 2 {                                                                                                                                             
+                        if last_commit_idx <= 2 {
                             let cur = Instant::now();
                             println!("critical path, thread_id={}, transaction_id={}, inside fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
                         }
@@ -920,35 +952,38 @@ where
                                 shared_counter,
                             ),
                             start_time_all,
-                            worker_id
+                            worker_id,
                         )? {
                             //if we are in fallback and won write => no need to validate
-                                if last_commit_idx <= 2 { 
-                                    let cur = Instant::now();
-                                    println!("executed fallback on critical path, thread_id={}, transaction_id={}, time elapsed={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
-                                }
-                                scheduler.finish_execution(
-                                    last_commit_idx,
-                                    incarnation,
+                            if last_commit_idx <= 2 {
+                                let cur = Instant::now();
+                                println!("executed fallback on critical path, thread_id={}, transaction_id={}, time elapsed={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                            }
+                            scheduler.finish_execution(
+                                last_commit_idx,
+                                incarnation,
                                 validation_mode,
                             )?;
                             let end3 = Instant::now();
                             fallback_time += end3 - start3;
-                            drain_commit_queue()?;
+
+                            // TODO: drain if the last txn.
                             continue;
+                        } else {
+                            let end3 = Instant::now();
+                            fallback_time += end3 - start3;
                         }
                     }
                 }
+            } else {
+                let end = Instant::now();
 
-                let end3 = Instant::now();
-                fallback_time += end3 - start3;
+                drain_commit_queue()?;
+
+                commit_time += end - start;
             }
 
-            let end = Instant::now();
-
-            commit_time += end - start;
-
-            drain_commit_queue()?;
+            // TODO: also measure commit queue draining time.
 
             let start2 = Instant::now();
 
@@ -1079,6 +1114,8 @@ where
 
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
+
+        disable_speculative_logging();
 
         let start = Instant::now();
         let worker_ids: Vec<usize> = (0..num_workers).collect();

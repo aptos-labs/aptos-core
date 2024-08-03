@@ -19,7 +19,7 @@ use aptos_vm_types::{
 };
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 pub(crate) struct AptosExecutorTask {
     vm: AptosVM,
@@ -57,11 +57,21 @@ impl ExecutorTask for AptosExecutorTask {
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
+
+	let st = Instant::now();
+	if txn_idx <= 2 {
+	   println!("critical path, pre-execute-single-tx {} {} {}", txn_idx, _incarnation, _is_fallback);
+	}
+	
         match self
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)
         {
             Ok((vm_status, vm_output)) => {
+	    	if txn_idx <= 2 {
+	    	   let cur = Instant::now();
+	    	   println!("critical path, Executed OK {} {} {}, elapsed {:?}", txn_idx, _incarnation, _is_fallback, cur-st);
+		}
                 if vm_output.status().is_discarded() {
                     speculative_trace!(
                         &log_context,

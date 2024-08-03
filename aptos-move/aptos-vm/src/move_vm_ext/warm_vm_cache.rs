@@ -71,18 +71,18 @@ impl WarmVmCache {
             )?
         };
 
-        if let Some(vm) = self.cache.read().get(&id) {
-            let _timer = TIMER.timer_with(&["warm_vm_cache_hit"]);
-            return Ok(vm.clone());
-        }
+      //  if let Some(vm) = self.cache.read().get(&id) {
+      //      let _timer = TIMER.timer_with(&["warm_vm_cache_hit"]);
+      //      return Ok(vm.clone());
+      //  }
 
         {
             let _timer = TIMER.timer_with(&["warm_vm_cache_miss"]);
-            let mut cache_locked = self.cache.write();
-            if let Some(vm) = cache_locked.get(&id) {
-                // Another thread has loaded it
-                return Ok(vm.clone());
-            }
+      //      let mut cache_locked = self.cache.write();
+      //      if let Some(vm) = cache_locked.get(&id) {
+      //          // Another thread has loaded it
+      //          return Ok(vm.clone());
+      //      }
 
             let vm = MoveVM::new_with_config(
                 aptos_natives_with_builder(&mut native_builder, inject_create_signer_for_gov_sim),
@@ -91,10 +91,10 @@ impl WarmVmCache {
             Self::warm_vm_up(&vm, resolver);
 
             // Not using LruCache because its `::get()` requires &mut self
-            if cache_locked.len() >= WARM_VM_CACHE_SIZE {
-                cache_locked.clear();
-            }
-            cache_locked.insert(id, vm.clone());
+        //    if cache_locked.len() >= WARM_VM_CACHE_SIZE {
+        //        cache_locked.clear();
+        //    }
+      //      cache_locked.insert(id, vm.clone());
             Ok(vm)
         }
     }
