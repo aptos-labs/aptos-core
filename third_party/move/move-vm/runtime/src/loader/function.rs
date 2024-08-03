@@ -8,6 +8,7 @@ use crate::{
         Resolver, Script,
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
+    ModuleStorage,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -144,13 +145,14 @@ impl LoadedFunction {
         &self,
         loader: &'a Loader,
         module_store: &'a ModuleStorageAdapter,
+        module_storage: &'a impl ModuleStorage,
     ) -> Resolver<'a> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(loader, module_store, module.clone())
+                Resolver::for_module(loader, module_store, module_storage, module.clone())
             },
             LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(loader, module_store, script.clone())
+                Resolver::for_script(loader, module_store, module_storage, script.clone())
             },
         }
     }

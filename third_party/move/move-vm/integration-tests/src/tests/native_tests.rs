@@ -9,6 +9,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
+    DummyCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -73,11 +74,21 @@ fn test_publish_module_with_nested_loops() {
         });
 
         let mut sess = vm.new_session(&storage);
-        sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
-            .unwrap();
+        sess.publish_module(
+            m_blob.clone(),
+            TEST_ADDR,
+            &mut UnmeteredGasMeter,
+            &DummyCodeStorage,
+        )
+        .unwrap();
 
         let func = sess
-            .load_function(&m.self_id(), &Identifier::new("foo").unwrap(), &[])
+            .load_function(
+                &DummyCodeStorage,
+                &m.self_id(),
+                &Identifier::new("foo").unwrap(),
+                &[],
+            )
             .unwrap();
         let err1 = sess
             .execute_entry_function(
@@ -85,13 +96,19 @@ fn test_publish_module_with_nested_loops() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
 
         assert!(err1.exec_state().unwrap().stack_trace().is_empty());
 
         let func = sess
-            .load_function(&m.self_id(), &Identifier::new("foo2").unwrap(), &[])
+            .load_function(
+                &DummyCodeStorage,
+                &m.self_id(),
+                &Identifier::new("foo2").unwrap(),
+                &[],
+            )
             .unwrap();
         let err2 = sess
             .execute_entry_function(
@@ -99,6 +116,7 @@ fn test_publish_module_with_nested_loops() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
 

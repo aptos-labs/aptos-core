@@ -109,6 +109,7 @@ impl WarmVmCache {
         //
         // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
+        #[allow(deprecated)]
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
             resolver,

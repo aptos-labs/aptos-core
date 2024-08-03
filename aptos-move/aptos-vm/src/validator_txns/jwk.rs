@@ -31,7 +31,10 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    DummyCodeStorage,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::collections::HashMap;
 
@@ -144,6 +147,7 @@ impl AptosVM {
                 serialize_values(&args),
                 &mut gas_meter,
                 &mut TraversalContext::new(&module_storage),
+                &DummyCodeStorage,
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, UPSERT_INTO_OBSERVED_JWKS.as_str(), log_context)

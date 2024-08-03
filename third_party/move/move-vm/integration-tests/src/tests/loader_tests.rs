@@ -16,7 +16,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
 };
-use move_vm_runtime::{config::VMConfig, module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{config::VMConfig, module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::{path::PathBuf, sync::Arc, thread};
@@ -92,7 +92,12 @@ impl Adapter {
                 .serialize(&mut binary)
                 .unwrap_or_else(|_| panic!("failure in module serialization: {:#?}", module));
             session
-                .publish_module(binary, WORKING_ACCOUNT, &mut UnmeteredGasMeter)
+                .publish_module(
+                    binary,
+                    WORKING_ACCOUNT,
+                    &mut UnmeteredGasMeter,
+                    &DummyCodeStorage,
+                )
                 .unwrap_or_else(|_| panic!("failure publishing module: {:#?}", module));
         }
         let changeset = session.finish().expect("failure getting write set");
@@ -110,7 +115,12 @@ impl Adapter {
                 .serialize(&mut binary)
                 .unwrap_or_else(|_| panic!("failure in module serialization: {:#?}", module));
             session
-                .publish_module(binary, WORKING_ACCOUNT, &mut UnmeteredGasMeter)
+                .publish_module(
+                    binary,
+                    WORKING_ACCOUNT,
+                    &mut UnmeteredGasMeter,
+                    &DummyCodeStorage,
+                )
                 .expect_err("publishing must fail");
         }
     }
@@ -138,6 +148,7 @@ impl Adapter {
                             Vec::<Vec<u8>>::new(),
                             &mut UnmeteredGasMeter,
                             &mut TraversalContext::new(&traversal_storage),
+                            &DummyCodeStorage,
                         )
                         .unwrap_or_else(|_| {
                             panic!("Failure executing {:?}::{:?}", module_id, name)
@@ -161,6 +172,7 @@ impl Adapter {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module, name));
     }
@@ -230,6 +242,8 @@ fn load_phantom_module() {
 
     let module_id = module.self_id();
     adapter.publish_modules(vec![module]);
+
+    #[allow(deprecated)]
     adapter.vm.load_module(&module_id, &adapter.store).unwrap();
 }
 
@@ -264,6 +278,8 @@ fn load_with_extra_ability() {
 
     let module_id = module.self_id();
     adapter.publish_modules(vec![module]);
+
+    #[allow(deprecated)]
     adapter.vm.load_module(&module_id, &adapter.store).unwrap();
 }
 
