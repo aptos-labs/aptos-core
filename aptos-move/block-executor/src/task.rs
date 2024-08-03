@@ -70,24 +70,7 @@ pub trait ExecutorTask: Sync {
     ) -> Self;
 
     /// Execute a single transaction given the view of the current state.
-    /*fn execute_transaction(
-        &self,
-        view: &(impl TExecutorView<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Tag,
-            MoveTypeLayout,
-            <Self::Txn as Transaction>::Identifier,
-            <Self::Txn as Transaction>::Value,
-        > + TResourceGroupView<
-            GroupKey = <Self::Txn as Transaction>::Key,
-            ResourceTag = <Self::Txn as Transaction>::Tag,
-            Layout = MoveTypeLayout,
-        >),
-        txn: &Self::Txn,
-        txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error>;*/
-
-    fn execute_transaction_with_version(
+    fn execute_transaction(
         &self,
         view: &(impl TExecutorView<
             <Self::Txn as Transaction>::Key,

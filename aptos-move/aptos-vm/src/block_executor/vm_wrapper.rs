@@ -41,7 +41,7 @@ impl ExecutorTask for AptosExecutorTask {
     // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). It can be as a part of sequential
     // execution, or speculatively as a part of a parallel execution.
-    fn execute_transaction_with_version(
+    fn execute_transaction(
         &self,
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
@@ -57,6 +57,7 @@ impl ExecutorTask for AptosExecutorTask {
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
+
         match self
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)

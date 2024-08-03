@@ -13,7 +13,7 @@ use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cmp::{max, min},
     sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc, Condvar,
     },
 };
@@ -297,7 +297,6 @@ pub struct Scheduler {
     /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
-    num_dep_total: AtomicUsize,
 
     /// An index i maps to the most up-to-date status of transaction i.
     txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)>>,
@@ -351,7 +350,6 @@ impl Scheduler {
             txn_dependency: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(Vec::new())))
                 .collect(),
-            num_dep_total: AtomicUsize::new(0),
             txn_status: (0..num_txns)
                 .map(|_| {
                     CachePadded::new((
@@ -449,7 +447,6 @@ impl Scheduler {
         None
     }
 
-    #[cfg(test)]
     /// Return the TxnIndex and Wave of current commit index
     pub fn commit_state(&self) -> (TxnIndex, u32) {
         let commit_state = self.commit_state.dereference();
@@ -474,6 +471,25 @@ impl Scheduler {
         } else {
             false
         }
+    }
+
+    pub fn committer_next_task(&self) -> SchedulerTask {
+        if self.done() {
+            return SchedulerTask::Done;
+        }
+
+        let (idx_to_validate, _) =
+            Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
+
+        let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
+
+        let commit_idx = self.commit_state().0;
+        let proximity_interval = 4;
+        if min(idx_to_validate, idx_to_execute) > commit_idx + proximity_interval {
+            return SchedulerTask::Retry;
+        }
+
+        self.next_task()
     }
 
     /// Return the next task for the thread.
@@ -523,10 +539,6 @@ impl Scheduler {
         );
     }
 
-    pub fn get_num_dep_total(&self) -> usize {
-        self.num_dep_total.load(Ordering::SeqCst)
-    }
-
     fn wake_dependencies_after_execution(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
         let txn_deps: Vec<TxnIndex> = {
             let mut stored_deps = self.txn_dependency[txn_idx as usize].lock();
@@ -538,8 +550,6 @@ impl Scheduler {
         let mut min_dep = None;
         for dep in txn_deps {
             self.resume(dep)?;
-
-            self.num_dep_total.fetch_add(1, Ordering::SeqCst);
 
             if min_dep.is_none() || min_dep.is_some_and(|min_dep| min_dep > dep) {
                 min_dep = Some(dep);
@@ -670,6 +680,22 @@ impl Scheduler {
         }
     }
 
+    pub(crate) fn has_lost_execution_flag_writing(&self, txn_idx: TxnIndex) -> bool {
+        let status = self.txn_status[txn_idx as usize].0.write();
+        match *status {
+            ExecutionStatus::Executing(_, _, ref flag)
+            | ExecutionStatus::ReadyToWakeUp(_, _, ref flag) => {
+                if *flag == ExecutingFlag::Writing {
+                    true
+                } else {
+                    false
+                }
+            },
+            ExecutionStatus::Committed(_) => true,
+            _ => false,
+        }
+    }
+
     // TODO: comment, explain output convension: None -> lost.
     // Some(true) -> won, no need to validate. Some(false) -> won, need to validate
     pub(crate) fn try_set_execution_flag_writing<F>(
@@ -694,7 +720,7 @@ impl Scheduler {
                             Some(false)
                         },
                         ExecutingFlag::Fallback => {
-                            /*let old_incarnation = *incarnation;
+                            let old_incarnation = *incarnation;
                             drop(status);
                             if validation_f() {
                                 let mut status = self.txn_status[txn_idx as usize].0.write();
@@ -703,9 +729,9 @@ impl Scheduler {
                                     Some(old_incarnation),
                                 )
                             } else {
+                                println!("critical path, failed validation, txn_idx={}", txn_idx);
                                 None
-                            }*/
-                            None
+                            }
                         },
                         ExecutingFlag::Writing => None,
                     },
@@ -744,6 +770,7 @@ impl Scheduler {
         }
 
         let mut status = self.txn_status[txn_idx as usize].0.write();
+
         match &mut *status {
             ExecutionStatus::Executing(incarnation, _, ref mut flag)
             | ExecutionStatus::ReadyToWakeUp(incarnation, _, ref mut flag) => {
@@ -762,10 +789,18 @@ impl Scheduler {
                 // or finally execution should be halted, but it should never be suspended
                 unreachable!("May not be suspended");
             },
+            ExecutionStatus::ReadyToExecute(incarnation) => {
+                let ret = *incarnation;
+                *status = ExecutionStatus::Executing(
+                    *incarnation,
+                    ExecutionTaskType::Execution,
+                    ExecutingFlag::Fallback,
+                );
+                Some(ret)
+            },
             ExecutionStatus::Aborting(_)
             | ExecutionStatus::Committed(_)
             | ExecutionStatus::Executed(_)
-            | ExecutionStatus::ReadyToExecute(_)
             | ExecutionStatus::ExecutionHalted => {
                 // if execution is halted, or transaction already committed/executed no need to fallback
                 // otherwise we know that transaction will be eventually executed
@@ -870,6 +905,10 @@ impl TWaitForDependency for Scheduler {
             ));
         }
 
+        println!(
+            "wait for dependency txn={}, dep_txn={}",
+            txn_idx, dep_txn_idx
+        );
         // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
         // usually has just observed the read dependency.
 
@@ -1184,6 +1223,23 @@ impl Scheduler {
         }
     }
 
+    pub(crate) fn print_status(&self) {
+        let temp = self.commit_state().0;
+        if temp == self.num_txns - 1 {
+            return;
+        }
+
+        let status = self.txn_status[(temp + 1) as usize].0.read();
+
+        println!(
+            "commit idx={}, validation_idx={}, execution_idx={}, status={:?}",
+            temp,
+            Self::unpack_validation_idx(self.validation_idx.load(Ordering::SeqCst)).0,
+            self.execution_idx.load(Ordering::SeqCst),
+            *status,
+        );
+    }
+
     /// Set status of the transaction to Executed(incarnation).
     fn set_executed_status(
         &self,
@@ -1198,12 +1254,16 @@ impl Scheduler {
                 *status = ExecutionStatus::Executed(incarnation);
                 Ok(())
             },
-            ExecutionStatus::ReadyToWakeUp(_, ref mut condvar, _) => {
+            ExecutionStatus::ReadyToWakeUp(stored_incarnation, ref mut condvar, _) => {
                 {
                     let (lock, cvar) = &**condvar;
                     // Mark dependency resolved.
                     let mut lock = lock.lock();
-                    *lock = DependencyStatus::Resolved;
+                    *lock = if incarnation == stored_incarnation {
+                        DependencyStatus::ExecutionHalted
+                    } else {
+                        DependencyStatus::Resolved
+                    };
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
                 }
@@ -1246,7 +1306,7 @@ impl Scheduler {
     }
 
     /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.
-    fn done(&self) -> bool {
+    pub(crate) fn done(&self) -> bool {
         self.done_marker.load(Ordering::Acquire)
     }
 }
