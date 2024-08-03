@@ -120,13 +120,16 @@ pub(crate) fn extract_event_metadata_from_module(
     session: &mut SessionExt,
     module_id: &ModuleId,
 ) -> VMResult<HashSet<String>> {
-    let metadata = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-        .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
-    });
+    #[allow(deprecated)]
+    let metadata = session
+        .fetch_module_from_data_store(module_id)
+        .map(|module| {
+            CompiledModule::deserialize_with_config(
+                &module,
+                &session.get_vm_config().deserializer_config,
+            )
+            .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
+        });
 
     if let Ok(Ok(Some(metadata))) = metadata {
         extract_event_metadata(&metadata)

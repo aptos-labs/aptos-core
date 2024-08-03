@@ -10,6 +10,7 @@ use crate::{
     native_functions::NativeFunction,
     runtime::VMRuntime,
     session::Session,
+    storage::dummy::DummyCodeStorage,
 };
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
@@ -93,29 +94,11 @@ impl MoveVM {
         }
     }
 
-    /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
-    pub fn new_session_with_extensions_and_modules<'r>(
-        &self,
-        remote: &'r impl MoveResolver,
-        module_storage: Arc<dyn ModuleStorage>,
-        native_extensions: NativeContextExtensions<'r>,
-    ) -> Session<'r, '_> {
-        Session {
-            move_vm: self,
-            data_cache: TransactionDataCache::new(
-                self.runtime
-                    .loader()
-                    .vm_config()
-                    .deserializer_config
-                    .clone(),
-                remote,
-            ),
-            module_store: ModuleStorageAdapter::new(module_storage),
-            native_extensions,
-        }
-    }
-
-    /// Load a module into VM's code cache
+    /// DO NOT USE THIS API!
+    ///
+    /// Existing uses of this API is to fetch metadata from compiled modules on the client
+    /// side. With loader V2 design clients can fetch it directly from the module storage.
+    #[deprecated]
     pub fn load_module(
         &self,
         module_id: &ModuleId,
@@ -134,6 +117,9 @@ impl MoveVM {
                     remote,
                 ),
                 &ModuleStorageAdapter::new(self.runtime.module_storage()),
+                // Note(George): Use dummy here because we can change to direct metadata fetching in the caller,
+                //               and when creating VM we can prefetch the framework directly.
+                &DummyCodeStorage,
             )
             .map(|arc_module| arc_module.arc_module())
     }
@@ -142,7 +128,6 @@ impl MoveVM {
     /// outdated. This can happen if the adapter executed a particular code publishing transaction
     /// but decided to not commit the result to the data store. Because the code cache currently
     /// does not support deletion, the cache will, incorrectly, still contain this module.
-    /// TODO: new loader architecture
     pub fn mark_loader_cache_as_invalid(&self) {
         self.runtime.loader().mark_as_invalid()
     }
@@ -168,19 +153,11 @@ impl MoveVM {
         self.runtime.loader().flush_if_invalidated()
     }
 
-    /// Attempts to discover metadata in a given module with given key. Availability
-    /// of this data may depend on multiple aspects. In general, no hard assumptions of
-    /// availability should be made, but typically, one can expect that
-    /// the modules which have been involved in the execution of the last session are available.
+    /// DO NOT USE THIS API!
     ///
-    /// This is called by an adapter to extract, for example, debug information out of
-    /// the metadata section of the code for post mortem analysis. Notice that because
-    /// of ownership of the underlying binary representation of modules hidden behind an rwlock,
-    /// this actually has to hand back a copy of the associated metadata, so metadata should
-    /// be organized keeping this in mind.
-    ///
-    /// TODO: in the new loader architecture, as the loader is visible to the adapter, one would
-    ///   call this directly via the loader instead of the VM.
+    /// Currently, metadata is owned by module which is owned by the VM. In the new loader
+    /// V2 design, clients can fetch metadata and apply this function directly!
+    #[deprecated]
     pub fn with_module_metadata<T, F>(&self, module: &ModuleId, f: F) -> Option<T>
     where
         F: FnOnce(&[Metadata]) -> Option<T>,

@@ -71,7 +71,10 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::{MoveResource, MoveStructType},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    DummyCodeStorage,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -985,7 +988,12 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
+            let _ = session.load_function(
+                &DummyCodeStorage,
+                module,
+                &Self::name(function_name),
+                &type_params.clone(),
+            );
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -1029,6 +1037,7 @@ impl FakeExecutor {
                     arg,
                     regular.as_mut().unwrap(),
                     &mut TraversalContext::new(&storage),
+                    &DummyCodeStorage,
                 ),
                 GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
                     module,
@@ -1037,6 +1046,7 @@ impl FakeExecutor {
                     arg,
                     unmetered.as_mut().unwrap(),
                     &mut TraversalContext::new(&storage),
+                    &DummyCodeStorage,
                 ),
             };
             let elapsed = start.elapsed();
@@ -1111,6 +1121,7 @@ impl FakeExecutor {
                     shared_buffer: Arc::clone(&a1),
                 }),
                 &mut TraversalContext::new(&storage),
+                &DummyCodeStorage,
             );
             if let Err(err) = result {
                 if !should_error {
@@ -1164,6 +1175,7 @@ impl FakeExecutor {
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
                     &mut TraversalContext::new(&storage),
+                    &DummyCodeStorage,
                 )
                 .unwrap_or_else(|e| {
                     panic!(
@@ -1222,6 +1234,7 @@ impl FakeExecutor {
                 // TODO(Gas): we probably want to switch to metered execution in the future
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&storage),
+                &DummyCodeStorage,
             )
             .map_err(|e| e.into_vm_status())?;
 

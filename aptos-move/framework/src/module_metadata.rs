@@ -228,6 +228,8 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
 pub fn get_vm_metadata(vm: &MoveVM, module_id: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
+    // TODO(George): Use ModuleStorage to resolve module metadata directly.
+    #[allow(deprecated)]
     vm.with_module_metadata(module_id, get_metadata)
 }
 
@@ -236,6 +238,8 @@ pub fn get_vm_metadata_v0(
     vm: &MoveVM,
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
+    // TODO(George): Use ModuleStorage to resolve module metadata directly.
+    #[allow(deprecated)]
     vm.with_module_metadata(module_id, get_metadata_v0)
 }
 

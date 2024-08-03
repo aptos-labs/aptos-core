@@ -11,6 +11,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
     session::SerializedReturnValues,
+    storage::{module_storage::ModuleStorage as ModuleStorageV2, script_storage::ScriptStorage},
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -70,6 +71,7 @@ impl VMRuntime {
         module_store: &ModuleStorageAdapter,
         _gas_meter: &mut impl GasMeter,
         compat: Compatibility,
+        module_storage: &impl ModuleStorageV2,
     ) -> VMResult<()> {
         // deserialize the modules. Perform bounds check. After this indexes can be
         // used with the `[]` operator
@@ -120,9 +122,12 @@ impl VMRuntime {
             let module_id = module.self_id();
 
             if data_store.exists_module(&module_id)? && compat.need_check_compat() {
-                let old_module_ref =
-                    self.loader
-                        .load_module(&module_id, data_store, module_store)?;
+                let old_module_ref = self.loader.load_module(
+                    &module_id,
+                    data_store,
+                    module_store,
+                    module_storage,
+                )?;
                 let old_module = old_module_ref.module();
                 if self.loader.vm_config().use_compatibility_checker_v2 {
                     compat
@@ -151,6 +156,7 @@ impl VMRuntime {
             &compiled_modules,
             data_store,
             module_store,
+            module_storage,
         )?;
 
         // NOTE: we want to (informally) argue that all modules pass the linking check before being
@@ -222,12 +228,13 @@ impl VMRuntime {
     fn deserialize_arg(
         &self,
         module_store: &ModuleStorageAdapter,
+        module_storage: &impl ModuleStorageV2,
         ty: &Type,
         arg: impl Borrow<[u8]>,
     ) -> PartialVMResult<Value> {
         let (layout, has_identifier_mappings) = match self
             .loader
-            .type_to_type_layout_with_identifier_mappings(ty, module_store)
+            .type_to_type_layout_with_identifier_mappings(ty, module_store, module_storage)
         {
             Ok(layout) => layout,
             Err(_err) => {
@@ -259,6 +266,7 @@ impl VMRuntime {
     fn deserialize_args(
         &self,
         module_store: &ModuleStorageAdapter,
+        module_storage: &impl ModuleStorageV2,
         param_tys: Vec<Type>,
         serialized_args: Vec<impl Borrow<[u8]>>,
     ) -> PartialVMResult<(Locals, Vec<Value>)> {
@@ -286,12 +294,12 @@ impl VMRuntime {
                 Type::MutableReference(inner_t) | Type::Reference(inner_t) => {
                     dummy_locals.store_loc(
                         idx,
-                        self.deserialize_arg(module_store, inner_t, arg_bytes)?,
+                        self.deserialize_arg(module_store, module_storage, inner_t, arg_bytes)?,
                         self.loader.vm_config().check_invariant_in_swap_loc,
                     )?;
                     dummy_locals.borrow_loc(idx)
                 },
-                _ => self.deserialize_arg(module_store, &ty, arg_bytes),
+                _ => self.deserialize_arg(module_store, module_storage, &ty, arg_bytes),
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok((dummy_locals, deserialized_args))
@@ -300,6 +308,7 @@ impl VMRuntime {
     fn serialize_return_value(
         &self,
         module_store: &ModuleStorageAdapter,
+        module_storage: &impl ModuleStorageV2,
         ty: &Type,
         value: Value,
     ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
@@ -314,7 +323,7 @@ impl VMRuntime {
 
         let (layout, has_identifier_mappings) = self
             .loader
-            .type_to_type_layout_with_identifier_mappings(ty, module_store)
+            .type_to_type_layout_with_identifier_mappings(ty, module_store, module_storage)
             .map_err(|_err| {
                 // TODO: Should we use `err` instead of mapping?
                 PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
@@ -341,6 +350,7 @@ impl VMRuntime {
     fn serialize_return_values(
         &self,
         module_store: &ModuleStorageAdapter,
+        module_storage: &impl ModuleStorageV2,
         return_types: &[Type],
         return_values: Vec<Value>,
     ) -> PartialVMResult<Vec<(Vec<u8>, MoveTypeLayout)>> {
@@ -359,7 +369,7 @@ impl VMRuntime {
         return_types
             .iter()
             .zip(return_values)
-            .map(|(ty, value)| self.serialize_return_value(module_store, ty, value))
+            .map(|(ty, value)| self.serialize_return_value(module_store, module_storage, ty, value))
             .collect()
     }
 
@@ -369,6 +379,7 @@ impl VMRuntime {
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
+        module_storage: &impl ModuleStorageV2,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -391,7 +402,7 @@ impl VMRuntime {
             })
             .collect::<Vec<_>>();
         let (mut dummy_locals, deserialized_args) = self
-            .deserialize_args(module_store, param_tys, serialized_args)
+            .deserialize_args(module_store, module_storage, param_tys, serialized_args)
             .map_err(|e| e.finish(Location::Undefined))?;
         let return_tys = function
             .return_tys()
@@ -405,6 +416,7 @@ impl VMRuntime {
             deserialized_args,
             data_store,
             module_store,
+            module_storage,
             gas_meter,
             traversal_context,
             extensions,
@@ -412,7 +424,7 @@ impl VMRuntime {
         )?;
 
         let serialized_return_values = self
-            .serialize_return_values(module_store, &return_tys, return_values)
+            .serialize_return_values(module_store, module_storage, &return_tys, return_values)
             .map_err(|e| e.finish(Location::Undefined))?;
         let serialized_mut_ref_outputs = mut_ref_args
             .into_iter()
@@ -420,7 +432,8 @@ impl VMRuntime {
                 // serialize return values first in the case that a value points into this local
                 let local_val = dummy_locals
                     .move_loc(idx, self.loader.vm_config().check_invariant_in_swap_loc)?;
-                let (bytes, layout) = self.serialize_return_value(module_store, &ty, local_val)?;
+                let (bytes, layout) =
+                    self.serialize_return_value(module_store, module_storage, &ty, local_val)?;
                 Ok((idx as LocalIndex, bytes, layout))
             })
             .collect::<PartialVMResult<_>>()
@@ -444,12 +457,14 @@ impl VMRuntime {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
+        module_storage: &impl ModuleStorageV2,
     ) -> VMResult<SerializedReturnValues> {
         self.execute_function_impl(
             func,
             serialized_args,
             data_store,
             module_store,
+            module_storage,
             gas_meter,
             traversal_context,
             extensions,
@@ -466,16 +481,25 @@ impl VMRuntime {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
+        module_storage: &impl ModuleStorageV2,
+        script_storage: &impl ScriptStorage,
     ) -> VMResult<()> {
         // Load the script first, verify it, and then execute the entry-point main function.
-        let main = self
-            .loader
-            .load_script(script.borrow(), &ty_args, data_store, module_store)?;
+        let main = self.loader.load_script(
+            script.borrow(),
+            &ty_args,
+            data_store,
+            module_store,
+            module_storage,
+            script_storage,
+        )?;
+
         self.execute_function_impl(
             main,
             serialized_args,
             data_store,
             module_store,
+            module_storage,
             gas_meter,
             traversal_context,
             extensions,

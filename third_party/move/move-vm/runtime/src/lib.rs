@@ -30,5 +30,9 @@ pub mod module_traversal;
 mod debug;
 
 mod access_control;
+mod storage;
 
 pub use loader::LoadedFunction;
+pub use storage::{
+    dummy::DummyCodeStorage, module_storage::ModuleStorage, script_storage::ScriptStorage,
+};

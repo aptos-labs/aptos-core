@@ -13,7 +13,9 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, DummyCodeStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::convert::TryInto;
@@ -106,6 +108,7 @@ fn run(
             serialize_values(&vec![arg_val0]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .and_then(|ret_values| {
             let change_set = session.finish()?;
