@@ -60,7 +60,7 @@ pub use mempool_config::*;
 pub use netbench_config::*;
 pub use network_config::*;
 pub use node_config::*;
-pub use node_config_loader::sanitize_node_config;
+pub use node_config_loader::{sanitize_node_config, NodeType};
 pub use override_node_config::*;
 pub use peer_monitoring_config::*;
 pub use persistable_config::*;

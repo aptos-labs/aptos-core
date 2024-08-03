@@ -249,19 +249,17 @@ B2:
 	5: LdU64(0)
 	6: StLoc[0](loc0: u64)
 B3:
-	7: LdU64(5)
-	8: StLoc[1](loc1: u64)
-	9: MoveLoc[0](loc0: u64)
-	10: MoveLoc[1](loc1: u64)
-	11: Eq
-	12: BrFalse(14)
+	7: MoveLoc[0](loc0: u64)
+	8: LdU64(5)
+	9: Eq
+	10: BrFalse(12)
 B4:
-	13: Branch(16)
+	11: Branch(14)
 B5:
-	14: LdU64(42)
-	15: Abort
+	12: LdU64(42)
+	13: Abort
 B6:
-	16: Ret
+	14: Ret
 }
 }
 ============ bytecode verification succeeded ========

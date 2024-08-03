@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    experiments::Experiment,
     file_format_generator::{
         module_generator::{ModuleContext, ModuleGenerator, SOURCE_MAP_OK},
-        MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
+        peephole_optimizer, Options, MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
     },
     pipeline::livevar_analysis_processor::LiveVarAnnotation,
 };
@@ -136,15 +137,27 @@ impl<'a> FunctionGenerator<'a> {
                 code: vec![],
             };
             let target = ctx.targets.get_target(&fun_env, &FunctionVariant::Baseline);
-            let code = fun_gen.gen_code(&FunctionContext {
+            let mut code = fun_gen.gen_code(&FunctionContext {
                 module: ctx.clone(),
                 fun: target,
                 loc: loc.clone(),
                 type_parameters: fun_env.get_type_parameters(),
                 def_idx,
             });
-            // Write the spec block table back to the environment.
-            if !fun_gen.spec_blocks.is_empty() {
+            if fun_gen.spec_blocks.is_empty() {
+                // Currently, peephole optimizations require that there are no inline spec blocks.
+                // This is to ensure that spec-related data structures do not refer to code
+                // offsets which could be changed by the peephole optimizer.
+                let options = ctx
+                    .env
+                    .get_extension::<Options>()
+                    .expect("Options is available");
+                if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
+                    // TODO: fix source mapping (#14167)
+                    peephole_optimizer::run(&mut code);
+                }
+            } else {
+                // Write the spec block table back to the environment.
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
             }
             (fun_gen.gen, Some(code))
@@ -358,7 +371,7 @@ impl<'a> FunctionGenerator<'a> {
             .insert(offset);
     }
 
-    /// Sets the resolution of a lable to the current code offset.
+    /// Sets the resolution of a label to the current code offset.
     fn define_label(&mut self, label: Label) {
         let offset = self.code.len() as FF::CodeOffset;
         self.label_info.entry(label).or_default().resolution = Some(offset)

@@ -21,7 +21,7 @@ fn gen_join_field(field: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 
 #[proc_macro_derive(AbstractDomain, attributes(no_join))]
 /// Derives `AbstractDomain` for structs. The derived `join` method pair-wise joins selected fields of a struct,
-/// or all fields for structs with anonymous fields, and returns the combined join results.
+/// or all fields for structs with positional fields, and returns the combined join results.
 /// The joined fields must implement `AbstractDomain`.
 /// # Usage
 ///
