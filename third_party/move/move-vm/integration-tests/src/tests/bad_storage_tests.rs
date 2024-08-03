@@ -13,7 +13,7 @@ use move_core_types::{
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
     gas::UnmeteredGasMeter,
@@ -103,6 +103,8 @@ fn test_malformed_resource() {
         vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
+        &DummyCodeStorage,
     )
     .map(|_| ())
     .unwrap();
@@ -122,6 +124,8 @@ fn test_malformed_resource() {
             vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
+            &DummyCodeStorage,
         )
         .map(|_| ())
         .unwrap();
@@ -150,6 +154,8 @@ fn test_malformed_resource() {
                 vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
+                &DummyCodeStorage,
             )
             .map(|_| ())
             .unwrap_err();
@@ -191,6 +197,7 @@ fn test_malformed_module() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap();
     }
@@ -218,6 +225,7 @@ fn test_malformed_module() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
@@ -259,6 +267,7 @@ fn test_unverifiable_module() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap();
     }
@@ -285,6 +294,7 @@ fn test_unverifiable_module() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
 
@@ -337,6 +347,7 @@ fn test_missing_module_dependency() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap();
     }
@@ -358,6 +369,7 @@ fn test_missing_module_dependency() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
 
@@ -410,6 +422,7 @@ fn test_malformed_module_dependency() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap();
     }
@@ -437,6 +450,7 @@ fn test_malformed_module_dependency() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
 
@@ -490,6 +504,7 @@ fn test_unverifiable_module_dependency() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap();
     }
@@ -517,6 +532,7 @@ fn test_unverifiable_module_dependency() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
 
@@ -609,6 +625,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
 
@@ -678,6 +695,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap();
 
@@ -689,6 +707,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
                 serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
             )
             .unwrap_err();
 

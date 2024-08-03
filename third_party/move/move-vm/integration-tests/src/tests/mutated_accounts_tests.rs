@@ -9,7 +9,7 @@ use move_core_types::{
     language_storage::ModuleId,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -60,13 +60,14 @@ fn mutated_accounts() {
         serialize_values(&vec![MoveValue::Signer(account1)]),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )
     .unwrap();
 
     // The resource was published to "account1" and the sender's account
     // (TEST_ADDR) is assumed to be mutated as well (e.g., in a subsequent
     // transaction epilogue).
-    assert_eq!(sess.num_mutated_accounts(&TEST_ADDR), 2);
+    assert_eq!(sess.num_mutated_resources(&TEST_ADDR), 2);
 
     sess.execute_function_bypass_visibility(
         &module_id,
@@ -75,10 +76,11 @@ fn mutated_accounts() {
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )
     .unwrap();
 
-    assert_eq!(sess.num_mutated_accounts(&TEST_ADDR), 2);
+    assert_eq!(sess.num_mutated_resources(&TEST_ADDR), 2);
 
     sess.execute_function_bypass_visibility(
         &module_id,
@@ -87,9 +89,10 @@ fn mutated_accounts() {
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )
     .unwrap();
-    assert_eq!(sess.num_mutated_accounts(&TEST_ADDR), 2);
+    assert_eq!(sess.num_mutated_resources(&TEST_ADDR), 2);
 
     let changes = sess.finish().unwrap();
     storage.apply(changes).unwrap();
@@ -102,9 +105,10 @@ fn mutated_accounts() {
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )
     .unwrap();
 
     // Only the sender's account (TEST_ADDR) should have been modified.
-    assert_eq!(sess.num_mutated_accounts(&TEST_ADDR), 1);
+    assert_eq!(sess.num_mutated_resources(&TEST_ADDR), 1);
 }

@@ -42,6 +42,7 @@ use move_vm_runtime::{
     module_traversal::*,
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
+    DummyCodeStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -169,7 +170,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     let id = module.self_id();
                     let sender = *id.address();
                     session
-                        .publish_module(module_bytes, sender, gas_status)
+                        .publish_module(module_bytes, sender, gas_status, &DummyCodeStorage)
                         .unwrap();
                 }
                 Ok(())
@@ -220,6 +221,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 vec![module_bytes],
                 sender,
                 gas_status,
+                &DummyCodeStorage,
                 compat,
             )
         });
@@ -272,6 +274,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 args,
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
+                &DummyCodeStorage,
+                &DummyCodeStorage,
             )
         })
         .map_err(|vm_error| {
@@ -323,6 +327,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     args,
                     gas_status,
                     &mut TraversalContext::new(&traversal_storage),
+                    &DummyCodeStorage,
                 )
             })
             .map_err(|vm_error| {
