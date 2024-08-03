@@ -27,7 +27,9 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::TraversalContext};
+use move_vm_runtime::{
+    logging::expect_no_verification_errors, module_traversal::TraversalContext, DummyCodeStorage,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 
@@ -142,6 +144,7 @@ pub(crate) fn run_script_prologue(
             serialize_values(&args),
             &mut gas_meter,
             traversal_context,
+            &DummyCodeStorage,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -185,6 +188,7 @@ pub(crate) fn run_multisig_prologue(
             ]),
             &mut UnmeteredGasMeter,
             traversal_context,
+            &DummyCodeStorage,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -226,6 +230,7 @@ fn run_epilogue(
             serialize_values(&args),
             &mut UnmeteredGasMeter,
             traversal_context,
+            &DummyCodeStorage,
         )
     } else {
         // Regular tx, run the normal epilogue
@@ -246,6 +251,7 @@ fn run_epilogue(
             serialize_values(&args),
             &mut UnmeteredGasMeter,
             traversal_context,
+            &DummyCodeStorage,
         )
     }
     .map(|_return_vals| ())
@@ -274,6 +280,7 @@ fn emit_fee_statement(
             vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
             &mut UnmeteredGasMeter,
             traversal_context,
+            &DummyCodeStorage,
         )
         .map(|_return_vals| ())
 }

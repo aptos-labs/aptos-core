@@ -26,6 +26,7 @@ use move_core_types::{
     value::MoveTypeLayout,
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
+use move_vm_runtime::DummyCodeStorage;
 use move_vm_test_utils::gas_schedule::GasStatus;
 use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use std::{
@@ -158,9 +159,12 @@ impl Harness {
                 }
             }
             self.log(format!("publishing {}", id));
-            session
-                .get_move_session()
-                .publish_module(cu.serialize(None), test_account(), gas)?
+            session.get_move_session().publish_module(
+                cu.serialize(None),
+                test_account(),
+                gas,
+                &DummyCodeStorage,
+            )?
         }
         Ok(())
     }

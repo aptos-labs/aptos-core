@@ -10,7 +10,9 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{MoveTypeLayout, MoveValue},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, DummyCodeStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -71,6 +73,7 @@ fn run(
         args,
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )?;
 
     Ok(return_values
