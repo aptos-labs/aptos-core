@@ -288,6 +288,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
+                // TODO(George): Use ModuleStorage to resolve module metadata directly.
+                #[allow(deprecated)]
                 let resource_group_tag = runtime
                     .with_module_metadata(&struct_tag.module_id(), |md| {
                         get_resource_group_member_from_metadata(&struct_tag, md)

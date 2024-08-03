@@ -11,6 +11,7 @@ pub(crate) fn get_randomness_annotation(
     session: &mut SessionExt,
     entry_fn: &EntryFunction,
 ) -> VMResult<Option<RandomnessAnnotation>> {
+    #[allow(deprecated)]
     let module = session
         .get_move_vm()
         .load_module(entry_fn.module(), resolver)?;

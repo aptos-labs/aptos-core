@@ -8,7 +8,9 @@ use move_core_types::{
     account_address::AccountAddress, gas_algebra::GasQuantity, identifier::Identifier,
     language_storage::ModuleId, vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction, DummyCodeStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
 use smallvec::SmallVec;
@@ -170,7 +172,8 @@ fn runtime_reentrancy_check() {
             vec![],
             args.clone(),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage)
+            &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap_err()
         .major_status(),
@@ -189,6 +192,7 @@ fn runtime_reentrancy_check() {
         args.clone(),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )
     .unwrap();
 
@@ -202,7 +206,8 @@ fn runtime_reentrancy_check() {
             vec![],
             args,
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage)
+            &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap_err()
         .major_status(),
