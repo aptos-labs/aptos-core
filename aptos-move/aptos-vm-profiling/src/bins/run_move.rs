@@ -12,7 +12,7 @@ use move_core_types::{account_address::AccountAddress, ident_str, identifier::Id
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction,
+    native_functions::NativeFunction, DummyCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -176,6 +176,8 @@ fn main() -> Result<()> {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
+            &DummyCodeStorage,
         )?;
     } else {
         let module = Compiler::new(test_modules.iter().collect()).into_compiled_module(&src)?;
@@ -186,6 +188,7 @@ fn main() -> Result<()> {
             module_blob,
             *module.self_id().address(),
             &mut UnmeteredGasMeter,
+            &DummyCodeStorage,
         )?;
         let args: Vec<Vec<u8>> = vec![];
         let res = sess.execute_function_bypass_visibility(
@@ -195,6 +198,7 @@ fn main() -> Result<()> {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )?;
         println!("{:?}", res);
     }

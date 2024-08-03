@@ -10,7 +10,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::{BlankStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -34,6 +34,7 @@ fn call_non_existent_module() {
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .unwrap_err();
 
@@ -71,6 +72,7 @@ fn call_non_existent_function() {
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&storage),
+            &DummyCodeStorage,
         )
         .unwrap_err();
 

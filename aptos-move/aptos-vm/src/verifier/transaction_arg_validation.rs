@@ -22,7 +22,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    LoadedFunction,
+    DummyCodeStorage, LoadedFunction,
 };
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
@@ -199,12 +199,12 @@ pub(crate) fn is_valid_txn_arg(
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
-        Struct { idx, .. } | StructInstantiation { idx, .. } => {
-            session.get_struct_type(*idx).is_some_and(|st| {
+        Struct { idx, .. } | StructInstantiation { idx, .. } => session
+            .fetch_struct_ty_by_idx(*idx, &DummyCodeStorage)
+            .is_some_and(|st| {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
                 allowed_structs.contains_key(&full_name)
-            })
-        },
+            }),
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
     }
 }
@@ -326,7 +326,7 @@ pub(crate) fn recursively_construct_arg(
         },
         Struct { idx, .. } | StructInstantiation { idx, .. } => {
             let st = session
-                .get_struct_type(*idx)
+                .fetch_struct_ty_by_idx(*idx, &DummyCodeStorage)
                 .ok_or_else(invalid_signature)?;
 
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
@@ -422,6 +422,7 @@ fn validate_and_construct(
     }
 
     let function = session.load_function_with_type_arg_inference(
+        &DummyCodeStorage,
         &constructor.module_id,
         constructor.func_name,
         expected_type,
@@ -452,6 +453,7 @@ fn validate_and_construct(
         args,
         gas_meter,
         &mut TraversalContext::new(&storage),
+        &DummyCodeStorage,
     )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1

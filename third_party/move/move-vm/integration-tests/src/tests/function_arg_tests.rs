@@ -12,7 +12,7 @@ use move_core_types::{
     value::{MoveStruct, MoveValue},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -77,6 +77,7 @@ fn run(
         args,
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )?;
 
     Ok(())

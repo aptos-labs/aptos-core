@@ -21,7 +21,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -263,6 +263,8 @@ fn call_script_with_args_ty_args_signers(
             combine_signers_and_args(signers, non_signer_args),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
+            &DummyCodeStorage,
         )
         .map(|_| ())
 }
@@ -295,6 +297,7 @@ fn call_script_function_with_args_ty_args_signers(
         combine_signers_and_args(signers, non_signer_args),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &DummyCodeStorage,
     )?;
     Ok(())
 }
@@ -792,6 +795,7 @@ fn call_missing_item() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .err()
         .unwrap();
@@ -816,6 +820,7 @@ fn call_missing_item() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &DummyCodeStorage,
         )
         .err()
         .unwrap();
