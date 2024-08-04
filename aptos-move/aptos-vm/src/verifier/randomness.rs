@@ -4,17 +4,28 @@
 use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
 use aptos_framework::{KnownAttribute, RandomnessAnnotation};
 use aptos_types::transaction::EntryFunction;
-use move_binary_format::errors::VMResult;
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
+use move_binary_format::errors::{Location, VMResult};
 
 pub(crate) fn get_randomness_annotation(
     resolver: &impl AptosMoveResolver,
+    module_storage: &impl AptosModuleStorage,
     session: &mut SessionExt,
     entry_fn: &EntryFunction,
+    use_loader_v2: bool,
 ) -> VMResult<Option<RandomnessAnnotation>> {
-    #[allow(deprecated)]
-    let module = session
-        .get_move_vm()
-        .load_module(entry_fn.module(), resolver)?;
+    let module = if use_loader_v2 {
+        // TODO(loader_v2): Enhance this further by querying RuntimeModuleMetadataV1 directly.
+        module_storage
+            .fetch_deserialized_module(entry_fn.module().address(), entry_fn.module().name())
+            .map_err(|e| e.finish(Location::Undefined))?
+    } else {
+        #[allow(deprecated)]
+        session
+            .get_move_vm()
+            .load_module(entry_fn.module(), resolver)?
+    };
+
     let metadata = aptos_framework::get_metadata_from_compiled_module(&module);
     if let Some(metadata) = metadata {
         let maybe_annotation = metadata

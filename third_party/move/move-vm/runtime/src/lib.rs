@@ -32,7 +32,11 @@ mod debug;
 mod access_control;
 mod storage;
 
-pub use loader::LoadedFunction;
+pub use loader::{LoadedFunction, Module, Script};
 pub use storage::{
-    dummy::DummyCodeStorage, module_storage::ModuleStorage, script_storage::ScriptStorage,
+    dummy::{should_use_loader_v2, DummyCodeStorage},
+    module_storage::ModuleStorage,
+    script_storage::{script_hash, ScriptStorage},
 };
+#[cfg(any(test, feature = "testing"))]
+pub use storage::{TestModuleStorage, TestScriptStorage};

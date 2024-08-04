@@ -7,12 +7,12 @@ use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::TypeTag,
     u256::U256,
     value::{MoveStruct, MoveValue},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -44,7 +44,7 @@ fn run(
 
             fun foo<{}>({}) {{ }}
         }}
-    "#,
+        "#,
         TEST_ADDR.to_hex(),
         ty_params,
         params
@@ -55,12 +55,13 @@ fn run(
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();
 
-    let mut storage = InMemoryStorage::new();
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
-    storage.publish_or_overwrite_module(module_id.clone(), blob);
-
     let vm = MoveVM::new(vec![]);
-    let mut sess = vm.new_session(&storage);
+
+    let mut resource_storage = InMemoryStorage::new();
+    resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
+
+    let module_storage = TestModuleStorage::empty_for_vm(&vm);
+    module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -70,14 +71,15 @@ fn run(
         .map(|val| val.simple_serialize().unwrap())
         .collect();
 
+    let mut sess = vm.new_session(&resource_storage);
     sess.execute_function_bypass_visibility(
-        &module_id,
+        &m.self_id(),
         &fun_name,
         ty_args,
         args,
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &DummyCodeStorage,
+        &module_storage,
     )?;
 
     Ok(())

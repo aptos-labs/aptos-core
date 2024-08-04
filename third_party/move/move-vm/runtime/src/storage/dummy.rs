@@ -10,6 +10,7 @@ use move_binary_format::{
     file_format::CompiledScript,
     CompiledModule,
 };
+use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, metadata::Metadata,
     vm_status::StatusCode,
@@ -18,7 +19,6 @@ use std::sync::Arc;
 
 /// An error which is returned in case unimplemented code is reached. This is just a safety
 /// precaution to avoid panics in case we forget some gating.
-#[macro_export]
 macro_rules! unexpected_unimplemented_error {
     () => {
         Err(
@@ -26,6 +26,19 @@ macro_rules! unexpected_unimplemented_error {
                 .with_message("New loader and code cache are not yet implemented".to_string()),
         )
     };
+}
+
+// Temporary infra to enable loader V2 to test & run things e2e locally.
+pub fn should_use_loader_v2() -> bool {
+    std::env::var("USE_LOADER_V2").is_ok()
+}
+
+pub(crate) fn ok_if_should_use_loader_v2() -> PartialVMResult<()> {
+    if should_use_loader_v2() {
+        Ok(())
+    } else {
+        unexpected_unimplemented_error!()
+    }
 }
 
 /// Dummy implementation of code storage (for modules and scripts), to be removed in the future.
@@ -54,7 +67,7 @@ impl ModuleStorage for DummyCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<&[Metadata]> {
+    ) -> PartialVMResult<Vec<Metadata>> {
         unexpected_unimplemented_error!()
     }
 
@@ -98,27 +111,37 @@ impl ScriptStorage for DummyCodeStorage {
 pub struct DummyVerifier;
 
 impl Verifier for DummyVerifier {
-    fn verify_script(&self, _script: &CompiledScript) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+    fn verify_script(&self, script: &CompiledScript) -> PartialVMResult<()> {
+        ok_if_should_use_loader_v2()?;
+        move_bytecode_verifier::verify_script(script).map_err(|e| e.to_partial())?;
+        Ok(())
     }
 
     fn verify_script_with_dependencies<'a>(
         &self,
-        _script: &CompiledScript,
-        _dependencies: impl IntoIterator<Item = &'a Module>,
+        script: &CompiledScript,
+        dependencies: impl IntoIterator<Item = &'a Module>,
     ) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+        ok_if_should_use_loader_v2()?;
+        dependencies::verify_script(script, dependencies.into_iter().map(|m| m.module()))
+            .map_err(|e| e.to_partial())?;
+        Ok(())
     }
 
-    fn verify_module(&self, _module: &CompiledModule) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+    fn verify_module(&self, module: &CompiledModule) -> PartialVMResult<()> {
+        ok_if_should_use_loader_v2()?;
+        move_bytecode_verifier::verify_module(module).map_err(|e| e.to_partial())?;
+        Ok(())
     }
 
     fn verify_module_with_dependencies<'a>(
         &self,
-        _module: &CompiledModule,
-        _dependencies: impl IntoIterator<Item = &'a Module>,
+        module: &CompiledModule,
+        dependencies: impl IntoIterator<Item = &'a Module>,
     ) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+        ok_if_should_use_loader_v2()?;
+        dependencies::verify_module(module, dependencies.into_iter().map(|m| m.module()))
+            .map_err(|e| e.to_partial())?;
+        Ok(())
     }
 }

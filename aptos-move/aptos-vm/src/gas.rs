@@ -14,8 +14,9 @@ use aptos_types::on_chain_config::{
     ConfigStorage, Features, GasSchedule, GasScheduleV2, OnChainConfig,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
-use aptos_vm_types::storage::{
-    io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
+use aptos_vm_types::{
+    module_and_script_storage::module_storage::AptosModuleStorage,
+    storage::{io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters},
 };
 use move_core_types::{
     gas_algebra::NumArgs,
@@ -124,6 +125,7 @@ pub(crate) fn check_gas(
     gas_params: &AptosGasParameters,
     gas_feature_version: u64,
     resolver: &impl AptosMoveResolver,
+    module_storage: &impl AptosModuleStorage,
     txn_metadata: &TransactionMetadata,
     features: &Features,
     is_approved_gov_script: bool,
@@ -258,8 +260,12 @@ pub(crate) fn check_gas(
     // gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
-    if crate::aptos_vm::is_account_init_for_sponsored_transaction(txn_metadata, features, resolver)?
-    {
+    if crate::aptos_vm::is_account_init_for_sponsored_transaction(
+        txn_metadata,
+        features,
+        resolver,
+        module_storage,
+    )? {
         let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
         let pricing = DiskSpacePricing::new(gas_feature_version, features);

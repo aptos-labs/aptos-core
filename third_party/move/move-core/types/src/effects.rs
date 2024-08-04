@@ -295,9 +295,8 @@ impl<Module, Resource> Changes<Module, Resource> {
         })
     }
 
-    pub fn modules(&self) -> impl Iterator<Item = (AccountAddress, &Identifier, Op<&Module>)> {
+    pub fn modules(&self) -> impl Iterator<Item = (&AccountAddress, &Identifier, Op<&Module>)> {
         self.accounts.iter().flat_map(|(addr, account)| {
-            let addr = *addr;
             account
                 .modules
                 .iter()

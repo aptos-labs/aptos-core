@@ -10,7 +10,9 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, TestModuleStorage, TestScriptStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::time::Instant;
@@ -70,7 +72,6 @@ fn script_large_ty() {
         max_value_stack_size: 1024,
         max_type_nodes: Some(256),
         max_push_size: Some(10000),
-        max_dependency_depth: Some(100),
         max_struct_definitions: Some(200),
         max_fields_in_struct: Some(30),
         max_function_definitions: Some(1000),
@@ -106,17 +107,27 @@ fn script_large_ty() {
     println!("Serialized len: {}", script.len());
     CompiledModule::deserialize(&module).unwrap();
 
-    let mut storage = InMemoryStorage::new();
     let move_vm = MoveVM::new_with_config(vec![], VMConfig {
         verifier_config,
         paranoid_type_checks: true,
         ..Default::default()
     });
+    let deserializer_config = &move_vm.vm_config().deserializer_config;
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();
 
-    storage.publish_or_overwrite_module(decompiled_module.self_id(), module.to_vec());
+    let mut resource_storage = InMemoryStorage::new();
+    resource_storage.publish_or_overwrite_module(decompiled_module.self_id(), module.clone());
+
+    let module_storage = TestModuleStorage::empty(deserializer_config);
+    module_storage.add_module_bytes(
+        decompiled_module.self_addr(),
+        decompiled_module.self_name(),
+        module.into(),
+    );
+
+    let script_storage = TestScriptStorage::empty(deserializer_config);
 
     // constructs a type with about 25^3 nodes
     let num_type_args = 25;
@@ -129,7 +140,7 @@ fn script_large_ty() {
         struct_name,
     );
 
-    let mut session = move_vm.new_session(&storage);
+    let mut session = move_vm.new_session(&resource_storage);
     let traversal_storage = TraversalStorage::new();
     let res = session
         .execute_script(
@@ -138,8 +149,8 @@ fn script_large_ty() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
-            &DummyCodeStorage,
+            &module_storage,
+            &script_storage,
         )
         .unwrap_err();
 
