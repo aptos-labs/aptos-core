@@ -575,7 +575,7 @@ impl Interpreter {
             } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
 
-                // Note(George): when V2 loader fetches the function, the defining module is
+                // Note(loader_v2): when V2 loader fetches the function, the defining module is
                 // automatically loaded as well, and there is no need for preloading of a module
                 // into the cache like in V1 design.
                 if let Loader::V1(loader) = resolver.loader() {
@@ -665,7 +665,7 @@ impl Interpreter {
                             format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
                         ))?;
 
-                // Note(George): same as above, when V2 loader fetches the function, the module
+                // Note(loader_v2): same as above, when V2 loader fetches the function, the module
                 // where it is defined automatically loaded from ModuleStorage as well. There is
                 // no resolution via ModuleStorageAdapter like in V1 design, and it will be soon
                 // removed.

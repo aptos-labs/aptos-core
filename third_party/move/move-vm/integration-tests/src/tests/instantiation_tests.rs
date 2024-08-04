@@ -14,9 +14,8 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, TestModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn instantiation_err() {
@@ -112,15 +111,25 @@ fn instantiation_err() {
     };
     let vm = MoveVM::new_with_config(vec![], vm_config);
 
-    let storage: InMemoryStorage = InMemoryStorage::new();
-    let mut session = vm.new_session(&storage);
-    let mut mod_bytes = vec![];
-    cm.serialize(&mut mod_bytes).unwrap();
+    let mut resource_storage: InMemoryStorage = InMemoryStorage::new();
+    let module_storage = TestModuleStorage::empty(&vm.vm_config().deserializer_config);
 
-    session
-        .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter, &DummyCodeStorage)
-        .expect("Module must publish");
+    // Verify we can publish this module.
+    {
+        let mut session = vm.new_session(&resource_storage);
+        session
+            .verify_module_bundle_before_publishing(&[cm.clone()], cm.self_addr(), &module_storage)
+            .expect("Module must publish");
+        drop(session);
 
+        // Add it to module storage and restart the session.
+        let mut mod_bytes = vec![];
+        cm.serialize(&mut mod_bytes).unwrap();
+        resource_storage.publish_or_overwrite_module(cm.self_id(), mod_bytes.clone());
+        module_storage.add_module_bytes(cm.self_addr(), cm.self_name(), mod_bytes.into());
+    }
+
+    let mut session = vm.new_session(&resource_storage);
     let mut ty_arg = TypeTag::U128;
     for _ in 0..4 {
         ty_arg = TypeTag::Struct(Box::new(StructTag {
@@ -131,7 +140,7 @@ fn instantiation_err() {
         }));
     }
 
-    let res = session.load_function(&DummyCodeStorage, &cm.self_id(), ident_str!("f"), &[ty_arg]);
+    let res = session.load_function(&module_storage, &cm.self_id(), ident_str!("f"), &[ty_arg]);
     assert!(
         res.is_err(),
         "Instantiation must fail at load time when converting from type tag to type "
