@@ -5,18 +5,22 @@
 use crate::compiler::compile_modules_in_file;
 use move_binary_format::{
     file_format::{
-        empty_module, AbilitySet, AddressIdentifierIndex, IdentifierIndex, ModuleHandle,
-        ModuleHandleIndex, StructHandle, StructTypeParameter, TableIndex,
+        empty_module, AbilitySet, AddressIdentifierIndex, Bytecode, CodeUnit, FunctionDefinition,
+        FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
+        SignatureIndex, StructHandle, StructTypeParameter, TableIndex, Visibility,
     },
     CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress,
+    ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
 };
-use move_vm_runtime::{config::VMConfig, module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, should_use_loader_v2, TestModuleStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::{path::PathBuf, sync::Arc, thread};
@@ -24,13 +28,14 @@ use std::{path::PathBuf, sync::Arc, thread};
 const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
 
 struct Adapter {
-    store: InMemoryStorage,
+    resource_storage: InMemoryStorage,
+    module_storage: TestModuleStorage,
     vm: Arc<MoveVM>,
     functions: Vec<(ModuleId, Identifier)>,
 }
 
 impl Adapter {
-    fn new(store: InMemoryStorage) -> Self {
+    fn new(resource_storage: InMemoryStorage) -> Self {
         let functions = vec![
             (
                 ModuleId::new(WORKING_ACCOUNT, Identifier::new("A").unwrap()),
@@ -56,14 +61,16 @@ impl Adapter {
 
         let config = VMConfig {
             verifier_config: VerifierConfig {
-                max_dependency_depth: Some(100),
                 ..Default::default()
             },
             ..Default::default()
         };
+        let vm = Arc::new(MoveVM::new_with_config(vec![], config));
+
         Self {
-            store,
-            vm: Arc::new(MoveVM::new_with_config(vec![], config)),
+            resource_storage,
+            module_storage: TestModuleStorage::empty(&vm.vm_config().deserializer_config),
+            vm,
             functions,
         }
     }
@@ -71,55 +78,59 @@ impl Adapter {
     fn fresh(self) -> Self {
         let config = VMConfig {
             verifier_config: VerifierConfig {
-                max_dependency_depth: Some(100),
                 ..Default::default()
             },
             ..Default::default()
         };
+        let vm = Arc::new(MoveVM::new_with_config(vec![], config));
+
         Self {
-            store: self.store,
-            vm: Arc::new(MoveVM::new_with_config(vec![], config)),
+            resource_storage: self.resource_storage,
+            module_storage: TestModuleStorage::empty(&vm.vm_config().deserializer_config),
+            vm,
             functions: self.functions,
         }
     }
 
     fn publish_modules(&mut self, modules: Vec<CompiledModule>) {
-        let mut session = self.vm.new_session(&self.store);
-
         for module in modules {
             let mut binary = vec![];
             module
                 .serialize(&mut binary)
                 .unwrap_or_else(|_| panic!("failure in module serialization: {:#?}", module));
+
+            let mut session = self.vm.new_session(&self.resource_storage);
             session
-                .publish_module(
-                    binary,
-                    WORKING_ACCOUNT,
-                    &mut UnmeteredGasMeter,
-                    &DummyCodeStorage,
+                .verify_module_bundle_before_publishing(
+                    &[module.clone()],
+                    &WORKING_ACCOUNT,
+                    &self.module_storage,
                 )
-                .unwrap_or_else(|_| panic!("failure publishing module: {:#?}", module));
+                .unwrap_or_else(|_| panic!("failure verifying publishing module: {:#?}", module));
+            drop(session);
+
+            self.module_storage.add_module_bytes(
+                module.self_addr(),
+                module.self_name(),
+                binary.clone().into(),
+            );
+            self.resource_storage
+                .publish_or_overwrite_module(module.self_id(), binary);
         }
-        let changeset = session.finish().expect("failure getting write set");
-        self.store
-            .apply(changeset)
-            .expect("failure applying write set");
     }
 
     fn publish_modules_with_error(&mut self, modules: Vec<CompiledModule>) {
-        let mut session = self.vm.new_session(&self.store);
-
+        let mut session = self.vm.new_session(&self.resource_storage);
         for module in modules {
             let mut binary = vec![];
             module
                 .serialize(&mut binary)
                 .unwrap_or_else(|_| panic!("failure in module serialization: {:#?}", module));
             session
-                .publish_module(
-                    binary,
-                    WORKING_ACCOUNT,
-                    &mut UnmeteredGasMeter,
-                    &DummyCodeStorage,
+                .verify_module_bundle_before_publishing(
+                    &[module.clone()],
+                    &WORKING_ACCOUNT,
+                    &self.module_storage,
                 )
                 .expect_err("publishing must fail");
         }
@@ -132,37 +143,35 @@ impl Adapter {
     }
 
     fn call_functions_async(&self, reps: usize) {
-        let mut children = vec![];
-        for _ in 0..reps {
-            for (module_id, name) in self.functions.clone() {
-                let vm = self.vm.clone();
-                let data_store = self.store.clone();
-                children.push(thread::spawn(move || {
-                    let mut session = vm.new_session(&data_store);
-                    let traversal_storage = TraversalStorage::new();
-                    session
-                        .execute_function_bypass_visibility(
-                            &module_id,
-                            &name,
-                            vec![],
-                            Vec::<Vec<u8>>::new(),
-                            &mut UnmeteredGasMeter,
-                            &mut TraversalContext::new(&traversal_storage),
-                            &DummyCodeStorage,
-                        )
-                        .unwrap_or_else(|_| {
-                            panic!("Failure executing {:?}::{:?}", module_id, name)
-                        });
-                }));
+        thread::scope(|scope| {
+            for _ in 0..reps {
+                for (module_id, name) in self.functions.clone() {
+                    let resource_storage = self.resource_storage.clone();
+                    scope.spawn(move || {
+                        // It is fine to share the VM: we do not publish modules anyway.
+                        let mut session = self.vm.as_ref().new_session(&resource_storage);
+                        let traversal_storage = TraversalStorage::new();
+                        session
+                            .execute_function_bypass_visibility(
+                                &module_id,
+                                &name,
+                                vec![],
+                                Vec::<Vec<u8>>::new(),
+                                &mut UnmeteredGasMeter,
+                                &mut TraversalContext::new(&traversal_storage),
+                                &self.module_storage,
+                            )
+                            .unwrap_or_else(|e| {
+                                panic!("Failure executing {}::{}: {:?}", module_id, name, e)
+                            });
+                    });
+                }
             }
-        }
-        for child in children {
-            let _ = child.join();
-        }
+        });
     }
 
     fn call_function(&self, module: &ModuleId, name: &IdentStr) {
-        let mut session = self.vm.new_session(&self.store);
+        let mut session = self.vm.new_session(&self.resource_storage);
         let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
@@ -172,7 +181,7 @@ impl Adapter {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &self.module_storage,
             )
             .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module, name));
     }
@@ -240,11 +249,41 @@ fn load_phantom_module() {
         }],
     });
 
+    module.identifiers.push(Identifier::new("foo").unwrap());
+    module.function_handles.push(FunctionHandle {
+        module: ModuleHandleIndex(0),
+        name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
+        parameters: SignatureIndex(0),
+        return_: SignatureIndex(0),
+        type_parameters: vec![],
+        access_specifiers: None,
+    });
+    module.function_defs.push(FunctionDefinition {
+        function: FunctionHandleIndex(0),
+        visibility: Visibility::Private,
+        is_entry: false,
+        acquires_global_resources: vec![],
+        code: Some(CodeUnit {
+            locals: SignatureIndex(0),
+            code: vec![Bytecode::Ret],
+        }),
+    });
+
     let module_id = module.self_id();
     adapter.publish_modules(vec![module]);
 
-    #[allow(deprecated)]
-    adapter.vm.load_module(&module_id, &adapter.store).unwrap();
+    if should_use_loader_v2() {
+        let mut session = adapter.vm.new_session(&adapter.resource_storage);
+        let _ = session
+            .load_function(&adapter.module_storage, &module_id, ident_str!("foo"), &[])
+            .unwrap();
+    } else {
+        #[allow(deprecated)]
+        adapter
+            .vm
+            .load_module(&module_id, &adapter.resource_storage)
+            .unwrap();
+    }
 }
 
 #[test]
@@ -276,11 +315,41 @@ fn load_with_extra_ability() {
         }],
     });
 
+    module.identifiers.push(Identifier::new("foo").unwrap());
+    module.function_handles.push(FunctionHandle {
+        module: ModuleHandleIndex(0),
+        name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
+        parameters: SignatureIndex(0),
+        return_: SignatureIndex(0),
+        type_parameters: vec![],
+        access_specifiers: None,
+    });
+    module.function_defs.push(FunctionDefinition {
+        function: FunctionHandleIndex(0),
+        visibility: Visibility::Private,
+        is_entry: false,
+        acquires_global_resources: vec![],
+        code: Some(CodeUnit {
+            locals: SignatureIndex(0),
+            code: vec![Bytecode::Ret],
+        }),
+    });
+
     let module_id = module.self_id();
     adapter.publish_modules(vec![module]);
 
-    #[allow(deprecated)]
-    adapter.vm.load_module(&module_id, &adapter.store).unwrap();
+    if should_use_loader_v2() {
+        let mut session = adapter.vm.new_session(&adapter.resource_storage);
+        let _ = session
+            .load_function(&adapter.module_storage, &module_id, ident_str!("foo"), &[])
+            .unwrap();
+    } else {
+        #[allow(deprecated)]
+        adapter
+            .vm
+            .load_module(&module_id, &adapter.resource_storage)
+            .unwrap();
+    }
 }
 
 #[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]

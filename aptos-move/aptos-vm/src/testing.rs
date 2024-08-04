@@ -13,7 +13,7 @@ use aptos_types::{state_store::StateView, transaction::SignedTransaction};
 #[cfg(any(test, feature = "testing"))]
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 #[cfg(any(test, feature = "testing"))]
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use move_binary_format::errors::VMResult;
 #[cfg(any(test, feature = "testing"))]
 use move_core_types::vm_status::VMStatus;
@@ -102,16 +102,19 @@ impl AptosVM {
             .change_set_configs;
 
         let resolver = state_view.as_move_resolver();
-        let storage = TraversalStorage::new();
+        let module_storage = state_view.as_aptos_code_storage();
+
+        let traversal_storage = TraversalStorage::new();
         self.failed_transaction_cleanup(
             SystemSessionChangeSet::empty(),
             error_vm_status,
             &mut gas_meter,
             &txn_data,
             &resolver,
+            &module_storage,
             &log_context,
             change_set_configs,
-            &mut TraversalContext::new(&storage),
+            &mut TraversalContext::new(&traversal_storage),
         )
     }
 }

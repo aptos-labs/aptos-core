@@ -19,6 +19,7 @@ use aptos_vm_types::{
 };
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_vm_runtime::DummyCodeStorage;
 use std::sync::Arc;
 
 pub(crate) struct AptosExecutorTask {
@@ -55,10 +56,13 @@ impl ExecutorTask for AptosExecutorTask {
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
-        match self
-            .vm
-            .execute_single_transaction(txn, &resolver, &log_context)
-        {
+        match self.vm.execute_single_transaction(
+            txn,
+            &resolver,
+            &DummyCodeStorage,
+            &DummyCodeStorage,
+            &log_context,
+        ) {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {
                     speculative_trace!(

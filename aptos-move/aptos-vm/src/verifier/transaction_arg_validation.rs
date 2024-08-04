@@ -7,6 +7,7 @@
 //! for strings whether they consist of correct characters.
 
 use crate::{move_vm_ext::SessionExt, VMStatus};
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
     errors::{Location, PartialVMError},
     file_format::FunctionDefinitionIndex,
@@ -22,7 +23,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    DummyCodeStorage, LoadedFunction,
+    LoadedFunction,
 };
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
@@ -103,6 +104,7 @@ pub(crate) fn get_allowed_structs(
 /// after validation, add senders and non-signer arguments to generate the final args
 pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
@@ -136,7 +138,7 @@ pub fn validate_combine_signer_and_txn_args(
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(session, &ty, allowed_structs);
+        let valid = is_valid_txn_arg(session, module_storage, &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -168,6 +170,7 @@ pub fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
+        module_storage,
         &func.param_tys()[signer_param_cnt..],
         args,
         func.ty_args(),
@@ -191,6 +194,7 @@ pub fn validate_combine_signer_and_txn_args(
 // Return whether the argument is valid/allowed and whether it needs construction.
 pub(crate) fn is_valid_txn_arg(
     session: &SessionExt,
+    module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
 ) -> bool {
@@ -198,9 +202,9 @@ pub(crate) fn is_valid_txn_arg(
 
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
-        Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
+        Vector(inner) => is_valid_txn_arg(session, module_storage, inner, allowed_structs),
         Struct { idx, .. } | StructInstantiation { idx, .. } => session
-            .fetch_struct_ty_by_idx(*idx, &DummyCodeStorage)
+            .fetch_struct_ty_by_idx(*idx, module_storage)
             .is_some_and(|st| {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
                 allowed_structs.contains_key(&full_name)
@@ -214,6 +218,7 @@ pub(crate) fn is_valid_txn_arg(
 // TODO: This needs a more solid story and a tighter integration with the VM.
 pub(crate) fn construct_args(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     types: &[Type],
     args: Vec<Vec<u8>>,
     ty_args: &[Type],
@@ -231,7 +236,15 @@ pub(crate) fn construct_args(
     for (ty, arg) in types.iter().zip(args) {
         let subst_res = ty_builder.create_ty_with_subst(ty, ty_args);
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let arg = construct_arg(session, &ty, allowed_structs, arg, &mut gas_meter, is_view)?;
+        let arg = construct_arg(
+            session,
+            module_storage,
+            &ty,
+            allowed_structs,
+            arg,
+            &mut gas_meter,
+            is_view,
+        )?;
         res_args.push(arg);
     }
     Ok(res_args)
@@ -243,6 +256,7 @@ fn invalid_signature() -> VMStatus {
 
 fn construct_arg(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     arg: Vec<u8>,
@@ -259,6 +273,7 @@ fn construct_arg(
             let mut max_invocations = 10; // Read from config in the future
             recursively_construct_arg(
                 session,
+                module_storage,
                 ty,
                 allowed_structs,
                 &mut cursor,
@@ -295,6 +310,7 @@ fn construct_arg(
 // constructed types into the output parameter arg.
 pub(crate) fn recursively_construct_arg(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
@@ -313,6 +329,7 @@ pub(crate) fn recursively_construct_arg(
             while len > 0 {
                 recursively_construct_arg(
                     session,
+                    module_storage,
                     inner,
                     allowed_structs,
                     cursor,
@@ -326,7 +343,7 @@ pub(crate) fn recursively_construct_arg(
         },
         Struct { idx, .. } | StructInstantiation { idx, .. } => {
             let st = session
-                .fetch_struct_ty_by_idx(*idx, &DummyCodeStorage)
+                .fetch_struct_ty_by_idx(*idx, module_storage)
                 .ok_or_else(invalid_signature)?;
 
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
@@ -337,6 +354,7 @@ pub(crate) fn recursively_construct_arg(
             // of the argument.
             arg.append(&mut validate_and_construct(
                 session,
+                module_storage,
                 ty,
                 constructor,
                 allowed_structs,
@@ -363,6 +381,7 @@ pub(crate) fn recursively_construct_arg(
 // value and returning the BCS serialized representation.
 fn validate_and_construct(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     expected_type: &Type,
     constructor: &FunctionId,
     allowed_structs: &ConstructorMap,
@@ -422,7 +441,7 @@ fn validate_and_construct(
     }
 
     let function = session.load_function_with_type_arg_inference(
-        &DummyCodeStorage,
+        module_storage,
         &constructor.module_id,
         constructor.func_name,
         expected_type,
@@ -437,6 +456,7 @@ fn validate_and_construct(
 
         recursively_construct_arg(
             session,
+            module_storage,
             &arg_ty,
             allowed_structs,
             cursor,
@@ -453,7 +473,7 @@ fn validate_and_construct(
         args,
         gas_meter,
         &mut TraversalContext::new(&storage),
-        &DummyCodeStorage,
+        module_storage,
     )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1

@@ -13,7 +13,9 @@ use crate::{
     ScriptStorage,
 };
 use bytes::Bytes;
-use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
+use move_binary_format::{
+    compatibility::Compatibility, errors::*, file_format::LocalIndex, CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -180,35 +182,17 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    /// Publish the given module.
+    /// Publish a series of modules.
+    ///
+    /// The Move VM MUST return a user error, i.e., an error that's not an invariant violation, if
+    /// any module fails to deserialize or verify. The publishing of the module series is an
+    /// all-or-nothing action: either all modules are published to the data store or none is.
     ///
     /// The Move VM MUST return a user error, i.e., an error that's not an invariant violation, if
     ///   - The module fails to deserialize or verify.
     ///   - The sender address does not match that of the module.
     ///   - (Republishing-only) the module to be updated is not backward compatible with the old module.
     ///   - (Republishing-only) the module to be updated introduces cyclic dependencies.
-    ///
-    /// The Move VM should not be able to produce other user errors.
-    /// Besides, no user input should cause the Move VM to return an invariant violation.
-    ///
-    /// In case an invariant violation occurs, the whole Session should be considered corrupted and
-    /// one shall not proceed with effect generation.
-    pub fn publish_module(
-        &mut self,
-        module: Vec<u8>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<()> {
-        self.publish_module_bundle(vec![module], sender, gas_meter, module_storage)
-    }
-
-    /// Publish a series of modules.
-    ///
-    /// The Move VM MUST return a user error, i.e., an error that's not an invariant violation, if
-    /// any module fails to deserialize or verify (see the full list of  failing conditions in the
-    /// `publish_module` API). The publishing of the module series is an all-or-nothing action:
-    /// either all modules are published to the data store or none is.
     ///
     /// Similar to the `publish_module` API, the Move VM should not be able to produce other user
     /// errors. Besides, no user input should cause the Move VM to return an invariant violation.
@@ -218,25 +202,7 @@ impl<'r, 'l> Session<'r, 'l> {
     ///
     /// This operation performs compatibility checks if a module is replaced. See also
     /// `move_binary_format::compatibility`.
-    pub fn publish_module_bundle(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<()> {
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::full_check(),
-            module_storage,
-        )
-    }
-
-    /// Same like `publish_module_bundle` but with a custom compatibility check.
+    #[deprecated]
     pub fn publish_module_bundle_with_compat_config(
         &mut self,
         modules: Vec<Vec<u8>>,
@@ -256,20 +222,33 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    pub fn publish_module_bundle_relax_compatibility(
+    pub fn verify_module_bundle_before_publishing(
         &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
+        modules: &[CompiledModule],
+        sender: &AccountAddress,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<()> {
-        self.move_vm.runtime.publish_module_bundle(
+        self.verify_module_bundle_before_publishing_with_compat_config(
+            modules,
+            sender,
+            module_storage,
+            Compatibility::full_check(),
+        )
+    }
+
+    pub fn verify_module_bundle_before_publishing_with_compat_config(
+        &mut self,
+        modules: &[CompiledModule],
+        sender: &AccountAddress,
+        module_storage: &impl ModuleStorage,
+        compat_config: Compatibility,
+    ) -> VMResult<()> {
+        self.move_vm.runtime.verify_module_bundle_before_publishing(
             modules,
             sender,
             &mut self.data_cache,
             &self.module_store,
-            gas_meter,
-            Compatibility::no_check(),
+            compat_config,
             module_storage,
         )
     }
@@ -356,7 +335,9 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     /// Check if this module exists.
+    #[deprecated]
     pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
+        #[allow(deprecated)]
         self.data_cache.exists_module(module_id)
     }
 
