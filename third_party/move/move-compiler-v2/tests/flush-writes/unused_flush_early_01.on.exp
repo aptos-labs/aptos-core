@@ -1,11 +1,11 @@
-============ after InstructionReorderingProcessor: ================
+============ after FlushWritesProcessor: ================
 
 [variant baseline]
 fun m::one(): u64 {
      var $t0: u64
-     # deps: {1}, dfs: [Some(0)]
+     # live vars:
   0: $t0 := 1
-     # deps: {}, dfs: [Some(1)]
+     # live vars: $t0
   1: return $t0
 }
 
@@ -17,13 +17,14 @@ public fun m::test1(): (u64, u64) {
      var $t2: u64
      var $t3: u64
      var $t4: u64
-     # deps: {1, 2, 3}, dfs: [None]
+     # flush: $t2
+     # live vars:
   0: $t2 := m::one()
-     # deps: {2, 3}, dfs: [Some(0)]
+     # live vars:
   1: $t3 := m::one()
-     # deps: {3}, dfs: [Some(1)]
+     # live vars: $t3
   2: $t4 := m::one()
-     # deps: {}, dfs: [Some(2)]
+     # live vars: $t3, $t4
   3: return ($t3, $t4)
 }
 
@@ -35,13 +36,33 @@ public fun m::test2(): (u64, u64) {
      var $t2: u64
      var $t3: u64
      var $t4: u64
-     # deps: {1, 2, 3}, dfs: [Some(1)]
+     # live vars:
   0: $t2 := m::one()
-     # deps: {2, 3}, dfs: [None]
+     # flush: $t3
+     # live vars: $t2
   1: $t3 := m::one()
-     # deps: {3}, dfs: [Some(0)]
+     # live vars: $t2
   2: $t4 := m::one()
-     # deps: {}, dfs: [Some(2)]
+     # live vars: $t2, $t4
+  3: return ($t2, $t4)
+}
+
+
+[variant baseline]
+public fun m::test3(): (u64, u64) {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t2 := m::one()
+     # flush: $t3
+     # live vars: $t2
+  1: $t3 := m::one()
+     # live vars: $t2
+  2: $t4 := m::one()
+     # live vars: $t2, $t4
   3: return ($t4, $t2)
 }
 
@@ -57,28 +78,30 @@ B0:
 	1: Ret
 }
 public test1(): u64 * u64 /* def_idx: 1 */ {
-L0:	loc0: u64
-L1:	loc1: u64
 B0:
 	0: Call one(): u64
-	1: Call one(): u64
+	1: Pop
 	2: Call one(): u64
-	3: StLoc[0](loc0: u64)
-	4: StLoc[1](loc1: u64)
-	5: Pop
-	6: MoveLoc[1](loc1: u64)
-	7: MoveLoc[0](loc0: u64)
-	8: Ret
+	3: Call one(): u64
+	4: Ret
 }
 public test2(): u64 * u64 /* def_idx: 2 */ {
+B0:
+	0: Call one(): u64
+	1: Call one(): u64
+	2: Pop
+	3: Call one(): u64
+	4: Ret
+}
+public test3(): u64 * u64 /* def_idx: 3 */ {
 L0:	loc0: u64
 L1:	loc1: u64
 B0:
 	0: Call one(): u64
 	1: Call one(): u64
-	2: Call one(): u64
-	3: StLoc[0](loc0: u64)
-	4: Pop
+	2: Pop
+	3: Call one(): u64
+	4: StLoc[0](loc0: u64)
 	5: StLoc[1](loc1: u64)
 	6: MoveLoc[0](loc0: u64)
 	7: MoveLoc[1](loc1: u64)

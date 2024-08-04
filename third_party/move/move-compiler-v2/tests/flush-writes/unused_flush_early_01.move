@@ -14,6 +14,13 @@ module 0xc0ffee::m {
         let x = one();
         let _y = one();
         let z = one();
+        (x, z)
+    }
+
+    public fun test3(): (u64, u64) {
+        let x = one();
+        let _y = one();
+        let z = one();
         (z, x)
     }
 }

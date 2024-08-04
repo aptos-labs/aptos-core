@@ -8,7 +8,9 @@ use crate::{
         peephole_optimizer, Options, MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
     },
     pipeline::{
-        instruction_reordering::PrepareUseAnnotation, livevar_analysis_processor::LiveVarAnnotation,
+        flush_writes_processor::FlushWritesAnnotation,
+        instruction_reordering::PrepareUseAnnotation,
+        livevar_analysis_processor::LiveVarAnnotation,
     },
 };
 use move_binary_format::{
@@ -1112,18 +1114,34 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Push the result of an operation to the abstract stack.
     fn abstract_push_result(&mut self, ctx: &BytecodeContext, result: impl AsRef<[TempIndex]>) {
-        let mut flush_mark = usize::MAX;
-        for temp in result.as_ref() {
+        let pre_stack_len = self.stack.len();
+        let result = result.as_ref();
+        let mut flush_mark = result.len();
+        for (i, temp) in result.as_ref().iter().enumerate() {
             if self.pinned.contains(temp) {
                 // need to flush this right away and maintain a local for it
-                flush_mark = flush_mark.min(self.stack.len())
+                flush_mark = flush_mark.min(i);
             }
             // The result is on stack only.
             self.stack.push((*temp, true));
         }
-        if flush_mark != usize::MAX {
-            self.abstract_flush_stack_after(ctx, flush_mark)
+        if let Some(flush_writes) = ctx
+            .fun_ctx
+            .fun
+            .get_annotations()
+            .get::<FlushWritesAnnotation>()
+            .and_then(|annotation| annotation.0.get(&ctx.code_offset))
+        {
+            for (i, temp) in result[..flush_mark].iter().enumerate().rev() {
+                if flush_writes.contains(temp) {
+                    flush_mark = i;
+                } else {
+                    break;
+                }
+            }
         }
+        let flush_mark = pre_stack_len + flush_mark;
+        self.abstract_flush_stack_after(ctx, flush_mark);
     }
 
     /// Pop a value from the abstract stack.

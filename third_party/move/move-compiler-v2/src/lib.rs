@@ -36,6 +36,7 @@ use crate::{
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover,
         unused_assignment_checker::UnusedAssignmentChecker,
+        flush_writes_processor::FlushWritesProcessor,
         variable_coalescing::VariableCoalescing,
     },
 };
@@ -456,6 +457,11 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+
+    if options.experiment_on(Experiment::FLUSH_WRITES_OPTIMIZATION) {
+        pipeline.add_processor(Box::new(FlushWritesProcessor {}));
+    }
+
     pipeline
 }
 
