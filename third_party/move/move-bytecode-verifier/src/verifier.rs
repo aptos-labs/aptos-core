@@ -29,7 +29,6 @@ pub struct VerifierConfig {
     pub max_value_stack_size: usize,
     pub max_type_nodes: Option<usize>,
     pub max_push_size: Option<usize>,
-    pub max_dependency_depth: Option<usize>,
     pub max_struct_definitions: Option<usize>,
     pub max_struct_variants: Option<usize>,
     pub max_fields_in_struct: Option<usize>,
@@ -210,8 +209,6 @@ impl Default for VerifierConfig {
             max_value_stack_size: 1024,
             // Max number of pushes in one function
             max_push_size: None,
-            // Max depth in dependency tree for both direct and friend dependencies
-            max_dependency_depth: None,
             // Max count of structs in a module
             max_struct_definitions: None,
             // Max count of fields in a struct
@@ -266,7 +263,6 @@ impl VerifierConfig {
             max_value_stack_size: 1024,
             max_type_nodes: Some(256),
             max_push_size: Some(10000),
-            max_dependency_depth: Some(100),
             max_struct_definitions: Some(200),
             max_fields_in_struct: Some(30),
             max_struct_variants: Some(90),

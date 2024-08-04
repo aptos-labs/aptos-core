@@ -58,19 +58,18 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     environment::Environment,
+    module_and_script_storage::AsAptosCodeStorage,
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use bytes::Bytes;
+use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::{MoveResource, MoveStructType},
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    DummyCodeStorage,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -776,8 +775,12 @@ impl FakeExecutor {
         let vm = AptosVM::new(self.get_state_view());
 
         let resolver = self.data_store.as_move_resolver();
+        let module_and_script_storage = self.data_store.as_aptos_code_storage();
+
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
+            &module_and_script_storage,
+            &module_and_script_storage,
             &txn,
             &log_context,
             |gas_meter| {
@@ -857,7 +860,7 @@ impl FakeExecutor {
     pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
         self.block_time = time_microseconds;
 
-        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
+        let validator_set = ValidatorSet::fetch_config(&self.data_store)
             .expect("Unable to retrieve the validator set from storage");
         let proposer = *validator_set.payload().next().unwrap().account_address();
         // when updating time, proposer cannot be ZERO.
@@ -872,7 +875,7 @@ impl FakeExecutor {
     ) -> Vec<(TransactionStatus, u64)> {
         let mut txn_block: Vec<Transaction> =
             txns.into_iter().map(Transaction::UserTransaction).collect();
-        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
+        let validator_set = ValidatorSet::fetch_config(&self.data_store)
             .expect("Unable to retrieve the validator set from storage");
         let new_block_metadata = BlockMetadata::new(
             HashValue::zero(),
@@ -957,6 +960,7 @@ impl FakeExecutor {
         };
 
         let resolver = self.data_store.as_move_resolver();
+        let module_storage = self.data_store.as_aptos_code_storage();
 
         let (gas_params, storage_gas_params) = match gas_meter_type {
             GasMeterType::RegularGasMeter => (
@@ -985,7 +989,7 @@ impl FakeExecutor {
 
             // load function name into cache to ensure cache is hot
             let _ = session.load_function(
-                &DummyCodeStorage,
+                &module_storage,
                 module,
                 &Self::name(function_name),
                 &type_params.clone(),
@@ -1033,7 +1037,7 @@ impl FakeExecutor {
                     arg,
                     regular.as_mut().unwrap(),
                     &mut TraversalContext::new(&storage),
-                    &DummyCodeStorage,
+                    &module_storage,
                 ),
                 GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
                     module,
@@ -1042,7 +1046,7 @@ impl FakeExecutor {
                     arg,
                     unmetered.as_mut().unwrap(),
                     &mut TraversalContext::new(&storage),
-                    &DummyCodeStorage,
+                    &module_storage,
                 ),
             };
             let elapsed = start.elapsed();
@@ -1082,6 +1086,7 @@ impl FakeExecutor {
 
         let (write_set, _events) = {
             let resolver = self.data_store.as_move_resolver();
+            let module_storage = self.data_store.as_aptos_code_storage();
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_extended_options(
@@ -1117,20 +1122,23 @@ impl FakeExecutor {
                     shared_buffer: Arc::clone(&a1),
                 }),
                 &mut TraversalContext::new(&storage),
-                &DummyCodeStorage,
+                &module_storage,
             );
             if let Err(err) = result {
                 if !should_error {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
-            let (change_set, module_write_set) = session
-                .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                    LATEST_GAS_FEATURE_VERSION,
-                ))
+            let (change_set, empty_module_write_set) = session
+                .finish(
+                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                    &module_storage,
+                )
                 .expect("Failed to generate txn effects");
+            assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
+
             change_set
-                .try_combine_into_storage_change_set(module_write_set)
+                .try_combine_into_storage_change_set(empty_module_write_set)
                 .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
@@ -1144,15 +1152,17 @@ impl FakeExecutor {
             .to_vec()
     }
 
-    pub fn exec_module(
+    pub fn exec(
         &mut self,
-        module_id: &ModuleId,
+        module_name: &str,
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) {
+        let module_id = Self::module(module_name);
         let (write_set, events) = {
             let resolver = self.data_store.as_move_resolver();
+            let module_storage = self.data_store.as_aptos_code_storage();
 
             let vm = MoveVmExt::new(
                 LATEST_GAS_FEATURE_VERSION,
@@ -1164,45 +1174,38 @@ impl FakeExecutor {
             let storage = TraversalStorage::new();
             session
                 .execute_function_bypass_visibility(
-                    module_id,
+                    &module_id,
                     &Self::name(function_name),
                     type_params,
                     args,
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
                     &mut TraversalContext::new(&storage),
-                    &DummyCodeStorage,
+                    &module_storage,
                 )
                 .unwrap_or_else(|e| {
                     panic!(
                         "Error calling {}.{}: {}",
-                        module_id,
+                        &module_id,
                         function_name,
                         e.into_vm_status()
                     )
                 });
-            let (change_set, module_write_set) = session
-                .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                    LATEST_GAS_FEATURE_VERSION,
-                ))
+            let (change_set, empty_module_write_set) = session
+                .finish(
+                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                    &module_storage,
+                )
                 .expect("Failed to generate txn effects");
+            assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
+
             change_set
-                .try_combine_into_storage_change_set(module_write_set)
+                .try_combine_into_storage_change_set(empty_module_write_set)
                 .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
         self.data_store.add_write_set(&write_set);
         self.event_store.extend(events);
-    }
-
-    pub fn exec(
-        &mut self,
-        module_name: &str,
-        function_name: &str,
-        type_params: Vec<TypeTag>,
-        args: Vec<Vec<u8>>,
-    ) {
-        self.exec_module(&Self::module(module_name), function_name, type_params, args)
     }
 
     pub fn try_exec(
@@ -1213,6 +1216,8 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let resolver = self.data_store.as_move_resolver();
+        let module_storage = self.data_store.as_aptos_code_storage();
+
         let vm = MoveVmExt::new(
             LATEST_GAS_FEATURE_VERSION,
             Ok(&AptosGasParameters::initial()),
@@ -1220,7 +1225,7 @@ impl FakeExecutor {
             &resolver,
         );
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
@@ -1229,18 +1234,21 @@ impl FakeExecutor {
                 args,
                 // TODO(Gas): we probably want to switch to metered execution in the future
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&storage),
-                &DummyCodeStorage,
+                &mut TraversalContext::new(&traversal_storage),
+                &module_storage,
             )
             .map_err(|e| e.into_vm_status())?;
 
-        let (change_set, module_write_set) = session
-            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ))
+        let (change_set, empty_module_write_set) = session
+            .finish(
+                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                &module_storage,
+            )
             .expect("Failed to generate txn effects");
+        assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
+
         let (write_set, events) = change_set
-            .try_combine_into_storage_change_set(module_write_set)
+            .try_combine_into_storage_change_set(empty_module_write_set)
             .expect("Failed to convert to storage ChangeSet")
             .into_inner();
         Ok((write_set, events))

@@ -4,21 +4,28 @@
 
 use crate::compiler::{as_module, as_script, compile_units};
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, Module, ModuleStorage, TestModuleStorage,
+    TestScriptStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
     gas::UnmeteredGasMeter,
     resolver::{ModuleResolver, ResourceResolver},
 };
+use std::sync::Arc;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -76,26 +83,31 @@ fn test_malformed_resource() {
     let m = as_module(units.pop().unwrap());
     let ms = as_module(units.pop().unwrap());
 
-    let mut storage = InMemoryStorage::new();
-
-    // Publish module Signer and module M.
-    let mut blob = vec![];
-    ms.serialize(&mut blob).unwrap();
-    storage.publish_or_overwrite_module(ms.self_id(), blob);
-
-    let mut blob = vec![];
-    m.serialize(&mut blob).unwrap();
-    storage.publish_or_overwrite_module(m.self_id(), blob);
+    let mut ms_blob = vec![];
+    ms.serialize(&mut ms_blob).unwrap();
+    let mut m_blob = vec![];
+    m.serialize(&mut m_blob).unwrap();
 
     let vm = MoveVM::new(move_stdlib::natives::all_natives(
         AccountAddress::from_hex_literal("0x1").unwrap(),
         move_stdlib::natives::GasParameters::zeros(),
     ));
+    let deserializer_config = &vm.vm_config().deserializer_config;
+
+    let mut resource_storage = InMemoryStorage::new();
+    resource_storage.publish_or_overwrite_module(ms.self_id(), ms_blob.clone());
+    resource_storage.publish_or_overwrite_module(m.self_id(), m_blob.clone());
+
+    let module_storage = TestModuleStorage::empty(deserializer_config);
+    module_storage.add_module_bytes(ms.self_addr(), ms.self_name(), ms_blob.into());
+    module_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.into());
+
+    let script_storage = TestScriptStorage::empty(deserializer_config);
 
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
     s1.serialize(&mut script_blob).unwrap();
-    let mut sess = vm.new_session(&storage);
+    let mut sess = vm.new_session(&resource_storage);
     let traversal_storage = TraversalStorage::new();
     sess.execute_script(
         script_blob,
@@ -103,36 +115,36 @@ fn test_malformed_resource() {
         vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &DummyCodeStorage,
-        &DummyCodeStorage,
+        &module_storage,
+        &script_storage,
     )
     .map(|_| ())
     .unwrap();
     let changeset = sess.finish().unwrap();
-    storage.apply(changeset).unwrap();
+    resource_storage.apply(changeset).unwrap();
 
     // Execute the second script and make sure it succeeds. This script simply checks
-    // that the published resource is what we expect it to be. This inital run is to ensure
+    // that the published resource is what we expect it to be. This initial run is to ensure
     // the testing environment is indeed free of errors without external interference.
     let mut script_blob = vec![];
     s2.serialize(&mut script_blob).unwrap();
     {
-        let mut sess = vm.new_session(&storage);
+        let mut sess = vm.new_session(&resource_storage);
         sess.execute_script(
             script_blob.clone(),
             vec![],
             vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
-            &DummyCodeStorage,
+            &module_storage,
+            &script_storage,
         )
         .map(|_| ())
         .unwrap();
     }
 
     // Corrupt the resource in the storage.
-    storage.publish_or_overwrite_resource(
+    resource_storage.publish_or_overwrite_resource(
         TEST_ADDR,
         StructTag {
             address: TEST_ADDR,
@@ -146,7 +158,7 @@ fn test_malformed_resource() {
     // Run the second script again.
     // The test will be successful if it fails with an invariant violation.
     {
-        let mut sess = vm.new_session(&storage);
+        let mut sess = vm.new_session(&resource_storage);
         let err = sess
             .execute_script(
                 script_blob,
@@ -154,8 +166,8 @@ fn test_malformed_resource() {
                 vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
-                &DummyCodeStorage,
+                &module_storage,
+                &script_storage,
             )
             .map(|_| ())
             .unwrap_err();
@@ -176,28 +188,31 @@ fn test_malformed_module() {
     let mut units = compile_units(&code).unwrap();
 
     let m = as_module(units.pop().unwrap());
-
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();
 
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
 
     // Publish M and call M::foo. No errors should be thrown.
     {
-        let mut storage = InMemoryStorage::new();
-        storage.publish_or_overwrite_module(m.self_id(), blob.clone());
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
+
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
+
+        let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
-            &module_id,
+            &m.self_id(),
             &fun_name,
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap();
     }
@@ -213,21 +228,30 @@ fn test_malformed_module() {
         blob[1] = 0xAD;
         blob[2] = 0xBE;
         blob[3] = 0xEF;
-        let mut storage = InMemoryStorage::new();
-        storage.publish_or_overwrite_module(m.self_id(), blob);
+
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
+
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
+
+        let mut sess = vm.new_session(&resource_storage);
         let err = sess
             .execute_function_bypass_visibility(
-                &module_id,
+                &m.self_id(),
                 &fun_name,
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &module_storage,
             )
             .unwrap_err();
+
+        // TODO(loader_v2): Loader V2 fails with Deserialization/Verification because we do not use
+        //                  expect_no_verification_errors which remaps those into invariant violations.
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -245,29 +269,31 @@ fn test_unverifiable_module() {
     let mut units = compile_units(&code).unwrap();
     let m = as_module(units.pop().unwrap());
 
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
 
     // Publish M and call M::foo to make sure it works.
     {
-        let mut storage = InMemoryStorage::new();
-
         let mut blob = vec![];
         m.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(m.self_id(), blob);
 
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
 
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+
+        let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
-            &module_id,
+            &m.self_id(),
             &fun_name,
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap();
     }
@@ -275,26 +301,30 @@ fn test_unverifiable_module() {
     // Erase the body of M::foo to make it fail verification.
     // Publish this modified version of M and the VM should fail to load it.
     {
-        let mut storage = InMemoryStorage::new();
-
         let mut m = m;
         m.function_defs[0].code.as_mut().unwrap().code = vec![];
         let mut blob = vec![];
         m.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(m.self_id(), blob);
 
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
+
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+
+        let mut sess = vm.new_session(&resource_storage);
 
         let err = sess
             .execute_function_bypass_visibility(
-                &module_id,
+                &m.self_id(),
                 &fun_name,
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &module_storage,
             )
             .unwrap_err();
 
@@ -326,28 +356,30 @@ fn test_missing_module_dependency() {
     let mut blob_n = vec![];
     n.serialize(&mut blob_n).unwrap();
 
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("N").unwrap());
     let fun_name = Identifier::new("bar").unwrap();
     let traversal_storage = TraversalStorage::new();
 
     // Publish M and N and call N::bar. Everything should work.
     {
-        let mut storage = InMemoryStorage::new();
-
-        storage.publish_or_overwrite_module(m.self_id(), blob_m);
-        storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
-
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
 
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
+        resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
+        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+
+        let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
-            &module_id,
+            &n.self_id(),
             &fun_name,
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap();
     }
@@ -355,21 +387,24 @@ fn test_missing_module_dependency() {
     // Publish only N and try to call N::bar. The VM should fail to find M and raise
     // an invariant violation.
     {
-        let mut storage = InMemoryStorage::new();
-        storage.publish_or_overwrite_module(n.self_id(), blob_n);
-
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
 
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+
+        let mut sess = vm.new_session(&resource_storage);
         let err = sess
             .execute_function_bypass_visibility(
-                &module_id,
+                &n.self_id(),
                 &fun_name,
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &module_storage,
             )
             .unwrap_err();
 
@@ -401,28 +436,30 @@ fn test_malformed_module_dependency() {
     let mut blob_n = vec![];
     n.serialize(&mut blob_n).unwrap();
 
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("N").unwrap());
     let fun_name = Identifier::new("bar").unwrap();
     let traversal_storage = TraversalStorage::new();
 
     // Publish M and N and call N::bar. Everything should work.
     {
-        let mut storage = InMemoryStorage::new();
-
-        storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
-        storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
-
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
 
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
+        resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.clone().into());
+        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+
+        let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
-            &module_id,
+            &n.self_id(),
             &fun_name,
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap();
     }
@@ -434,26 +471,31 @@ fn test_malformed_module_dependency() {
         blob_m[2] = 0xBE;
         blob_m[3] = 0xEF;
 
-        let mut storage = InMemoryStorage::new();
-
-        storage.publish_or_overwrite_module(m.self_id(), blob_m);
-        storage.publish_or_overwrite_module(n.self_id(), blob_n);
-
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
 
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
+        resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
+        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+
+        let mut sess = vm.new_session(&resource_storage);
         let err = sess
             .execute_function_bypass_visibility(
-                &module_id,
+                &n.self_id(),
                 &fun_name,
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &module_storage,
             )
             .unwrap_err();
 
+        // TODO(loader_v2): Loader V2 fails with Deserialization/Verification because we do not use
+        //                  expect_no_verification_errors which remaps those into invariant violations.
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -480,7 +522,6 @@ fn test_unverifiable_module_dependency() {
     let mut blob_n = vec![];
     n.serialize(&mut blob_n).unwrap();
 
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("N").unwrap());
     let fun_name = Identifier::new("bar").unwrap();
     let traversal_storage = TraversalStorage::new();
 
@@ -489,22 +530,25 @@ fn test_unverifiable_module_dependency() {
         let mut blob_m = vec![];
         m.serialize(&mut blob_m).unwrap();
 
-        let mut storage = InMemoryStorage::new();
-
-        storage.publish_or_overwrite_module(m.self_id(), blob_m);
-        storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
-
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
 
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
+        resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
+        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+
+        let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
-            &module_id,
+            &n.self_id(),
             &fun_name,
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap();
     }
@@ -516,26 +560,31 @@ fn test_unverifiable_module_dependency() {
         let mut blob_m = vec![];
         m.serialize(&mut blob_m).unwrap();
 
-        let mut storage = InMemoryStorage::new();
-
-        storage.publish_or_overwrite_module(m.self_id(), blob_m);
-        storage.publish_or_overwrite_module(n.self_id(), blob_n);
-
         let vm = MoveVM::new(vec![]);
-        let mut sess = vm.new_session(&storage);
 
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
+        resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
+        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+
+        let mut sess = vm.new_session(&resource_storage);
         let err = sess
             .execute_function_bypass_visibility(
-                &module_id,
+                &n.self_id(),
                 &fun_name,
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &module_storage,
             )
             .unwrap_err();
 
+        // TODO(loader_v2): Loader V2 fails with Deserialization/Verification because we do not use
+        //                  expect_no_verification_errors which remaps those into invariant violations.
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -550,6 +599,49 @@ impl ModuleResolver for BogusModuleStorage {
     }
 
     fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+}
+
+impl ModuleStorage for BogusModuleStorage {
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
+    fn fetch_deserialized_module(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Arc<CompiledModule>> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
+    fn fetch_or_create_verified_module(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+        _f: &dyn Fn(Arc<CompiledModule>) -> PartialVMResult<Module>,
+    ) -> PartialVMResult<Arc<Module>> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }
@@ -625,7 +717,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &storage,
             )
             .unwrap_err();
 
@@ -674,20 +766,25 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
     let traversal_storage = TraversalStorage::new();
 
     for error_code in LIST_OF_ERROR_CODES {
-        let mut module_storage = InMemoryStorage::new();
-        module_storage.publish_or_overwrite_module(m.self_id(), m_blob.clone());
-        module_storage.publish_or_overwrite_module(s.self_id(), s_blob.clone());
-        let storage = BogusResourceStorage {
-            module_storage,
-            bad_status_code: *error_code,
-        };
-
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
         ));
-        let mut sess = vm.new_session(&storage);
 
+        let mut resource_storage = InMemoryStorage::new();
+        resource_storage.publish_or_overwrite_module(m.self_id(), m_blob.clone());
+        resource_storage.publish_or_overwrite_module(s.self_id(), s_blob.clone());
+
+        let module_storage = TestModuleStorage::empty_for_vm(&vm);
+        module_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.clone().into());
+        module_storage.add_module_bytes(s.self_addr(), s.self_name(), s_blob.clone().into());
+
+        let storage = BogusResourceStorage {
+            module_storage: resource_storage,
+            bad_status_code: *error_code,
+        };
+
+        let mut sess = vm.new_session(&storage);
         sess.execute_function_bypass_visibility(
             &m_id,
             &foo_name,
@@ -695,7 +792,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap();
 
@@ -707,7 +804,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
                 serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &module_storage,
             )
             .unwrap_err();
 

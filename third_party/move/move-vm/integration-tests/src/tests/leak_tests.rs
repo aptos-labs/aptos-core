@@ -4,7 +4,7 @@
 use move_binary_format::file_format::{
     Bytecode::*, CodeUnit, CompiledScript, Signature, SignatureIndex, SignatureToken::*,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage, TestScriptStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -44,16 +44,20 @@ fn leak_with_abort() {
         type_parameters: vec![],
         parameters: SignatureIndex(0),
     };
-
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
-    let vm = MoveVM::new(vec![]);
-
-    let storage: InMemoryStorage = InMemoryStorage::new();
-    let mut session = vm.new_session(&storage);
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
+
+    let vm = MoveVM::new(vec![]);
+
+    let deserializer_config = &vm.vm_config().deserializer_config;
+    let module_storage = TestModuleStorage::empty(deserializer_config);
+    let script_storage = TestScriptStorage::empty(deserializer_config);
+    let resource_storage = InMemoryStorage::new();
+
     let traversal_storage = TraversalStorage::new();
 
+    let mut session = vm.new_session(&resource_storage);
     for _ in 0..100_000 {
         let _ = session.execute_script(
             script_bytes.as_slice(),
@@ -61,8 +65,8 @@ fn leak_with_abort() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
-            &DummyCodeStorage,
+            &module_storage,
+            &script_storage,
         );
     }
 

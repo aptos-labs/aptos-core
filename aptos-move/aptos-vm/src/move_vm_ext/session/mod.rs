@@ -21,14 +21,17 @@ use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
     state_store::state_key::StateKey,
-    transaction::user_transaction_context::UserTransactionContext,
+    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
-    storage::change_set_configs::ChangeSetConfigs,
+    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWriteSet, storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
     language_storage::StructTag,
@@ -64,6 +67,7 @@ pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
     resolver: &'r dyn AptosMoveResolver,
     is_storage_slot_metadata_enabled: bool,
+    use_loader_v2: bool,
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
@@ -108,14 +112,29 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         move_vm.flush_loader_cache_if_invalidated();
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
+        let use_loader_v2 = features.use_loader_v2();
         Self {
             inner: move_vm.new_session_with_extensions(resolver, extensions),
             resolver,
             is_storage_slot_metadata_enabled,
+            use_loader_v2,
         }
     }
 
-    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
+    pub fn convert_modules_into_write_ops<'a>(
+        &self,
+        module_storage: &impl AptosModuleStorage,
+        code_and_modules: impl IntoIterator<Item = (Bytes, &'a CompiledModule)>,
+    ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
+        let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
+        woc.convert_modules_into_write_ops(module_storage, code_and_modules)
+    }
+
+    pub fn finish(
+        self,
+        configs: &ChangeSetConfigs,
+        module_storage: &impl AptosModuleStorage,
+    ) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
         let move_vm = self.inner.get_move_vm();
 
         let resource_converter = |value: Value,
@@ -145,9 +164,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .inner
             .finish_with_extensions_with_custom_effects(&resource_converter)?;
 
-        let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(move_vm, self.resolver, change_set)
-                .map_err(|e| e.finish(Location::Undefined))?;
+        let (change_set, resource_group_change_set) = Self::split_and_merge_resource_groups(
+            move_vm,
+            self.resolver,
+            module_storage,
+            self.use_loader_v2,
+            change_set,
+        )
+        .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -167,6 +191,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let (change_set, module_write_set) = Self::convert_change_set(
             &woc,
             change_set,
+            self.use_loader_v2,
             resource_group_change_set,
             events,
             table_change_set,
@@ -257,8 +282,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
-        runtime: &MoveVM,
+        vm: &MoveVM,
         resolver: &dyn AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        use_loader_v2: bool,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -288,12 +315,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                // TODO(George): Use ModuleStorage to resolve module metadata directly.
-                #[allow(deprecated)]
-                let resource_group_tag = runtime
-                    .with_module_metadata(&struct_tag.module_id(), |md| {
+                let resource_group_tag = if use_loader_v2 {
+                    module_storage
+                        .fetch_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .ok()
+                        .and_then(|md| get_resource_group_member_from_metadata(&struct_tag, &md))
+                } else {
+                    #[allow(deprecated)]
+                    vm.with_module_metadata(&struct_tag.module_id(), |md| {
                         get_resource_group_member_from_metadata(&struct_tag, md)
-                    });
+                    })
+                };
 
                 if let Some(resource_group_tag) = resource_group_tag {
                     if resource_groups
@@ -356,6 +388,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn convert_change_set(
         woc: &WriteOpConverter,
         change_set: ChangeSet,
+        use_loader_v2: bool,
         resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         table_change_set: TableChangeSet,
@@ -457,6 +490,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             group_reads_needing_change,
             events,
         )?;
+
+        // Modules must not be published through the V1 flow if we are using V2.
+        if use_loader_v2 && !module_write_ops.is_empty() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Non-empty V1 module write set in V2 flow".to_string()),
+            );
+        }
         let module_write_set =
             ModuleWriteSet::new(has_modules_published_to_special_address, module_write_ops);
 

@@ -14,7 +14,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, DummyCodeStorage,
+    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, TestModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -94,12 +94,12 @@ fn run(
 ) -> VMResult<(ChangeSet, SerializedReturnValues)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
-    let (vm, storage) = setup_vm(&modules);
-    let mut session = vm.new_session(&storage);
+    let (vm, resource_storage, module_storage) = setup_vm(&modules);
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
 
+    let mut session = vm.new_session(&resource_storage);
     session
         .execute_function_bypass_visibility(
             module_id,
@@ -108,7 +108,7 @@ fn run(
             serialize_values(&vec![arg_val0]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .and_then(|ret_values| {
             let change_set = session.finish()?;
@@ -119,24 +119,23 @@ fn run(
 type ModuleCode = (ModuleId, String);
 
 // TODO - move some utility functions to where test infra lives, see about unifying with similar code
-fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage) {
-    let mut storage = InMemoryStorage::new();
-    compile_modules(&mut storage, modules);
-    (MoveVM::new(vec![]), storage)
-}
+fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage, TestModuleStorage) {
+    let vm = MoveVM::new(vec![]);
 
-fn compile_modules(storage: &mut InMemoryStorage, modules: &[ModuleCode]) {
-    modules.iter().for_each(|(id, code)| {
-        compile_module(storage, id, code);
-    });
-}
+    let mut resource_storage = InMemoryStorage::new();
+    let module_storage = TestModuleStorage::empty_for_vm(&vm);
 
-fn compile_module(storage: &mut InMemoryStorage, mod_id: &ModuleId, code: &str) {
-    let mut units = compile_units(code).unwrap();
-    let module = as_module(units.pop().unwrap());
-    let mut blob = vec![];
-    module.serialize(&mut blob).unwrap();
-    storage.publish_or_overwrite_module(mod_id.clone(), blob);
+    for (id, code) in modules.iter() {
+        let mut units = compile_units(code).unwrap();
+        let module = as_module(units.pop().unwrap());
+        let mut blob = vec![];
+        module.serialize(&mut blob).unwrap();
+
+        resource_storage.publish_or_overwrite_module(id.clone(), blob.clone());
+        module_storage.add_module_bytes(id.address(), id.name(), blob.into());
+    }
+
+    (vm, resource_storage, module_storage)
 }
 
 fn parse_u64_arg(arg: &[u8]) -> u64 {

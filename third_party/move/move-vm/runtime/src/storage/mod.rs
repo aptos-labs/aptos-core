@@ -11,5 +11,8 @@ pub mod module_storage;
 pub mod script_storage;
 pub mod verifier;
 
-// TODO(George): Remove when we no longer need the dummy implementation.
+// TODO(loader_v2): Remove when we no longer need the dummy implementation.
 pub mod dummy;
+mod test_utils;
+#[cfg(any(test, feature = "testing"))]
+pub use test_utils::{TestModuleStorage, TestScriptStorage};

@@ -6,10 +6,9 @@ use crate::compiler::{as_module, compile_units};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::ModuleId,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -39,12 +38,15 @@ fn mutated_accounts() {
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();
 
-    let mut storage = InMemoryStorage::new();
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
-    storage.publish_or_overwrite_module(module_id.clone(), blob);
-
     let vm = MoveVM::new(vec![]);
-    let mut sess = vm.new_session(&storage);
+
+    let mut resource_storage = InMemoryStorage::new();
+    resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
+
+    let module_storage = TestModuleStorage::empty_for_vm(&vm);
+    module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+
+    let mut sess = vm.new_session(&resource_storage);
 
     let publish = Identifier::new("publish").unwrap();
     let flip = Identifier::new("flip").unwrap();
@@ -54,13 +56,13 @@ fn mutated_accounts() {
     let traversal_storage = TraversalStorage::new();
 
     sess.execute_function_bypass_visibility(
-        &module_id,
+        &m.self_id(),
         &publish,
         vec![],
         serialize_values(&vec![MoveValue::Signer(account1)]),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &DummyCodeStorage,
+        &module_storage,
     )
     .unwrap();
 
@@ -70,42 +72,42 @@ fn mutated_accounts() {
     assert_eq!(sess.num_mutated_resources(&TEST_ADDR), 2);
 
     sess.execute_function_bypass_visibility(
-        &module_id,
+        &m.self_id(),
         &get,
         vec![],
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &DummyCodeStorage,
+        &module_storage,
     )
     .unwrap();
 
     assert_eq!(sess.num_mutated_resources(&TEST_ADDR), 2);
 
     sess.execute_function_bypass_visibility(
-        &module_id,
+        &m.self_id(),
         &flip,
         vec![],
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &DummyCodeStorage,
+        &module_storage,
     )
     .unwrap();
     assert_eq!(sess.num_mutated_resources(&TEST_ADDR), 2);
 
     let changes = sess.finish().unwrap();
-    storage.apply(changes).unwrap();
+    resource_storage.apply(changes).unwrap();
 
-    let mut sess = vm.new_session(&storage);
+    let mut sess = vm.new_session(&resource_storage);
     sess.execute_function_bypass_visibility(
-        &module_id,
+        &m.self_id(),
         &get,
         vec![],
         serialize_values(&vec![MoveValue::Address(account1)]),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &DummyCodeStorage,
+        &module_storage,
     )
     .unwrap();
 
