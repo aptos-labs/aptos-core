@@ -147,7 +147,7 @@ impl RemoteStateViewClient {
         let mut seq_num = 0;
 
         state_keys
-            .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
+            .chunks(8 * REMOTE_STATE_KEY_BATCH_SIZE)// each tx needs 8 state view queries in the case of non-conflicting txs
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
