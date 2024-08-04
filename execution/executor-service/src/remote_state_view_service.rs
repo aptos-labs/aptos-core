@@ -22,6 +22,7 @@ use rand::{Rng, SeedableRng};
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
+use aptos_types::state_store::state_value::StateValue;
 
 struct MessageWithPriority {
     msg: Message,
@@ -228,13 +229,19 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let resp = state_keys
             .into_iter()
             .map(|state_key| {
-                let state_value = state_view
-                    .read()
-                    .unwrap()
-                    .as_ref()
-                    .unwrap()
-                    .get_state_value(&state_key)
-                    .unwrap();
+                let state_value = if let Some(state_view_some) = state_view.read().unwrap().as_ref() {
+                    state_view_some.get_state_value(&state_key).unwrap()
+                }
+                else {
+                    None
+                };
+                // let state_value = state_view
+                //     .read()
+                //     .unwrap()
+                //     .as_ref()
+                //     .unwrap()
+                //     .get_state_value(&state_key)
+                //     .unwrap();
                 (state_key, state_value)
             })
             .collect_vec();
