@@ -109,7 +109,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         mut controller: NetworkController,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = num_threads.unwrap_or_else(num_cpus::get) / 2;
         let thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .num_threads(num_threads)
@@ -153,7 +153,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let cmd_tx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("rmt-exe-cli-cmd-tx-{}", index))
-                .num_threads(num_cpus::get() / 2)
+                .num_threads(num_cpus::get() / 4)
                 .build()
                 .unwrap(),
         );
