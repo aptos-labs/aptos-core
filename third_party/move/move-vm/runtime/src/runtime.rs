@@ -11,7 +11,10 @@ use crate::{
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
     session::SerializedReturnValues,
-    storage::{module_storage::ModuleStorage as ModuleStorageV2, script_storage::ScriptStorage},
+    storage::{
+        dummy::should_use_loader_v2, module_storage::ModuleStorage as ModuleStorageV2,
+        script_storage::ScriptStorage,
+    },
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -53,14 +56,108 @@ impl VMRuntime {
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
     ) -> Self {
+        let natives = NativeFunctions::new(natives)
+            .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
+
+        // TODO(loader_v2): Connect V2 creation to feature flag properly, for now use this to
+        //                  run end-to-end tests with adapter and raw MoveVM.
+        let loader = if should_use_loader_v2() {
+            Loader::v2(natives, vm_config)
+        } else {
+            Loader::v1(natives, vm_config)
+        };
+
         VMRuntime {
-            loader: Loader::new(
-                NativeFunctions::new(natives)
-                    .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e)),
-                vm_config,
-            ),
+            loader,
+            // Note(loader_v2): We still create this cache, but if V2 loader is used, it is not used.
             module_cache: Arc::new(ModuleCache::new()),
         }
+    }
+
+    pub(crate) fn verify_module_bundle_before_publishing(
+        &self,
+        compiled_modules: &[CompiledModule],
+        sender: &AccountAddress,
+        data_store: &mut TransactionDataCache,
+        module_store: &ModuleStorageAdapter,
+        compat: Compatibility,
+        module_storage: &impl ModuleStorageV2,
+    ) -> VMResult<()> {
+        // Make sure all modules' self addresses matches the transaction sender. The self address is
+        // where the module will actually be published. If we did not check this, the sender could
+        // publish a module under anyone's account.
+        for module in compiled_modules {
+            if module.address() != sender {
+                return Err(verification_error(
+                    StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
+                    IndexKind::AddressIdentifier,
+                    module.self_handle_idx().0,
+                )
+                .finish(Location::Undefined));
+            }
+        }
+
+        // Collect ids for modules that are published together
+        let mut bundle_unverified = BTreeSet::new();
+
+        // For now, we assume that all modules can be republished, as long as the new module is
+        // backward compatible with the old module.
+        //
+        // TODO: in the future, we may want to add restrictions on module republishing, possibly by
+        // changing the bytecode format to include an `is_upgradable` flag in the CompiledModule.
+        for module in compiled_modules {
+            let module_id = module.self_id();
+
+            let module_exists = match self.loader() {
+                Loader::V1(_) =>
+                {
+                    #[allow(deprecated)]
+                    data_store.exists_module(&module_id)?
+                },
+                Loader::V2(_) => module_storage
+                    .check_module_exists(module.self_addr(), module.self_name())
+                    .map_err(|e| e.finish(Location::Undefined))?,
+            };
+
+            if module_exists && compat.need_check_compat() {
+                let old_module_ref = self.loader.load_module(
+                    &module_id,
+                    data_store,
+                    module_store,
+                    module_storage,
+                )?;
+                let old_module = old_module_ref.module();
+                if self.loader.vm_config().use_compatibility_checker_v2 {
+                    compat
+                        .check(old_module, module)
+                        .map_err(|e| e.finish(Location::Undefined))?
+                } else {
+                    #[allow(deprecated)]
+                    let old_m = normalized::Module::new(old_module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    #[allow(deprecated)]
+                    let new_m = normalized::Module::new(module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    compat
+                        .legacy_check(&old_m, &new_m)
+                        .map_err(|e| e.finish(Location::Undefined))?
+                }
+            }
+            if !bundle_unverified.insert(module_id) {
+                return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)
+                    .finish(Location::Undefined));
+            }
+        }
+
+        // Perform bytecode and loading verification. Modules must be sorted in topological order.
+        self.loader.verify_module_bundle_for_publication(
+            compiled_modules,
+            data_store,
+            module_store,
+            module_storage,
+        )?;
+
+        Ok(())
     }
 
     pub(crate) fn publish_module_bundle(
@@ -96,66 +193,12 @@ impl VMRuntime {
             },
         };
 
-        // Make sure all modules' self addresses matches the transaction sender. The self address is
-        // where the module will actually be published. If we did not check this, the sender could
-        // publish a module under anyone's account.
-        for module in &compiled_modules {
-            if module.address() != &sender {
-                return Err(verification_error(
-                    StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
-                    IndexKind::AddressIdentifier,
-                    module.self_handle_idx().0,
-                )
-                .finish(Location::Undefined));
-            }
-        }
-
-        // Collect ids for modules that are published together
-        let mut bundle_unverified = BTreeSet::new();
-
-        // For now, we assume that all modules can be republished, as long as the new module is
-        // backward compatible with the old module.
-        //
-        // TODO: in the future, we may want to add restrictions on module republishing, possibly by
-        // changing the bytecode format to include an `is_upgradable` flag in the CompiledModule.
-        for module in &compiled_modules {
-            let module_id = module.self_id();
-
-            if data_store.exists_module(&module_id)? && compat.need_check_compat() {
-                let old_module_ref = self.loader.load_module(
-                    &module_id,
-                    data_store,
-                    module_store,
-                    module_storage,
-                )?;
-                let old_module = old_module_ref.module();
-                if self.loader.vm_config().use_compatibility_checker_v2 {
-                    compat
-                        .check(old_module, module)
-                        .map_err(|e| e.finish(Location::Undefined))?
-                } else {
-                    #[allow(deprecated)]
-                    let old_m = normalized::Module::new(old_module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                    #[allow(deprecated)]
-                    let new_m = normalized::Module::new(module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                    compat
-                        .legacy_check(&old_m, &new_m)
-                        .map_err(|e| e.finish(Location::Undefined))?
-                }
-            }
-            if !bundle_unverified.insert(module_id) {
-                return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)
-                    .finish(Location::Undefined));
-            }
-        }
-
-        // Perform bytecode and loading verification. Modules must be sorted in topological order.
-        self.loader.verify_module_bundle_for_publication(
+        self.verify_module_bundle_before_publishing(
             &compiled_modules,
+            &sender,
             data_store,
             module_store,
+            compat,
             module_storage,
         )?;
 
@@ -212,8 +255,20 @@ impl VMRuntime {
         // all the checks, then the whole bundle can be published/upgraded together. Otherwise,
         // none of the module can be published/updated.
 
-        // All modules verified, publish them to data cache
+        // Sanity check: we should only be calling the verification API with V2 loader design.
+        if let Loader::V2(_) = self.loader() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(
+                        "Can never publish modules via V2 workflow to data cache".to_string(),
+                    )
+                    .finish(Location::Undefined),
+            );
+        }
+
+        // All modules verified, publish them to data cache.
         for (module, blob) in compiled_modules.into_iter().zip(modules.into_iter()) {
+            #[allow(deprecated)]
             let is_republishing = data_store.exists_module(&module.self_id())?;
             if is_republishing {
                 // This is an upgrade, so invalidate the loader cache, which still contains the
