@@ -184,7 +184,7 @@ impl RemoteCoordinatorClient {
                         let state_keys = Self::extract_state_keys_from_txns(&transactions);
 
                         // cmd batches priorities are in the shard_id variable
-                        state_view_client_clone.pre_fetch_state_values(state_keys, false);
+                        state_view_client_clone.pre_fetch_state_values(state_keys, false, message.seq_num.unwrap());
 
                         let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
                             blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
@@ -221,7 +221,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                             .start_timer();
                         let state_keys = Self::extract_state_keys(&command);
                         self.state_view_client.init_for_block();
-                        self.state_view_client.pre_fetch_state_values(state_keys, false);
+                        self.state_view_client.pre_fetch_state_values(state_keys, false, 0);
                         drop(init_prefetch_timer);
 
                         let (sub_blocks, concurrency, onchain_config) = command.into();
@@ -261,7 +261,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
 
                 self.state_view_client.init_for_block();
                 let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
-                self.state_view_client.pre_fetch_state_values(state_keys, false);
+                self.state_view_client.pre_fetch_state_values(state_keys, false, message.shard_id.unwrap());
                 let num_txns = txns.num_txns;
                 let num_txns_in_the_batch = txns.cmds.len();
                 let shard_txns_start_index = txns.shard_txns_start_index;

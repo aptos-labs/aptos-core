@@ -4,6 +4,9 @@ use crate::{RemoteKVRequest, RemoteKVResponse};
 use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use std::{net::SocketAddr, sync::{Arc, RwLock}, thread};
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+use std::fmt::Binary;
 use std::ops::DerefMut;
 use std::time::SystemTime;
 
@@ -20,9 +23,35 @@ use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
+struct MessageWithPriority {
+    msg: Message,
+    priority: u64,
+}
+impl PartialEq for MessageWithPriority {
+    fn eq(&self, other: &Self) -> bool {
+        self.priority == other.priority
+    }
+}
+impl Eq for MessageWithPriority {}
+// The priority queue depends on `Ord`. Here, we implement the trait so the queue becomes a min-heap
+// instead of a max-heap.
+impl Ord for MessageWithPriority {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.priority.cmp(&self.priority)
+            .then_with(|| self.priority.cmp(&other.priority))
+    }
+}
+
+// `PartialOrd` needs to be implemented as well.
+impl PartialOrd for MessageWithPriority {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_rx: Receiver<Message>,
-    kv_unprocessed_pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
+    kv_unprocessed_pq: Arc<Mutex<BinaryHeap<MessageWithPriority>>>,
     kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
     //thread_pool: Arc<Vec<rayon::ThreadPool>>,
     thread_pool: Arc<rayon::ThreadPool>,
@@ -71,7 +100,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .collect_vec();
         Self {
             kv_rx: result_rx,
-            kv_unprocessed_pq: Arc::new(ConcurrentPriorityQueue::new()),
+            kv_unprocessed_pq: Arc::new(Mutex::new(BinaryHeap::new())),
             kv_tx: Arc::new(command_txs),
             thread_pool: Arc::new(thread_pool),
             state_view: Arc::new(RwLock::new(None)),
@@ -124,32 +153,34 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             {
                 let (lock, cvar) = &*self.recv_condition;
                 let _lg = lock.lock().unwrap();
-                self.kv_unprocessed_pq.push(message, priority);
-                self.recv_condition.1.notify_all();
+                self.kv_unprocessed_pq.lock().unwrap().push(MessageWithPriority{msg: message, priority});
+                self.recv_condition.1.notify_one();
+                REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&["0", "kv_req_pq_size"])
+                    .observe(self.kv_unprocessed_pq.lock().unwrap().len() as f64);
             }
-            REMOTE_EXECUTOR_TIMER
-                .with_label_values(&["0", "kv_req_pq_size"])
-                .observe(self.kv_unprocessed_pq.len() as f64);
+
         }
     }
 
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
                             kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
-                            pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
+                            pq: Arc<Mutex<BinaryHeap<MessageWithPriority>>>,
                             recv_condition: Arc<(Mutex<bool>, Condvar)>) {
         let mut rng = StdRng::from_entropy();
         loop {
             let (lock, cvar) = &*recv_condition;
             let mut lg = lock.lock().unwrap();
-            if pq.is_empty() {
+            if pq.lock().unwrap().is_empty() {
                 lg = cvar.wait(lg).unwrap();
             }
+            let message = pq.lock().unwrap().pop();
             drop(lg);
-            if let Some(message) = pq.pop() {
+            if let Some(message) = message {
                 let state_view = state_view.clone();
                 let kv_txs = kv_tx.clone();
 
-                Self::handle_message(message, state_view, kv_txs, &mut rng);
+                Self::handle_message(message.msg, state_view, kv_txs, &mut rng);
             }
         }
     }
