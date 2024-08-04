@@ -265,6 +265,10 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
 
     }
 
+    fn reset_state_view(&self) {
+        panic!("Not implemented for LocalCoordinatorClient");
+    }
+
     fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
         self.result_tx.send(result).unwrap()
     }

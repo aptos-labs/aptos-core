@@ -152,8 +152,8 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
                     REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                         .with_label_values(&["4_cmd_tx_msg_grpc_recv"]).observe(delta as f64);
                 } else if message_type.get_type().starts_with("execute_result_") {
-                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["9_results_tx_msg_grpc_recv"]).observe(delta as f64);
+                    // REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                    //     .with_label_values(&["9_results_tx_msg_grpc_recv"]).observe(delta as f64);
                 }
             }
             // Send the message to the registered handler

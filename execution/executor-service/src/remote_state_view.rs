@@ -48,10 +48,12 @@ impl RemoteStateView {
     }
 
     pub fn set_state_value(&self, state_key: &StateKey, state_value: Option<StateValue>) {
-        self.state_values
-            .get(state_key)
-            .unwrap()
-            .set_value(state_value);
+        // Since resetting state_values is independent of the remote responses, we need to check
+        // if the state_key still exists; if it doesn't it means that the BlockSTM has already moved
+        // past this key
+        if let Some(value) = self.state_values.get(state_key) {
+            value.set_value(state_value);
+        }
     }
 
     pub fn insert_state_key(&self, state_key: StateKey) {
