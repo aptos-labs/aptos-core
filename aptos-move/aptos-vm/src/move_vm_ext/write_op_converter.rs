@@ -9,13 +9,18 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::{
-    abstract_write_op::GroupWrite, resolver::ResourceGroupSize,
-    resource_group_adapter::group_tagged_resource_size,
+    abstract_write_op::GroupWrite, module_and_script_storage::module_storage::AptosModuleStorage,
+    resolver::ResourceGroupSize, resource_group_adapter::group_tagged_resource_size,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{
-    effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
+    effects::{Op as MoveStorageOp, Op},
+    language_storage::StructTag,
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::delayed_values::error::code_invariant_error;
@@ -159,6 +164,33 @@ impl<'r> WriteOpConverter<'r> {
             remote,
             new_slot_metadata,
         }
+    }
+
+    /// Converts module bytes and their compiled representation extracted from publish
+    /// request into write ops. Only used by V2 loader implementation.
+    pub(crate) fn convert_modules_into_write_ops<'a>(
+        &self,
+        module_storage: &impl AptosModuleStorage,
+        code_and_modules: impl IntoIterator<Item = (Bytes, &'a CompiledModule)>,
+    ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
+        let mut write_ops = BTreeMap::new();
+        for (bytes, compiled_module) in code_and_modules.into_iter() {
+            let addr = compiled_module.self_addr();
+            let name = compiled_module.self_name();
+            let state_key = StateKey::module(addr, name);
+
+            let module_exists = module_storage.check_module_exists(addr, name)?;
+            let op = if module_exists {
+                Op::Modify(bytes)
+            } else {
+                Op::New(bytes)
+            };
+
+            // TODO(loader_v2): Query state value metadata from module storage.
+            let write_op = self.convert_module(&state_key, op, false)?;
+            write_ops.insert(state_key, write_op);
+        }
+        Ok(write_ops)
     }
 
     pub(crate) fn convert_resource(

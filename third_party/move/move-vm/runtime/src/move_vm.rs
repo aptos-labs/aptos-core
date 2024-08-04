@@ -5,17 +5,19 @@
 use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
-    loader::{ModuleStorage, ModuleStorageAdapter},
+    loader::{Loader, ModuleStorage, ModuleStorageAdapter},
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
     runtime::VMRuntime,
     session::Session,
-    storage::dummy::DummyCodeStorage,
 };
-use move_binary_format::{errors::VMResult, CompiledModule};
+use move_binary_format::{
+    errors::{Location, PartialVMError, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata,
+    metadata::Metadata, vm_status::StatusCode,
 };
 use move_vm_types::resolver::MoveResolver;
 use std::sync::Arc;
@@ -104,24 +106,28 @@ impl MoveVM {
         module_id: &ModuleId,
         remote: &impl MoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.runtime
-            .loader()
-            .load_module(
-                module_id,
-                &mut TransactionDataCache::new(
-                    self.runtime
-                        .loader()
-                        .vm_config()
-                        .deserializer_config
-                        .clone(),
-                    remote,
-                ),
-                &ModuleStorageAdapter::new(self.runtime.module_storage()),
-                // Note(George): Use dummy here because we can change to direct metadata fetching in the caller,
-                //               and when creating VM we can prefetch the framework directly.
-                &DummyCodeStorage,
+        match self.runtime.loader() {
+            Loader::V1(loader) => {
+                let module = loader.load_module(
+                    module_id,
+                    &mut TransactionDataCache::new(
+                        self.runtime
+                            .loader()
+                            .vm_config()
+                            .deserializer_config
+                            .clone(),
+                        remote,
+                    ),
+                    &ModuleStorageAdapter::new(self.runtime.module_storage()),
+                )?;
+                Ok(module.as_compiled_module())
+            },
+            Loader::V2(_) => Err(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             )
-            .map(|arc_module| arc_module.arc_module())
+            .with_message("Loader V2 implementation never calls move_vm::load_module".to_string())
+            .finish(Location::Undefined)),
+        }
     }
 
     /// Allows the adapter to announce to the VM that the code loading cache should be considered

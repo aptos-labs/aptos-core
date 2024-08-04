@@ -49,7 +49,9 @@ use aptos_vm::{
     AptosVM,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
+use aptos_vm_types::{
+    module_and_script_storage::AsAptosCodeStorage, storage::change_set_configs::ChangeSetConfigs,
+};
 use clap::Parser;
 use move_binary_format::{
     access::ModuleAccess,
@@ -66,10 +68,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    DummyCodeStorage,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -466,6 +465,7 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
     flush_warm_vm_cache();
     let vm = AptosVM::new_for_gov_sim(&state_view);
     let resolver = state_view.as_move_resolver();
+    let module_storage = state_view.as_aptos_code_storage();
 
     let gas_schedule =
         GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
@@ -483,13 +483,20 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
         vec![bcs::to_bytes(&AccountAddress::ONE)?],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &DummyCodeStorage,
+        &module_storage,
     )?;
-    let (mut change_set, module_write_set) = sess.finish(&change_set_configs)?;
-    change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
+    let (mut change_set, empty_module_write_set) =
+        sess.finish(&change_set_configs, &module_storage)?;
+    assert!(
+        empty_module_write_set
+            .is_empty_or_invariant_violation()
+            .is_ok(),
+        "Modules cannot be published by 'force_end_epoch'"
+    );
 
+    change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
     let (write_set, _events) = change_set
-        .try_combine_into_storage_change_set(module_write_set)
+        .try_combine_into_storage_change_set(empty_module_write_set)
         .expect("Failed to convert to storage ChangeSet")
         .into_inner();
 
@@ -613,9 +620,14 @@ pub async fn simulate_multistep_proposal(
         flush_warm_vm_cache();
         let vm = AptosVM::new_for_gov_sim(&state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
         let resolver = state_view.as_move_resolver();
+        let module_and_script_storage = state_view.as_aptos_code_storage();
+
         let (_vm_status, vm_output) = vm.execute_user_transaction(
             &resolver,
+            &module_and_script_storage,
+            &module_and_script_storage,
             &account
                 .account()
                 .transaction()
