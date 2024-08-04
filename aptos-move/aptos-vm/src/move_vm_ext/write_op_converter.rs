@@ -21,14 +21,14 @@ use move_core_types::{
 use move_vm_types::delayed_values::error::code_invariant_error;
 use std::{collections::BTreeMap, sync::Arc};
 
-pub(crate) struct WriteOpConverter<'r> {
+pub struct WriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,
     new_slot_metadata: Option<StateValueMetadata>,
 }
 
 macro_rules! convert_impl {
     ($convert_func_name:ident, $get_metadata_callback:ident) => {
-        pub(crate) fn $convert_func_name(
+        pub fn $convert_func_name(
             &self,
             state_key: &StateKey,
             move_storage_op: MoveStorageOp<Bytes>,

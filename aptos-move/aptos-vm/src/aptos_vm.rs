@@ -76,6 +76,10 @@ use aptos_vm_types::{
         ChangeSetInterface, VMChangeSet,
     },
     environment::Environment,
+    module_and_script_storage::{
+        module_storage::AptosModuleStorage, script_storage::AptosScriptStorage, AsAptosCodeStorage,
+        TemporaryModuleStorage,
+    },
     module_write_set::ModuleWriteSet,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
@@ -95,9 +99,11 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    effects::Op,
     ident_str,
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
+    metadata::Metadata,
     move_resource::MoveStructType,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveTypeLayout, MoveValue},
@@ -106,7 +112,6 @@ use move_core_types::{
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    DummyCodeStorage,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -150,9 +155,11 @@ macro_rules! unwrap_or_discard {
 
 pub(crate) fn get_system_transaction_output(
     session: SessionExt,
+    module_storage: &impl AptosModuleStorage,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let (change_set, empty_module_write_set) = session.finish(change_set_configs)?;
+    let (change_set, empty_module_write_set) =
+        session.finish(change_set_configs, module_storage)?;
 
     // System transactions can never publish modules! When we move publishing outside MoveVM, we do not
     // need to have this check here, as modules will only be visible in user session.
@@ -255,9 +262,15 @@ impl AptosVM {
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let pvk = keyless_validation::get_groth16_vk_onchain(&resolver)
-            .ok()
-            .and_then(|vk| vk.try_into().ok());
+        // TODO(George): pass ModuleStorage from the outside?
+        let module_storage = state_view.as_aptos_code_storage();
+        let pvk = keyless_validation::get_groth16_vk_onchain(
+            move_vm.env.features(),
+            &resolver,
+            &module_storage,
+        )
+        .ok()
+        .and_then(|vk| vk.try_into().ok());
 
         Self {
             is_simulation: false,
@@ -428,6 +441,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
@@ -475,6 +489,7 @@ impl AptosVM {
                         gas_meter,
                         txn_data,
                         resolver,
+                        module_storage,
                         status,
                         txn_aux_data,
                         log_context,
@@ -492,7 +507,11 @@ impl AptosVM {
         }
     }
 
-    fn inject_abort_info_if_available(&self, status: ExecutionStatus) -> ExecutionStatus {
+    fn inject_abort_info_if_available(
+        &self,
+        module_storage: &impl AptosModuleStorage,
+        status: ExecutionStatus,
+    ) -> ExecutionStatus {
         match status {
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module),
@@ -500,7 +519,7 @@ impl AptosVM {
                 ..
             } => {
                 let info = self
-                    .extract_module_metadata(&module)
+                    .extract_module_metadata(module_storage, &module)
                     .and_then(|m| m.extract_abort_info(code));
                 ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(module),
@@ -518,6 +537,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         status: ExecutionStatus,
         txn_aux_data: TransactionAuxiliaryData,
         log_context: &AdapterLogSchema,
@@ -527,8 +547,12 @@ impl AptosVM {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
 
-        let is_account_init_for_sponsored_transaction =
-            is_account_init_for_sponsored_transaction(txn_data, self.features(), resolver)?;
+        let is_account_init_for_sponsored_transaction = is_account_init_for_sponsored_transaction(
+            txn_data,
+            self.features(),
+            resolver,
+            module_storage,
+        )?;
 
         let (previous_session_change_set, fee_statement) =
             if is_account_init_for_sponsored_transaction {
@@ -538,6 +562,7 @@ impl AptosVM {
                 abort_hook_session.execute(|session| {
                     create_account_if_does_not_exist(
                         session,
+                        module_storage,
                         gas_meter,
                         txn_data.sender(),
                         traversal_context,
@@ -547,6 +572,7 @@ impl AptosVM {
                     .or_else(|_err| {
                         create_account_if_does_not_exist(
                             session,
+                            module_storage,
                             &mut UnmeteredGasMeter,
                             txn_data.sender(),
                             traversal_context,
@@ -563,7 +589,7 @@ impl AptosVM {
                 })?;
 
                 let mut abort_hook_session_change_set =
-                    abort_hook_session.finish(change_set_configs)?;
+                    abort_hook_session.finish(change_set_configs, module_storage)?;
                 if let Err(err) = self.charge_change_set(
                     &mut abort_hook_session_change_set,
                     gas_meter,
@@ -627,11 +653,12 @@ impl AptosVM {
         // Also, do not move this after we run failure epilogue below, because this will load
         // module, which alters abort info. We have a transaction at version 596888095 which
         // relies on this specific behavior...
-        let status = self.inject_abort_info_if_available(status);
+        let status = self.inject_abort_info_if_available(module_storage, status);
 
         epilogue_session.execute(|session| {
             transaction_validation::run_failure_epilogue(
                 session,
+                module_storage,
                 gas_meter.balance(),
                 fee_statement,
                 self.features(),
@@ -641,12 +668,19 @@ impl AptosVM {
             )
         })?;
 
-        epilogue_session.finish(fee_statement, status, txn_aux_data, change_set_configs)
+        epilogue_session.finish(
+            fee_statement,
+            status,
+            txn_aux_data,
+            change_set_configs,
+            module_storage,
+        )
     }
 
     fn success_transaction_cleanup(
         &self,
         mut epilogue_session: EpilogueSession,
+        module_storage: &impl AptosModuleStorage,
         gas_meter: &impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -677,6 +711,7 @@ impl AptosVM {
         epilogue_session.execute(|session| {
             transaction_validation::run_success_epilogue(
                 session,
+                module_storage,
                 gas_meter.balance(),
                 fee_statement,
                 self.features(),
@@ -690,6 +725,7 @@ impl AptosVM {
             ExecutionStatus::Success,
             TransactionAuxiliaryData::default(),
             change_set_configs,
+            module_storage,
         )?;
 
         // We mark module cache invalid if transaction is successfully executed and has
@@ -707,6 +743,8 @@ impl AptosVM {
     fn validate_and_execute_script(
         &self,
         session: &mut SessionExt,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         // Note: cannot use AptosGasMeter because it is not implemented for
         //       UnmeteredGasMeter.
         gas_meter: &mut impl GasMeter,
@@ -732,8 +770,8 @@ impl AptosVM {
         //       the error semantics.
         if self.gas_feature_version >= 15 {
             session.check_script_dependencies_and_check_gas(
-                &DummyCodeStorage,
-                &DummyCodeStorage,
+                module_storage,
+                script_storage,
                 gas_meter,
                 traversal_context,
                 script.code(),
@@ -741,8 +779,8 @@ impl AptosVM {
         }
 
         let func = session.load_script(
-            &DummyCodeStorage,
-            &DummyCodeStorage,
+            module_storage,
+            script_storage,
             script.code(),
             script.ty_args(),
         )?;
@@ -774,6 +812,7 @@ impl AptosVM {
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
+            module_storage,
             senders,
             convert_txn_args(script.args()),
             &func,
@@ -786,8 +825,8 @@ impl AptosVM {
             args,
             gas_meter,
             traversal_context,
-            &DummyCodeStorage,
-            &DummyCodeStorage,
+            module_storage,
+            script_storage,
         )?;
         Ok(())
     }
@@ -795,6 +834,7 @@ impl AptosVM {
     fn validate_and_execute_entry_function(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
@@ -802,6 +842,11 @@ impl AptosVM {
         entry_fn: &EntryFunction,
         _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
+        if self.features().use_loader_v2() {
+            // TODO(George): Check that the module & function actually exist? The
+            //               existing code does not do it anyway though!
+        }
+
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
@@ -810,7 +855,7 @@ impl AptosVM {
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
             session.check_dependencies_and_charge_gas(
-                &DummyCodeStorage,
+                module_storage,
                 gas_meter,
                 traversal_context,
                 [(module_id.address(), module_id.name())],
@@ -818,7 +863,7 @@ impl AptosVM {
         }
 
         let function = session.load_function(
-            &DummyCodeStorage,
+            module_storage,
             entry_fn.module(),
             entry_fn.function(),
             entry_fn.ty_args(),
@@ -842,7 +887,14 @@ impl AptosVM {
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
         if function.is_friend_or_private()
-            && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
+            && get_randomness_annotation(
+                resolver,
+                module_storage,
+                session,
+                entry_fn,
+                self.features().use_loader_v2(),
+            )?
+            .is_some()
         {
             let txn_context = session
                 .get_native_extensions()
@@ -854,6 +906,7 @@ impl AptosVM {
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
+            module_storage,
             senders,
             entry_fn.args().to_vec(),
             &function,
@@ -864,7 +917,7 @@ impl AptosVM {
             args,
             gas_meter,
             traversal_context,
-            &DummyCodeStorage,
+            module_storage,
         )?;
         Ok(())
     }
@@ -872,6 +925,8 @@ impl AptosVM {
     fn execute_script_or_entry_function<'a, 'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         mut session: UserSession<'r, 'l>,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
@@ -899,6 +954,8 @@ impl AptosVM {
                 session.execute(|session| {
                     self.validate_and_execute_script(
                         session,
+                        module_storage,
+                        script_storage,
                         gas_meter,
                         traversal_context,
                         txn_data.senders(),
@@ -910,6 +967,7 @@ impl AptosVM {
                 session.execute(|session| {
                     self.validate_and_execute_entry_function(
                         resolver,
+                        module_storage,
                         session,
                         gas_meter,
                         traversal_context,
@@ -928,6 +986,7 @@ impl AptosVM {
         let user_session_change_set = self.resolve_pending_code_publish_and_finish_user_session(
             session,
             resolver,
+            module_storage,
             gas_meter,
             traversal_context,
             new_published_modules_loaded,
@@ -945,6 +1004,7 @@ impl AptosVM {
 
         self.success_transaction_cleanup(
             epilogue_session,
+            module_storage,
             gas_meter,
             txn_data,
             log_context,
@@ -1005,6 +1065,7 @@ impl AptosVM {
     fn simulate_multisig_transaction<'a, 'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         session: UserSession<'r, 'l>,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
@@ -1022,6 +1083,7 @@ impl AptosVM {
                         aptos_try!({
                             let user_session_change_set = self.execute_multisig_entry_function(
                                 resolver,
+                                module_storage,
                                 session,
                                 gas_meter,
                                 traversal_context,
@@ -1047,6 +1109,7 @@ impl AptosVM {
 
                             self.success_transaction_cleanup(
                                 epilogue_session,
+                                module_storage,
                                 gas_meter,
                                 txn_data,
                                 log_context,
@@ -1071,6 +1134,7 @@ impl AptosVM {
     fn execute_multisig_transaction<'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         mut session: UserSession<'r, 'l>,
         prologue_session_change_set: &SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
@@ -1125,7 +1189,7 @@ impl AptosVM {
                     ]),
                     gas_meter,
                     traversal_context,
-                    &DummyCodeStorage,
+                    module_storage,
                 )
             })?
             .return_values
@@ -1161,6 +1225,7 @@ impl AptosVM {
             MultisigTransactionPayload::EntryFunction(entry_function) => self
                 .execute_multisig_entry_function(
                     resolver,
+                    module_storage,
                     session,
                     gas_meter,
                     traversal_context,
@@ -1194,6 +1259,7 @@ impl AptosVM {
                 };
                 let epilogue_session = self.failure_multisig_payload_cleanup(
                     resolver,
+                    module_storage,
                     prologue_session_change_set,
                     execution_error,
                     txn_data,
@@ -1224,7 +1290,7 @@ impl AptosVM {
                             cleanup_args,
                             &mut UnmeteredGasMeter,
                             traversal_context,
-                            &DummyCodeStorage,
+                            module_storage,
                         )
                         .map_err(|e| e.into_vm_status())
                 })?;
@@ -1235,6 +1301,7 @@ impl AptosVM {
         // TODO(Gas): Charge for aggregator writes
         self.success_transaction_cleanup(
             epilogue_session,
+            module_storage,
             gas_meter,
             txn_data,
             log_context,
@@ -1247,6 +1314,7 @@ impl AptosVM {
     fn execute_or_simulate_multisig_transaction<'a, 'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         session: UserSession<'r, 'l>,
         prologue_session_change_set: &SystemSessionChangeSet,
         gas_meter: &mut impl AptosGasMeter,
@@ -1260,6 +1328,7 @@ impl AptosVM {
         if self.is_simulation {
             self.simulate_multisig_transaction(
                 resolver,
+                module_storage,
                 session,
                 gas_meter,
                 traversal_context,
@@ -1272,6 +1341,7 @@ impl AptosVM {
         } else {
             self.execute_multisig_transaction(
                 resolver,
+                module_storage,
                 session,
                 prologue_session_change_set,
                 gas_meter,
@@ -1288,6 +1358,7 @@ impl AptosVM {
     fn execute_multisig_entry_function(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         mut session: UserSession<'_, '_>,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
@@ -1302,6 +1373,7 @@ impl AptosVM {
         session.execute(|session| {
             self.validate_and_execute_entry_function(
                 resolver,
+                module_storage,
                 session,
                 gas_meter,
                 traversal_context,
@@ -1316,6 +1388,7 @@ impl AptosVM {
         self.resolve_pending_code_publish_and_finish_user_session(
             session,
             resolver,
+            module_storage,
             gas_meter,
             traversal_context,
             new_published_modules_loaded,
@@ -1326,6 +1399,7 @@ impl AptosVM {
     fn failure_multisig_payload_cleanup<'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         prologue_session_change_set: &SystemSessionChangeSet,
         execution_error: VMStatus,
         txn_data: &'l TransactionMetadata,
@@ -1357,7 +1431,7 @@ impl AptosVM {
                     cleanup_args,
                     &mut UnmeteredGasMeter,
                     traversal_context,
-                    &DummyCodeStorage,
+                    module_storage,
                 )
                 .map_err(|e| e.into_vm_status())
         })?;
@@ -1368,6 +1442,7 @@ impl AptosVM {
     fn execute_module_initialization(
         &self,
         session: &mut SessionExt,
+        module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
         modules: &[CompiledModule],
         exists: BTreeSet<ModuleId>,
@@ -1383,7 +1458,7 @@ impl AptosVM {
             }
             *new_published_modules_loaded = true;
             let init_function =
-                session.load_function(&DummyCodeStorage, &module.self_id(), init_func_name, &[]);
+                session.load_function(module_storage, &module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
             // Note that for historic reasons, verification here is treated
@@ -1402,7 +1477,7 @@ impl AptosVM {
                         args,
                         gas_meter,
                         traversal_context,
-                        &DummyCodeStorage,
+                        module_storage,
                     )?;
                 } else {
                     return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
@@ -1438,12 +1513,13 @@ impl AptosVM {
         &self,
         mut session: UserSession<'_, '_>,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        session.execute(|session| {
+        let maybe_module_write_set = session.execute(|session| {
             if let Some(publish_request) = session.extract_publish_request() {
                 let PublishRequest {
                     destination,
@@ -1474,10 +1550,24 @@ impl AptosVM {
                             continue;
                         }
 
-                        let size_if_module_exists = resolver
-                            .as_executor_view()
-                            .get_module_state_value_size(&state_key)
-                            .map_err(|e| e.finish(Location::Undefined))?;
+                        let size_if_module_exists = if self.features().use_loader_v2() {
+                            if module_storage
+                                .check_module_exists(addr, name)
+                                .map_err(|e| e.finish(Location::Undefined))?
+                            {
+                                let size = module_storage
+                                    .fetch_module_size_in_bytes(addr, name)
+                                    .map_err(|e| e.finish(Location::Undefined))?;
+                                Some(size as u64)
+                            } else {
+                                None
+                            }
+                        } else {
+                            resolver
+                                .as_executor_view()
+                                .get_module_state_value_size(&state_key)
+                                .map_err(|e| e.finish(Location::Undefined))?
+                        };
 
                         if let Some(size) = size_if_module_exists {
                             gas_meter
@@ -1514,7 +1604,7 @@ impl AptosVM {
                         .collect::<BTreeSet<_>>();
 
                     session.check_dependencies_and_charge_gas(
-                        &DummyCodeStorage,
+                        module_storage,
                         gas_meter,
                         traversal_context,
                         modules
@@ -1544,47 +1634,150 @@ impl AptosVM {
                     }
                 }
 
-                // Validate the module bundle
-                self.validate_publish_request(session, modules, expected_modules, allowed_deps)?;
+                let check_struct_layout = true;
+                let check_friend_linking = !self
+                    .features()
+                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+                let compat = Compatibility::new(check_struct_layout, check_friend_linking);
 
-                // Check what modules exist before publishing.
-                let mut exists = BTreeSet::new();
-                for m in modules {
-                    let id = m.self_id();
-                    if session.exists_module(&id)? {
-                        exists.insert(id);
+                if self.features().use_loader_v2() {
+                    // TODO(George): This check MUST also have inside of it whatever `validate_publish_request` was doing.
+                    session.verify_module_bundle_before_publishing_with_compat_config(
+                        modules.as_slice(),
+                        destination,
+                        module_storage,
+                        compat,
+                    )?;
+
+                    // Create module write set.
+                    // TODO(George): Refactor with VM genesis, possible making it a session-based
+                    //               functionality.
+                    let mut write_ops = BTreeMap::new();
+                    let woc = session.write_op_converter();
+                    for ((addr, name), module) in modules
+                        .iter()
+                        .map(|m| (m.self_addr(), m.self_name()))
+                        .zip(bundle.iter())
+                    {
+                        let state_key = StateKey::module(addr, name);
+
+                        let module_exists = module_storage
+                            .check_module_exists(addr, name)
+                            .map_err(|e| e.finish(Location::Undefined))?;
+                        let bytes = module.code().to_vec().into();
+                        let op = if module_exists {
+                            Op::Modify(bytes)
+                        } else {
+                            Op::New(bytes)
+                        };
+                        let write_op = woc
+                            .convert_module(&state_key, op, false)
+                            .map_err(|e| e.finish(Location::Undefined))?;
+                        write_ops.insert(state_key, write_op);
                     }
+
+                    let tmp_module_storage = TemporaryModuleStorage::create(
+                        self.deserializer_config(),
+                        write_ops,
+                        module_storage,
+                    );
+
+                    // TODO(George): This is very similar to init_function code, refactor?
+                    let init_func_name = ident_str!("init_module");
+                    for module in modules {
+                        // Check if module existed previously.
+                        let module_exists = module_storage
+                            .check_module_exists(module.self_addr(), module.self_name())
+                            .map_err(|e| e.finish(Location::Undefined))?;
+                        if module_exists {
+                            continue;
+                        }
+
+                        let module_id = module.self_id();
+                        let init_function = session.load_function(
+                            &tmp_module_storage,
+                            &module_id,
+                            init_func_name,
+                            &[],
+                        );
+                        if init_function.is_ok() {
+                            if verifier::module_init::verify_module_init_function(module).is_ok() {
+                                session.execute_function_bypass_visibility(
+                                    &module_id,
+                                    init_func_name,
+                                    vec![],
+                                    vec![MoveValue::Signer(destination)
+                                        .simple_serialize()
+                                        .unwrap()],
+                                    gas_meter,
+                                    traversal_context,
+                                    &tmp_module_storage,
+                                )?;
+                            } else {
+                                // TODO(George): Use this opportunity to change the error message?
+                                return Err(PartialVMError::new(
+                                    StatusCode::CONSTRAINT_NOT_SATISFIED,
+                                )
+                                .finish(Location::Undefined));
+                            }
+                        }
+                    }
+
+                    Ok(Some(tmp_module_storage.destroy()))
+                } else {
+                    // Validate the module bundle
+                    self.validate_publish_request(
+                        session,
+                        modules,
+                        expected_modules,
+                        allowed_deps,
+                    )?;
+
+                    // Check what modules exist before publishing.
+                    let mut exists = BTreeSet::new();
+                    for m in modules {
+                        let id = m.self_id();
+                        #[allow(deprecated)]
+                        if session.exists_module(&id)? {
+                            exists.insert(id);
+                        }
+                    }
+
+                    // Publish the bundle and execute initializers
+                    // publish_module_bundle doesn't actually load the published module into
+                    // the loader cache. It only puts the module data in the data cache.
+                    #[allow(deprecated)]
+                    session.publish_module_bundle_with_compat_config(
+                        bundle.into_inner(),
+                        destination,
+                        gas_meter,
+                        module_storage,
+                        compat,
+                    )?;
+
+                    self.execute_module_initialization(
+                        session,
+                        module_storage,
+                        gas_meter,
+                        modules,
+                        exists,
+                        &[destination],
+                        new_published_modules_loaded,
+                        traversal_context,
+                    )?;
+                    Ok(None)
                 }
-
-                // Publish the bundle and execute initializers
-                // publish_module_bundle doesn't actually load the published module into
-                // the loader cache. It only puts the module data in the data cache.
-                session.publish_module_bundle_with_compat_config(
-                    bundle.into_inner(),
-                    destination,
-                    gas_meter,
-                    &DummyCodeStorage,
-                    Compatibility::new(
-                        true,
-                        !self
-                            .features()
-                            .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                    ),
-                )?;
-
-                self.execute_module_initialization(
-                    session,
-                    gas_meter,
-                    modules,
-                    exists,
-                    &[destination],
-                    new_published_modules_loaded,
-                    traversal_context,
-                )?;
+            } else {
+                Ok::<_, VMError>(
+                    if self.features().use_loader_v2() {
+                        Some(ModuleWriteSet::empty())
+                    } else {
+                        None
+                    },
+                )
             }
-            Ok::<(), VMError>(())
         })?;
-        session.finish(change_set_configs)
+        session.finish(change_set_configs, maybe_module_write_set, module_storage)
     }
 
     /// Validate a publish request.
@@ -1697,6 +1890,7 @@ impl AptosVM {
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         transaction: &SignedTransaction,
         transaction_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -1721,6 +1915,7 @@ impl AptosVM {
                 &keyless_authenticators,
                 self.features(),
                 resolver,
+                module_storage,
             )?;
         }
 
@@ -1730,6 +1925,7 @@ impl AptosVM {
         self.run_prologue_with_payload(
             session,
             resolver,
+            module_storage,
             transaction.payload(),
             transaction_data,
             log_context,
@@ -1745,6 +1941,7 @@ impl AptosVM {
         prologue_session_change_set: SystemSessionChangeSet,
         err: VMStatus,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
@@ -1767,6 +1964,7 @@ impl AptosVM {
             gas_meter,
             txn_data,
             resolver,
+            module_storage,
             log_context,
             change_set_configs,
             traversal_context,
@@ -1776,6 +1974,8 @@ impl AptosVM {
     fn execute_user_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         txn: &SignedTransaction,
         txn_data: TransactionMetadata,
         is_approved_gov_script: bool,
@@ -1791,6 +1991,7 @@ impl AptosVM {
             self.validate_signed_transaction(
                 session,
                 resolver,
+                module_storage,
                 txn,
                 &txn_data,
                 log_context,
@@ -1811,15 +2012,21 @@ impl AptosVM {
                 resolver,
                 self.gas_feature_version,
                 change_set_configs,
+                module_storage,
             ));
 
-        let is_account_init_for_sponsored_transaction = unwrap_or_discard!(
-            is_account_init_for_sponsored_transaction(&txn_data, self.features(), resolver)
-        );
+        let is_account_init_for_sponsored_transaction =
+            unwrap_or_discard!(is_account_init_for_sponsored_transaction(
+                &txn_data,
+                self.features(),
+                resolver,
+                module_storage
+            ));
         if is_account_init_for_sponsored_transaction {
             unwrap_or_discard!(
                 user_session.execute(|session| create_account_if_does_not_exist(
                     session,
+                    module_storage,
                     gas_meter,
                     txn.sender(),
                     &mut traversal_context,
@@ -1836,6 +2043,8 @@ impl AptosVM {
             | payload @ TransactionPayload::EntryFunction(_) => self
                 .execute_script_or_entry_function(
                     resolver,
+                    module_storage,
+                    script_storage,
                     user_session,
                     gas_meter,
                     &mut traversal_context,
@@ -1847,6 +2056,7 @@ impl AptosVM {
                 ),
             TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
                 resolver,
+                module_storage,
                 user_session,
                 &prologue_change_set,
                 gas_meter,
@@ -1876,6 +2086,7 @@ impl AptosVM {
                 prologue_change_set,
                 err,
                 resolver,
+                module_storage,
                 &txn_data,
                 log_context,
                 gas_meter,
@@ -1891,6 +2102,8 @@ impl AptosVM {
     pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
@@ -1915,6 +2128,8 @@ impl AptosVM {
         );
         let (status, output) = self.execute_user_transaction_impl(
             resolver,
+            module_storage,
+            script_storage,
             txn,
             txn_metadata,
             is_approved_gov_script,
@@ -1933,6 +2148,8 @@ impl AptosVM {
     pub fn execute_user_transaction_with_modified_gas_meter<G, F>(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         modify_gas_meter: F,
@@ -1943,6 +2160,8 @@ impl AptosVM {
     {
         self.execute_user_transaction_with_custom_gas_meter(
             resolver,
+            module_storage,
+            script_storage,
             txn,
             log_context,
             |gas_feature_version,
@@ -1965,11 +2184,15 @@ impl AptosVM {
     pub fn execute_user_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
         match self.execute_user_transaction_with_custom_gas_meter(
             resolver,
+            module_storage,
+            script_storage,
             txn,
             log_context,
             make_prod_gas_meter,
@@ -1985,6 +2208,8 @@ impl AptosVM {
     fn execute_write_set(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         write_set_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
@@ -2024,6 +2249,8 @@ impl AptosVM {
 
                 self.validate_and_execute_script(
                     &mut tmp_session,
+                    module_storage,
+                    script_storage,
                     &mut UnmeteredGasMeter,
                     &mut traversal_context,
                     senders,
@@ -2035,7 +2262,8 @@ impl AptosVM {
 
                 // TODO(George): This session should not publish modules, and should be using native
                 //               code context instead.
-                let (change_set, module_write_set) = tmp_session.finish(&change_set_configs)?;
+                let (change_set, module_write_set) =
+                    tmp_session.finish(&change_set_configs, module_storage)?;
                 Ok((change_set, module_write_set))
             },
         }
@@ -2098,6 +2326,8 @@ impl AptosVM {
     pub(crate) fn process_waypoint_change_set(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         write_set_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
@@ -2105,6 +2335,8 @@ impl AptosVM {
         let genesis_id = HashValue::zero();
         let (change_set, module_write_set) = self.execute_write_set(
             resolver,
+            module_storage,
+            script_storage,
             &write_set_payload,
             Some(account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
@@ -2134,6 +2366,7 @@ impl AptosVM {
     fn process_block_prologue(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         block_metadata: BlockMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
@@ -2160,7 +2393,7 @@ impl AptosVM {
                 args,
                 &mut gas_meter,
                 &mut TraversalContext::new(&storage),
-                &DummyCodeStorage,
+                module_storage,
             )
             .map(|_return_vals| ())
             .or_else(|e| {
@@ -2170,6 +2403,7 @@ impl AptosVM {
 
         let output = get_system_transaction_output(
             session,
+            module_storage,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
@@ -2178,6 +2412,7 @@ impl AptosVM {
     fn process_block_prologue_ext(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         block_metadata_ext: BlockMetadataExt,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
@@ -2240,7 +2475,7 @@ impl AptosVM {
                 serialize_values(&args),
                 &mut gas_meter,
                 &mut TraversalContext::new(&storage),
-                &DummyCodeStorage,
+                module_storage,
             )
             .map(|_return_vals| ())
             .or_else(|e| {
@@ -2250,16 +2485,31 @@ impl AptosVM {
 
         let output = get_system_transaction_output(
             session,
+            module_storage,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
     }
 
-    fn extract_module_metadata(&self, module: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
+    fn extract_module_metadata(
+        &self,
+        module_storage: &impl AptosModuleStorage,
+        module_id: &ModuleId,
+    ) -> Option<Arc<RuntimeModuleMetadataV1>> {
         if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            aptos_framework::get_vm_metadata(&self.move_vm, module)
+            aptos_framework::get_vm_metadata(
+                &self.move_vm,
+                module_storage,
+                self.features(),
+                module_id,
+            )
         } else {
-            aptos_framework::get_vm_metadata_v0(&self.move_vm, module)
+            aptos_framework::get_vm_metadata_v0(
+                &self.move_vm,
+                module_storage,
+                self.features(),
+                module_id,
+            )
         }
     }
 
@@ -2298,6 +2548,8 @@ impl AptosVM {
         );
 
         let resolver = state_view.as_move_resolver();
+        let module_storage = state_view.as_aptos_code_storage();
+
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
             &mut session,
@@ -2307,6 +2559,7 @@ impl AptosVM {
             type_args,
             arguments,
             &mut gas_meter,
+            &module_storage,
         );
         let gas_used = Self::gas_used(max_gas_amount.into(), &gas_meter);
         match execution_result {
@@ -2330,11 +2583,13 @@ impl AptosVM {
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
+        module_storage: &impl AptosModuleStorage,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let func = session.load_function(&DummyCodeStorage, &module_id, &func_name, &type_args)?;
-        let metadata = vm.extract_module_metadata(&module_id);
+        let func = session.load_function(module_storage, &module_id, &func_name, &type_args)?;
+        let metadata = vm.extract_module_metadata(module_storage, &module_id);
         let arguments = verifier::view_function::validate_view_function(
             session,
+            module_storage,
             arguments,
             func_name.as_ident_str(),
             &func,
@@ -2352,7 +2607,7 @@ impl AptosVM {
                 arguments,
                 gas_meter,
                 &mut TraversalContext::new(&storage),
-                &DummyCodeStorage,
+                module_storage,
             )
             .map_err(|err| anyhow!("Failed to execute function: {:?}", err))?
             .return_values
@@ -2365,6 +2620,7 @@ impl AptosVM {
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -2375,6 +2631,7 @@ impl AptosVM {
             get_or_vm_startup_failure(&self.gas_params, log_context)?,
             self.gas_feature_version,
             resolver,
+            module_storage,
             txn_data,
             self.features(),
             is_approved_gov_script,
@@ -2385,6 +2642,7 @@ impl AptosVM {
             TransactionPayload::Script(_) | TransactionPayload::EntryFunction(_) => {
                 transaction_validation::run_script_prologue(
                     session,
+                    module_storage,
                     txn_data,
                     log_context,
                     traversal_context,
@@ -2396,6 +2654,7 @@ impl AptosVM {
                 // one of the owners.
                 transaction_validation::run_script_prologue(
                     session,
+                    module_storage,
                     txn_data,
                     log_context,
                     traversal_context,
@@ -2406,6 +2665,7 @@ impl AptosVM {
                 if !self.is_simulation {
                     transaction_validation::run_multisig_prologue(
                         session,
+                        module_storage,
                         txn_data,
                         multisig_payload,
                         self.features(),
@@ -2436,6 +2696,8 @@ impl AptosVM {
         &self,
         txn: &SignatureVerifiedTransaction,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        script_storage: &impl AptosScriptStorage,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         assert!(!self.is_simulation, "VM has to be created for execution");
@@ -2449,14 +2711,19 @@ impl AptosVM {
         Ok(match txn.expect_valid() {
             Transaction::BlockMetadata(block_metadata) => {
                 fail_point!("aptos_vm::execution::block_metadata");
-                let (vm_status, output) =
-                    self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
+                let (vm_status, output) = self.process_block_prologue(
+                    resolver,
+                    module_storage,
+                    block_metadata.clone(),
+                    log_context,
+                )?;
                 (vm_status, output)
             },
             Transaction::BlockMetadataExt(block_metadata_ext) => {
                 fail_point!("aptos_vm::execution::block_metadata_ext");
                 let (vm_status, output) = self.process_block_prologue_ext(
                     resolver,
+                    module_storage,
                     block_metadata_ext.clone(),
                     log_context,
                 )?;
@@ -2465,6 +2732,8 @@ impl AptosVM {
             Transaction::GenesisTransaction(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
                     resolver,
+                    module_storage,
+                    script_storage,
                     write_set_payload.clone(),
                     log_context,
                 )?;
@@ -2473,7 +2742,13 @@ impl AptosVM {
             Transaction::UserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
-                let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
+                let (vm_status, output) = self.execute_user_transaction(
+                    resolver,
+                    module_storage,
+                    script_storage,
+                    txn,
+                    log_context,
+                );
 
                 if let StatusType::InvariantViolation = vm_status.status_type() {
                     match vm_status.status_code() {
@@ -2555,8 +2830,12 @@ impl AptosVM {
                 (VMStatus::Executed, output)
             },
             Transaction::ValidatorTransaction(txn) => {
-                let (vm_status, output) =
-                    self.process_validator_transaction(resolver, txn.clone(), log_context)?;
+                let (vm_status, output) = self.process_validator_transaction(
+                    resolver,
+                    module_storage,
+                    txn.clone(),
+                    log_context,
+                )?;
                 (vm_status, output)
             },
         })
@@ -2706,6 +2985,8 @@ impl VMValidator for AptosVM {
         let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
+        let module_storage = state_view.as_aptos_code_storage();
+
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
 
         let mut session = self.new_session(
@@ -2720,6 +3001,7 @@ impl VMValidator for AptosVM {
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
             &resolver,
+            &module_storage,
             &txn,
             &txn_data,
             &log_context,
@@ -2770,8 +3052,15 @@ impl AptosSimulationVM {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let (vm_status, vm_output) =
-            vm.0.execute_user_transaction(&resolver, transaction, &log_context);
+        let module_and_script_storage = state_view.as_aptos_code_storage();
+
+        let (vm_status, vm_output) = vm.0.execute_user_transaction(
+            &resolver,
+            &module_and_script_storage,
+            &module_and_script_storage,
+            transaction,
+            &log_context,
+        );
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .expect("Materializing aggregator V1 deltas should never fail");
@@ -2781,6 +3070,7 @@ impl AptosSimulationVM {
 
 fn create_account_if_does_not_exist(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     gas_meter: &mut impl GasMeter,
     account: AccountAddress,
     traversal_context: &mut TraversalContext,
@@ -2793,7 +3083,7 @@ fn create_account_if_does_not_exist(
             serialize_values(&vec![MoveValue::Address(account)]),
             gas_meter,
             traversal_context,
-            &DummyCodeStorage,
+            module_storage,
         )
         .map(|_return_vals| ())
 }
@@ -2808,21 +3098,44 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
     txn_data: &TransactionMetadata,
     features: &Features,
     resolver: &impl AptosMoveResolver,
+    module_storage: &impl AptosModuleStorage,
 ) -> VMResult<bool> {
-    Ok(
-        features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
-            && txn_data.fee_payer.is_some()
-            && txn_data.sequence_number == 0
-            && resolver
-                .get_resource_bytes_with_metadata_and_layout(
-                    &txn_data.sender(),
-                    &AccountResource::struct_tag(),
-                    &resolver.get_module_metadata(&AccountResource::struct_tag().module_id()),
-                    None,
-                )
-                .map(|(data, _)| data.is_none())
-                .map_err(|e| e.finish(Location::Undefined))?,
-    )
+    if features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
+        && txn_data.fee_payer.is_some()
+        && txn_data.sequence_number == 0
+    {
+        let metadata = fetch_module_metadata_for_struct_tag(
+            &AccountResource::struct_tag(),
+            features,
+            resolver,
+            module_storage,
+        )?;
+        let (maybe_bytes, _) = resolver
+            .get_resource_bytes_with_metadata_and_layout(
+                &txn_data.sender(),
+                &AccountResource::struct_tag(),
+                &metadata,
+                None,
+            )
+            .map_err(|e| e.finish(Location::Undefined))?;
+        return Ok(maybe_bytes.is_some());
+    }
+    Ok(false)
+}
+
+pub(crate) fn fetch_module_metadata_for_struct_tag(
+    struct_tag: &StructTag,
+    features: &Features,
+    resolver: &impl AptosMoveResolver,
+    module_storage: &impl AptosModuleStorage,
+) -> VMResult<Vec<Metadata>> {
+    if features.use_loader_v2() {
+        module_storage
+            .fetch_module_metadata(&struct_tag.address, &struct_tag.module)
+            .map_err(|e| e.finish(Location::Undefined))
+    } else {
+        Ok(resolver.get_module_metadata(&struct_tag.module_id()))
+    }
 }
 
 #[test]

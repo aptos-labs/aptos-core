@@ -178,6 +178,10 @@ impl Script {
         })
     }
 
+    pub fn as_compiled_script(&self) -> Arc<CompiledScript> {
+        self.script.clone()
+    }
+
     pub(crate) fn entry_point(&self) -> Arc<Function> {
         self.main.clone()
     }

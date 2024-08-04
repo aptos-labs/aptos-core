@@ -7,11 +7,11 @@ use crate::{
     module_traversal::TraversalContext,
     native_functions::NativeFunctions,
     storage::{
-        module_storage::ModuleStorage, script_storage::ScriptStorage,
-        struct_name_index_map::StructNameIndexMap, struct_type_storage::LoaderV2StructTypeStorage,
-        verifier::Verifier,
+        dummy::ok_if_loader_v2_test_env, module_storage::ModuleStorage,
+        script_storage::ScriptStorage, struct_name_index_map::StructNameIndexMap,
+        struct_type_storage::LoaderV2StructTypeStorage, verifier::Verifier,
     },
-    unexpected_unimplemented_error, LoadedFunction,
+    LoadedFunction,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -60,6 +60,16 @@ pub(crate) struct LoaderV2<V: Clone + Verifier> {
 }
 
 impl<V: Clone + Verifier> LoaderV2<V> {
+    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig, verifier: V) -> Self {
+        Self {
+            struct_name_index_map: StructNameIndexMap::empty(),
+            vm_config,
+            verifier,
+            natives,
+            ty_cache: RwLock::new(TypeCache::empty()),
+        }
+    }
+
     pub(crate) fn vm_config(&self) -> &VMConfig {
         &self.vm_config
     }
@@ -176,9 +186,20 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Arc<Module>> {
-        module_storage.fetch_or_create_verified_module(address, module_name, &|cm| {
-            self.build_module(module_storage, cm)
-        })
+        let module =
+            module_storage.fetch_or_create_verified_module(address, module_name, &|cm| {
+                self.build_module(module_storage, cm)
+            })?;
+
+        // Loader V1 implementation runs cyclic checks after loading: do not do it for now.
+        // TODO(George): Revisit?
+        // cyclic_dependencies::verify_module(
+        //     module.module(),
+        //     |module_id| module_storage.fetch_deserialized_module(address, module_name).map(|m| m.immediate_dependencies()),
+        //     |module_id| module_storage.fetch_deserialized_module(address, module_name).map(|m| m.immediate_friends()),
+        // )?;
+
+        Ok(module)
     }
 
     /// Returns a function definition corresponding to the specified name. The module
@@ -258,7 +279,7 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         _module_storage: &impl ModuleStorage,
         _published_modules: &[CompiledModule],
     ) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+        ok_if_loader_v2_test_env()
     }
 }
 
@@ -324,6 +345,9 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         self.verifier.verify_module(compiled_module.as_ref())?;
 
         // Fetch all dependencies of this module, ensuring they are verified as well.
+        // TODO(George): Revisit cyclic checks here and in `load_module`. As we traverse
+        //               dependencies, there can be a cycle, so we may need to keep track
+        //               of visited modules?
         let f = |cm| self.build_module(module_storage, cm);
         let imm_dependencies = compiled_module
             .immediate_dependencies_iter()
@@ -335,6 +359,14 @@ impl<V: Clone + Verifier> LoaderV2<V> {
             compiled_module.as_ref(),
             imm_dependencies.iter().map(|m| m.as_ref()),
         )?;
+
+        // In the V1 loader implementation, friends are also loaded. For now,
+        // mimic the same behaviour. Note that this is a bit weird now because
+        // we cache on read, so possibly we do not even need this.
+        compiled_module
+            .immediate_friends_iter()
+            .map(|(addr, name)| module_storage.fetch_or_create_verified_module(addr, name, &f))
+            .collect::<PartialVMResult<Vec<_>>>()?;
 
         let struct_ty_storage = LoaderV2StructTypeStorage {
             loader: self,
