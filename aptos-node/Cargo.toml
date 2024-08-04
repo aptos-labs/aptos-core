@@ -40,7 +40,7 @@ aptos-indexer-grpc-table-info = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-jwk-consensus = { workspace = true }
-aptos-logger = { workspace = true }
+aptos-logger = { workspace = true, features = ["node-identity"] }
 aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
 aptos-network = { workspace = true }
