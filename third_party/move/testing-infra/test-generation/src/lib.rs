@@ -20,6 +20,7 @@ use getrandom::getrandom;
 use module_generation::generate_module;
 use move_binary_format::{
     access::ModuleAccess,
+    deserializer::DeserializerConfig,
     file_format::{
         AbilitySet, CompiledModule, FunctionDefinitionIndex, SignatureToken, StructHandleIndex,
     },
@@ -36,7 +37,7 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -55,9 +56,10 @@ fn run_verifier(module: CompiledModule) -> Result<CompiledModule, String> {
 }
 
 // Creates a storage with Move standard library as well as a few additional modules.
-fn storage_with_stdlib_and_modules(additional_modules: Vec<&CompiledModule>) -> InMemoryStorage {
-    let mut storage = InMemoryStorage::new();
-
+fn storage_with_stdlib_and_modules(
+    deserializer_config: &DeserializerConfig,
+    additional_modules: Vec<CompiledModule>,
+) -> (InMemoryStorage, TestModuleStorage) {
     // First, compile and add standard library.
     let (_, compiled_units) = Compiler::from_files(
         move_stdlib::move_stdlib_files(),
@@ -68,23 +70,26 @@ fn storage_with_stdlib_and_modules(additional_modules: Vec<&CompiledModule>) -> 
     )
     .build_and_report()
     .unwrap();
-    let compiled_modules = compiled_units.into_iter().map(|unit| match unit {
-        AnnotatedCompiledUnit::Module(annot_module) => annot_module.named_module.module,
-        AnnotatedCompiledUnit::Script(_) => panic!("Unexpected Script in stdlib"),
-    });
-    for module in compiled_modules {
+
+    let mut compiled_modules = compiled_units
+        .into_iter()
+        .map(|unit| match unit {
+            AnnotatedCompiledUnit::Module(annot_module) => annot_module.named_module.module,
+            AnnotatedCompiledUnit::Script(_) => panic!("Unexpected Script in stdlib"),
+        })
+        .collect::<Vec<_>>();
+    compiled_modules.extend(additional_modules);
+
+    let mut resource_storage = InMemoryStorage::new();
+    let module_storage = TestModuleStorage::empty(deserializer_config);
+    for module in &compiled_modules {
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(module.self_id(), blob);
+        resource_storage.publish_or_overwrite_module(module.self_id(), blob.clone());
+        module_storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
     }
 
-    // Now add the additional modules.
-    for module in additional_modules {
-        let mut blob = vec![];
-        module.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(module.self_id(), blob);
-    }
-    storage
+    (resource_storage, module_storage)
 }
 
 /// This function runs a verified module in the VM runtime
@@ -138,7 +143,7 @@ fn execute_function_in_module(
     let entry_name = {
         let entry_func_idx = module.function_def_at(idx).function;
         let entry_name_idx = module.function_handle_at(entry_func_idx).name;
-        module.identifier_at(entry_name_idx)
+        module.identifier_at(entry_name_idx).to_owned()
     };
     {
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
@@ -146,18 +151,19 @@ fn execute_function_in_module(
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let storage = storage_with_stdlib_and_modules(vec![&module]);
+        let (resource_storage, module_storage) =
+            storage_with_stdlib_and_modules(&vm.vm_config().deserializer_config, vec![module]);
 
-        let mut sess = vm.new_session(&storage);
+        let mut sess = vm.new_session(&resource_storage);
         let traversal_storage = TraversalStorage::new();
         sess.execute_function_bypass_visibility(
             &module_id,
-            entry_name,
+            entry_name.as_ident_str(),
             ty_args,
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )?;
 
         Ok(())

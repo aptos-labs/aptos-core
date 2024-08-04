@@ -25,16 +25,15 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{
+    module_and_script_storage::module_storage::AptosModuleStorage, output::VMOutput,
+};
 use move_core_types::{
     account_address::AccountAddress,
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    DummyCodeStorage,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::collections::HashMap;
 
@@ -59,12 +58,19 @@ impl AptosVM {
     pub(crate) fn process_jwk_update(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         debug!("Processing jwk transaction");
-        match self.process_jwk_update_inner(resolver, log_context, session_id, update) {
+        match self.process_jwk_update_inner(
+            resolver,
+            module_storage,
+            log_context,
+            session_id,
+            update,
+        ) {
             Ok((vm_status, vm_output)) => {
                 debug!("Processing jwk transaction ok.");
                 Ok((vm_status, vm_output))
@@ -90,6 +96,7 @@ impl AptosVM {
     fn process_jwk_update_inner(
         &self,
         resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
@@ -138,7 +145,7 @@ impl AptosVM {
             vec![observed].as_move_value(),
         ];
 
-        let module_storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 &JWKS_MODULE,
@@ -146,8 +153,8 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&module_storage),
-                &DummyCodeStorage,
+                &mut TraversalContext::new(&traversal_storage),
+                module_storage,
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, UPSERT_INTO_OBSERVED_JWKS.as_str(), log_context)
@@ -156,6 +163,7 @@ impl AptosVM {
 
         let output = get_system_transaction_output(
             session,
+            module_storage,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)
                 .map_err(Unexpected)?
                 .change_set_configs,

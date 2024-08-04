@@ -10,7 +10,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage};
 use move_vm_test_utils::{BlankStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -19,9 +19,11 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 #[test]
 fn call_non_existent_module() {
     let vm = MoveVM::new(vec![]);
-    let storage = BlankStorage;
 
-    let mut sess = vm.new_session(&storage);
+    let resource_storage = BlankStorage;
+    let module_storage = TestModuleStorage::empty_for_vm(&vm);
+
+    let mut sess = vm.new_session(&resource_storage);
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -34,10 +36,12 @@ fn call_non_existent_module() {
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap_err();
 
+    // TODO(loader_v2): This test is broken! This is an invariant violation, not a verification
+    //                  because we should not allow only non-existent entry functions.
     assert_eq!(err.status_type(), StatusType::Verification);
 }
 
@@ -53,28 +57,31 @@ fn call_non_existent_function() {
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();
 
-    let mut storage = InMemoryStorage::new();
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
-    storage.publish_or_overwrite_module(module_id.clone(), blob);
-
     let vm = MoveVM::new(vec![]);
-    let mut sess = vm.new_session(&storage);
 
+    let mut resource_storage = InMemoryStorage::new();
+    resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
+
+    let module_storage = TestModuleStorage::empty_for_vm(&vm);
+    module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+
+    let mut sess = vm.new_session(&resource_storage);
     let fun_name = Identifier::new("foo").unwrap();
-
     let storage = TraversalStorage::new();
 
     let err = sess
         .execute_function_bypass_visibility(
-            &module_id,
+            &m.self_id(),
             &fun_name,
             vec![],
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap_err();
 
+    // TODO(loader_v2): This test is broken! This is an invariant violation, not a verification
+    //                  because we should not allow only non-existent entry functions.
     assert_eq!(err.status_type(), StatusType::Verification);
 }
