@@ -7,18 +7,19 @@ use crate::{
     module_traversal::TraversalContext,
     native_functions::NativeFunctions,
     storage::{
-        module_storage::ModuleStorage, script_storage::ScriptStorage,
-        struct_name_index_map::StructNameIndexMap, struct_type_storage::LoaderV2StructTypeStorage,
-        verifier::Verifier,
+        dummy::ok_if_should_use_loader_v2, module_storage::ModuleStorage,
+        script_storage::ScriptStorage, struct_name_index_map::StructNameIndexMap,
+        struct_type_storage::LoaderV2StructTypeStorage, verifier::Verifier,
     },
-    unexpected_unimplemented_error, LoadedFunction,
+    LoadedFunction,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
-    errors::{Location, PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::CompiledScript,
     CompiledModule,
 };
+use move_bytecode_verifier::cyclic_dependencies;
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::NumBytes, identifier::IdentStr,
     language_storage::TypeTag, vm_status::StatusCode,
@@ -37,6 +38,15 @@ use typed_arena::Arena;
 pub(crate) struct LoaderV2<V: Clone + Verifier> {
     // Map to from struct names to indices, to save on unnecessary cloning and
     // reduce memory consumption.
+    // TODO(loader_v2): We probably HAVE TO move it outside of the loader because:
+    //   1) ModuleStorage has types which have indices from loader's renaming map,
+    //      that means VM MUST outlive the module storage.
+    //   2) In case of unsuccessful publish, we cache struct name as an index and
+    //      a type. If republish happens with the same struct name but different
+    //      type, we get a wrong cached version! Can this happen? Yes, that means
+    //      that a Module can be created only once all bundle has been verified,
+    //      not just a module and its transitive dependencies!!! Revisit when
+    //      implementing & testing publishing flow.
     struct_name_index_map: StructNameIndexMap,
     // Configuration of the VM, which own this loader. Contains information about
     // enabled checks, etc.
@@ -54,12 +64,22 @@ pub(crate) struct LoaderV2<V: Clone + Verifier> {
     //   These caches are owned by this loader and are not affected by module
     //   upgrades. When a new cache is added, the safety guarantees (i.e., why
     //   it is safe for the loader to own this cache) MUST be documented.
-    // TODO(George): Revisit type cache implementation. For now re-use the existing
-    //               one to unblock upgradable module and script storage first.
+    // TODO(loader_v2): Revisit type cache implementation. For now re-use the existing
+    //                  one to unblock upgradable module and script storage first.
     ty_cache: RwLock<TypeCache>,
 }
 
 impl<V: Clone + Verifier> LoaderV2<V> {
+    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig, verifier: V) -> Self {
+        Self {
+            struct_name_index_map: StructNameIndexMap::empty(),
+            vm_config,
+            verifier,
+            natives,
+            ty_cache: RwLock::new(TypeCache::empty()),
+        }
+    }
+
     pub(crate) fn vm_config(&self) -> &VMConfig {
         &self.vm_config
     }
@@ -145,22 +165,28 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         script_storage: &impl ScriptStorage,
         serialized_script: &[u8],
         ty_args: &[TypeTag],
-    ) -> PartialVMResult<LoadedFunction> {
+    ) -> VMResult<LoadedFunction> {
         // Step 1: Load script. During the loading process, if script has not been previously
         // cached, it will be verified.
-        let script = script_storage.fetch_or_create_verified_script(serialized_script, &|cs| {
-            self.build_script(module_storage, cs)
-        })?;
+        let script = script_storage
+            .fetch_or_create_verified_script(serialized_script, &|cs| {
+                self.build_script(module_storage, cs)
+            })
+            .map_err(|e| e.finish(Location::Script))?;
 
         // Step 2: Load & verify types used as type arguments passed to this script. Note that
         // arguments for scripts are verified on the client side.
         let ty_args = ty_args
             .iter()
             .map(|ty| self.load_ty(module_storage, ty))
-            .collect::<PartialVMResult<Vec<_>>>()?;
+            .collect::<PartialVMResult<Vec<_>>>()
+            // TODO(loader_v2): We return a VMResult here only because one of transactional tests differs
+            //                  in location: loader V1 returns undefined...
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         let main = script.entry_point();
-        Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)?;
+        Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
+            .map_err(|e| e.finish(Location::Script))?;
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Script(script),
@@ -176,9 +202,30 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Arc<Module>> {
-        module_storage.fetch_or_create_verified_module(address, module_name, &|cm| {
-            self.build_module(module_storage, cm)
-        })
+        let module =
+            module_storage.fetch_or_create_verified_module(address, module_name, &|cm| {
+                self.build_module(module_storage, cm)
+            })?;
+
+        // TODO(loader_v2): We do not do upward friends exploration here but we do in V1. Revisit.
+
+        // TODO(loader_v2): Consider not performing cyclic checks like in V1. Revisit.
+        cyclic_dependencies::verify_module(
+            module.module(),
+            |module_id| {
+                module_storage
+                    .fetch_deserialized_module(module_id.address(), module_id.name())
+                    .map(|m| m.immediate_dependencies())
+            },
+            |module_id| {
+                module_storage
+                    .fetch_deserialized_module(module_id.address(), module_id.name())
+                    .map(|m| m.immediate_friends())
+            },
+        )
+        .map_err(|e| e.to_partial())?;
+
+        Ok(module)
     }
 
     /// Returns a function definition corresponding to the specified name. The module
@@ -237,9 +284,9 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         module_storage: &impl ModuleStorage,
         ty_tag: &TypeTag,
     ) -> PartialVMResult<Type> {
-        // TODO(George): Loader V1 uses VMResults everywhere, but partial VM errors
-        //               seem better fit. Here we map error to VMError to reuse existing
-        //               type builder implementation, and then strip the location info.
+        // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
+        //                  seem better fit. Here we map error to VMError to reuse existing
+        //                  type builder implementation, and then strip the location info.
         self.ty_builder()
             .create_ty(ty_tag, |st| {
                 self.load_struct_ty(
@@ -258,7 +305,7 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         _module_storage: &impl ModuleStorage,
         _published_modules: &[CompiledModule],
     ) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+        ok_if_should_use_loader_v2()
     }
 }
 
@@ -290,11 +337,7 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         // Fetch all dependencies of this script, and verify them as well.
         let imm_dependencies = compiled_script
             .immediate_dependencies_iter()
-            .map(|(addr, name)| {
-                module_storage.fetch_or_create_verified_module(addr, name, &|cm| {
-                    self.build_module(module_storage, cm)
-                })
-            })
+            .map(|(addr, name)| self.load_module(module_storage, addr, name))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         // Perform checks on script and its dependencies.
@@ -324,6 +367,9 @@ impl<V: Clone + Verifier> LoaderV2<V> {
         self.verifier.verify_module(compiled_module.as_ref())?;
 
         // Fetch all dependencies of this module, ensuring they are verified as well.
+        // TODO(loader_v2): Revisit cyclic checks here and in `load_module`. As we traverse
+        //                  dependencies, there can be a cycle, so we may need to keep track
+        //                  of visited modules?
         let f = |cm| self.build_module(module_storage, cm);
         let imm_dependencies = compiled_module
             .immediate_dependencies_iter()
@@ -341,8 +387,8 @@ impl<V: Clone + Verifier> LoaderV2<V> {
             module_storage,
         };
 
-        // TODO(George): While we do not need size anymore, fetch the correct value just in case.
-        //               Once V1 API is no longer used, we can remove this.
+        // TODO(loader_v2): While we do not need size anymore, fetch the correct value just in case.
+        //                  Once V1 API is no longer used, we can remove this.
         let size = module_storage
             .fetch_module_size_in_bytes(compiled_module.self_addr(), compiled_module.self_name())?;
         Module::new(

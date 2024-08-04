@@ -10,8 +10,10 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
+use move_vm_runtime::should_use_loader_v2;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
+
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
@@ -95,6 +97,7 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
+    USE_LOADER_V2 = 80,
 }
 
 impl FeatureFlag {
@@ -172,6 +175,9 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            // TODO(loader_v2): Enable the feature flag once ready, for now the feature is
+            //                  enabled using an environment variable.
+            // FeatureFlag::USE_LOADER_V2,
         ]
     }
 }
@@ -191,6 +197,10 @@ impl Default for Features {
 
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
+        }
+
+        if should_use_loader_v2() {
+            features.enable(FeatureFlag::USE_LOADER_V2);
         }
 
         features
@@ -315,6 +325,10 @@ impl Features {
 
     pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    pub fn use_loader_v2(&self) -> bool {
+        self.is_enabled(FeatureFlag::USE_LOADER_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

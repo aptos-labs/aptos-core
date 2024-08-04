@@ -20,7 +20,8 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet, module_write_set::ModuleWriteSet, output::VMOutput,
+    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWriteSet, output::VMOutput,
     storage::change_set_configs::ChangeSetConfigs,
 };
 use derive_more::{Deref, DerefMut};
@@ -105,6 +106,7 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
         execution_status: ExecutionStatus,
         txn_aux_data: TransactionAuxiliaryData,
         change_set_configs: &ChangeSetConfigs,
+        module_storage: &impl AptosModuleStorage,
     ) -> Result<VMOutput, VMStatus> {
         let Self {
             session,
@@ -113,7 +115,7 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
         } = self;
 
         let (change_set, empty_module_write_set) =
-            session.finish_with_squashed_change_set(change_set_configs, true)?;
+            session.finish_with_squashed_change_set(change_set_configs, module_storage, true)?;
         let epilogue_session_change_set =
             UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)?;
 

@@ -684,7 +684,7 @@ impl Module {
         &self.module
     }
 
-    pub(crate) fn arc_module(&self) -> Arc<CompiledModule> {
+    pub fn as_compiled_module(&self) -> Arc<CompiledModule> {
         self.module.clone()
     }
 

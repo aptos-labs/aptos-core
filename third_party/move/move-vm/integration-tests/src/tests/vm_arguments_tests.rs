@@ -21,7 +21,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage, TestScriptStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -252,10 +252,15 @@ fn call_script_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let move_vm = MoveVM::new(vec![]);
-    let remote_view = InMemoryStorage::new();
-    let mut session = move_vm.new_session(&remote_view);
+
+    let deserializer_config = &move_vm.vm_config().deserializer_config;
+    let module_storage = TestModuleStorage::empty(deserializer_config);
+    let script_storage = TestScriptStorage::empty(deserializer_config);
+    let resource_storage = InMemoryStorage::new();
+
     let traversal_storage = TraversalStorage::new();
 
+    let mut session = move_vm.new_session(&resource_storage);
     session
         .execute_script(
             script,
@@ -263,8 +268,8 @@ fn call_script_with_args_ty_args_signers(
             combine_signers_and_args(signers, non_signer_args),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
-            &DummyCodeStorage,
+            &module_storage,
+            &script_storage,
         )
         .map(|_| ())
 }
@@ -273,23 +278,28 @@ fn call_script(script: Vec<u8>, args: Vec<Vec<u8>>) -> VMResult<()> {
     call_script_with_args_ty_args_signers(script, args, vec![], vec![])
 }
 
-fn call_script_function_with_args_ty_args_signers(
+fn call_function_with_args_ty_args_signers(
     module: CompiledModule,
     function_name: Identifier,
     non_signer_args: Vec<Vec<u8>>,
     ty_args: Vec<TypeTag>,
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
-    let move_vm = MoveVM::new(vec![]);
-    let mut remote_view = InMemoryStorage::new();
-
     let module_id = module.self_id();
     let mut module_blob = vec![];
     module.serialize(&mut module_blob).unwrap();
 
-    remote_view.publish_or_overwrite_module(module_id.clone(), module_blob);
-    let mut session = move_vm.new_session(&remote_view);
+    let move_vm = MoveVM::new(vec![]);
+
+    let mut resource_storage = InMemoryStorage::new();
+    resource_storage.publish_or_overwrite_module(module_id.clone(), module_blob.clone());
+
+    let module_storage = TestModuleStorage::empty_for_vm(&move_vm);
+    module_storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
+
     let traversal_storage = TraversalStorage::new();
+
+    let mut session = move_vm.new_session(&resource_storage);
     session.execute_function_bypass_visibility(
         &module_id,
         function_name.as_ident_str(),
@@ -297,7 +307,7 @@ fn call_script_function_with_args_ty_args_signers(
         combine_signers_and_args(signers, non_signer_args),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &DummyCodeStorage,
+        &module_storage,
     )?;
     Ok(())
 }
@@ -307,7 +317,7 @@ fn call_script_function(
     function_name: Identifier,
     args: Vec<Vec<u8>>,
 ) -> VMResult<()> {
-    call_script_function_with_args_ty_args_signers(module, function_name, args, vec![], vec![])
+    call_function_with_args_ty_args_signers(module, function_name, args, vec![], vec![])
 }
 
 // these signatures used to be bad, but there are no bad signatures for scripts at the VM
@@ -712,7 +722,7 @@ fn check_script_function() {
         let expected_status = expected_status_opt.unwrap_or(StatusCode::ABORTED);
         let (module, function_name) = make_script_function(signature);
         assert_eq!(
-            call_script_function_with_args_ty_args_signers(
+            call_function_with_args_ty_args_signers(
                 module,
                 function_name,
                 serialize_values(&args),
@@ -739,16 +749,10 @@ fn check_script_function() {
         vec![],
     );
     assert_eq!(
-        call_script_function_with_args_ty_args_signers(
-            module,
-            function_name,
-            vec![],
-            vec![],
-            vec![],
-        )
-        .err()
-        .unwrap()
-        .major_status(),
+        call_function_with_args_ty_args_signers(module, function_name, vec![], vec![], vec![],)
+            .err()
+            .unwrap()
+            .major_status(),
         StatusCode::ABORTED,
     );
     // private
@@ -760,16 +764,10 @@ fn check_script_function() {
         vec![],
     );
     assert_eq!(
-        call_script_function_with_args_ty_args_signers(
-            module,
-            function_name,
-            vec![],
-            vec![],
-            vec![],
-        )
-        .err()
-        .unwrap()
-        .major_status(),
+        call_function_with_args_ty_args_signers(module, function_name, vec![], vec![], vec![],)
+            .err()
+            .unwrap()
+            .major_status(),
         StatusCode::ABORTED,
     );
 }
@@ -780,13 +778,18 @@ fn call_missing_item() {
     let module_id = module.self_id();
     let mut module_blob = vec![];
     module.serialize(&mut module_blob).unwrap();
-
-    // missing module
     let function_name = ident_str!("foo");
+
     let move_vm = MoveVM::new(vec![]);
-    let mut remote_view = InMemoryStorage::new();
-    let mut session = move_vm.new_session(&remote_view);
+
+    let deserializer_config = &move_vm.vm_config().deserializer_config;
+    let module_storage = TestModuleStorage::empty(deserializer_config);
+    let mut resource_storage = InMemoryStorage::new();
+
     let traversal_storage = TraversalStorage::new();
+
+    // A module is missing.
+    let mut session = move_vm.new_session(&resource_storage);
     let error = session
         .execute_function_bypass_visibility(
             &module_id,
@@ -795,7 +798,7 @@ fn call_missing_item() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .err()
         .unwrap();
@@ -808,10 +811,13 @@ fn call_missing_item() {
     assert_eq!(error.status_type(), StatusType::Verification);
     drop(session);
 
-    // missing function
-    remote_view.publish_or_overwrite_module(module_id.clone(), module_blob);
-    let mut session = move_vm.new_session(&remote_view);
+    resource_storage.publish_or_overwrite_module(module_id.clone(), module_blob.clone());
+    module_storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
+
     let traversal_storage = TraversalStorage::new();
+
+    // A function is missing.
+    let mut session = move_vm.new_session(&resource_storage);
     let error = session
         .execute_function_bypass_visibility(
             &module_id,
@@ -820,7 +826,7 @@ fn call_missing_item() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .err()
         .unwrap();
