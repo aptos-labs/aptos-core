@@ -4,6 +4,7 @@
 pub mod abstract_write_op;
 pub mod change_set;
 pub mod environment;
+pub mod module_and_script_storage;
 pub mod module_write_set;
 pub mod output;
 pub mod resolver;

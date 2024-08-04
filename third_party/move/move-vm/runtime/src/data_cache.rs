@@ -254,7 +254,7 @@ impl<'r> TransactionDataCache<'r> {
                     self.remote.get_resource_bytes_with_metadata_and_layout(
                         &addr,
                         &ty_tag,
-                        metadata,
+                        &metadata,
                         if has_aggregator_lifting {
                             Some(&ty_layout)
                         } else {
@@ -390,6 +390,7 @@ impl<'r> TransactionDataCache<'r> {
         Ok(())
     }
 
+    #[deprecated]
     pub(crate) fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
         if let Some(account_cache) = self.account_map.get(module_id.address()) {
             if account_cache.module_map.contains_key(module_id.name()) {

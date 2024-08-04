@@ -55,7 +55,7 @@ impl GenesisMoveVM {
 
         let vm = MoveVM::new_with_config(
             aptos_natives_with_builder(&mut native_builder, false),
-            vm_config.clone(),
+            vm_config,
         );
 
         Self {
@@ -125,7 +125,7 @@ impl MoveVmExt {
             },
         };
 
-        let builder = SafeNativeBuilder::new(
+        let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
             native_gas_params,
             misc_gas_params,
@@ -141,17 +141,25 @@ impl MoveVmExt {
             .features()
             .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
 
-        Self {
-            inner: WarmVmCache::get_warm_vm(
+        let vm = if env.features().use_loader_v2() {
+            // TODO(loader_v2): For now re-create the VM every time. Later we can have a
+            //                  single VM created once.
+            MoveVM::new_with_config(
+                aptos_natives_with_builder(&mut builder, inject_create_signer_for_gov_sim),
+                vm_config,
+            )
+        } else {
+            WarmVmCache::get_warm_vm(
                 builder,
                 vm_config,
                 resolver,
                 env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
                 inject_create_signer_for_gov_sim,
             )
-            .expect("should be able to create Move VM; check if there are duplicated natives"),
-            env,
-        }
+            .expect("should be able to create Move VM; check if there are duplicated natives")
+        };
+
+        Self { inner: vm, env }
     }
 
     pub fn new(

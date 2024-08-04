@@ -31,7 +31,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<&[Metadata]>;
+    ) -> PartialVMResult<Vec<Metadata>>;
 
     /// Returns the deserialized module. There is no guarantees that the module has been
     /// previously verified. An error is returned if:
