@@ -2572,7 +2572,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
         maccess: &EA::ModuleAccess,
     ) -> Option<(QualifiedSymbol, Option<Symbol>, StructEntry)> {
-        let expected_type = if let Type::Reference(kind, ty) = expected_type {
+        let expected_type = if let Type::Reference(_kind, ty) = expected_type {
             ty
         } else {
             expected_type
