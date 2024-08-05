@@ -141,6 +141,15 @@ pub fn core_mempool_index_size(label: &'static str, size: usize) {
         .set(size as i64)
 }
 
+pub static SENDER_BUCKET_FREQUENCIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_core_mempool_sender_bucket_frequencies",
+        "Frequency of each sender bucket in core mempool",
+        &["sender_bucket"]
+    )
+    .unwrap()
+});
+
 /// Counter tracking size of each bucket in timeline index
 static CORE_MEMPOOL_TIMELINE_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
