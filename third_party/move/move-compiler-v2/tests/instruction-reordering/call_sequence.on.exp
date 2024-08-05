@@ -2,7 +2,6 @@
 
 [variant baseline]
 fun m::bar($t0: u64, $t1: u64) {
-     # deps: {}, dfs: []
   0: return ()
 }
 
@@ -11,13 +10,9 @@ fun m::bar($t0: u64, $t1: u64) {
 fun m::foo($t0: u64, $t1: &u64): u64 {
      var $t2: u64 [unused]
      var $t3: u64
-     # deps: {1, 2}, dfs: [Some(0)]
   0: touch($t0)
-     # deps: {1, 2}, dfs: [Some(1)]
   1: $t3 := read_ref($t1)
-     # deps: {2}, dfs: [Some(2)]
   2: $t0 := +($t0, $t3)
-     # deps: {}, dfs: [Some(3)]
   3: return $t0
 }
 
@@ -27,19 +22,12 @@ public fun m::test($t0: address, $t1: u64, $t2: u64) {
      var $t3: &u64
      var $t4: &m::Foo
      var $t5: u64 [unused]
-     # deps: {3, 4}, dfs: [Some(0)]
   0: touch($t2)
-     # deps: {2, 3, 4}, dfs: [Some(1)]
   1: touch($t1)
-     # deps: {1, 2, 3, 4}, dfs: [Some(2)]
   2: $t4 := borrow_global<m::Foo>($t0)
-     # deps: {2, 3, 4}, dfs: [Some(3)]
   3: $t3 := borrow_field<m::Foo>.x($t4)
-     # deps: {3, 4}, dfs: [Some(4)]
   4: $t1 := m::foo($t1, $t3)
-     # deps: {4}, dfs: [Some(5)]
   5: m::bar($t2, $t1)
-     # deps: {}, dfs: [None]
   6: return ()
 }
 

@@ -102,7 +102,7 @@ fun borrow::mut_field($t0: &mut borrow::S): u64 {
      var $t3: u64
   0: $t2 := borrow_field<borrow::S>.f($t0)
   1: $t3 := 22
-  2: write_ref($t2, $t3)
+  2: write_ref($t3, $t2)
   3: $t1 := read_ref($t2)
   4: return $t1
 }
@@ -117,7 +117,7 @@ fun borrow::mut_local($t0: u64): u64 {
   0: $t2 := 33
   1: $t3 := borrow_local($t2)
   2: $t4 := 22
-  3: write_ref($t3, $t4)
+  3: write_ref($t4, $t3)
   4: $t1 := read_ref($t3)
   5: return $t1
 }
@@ -130,7 +130,7 @@ fun borrow::mut_param($t0: u64): u64 {
      var $t3: u64
   0: $t2 := borrow_local($t0)
   1: $t3 := 22
-  2: write_ref($t2, $t3)
+  2: write_ref($t3, $t2)
   3: $t1 := read_ref($t2)
   4: return $t1
 }

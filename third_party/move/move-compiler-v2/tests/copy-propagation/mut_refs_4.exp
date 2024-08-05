@@ -13,7 +13,7 @@ fun m::test($t0: u64): u64 {
   2: $t4 := infer($t3)
   3: $t5 := infer($t4)
   4: $t6 := 0
-  5: write_ref($t2, $t6)
+  5: write_ref($t6, $t2)
   6: $t1 := infer($t5)
   7: return $t1
 }
@@ -46,7 +46,7 @@ fun m::test($t0: u64): u64 {
   2: $t4 := move($t3)
   3: $t5 := move($t4)
   4: $t6 := 0
-  5: write_ref($t2, $t6)
+  5: write_ref($t6, $t2)
   6: $t1 := move($t5)
   7: return $t1
 }

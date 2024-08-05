@@ -217,7 +217,6 @@ module 32.m {
 
 main() /* def_idx: 0 */ {
 L0:	loc0: u64
-L1:	loc1: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[0](loc0: u64)

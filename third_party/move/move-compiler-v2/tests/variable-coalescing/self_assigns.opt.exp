@@ -452,34 +452,32 @@ B0:
 public test3(): u64 /* def_idx: 2 */ {
 L0:	loc0: u64
 L1:	loc1: u64
-L2:	loc2: u64
 B0:
 	0: LdU64(0)
-	1: LdU64(1)
-	2: StLoc[0](loc0: u64)
+	1: StLoc[0](loc0: u64)
+	2: LdU64(1)
 	3: StLoc[1](loc1: u64)
 B1:
-	4: CopyLoc[1](loc1: u64)
+	4: CopyLoc[0](loc0: u64)
 	5: LdU64(42)
 	6: Lt
 	7: BrFalse(13)
 B2:
-	8: MoveLoc[1](loc1: u64)
+	8: MoveLoc[0](loc0: u64)
 	9: LdU64(1)
 	10: Add
-	11: StLoc[1](loc1: u64)
+	11: StLoc[0](loc0: u64)
 	12: Branch(14)
 B3:
 	13: Branch(15)
 B4:
 	14: Branch(4)
 B5:
-	15: MoveLoc[0](loc0: u64)
+	15: MoveLoc[1](loc1: u64)
 	16: Ret
 }
 public test4(Arg0: u64): u64 /* def_idx: 3 */ {
 L1:	loc0: u64
-L2:	loc1: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[1](loc0: u64)

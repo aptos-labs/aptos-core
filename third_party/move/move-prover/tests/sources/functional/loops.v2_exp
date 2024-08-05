@@ -38,8 +38,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =         <redacted> = <redacted>
    =     at tests/sources/functional/loops.move:78: iter10_abort_incorrect
    =     at tests/sources/functional/loops.move:82: iter10_abort_incorrect
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/loops.move:82: iter10_abort_incorrect
    =         ABORTED
 
 error: induction case of the loop invariant does not hold
@@ -64,7 +62,6 @@ error: induction case of the loop invariant does not hold
     =     at tests/sources/functional/loops.move:123: nested_loop_outer_invariant_incorrect
     =     at tests/sources/functional/loops.move:128: nested_loop_outer_invariant_incorrect
     =     at tests/sources/functional/loops.move:131: nested_loop_outer_invariant_incorrect
-    =         <redacted> = <redacted>
     =         x = <redacted>
     =     at tests/sources/functional/loops.move:117: nested_loop_outer_invariant_incorrect
     =     at tests/sources/functional/loops.move:119: nested_loop_outer_invariant_incorrect
@@ -87,7 +84,6 @@ error: induction case of the loop invariant does not hold
     =     loop invariant holds at current state
     =     at tests/sources/functional/loops.move:147: nested_loop_inner_invariant_incorrect
     =     at tests/sources/functional/loops.move:150: nested_loop_inner_invariant_incorrect
-    =         <redacted> = <redacted>
     =         y = <redacted>
     =     at tests/sources/functional/loops.move:143: nested_loop_inner_invariant_incorrect
     =     at tests/sources/functional/loops.move:145: nested_loop_inner_invariant_incorrect
@@ -111,7 +107,6 @@ error: induction case of the loop invariant does not hold
     =     at tests/sources/functional/loops.move:191: loop_with_two_back_edges_incorrect
     =     at tests/sources/functional/loops.move:195: loop_with_two_back_edges_incorrect
     =     at tests/sources/functional/loops.move:196: loop_with_two_back_edges_incorrect
-    =         <redacted> = <redacted>
     =         x = <redacted>
     =     at tests/sources/functional/loops.move:197: loop_with_two_back_edges_incorrect
     =     at tests/sources/functional/loops.move:189: loop_with_two_back_edges_incorrect
@@ -147,7 +142,6 @@ error: induction case of the loop invariant does not hold
     =     at tests/sources/functional/loops.move:225: loop_invariant_induction_invalid
     =     at tests/sources/functional/loops.move:221: loop_invariant_induction_invalid
     =     at tests/sources/functional/loops.move:227: loop_invariant_induction_invalid
-    =         <redacted> = <redacted>
     =         x = <redacted>
     =     at tests/sources/functional/loops.move:226: loop_invariant_induction_invalid
     =     at tests/sources/functional/loops.move:221: loop_invariant_induction_invalid

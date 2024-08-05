@@ -368,7 +368,7 @@ object "A3_AccountStateMachine" {
                         $t10 := $AddU64($t9, v)
                         // $t11 := borrow_field<AccountStateMachine::Account>.value($t0)
                         $t11 := $IndexPtr(this, 32)
-                        // write_ref($t11, $t10)
+                        // write_ref($t10, $t11)
                         $StoreU64($t11, $t10)
                         // return ()
                         leave
@@ -416,7 +416,7 @@ object "A3_AccountStateMachine" {
                         $t8 := $Sub($t7, v)
                         // $t9 := borrow_field<AccountStateMachine::Account>.value($t0)
                         $t9 := $IndexPtr(this, 32)
-                        // write_ref($t9, $t8)
+                        // write_ref($t8, $t9)
                         $StoreU64($t9, $t8)
                         // return ()
                         leave
@@ -792,7 +792,7 @@ object "A3_AccountStateMachine" {
                 $t6 := 1
                 // $t7 := +($t5, $t6)
                 $t7 := $AddU64($t5, $t6)
-                // write_ref($t3, $t7)
+                // write_ref($t7, $t3)
                 $StoreU64($t3, $t7)
                 // return $t4
                 $result := $t4

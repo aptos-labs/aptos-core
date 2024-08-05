@@ -22,7 +22,7 @@ public fun Test::borrow($t0|a: address) {
   7: $t8 := +($t6, $t7)
   8: $t9 := move($t1)
   9: $t10 := borrow_field<Test::R>.x($t9)
- 10: write_ref($t10, $t8)
+ 10: write_ref($t8, $t10)
  11: return ()
 }
 
@@ -44,7 +44,7 @@ public fun Test::borrow($t0|a: address) {
   3: $t5 := 1
   4: $t6 := +($t4, $t5) on_abort goto 12 with $t3
   5: $t7 := borrow_field<Test::R>.x($t2)
-  6: write_ref($t7, $t6)
+  6: write_ref($t6, $t7)
   7: write_back[Reference($t2).x (u64)]($t7)
   8: write_back[Test::R@]($t2)
      # global invariant at tests/global_invariant_instrumentation/borrow.move:7:9+57

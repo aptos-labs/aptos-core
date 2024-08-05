@@ -17,7 +17,7 @@ fun m::drop_after_loop() {
   4: if ($t2) goto 5 else goto 11
   5: label L2
   6: $t3 := 2
-  7: write_ref($t1, $t3)
+  7: write_ref($t3, $t1)
   8: $t4 := false
   9: $t2 := infer($t4)
  10: goto 13
@@ -65,7 +65,7 @@ fun m::drop_after_loop() {
      # live vars: $t0, $t1
   6: $t3 := 2
      # live vars: $t0, $t1, $t3
-  7: write_ref($t1, $t3)
+  7: write_ref($t3, $t1)
      # live vars: $t0, $t1
   8: $t4 := false
      # live vars: $t0, $t1, $t4
@@ -131,7 +131,7 @@ fun m::drop_after_loop() {
      # live vars: $t0, $t1
   6: $t3 := 2
      # live vars: $t0, $t1, $t3
-  7: write_ref($t1, $t3)
+  7: write_ref($t3, $t1)
      # live vars: $t0, $t1
   8: $t4 := false
      # live vars: $t0, $t1, $t4
@@ -229,7 +229,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@100,$t1=@101}
      # globals: {}
      #
-  7: write_ref($t1, $t3)
+  7: write_ref($t3, $t1)
      # live vars: $t0, $t1
      # graph: {@100=local($t0)[borrow_mut -> @101],@101=derived[]}
      # locals: {$t0=@100,$t1=@101}
@@ -407,7 +407,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@100,$t1=@101}
      # globals: {}
      #
-  7: write_ref($t1, $t3)
+  7: write_ref($t3, $t1)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
      # graph: {@100=local($t0)[borrow_mut -> @101],@101=derived[]}
@@ -555,7 +555,7 @@ fun m::drop_after_loop() {
   4: if ($t2) goto 5 else goto 11
   5: label L2
   6: $t3 := 2
-  7: write_ref($t1, $t3)
+  7: write_ref($t3, $t1)
   8: $t4 := false
   9: $t2 := move($t4)
  10: goto 14

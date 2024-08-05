@@ -4,7 +4,7 @@
 fun m::update($t0: &mut u64) {
      var $t1: u64
   0: $t1 := 0
-  1: write_ref($t0, $t1)
+  1: write_ref($t1, $t0)
   2: return ()
 }
 
@@ -31,7 +31,7 @@ fun m::test($t0: u64): u64 {
 fun m::update($t0: &mut u64) {
      var $t1: u64
   0: $t1 := 0
-  1: write_ref($t0, $t1)
+  1: write_ref($t1, $t0)
   2: return ()
 }
 

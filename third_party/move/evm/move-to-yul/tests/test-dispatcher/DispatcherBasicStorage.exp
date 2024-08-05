@@ -159,7 +159,7 @@ object "A2_M" {
                 $t4 := $AddU64($t2, $t3)
                 // $t5 := borrow_field<M::Storage>.counter($t0)
                 $t5 := self
-                // write_ref($t5, $t4)
+                // write_ref($t4, $t5)
                 $StoreU64($t5, $t4)
                 // return ()
             }
@@ -176,7 +176,7 @@ object "A2_M" {
                 $t4 := $AddU64($t2, $t3)
                 // $t5 := borrow_field<M::Storage>.counter($t0)
                 $t5 := self
-                // write_ref($t5, $t4)
+                // write_ref($t4, $t5)
                 $StoreU64($t5, $t4)
                 // return ()
             }

@@ -159,7 +159,7 @@ object "test_A2_M_test_increment_a" {
             // $t7 := borrow_field<M::S>.a($t2)
             /// @src 1:1142:1145
             $t7 := $IndexPtr($t2, 32)
-            // write_ref($t7, $t6)
+            // write_ref($t6, $t7)
             /// @src 1:1142:1155
             $StoreU64($t7, $t6)
             // return ()

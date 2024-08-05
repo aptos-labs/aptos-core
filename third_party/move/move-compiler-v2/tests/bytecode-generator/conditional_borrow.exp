@@ -162,13 +162,13 @@ fun M::test1($t0: u64): u64 {
   8: label L2
   9: $t2 := borrow_local($t3)
  10: $t6 := 10
- 11: write_ref($t2, $t6)
+ 11: write_ref($t6, $t2)
  12: $t7 := infer($t0)
  13: $t8 := borrow_local($t7)
  14: $t10 := read_ref($t8)
  15: $t11 := 1
  16: $t9 := +($t10, $t11)
- 17: write_ref($t8, $t9)
+ 17: write_ref($t9, $t8)
  18: $t12 := infer($t7)
  19: $t15 := 0
  20: $t14 := +($t12, $t15)
@@ -176,27 +176,27 @@ fun M::test1($t0: u64): u64 {
  22: $t17 := read_ref($t13)
  23: $t18 := 2
  24: $t16 := +($t17, $t18)
- 25: write_ref($t13, $t16)
+ 25: write_ref($t16, $t13)
  26: $t19 := infer($t12)
  27: $t21 := infer($t19)
  28: $t20 := borrow_local($t21)
  29: $t23 := read_ref($t20)
  30: $t24 := 4
  31: $t22 := +($t23, $t24)
- 32: write_ref($t20, $t22)
+ 32: write_ref($t22, $t20)
  33: $t26 := infer($t19)
  34: $t25 := borrow_local($t26)
  35: $t28 := read_ref($t25)
  36: $t29 := 8
  37: $t27 := +($t28, $t29)
- 38: write_ref($t25, $t27)
+ 38: write_ref($t27, $t25)
  39: $t32 := 3
  40: $t31 := infer($t19)
  41: $t30 := borrow_local($t31)
  42: $t34 := read_ref($t30)
  43: $t35 := 16
  44: $t33 := +($t34, $t35)
- 45: write_ref($t30, $t33)
+ 45: write_ref($t33, $t30)
  46: $t1 := infer($t19)
  47: return $t1
 }
@@ -279,7 +279,7 @@ fun M::test1b($t0: M::S): u64 {
  16: $t13 := read_ref($t4)
  17: $t14 := borrow_local($t13)
  18: $t12 := borrow_field<M::S>.f($t14)
- 19: write_ref($t12, $t11)
+ 19: write_ref($t11, $t12)
  20: $t15 := infer($t0)
  21: $t16 := borrow_local($t15)
  22: $t19 := read_ref($t16)
@@ -291,14 +291,14 @@ fun M::test1b($t0: M::S): u64 {
  28: $t24 := read_ref($t16)
  29: $t25 := borrow_local($t24)
  30: $t23 := borrow_field<M::S>.f($t25)
- 31: write_ref($t23, $t17)
+ 31: write_ref($t17, $t23)
  32: $t26 := infer($t15)
  33: $t28 := borrow_local($t26)
  34: $t27 := borrow_field<M::S>.f($t28)
  35: $t30 := read_ref($t27)
  36: $t31 := 1
  37: $t29 := +($t30, $t31)
- 38: write_ref($t27, $t29)
+ 38: write_ref($t29, $t27)
  39: $t32 := infer($t26)
  40: $t35 := borrow_local($t32)
  41: $t36 := borrow_field<M::S>.f($t35)
@@ -307,7 +307,7 @@ fun M::test1b($t0: M::S): u64 {
  44: $t38 := read_ref($t33)
  45: $t39 := 1
  46: $t37 := +($t38, $t39)
- 47: write_ref($t33, $t37)
+ 47: write_ref($t37, $t33)
  48: $t42 := borrow_local($t32)
  49: $t43 := borrow_field<M::S>.f($t42)
  50: $t41 := read_ref($t43)
@@ -315,7 +315,7 @@ fun M::test1b($t0: M::S): u64 {
  52: $t45 := read_ref($t40)
  53: $t46 := 8
  54: $t44 := +($t45, $t46)
- 55: write_ref($t40, $t44)
+ 55: write_ref($t44, $t40)
  56: $t49 := 3
  57: $t50 := borrow_local($t32)
  58: $t51 := borrow_field<M::S>.f($t50)
@@ -324,7 +324,7 @@ fun M::test1b($t0: M::S): u64 {
  61: $t53 := read_ref($t47)
  62: $t54 := 16
  63: $t52 := +($t53, $t54)
- 64: write_ref($t47, $t52)
+ 64: write_ref($t52, $t47)
  65: $t55 := borrow_local($t32)
  66: $t56 := borrow_field<M::S>.f($t55)
  67: $t1 := read_ref($t56)

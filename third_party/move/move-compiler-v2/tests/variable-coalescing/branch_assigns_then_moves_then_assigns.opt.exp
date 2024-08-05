@@ -237,7 +237,6 @@ script {
 
 main() /* def_idx: 0 */ {
 L0:	loc0: u64
-L1:	loc1: u64
 B0:
 	0: LdTrue
 	1: BrFalse(5)

@@ -188,7 +188,6 @@ B0:
 	0: Ret
 }
 test(Arg0: u64, Arg1: bool) /* def_idx: 1 */ {
-L2:	loc0: u64
 B0:
 	0: MoveLoc[1](Arg1: bool)
 	1: BrFalse(5)

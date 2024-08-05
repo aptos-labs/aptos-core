@@ -36,11 +36,11 @@ public fun Test::test_borrow_mut<#0>(): u64 {
   4: $t4 := copy($t0)
   5: $t5 := borrow_field<Test::R<#0>>.s($t4)
   6: $t6 := borrow_field<Test::S>.y($t5)
-  7: write_ref($t6, $t3)
+  7: write_ref($t3, $t6)
   8: $t7 := 3
   9: $t8 := copy($t0)
  10: $t9 := borrow_field<Test::R<#0>>.x($t8)
- 11: write_ref($t9, $t7)
+ 11: write_ref($t7, $t9)
  12: $t10 := move($t0)
  13: $t11 := borrow_field<Test::R<#0>>.x($t10)
  14: $t12 := read_ref($t11)
@@ -78,11 +78,11 @@ public fun Test::test_borrow_mut_local(): Test::R<u64> {
   9: $t9 := copy($t1)
  10: $t10 := borrow_field<Test::R<u64>>.s($t9)
  11: $t11 := borrow_field<Test::S>.y($t10)
- 12: write_ref($t11, $t8)
+ 12: write_ref($t8, $t11)
  13: $t12 := 3
  14: $t13 := move($t1)
  15: $t14 := borrow_field<Test::R<u64>>.x($t13)
- 16: write_ref($t14, $t12)
+ 16: write_ref($t12, $t14)
  17: $t15 := move($t0)
  18: return $t15
 }
@@ -124,12 +124,12 @@ public fun Test::test_borrow_mut<#0>(): u64 {
   3: $t4 := 2
   4: $t5 := borrow_field<Test::R<#0>>.s($t2)
   5: $t6 := borrow_field<Test::S>.y($t5)
-  6: write_ref($t6, $t4)
+  6: write_ref($t4, $t6)
   7: write_back[Reference($t5).y (u64)]($t6)
   8: write_back[Reference($t2).s (Test::S)]($t5)
   9: $t7 := 3
  10: $t8 := borrow_field<Test::R<#0>>.x($t2)
- 11: write_ref($t8, $t7)
+ 11: write_ref($t7, $t8)
  12: write_back[Reference($t2).x (u64)]($t8)
  13: $t9 := get_field<Test::R<#0>>.x($t2)
      # data invariant at tests/data_invariant_instrumentation/borrow.move:13:9+18
@@ -176,12 +176,12 @@ public fun Test::test_borrow_mut_local(): Test::R<u64> {
   8: $t7 := 2
   9: $t8 := borrow_field<Test::R<u64>>.s($t6)
  10: $t9 := borrow_field<Test::S>.y($t8)
- 11: write_ref($t9, $t7)
+ 11: write_ref($t7, $t9)
  12: write_back[Reference($t8).y (u64)]($t9)
  13: write_back[Reference($t6).s (Test::S)]($t8)
  14: $t10 := 3
  15: $t11 := borrow_field<Test::R<u64>>.x($t6)
- 16: write_ref($t11, $t10)
+ 16: write_ref($t10, $t11)
  17: write_back[Reference($t6).x (u64)]($t11)
      # data invariant at tests/data_invariant_instrumentation/borrow.move:13:9+18
      # VC: data invariant does not hold at tests/data_invariant_instrumentation/borrow.move:13:9+18

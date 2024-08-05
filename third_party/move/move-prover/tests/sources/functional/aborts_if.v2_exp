@@ -102,7 +102,7 @@ error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/aborts_if.move:139:5
     │
 137 │           if (x == 2 || x == 3) abort 1;
-    │                         ------ abort happened here with code 0x1
+    │                                 ------- abort happened here with code 0x1
 138 │       }
 139 │ ╭     spec abort_at_2_or_3_total_incorrect {
 140 │ │         // Counter check that we get an error message without the pragma.
@@ -136,7 +136,7 @@ error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/aborts_if.move:157:5
     │
 155 │           if (x == 2 || x == 3) abort 1;
-    │                         ------ abort happened here with code 0x1
+    │                                 ------- abort happened here with code 0x1
 156 │       }
 157 │ ╭     spec abort_at_2_or_3_strict_incorrect {
 158 │ │         // When the strict mode is enabled, no aborts_if clause means aborts_if false.

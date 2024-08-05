@@ -9,15 +9,15 @@ use 0000000000000000000000000000000000000000000000000000000000000001::vector as 
 
 public remove<Ty0>(Arg0: &mut vector<Ty0>, Arg1: u64): Ty0 /* def_idx: 0 */ {
 L2:	loc0: u64
-L3:	loc1: u64
-L4:	loc2: &mut vector<Ty0>
+L3:	loc1: &mut vector<Ty0>
+L4:	loc2: u64
 L5:	loc3: u64
 B0:
-	0: CopyLoc[0](Arg0: &mut vector<Ty0>)
-	1: FreezeRef
-	2: VecLen(1)
-	3: StLoc[2](loc0: u64)
-	4: CopyLoc[1](Arg1: u64)
+	0: CopyLoc[1](Arg1: u64)
+	1: CopyLoc[0](Arg0: &mut vector<Ty0>)
+	2: FreezeRef
+	3: VecLen(1)
+	4: StLoc[2](loc0: u64)
 	5: CopyLoc[2](loc0: u64)
 	6: Ge
 	7: BrFalse(12)
@@ -38,17 +38,17 @@ B3:
 	19: BrFalse(35)
 B4:
 	20: CopyLoc[0](Arg0: &mut vector<Ty0>)
-	21: StLoc[4](loc2: &mut vector<Ty0>)
+	21: StLoc[3](loc1: &mut vector<Ty0>)
 	22: CopyLoc[1](Arg1: u64)
-	23: StLoc[3](loc1: u64)
+	23: StLoc[4](loc2: u64)
 	24: MoveLoc[1](Arg1: u64)
 	25: LdU64(1)
 	26: Add
 	27: StLoc[1](Arg1: u64)
 	28: CopyLoc[1](Arg1: u64)
 	29: StLoc[5](loc3: u64)
-	30: MoveLoc[4](loc2: &mut vector<Ty0>)
-	31: MoveLoc[3](loc1: u64)
+	30: MoveLoc[3](loc1: &mut vector<Ty0>)
+	31: MoveLoc[4](loc2: u64)
 	32: MoveLoc[5](loc3: u64)
 	33: VecSwap(1)
 	34: Branch(36)
@@ -67,33 +67,32 @@ B0:
 	1: Ret
 }
 test_fold() /* def_idx: 2 */ {
-L0:	loc0: vector<u64>
-L1:	loc1: u64
-L2:	loc2: u64
+L0:	loc0: u64
+L1:	loc1: vector<u64>
 B0:
 	0: LdU64(0)
-	1: LdConst[1](Vector(U64): [1, 1, 0, 0, 0, 0, 0, 0, 0])
-	2: StLoc[0](loc0: vector<u64>)
-	3: MutBorrowLoc[0](loc0: vector<u64>)
-	4: Call 1vector::reverse<u64>(&mut vector<u64>)
-	5: StLoc[1](loc1: u64)
+	1: StLoc[0](loc0: u64)
+	2: LdConst[1](Vector(U64): [1, 1, 0, 0, 0, 0, 0, 0, 0])
+	3: StLoc[1](loc1: vector<u64>)
+	4: MutBorrowLoc[1](loc1: vector<u64>)
+	5: Call 1vector::reverse<u64>(&mut vector<u64>)
 B1:
-	6: ImmBorrowLoc[0](loc0: vector<u64>)
+	6: ImmBorrowLoc[1](loc1: vector<u64>)
 	7: Call 1vector::is_empty<u64>(&vector<u64>): bool
 	8: BrTrue(15)
 B2:
-	9: MutBorrowLoc[0](loc0: vector<u64>)
+	9: MutBorrowLoc[1](loc1: vector<u64>)
 	10: VecPopBack(5)
-	11: LdU64(0)
-	12: StLoc[1](loc1: u64)
-	13: Pop
+	11: Pop
+	12: LdU64(0)
+	13: StLoc[0](loc0: u64)
 	14: Branch(16)
 B3:
 	15: Branch(17)
 B4:
 	16: Branch(6)
 B5:
-	17: MoveLoc[1](loc1: u64)
+	17: MoveLoc[0](loc0: u64)
 	18: LdU64(0)
 	19: Eq
 	20: BrFalse(22)

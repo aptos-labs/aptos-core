@@ -144,7 +144,7 @@ object "test_A2_GlobalVectors_test_borrow_mut_global" {
                     $t17 := A1_vector_borrow_mut$u64$($t15, $t16)
                     // $t18 := 12
                     $t18 := 12
-                    // write_ref($t17, $t18)
+                    // write_ref($t18, $t17)
                     $StoreU64($t17, $t18)
                     // $t19 := 0x42
                     $t19 := 0x42

@@ -98,7 +98,7 @@ fun Test::mut_ref_param($t0|r: &mut Test::R): u64 {
   8: $t9 := -($t7, $t8)
   9: $t10 := move($t0)
  10: $t11 := borrow_field<Test::R>.v($t10)
- 11: write_ref($t11, $t9)
+ 11: write_ref($t9, $t11)
  12: $t12 := move($t1)
  13: return $t12
 }
@@ -160,7 +160,7 @@ fun Test::resource_with_old($t0|val: u64) {
  15: $t12 := +($t10, $t11)
  16: $t13 := move($t1)
  17: $t14 := borrow_field<Test::R>.v($t13)
- 18: write_ref($t14, $t12)
+ 18: write_ref($t12, $t14)
  19: return ()
 }
 
@@ -267,7 +267,7 @@ fun Test::mut_ref_param($t0|r: &mut Test::R): u64 {
   3: $t5 := 1
   4: $t6 := -($t4, $t5) on_abort goto 15 with $t7
   5: $t8 := borrow_field<Test::R>.v($t0)
-  6: write_ref($t8, $t6)
+  6: write_ref($t6, $t8)
   7: write_back[Reference($t0).v (u64)]($t8)
   8: trace_local[r]($t0)
   9: trace_local[r]($t0)
@@ -342,7 +342,7 @@ fun Test::resource_with_old($t0|val: u64) {
  15: $t9 := get_field<Test::R>.v($t8)
  16: $t10 := +($t9, $t0) on_abort goto 26 with $t6
  17: $t11 := borrow_field<Test::R>.v($t8)
- 18: write_ref($t11, $t10)
+ 18: write_ref($t10, $t11)
  19: write_back[Reference($t8).v (u64)]($t11)
  20: write_back[Test::R@]($t8)
  21: label L2
