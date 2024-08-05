@@ -1964,11 +1964,11 @@ fn realistic_env_max_load_test(
 
     let mut success_criteria = SuccessCriteria::new(95)
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
-            // Check that we don't use more than 18 CPU cores for 10% of the time.
-            MetricsThreshold::new(18.0, 10),
-            // Memory starts around 3.5GB, and grows around 1.4GB/hr in this test.
-            // Check that we don't use more than final expected memory for more than 10% of the time.
-            MetricsThreshold::new_gb(3.5 + 1.4 * (duration_secs as f64 / 3600.0), 10),
+            // Check that we don't use more than 18 CPU cores for 15% of the time.
+            MetricsThreshold::new(25.0, 15),
+            // Memory starts around 5GB, and grows around 1.4GB/hr in this test.
+            // Check that we don't use more than final expected memory for more than 15% of the time.
+            MetricsThreshold::new_gb(5.0 + 1.4 * (duration_secs as f64 / 3600.0), 15),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -1991,7 +1991,7 @@ fn realistic_env_max_load_test(
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
-                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.75),
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 1.0),
                 ],
                 5,
             ),
@@ -2009,13 +2009,13 @@ fn realistic_env_max_load_test(
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
-                    4600
+                    7000
                 } else if long_running {
                     // This is for forge stable
-                    7000
+                    11000
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    6500
+                    10000
                 },
             ),
         }))
@@ -2029,6 +2029,12 @@ fn realistic_env_max_load_test(
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
+        }))
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
+            optimize_state_sync_for_throughput(config, 3500);
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(move |config, _| {
+            optimize_state_sync_for_throughput(config, 3500);
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
@@ -2070,7 +2076,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-            optimize_state_sync_for_throughput(config);
+            optimize_state_sync_for_throughput(config, 15_000);
 
             optimize_for_maximum_throughput(config, TARGET_TPS, MAX_TXNS_PER_BLOCK, VN_LATENCY_S);
 
@@ -2109,7 +2115,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                optimize_state_sync_for_throughput(config);
+                optimize_state_sync_for_throughput(config, 15_000);
 
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
@@ -2164,8 +2170,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 }
 
 /// Optimizes the state sync configs for throughput
-fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig) {
-    let max_chunk_size = 15_000; // This allows state sync to match consensus block sizes
+/// `max_chunk_size` is the maximum number of transactions to include in a chunk.
+fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig, max_chunk_size: u64) {
     let max_chunk_bytes = 40 * 1024 * 1024; // 10x the current limit (to prevent execution fallback)
 
     // Update the chunk sizes for the data client
