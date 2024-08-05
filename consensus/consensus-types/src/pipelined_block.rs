@@ -9,9 +9,9 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
 use aptos_executor_types::StateComputeResult;
-use aptos_logger::warn;
+use aptos_logger::{error, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
@@ -125,22 +125,37 @@ impl PipelinedBlock {
             }
         }
 
+        let execution_summary = ExecutionSummary {
+            payload_len: self
+                .block
+                .payload()
+                .map_or(0, |payload| payload.len_for_execution()),
+            to_commit,
+            to_retry,
+            execution_time,
+            root_hash: self.state_compute_result.root_hash(),
+        };
+
         // We might be retrying execution, so it might have already been set.
         // Because we use this for statistics, it's ok that we drop the newer value.
-        if self
-            .execution_summary
-            .set(ExecutionSummary {
-                payload_len: self
-                    .block
-                    .payload()
-                    .map_or(0, |payload| payload.len_for_execution()),
-                to_commit,
-                to_retry,
-                execution_time,
-            })
-            .is_err()
-        {
-            warn!("Execution result recomputed, leaving stale ExecutionSummary")
+        if let Some(previous) = self.execution_summary.get() {
+            if previous.root_hash == execution_summary.root_hash
+                || previous.root_hash == *ACCUMULATOR_PLACEHOLDER_HASH
+            {
+                warn!(
+                    "Skipping re-inserting execution result, from {:?} to {:?}",
+                    previous, execution_summary
+                );
+            } else {
+                error!(
+                    "Re-inserting execution result with different root hash: from {:?} to {:?}",
+                    previous, execution_summary
+                );
+            }
+        } else {
+            self.execution_summary
+                .set(execution_summary)
+                .expect("inserting into empty execution summary");
         }
 
         self
@@ -300,4 +315,5 @@ pub struct ExecutionSummary {
     pub to_commit: u64,
     pub to_retry: u64,
     pub execution_time: Duration,
+    pub root_hash: HashValue,
 }
