@@ -501,14 +501,23 @@ impl BufferManager {
         let executed_blocks = match inner {
             Ok(result) => result,
             Err(ExecutorError::CouldNotGetData) => {
+                counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT
+                    .with_label_values(&["CouldNotGetData"])
+                    .inc();
                 warn!("Execution error - CouldNotGetData {}", block_id);
                 return;
             },
             Err(ExecutorError::BlockNotFound(block_id)) => {
+                counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT
+                    .with_label_values(&["BlockNotFound"])
+                    .inc();
                 warn!("Execution error BlockNotFound {}", block_id);
                 return;
             },
             Err(e) => {
+                counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT
+                    .with_label_values(&["UnexpectedError"])
+                    .inc();
                 error!("Execution error {:?} for {}", e, block_id);
                 return;
             },

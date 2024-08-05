@@ -1002,6 +1002,16 @@ pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the buffer manager receiving executor error
+pub static BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_buffer_manager_received_executor_error_count",
+        "Count of the buffer manager receiving executor error",
+        &["error_type"],
+    )
+    .unwrap()
+});
+
 const PROPSER_ELECTION_DURATION_BUCKETS: [f64; 17] = [
     0.001, 0.002, 0.003, 0.004, 0.006, 0.008, 0.01, 0.012, 0.014, 0.0175, 0.02, 0.025, 0.05, 0.25,
     0.5, 1.0, 2.0,
