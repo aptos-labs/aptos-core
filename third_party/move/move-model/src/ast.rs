@@ -60,6 +60,8 @@ pub struct SpecFunDecl {
     pub body: Option<Exp>,
     pub callees: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub is_recursive: RefCell<Option<bool>>,
+    /// The instantiations for which this function is known to use generic type reflection.
+    pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
 }
 
 // =================================================================================================

@@ -245,7 +245,8 @@ impl PrioritizedPeersState {
     fn update_sender_bucket_for_peers(
         &mut self,
         peer_monitoring_data: &HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>>,
-        num_txns_received_since_peers_updated: u64,
+        num_mempool_txns_received_since_peers_updated: u64,
+        num_committed_txns_received_since_peers_updated: u64,
     ) {
         // TODO: If the top peer set didn't change, then don't change the Primary sender bucket assignment.
         // TODO: (Minor) If the load is low, don't do load balancing for Failover buckets.
@@ -253,7 +254,7 @@ impl PrioritizedPeersState {
 
         // Obtain the top peers to assign the sender buckets with Primary priority
         let mut top_peers = vec![];
-        let time_elapsed_since_last_update =
+        let secs_elapsed_since_last_update =
             self.last_peer_priority_update.map_or(0, |last_update| {
                 self.time_service
                     .now()
@@ -261,8 +262,17 @@ impl PrioritizedPeersState {
                     .as_secs()
             });
 
-        let average_mempool_traffic_observed = num_txns_received_since_peers_updated as f64
-            / max(1, time_elapsed_since_last_update) as f64;
+        // When the node is in state sync mode, it will receive more mempool commit notifications than the actual
+        // commits that happens on the blockchain during the same time period. As secs_elapsed_since_last_update is
+        // local time and not the on chain time, the average_committed_traffic_observed is only a local estimate of
+        // the traffic and could differ from the actual traffic observed by the blockchain. If the estimate differs
+        // from the actual traffic observed on the blockchain, we could end up load balancing more or less than required.
+        let average_mempool_traffic_observed = num_mempool_txns_received_since_peers_updated as f64
+            / max(1, secs_elapsed_since_last_update) as f64;
+        let average_committed_traffic_observed = num_committed_txns_received_since_peers_updated
+            as f64
+            / max(1, secs_elapsed_since_last_update) as f64;
+
         // Obtain the highest threshold from mempool_config.load_balancing_thresholds for which avg_mempool_traffic_threshold_in_tps exceeds average_mempool_traffic_observed
         let threshold_config = self
             .mempool_config
@@ -272,7 +282,10 @@ impl PrioritizedPeersState {
             .rev()
             .find(|threshold_config| {
                 threshold_config.avg_mempool_traffic_threshold_in_tps
-                    <= average_mempool_traffic_observed as u64
+                    <= max(
+                        average_mempool_traffic_observed as u64,
+                        average_committed_traffic_observed as u64,
+                    )
             })
             .unwrap_or_default();
 
@@ -289,13 +302,17 @@ impl PrioritizedPeersState {
         );
         info!(
             "Time elapsed since last peer update: {:?}\n
-            Number of transactions received since last peer update: {:?},\n
+            Number of mempool transactions received since last peer update: {:?},\n
             Average mempool traffic observed: {:?},\n
+            Number of committed transactions received since last peer update: {:?},\n
+            Average committed traffic observed: {:?},\n
             Load balancing threshold config: {:?},\n
             Number of top peers picked: {:?}",
-            time_elapsed_since_last_update,
-            num_txns_received_since_peers_updated,
+            secs_elapsed_since_last_update,
+            num_mempool_txns_received_since_peers_updated,
             average_mempool_traffic_observed,
+            num_committed_txns_received_since_peers_updated,
+            average_committed_traffic_observed,
             threshold_config,
             num_top_peers
         );
@@ -391,7 +408,8 @@ impl PrioritizedPeersState {
     pub fn update_prioritized_peers(
         &mut self,
         peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
-        num_txns_received_since_peers_updated: u64,
+        num_mempool_txns_received_since_peers_updated: u64,
+        num_committed_txns_recieved_since_peers_updated: u64,
     ) {
         let peer_monitoring_data: HashMap<PeerNetworkId, Option<&PeerMonitoringMetadata>> =
             peers_and_metadata.clone().into_iter().collect();
@@ -415,7 +433,8 @@ impl PrioritizedPeersState {
         // Divide the sender buckets amongst the top peers
         self.update_sender_bucket_for_peers(
             &peer_monitoring_data,
-            num_txns_received_since_peers_updated,
+            num_mempool_txns_received_since_peers_updated,
+            num_committed_txns_recieved_since_peers_updated,
         );
 
         // Set the last peer priority update time
@@ -786,7 +805,7 @@ mod test {
         let peer_4 = (create_public_peer(), Some(&peer_metadata_4));
 
         let all_peers = vec![peer_1, peer_2, peer_3, peer_4];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 5000);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 5000, 7000);
         assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
         prioritized_peer_state_well_formed(
             &prioritized_peers_state,
@@ -798,7 +817,7 @@ mod test {
         );
 
         let all_peers = vec![peer_1, peer_2, peer_4];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 3000);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 3000, 7000);
         assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
         prioritized_peer_state_well_formed(
             &prioritized_peers_state,
@@ -810,7 +829,7 @@ mod test {
         );
 
         let all_peers = vec![peer_3, peer_1];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 0);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 0, 0);
         assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
         prioritized_peer_state_well_formed(
             &prioritized_peers_state,
@@ -840,7 +859,7 @@ mod test {
         let peer_4 = (create_public_peer(), Some(&peer_metadata_4));
 
         let all_peers = vec![peer_1, peer_2, peer_3, peer_4];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 5000);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 5000, 2000);
         assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
         prioritized_peer_state_well_formed(
             &prioritized_peers_state,
@@ -848,7 +867,7 @@ mod test {
         );
 
         let all_peers = vec![peer_1, peer_2, peer_4];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 3000);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 3000, 2000);
         assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
         prioritized_peer_state_well_formed(
             &prioritized_peers_state,
@@ -856,7 +875,7 @@ mod test {
         );
 
         let all_peers = vec![peer_3, peer_1];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 0);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 0, 0);
         assert!(!prioritized_peers_state.peer_to_sender_buckets.is_empty());
         prioritized_peer_state_well_formed(
             &prioritized_peers_state,
@@ -1113,7 +1132,7 @@ mod test {
 
         // Update the prioritized peers
         let all_peers = vec![public_peer_1, public_peer_2, public_peer_3, public_peer_4];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 5000);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 5000, 7000);
 
         // Verify that the prioritized peers were updated correctly
         let expected_peers = vec![
@@ -1140,7 +1159,7 @@ mod test {
 
         // Update the prioritized peers for only peers with ping latencies
         let all_peers = vec![public_peer_1, public_peer_2, public_peer_3];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 5000);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 5000, 1000);
 
         // Verify that the prioritized peers were updated correctly
         let expected_peers = vec![public_peer_3.0, public_peer_1.0, public_peer_2.0];
@@ -1181,7 +1200,7 @@ mod test {
 
         // Update the prioritized peers
         let all_peers = vec![validator_peer, vfn_peer, public_peer];
-        prioritized_peers_state.update_prioritized_peers(all_peers, 5000);
+        prioritized_peers_state.update_prioritized_peers(all_peers, 5000, 2000);
 
         // Verify that the prioritized peers were updated correctly
         let expected_peers = vec![validator_peer.0, vfn_peer.0, public_peer.0];
@@ -1202,7 +1221,7 @@ mod test {
         // Update the prioritized peers multiple times and verify that the order is consistent
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         for _ in 0..10 {
-            prioritized_peers_state.update_prioritized_peers(all_peers.clone(), 5000);
+            prioritized_peers_state.update_prioritized_peers(all_peers.clone(), 5000, 2000);
             let new_prioritized_peers = prioritized_peers_state.prioritized_peers.read().clone();
             assert_eq!(prioritized_peers, new_prioritized_peers);
         }
