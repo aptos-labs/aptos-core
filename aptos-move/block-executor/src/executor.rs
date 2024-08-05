@@ -125,7 +125,7 @@ where
         // VM execution.
         let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
 
-        if idx_to_execute <= 2 {
+        if idx_to_execute <= 50 {
             let cur = Instant::now();
             println!("critical path, about to execute transaction with version, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
         }
@@ -137,7 +137,7 @@ where
             fallback,
         );
 
-        if idx_to_execute <= 2 {
+        if idx_to_execute <= 50 {
             let cur = Instant::now();
             println!("critical path, executed transaction with vertsion, thread_id={}, txn={} at time {:?}", *thread_id, idx_to_execute, cur-*start_time_all);
             sync_view.print_debug_info();
