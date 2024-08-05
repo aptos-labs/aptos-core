@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected positional constructor `test::S(..)` for struct `test::S`
+  ┌─ tests/checking/positional_fields/constructor_invalid1.move:5:9
+  │
+5 │         S { _0: 42, _1: 42 };
+  │         ^^^^^^^^^^^^^^^^^^^^

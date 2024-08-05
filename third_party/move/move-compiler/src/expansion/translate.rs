@@ -1424,8 +1424,8 @@ fn struct_layout(
 ) -> E::StructLayout {
     match parsed_layout {
         P::StructLayout::Native(loc) => E::StructLayout::Native(loc),
-        P::StructLayout::Singleton(fields) => {
-            E::StructLayout::Singleton(struct_fields(context, fields))
+        P::StructLayout::Singleton(fields, is_positional) => {
+            E::StructLayout::Singleton(struct_fields(context, fields), is_positional)
         },
         P::StructLayout::Variants(variants) => {
             let mut previous_variants = BTreeMap::new();
@@ -1461,6 +1461,7 @@ fn struct_layout(
                             loc: v.loc,
                             name: v.name,
                             fields: struct_fields(context, v.fields),
+                            is_positional: v.is_positional,
                         }
                     })
                     .collect(),
@@ -2929,6 +2930,18 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             let fields = fields(context, loc, "deconstruction binding", "binding", vfields?);
             EL::Unpack(tn, tys_opt, fields)
         },
+        PB::PositionalUnpack(ptn, ptys_opt, pargs) => {
+            let tn = name_access_chain(
+                context,
+                Access::ApplyPositional,
+                *ptn,
+                Some(DeprecatedItem::Struct),
+            )?;
+            let tys_opt = optional_types(context, ptys_opt);
+            let fields: Option<Vec<E::LValue>> =
+                pargs.into_iter().map(|pb| bind(context, pb)).collect();
+            EL::PositionalUnpack(tn, tys_opt, Spanned::new(loc, fields?))
+        },
     };
     Some(sp(loc, b_))
 }
@@ -3268,6 +3281,7 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
         EL::Unpack(_, _, efields) => efields
             .iter()
             .for_each(|(_, _, (_, l))| unbound_names_bind(unbound, l)),
+        EL::PositionalUnpack(_, _, ls) => unbound_names_binds(unbound, ls),
     }
 }
 
@@ -3289,6 +3303,7 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
         EL::Unpack(_, _, efields) => efields
             .iter()
             .for_each(|(_, _, (_, l))| unbound_names_assign(unbound, l)),
+        EL::PositionalUnpack(_, _, ls) => unbound_names_assigns(unbound, ls),
     }
 }
 

@@ -164,7 +164,7 @@ fn derive_module_for_async(
                 new_structs.push(new_struct(
                     loc,
                     StructName(sp(loc, Symbol::from(struct_name))),
-                    StructLayout::Singleton(fields),
+                    StructLayout::Singleton(fields, false),
                 ));
             }
         }

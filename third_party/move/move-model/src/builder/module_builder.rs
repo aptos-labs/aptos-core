@@ -255,10 +255,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         qsym
     }
 
+    pub fn is_variant(maccess: &EA::ModuleAccess) -> bool {
+        matches!(
+            maccess.value,
+            EA::ModuleAccess_::ModuleAccess(_, _, Some(_))
+        )
+    }
+
     pub fn check_no_variant(&self, maccess: &EA::ModuleAccess) -> bool {
-        if let EA::ModuleAccess_::ModuleAccess(_, _, Some(n)) = &maccess.value {
+        if Self::is_variant(maccess) {
             self.parent.env.error(
-                &self.parent.to_loc(&n.loc),
+                &self.parent.to_loc(&maccess.loc),
                 "variants not allowed in this context",
             );
             false
@@ -1218,10 +1225,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // Notice: duplicate field and variant declarations are currently checked in
         // the expansion phase, so don't need to do here again.
         let (layout, is_empty_struct) = match &def.layout {
-            EA::StructLayout::Singleton(fields) => {
+            EA::StructLayout::Singleton(fields, is_positional) => {
                 let (map, is_struct_empty) =
                     Self::build_field_map(&mut et, None, struct_abilities, &loc, fields);
-                (StructLayout::Singleton(map), is_struct_empty)
+                (
+                    StructLayout::Singleton(map, *is_positional),
+                    is_struct_empty,
+                )
             },
             EA::StructLayout::Variants(variants) => {
                 let mut variant_maps = variants
@@ -1242,6 +1252,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             name: variant_name,
                             attributes,
                             fields: variant_fields,
+                            is_positional: v.is_positional,
                         }
                     })
                     .collect_vec();
@@ -1805,7 +1816,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 et.define_type_params(loc, &entry.type_params, false);
-                if let StructLayout::Singleton(fields) = &entry.layout {
+                if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
                     for f in fields.values() {
                         et.define_local(
@@ -3488,7 +3499,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let mut field_data: BTreeMap<FieldId, FieldData> = BTreeMap::new();
             let mut variants: BTreeMap<Symbol, model::StructVariant> = BTreeMap::new();
             match &entry.layout {
-                StructLayout::Singleton(fields) => {
+                StructLayout::Singleton(fields, _) => {
                     field_data.extend(fields.values().map(|f| (FieldId::new(f.name), f.clone())));
                 },
                 StructLayout::Variants(entry_variants) => {

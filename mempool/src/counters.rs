@@ -151,10 +151,10 @@ static CORE_MEMPOOL_TIMELINE_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub fn core_mempool_timeline_index_size(bucket_min_size_pairs: &Vec<(&str, usize)>) {
-    for &(bucket_min, size) in bucket_min_size_pairs {
+pub fn core_mempool_timeline_index_size(bucket_min_size_pairs: Vec<(String, usize)>) {
+    for (bucket_min, size) in bucket_min_size_pairs {
         CORE_MEMPOOL_TIMELINE_INDEX_SIZE
-            .with_label_values(&[bucket_min])
+            .with_label_values(&[bucket_min.as_str()])
             .set(size as i64)
     }
 }

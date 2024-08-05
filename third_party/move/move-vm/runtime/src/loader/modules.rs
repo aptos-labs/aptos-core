@@ -147,45 +147,28 @@ impl ModuleStorageAdapter {
             })
     }
 
-    // Given a ModuleId::func_name, retrieve the `StructType` and the index associated.
-    // Return and error if the function has not been loaded
-    pub(crate) fn resolve_function_by_name(
+    /// Given module address/name and the function name, returns the corresponding module
+    /// and function if they exist in module store cache. If not, an error is returned.
+    pub(crate) fn resolve_module_and_function_by_name(
         &self,
-        func_name: &IdentStr,
         module_id: &ModuleId,
-    ) -> PartialVMResult<Arc<Function>> {
-        let may_be_func = self.modules.fetch_module(module_id).and_then(|module| {
-            let idx = module.function_map.get(func_name)?;
-            module.function_defs.get(*idx).cloned()
-        });
-        match may_be_func {
-            Some(func) => Ok(func),
-            None => Err(
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
-                    "Cannot find {:?}::{:?} in cache",
-                    module_id, func_name
-                )),
-            ),
-        }
-    }
+        func_name: &IdentStr,
+    ) -> PartialVMResult<(Arc<Module>, Arc<Function>)> {
+        let error = || {
+            PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
+                "Cannot find {:?}::{:?} in cache",
+                module_id, func_name
+            ))
+        };
 
-    pub(crate) fn function_at(&self, handle: &FunctionHandle) -> PartialVMResult<Arc<Function>> {
-        match handle {
-            FunctionHandle::Local(func) => Ok(func.clone()),
-            FunctionHandle::Remote { module, name } => {
-                self.modules
-                    .fetch_module(module)
-                    .and_then(|module| {
-                        let idx = module.function_map.get(name)?;
-                        module.function_defs.get(*idx).cloned()
-                    })
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
-                            format!("Failed to resolve function: {:?}::{:?}", module, name),
-                        )
-                    })
-            },
-        }
+        let module = self.modules.fetch_module(module_id).ok_or_else(error)?;
+        let function = module
+            .function_map
+            .get(func_name)
+            .and_then(|idx| module.function_defs.get(*idx))
+            .cloned()
+            .ok_or_else(error)?;
+        Ok((module, function.clone()))
     }
 }
 
@@ -195,7 +178,6 @@ impl ModuleStorageAdapter {
 // so that any data needed for execution is immediately available
 #[derive(Clone, Debug)]
 pub struct Module {
-    #[allow(dead_code)]
     id: ModuleId,
 
     // size in bytes
@@ -646,6 +628,10 @@ impl Module {
         Ok((module.identifier_at(field.name).to_owned(), ty))
     }
 
+    pub(crate) fn self_id(&self) -> &ModuleId {
+        &self.id
+    }
+
     pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> Arc<StructType> {
         self.structs[idx.0 as usize].definition_struct_type.clone()
     }
@@ -669,8 +655,12 @@ impl Module {
         &self.function_refs[idx as usize]
     }
 
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &FunctionInstantiation {
-        &self.function_instantiations[idx as usize]
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
+        &self.function_instantiations[idx as usize].instantiation
+    }
+
+    pub(crate) fn function_instantiation_handle_at(&self, idx: u16) -> &FunctionHandle {
+        &self.function_instantiations[idx as usize].handle
     }
 
     pub(crate) fn field_count(&self, idx: u16) -> u16 {

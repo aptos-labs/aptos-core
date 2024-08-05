@@ -60,10 +60,6 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: python3 scripts/check-cryptohasher-symbols.py
 
   # Run all rust lints. This is a PR required job.
@@ -185,9 +181,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Run aptos cached packages build test
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         run: scripts/cargo_build_aptos_cached_packages.sh --check
@@ -200,12 +193,6 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v4
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - uses: taiki-e/install-action@v1.5.6
-        with:
-          tool: nextest
       - run: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-api --exclude aptos-executor-benchmark --exclude aptos-backup-cli --retries 3 --no-fail-fast -F consensus-only-perf-test
         env:
           RUST_MIN_STACK: 4297152
@@ -216,12 +203,6 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v4
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - uses: taiki-e/install-action@v1.5.6
-        with:
-          tool: nextest
       # prebuild aptos-node binary, so that tests don't start before node is built.
       # also prebuild aptos-node binary as a separate step to avoid feature unification issues
       - run: cargo build --locked --package=aptos-node -F consensus-only-perf-test --release && LOCAL_SWARM_NODE_RELEASE=1 CONSENSUS_ONLY_PERF_TEST=1 cargo nextest run --release --package smoke-test -E "test(test_consensus_only_with_txn_emitter)" --run-ignored all

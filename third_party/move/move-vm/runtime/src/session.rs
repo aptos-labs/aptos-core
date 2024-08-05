@@ -62,13 +62,14 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
         if !func.is_entry() {
+            let module_id = func
+                .module_id()
+                .cloned()
+                .expect("Entry function always has module id");
             return Err(PartialVMError::new(
                 StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
             )
-            .finish(Location::Module(
-                func.module_id()
-                    .expect("Entry function always has module id"),
-            )));
+            .finish(Location::Module(module_id)));
         }
 
         self.move_vm.runtime.execute_function_instantiation(
