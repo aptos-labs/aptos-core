@@ -80,10 +80,10 @@ impl InstructionReordering {
             return None;
         }
         let cfg = StacklessControlFlowGraph::new_forward(code);
-        let live_vars = target
-            .get_annotations()
-            .get::<LiveVarAnnotation>()
-            .expect("live variable annotation is a prerequisite");
+        // let live_vars = target
+        //     .get_annotations()
+        //     .get::<LiveVarAnnotation>()
+        //     .expect("live variable annotation is a prerequisite");
         let mut block_ranges = cfg
             .blocks()
             .iter()
@@ -99,7 +99,7 @@ impl InstructionReordering {
                 block,
                 ordering,
                 touch_use,
-            } = Self::optimize_block_for_stack_machine(code, lower, upper, live_vars, target);
+            } = Self::optimize_block_for_stack_machine(code, lower, upper, target);
             let new_lower = new_code.len() as CodeOffset;
             new_code.extend(block);
             for (offset, order_info) in ordering.0.into_iter() {
@@ -109,10 +109,9 @@ impl InstructionReordering {
                 );
             }
             for (touch_offset, tuple) in touch_use.0 {
-                touch_use_annotation.0.insert(
-                    new_lower + touch_offset,
-                    (new_lower + tuple.0, tuple.1),
-                );
+                touch_use_annotation
+                    .0
+                    .insert(new_lower + touch_offset, (new_lower + tuple.0, tuple.1));
             }
         }
         Some(ReorderedFunction {
@@ -126,7 +125,6 @@ impl InstructionReordering {
         code: &[Bytecode],
         lower: CodeOffset,
         upper: CodeOffset,
-        _live_vars: &LiveVarAnnotation,
         target: &FunctionTarget,
     ) -> ReorderedBlock {
         let mut new_block = code[usize::from(lower)..=usize::from(upper)].to_vec();
@@ -947,7 +945,10 @@ fn is_ref_arg_instr(instr: &Bytecode, target: &FunctionTarget) -> bool {
             // target.get_local_type(dsts[0]).is_mutable_reference()
         },
         Bytecode::Call(_, _, op, _, _) => {
-            matches!(op, FreezeRef(_) | WriteRef | BorrowGlobal(..) | BorrowField(..))
+            matches!(
+                op,
+                FreezeRef(_) | WriteRef | BorrowGlobal(..) | BorrowField(..)
+            )
         },
         _ => false,
     }

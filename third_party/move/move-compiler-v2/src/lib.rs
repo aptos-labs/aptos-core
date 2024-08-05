@@ -449,13 +449,12 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     }
 
     if options.experiment_on(Experiment::INSTRUCTION_REORDERING) {
-        // We need to track all usages of variable definitions to be able to reorder instructions.
-        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
         pipeline.add_processor(Box::new(InstructionReorderingProcessor {}));
     }
 
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
+    // There should be no "transforming" processors run after this point.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
 
     if options.experiment_on(Experiment::FLUSH_WRITES_OPTIMIZATION) {
