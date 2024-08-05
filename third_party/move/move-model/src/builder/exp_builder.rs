@@ -2472,7 +2472,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             && args.value.len() > arity
                             && !(args.value.len() == 1 && arity == 0)
                     {
-                        self.error(loc, &context.arity_mismatch(true, arity, args.value.len()));
+                        self.error(loc, &ErrorMessageContext::PositionalConstructorArgument.arity_mismatch(
+                            false,
+                            args.value.len(),
+                            arity,
+                        ));
                         return self.new_error_pat(loc);
                     }
                     let mut fields = UniqueMap::new();
