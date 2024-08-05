@@ -332,14 +332,4 @@ warning: Unused assignment to `x`. Consider removing or prefixing with an unders
    │                                   ^^^^^^^^^
 
 
-Diagnostics:
-error: mutable reference in local `s` requires exclusive access but is borrowed
-   ┌─ tests/bytecode-generator/freeze_mut_ref.move:66:35
-   │
-65 │         let f = &mut ({x = x + 1; s}).f;
-   │                 ----------------------- previous mutable field borrow
-66 │         let g = &mut ({x = x + 1; s}).f;
-   │                                   ^ requirement enforced here
-   ·
-69 │         *({*f = 0; z = y; g}) = 2;
-   │            ------ conflicting reference `f` used here
+============ bytecode verification succeeded ========
