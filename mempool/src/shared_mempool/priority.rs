@@ -262,6 +262,11 @@ impl PrioritizedPeersState {
                     .as_secs()
             });
 
+        // When the node is in state sync mode, it will receive more mempool commit notifications than the actual
+        // commits that happens on the blockchain during the same time period. As time_elapsed_since_last_update is
+        // local time and not the on chain time, the average_committed_traffic_observed is only a local estimate of
+        // the traffic and could differ from the actual traffic observed by the blockchain. If the estimate differs
+        // from the actual traffic observed on the blockchain, we could end up load balancing more or less than required.
         let average_mempool_traffic_observed = num_mempool_txns_received_since_peers_updated as f64
             / max(1, time_elapsed_since_last_update) as f64;
         let average_committed_traffic_observed = num_committed_txns_received_since_peers_updated
