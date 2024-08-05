@@ -2076,7 +2076,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-            optimize_state_sync_for_throughput(config);
+            optimize_state_sync_for_throughput(config, 15_000);
 
             optimize_for_maximum_throughput(config, TARGET_TPS, MAX_TXNS_PER_BLOCK, VN_LATENCY_S);
 
@@ -2115,7 +2115,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                optimize_state_sync_for_throughput(config);
+                optimize_state_sync_for_throughput(config, 15_000);
 
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
@@ -2170,8 +2170,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 }
 
 /// Optimizes the state sync configs for throughput
-fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig) {
-    let max_chunk_size = 15_000; // This allows state sync to match consensus block sizes
+/// `max_chunk_size` is the maximum number of transactions to include in a chunk.
+fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig, max_chunk_size: u64) {
     let max_chunk_bytes = 40 * 1024 * 1024; // 10x the current limit (to prevent execution fallback)
 
     // Update the chunk sizes for the data client
