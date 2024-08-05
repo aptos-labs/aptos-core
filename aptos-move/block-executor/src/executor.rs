@@ -908,7 +908,7 @@ where
                         block,
                         num_workers,
                     )? {
-                        if last_idx <= 2 {
+                        if last_idx <= 50 {
                             let cur = Instant::now();
                             println!("critical path, thread_id={}, transaction_id={}, commited at time={:?}", *worker_id, last_idx, cur-*start_time_all);
                         }
