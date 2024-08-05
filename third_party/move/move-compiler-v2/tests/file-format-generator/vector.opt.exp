@@ -27,43 +27,39 @@ B1:
 	10: LdU64(1)
 	11: Abort
 B2:
-	12: LdU64(1)
-	13: StLoc[3](loc1: u64)
-	14: MoveLoc[2](loc0: u64)
-	15: MoveLoc[3](loc1: u64)
-	16: Sub
-	17: StLoc[2](loc0: u64)
+	12: MoveLoc[2](loc0: u64)
+	13: LdU64(1)
+	14: Sub
+	15: StLoc[2](loc0: u64)
 B3:
-	18: CopyLoc[1](Arg1: u64)
-	19: CopyLoc[2](loc0: u64)
-	20: Lt
-	21: BrFalse(39)
+	16: CopyLoc[1](Arg1: u64)
+	17: CopyLoc[2](loc0: u64)
+	18: Lt
+	19: BrFalse(35)
 B4:
-	22: CopyLoc[0](Arg0: &mut vector<Ty0>)
-	23: StLoc[4](loc2: &mut vector<Ty0>)
-	24: CopyLoc[1](Arg1: u64)
-	25: StLoc[3](loc1: u64)
-	26: LdU64(1)
-	27: StLoc[5](loc3: u64)
-	28: MoveLoc[1](Arg1: u64)
-	29: MoveLoc[5](loc3: u64)
-	30: Add
-	31: StLoc[1](Arg1: u64)
-	32: CopyLoc[1](Arg1: u64)
-	33: StLoc[5](loc3: u64)
-	34: MoveLoc[4](loc2: &mut vector<Ty0>)
-	35: MoveLoc[3](loc1: u64)
-	36: MoveLoc[5](loc3: u64)
-	37: VecSwap(1)
-	38: Branch(40)
+	20: CopyLoc[0](Arg0: &mut vector<Ty0>)
+	21: StLoc[4](loc2: &mut vector<Ty0>)
+	22: CopyLoc[1](Arg1: u64)
+	23: StLoc[3](loc1: u64)
+	24: MoveLoc[1](Arg1: u64)
+	25: LdU64(1)
+	26: Add
+	27: StLoc[1](Arg1: u64)
+	28: CopyLoc[1](Arg1: u64)
+	29: StLoc[5](loc3: u64)
+	30: MoveLoc[4](loc2: &mut vector<Ty0>)
+	31: MoveLoc[3](loc1: u64)
+	32: MoveLoc[5](loc3: u64)
+	33: VecSwap(1)
+	34: Branch(36)
 B5:
-	39: Branch(41)
+	35: Branch(37)
 B6:
-	40: Branch(18)
+	36: Branch(16)
 B7:
-	41: MoveLoc[0](Arg0: &mut vector<Ty0>)
-	42: VecPopBack(1)
-	43: Ret
+	37: MoveLoc[0](Arg0: &mut vector<Ty0>)
+	38: VecPopBack(1)
+	39: Ret
 }
 create(): vector<u64> /* def_idx: 1 */ {
 B0:
@@ -84,33 +80,30 @@ B0:
 B1:
 	6: ImmBorrowLoc[0](loc0: vector<u64>)
 	7: Call 1vector::is_empty<u64>(&vector<u64>): bool
-	8: Not
-	9: BrFalse(16)
+	8: BrTrue(15)
 B2:
-	10: MutBorrowLoc[0](loc0: vector<u64>)
-	11: VecPopBack(5)
-	12: LdU64(0)
-	13: StLoc[1](loc1: u64)
-	14: Pop
-	15: Branch(17)
+	9: MutBorrowLoc[0](loc0: vector<u64>)
+	10: VecPopBack(5)
+	11: LdU64(0)
+	12: StLoc[1](loc1: u64)
+	13: Pop
+	14: Branch(16)
 B3:
-	16: Branch(18)
+	15: Branch(17)
 B4:
-	17: Branch(6)
+	16: Branch(6)
 B5:
+	17: MoveLoc[1](loc1: u64)
 	18: LdU64(0)
-	19: StLoc[2](loc2: u64)
-	20: MoveLoc[1](loc1: u64)
-	21: MoveLoc[2](loc2: u64)
-	22: Eq
-	23: BrFalse(25)
+	19: Eq
+	20: BrFalse(22)
 B6:
-	24: Branch(27)
+	21: Branch(24)
 B7:
-	25: LdU64(0)
-	26: Abort
+	22: LdU64(0)
+	23: Abort
 B8:
-	27: Ret
+	24: Ret
 }
 }
 ============ bytecode verification succeeded ========

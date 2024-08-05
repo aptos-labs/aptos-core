@@ -310,7 +310,7 @@ impl RoundState {
         }
     }
 
-    pub async fn process_delayed_qc_msg(
+    pub fn process_delayed_qc_msg(
         &mut self,
         validator_verifier: &ValidatorVerifier,
         msg: DelayedQcMsg,
@@ -322,11 +322,6 @@ impl RoundState {
 
     pub fn vote_sent(&self) -> Option<Vote> {
         self.vote_sent.clone()
-    }
-
-    /// Setup a longer timeout task for leader because it enters the round earlier.
-    pub fn setup_leader_timeout(&mut self) {
-        self.setup_timeout(2);
     }
 
     /// Setup the timeout task and return the duration of the current timeout

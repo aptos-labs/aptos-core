@@ -222,7 +222,8 @@ pub struct StructDefinition {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructLayout {
-    Singleton(Vec<(Field, Type)>),
+    // the second field is true iff the struct has positional fields
+    Singleton(Vec<(Field, Type)>, bool),
     Variants(Vec<StructVariant>),
     Native(Loc),
 }
@@ -233,6 +234,7 @@ pub struct StructVariant {
     pub loc: Loc,
     pub name: VariantName,
     pub fields: Vec<(Field, Type)>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -508,6 +510,9 @@ pub enum Bind_ {
     // T { f1: b1, ... fn: bn }
     // T<t1, ... , tn> { f1: b1, ... fn: bn }
     Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<(Field, Bind)>),
+    // T(e1, ..., en)
+    // T<t1, ... , tn>(e1, ..., en)
+    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<Bind>),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
@@ -1312,7 +1317,7 @@ impl AstDebug for StructDefinition {
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         match layout {
-            StructLayout::Singleton(fields) => w.block(|w| {
+            StructLayout::Singleton(fields, _) => w.block(|w| {
                 w.semicolon(fields, |w, (f, st)| {
                     w.write(&format!("{}: ", f));
                     st.ast_debug(w);
@@ -2049,6 +2054,17 @@ impl AstDebug for Bind_ {
                     b.ast_debug(w);
                 });
                 w.write("}");
+            },
+            B::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(args, |w, b| b.ast_debug(w));
+                w.write(")");
             },
         }
     }

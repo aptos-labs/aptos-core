@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid modifier
+  ┌─ tests/checking/positional_fields/variant_abiliy_decl_invalid.move:5:8
+  │
+5 │     } has drop, copy;
+  │           ^^^^ Conflicting ability declarations. Abilities must be declared either before or after the variant list, not both.

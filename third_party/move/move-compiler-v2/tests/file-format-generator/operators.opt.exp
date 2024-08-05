@@ -75,40 +75,38 @@ B8:
 B9:
 	22: LdTrue
 	23: StLoc[2](loc0: bool)
-	24: Branch(33)
+	24: Branch(32)
 B10:
 	25: CopyLoc[0](Arg0: bool)
-	26: Not
-	27: BrFalse(31)
+	26: BrTrue(30)
 B11:
-	28: CopyLoc[1](Arg1: bool)
-	29: StLoc[2](loc0: bool)
-	30: Branch(33)
+	27: CopyLoc[1](Arg1: bool)
+	28: StLoc[2](loc0: bool)
+	29: Branch(32)
 B12:
-	31: LdFalse
-	32: StLoc[2](loc0: bool)
+	30: LdFalse
+	31: StLoc[2](loc0: bool)
 B13:
-	33: MoveLoc[2](loc0: bool)
-	34: BrFalse(38)
+	32: MoveLoc[2](loc0: bool)
+	33: BrFalse(37)
 B14:
-	35: LdTrue
-	36: StLoc[2](loc0: bool)
-	37: Branch(47)
+	34: LdTrue
+	35: StLoc[2](loc0: bool)
+	36: Branch(45)
 B15:
-	38: MoveLoc[0](Arg0: bool)
-	39: Not
-	40: BrFalse(45)
+	37: MoveLoc[0](Arg0: bool)
+	38: BrTrue(43)
 B16:
-	41: MoveLoc[1](Arg1: bool)
-	42: Not
-	43: StLoc[2](loc0: bool)
-	44: Branch(47)
+	39: MoveLoc[1](Arg1: bool)
+	40: Not
+	41: StLoc[2](loc0: bool)
+	42: Branch(45)
 B17:
-	45: LdFalse
-	46: StLoc[2](loc0: bool)
+	43: LdFalse
+	44: StLoc[2](loc0: bool)
 B18:
-	47: MoveLoc[2](loc0: bool)
-	48: Ret
+	45: MoveLoc[2](loc0: bool)
+	46: Ret
 }
 equality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
 B0:

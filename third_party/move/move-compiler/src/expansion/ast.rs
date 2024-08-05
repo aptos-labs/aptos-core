@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    expansion::translate::is_valid_struct_constant_or_schema_name,
     parser::ast::{
         self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName,
         ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
@@ -171,7 +172,8 @@ pub struct StructDefinition {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructLayout {
-    Singleton(Fields<Type>),
+    // the second field is true iff the struct has positional fields
+    Singleton(Fields<Type>, bool),
     Variants(Vec<StructVariant>),
     Native(Loc),
 }
@@ -182,6 +184,7 @@ pub struct StructVariant {
     pub loc: Loc,
     pub name: VariantName,
     pub fields: Fields<Type>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -377,6 +380,19 @@ pub enum ModuleAccess_ {
     // ModuleAccess(module_ident, member_ident, optional_variant_ident)
     ModuleAccess(ModuleIdent, Name, Option<Name>),
 }
+
+impl ModuleAccess_ {
+    fn get_name(&self) -> &Name {
+        match self {
+            ModuleAccess_::Name(n) | ModuleAccess_::ModuleAccess(_, n, _) => n,
+        }
+    }
+
+    pub fn is_valid_struct_constant_or_schema_name(&self) -> bool {
+        is_valid_struct_constant_or_schema_name(self.get_name().value.as_str())
+    }
+}
+
 pub type ModuleAccess = Spanned<ModuleAccess_>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -399,6 +415,7 @@ pub type Type = Spanned<Type_>;
 pub enum LValue_ {
     Var(ModuleAccess, Option<Vec<Type>>),
     Unpack(ModuleAccess, Option<Vec<Type>>, Fields<LValue>),
+    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueList),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
@@ -1086,7 +1103,7 @@ impl AstDebug for (StructName, &StructDefinition) {
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
-        if let StructLayout::Singleton(fields) = fields {
+        if let StructLayout::Singleton(fields, _) = fields {
             w.block(|w| {
                 w.list(fields, ",", |w, (_, f, idx_st)| {
                     let (idx, st) = idx_st;
@@ -1787,6 +1804,17 @@ impl AstDebug for LValue_ {
                     b.ast_debug(w);
                 });
                 w.write("}");
+            },
+            L::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(&args.value, |w, b| b.ast_debug(w));
+                w.write(")");
             },
         }
     }
