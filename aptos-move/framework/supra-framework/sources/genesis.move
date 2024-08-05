@@ -960,7 +960,12 @@ module supra_framework::genesis {
             i = i + 1;
         };
         let principle_lockup_time = 100;
-        let pbo_delegator_config = PboDelegatorConfiguration{
+        let pbo_delegator_config = PboDelegatorConfiguration {
+            multisig_admin: owner,
+            unlock_period_duration: 0,
+            unlock_schedule_denominator: 0,
+            unlock_schedule_numerators: vector[],
+            unlock_startup_time_from_now: 0,
             delegator_config: DelegatorConfiguration{
                 owner_address: owner,
                 validator: validator_config_commission,
@@ -968,7 +973,6 @@ module supra_framework::genesis {
                 delegator_addresses,
                 delegator_stakes,
             },
-            principle_lockup_time,
         };
         create_pbo_delegation_pool(&pbo_delegator_config, delegation_percentage);
         let pool_address = pbo_delegation_pool::get_owned_pool_address(owner);
@@ -1013,6 +1017,11 @@ module supra_framework::genesis {
         };
         let principle_lockup_time1 = 100;
         let pbo_delegator_config1 = PboDelegatorConfiguration{
+            multisig_admin: owner1,
+            unlock_period_duration: 0,
+            unlock_schedule_denominator: 0,
+            unlock_schedule_numerators: vector[],
+            unlock_startup_time_from_now: 0,
             delegator_config: DelegatorConfiguration{
                 owner_address: owner1,
                 validator: validator_config_commission1,
@@ -1020,7 +1029,6 @@ module supra_framework::genesis {
                 delegator_addresses: delegator_address1,
                 delegator_stakes: delegator_stakes1,
             },
-            principle_lockup_time: principle_lockup_time1,
         };
 
         let owner2 = @0x121344;
@@ -1051,6 +1059,11 @@ module supra_framework::genesis {
         };
         let principle_lockup_time2 = 200;
         let pbo_delegator_config2 = PboDelegatorConfiguration{
+            multisig_admin: owner2,
+            unlock_period_duration: 0,
+            unlock_schedule_denominator: 0,
+            unlock_schedule_numerators: vector[],
+            unlock_startup_time_from_now: 0,
             delegator_config: DelegatorConfiguration{
                 owner_address: owner2,
                 validator: validator_config_commission2,
@@ -1058,7 +1071,6 @@ module supra_framework::genesis {
                 delegator_addresses: delegator_address2,
                 delegator_stakes: delegator_stakes2,
             },
-            principle_lockup_time: principle_lockup_time2,
         };
         let pbo_delegator_configs = vector[pbo_delegator_config1, pbo_delegator_config2];
         create_pbo_delegation_pools(pbo_delegator_configs, delegation_percentage);
