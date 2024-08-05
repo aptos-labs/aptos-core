@@ -2507,42 +2507,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 }
                             },
                         }
-                        // if let sp!(loc, EA::LValueOrDotdot_::Dotdot) = args.value.get(arg_idx).expect("invalid index") {
-                        //     let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
-                        //         arity - args.value.len() + 1
-                        //     } else {
-                        //         0
-                        //     };
-                        //     for i in 0..fields_to_expand {
-                        //         let field_name = Name::new(*loc, move_symbol_pool::Symbol::from(format!("{}", field_offset)));
-                        //         let field_name = Field(field_name);
-                        //         fields.add(field_name, (field_offset, wild_card(*loc))).expect("duplicate keys");
-                        //         remainning_fields -= 1;
-                        //         field_offset += 1;
-                        //     }
-                        // } else {
-                        //     let arg = args.value.get(arg_idx).expect("invalid index");
-                        //     let field_name = Name::new(arg.loc, move_symbol_pool::Symbol::from(format!("{}", field_offset)));
-                        //     let field_name = Field(field_name);
-                        //     fields.add(field_name, (field_offset, arg.clone())).expect("duplicate keys");
-                        //     remainning_fields -= 1;
-                        //     field_offset += 1;
-                        // }
                         arg_idx += 1;
                     }
-                    // let fields = UniqueMap::maybe_from_iter(args
-                    //     .value
-                    //     .iter()
-                    //     .enumerate()
-                    //     .map(|(field_offset, arg)| {
-                    //         if let sp!(loc, EA::LValueOrDotdot_::Dotdot) = arg.value {
-                    //             dotdot_idx = Some(field_offset);
-                    //         }
-                    //         let field_name = Name::new(arg.loc, move_symbol_pool::Symbol::from(format!("{}", field_offset)));
-                    //         let field_name = Field(field_name);
-                    //         (field_name, (field_offset, arg.clone()))
-                    //     }))
-                    //     .expect("unique field names");
                     let unpack_ =
                         EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields, None);
                     let unpack = Spanned::new(lv.loc.clone(), unpack_);
