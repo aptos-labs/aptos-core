@@ -2214,7 +2214,6 @@ module supra_framework::pbo_delegation_pool {
         principle_stake: vector<u64>,
         coin: Coin<SupraCoin>,
         principle_lockup_time: u64,
-        unlock_start_time: u64,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_test_validator_custom(validator,
             amount,
@@ -2224,8 +2223,7 @@ module supra_framework::pbo_delegation_pool {
             delegator_address,
             principle_stake,
             coin,
-            principle_lockup_time,
-            unlock_start_time
+            principle_lockup_time
         );
     }
 
@@ -2240,7 +2238,6 @@ module supra_framework::pbo_delegation_pool {
         principle_stake: vector<u64>,
         coin: Coin<SupraCoin>,
         principle_lockup_time: u64,
-        unlock_start_time: u64,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         let validator_address = signer::address_of(validator);
         if (!account::exists_at(validator_address)) {
@@ -2257,7 +2254,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            unlock_start_time,
+            principle_lockup_time,
             12
         );
         let pool_address = get_owned_pool_address(validator_address);
@@ -2310,7 +2307,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         )
     }
@@ -2335,7 +2332,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         );
         let pool_address = get_owned_pool_address(validator_address);
@@ -2384,7 +2381,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         );
         let coin = stake::mint_coins(100 * ONE_APT);
@@ -2420,7 +2417,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         );
         withdraw(validator, get_owned_pool_address(signer::address_of(validator)), 0);
@@ -2489,7 +2486,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         );
         let pool_address = get_owned_pool_address(validator_address);
@@ -2640,7 +2637,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-        0
         );
 
         let validator_address = signer::address_of(validator);
@@ -2712,7 +2708,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
     }
 
@@ -2731,7 +2726,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -2837,7 +2831,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -2910,7 +2903,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3036,7 +3028,7 @@ module supra_framework::pbo_delegation_pool {
         let coin = stake::mint_coins(100 * ONE_APT);
 
         // lockup time updated as you see above we `fast_forward_seconds` alog with `end_aptos_epoch`
-        let unlock_start_time = LOCKUP_CYCLE_SECONDS + (LOCKUP_CYCLE_SECONDS - (3 * EPOCH_DURATION)) + (5 * EPOCH_DURATION);
+        principle_lockup_time = LOCKUP_CYCLE_SECONDS + (LOCKUP_CYCLE_SECONDS - (3 * EPOCH_DURATION)) + (5 * EPOCH_DURATION);
         initialize_test_validator(delegator,
             100 * ONE_APT,
             true,
@@ -3045,7 +3037,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            unlock_start_time
         );
         // inactivate validator
         stake::leave_validator_set(validator, pool_address);
@@ -3118,7 +3109,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3191,7 +3181,7 @@ module supra_framework::pbo_delegation_pool {
         let delegator_address = vector[@0x010];
         let principle_stake = vector[100 * ONE_APT];
         let coin = stake::mint_coins(100 * ONE_APT);
-        let unlock_start_time = ( 2 * LOCKUP_CYCLE_SECONDS) + (4 * EPOCH_DURATION);
+        principle_lockup_time = ( 2 * LOCKUP_CYCLE_SECONDS) + (4 * EPOCH_DURATION);
         initialize_test_validator(delegator1,
             100 * ONE_APT,
             true,
@@ -3200,7 +3190,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            unlock_start_time
         );
         // inactivate validator
         stake::leave_validator_set(validator, pool_address);
@@ -3249,7 +3238,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3331,7 +3319,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3422,7 +3409,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3451,7 +3437,7 @@ module supra_framework::pbo_delegation_pool {
         let delegator_address_vec = vector[@0x010];
         let principle_stake = vector[100 * ONE_APT];
         let coin = stake::mint_coins(100 * ONE_APT);
-        let unlock_start_time = LOCKUP_CYCLE_SECONDS + (2 * EPOCH_DURATION);
+        principle_lockup_time = LOCKUP_CYCLE_SECONDS + (2 * EPOCH_DURATION);
         initialize_test_validator(delegator,
             100 * ONE_APT,
             true,
@@ -3460,7 +3446,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            unlock_start_time
         );
         // inactivate validator
         stake::leave_validator_set(validator, pool_address);
@@ -3561,7 +3546,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3646,7 +3630,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3717,7 +3700,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3777,7 +3759,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -3883,7 +3864,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         );
         let pool_address = get_owned_pool_address(validator_address);
@@ -4128,7 +4109,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         );
         let pool_address = get_owned_pool_address(operator1_address);
@@ -4205,7 +4186,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         );
         let pool_address = get_owned_pool_address(operator_address);
@@ -4278,7 +4259,7 @@ module supra_framework::pbo_delegation_pool {
             coin,
             vector[2, 2, 3],
             10,
-            0,
+            principle_lockup_time,
             12
         );
         let pool_address = get_owned_pool_address(operator_address);
@@ -4340,7 +4321,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -4467,7 +4447,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -4513,7 +4492,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -4564,7 +4542,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -4782,7 +4759,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -4871,7 +4847,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -5305,7 +5280,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -5355,7 +5329,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -5383,7 +5356,6 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             principle_lockup_time,
-            0
         );
 
         let validator_address = signer::address_of(validator);
@@ -5406,19 +5378,18 @@ module supra_framework::pbo_delegation_pool {
         let coin = stake::mint_coins(300 * ONE_APT);
         let principle_lockup_time = 0;
         initialize_test_validator(validator, 0, true, true, delegator_address,
-            principle_stake, coin, principle_lockup_time, 0);
+            principle_stake, coin, principle_lockup_time);
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
         unlock(delegator1, pool_address, 11 * ONE_APT);
         unlock(delegator2, pool_address, 21 * ONE_APT);
     }
 
-    #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010)]
     public entry fun test_unlock_mutiple_times(
         supra_framework: &signer,
         validator: &signer,
         delegator1: &signer,
-        delegator2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(supra_framework);
         let delegator_address = vector[@0x010, @0x020];
@@ -5428,7 +5399,7 @@ module supra_framework::pbo_delegation_pool {
         let delegator1_address = signer::address_of(delegator1);
         aptos_account::create_account(delegator1_address);
         initialize_test_validator(validator, 0, true, true, delegator_address,
-            principle_stake, coin, principle_lockup_time, 0);
+            principle_stake, coin, principle_lockup_time);
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
         stake::mint(delegator1, 1000 * ONE_APT);
@@ -5439,6 +5410,7 @@ module supra_framework::pbo_delegation_pool {
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
+    #[expected_failure(abort_code = 65561, location = Self)]
     public entry fun test_multiple_users(
         supra_framework: &signer,
         validator: &signer,
@@ -5455,7 +5427,7 @@ module supra_framework::pbo_delegation_pool {
         aptos_account::create_account(delegator1_address);
         aptos_account::create_account(delegator2_address);
         initialize_test_validator(validator, 0, true, true, delegator_address,
-            principle_stake, coin, principle_lockup_time, 0);
+            principle_stake, coin, principle_lockup_time);
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
         stake::mint(delegator1, 1000 * ONE_APT);
