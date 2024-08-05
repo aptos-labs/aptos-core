@@ -4,13 +4,9 @@
 fun m::inc_immut($t0: u64): u64 {
      var $t1: u64 [unused]
      var $t2: u64
-     # deps: {1, 2}, dfs: [Some(0)]
   0: touch($t0)
-     # deps: {1, 2}, dfs: [Some(1)]
   1: $t2 := 1
-     # deps: {2}, dfs: [Some(2)]
   2: $t0 := +($t0, $t2)
-     # deps: {}, dfs: [Some(3)]
   3: return $t0
 }
 
@@ -21,17 +17,11 @@ fun m::inc_mut($t0: &mut u64): u64 {
      var $t2: u64 [unused]
      var $t3: u64
      var $t4: u64
-     # deps: {2, 3, 4, 5}, dfs: [None, Some(0)]
   0: $t3 := read_ref($t0)
-     # deps: {2, 3, 4, 5}, dfs: [None, Some(1)]
   1: $t4 := 1
-     # deps: {3, 4, 5}, dfs: [None, Some(2)]
   2: $t3 := +($t3, $t4)
-     # deps: {4, 5}, dfs: [None, Some(3)]
   3: write_ref($t3, $t0)
-     # deps: {5}, dfs: [Some(0), None]
   4: $t3 := read_ref($t0)
-     # deps: {}, dfs: [Some(1), None]
   5: return $t3
 }
 
@@ -53,43 +43,24 @@ public fun m::test1(): u64 {
      var $t12: u64 [unused]
      var $t13: &mut u64 [unused]
      var $t14: u64
-     # deps: {1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(0)]
   0: $t1 := 1
-     # deps: {2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(1)]
   1: $t6 := borrow_local($t1)
-     # deps: {4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(2)]
   2: $t5 := m::inc_mut($t6)
-     # deps: {4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(3)]
   3: $t7 := 1
-     # deps: {5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(4)]
   4: $t5 := +($t5, $t7)
-     # deps: {6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(5)]
   5: $t1 := move($t5)
-     # deps: {7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(6)]
   6: $t5 := 1
-     # deps: {8, 9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(7)]
   7: $t5 := +($t1, $t5)
-     # deps: {9, 10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(8)]
   8: $t1 := move($t5)
-     # deps: {10, 11, 12, 14, 15, 16, 17, 18}, dfs: [Some(9)]
   9: $t5 := copy($t1)
-     # deps: {12, 14, 15, 16, 17, 18}, dfs: [Some(10)]
  10: $t5 := m::inc_immut($t5)
-     # deps: {12, 14, 15, 16, 17, 18}, dfs: [Some(11)]
  11: $t6 := borrow_local($t1)
-     # deps: {14, 15, 16, 17, 18}, dfs: [Some(12)]
  12: $t7 := m::inc_mut($t6)
-     # deps: {14, 15, 16, 17, 18}, dfs: [Some(13)]
  13: $t14 := 1
-     # deps: {15, 16, 17, 18}, dfs: [Some(14)]
  14: $t7 := +($t7, $t14)
-     # deps: {16, 17, 18}, dfs: [Some(15)]
  15: $t1 := move($t7)
-     # deps: {17, 18}, dfs: [Some(16)]
  16: $t7 := move($t1)
-     # deps: {18}, dfs: [Some(17)]
  17: $t5 := +($t5, $t7)
-     # deps: {}, dfs: [Some(18)]
  18: return $t5
 }
 
@@ -130,26 +101,18 @@ B0:
 	4: LdU64(1)
 	5: Add
 	6: StLoc[0](loc0: u64)
-	7: LdU64(1)
-	8: StLoc[1](loc1: u64)
-	9: MoveLoc[0](loc0: u64)
-	10: MoveLoc[1](loc1: u64)
-	11: Add
-	12: StLoc[0](loc0: u64)
-	13: CopyLoc[0](loc0: u64)
-	14: StLoc[1](loc1: u64)
-	15: MoveLoc[1](loc1: u64)
-	16: Call inc_immut(u64): u64
-	17: MutBorrowLoc[0](loc0: u64)
-	18: Call inc_mut(&mut u64): u64
-	19: LdU64(1)
-	20: Add
-	21: StLoc[0](loc0: u64)
-	22: MoveLoc[0](loc0: u64)
-	23: StLoc[2](loc2: u64)
-	24: MoveLoc[2](loc2: u64)
-	25: Add
-	26: Ret
+	7: MoveLoc[0](loc0: u64)
+	8: LdU64(1)
+	9: Add
+	10: StLoc[0](loc0: u64)
+	11: CopyLoc[0](loc0: u64)
+	12: Call inc_immut(u64): u64
+	13: MutBorrowLoc[0](loc0: u64)
+	14: Call inc_mut(&mut u64): u64
+	15: LdU64(1)
+	16: Add
+	17: Add
+	18: Ret
 }
 }
 ============ bytecode verification succeeded ========

@@ -220,24 +220,16 @@ public test(Arg0: &u64) /* def_idx: 1 */ {
 L1:	loc0: &u64
 B0:
 	0: CopyLoc[0](Arg0: &u64)
-	1: StLoc[1](loc0: &u64)
-	2: MoveLoc[1](loc0: &u64)
+	1: Call blah(&u64)
+	2: CopyLoc[0](Arg0: &u64)
 	3: Call blah(&u64)
 	4: CopyLoc[0](Arg0: &u64)
-	5: StLoc[1](loc0: &u64)
-	6: MoveLoc[1](loc0: &u64)
+	5: Call blah(&u64)
+	6: CopyLoc[0](Arg0: &u64)
 	7: Call blah(&u64)
-	8: CopyLoc[0](Arg0: &u64)
-	9: StLoc[1](loc0: &u64)
-	10: MoveLoc[1](loc0: &u64)
-	11: Call blah(&u64)
-	12: CopyLoc[0](Arg0: &u64)
-	13: StLoc[1](loc0: &u64)
-	14: MoveLoc[1](loc0: &u64)
-	15: Call blah(&u64)
-	16: MoveLoc[0](Arg0: &u64)
-	17: Call blah(&u64)
-	18: Ret
+	8: MoveLoc[0](Arg0: &u64)
+	9: Call blah(&u64)
+	10: Ret
 }
 }
 ============ bytecode verification succeeded ========

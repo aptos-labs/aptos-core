@@ -78,15 +78,13 @@ B0:
 	5: LdU64(1)
 	6: StLoc[1](loc0: u64)
 	7: StLoc[2](loc1: &mut u64)
-	8: StLoc[3](loc2: u64)
-	9: MoveLoc[3](loc2: u64)
-	10: MoveLoc[1](loc0: u64)
-	11: Add
-	12: StLoc[3](loc2: u64)
-	13: MoveLoc[2](loc1: &mut u64)
-	14: MoveLoc[3](loc2: u64)
-	15: Call baz(&mut u64, u64)
-	16: Ret
+	8: MoveLoc[1](loc0: u64)
+	9: Add
+	10: StLoc[3](loc2: u64)
+	11: MoveLoc[2](loc1: &mut u64)
+	12: MoveLoc[3](loc2: u64)
+	13: Call baz(&mut u64, u64)
+	14: Ret
 }
 }
 ============ bytecode verification succeeded ========

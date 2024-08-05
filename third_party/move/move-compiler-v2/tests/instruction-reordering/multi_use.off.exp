@@ -631,27 +631,21 @@ B0:
 	4: CopyLoc[1](loc1: u64)
 	5: MoveLoc[0](loc0: u64)
 	6: Call consume(u64, u64)
-	7: LdU64(1)
-	8: StLoc[0](loc0: u64)
-	9: MoveLoc[1](loc1: u64)
-	10: MoveLoc[0](loc0: u64)
-	11: Call consume(u64, u64)
-	12: Ret
+	7: MoveLoc[1](loc1: u64)
+	8: LdU64(1)
+	9: Call consume(u64, u64)
+	10: Ret
 }
 public test4(Arg0: u64) /* def_idx: 6 */ {
 L1:	loc0: u64
 B0:
-	0: LdU64(2)
-	1: StLoc[1](loc0: u64)
-	2: CopyLoc[0](Arg0: u64)
-	3: MoveLoc[1](loc0: u64)
-	4: Call consume(u64, u64)
-	5: LdU64(1)
-	6: StLoc[1](loc0: u64)
-	7: MoveLoc[0](Arg0: u64)
-	8: MoveLoc[1](loc0: u64)
-	9: Call consume(u64, u64)
-	10: Ret
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(2)
+	2: Call consume(u64, u64)
+	3: MoveLoc[0](Arg0: u64)
+	4: LdU64(1)
+	5: Call consume(u64, u64)
+	6: Ret
 }
 }
 ============ bytecode verification succeeded ========

@@ -53,9 +53,7 @@ B0:
 	6: MutBorrowLoc[0](loc0: u64)
 	7: Call foo(u64, &mut u64)
 	8: MoveLoc[0](loc0: u64)
-	9: StLoc[1](loc1: u64)
-	10: MoveLoc[1](loc1: u64)
-	11: Ret
+	9: Ret
 }
 }
 ============ bytecode verification succeeded ========

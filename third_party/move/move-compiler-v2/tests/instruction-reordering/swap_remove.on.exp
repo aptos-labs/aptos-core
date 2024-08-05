@@ -66,31 +66,30 @@ B0:
 	0: CopyLoc[0](Arg0: &mut vector<Ty0>)
 	1: FreezeRef
 	2: Call is_empty<Ty0>(&vector<Ty0>): bool
-	3: Not
-	4: BrFalse(6)
+	3: BrTrue(5)
 B1:
-	5: Branch(10)
+	4: Branch(9)
 B2:
-	6: MoveLoc[0](Arg0: &mut vector<Ty0>)
-	7: Pop
-	8: LdU64(0)
-	9: Abort
+	5: MoveLoc[0](Arg0: &mut vector<Ty0>)
+	6: Pop
+	7: LdU64(0)
+	8: Abort
 B3:
-	10: CopyLoc[0](Arg0: &mut vector<Ty0>)
-	11: FreezeRef
-	12: VecLen(2)
-	13: LdU64(1)
-	14: Sub
-	15: CopyLoc[0](Arg0: &mut vector<Ty0>)
-	16: StLoc[2](loc0: &mut vector<Ty0>)
-	17: StLoc[3](loc1: u64)
-	18: MoveLoc[2](loc0: &mut vector<Ty0>)
-	19: MoveLoc[1](Arg1: u64)
-	20: MoveLoc[3](loc1: u64)
-	21: VecSwap(2)
-	22: MoveLoc[0](Arg0: &mut vector<Ty0>)
-	23: VecPopBack(2)
-	24: Ret
+	9: CopyLoc[0](Arg0: &mut vector<Ty0>)
+	10: FreezeRef
+	11: VecLen(2)
+	12: LdU64(1)
+	13: Sub
+	14: CopyLoc[0](Arg0: &mut vector<Ty0>)
+	15: StLoc[2](loc0: &mut vector<Ty0>)
+	16: StLoc[3](loc1: u64)
+	17: MoveLoc[2](loc0: &mut vector<Ty0>)
+	18: MoveLoc[1](Arg1: u64)
+	19: MoveLoc[3](loc1: u64)
+	20: VecSwap(2)
+	21: MoveLoc[0](Arg0: &mut vector<Ty0>)
+	22: VecPopBack(2)
+	23: Ret
 }
 }
 ============ bytecode verification succeeded ========

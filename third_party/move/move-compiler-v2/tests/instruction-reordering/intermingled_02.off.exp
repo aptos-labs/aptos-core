@@ -175,12 +175,10 @@ B0:
 	0: ImmBorrowLoc[0](Arg0: u64)
 	1: ImmBorrowLoc[1](Arg1: u64)
 	2: StLoc[2](loc0: &u64)
-	3: StLoc[3](loc1: &u64)
-	4: MoveLoc[3](loc1: &u64)
+	3: Call foo(&u64)
+	4: MoveLoc[2](loc0: &u64)
 	5: Call foo(&u64)
-	6: MoveLoc[2](loc0: &u64)
-	7: Call foo(&u64)
-	8: Ret
+	6: Ret
 }
 }
 ============ bytecode verification succeeded ========

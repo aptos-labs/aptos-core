@@ -371,35 +371,31 @@ B0:
 	3: Shl
 	4: LdU64(0)
 	5: CopyLoc[0](Arg0: &vector<u8>)
-	6: StLoc[2](loc0: &vector<u8>)
-	7: MoveLoc[2](loc0: &vector<u8>)
-	8: VecLen(2)
-	9: Lt
-	10: StLoc[3](loc1: bool)
-	11: StLoc[4](loc2: u8)
-	12: MoveLoc[3](loc1: bool)
-	13: BrFalse(26)
+	6: VecLen(2)
+	7: Lt
+	8: StLoc[3](loc1: bool)
+	9: StLoc[4](loc2: u8)
+	10: MoveLoc[3](loc1: bool)
+	11: BrFalse(22)
 B1:
-	14: LdU64(0)
-	15: StLoc[1](Arg1: u64)
-	16: MoveLoc[0](Arg0: &vector<u8>)
-	17: MoveLoc[1](Arg1: u64)
-	18: VecImmBorrow(2)
-	19: ReadRef
-	20: MoveLoc[4](loc2: u8)
-	21: BitAnd
-	22: LdU8(0)
-	23: Neq
-	24: StLoc[3](loc1: bool)
-	25: Branch(30)
+	12: MoveLoc[0](Arg0: &vector<u8>)
+	13: LdU64(0)
+	14: VecImmBorrow(2)
+	15: ReadRef
+	16: MoveLoc[4](loc2: u8)
+	17: BitAnd
+	18: LdU8(0)
+	19: Neq
+	20: StLoc[3](loc1: bool)
+	21: Branch(26)
 B2:
-	26: MoveLoc[0](Arg0: &vector<u8>)
-	27: Pop
-	28: LdFalse
-	29: StLoc[3](loc1: bool)
+	22: MoveLoc[0](Arg0: &vector<u8>)
+	23: Pop
+	24: LdFalse
+	25: StLoc[3](loc1: bool)
 B3:
-	30: MoveLoc[3](loc1: bool)
-	31: Ret
+	26: MoveLoc[3](loc1: bool)
+	27: Ret
 }
 }
 ============ bytecode verification succeeded ========

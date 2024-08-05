@@ -46,43 +46,39 @@ module c0ffee.m {
 
 
 public contains(Arg0: &vector<u8>, Arg1: u64): bool /* def_idx: 0 */ {
-L2:	loc0: &vector<u8>
-L3:	loc1: bool
-L4:	loc2: u8
+L2:	loc0: u8
+L3:	loc1: &vector<u8>
+L4:	loc2: bool
 B0:
 	0: LdU8(1)
 	1: MoveLoc[1](Arg1: u64)
 	2: CastU8
 	3: Shl
-	4: LdU64(0)
-	5: CopyLoc[0](Arg0: &vector<u8>)
-	6: StLoc[2](loc0: &vector<u8>)
-	7: MoveLoc[2](loc0: &vector<u8>)
-	8: VecLen(2)
-	9: Lt
-	10: StLoc[3](loc1: bool)
-	11: StLoc[4](loc2: u8)
-	12: MoveLoc[3](loc1: bool)
-	13: BrFalse(24)
+	4: StLoc[2](loc0: u8)
+	5: LdU64(0)
+	6: CopyLoc[0](Arg0: &vector<u8>)
+	7: VecLen(2)
+	8: Lt
+	9: BrFalse(20)
 B1:
-	14: MoveLoc[0](Arg0: &vector<u8>)
-	15: LdU64(0)
-	16: VecImmBorrow(2)
-	17: ReadRef
-	18: MoveLoc[4](loc2: u8)
-	19: BitAnd
-	20: LdU8(0)
-	21: Neq
-	22: StLoc[3](loc1: bool)
-	23: Branch(28)
+	10: MoveLoc[0](Arg0: &vector<u8>)
+	11: LdU64(0)
+	12: VecImmBorrow(2)
+	13: ReadRef
+	14: MoveLoc[2](loc0: u8)
+	15: BitAnd
+	16: LdU8(0)
+	17: Neq
+	18: StLoc[4](loc2: bool)
+	19: Branch(24)
 B2:
-	24: MoveLoc[0](Arg0: &vector<u8>)
-	25: Pop
-	26: LdFalse
-	27: StLoc[3](loc1: bool)
+	20: MoveLoc[0](Arg0: &vector<u8>)
+	21: Pop
+	22: LdFalse
+	23: StLoc[4](loc2: bool)
 B3:
-	28: MoveLoc[3](loc1: bool)
-	29: Ret
+	24: MoveLoc[4](loc2: bool)
+	25: Ret
 }
 }
 ============ bytecode verification succeeded ========

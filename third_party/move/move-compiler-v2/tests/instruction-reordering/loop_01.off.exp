@@ -527,12 +527,10 @@ module c0ffee.m {
 foo(Arg0: u64): u64 /* def_idx: 0 */ {
 L1:	loc0: u64
 B0:
-	0: LdU64(1)
-	1: StLoc[1](loc0: u64)
-	2: MoveLoc[0](Arg0: u64)
-	3: MoveLoc[1](loc0: u64)
-	4: Add
-	5: Ret
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
 }
 public test1(Arg0: u64) /* def_idx: 1 */ {
 L1:	loc0: u64
@@ -540,18 +538,16 @@ B0:
 	0: MoveLoc[0](Arg0: u64)
 	1: Call foo(u64): u64
 	2: StLoc[0](Arg0: u64)
-	3: LdU64(10)
-	4: StLoc[1](loc0: u64)
-	5: CopyLoc[0](Arg0: u64)
-	6: MoveLoc[1](loc0: u64)
-	7: Gt
-	8: BrFalse(10)
+	3: CopyLoc[0](Arg0: u64)
+	4: LdU64(10)
+	5: Gt
+	6: BrFalse(8)
 B1:
-	9: Branch(11)
+	7: Branch(9)
 B2:
-	10: Branch(0)
+	8: Branch(0)
 B3:
-	11: Ret
+	9: Ret
 }
 public test2(Arg0: u64, Arg1: u64, Arg2: u64): u64 /* def_idx: 2 */ {
 B0:

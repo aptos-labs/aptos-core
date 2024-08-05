@@ -565,12 +565,10 @@ module c0ffee.m {
 inc_immut(Arg0: u64): u64 /* def_idx: 0 */ {
 L1:	loc0: u64
 B0:
-	0: LdU64(1)
-	1: StLoc[1](loc0: u64)
-	2: MoveLoc[0](Arg0: u64)
-	3: MoveLoc[1](loc0: u64)
-	4: Add
-	5: Ret
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
 }
 inc_mut(Arg0: &mut u64): u64 /* def_idx: 1 */ {
 B0:
@@ -596,26 +594,18 @@ B0:
 	4: LdU64(1)
 	5: Add
 	6: StLoc[0](loc0: u64)
-	7: LdU64(1)
-	8: StLoc[1](loc1: u64)
-	9: MoveLoc[0](loc0: u64)
-	10: MoveLoc[1](loc1: u64)
-	11: Add
-	12: StLoc[0](loc0: u64)
-	13: CopyLoc[0](loc0: u64)
-	14: StLoc[1](loc1: u64)
-	15: MoveLoc[1](loc1: u64)
-	16: Call inc_immut(u64): u64
-	17: MutBorrowLoc[0](loc0: u64)
-	18: Call inc_mut(&mut u64): u64
-	19: LdU64(1)
-	20: Add
-	21: StLoc[0](loc0: u64)
-	22: MoveLoc[0](loc0: u64)
-	23: StLoc[2](loc2: u64)
-	24: MoveLoc[2](loc2: u64)
-	25: Add
-	26: Ret
+	7: MoveLoc[0](loc0: u64)
+	8: LdU64(1)
+	9: Add
+	10: StLoc[0](loc0: u64)
+	11: CopyLoc[0](loc0: u64)
+	12: Call inc_immut(u64): u64
+	13: MutBorrowLoc[0](loc0: u64)
+	14: Call inc_mut(&mut u64): u64
+	15: LdU64(1)
+	16: Add
+	17: Add
+	18: Ret
 }
 }
 ============ bytecode verification succeeded ========
