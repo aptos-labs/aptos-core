@@ -32,8 +32,8 @@ use std::{
 };
 mod utils;
 use utils::{
-    check_for_invariant_violation, publish_group, RunnableState, sort_by_deps, ExecVariant,
-    Authenticator,
+    check_for_invariant_violation, publish_group, sort_by_deps, Authenticator, ExecVariant,
+    RunnableState,
 };
 
 // genesis write set generated once for each fuzzing session
