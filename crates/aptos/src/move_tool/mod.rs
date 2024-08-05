@@ -8,10 +8,9 @@ use crate::{
         types::{
             load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
-            MoveManifestAccountWrapper, MovePackageDir, OverrideSizeCheckOption, OptimizationLevel,
-            ProfileOptions,
-            PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments, TransactionOptions,
-            TransactionSummary,
+            MoveManifestAccountWrapper, MovePackageDir, OptimizationLevel, OverrideSizeCheckOption,
+            ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
+            TransactionOptions, TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -765,31 +764,12 @@ pub struct BuildPublishPayload {
     pub(crate) json_output_file: PathBuf,
 }
 
-fn get_build_options(
-    included_artifacts_args: &IncludedArtifactsArgs,
-    move_options: &MovePackageDir,
-) -> BuildOptions {
-    included_artifacts_args.included_artifacts.build_options(
-        move_options.dev,
-        move_options.skip_fetch_latest_git_deps,
-        move_options.named_addresses(),
-        move_options.override_std.clone(),
-        move_options.bytecode_version,
-        move_options.compiler_version,
-        move_options.language_version,
-        move_options.skip_attribute_checks,
-        move_options.check_test_code,
-    )
-}
-
 impl TryInto<PackagePublicationData> for &PublishPackage {
     type Error = CliError;
 
     fn try_into(self) -> Result<PackagePublicationData, Self::Error> {
-        let package_path = self.move_options.get_package_path()?;
-        let options = get_build_options(&(self.included_artifacts_args), &(self.move_options));
-        let package = BuiltPackage::build(package_path, options)
-            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
 
         let package_publication_data = create_package_publication_data_from_built_package(
             package,
@@ -826,10 +806,8 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
     type Error = CliError;
 
     async fn async_try_into(self) -> Result<ChunkedPublishPayloads, Self::Error> {
-        let package_path = self.move_options.get_package_path()?;
-        let options = get_build_options(&(self.included_artifacts_args), &(self.move_options));
-        let package = BuiltPackage::build(package_path, options)
-            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
 
         let chunked_publish_payloads = create_chunked_publish_payloads_from_built_package(
             package,
@@ -1161,8 +1139,8 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
-            let options = get_build_options(&(self.included_artifacts_args), &(self.move_options));
-            let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+            let package =
+                build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
             let mock_payloads = create_chunked_publish_payloads_from_built_package(
                 package,
                 PublishType::AccountDeploy,
@@ -1180,8 +1158,8 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let options = get_build_options(&(self.included_artifacts_args), &(self.move_options));
-        let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
         let message = format!(
             "Do you want to publish this package at object address {}",
             object_address
@@ -1270,8 +1248,8 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let options = get_build_options(&(self.included_artifacts_args), &(self.move_options));
-        let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let built_package =
+            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
         let url = self
             .txn_options
             .rest_options
