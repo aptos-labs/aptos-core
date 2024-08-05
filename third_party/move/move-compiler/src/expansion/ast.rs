@@ -414,7 +414,6 @@ pub type Type = Spanned<Type_>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum LValue_ {
     Var(ModuleAccess, Option<Vec<Type>>),
-    // the last bool is true if the unpack has a trailing ".."
     Unpack(
         ModuleAccess,
         Option<Vec<Type>>,
