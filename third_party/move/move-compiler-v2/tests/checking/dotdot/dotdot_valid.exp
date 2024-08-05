@@ -1,5 +1,14 @@
 // -- Model dump before bytecode pipeline
 module 0x42::test {
+    enum E1 {
+        A {
+            0: u8,
+            1: bool,
+        }
+        B {
+            0: u8,
+        }
+    }
     struct S0 {
         dummy_field: bool,
     }
@@ -77,5 +86,16 @@ module 0x42::test {
             }
           }
         }
+    }
+    private fun simple_4(x: test::E1): u8 {
+        match (x) {
+          test::E1::A{ 0: x, 1: _ } => {
+            x
+          }
+          test::E1::B{ 0: x } => {
+            x
+          }
+        }
+
     }
 } // end 0x42::test
