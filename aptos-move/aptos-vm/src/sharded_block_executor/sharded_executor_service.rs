@@ -34,6 +34,9 @@ use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::SystemTime;
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
 use rayon::prelude::IntoParallelIterator;
 use serde::{Deserialize, Serialize};
 use aptos_block_executor::transaction_provider::TxnProvider;
@@ -63,7 +66,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 // We need two extra threads for the cross-shard commit receiver and the thread
                 // that is blocked on waiting for execute block to finish.
                 .thread_name(move |i| format!("sharded-executor-shard-{}-{}", shard_id, i))
-                .num_threads(num_threads + 2)
+                .num_threads(num_threads + 2 + 1)
                 .build()
                 .unwrap(),
         );
@@ -226,6 +229,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             self.shard_id,
             self.num_shards
         );
+
         let mut cumulative_txns = 0;
         let mut i = 0;
         loop {
@@ -297,22 +301,28 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             });*/
 
             let (stream_results_tx, stream_results_rx) = unbounded();
+            let (stream_results_finished_tx, stream_results_finished_rx) = unbounded();
             let coordinator_client_clone = self.coordinator_client.clone();
-            let stream_results_thread = thread::spawn(move || {
+            let stream_results_thread = self.executor_thread_pool.spawn(move || {
                 let batch_size = 200;
                 let mut curr_batch = vec![];
+                let mut seq_num: u64 = 0;
+                let mut rng = StdRng::from_entropy();
+                let random_number = rng.gen_range(0, u64::MAX);
                 loop {
                     let txn_idx_output: TransactionIdxAndOutput = stream_results_rx.recv().unwrap();
                     if txn_idx_output.txn_idx == u32::MAX {
                         if !curr_batch.is_empty() {
-                            coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+                            coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch, random_number as usize, seq_num);
                         }
+                        stream_results_finished_tx.send(()).unwrap();
                         break;
                     }
                     curr_batch.push(txn_idx_output);
                     if curr_batch.len() == batch_size {
-                        coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+                        coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch, random_number as usize, seq_num);
                         curr_batch = vec![];
+                        seq_num += 1;
                     }
                 }
             });
@@ -343,13 +353,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             drop(exe_timer);
 
             self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
-
             stream_results_tx.send(TransactionIdxAndOutput {
                 txn_idx: u32::MAX,
                 txn_output: TransactionOutput::default(),
             }).unwrap();
+            stream_results_finished_rx.recv().unwrap();
             self.coordinator_client.lock().unwrap().reset_state_view();
-            stream_results_thread.join().unwrap();
             if (i % 50 == 49) {
                 let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
                     .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])

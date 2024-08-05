@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult, RemoteExecutionRequestRef, ExecuteBlockCommandRef};
 use aptos_logger::{info, trace};
-use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
+use aptos_secure_net::network_controller::{Message, MessageType, NetworkController, OutboundRpcScheduler};
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
@@ -91,7 +91,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
     network_controller: NetworkController,
     state_view_service: Arc<RemoteStateViewService<S>>,
     // Channels to send execute block commands to the executor shards.
-    command_txs: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
+    command_txs: Arc<Vec<Vec<Arc<tokio::sync::Mutex<OutboundRpcHelper>>>>>,
     // Channels to receive execution results from the executor shards.
     result_rxs: Vec<Receiver<Message>>,
     // Thread pool used to pre-fetch the state values for the block in parallel and create an in-memory state view.
@@ -100,6 +100,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
 
     phantom: std::marker::PhantomData<S>,
     _join_handle: Option<thread::JoinHandle<()>>,
+    outbound_rpc_scheduler: Arc<OutboundRpcScheduler>
 }
 
 #[allow(dead_code)]
@@ -109,10 +110,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         mut controller: NetworkController,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = num_threads.unwrap_or_else(num_cpus::get) / 2;
+        let num_threads = num_threads.unwrap_or_else(num_cpus::get);
         let thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
-                .num_threads(num_threads)
+                .num_threads(24) //num_threads)
                 .build()
                 .unwrap(),
         );
@@ -128,7 +129,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let execute_result_type = format!("execute_result_{}", shard_id);
                 let mut command_tx = vec![];
                 for _ in 0..num_threads/(2 * num_shards) {
-                    command_tx.push(Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone())));
+                    command_tx.push(Arc::new(tokio::sync::Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone()))));
                 }
                 let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
                 (command_tx, result_rx)
@@ -153,11 +154,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let cmd_tx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("rmt-exe-cli-cmd-tx-{}", index))
-                .num_threads(num_cpus::get() / 4)
+                .num_threads(num_shards) //num_cpus::get() / 2)
                 .build()
                 .unwrap(),
         );
-
+        let scheduler = controller.get_outbound_rpc_scheduler();
         Self {
             network_controller: controller,
             state_view_service,
@@ -167,6 +168,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             thread_pool,
             cmd_tx_thread_pool,
             phantom: std::marker::PhantomData,
+            outbound_rpc_scheduler: scheduler,
         }
     }
 
@@ -226,10 +228,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         Ok(res)
     }
 
-    // Parallel results aggregation from shards. Requires each network message to provide
-    // the number of transactions in the message (seq_num variable).
     fn get_streamed_output_from_shards(&self, expected_outputs: Vec<u64>, duration_since_epoch: u64) -> Result<Vec<TransactionOutput>, VMStatus> {
-        //info!("expected outputs {:?} ", expected_outputs);
         #[derive(Copy, Clone)]
         struct Pointer(*mut TransactionOutput);
         unsafe impl Send for Pointer {}
@@ -262,7 +261,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                     drop(bcs_deser_timer);
                     for txn_output in result {
                         // correctness guaranteed by disjointness of txn indices
-                        unsafe { *{ results_clone }.0.wrapping_add(txn_output.txn_idx as usize) = txn_output.txn_output; }
+                        unsafe { *{results_clone}.0.wrapping_add(txn_output.txn_idx as usize) = txn_output.txn_output; }
                     }
                 }
                 deser_finished_tx_clone.send(()).unwrap();
@@ -272,7 +271,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             let mut num_outputs_received: u64 = 0;
             loop {
                 let received_msg = self.result_rxs[shard_id].recv().unwrap();
-                let num_txn = received_msg.seq_num.unwrap();
+                let num_txn = received_msg.shard_id.unwrap();
                 num_outputs_received += num_txn;
                 deser_tx.send(received_msg).unwrap();
                 if num_outputs_received == expected_outputs[shard_id] {
@@ -317,6 +316,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         duration_since_epoch: u64
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("RemoteExecutorClient Sending block to shards");
+        let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        info!("Executing block started at time {}", current_time);
         self.state_view_service.set_state_view(state_view);
         let (sub_blocks, global_txns) = transactions.get_ref();
         if !global_txns.is_empty() {
@@ -339,6 +340,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             let onchain_config_clone = onchain_config.clone();
             let transactions_clone = transactions.clone();
             let senders = self.command_txs.clone();
+            let outbound_rpc_scheduler_clone = self.outbound_rpc_scheduler.clone();
             self.cmd_tx_thread_pool.spawn(move || {
                 let shard_txns = &transactions_clone.get_ref().0[shard_id].sub_blocks[0].transactions;
                 let index_offset = transactions_clone.get_ref().0[shard_id].sub_blocks[0].start_index as usize;
@@ -361,101 +363,26 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
                             .with_label_values(&["0", "cmd_tx_bcs_ser"])
                             .start_timer();
-                        let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, 0, (chunk_idx + 1) as u64);
+                        let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, analyzed_txns.len() as u64, (chunk_idx + 1) as u64);
                         drop(bcs_ser_timer);
                         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                             .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
                         let execute_command_type = format!("execute_command_{}", shard_id);
                         let mut rng = StdRng::from_entropy();
                         let rand_send_thread_idx = rng.gen_range(0, senders[shard_id].len());
-                        senders[shard_id][rand_send_thread_idx]
-                            .lock()
-                            .unwrap()
-                            .send(msg, &MessageType::new(execute_command_type));
-                    });
-                
-                /*let shard_txns = &transactions_clone.get_ref().0[shard_id];
-                let index_offset = shard_txns.sub_blocks[0].start_index as usize;
-                let num_txns = shard_txns.num_txns();
-                let mut batch_start_idx = 0;
-
-                for batch in &shard_txns.iter().chunks(batch_size) {
-                    let senders = self.command_txs.clone();
-                    cmd_tx_thread_pool_clone.spawn(move || {
-                        let analyzed_txns = batch.map(|txn| {
-                            txn.txn()
-                        }).collect::<Vec<&AnalyzedTransaction>>();
-                        let execution_batch_req = CmdsAndMetaDataRef {
-                            cmds: &analyzed_txns,
-                            num_txns,
-                            shard_txns_start_index: index_offset,
-                            batch_start_index: batch_start_idx,
-                        };
-                        let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
-                            .with_label_values(&["0", "cmd_tx_bcs_ser"])
+                        let timer_1 = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&["0", "cmd_tx_lock_send"])
                             .start_timer();
-                        let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, 0, 0);
-                        drop(bcs_ser_timer);
-                        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                            .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
-                        let execute_command_type = format!("execute_command_{}", shard_id);
-                        senders[shard_id]
-                            .lock()
-                            .unwrap()
-                            .send(msg, &MessageType::new(execute_command_type));
-                    });*/
-
-
-                /*let analyzed_txns = &transactions_clone.get_ref().0[shard_id]
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, txn)| {
-                        (txn.txn(), idx)
-                    }).collect::<Vec<(&AnalyzedTransaction, usize)>>();
-
-                let mut st_idx = 0;
-
-                while st_idx < num_txns {
-                    let end_idx = std::cmp::min(st_idx + batch_size, num_txns);
-                    let execution_batch_req = CmdsAndMetaDataRef {
-                        cmds: &analyzed_txns[st_idx..end_idx],
-                        num_txns,
-                        shard_txns_start_index: index_offset,
-                        onchain_config: &onchain_config_clone,
-                    };
-                    let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
-                        .with_label_values(&["0", "cmd_tx_bcs_ser"])
-                        .start_timer();
-                    let msg = Message::create_with_metadata(bcs::to_bytes(&execution_batch_req).unwrap(), duration_since_epoch, 0, 0);
-                    drop(bcs_ser_timer);
-                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
-                    let execute_command_type = format!("execute_command_{}", shard_id);
-                    senders[shard_id]
-                        .lock()
-                        .unwrap()
-                        .send(msg, &MessageType::new(execute_command_type));
-                    st_idx += batch_size;
-                }
-
-                let execution_request = RemoteExecutionRequestRef::ExecuteBlock(ExecuteBlockCommandRef {
-                    sub_blocks: &transactions_clone.get_ref().0[shard_id],
-                    concurrency_level: concurrency_level_per_shard,
-                    onchain_config: &onchain_config_clone,
-                });
-
-                let execute_command_type = format!("execute_command_{}", shard_id);
-                let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
-                    .with_label_values(&["0", "cmd_tx_bcs_ser"])
-                    .start_timer();
-                let msg = Message::create_with_metadata(bcs::to_bytes(&execution_request).unwrap(), duration_since_epoch, 0, 0);
-                drop(bcs_ser_timer);
-                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
-                senders[shard_id]
-                    .lock()
-                    .unwrap()
-                    .send(msg, &MessageType::new(execute_command_type));*/
+                        // senders[shard_id][rand_send_thread_idx]
+                        //     .lock()
+                        //     .unwrap()
+                        //     .send(msg, &MessageType::new(execute_command_type));
+                        outbound_rpc_scheduler_clone.send(msg,
+                                                         MessageType::new(execute_command_type),
+                                                         senders[shard_id][rand_send_thread_idx].clone(),
+                                                         chunk_idx as u64);
+                        drop(timer_1)
+                    });
             });
         }
 
