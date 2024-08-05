@@ -44,7 +44,10 @@ use futures::{
     FutureExt, StreamExt,
 };
 use std::{
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{Duration, Instant, SystemTime},
 };
 use tokio::{runtime::Handle, time::interval};
@@ -224,7 +227,7 @@ fn handle_commit_notification<TransactionValidator>(
     mempool_validator: &Arc<RwLock<TransactionValidator>>,
     use_case_history: &Arc<Mutex<UseCaseHistory>>,
     msg: MempoolCommitNotification,
-    num_committed_txns_recieved_since_peers_updated: &Arc<RwLock<u64>>,
+    num_committed_txns_recieved_since_peers_updated: &Arc<AtomicU64>,
 ) where
     TransactionValidator: TransactionValidation,
 {
@@ -240,7 +243,8 @@ fn handle_commit_notification<TransactionValidator>(
         counters::COMMIT_STATE_SYNC_LABEL,
         msg.transactions.len(),
     );
-    *num_committed_txns_recieved_since_peers_updated.write() += msg.transactions.len() as u64;
+    num_committed_txns_recieved_since_peers_updated
+        .fetch_add(msg.transactions.len() as u64, Ordering::Relaxed);
     process_committed_transactions(
         mempool,
         use_case_history,

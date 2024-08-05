@@ -36,7 +36,10 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt::Display,
     ops::Add,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{Duration, Instant, SystemTime},
 };
 use thiserror::Error;
@@ -110,7 +113,7 @@ pub(crate) struct MempoolNetworkInterface<NetworkClient> {
     mempool_config: MempoolConfig,
     prioritized_peers_state: PrioritizedPeersState,
     pub num_mempool_txns_received_since_peers_updated: u64,
-    pub num_committed_txns_received_since_peers_updated: Arc<RwLock<u64>>,
+    pub num_committed_txns_received_since_peers_updated: Arc<AtomicU64>,
 }
 
 impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterface<NetworkClient> {
@@ -128,7 +131,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             mempool_config,
             prioritized_peers_state,
             num_mempool_txns_received_since_peers_updated: 0,
-            num_committed_txns_received_since_peers_updated: Arc::new(RwLock::new(0)),
+            num_committed_txns_received_since_peers_updated: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -243,11 +246,13 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         self.prioritized_peers_state.update_prioritized_peers(
             peers_and_metadata,
             self.num_mempool_txns_received_since_peers_updated,
-            *self.num_committed_txns_received_since_peers_updated.read(),
+            self.num_committed_txns_received_since_peers_updated
+                .load(Ordering::Relaxed),
         );
         // Resetting the counter
         self.num_mempool_txns_received_since_peers_updated = 0;
-        *self.num_committed_txns_received_since_peers_updated.write() = 0;
+        self.num_committed_txns_received_since_peers_updated
+            .store(0, Ordering::SeqCst);
     }
 
     pub fn is_validator(&self) -> bool {

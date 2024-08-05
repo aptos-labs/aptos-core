@@ -254,7 +254,7 @@ impl PrioritizedPeersState {
 
         // Obtain the top peers to assign the sender buckets with Primary priority
         let mut top_peers = vec![];
-        let time_elapsed_since_last_update =
+        let secs_elapsed_since_last_update =
             self.last_peer_priority_update.map_or(0, |last_update| {
                 self.time_service
                     .now()
@@ -263,15 +263,15 @@ impl PrioritizedPeersState {
             });
 
         // When the node is in state sync mode, it will receive more mempool commit notifications than the actual
-        // commits that happens on the blockchain during the same time period. As time_elapsed_since_last_update is
+        // commits that happens on the blockchain during the same time period. As secs_elapsed_since_last_update is
         // local time and not the on chain time, the average_committed_traffic_observed is only a local estimate of
         // the traffic and could differ from the actual traffic observed by the blockchain. If the estimate differs
         // from the actual traffic observed on the blockchain, we could end up load balancing more or less than required.
         let average_mempool_traffic_observed = num_mempool_txns_received_since_peers_updated as f64
-            / max(1, time_elapsed_since_last_update) as f64;
+            / max(1, secs_elapsed_since_last_update) as f64;
         let average_committed_traffic_observed = num_committed_txns_received_since_peers_updated
             as f64
-            / max(1, time_elapsed_since_last_update) as f64;
+            / max(1, secs_elapsed_since_last_update) as f64;
 
         // Obtain the highest threshold from mempool_config.load_balancing_thresholds for which avg_mempool_traffic_threshold_in_tps exceeds average_mempool_traffic_observed
         let threshold_config = self
@@ -308,7 +308,7 @@ impl PrioritizedPeersState {
             Average committed traffic observed: {:?},\n
             Load balancing threshold config: {:?},\n
             Number of top peers picked: {:?}",
-            time_elapsed_since_last_update,
+            secs_elapsed_since_last_update,
             num_mempool_txns_received_since_peers_updated,
             average_mempool_traffic_observed,
             num_committed_txns_received_since_peers_updated,
