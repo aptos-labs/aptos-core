@@ -34,7 +34,7 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{AptosVM, VMExecutor, VMRandChecker};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use std::{ops::Deref, sync::Arc, time::Duration};

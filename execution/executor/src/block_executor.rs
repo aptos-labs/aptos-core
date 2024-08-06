@@ -153,6 +153,19 @@ where
     fn finish(&self) {
         *self.inner.write() = None;
     }
+
+    fn get_state_view(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<CachedStateView> {
+        self.maybe_initialize()?;
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .get_state_view(block_id, parent_block_id)
+    }
 }
 
 struct BlockExecutorInner<V> {
@@ -423,5 +436,36 @@ where
             .expect("Failure pruning block tree.");
 
         Ok(())
+    }
+
+    fn get_state_view(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<CachedStateView> {
+        let mut block_vec = self
+            .block_tree
+            .get_blocks_opt(&[block_id, parent_block_id])?;
+        let parent_block = block_vec
+            .pop()
+            .expect("Must exist.")
+            .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
+        let parent_output = &parent_block.output;
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+            "execute_block"
+        );
+
+        let state_view = {
+            CachedStateView::new(
+                StateViewId::BlockExecution { block_id },
+                Arc::clone(&self.db.reader),
+                parent_output.next_version(),
+                parent_output.state().current.clone(),
+                Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+            )?
+        };
+
+        Ok(state_view)
     }
 }

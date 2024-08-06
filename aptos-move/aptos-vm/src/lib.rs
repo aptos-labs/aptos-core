@@ -126,6 +126,7 @@ pub mod verifier;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
@@ -148,6 +149,15 @@ pub trait VMValidator {
         transaction: SignedTransaction,
         state_view: &impl StateView,
     ) -> VMValidatorResult;
+}
+
+pub trait VMRandChecker {
+    fn require_randomness(
+        &self,
+        state_view: &impl StateView,
+        transaction: &SignatureVerifiedTransaction,
+        txn_idx: TxnIndex,
+    ) -> bool;
 }
 
 /// This trait describes the VM's execution interface.
