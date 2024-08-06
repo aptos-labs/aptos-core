@@ -315,6 +315,15 @@ pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED_BY_BUCKET: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_core_mempool_txn_consensus_pulled_by_bucket",
+        "Number of times a txn was pulled from core mempool by consensus for each gas bucket",
+        &["bucket"]
+    )
+    .unwrap()
+});
+
 /// Counter of pending network events to Mempool
 pub static PENDING_MEMPOOL_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
