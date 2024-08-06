@@ -5,6 +5,7 @@
 
 use crate::{
     block_preparer::BlockPreparer,
+    counters::{self, log_executor_error_occurred},
     monitor,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
 };
@@ -15,7 +16,7 @@ use aptos_executor_types::{
     ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, warn};
 use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata_ext::BlockMetadataExt,
@@ -115,14 +116,9 @@ impl ExecutionPipeline {
         debug!("prepare_block received block {}.", block.id());
         let input_txns = block_preparer.prepare_block(&block).await;
         if let Err(e) = input_txns {
-            result_tx.send(Err(e)).unwrap_or_else(|err| {
-                error!(
-                    block_id = block.id(),
-                    "Failed to send back execution result for block {}: {:?}.",
-                    block.id(),
-                    err,
-                );
-            });
+            result_tx
+                .send(Err(e))
+                .unwrap_or_else(|value| process_failed_to_send_result(value, block.id()));
             return;
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
@@ -246,12 +242,9 @@ impl ExecutionPipeline {
             let pipe_line_res = res.map(|(output, execution_duration)| {
                 PipelineExecutionResult::new(input_txns, output, execution_duration)
             });
-            result_tx.send(pipe_line_res).unwrap_or_else(|err| {
-                error!(
-                    block_id = block_id,
-                    "Failed to send back execution result for block {}: {:?}", block_id, err,
-                );
-            });
+            result_tx
+                .send(pipe_line_res)
+                .unwrap_or_else(|value| process_failed_to_send_result(value, block_id));
         }
         debug!("ledger_apply stage quitting.");
     }
@@ -281,4 +274,23 @@ struct LedgerApplyCommand {
     parent_block_id: HashValue,
     state_checkpoint_output: ExecutorResult<(StateCheckpointOutput, Duration)>,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+}
+
+fn process_failed_to_send_result(
+    value: Result<PipelineExecutionResult, ExecutorError>,
+    block_id: HashValue,
+) {
+    warn!(
+        block_id = block_id,
+        is_err = value.is_err(),
+        "Failed to send back execution result",
+    );
+    if let Err(e) = value {
+        // receive channel discarding error, log for debugging.
+        log_executor_error_occurred(
+            e,
+            &counters::PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT,
+            block_id,
+        );
+    }
 }
