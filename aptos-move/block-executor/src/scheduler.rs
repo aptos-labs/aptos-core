@@ -719,6 +719,7 @@ impl Scheduler {
                                     Some(old_incarnation),
                                 )
                             } else {
+                                println!("failed validation, txn_idx={}", txn_idx);
                                 None
                             }
                         },
