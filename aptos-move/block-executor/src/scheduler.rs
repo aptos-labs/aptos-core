@@ -694,7 +694,7 @@ impl Scheduler {
                             Some(false)
                         },
                         ExecutingFlag::Fallback => {
-			    let old_incarnation = *incarnation;
+                            let old_incarnation = *incarnation;
                             drop(status);
                             if validation_f() {
                                 let mut status = self.txn_status[txn_idx as usize].0.write();
@@ -705,7 +705,7 @@ impl Scheduler {
                             } else {
                                 None
                             }
-                         },
+                        },
                         ExecutingFlag::Writing => None,
                     },
                     ExecutionStatus::Suspended(_, _)
@@ -869,6 +869,10 @@ impl TWaitForDependency for Scheduler {
             ));
         }
 
+        println!(
+            "wait for dependency txn={}, dep_txn={}",
+            txn_idx, dep_txn_idx
+        );
         // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
         // usually has just observed the read dependency.
 
