@@ -1201,12 +1201,16 @@ impl Scheduler {
                 *status = ExecutionStatus::Executed(incarnation);
                 Ok(())
             },
-            ExecutionStatus::ReadyToWakeUp(_, ref mut condvar, _) => {
+            ExecutionStatus::ReadyToWakeUp(stored_incarnation, ref mut condvar, _) => {
                 {
                     let (lock, cvar) = &**condvar;
                     // Mark dependency resolved.
                     let mut lock = lock.lock();
-                    *lock = DependencyStatus::Resolved;
+                    *lock = if incarnation == stored_incarnation {
+                        DependencyStatus::ExecutionHalted
+                    } else {
+                        DependencyStatus::Resolved
+                    };
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
                 }

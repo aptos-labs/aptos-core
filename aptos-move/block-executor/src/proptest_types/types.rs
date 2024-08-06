@@ -22,6 +22,7 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
+    vm_status::StatusCode,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
@@ -1042,35 +1043,58 @@ where
                     }
                 }
 
-                let read_group_size_or_metadata = behavior
-                    .group_queries
-                    .iter()
-                    .map(|(group_key, query_metadata)| {
-                        let res = if *query_metadata {
-                            GroupSizeOrMetadata::Metadata(
-                                view.get_resource_state_value_metadata(group_key)
-                                    .expect("Group must exist and size computation must succeed"),
-                            )
-                        } else {
-                            GroupSizeOrMetadata::Size(
-                                view.resource_group_size(group_key)
-                                    .expect("Group must exist and size computation must succeed")
-                                    .get(),
-                            )
-                        };
+                let mut read_group_size_or_metadata =
+                    Vec::with_capacity(behavior.group_queries.len());
+                for (group_key, query_metadata) in behavior.group_queries.iter() {
+                    let res = if *query_metadata {
+                        GroupSizeOrMetadata::Metadata(
+                            match view.get_resource_state_value_metadata(group_key) {
+                                Err(e) => {
+                                    assert!(
+                                        e.major_status()
+                                            == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                                    );
+                                    return ExecutionStatus::SpeculativeExecutionAbortError(
+                                        "Test execution speculation stopped".to_string(),
+                                    );
+                                },
+                                Ok(v) => v,
+                            },
+                        )
+                    } else {
+                        GroupSizeOrMetadata::Size(match view.resource_group_size(group_key) {
+                            Err(e) => {
+                                assert!(
+                                    e.major_status()
+                                        == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                                );
+                                return ExecutionStatus::SpeculativeExecutionAbortError(
+                                    "Test execution speculation stopped".to_string(),
+                                );
+                            },
+                            Ok(v) => v.get(),
+                        })
+                    };
 
-                        (group_key.clone(), res)
-                    })
-                    .collect();
+                    read_group_size_or_metadata.push((group_key.clone(), res));
+                }
 
                 let mut group_writes = vec![];
                 for (key, metadata, inner_ops) in behavior.group_writes.iter() {
                     let mut new_inner_ops = HashMap::new();
                     for (tag, inner_op) in inner_ops.iter() {
-                        let exists = view
-                            .get_resource_from_group(key, tag, None)
-                            .unwrap()
-                            .is_some();
+                        let exists: bool = match view.get_resource_from_group(key, tag, None) {
+                            Err(e) => {
+                                assert!(
+                                    e.major_status()
+                                        == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                                );
+                                return ExecutionStatus::SpeculativeExecutionAbortError(
+                                    "Test execution speculation stopped".to_string(),
+                                );
+                            },
+                            Ok(v) => v.is_some(),
+                        };
                         assert!(
                             *tag != RESERVED_TAG || exists,
                             "RESERVED_TAG must always be present in groups in tests"
