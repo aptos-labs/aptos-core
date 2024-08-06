@@ -759,6 +759,7 @@ impl Scheduler {
         }
 
         let mut status = self.txn_status[txn_idx as usize].0.write();
+
         match &mut *status {
             ExecutionStatus::Executing(incarnation, _, ref mut flag)
             | ExecutionStatus::ReadyToWakeUp(incarnation, _, ref mut flag) => {
@@ -777,10 +778,18 @@ impl Scheduler {
                 // or finally execution should be halted, but it should never be suspended
                 unreachable!("May not be suspended");
             },
+            ExecutionStatus::ReadyToExecute(incarnation) => {
+                let ret = *incarnation;
+                *status = ExecutionStatus::Executing(
+                    *incarnation,
+                    ExecutionTaskType::Execution,
+                    ExecutingFlag::Fallback,
+                );
+                Some(ret)
+            },
             ExecutionStatus::Aborting(_)
             | ExecutionStatus::Committed(_)
             | ExecutionStatus::Executed(_)
-            | ExecutionStatus::ReadyToExecute(_)
             | ExecutionStatus::ExecutionHalted => {
                 // if execution is halted, or transaction already committed/executed no need to fallback
                 // otherwise we know that transaction will be eventually executed
