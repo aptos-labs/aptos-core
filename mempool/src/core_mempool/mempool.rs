@@ -155,7 +155,9 @@ impl Mempool {
                 priority.as_str(),
             );
             counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
-            counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED_BY_BUCKET.with_label_values(bucket.as_str()).observe((prev_count + 1) as f64);
+            counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED_BY_BUCKET
+                .with_label_values(&[bucket.as_str()])
+                .observe((prev_count + 1) as f64);
         }
     }
 
