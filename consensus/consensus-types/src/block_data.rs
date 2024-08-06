@@ -241,6 +241,7 @@ impl BlockData {
             1,
             1,
             QuorumCert::dummy(),
+            None,
         )
     }
 
@@ -338,18 +339,30 @@ impl BlockData {
         round: Round,
         timestamp_usecs: u64,
         quorum_cert: QuorumCert,
+        maybe_require_randomness: Option<bool>,
     ) -> Self {
+        let block_type = if maybe_require_randomness.is_none() {
+            BlockType::ProposalExt(ProposalExt::V0 {
+                validator_txns,
+                payload,
+                author,
+                failed_authors,
+            })
+        } else {
+            BlockType::ProposalExt(ProposalExt::V1 {
+                validator_txns,
+                payload,
+                author,
+                failed_authors,
+                require_randomness: maybe_require_randomness.unwrap(),
+            })
+        };
         Self {
             epoch: quorum_cert.certified_block().epoch(),
             round,
             timestamp_usecs,
             quorum_cert,
-            block_type: BlockType::ProposalExt(ProposalExt::V0 {
-                validator_txns,
-                payload,
-                author,
-                failed_authors,
-            }),
+            block_type,
         }
     }
 

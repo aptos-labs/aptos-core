@@ -286,6 +286,10 @@ impl PipelinedBlock {
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
     }
+
+    pub fn require_randomness(&self) -> bool {
+        self.block().require_randomness()
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

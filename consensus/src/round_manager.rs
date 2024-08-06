@@ -889,7 +889,10 @@ impl RoundManager {
         } else {
             vote.vote_data_hash()
         };
-        self.broadcast_precommit_vote(vote.ledger_info().commit_info().clone(), consensus_data_hash).await;
+
+        if self.randomness_config.skip_non_rand_blocks() {
+            self.broadcast_precommit_vote(vote.ledger_info().commit_info().clone(), consensus_data_hash).await;
+        }
 
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
@@ -1053,9 +1056,9 @@ impl RoundManager {
                         );
                         let execution_future = Box::pin(async move { Ok(execution_result) });
                         execution_futures.insert(block_id, execution_future);
-    
+
                         info!("[PreExecution] broadcast commit vote for block of epoch {} round {} id {}", block_info.epoch(), block_info.round(), block_id);
-    
+
                         let commit_ledger_info = LedgerInfo::new(commit_info, consensus_data_hash);
                         let signature = safety_rules.lock().sign_pre_commit_vote(commit_ledger_info.clone());
                         match signature{

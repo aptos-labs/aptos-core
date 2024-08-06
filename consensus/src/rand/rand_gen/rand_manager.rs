@@ -23,7 +23,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, trace, warn};
+use aptos_logger::{debug, error, info, spawn_named, trace, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -67,6 +67,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
 
     // for randomness fast path
     fast_config: Option<RandConfig>,
+
+    skip_non_rand_blocks: bool,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -81,6 +83,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         db: Arc<dyn RandStorage<D>>,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
+        skip_non_rand_blocks: bool,
     ) -> Self {
         let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
@@ -126,6 +129,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             block_queue: BlockQueue::new(),
 
             fast_config,
+
+            skip_non_rand_blocks,
         }
     }
 
@@ -135,14 +140,18 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
-            .map(|block| FullRandMetadata::from(block.block()))
-            .map(|metadata| self.process_incoming_metadata(metadata))
+            .map(|block| (FullRandMetadata::from(block.block()), block.require_randomness()))
+            .map(|(metadata, require_randomness)| self.process_incoming_metadata(metadata, require_randomness))
             .collect();
         let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
         self.block_queue.push_back(queue_item);
     }
 
-    fn process_incoming_metadata(&self, metadata: FullRandMetadata) -> DropGuard {
+    fn process_incoming_metadata(&self, metadata: FullRandMetadata, require_randomness: bool) -> Option<DropGuard> {
+        if self.skip_non_rand_blocks && !require_randomness {
+            debug!("[RandManager] Skip non-random block epoch {} round {} id {}.", metadata.epoch(), metadata.round(), metadata.block_id);
+            return None;
+        }
         let self_share = S::generate(&self.config, metadata.metadata.clone());
         info!(LogSchema::new(LogEvent::BroadcastRandShare)
             .epoch(self.epoch_state.epoch)
@@ -165,7 +174,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         rand_store.add_rand_metadata(metadata.clone());
         self.network_sender
             .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
-        self.spawn_aggregate_shares_task(metadata.metadata)
+        Some(self.spawn_aggregate_shares_task(metadata.metadata))
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {

@@ -18,11 +18,12 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::{block::Block, common::Round, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{block::Block, block_data::BlockData, common::Round, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
     block_executor::config::BlockExecutorConfigFromOnchain,
@@ -167,6 +168,10 @@ impl ExecutionProxy {
         executed_block
             .compute_result()
             .transactions_to_commit(input_txns, executed_block.id())
+    }
+
+    pub fn get_state_view(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        self.executor.get_state_view(block_id, parent_block_id)
     }
 }
 
@@ -496,6 +501,10 @@ async fn test_commit_sync_race() {
         }
 
         fn finish(&self) {}
+
+        fn get_state_view(&self) -> ExecutorResult<CachedStateView> {
+            todo!()
+        }
     }
 
     #[async_trait::async_trait]

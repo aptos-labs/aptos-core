@@ -270,6 +270,7 @@ impl Block {
         quorum_cert: QuorumCert,
         validator_signer: &ValidatorSigner,
         failed_authors: Vec<(Round, Author)>,
+        maybe_require_randomness: Option<bool>,
     ) -> anyhow::Result<Self> {
         let block_data = BlockData::new_proposal_ext(
             validator_txns,
@@ -279,6 +280,7 @@ impl Block {
             round,
             timestamp_usecs,
             quorum_cert,
+            maybe_require_randomness,
         );
 
         Self::new_proposal_from_block_data(block_data, validator_signer)
@@ -497,6 +499,13 @@ impl Block {
             })
             .map(|index| u32::try_from(index).expect("Index is out of bounds for u32"))
             .collect()
+    }
+
+    pub fn require_randomness(&self) -> bool {
+        match self.block_data.block_type() {
+            BlockType::ProposalExt(proposal_ext) => proposal_ext.require_randomness(),
+            _ => false,
+        }
     }
 }
 

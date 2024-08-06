@@ -39,6 +39,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -76,8 +77,6 @@ pub trait TExecutionClient: Send + Sync {
     /// This is needed for some DAG tests. Clean this up as a TODO.
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>>;
 
-    async fn pre_execute(&self, block: &Arc<PipelinedBlock>);
-
     /// Send ordered blocks to the real execution phase through the channel.
     async fn finalize_order(
         &self,
@@ -100,6 +99,11 @@ pub trait TExecutionClient: Send + Sync {
 
     /// Shutdown the current processor at the end of the epoch.
     async fn end_epoch(&self);
+
+    async fn pre_execute(&self, block: &Arc<PipelinedBlock>);
+
+    // fn get_state_view(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<CachedStateView>;
+    fn get_execution_proxy(&self) -> Arc<ExecutionProxy>;
 }
 
 struct BufferManagerHandle {
@@ -205,6 +209,7 @@ impl ExecutionProxyClient {
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
+        skip_non_rand_blocks: bool,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -244,6 +249,7 @@ impl ExecutionProxyClient {
                     self.rand_storage.clone(),
                     self.bounded_executor.clone(),
                     &self.consensus_config.rand_rb_config,
+                    skip_non_rand_blocks,
                 );
 
                 tokio::spawn(rand_manager.start(
@@ -306,6 +312,10 @@ impl ExecutionProxyClient {
         tokio::spawn(persisting_phase.start());
         tokio::spawn(buffer_manager.start());
     }
+
+    pub fn get_state_view(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        self.execution_proxy.get_state_view(block_id, parent_block_id)
+    }
 }
 
 #[async_trait::async_trait]
@@ -335,6 +345,7 @@ impl TExecutionClient for ExecutionProxyClient {
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
             execution_futures,
+            onchain_randomness_config.skip_non_rand_blocks()
         );
 
         let transaction_shuffler =
@@ -359,27 +370,6 @@ impl TExecutionClient for ExecutionProxyClient {
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
         self.handle.read().execute_tx.clone()
-    }
-
-    async fn pre_execute(
-        &self,
-        block: &Arc<PipelinedBlock>,
-    ) {
-        let pre_execute_tx = self.handle.read().pre_execute_tx.clone();
-
-        if pre_execute_tx.is_none() {
-            debug!("Failed to send to buffer manager, maybe epoch ends");
-            return;
-        }
-
-        if pre_execute_tx
-            .unwrap()
-            .send((**block).clone())
-            .await
-            .is_err()
-        {
-            debug!("Failed to send to buffer manager, maybe epoch ends");
-        }
     }
 
     async fn finalize_order(
@@ -518,6 +508,35 @@ impl TExecutionClient for ExecutionProxyClient {
         }
         self.execution_proxy.end_epoch();
     }
+
+    async fn pre_execute(
+        &self,
+        block: &Arc<PipelinedBlock>,
+    ) {
+        let pre_execute_tx = self.handle.read().pre_execute_tx.clone();
+
+        if pre_execute_tx.is_none() {
+            debug!("Failed to send to buffer manager, maybe epoch ends");
+            return;
+        }
+
+        if pre_execute_tx
+            .unwrap()
+            .send((**block).clone())
+            .await
+            .is_err()
+        {
+            debug!("Failed to send to buffer manager, maybe epoch ends");
+        }
+    }
+
+    // fn get_state_view(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<CachedStateView> {
+    //     self.execution_proxy.get_state_view(block_id, parent_block_id)
+    // }
+
+    fn get_execution_proxy(&self) -> Arc<ExecutionProxy> {
+        self.execution_proxy.clone()
+    }
 }
 
 pub struct DummyExecutionClient;
@@ -544,8 +563,6 @@ impl TExecutionClient for DummyExecutionClient {
         None
     }
 
-    async fn pre_execute(&self, _block: &Arc<PipelinedBlock>) {}
-
     async fn finalize_order(
         &self,
         _: &[Arc<PipelinedBlock>],
@@ -568,4 +585,14 @@ impl TExecutionClient for DummyExecutionClient {
     }
 
     async fn end_epoch(&self) {}
+
+    async fn pre_execute(&self, _block: &Arc<PipelinedBlock>) {}
+
+    // fn get_state_view(&self, _: HashValue, _: HashValue) -> ExecutorResult<CachedStateView> {
+    //     todo!();
+    // }
+
+    fn get_execution_proxy(&self) -> Arc<ExecutionProxy> {
+        todo!()
+    }
 }

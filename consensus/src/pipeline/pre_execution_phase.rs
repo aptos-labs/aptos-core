@@ -13,6 +13,7 @@ use aptos_logger::{debug, info, warn};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use futures::TryFutureExt;
+use once_cell::sync::OnceCell;
 use std::sync::Arc;
 
 pub struct PreExecutionRequest {
@@ -26,7 +27,7 @@ pub struct PreExecutionPhase {
 
 impl PreExecutionPhase {
     pub fn new(execution_proxy: Arc<dyn StateComputer>, execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
-        Self { 
+        Self {
             execution_proxy,
             execution_futures,
         }

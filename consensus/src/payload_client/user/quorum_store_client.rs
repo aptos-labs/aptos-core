@@ -10,6 +10,7 @@ use aptos_consensus_types::{
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::info;
+use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use futures::future::BoxFuture;
 use futures_channel::{mpsc, oneshot};

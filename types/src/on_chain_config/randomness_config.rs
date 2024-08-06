@@ -199,8 +199,7 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        // OnChainRandomnessConfig::V2(ConfigV2::default())
-        OnChainRandomnessConfig::Off
+        OnChainRandomnessConfig::V2(ConfigV2::default())
     }
 
     pub fn randomness_enabled(&self) -> bool {
@@ -240,6 +239,14 @@ impl OnChainRandomnessConfig {
             OnChainRandomnessConfig::Off => None,
             OnChainRandomnessConfig::V1(_) => None,
             OnChainRandomnessConfig::V2(v2) => Some(v2.fast_path_secrecy_threshold.as_u64f64()),
+        }
+    }
+
+    pub fn skip_non_rand_blocks(&self) -> bool {
+        match self {
+            OnChainRandomnessConfig::Off => false,
+            OnChainRandomnessConfig::V1(_) => false,
+            OnChainRandomnessConfig::V2(_) => true,
         }
     }
 }

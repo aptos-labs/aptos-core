@@ -11,9 +11,7 @@ use crate::{
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_consensus_types::{
-    block::Block,
-    common::{DataStatus, Payload, ProofWithData, Round},
-    proof_of_store::ProofOfStore,
+    block::Block, block_data::{self, BlockData}, common::{DataStatus, Payload, ProofWithData, Round}, proof_of_store::ProofOfStore
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -230,7 +228,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
         let transaction_payload = match payload {
             Payload::InQuorumStore(proof_with_data) => {
                 let transactions =
-                    process_payload(proof_with_data, self.batch_reader.clone(), block).await?;
+                    process_payload(proof_with_data, self.batch_reader.clone(), block.block_data()).await?;
                 BlockTransactionPayload::new_in_quorum_store(
                     transactions,
                     proof_with_data.proofs.clone(),
@@ -240,7 +238,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 let transactions = process_payload(
                     &proof_with_data.proof_with_data,
                     self.batch_reader.clone(),
-                    block,
+                    block.block_data(),
                 )
                 .await?;
                 BlockTransactionPayload::new_in_quorum_store_with_limit(
@@ -256,7 +254,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
             ) => {
                 let all_transactions = {
                     let mut all_txns =
-                        process_payload(proof_with_data, self.batch_reader.clone(), block).await?;
+                        process_payload(proof_with_data, self.batch_reader.clone(), block.block_data()).await?;
                     all_txns.append(
                         &mut inline_batches
                             .iter()
@@ -353,7 +351,7 @@ async fn get_transactions_for_observer(
 async fn process_payload(
     proof_with_data: &ProofWithData,
     batch_reader: Arc<dyn BatchReader>,
-    block: &Block,
+    block_data: &BlockData,
 ) -> ExecutorResult<Vec<SignedTransaction>> {
     let status = proof_with_data.status.lock().take();
     match status.expect("Should have been updated before.") {
@@ -372,7 +370,7 @@ async fn process_payload(
                 debug!(
                     "QSE: waiting for data on {} receivers, block_round {}",
                     receivers.len(),
-                    block.round()
+                    block_data.round()
                 );
             }
             for (digest, rx) in receivers {
@@ -385,7 +383,7 @@ async fn process_payload(
                         );
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
                             proof_with_data.proofs.clone(),
-                            block.timestamp_usecs(),
+                            block_data.timestamp_usecs(),
                             batch_reader.clone(),
                         );
                         // Could not get all data so requested again
@@ -401,7 +399,7 @@ async fn process_payload(
                     Ok(Err(e)) => {
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
                             proof_with_data.proofs.clone(),
-                            block.timestamp_usecs(),
+                            block_data.timestamp_usecs(),
                             batch_reader.clone(),
                         );
                         // Could not get all data so requested again

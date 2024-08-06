@@ -6,15 +6,12 @@ use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
 };
 use crate::{
-    block_storage::BlockReader,
-    counters::{
+    block_storage::BlockReader, counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
         PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
         PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING, PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE,
         PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
-    },
-    payload_client::PayloadClient,
-    util::time_service::TimeService,
+    }, payload_client::PayloadClient, pipeline::execution_client::{ExecutionProxyClient, TExecutionClient}, state_computer::ExecutionProxy, util::time_service::TimeService
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{
@@ -27,10 +24,11 @@ use aptos_consensus_types::{
     pipelined_block::ExecutionSummary,
     quorum_cert::QuorumCert,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue};
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
-use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
+use aptos_types::{on_chain_config::{OnChainRandomnessConfig, ValidatorTxnConfig}, transaction::Transaction, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_vm::AptosVM;
 use futures::future::BoxFuture;
 use itertools::Itertools;
 use std::{
@@ -250,8 +248,11 @@ pub struct ProposalGenerator {
     last_round_generated: Round,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
+    onchain_randomness_config: OnChainRandomnessConfig,
 
     allow_batches_without_pos_in_proposal: bool,
+
+    execution_proxy: Arc<ExecutionProxy>,
 }
 
 impl ProposalGenerator {
@@ -272,7 +273,9 @@ impl ProposalGenerator {
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
+        onchain_randomness_config: OnChainRandomnessConfig,
         allow_batches_without_pos_in_proposal: bool,
+        execution_proxy: Arc<ExecutionProxy>,
     ) -> Self {
         Self {
             author,
@@ -291,7 +294,9 @@ impl ProposalGenerator {
             last_round_generated: 0,
             quorum_store_enabled,
             vtxn_config,
+            onchain_randomness_config,
             allow_batches_without_pos_in_proposal,
+            execution_proxy,
         }
     }
 
@@ -465,6 +470,45 @@ impl ProposalGenerator {
             proposer_election,
         );
 
+        let maybe_require_randomness = if self.onchain_randomness_config.skip_non_rand_blocks() {
+            // let mut require_randomness = false;
+            // let block_id = HashValue::zero();
+            // let parent_block_id = self.block_store.ordered_root().id();
+            // if let Ok(stale_state_view) = self.execution_proxy.get_state_view(block_id, parent_block_id) {
+            //     println!("daniel debug 1 round {}", round);
+            //     let block_data = BlockData::new_proposal_ext(
+            //         validator_txns.clone(),
+            //         payload.clone(),
+            //         self.author,
+            //         failed_authors.clone(),
+            //         round,
+            //         timestamp,
+            //         quorum_cert.clone(),
+            //         None,
+            //     );
+            //     if let Ok(txns) = self.execution_proxy.get_transactions_for_proposal(&block_data).await {
+            //         let vm = AptosVM::new(&stale_state_view);
+            //         for txn in txns.iter() {
+            //             if vm.require_randomness(&stale_state_view, txn, 0) {
+            //                 require_randomness = true;
+            //                 break;
+            //             }
+            //         }
+            //     }
+            // }
+
+            // Some(require_randomness)
+
+            if round % 2 == 0 {
+                Some(false)
+            } else {
+                Some(true)
+            }
+        } else {
+            None
+        };
+        println!("[Proposal] epoch {} round {} maybe_require_randomness {:?}", quorum_cert.certified_block().epoch(), round, maybe_require_randomness);
+
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(
                 validator_txns,
@@ -474,6 +518,7 @@ impl ProposalGenerator {
                 round,
                 timestamp,
                 quorum_cert,
+                maybe_require_randomness,
             )
         } else {
             BlockData::new_proposal(

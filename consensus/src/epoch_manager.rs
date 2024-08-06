@@ -844,6 +844,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
             self.pending_blocks.clone(),
+            onchain_randomness_config.skip_non_rand_blocks(),
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
@@ -865,9 +866,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chain_health_backoff_config,
             self.quorum_store_enabled,
             onchain_consensus_config.effective_validator_txn_config(),
+            onchain_randomness_config.clone(),
             self.config
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
+            self.execution_client.get_execution_proxy(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
