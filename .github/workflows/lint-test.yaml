@@ -209,7 +209,7 @@ jobs:
 
       # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
       - name: Upload smoke test logs for failed and flaky tests
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ failure() || success() }}
         with:
           name: failed-consensus-only-smoke-test-logs
