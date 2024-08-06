@@ -922,7 +922,8 @@ where
 
                 let start3 = Instant::now();
 
-                if let Some(mut last_commit_idx) = last_commit_idx {
+             match last_commit_idx { 
+                Some(mut last_commit_idx) if *worker_id == 0 => {
                     //need to process next task
                     last_commit_idx += 1;
 
@@ -974,15 +975,16 @@ where
                             fallback_time += end3 - start3;
                         }
                     }
-                }
-            } else {
-                let end = Instant::now();
-
-                drain_commit_queue()?;
-
-                commit_time += end - start;
-            }
-
+                },
+                _ => {
+                    let end = Instant::now();
+    
+                    drain_commit_queue()?;
+    
+                    commit_time += end - start;
+                },
+            };
+        
             // TODO: also measure commit queue draining time.
 
             let start2 = Instant::now();
