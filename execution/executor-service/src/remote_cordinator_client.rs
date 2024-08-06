@@ -152,34 +152,37 @@ impl RemoteCoordinatorClient {
                     let is_block_init_done_clone = is_block_init_done.clone();
                     let cmd_rx_thread_pool_clone = cmd_rx_thread_pool.clone();
 
+
                     let delta = get_delta_time(message.start_ms_since_epoch.unwrap());
                     REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                         .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
                     cmd_rx_msg_duration_since_epoch_clone.store(message.start_ms_since_epoch.unwrap(), std::sync::atomic::Ordering::Relaxed);
-                    let _rx_timer = REMOTE_EXECUTOR_TIMER
-                        .with_label_values(&[&shard_id.to_string(), "cmd_rx"])
-                        .start_timer();
-                    let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
-                        .with_label_values(&[&shard_id.to_string(), "cmd_rx_bcs_deser"])
-                        .start_timer();
 
-                    let txns: CmdsAndMetaData = bcs::from_bytes(&message.data).unwrap();
-                    drop(bcs_deser_timer);
-                    let transactions = txns.cmds;
-
-                    num_txns_processed += transactions.len();
+                    num_txns_processed += message.seq_num.unwrap() as usize;
                     info!("txns considered is ********* {}; num txns in block {}", num_txns_processed, num_txns_in_the_block);
                     if num_txns_processed == num_txns_in_the_block {
                         is_block_init_done_clone.store(false, std::sync::atomic::Ordering::Relaxed);
                         break_out = true;
                     }
 
-
-                    let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
-                        .with_label_values(&[&shard_id.to_string(), "init_prefetch"])
-                        .start_timer();
-
                     cmd_rx_thread_pool_clone.spawn(move || {
+                        let _rx_timer = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&[&shard_id.to_string(), "cmd_rx"])
+                            .start_timer();
+                        let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&[&shard_id.to_string(), "cmd_rx_bcs_deser"])
+                            .start_timer();
+
+                        let txns: CmdsAndMetaData = bcs::from_bytes(&message.data).unwrap();
+                        drop(bcs_deser_timer);
+                        let transactions = txns.cmds;
+
+
+                        let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&[&shard_id.to_string(), "init_prefetch"])
+                            .start_timer();
+
+
                         let batch_start_index = txns.batch_start_index;
                         let state_keys = Self::extract_state_keys_from_txns(&transactions);
 
