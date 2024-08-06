@@ -27,6 +27,15 @@ impl FinalityView {
 }
 
 impl FinalityView {
+    /// Returns the height of the previously finalized block.
+    ///
+    /// If [`set_finalized_block_height`] has never been called on this
+    /// instance, `None` is returned.
+    pub fn finalized_block_height(&self) -> Option<u64> {
+        let fin_ledger_info = self.finalized_ledger_info.read().unwrap();
+        fin_ledger_info.as_ref().map(|ledger_info| ledger_info.commit_info().version())
+    }
+
     /// Updates the information on the latest finalized block at the specified height.
     pub fn set_finalized_block_height(&self, height: u64) -> Result<()> {
         let (_start_ver, end_ver, block_event) = self.reader.get_block_info_by_height(height)?;
@@ -92,6 +101,15 @@ mod tests {
 
     use super::*;
     use crate::{mock::MockDbReaderWriter, state_view::LatestDbStateCheckpointView as _};
+
+    #[test]
+    fn test_finalized_block_height() -> anyhow::Result<()> {
+        let view = Arc::new(FinalityView::new(Arc::new(MockDbReaderWriter)));
+        assert!(view.finalized_block_height().is_none());
+        view.set_finalized_block_height(1)?;
+        assert_eq!(view.finalized_block_height(), Some(1));
+        Ok(())
+    }
 
     #[test]
     fn test_get_latest_ledger_info() -> anyhow::Result<()> {
