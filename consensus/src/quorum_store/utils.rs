@@ -13,12 +13,14 @@ use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use chrono::Utc;
 use futures::channel::{mpsc::Sender, oneshot};
+use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use rand::{seq::SliceRandom, thread_rng};
 use std::{
     cmp::{Ordering, Reverse},
     collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque},
     hash::Hash,
+    rc::Rc,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -399,7 +401,10 @@ impl BatchProofQueue {
                     if item.txn_summaries.is_none() {
                         item.txn_summaries = Some(txn_summaries.clone())
                     } else {
-                        debug!("Txn Summary already exists for batch {}", batch_key);
+                        debug!(
+                            "Txn Summary already exists for batch {}",
+                            batch_info.batch_id()
+                        );
                         txn_summary_already_exists = true;
                     }
 
@@ -508,7 +513,7 @@ impl BatchProofQueue {
         return_non_full: bool,
         block_timestamp: Duration,
     ) -> (Vec<ProofOfStore>, PayloadTxnsSize, u64, bool) {
-        let (proofs, _, all_txns, unique_txns, not_full) = self.pull_internal(
+        let (result, all_txns, unique_txns, is_full) = self.pull_internal(
             false,
             excluded_batches,
             max_txns,
@@ -516,7 +521,23 @@ impl BatchProofQueue {
             return_non_full,
             block_timestamp,
         );
-        (proofs, all_txns, unique_txns, not_full)
+        let proof_of_stores: Vec<_> = result
+            .into_iter()
+            .map(|item| item.proof.clone().expect("proof must exist"))
+            .collect();
+
+        if is_full || return_non_full {
+            counters::BLOCK_SIZE_WHEN_PULL.observe(unique_txns as f64);
+            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(all_txns.count as f64);
+            counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
+                .observe((all_txns.count.saturating_sub(unique_txns)) as f64);
+            counters::BLOCK_BYTES_WHEN_PULL.observe(all_txns.bytes as f64);
+            counters::PROOF_SIZE_WHEN_PULL.observe(proof_of_stores.len() as f64);
+            // Number of proofs remaining in proof queue after the pull
+            self.log_remaining_data_after_pull(excluded_batches, &proof_of_stores);
+        }
+
+        (proof_of_stores, all_txns, unique_txns, !is_full)
     }
 
     pub fn pull_batches(
@@ -527,7 +548,7 @@ impl BatchProofQueue {
         return_non_full: bool,
         block_timestamp: Duration,
     ) -> (Vec<BatchInfo>, PayloadTxnsSize, u64) {
-        let (_, batches, all_txns, unique_txns, _) = self.pull_internal(
+        let (result, all_txns, unique_txns, _) = self.pull_internal(
             true,
             excluded_batches,
             max_txns,
@@ -535,6 +556,7 @@ impl BatchProofQueue {
             return_non_full,
             block_timestamp,
         );
+        let batches = result.into_iter().map(|item| item.info.clone()).collect();
         (batches, all_txns, unique_txns)
     }
 
@@ -575,21 +597,14 @@ impl BatchProofQueue {
 
     fn pull_internal(
         &mut self,
-        batch_without_proofs: bool,
+        batches_without_proofs: bool,
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
-    ) -> (
-        Vec<ProofOfStore>,
-        Vec<BatchInfo>,
-        PayloadTxnsSize,
-        u64,
-        bool,
-    ) {
-        let mut proof_of_stores = Vec::new();
-        let mut batches = Vec::new();
+    ) -> (Vec<&QueueItem>, PayloadTxnsSize, u64, bool) {
+        let mut result = Vec::new();
         let mut cur_unique_txns = 0;
         let mut cur_all_txns = PayloadTxnsSize::zero();
         let mut excluded_txns = 0;
@@ -617,8 +632,8 @@ impl BatchProofQueue {
                     if item.proof.is_none() && item.txn_summaries.is_none() {
                         return None;
                     }
-                    if !(batch_without_proofs ^ item.proof.is_none()) {
-                        return Some((sort_key, info, item));
+                    if !(batches_without_proofs ^ item.proof.is_none()) {
+                        return Some((info, item));
                     }
                 }
                 None
@@ -633,7 +648,7 @@ impl BatchProofQueue {
                     return false;
                 }
 
-                if let Some((sort_key, batch, item)) = iter.next() {
+                if let Some((batch, item)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
                     } else {
@@ -675,16 +690,8 @@ impl BatchProofQueue {
                                         .count() as u64
                                 });
 
-                        assert!(item.proof.is_none() == batch_without_proofs);
-                        if let Some(ref proof) = item.proof {
-                            let bucket = proof.gas_bucket_start();
-                            counters::pos_to_pull(
-                                bucket,
-                                item.proof_insertion_time.unwrap().elapsed().as_secs_f64(),
-                            );
-                            proof_of_stores.push(proof.clone());
-                        }
-                        batches.push(batch.clone());
+                        assert!(item.proof.is_none() == batches_without_proofs);
+                        result.push(item);
                         if cur_all_txns == max_txns || cur_unique_txns == max_txns_after_filtering {
                             full = true;
                             return false;
@@ -704,35 +711,21 @@ impl BatchProofQueue {
             max_txns = max_txns.count,
             max_txns_after_filtering = max_txns_after_filtering,
             max_bytes = max_txns.bytes,
-            proof_batch_count = proof_of_stores.len(),
-            nonproof_batch_count = batches.len(),
+            result_is_proof = !batches_without_proofs,
+            result_count = result.len(),
             full = full,
             return_non_full = return_non_full,
             "Pull payloads from QuorumStore: internal"
         );
 
+        counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
+
         if full || return_non_full {
-            counters::BLOCK_SIZE_WHEN_PULL.observe(cur_unique_txns as f64);
-            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns.count as f64);
-            counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
-                .observe((cur_all_txns.count.saturating_sub(cur_unique_txns)) as f64);
-            counters::BLOCK_BYTES_WHEN_PULL.observe(cur_all_txns.bytes as f64);
-            counters::PROOF_SIZE_WHEN_PULL.observe(proof_of_stores.len() as f64);
-            counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
-            // Number of proofs remaining in proof queue after the pull
-            self.log_remaining_data_after_pull(excluded_batches, &proof_of_stores);
             // Stable sort, so the order of proofs within an author will not change.
-            proof_of_stores.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            batches.sort_by_key(|batch| Reverse(batch.gas_bucket_start()));
-            (
-                proof_of_stores,
-                batches,
-                cur_all_txns,
-                cur_unique_txns,
-                !full,
-            )
+            result.sort_by_key(|item| Reverse(item.info.gas_bucket_start()));
+            (result, cur_all_txns, cur_unique_txns, !full)
         } else {
-            (Vec::new(), Vec::new(), PayloadTxnsSize::zero(), 0, !full)
+            (Vec::new(), PayloadTxnsSize::zero(), 0, !full)
         }
     }
 
