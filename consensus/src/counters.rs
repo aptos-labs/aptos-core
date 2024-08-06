@@ -9,6 +9,9 @@ use crate::{
     quorum_store,
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutorError;
+use aptos_logger::prelude::{error, warn};
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
     register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
@@ -1011,6 +1014,46 @@ pub static BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT: Lazy<IntCounterVec> = L
     )
     .unwrap()
 });
+
+/// Count of the executor errors pipeline discarded
+pub static PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_pipeline_discarded_executor_error_count",
+        "Count of the executor errors pipeline discarded",
+        &["error_type"],
+    )
+    .unwrap()
+});
+
+pub fn log_executor_error_occurred(
+    e: ExecutorError,
+    counter: &Lazy<IntCounterVec>,
+    block_id: HashValue,
+) {
+    match e {
+        ExecutorError::CouldNotGetData => {
+            counter.with_label_values(&["CouldNotGetData"]).inc();
+            warn!(
+                block_id = block_id,
+                "Execution error - CouldNotGetData {}", block_id
+            );
+        },
+        ExecutorError::BlockNotFound(block_id) => {
+            counter.with_label_values(&["BlockNotFound"]).inc();
+            warn!(
+                block_id = block_id,
+                "Execution error BlockNotFound {}", block_id
+            );
+        },
+        e => {
+            counter.with_label_values(&["UnexpectedError"]).inc();
+            error!(
+                block_id = block_id,
+                "Execution error {:?} for {}", e, block_id
+            );
+        },
+    }
+}
 
 const PROPSER_ELECTION_DURATION_BUCKETS: [f64; 17] = [
     0.001, 0.002, 0.003, 0.004, 0.006, 0.008, 0.01, 0.012, 0.014, 0.0175, 0.02, 0.025, 0.05, 0.25,
