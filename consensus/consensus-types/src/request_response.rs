@@ -11,7 +11,9 @@ pub enum GetPayloadCommand {
     GetPayloadRequest(
         // max number of transactions in the block
         u64,
-        // max number of unique transactions in the block
+        // max number of transactions after filtering in the block
+        u64,
+        // soft max number of transactions after filtering in the block (i.e. include one that crosses it)
         u64,
         // max byte size
         u64,
@@ -36,6 +38,7 @@ impl fmt::Display for GetPayloadCommand {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
                 max_txns_after_filtering,
+                soft_max_txns_after_filtering,
                 max_bytes,
                 max_inline_txns,
                 max_inline_bytes,
@@ -46,8 +49,8 @@ impl fmt::Display for GetPayloadCommand {
             ) => {
                 write!(
                     f,
-                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {}, max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}, block_timestamp: {:?}]",
-                    max_txns, max_txns_after_filtering, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded, block_timestamp
+                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {} (soft: {}), max_bytes: {}, max_inline_txns: {}, max_inline_bytes:{}, return_non_full: {},  excluded: {}, block_timestamp: {:?}]",
+                    max_txns, max_txns_after_filtering, soft_max_txns_after_filtering, max_bytes, max_inline_txns, max_inline_bytes, return_non_full, excluded, block_timestamp
                 )
             },
         }
