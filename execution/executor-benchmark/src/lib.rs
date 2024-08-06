@@ -424,6 +424,8 @@ struct GasMeasurement {
     pub io_gas: f64,
     pub execution_gas: f64,
 
+    pub storage_fee: f64,
+
     pub approx_block_output: f64,
 
     pub gas_count: u64,
@@ -445,10 +447,17 @@ impl GasMeasurement {
     pub fn now() -> GasMeasurement {
         let gas = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_sum()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_sum();
+
         let io_gas = Self::sequential_gas_counter(GasType::IO_GAS).get_sample_sum()
             + Self::parallel_gas_counter(GasType::IO_GAS).get_sample_sum();
         let execution_gas = Self::sequential_gas_counter(GasType::EXECUTION_GAS).get_sample_sum()
             + Self::parallel_gas_counter(GasType::EXECUTION_GAS).get_sample_sum();
+
+        let storage_fee = Self::sequential_gas_counter(GasType::STORAGE_FEE).get_sample_sum()
+            + Self::parallel_gas_counter(GasType::STORAGE_FEE).get_sample_sum() - (
+                Self::sequential_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum()
+            + Self::parallel_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum()
+        );
 
         let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
@@ -474,6 +483,7 @@ impl GasMeasurement {
             effective_block_gas,
             io_gas,
             execution_gas,
+            storage_fee,
             approx_block_output,
             gas_count,
             speculative_abort_count,
@@ -488,6 +498,7 @@ impl GasMeasurement {
             effective_block_gas: end.effective_block_gas - self.effective_block_gas,
             io_gas: end.io_gas - self.io_gas,
             execution_gas: end.execution_gas - self.execution_gas,
+            storage_fee: end.storage_fee - self.storage_fee,
             approx_block_output: end.approx_block_output - self.approx_block_output,
             gas_count: end.gas_count - self.gas_count,
             speculative_abort_count: end.speculative_abort_count - self.speculative_abort_count,
@@ -639,6 +650,11 @@ impl OverallMeasuring {
             "{} GPT: {} gas/txn",
             prefix,
             delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
+        );
+        info!(
+            "{} Storage fee: {} octas/txn",
+            prefix,
+            delta_gas.storage_fee / (delta_gas.gas_count as f64).max(1.0)
         );
         info!(
             "{} approx_output: {} bytes/s",

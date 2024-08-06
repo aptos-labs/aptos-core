@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
@@ -209,6 +209,13 @@ if os.environ.get("PROD_DB_FLAGS"):
 else:
     DB_CONFIG_FLAGS = "--enable-storage-sharding"
 
+if os.environ.get("DISABLE_FA_APT"):
+    FEATURE_FLAGS = ""
+    SKIP_NATIVE = False
+else:
+    FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE"
+    SKIP_NATIVE = True
+
 if os.environ.get("ENABLE_PRUNER"):
     DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"
 else:
@@ -271,6 +278,7 @@ class RunResults:
     io_gps: float
     execution_gps: float
     gpt: float
+    storage_fee_pt: float
     output_bps: float
     fraction_in_execution: float
     fraction_of_execution_in_vm: float
@@ -308,6 +316,7 @@ def extract_run_results(
         io_gps = 0
         execution_gps = 0
         gpt = 0
+        storage_fee_pt = 0
         output_bps = 0
         fraction_in_execution = 0
         fraction_of_execution_in_vm = 0
@@ -325,6 +334,12 @@ def extract_run_results(
             get_only(re.findall(prefix + r" executionGPS: (\d+\.?\d*) gas/s", output))
         )
         gpt = float(get_only(re.findall(prefix + r" GPT: (\d+\.?\d*) gas/txn", output)))
+        storage_fee_pt = float(
+            get_only(
+                re.findall(prefix + r" Storage fee: (\-?\d+\.?\d*) octas/txn", output)
+            )
+        )
+
         output_bps = float(
             get_only(re.findall(prefix + r" output: (\d+\.?\d*) bytes/s", output))
         )
@@ -349,6 +364,7 @@ def extract_run_results(
         io_gps=io_gps,
         execution_gps=execution_gps,
         gpt=gpt,
+        storage_fee_pt=storage_fee_pt,
         output_bps=output_bps,
         fraction_in_execution=fraction_in_execution,
         fraction_of_execution_in_vm=fraction_of_execution_in_vm,
@@ -390,6 +406,7 @@ def print_table(
                 "io g/s",
                 "exe g/s",
                 "g/t",
+                "fee/t",
                 "out B/s",
             ]
         )
@@ -424,6 +441,7 @@ def print_table(
             row.append(int(round(result.single_node_result.io_gps)))
             row.append(int(round(result.single_node_result.execution_gps)))
             row.append(int(round(result.single_node_result.gpt)))
+            row.append(int(round(result.single_node_result.storage_fee_pt)))
             row.append(int(round(result.single_node_result.output_bps)))
         rows.append(row)
 
@@ -449,7 +467,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -469,6 +487,9 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         test,
     ) in enumerate(TESTS):
         if SELECTED_FLOW not in test.included_in:
+            continue
+    
+        if SKIP_NATIVE and test.key.executor_type == "native":
             continue
 
         print(f"Testing {test.key}")
@@ -499,7 +520,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             2 * MAX_BLOCK_SIZE * (1 if test.key.smaller_working_set else NUM_BLOCKS)
         )
 
-        common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         number_of_threads_results = {}
 
@@ -580,6 +601,19 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 results,
                 by_levels=True,
                 single_field=("g/s", lambda r: int(round(r.gps))),
+            )
+            print_table(
+                results,
+                by_levels=False,
+                single_field=("gas/txn", lambda r: int(round(r.gpt))),
+            )
+            print_table(
+                results,
+                by_levels=False,
+                single_field=(
+                    "storage fee/txn",
+                    lambda r: int(round(r.storage_fee_pt)),
+                ),
             )
             print_table(
                 results,
