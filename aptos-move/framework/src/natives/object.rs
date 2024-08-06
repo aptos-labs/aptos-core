@@ -82,7 +82,7 @@ fn native_exists_at(
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-fn native_create_user_derived_object_address_impl(
+pub(crate) fn native_create_user_derived_object_address_impl(
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,

@@ -19,6 +19,8 @@
 -  [Function `remove_native_authenticator`](#0x1_lite_account_remove_native_authenticator)
 -  [Function `update_dispatchable_authenticator`](#0x1_lite_account_update_dispatchable_authenticator)
 -  [Function `remove_dispatchable_authenticator`](#0x1_lite_account_remove_dispatchable_authenticator)
+-  [Function `resource_addr`](#0x1_lite_account_resource_addr)
+-  [Function `create_user_derived_object_address_impl`](#0x1_lite_account_create_user_derived_object_address_impl)
 -  [Function `update_native_authenticator_impl`](#0x1_lite_account_update_native_authenticator_impl)
 -  [Function `update_dispatchable_authenticator_impl`](#0x1_lite_account_update_dispatchable_authenticator_impl)
 -  [Function `create_account`](#0x1_lite_account_create_account)
@@ -172,7 +174,7 @@ A shared resource group for storing new account resources together in storage.
 Resource representing an account object.
 
 
-<pre><code>#[resource_group_member(#[group = <a href="lite_account.md#0x1_lite_account_LiteAccountGroup">0x1::lite_account::LiteAccountGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
 <b>struct</b> <a href="lite_account.md#0x1_lite_account_Account">Account</a> <b>has</b> key
 </code></pre>
 
@@ -201,7 +203,7 @@ Resource representing an account object.
 The native authenticator where the key is used for authenticator verification in native code.
 
 
-<pre><code>#[resource_group_member(#[group = <a href="lite_account.md#0x1_lite_account_LiteAccountGroup">0x1::lite_account::LiteAccountGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
 <b>struct</b> <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> <b>has</b> <b>copy</b>, drop, key
 </code></pre>
 
@@ -231,7 +233,7 @@ The dispatchable authenticator that defines how to authenticates this account in
 An integral part of Account Abstraction.
 
 
-<pre><code>#[resource_group_member(#[group = <a href="lite_account.md#0x1_lite_account_LiteAccountGroup">0x1::lite_account::LiteAccountGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
 <b>struct</b> <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> <b>has</b> <b>copy</b>, drop, key
 </code></pre>
 
@@ -260,7 +262,7 @@ An integral part of Account Abstraction.
 Legacy field from deprecated Account module.
 
 
-<pre><code>#[resource_group_member(#[group = <a href="lite_account.md#0x1_lite_account_LiteAccountGroup">0x1::lite_account::LiteAccountGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
 <b>struct</b> <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> <b>has</b> key
 </code></pre>
 
@@ -289,7 +291,7 @@ Legacy field from deprecated Account module.
 Legacy field from deprecated Account module.
 
 
-<pre><code>#[resource_group_member(#[group = <a href="lite_account.md#0x1_lite_account_LiteAccountGroup">0x1::lite_account::LiteAccountGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
 <b>struct</b> <a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a> <b>has</b> drop, key
 </code></pre>
 
@@ -318,7 +320,7 @@ Legacy field from deprecated Account module.
 Legacy field from deprecated Account module.
 
 
-<pre><code>#[resource_group_member(#[group = <a href="lite_account.md#0x1_lite_account_LiteAccountGroup">0x1::lite_account::LiteAccountGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
 <b>struct</b> <a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a> <b>has</b> drop, key
 </code></pre>
 
@@ -548,6 +550,52 @@ Note: it is a private entry function that can only be called directly from trans
 
 </details>
 
+<a id="0x1_lite_account_resource_addr"></a>
+
+## Function `resource_addr`
+
+
+
+<pre><code><b>fun</b> <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(source: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(source: <b>address</b>): <b>address</b> {
+    <a href="lite_account.md#0x1_lite_account_create_user_derived_object_address_impl">create_user_derived_object_address_impl</a>(source, @aptos_fungible_asset)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_lite_account_create_user_derived_object_address_impl"></a>
+
+## Function `create_user_derived_object_address_impl`
+
+
+
+<pre><code><b>fun</b> <a href="lite_account.md#0x1_lite_account_create_user_derived_object_address_impl">create_user_derived_object_address_impl</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="lite_account.md#0x1_lite_account_create_user_derived_object_address_impl">create_user_derived_object_address_impl</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_lite_account_update_native_authenticator_impl"></a>
 
 ## Function `update_native_authenticator_impl`
@@ -568,6 +616,7 @@ Note: it is a private entry function that can only be called directly from trans
     new_auth_key_option: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
 ) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&new_auth_key_option)) {
         <b>let</b> new_auth_key = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&new_auth_key_option);
         <b>assert</b>!(
@@ -575,33 +624,43 @@ Note: it is a private entry function that can only be called directly from trans
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="lite_account.md#0x1_lite_account_EMALFORMED_AUTHENTICATION_KEY">EMALFORMED_AUTHENTICATION_KEY</a>)
         );
         <b>let</b> native_auth_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&addr);
-        <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr)) {
+        <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr)) {
             <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(native_auth_key) == new_auth_key_option) {
-                <b>let</b> <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> { auth_key } = <b>move_from</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr);
+                <b>let</b> <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> { auth_key } = <b>move_from</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr);
                 <a href="event.md#0x1_event_emit">event::emit</a>(
-                    <a href="lite_account.md#0x1_lite_account_UpdateNativeAuthenticator">UpdateNativeAuthenticator</a> { <a href="account.md#0x1_account">account</a>: addr, old_auth_key: auth_key, new_auth_key: new_auth_key_option }
+                    <a href="lite_account.md#0x1_lite_account_UpdateNativeAuthenticator">UpdateNativeAuthenticator</a> {
+                        <a href="account.md#0x1_account">account</a>: addr,
+                        old_auth_key: auth_key, new_auth_key: new_auth_key_option
+                    }
                 );
             } <b>else</b> {
-                <b>let</b> current = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr).auth_key;
+                <b>let</b> current = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr).auth_key;
                 <b>if</b> (*current != new_auth_key_option) {
                     <a href="event.md#0x1_event_emit">event::emit</a>(
-                        <a href="lite_account.md#0x1_lite_account_UpdateNativeAuthenticator">UpdateNativeAuthenticator</a> { <a href="account.md#0x1_account">account</a>: addr, old_auth_key: *current, new_auth_key: new_auth_key_option }
+                        <a href="lite_account.md#0x1_lite_account_UpdateNativeAuthenticator">UpdateNativeAuthenticator</a> {
+                            <a href="account.md#0x1_account">account</a>: addr,
+                            old_auth_key: *current, new_auth_key: new_auth_key_option
+                        }
                     );
                     *current = new_auth_key_option;
                 };
             }
         } <b>else</b> <b>if</b> (new_auth_key != &native_auth_key) {
-            <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> { auth_key: new_auth_key_option });
+            <b>move_to</b>(
+                &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr),
+                <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> { auth_key: new_auth_key_option }
+            );
             <a href="event.md#0x1_event_emit">event::emit</a>(
                 <a href="lite_account.md#0x1_lite_account_UpdateNativeAuthenticator">UpdateNativeAuthenticator</a> {
-                    <a href="account.md#0x1_account">account</a>: addr, old_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
+                    <a href="account.md#0x1_account">account</a>: addr,
+                    old_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
                         native_auth_key
                     ), new_auth_key: new_auth_key_option
                 }
             )
         };
-    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr)) {
-        <b>let</b> authenticator = <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr);
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr)) {
+        <b>let</b> authenticator = <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr);
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&authenticator.auth_key)) {
             <a href="event.md#0x1_event_emit">event::emit</a>(<a href="lite_account.md#0x1_lite_account_UpdateNativeAuthenticator">UpdateNativeAuthenticator</a> {
                 <a href="account.md#0x1_account">account</a>: addr,
@@ -613,10 +672,10 @@ Note: it is a private entry function that can only be called directly from trans
     } <b>else</b> {
         <a href="event.md#0x1_event_emit">event::emit</a>(<a href="lite_account.md#0x1_lite_account_UpdateNativeAuthenticator">UpdateNativeAuthenticator</a> {
             <a href="account.md#0x1_account">account</a>: addr,
-            old_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&addr)),
+            old_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&resource_addr)),
             new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
         });
-        <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> { auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>() });
+        <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr), <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> { auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>() });
     };
 }
 </code></pre>
@@ -644,7 +703,8 @@ Note: it is a private entry function that can only be called directly from trans
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     auth_function_option: Option&lt;FunctionInfo&gt;,
 ) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> {
-    <b>let</b> account_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&auth_function_option)) {
         <b>let</b> auth_function = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(auth_function_option);
         <b>let</b> dispatcher_auth_function_info = <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(
@@ -656,12 +716,12 @@ Note: it is a private entry function that can only be called directly from trans
             <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">function_info::check_dispatch_type_compatibility</a>(&dispatcher_auth_function_info, &auth_function),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="lite_account.md#0x1_lite_account_EAUTH_FUNCTION_SIGNATURE_MISMATCH">EAUTH_FUNCTION_SIGNATURE_MISMATCH</a>)
         );
-        <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(account_address)) {
-            <b>let</b> current = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(account_address).auth_function;
+        <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
+            <b>let</b> current = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr).auth_function;
             <b>if</b> (*current != auth_function) {
                 <a href="event.md#0x1_event_emit">event::emit</a>(
                     <a href="lite_account.md#0x1_lite_account_UpdateDispatchableAuthenticator">UpdateDispatchableAuthenticator</a> {
-                        <a href="account.md#0x1_account">account</a>: account_address,
+                        <a href="account.md#0x1_account">account</a>: addr,
                         old_auth_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*current),
                         new_auth_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(auth_function)
                     }
@@ -669,19 +729,19 @@ Note: it is a private entry function that can only be called directly from trans
                 *current = auth_function;
             }
         } <b>else</b> {
-            <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> { auth_function });
+            <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr), <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> { auth_function });
             <a href="event.md#0x1_event_emit">event::emit</a>(
                 <a href="lite_account.md#0x1_lite_account_UpdateDispatchableAuthenticator">UpdateDispatchableAuthenticator</a> {
-                    <a href="account.md#0x1_account">account</a>: account_address,
+                    <a href="account.md#0x1_account">account</a>: addr,
                     old_auth_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
                     new_auth_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(auth_function)
                 }
             );
         }
-    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(account_address)) {
-        <b>let</b> <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> { auth_function } = <b>move_from</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(account_address);
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
+        <b>let</b> <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> { auth_function } = <b>move_from</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr);
         <a href="event.md#0x1_event_emit">event::emit</a>(<a href="lite_account.md#0x1_lite_account_UpdateDispatchableAuthenticator">UpdateDispatchableAuthenticator</a> {
-            <a href="account.md#0x1_account">account</a>: account_address,
+            <a href="account.md#0x1_account">account</a>: addr,
             old_auth_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(auth_function),
             new_auth_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
         });
@@ -712,7 +772,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_create_account">create_account</a>(new_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    // there cannot be an <a href="lite_account.md#0x1_lite_account_Account">Account</a> resource under new_addr already.
+    // there cannot be an <a href="lite_account.md#0x1_lite_account_Account">Account</a> resource under new_address already.
     <b>assert</b>!(!<a href="lite_account.md#0x1_lite_account_account_resource_exists_at">account_resource_exists_at</a>(new_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="lite_account.md#0x1_lite_account_EACCOUNT_EXISTENCE">EACCOUNT_EXISTENCE</a>));
 
     // NOTE: @core_resources gets created via a `create_account` call, so we do not <b>include</b> it below.
@@ -772,7 +832,7 @@ is returned. This way, the caller of this function can publish additional resour
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_create_account_with_resource">create_account_with_resource</a>(new_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>let</b> new_account = <a href="lite_account.md#0x1_lite_account_create_account">create_account</a>(new_address);
     <b>move_to</b>(
-        &new_account,
+        &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(<a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(new_address)),
         <a href="lite_account.md#0x1_lite_account_Account">Account</a> {
             sequence_number: 0,
         }
@@ -803,7 +863,7 @@ Return <code><b>true</b></code> if Account resource exists at this address.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="lite_account.md#0x1_lite_account_account_resource_exists_at">account_resource_exists_at</a>(addr: <b>address</b>): bool {
-    <b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(addr)
+    <b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(<a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr))
 }
 </code></pre>
 
@@ -829,7 +889,10 @@ Return <code><b>true</b></code> if the account could be authenticated with nativ
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="lite_account.md#0x1_lite_account_using_native_authenticator">using_native_authenticator</a>(addr: <b>address</b>): bool <b>acquires</b> <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> {
-    !<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr).auth_key)
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
+    !<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(
+        &<b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr).auth_key
+    )
 }
 </code></pre>
 
@@ -855,7 +918,7 @@ Return <code><b>true</b></code> if the account is an abstracted account that can
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">using_dispatchable_authenticator</a>(addr: <b>address</b>): bool {
-    <b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(addr)
+    <b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(<a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr))
 }
 </code></pre>
 
@@ -882,7 +945,7 @@ Return the current sequence number.
 
 <pre><code><b>public</b> <b>fun</b> <a href="lite_account.md#0x1_lite_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64 <b>acquires</b> <a href="lite_account.md#0x1_lite_account_Account">Account</a> {
     <b>if</b> (<a href="lite_account.md#0x1_lite_account_account_resource_exists_at">account_resource_exists_at</a>(addr)) {
-        <b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(addr).sequence_number
+        <b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(<a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr)).sequence_number
     } <b>else</b> {
         0
     }
@@ -911,8 +974,9 @@ Return the current native authenticator. <code>None</code> means this authentica
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="lite_account.md#0x1_lite_account_native_authenticator">native_authenticator</a>(addr: <b>address</b>): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a> {
-    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr)) {
-        <b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(addr).auth_key
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
+    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr)) {
+        <b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_NativeAuthenticator">NativeAuthenticator</a>&gt;(resource_addr).auth_key
     } <b>else</b> {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&addr))
     }
@@ -941,9 +1005,10 @@ Return the current dispatchable authenticator move function info. <code>None</co
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="lite_account.md#0x1_lite_account_dispatchable_authenticator">dispatchable_authenticator</a>(addr: <b>address</b>): Option&lt;FunctionInfo&gt; <b>acquires</b> <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> {
-    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(addr)) {
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
+    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-            <b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(addr).auth_function
+            <b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr).auth_function
         )
     } <b>else</b> { <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>() }
 }
@@ -973,7 +1038,7 @@ Bump sequence number, which is only called by transaction_validation.move in api
     <b>if</b> (!<a href="lite_account.md#0x1_lite_account_account_resource_exists_at">account_resource_exists_at</a>(addr)) {
         <a href="lite_account.md#0x1_lite_account_create_account_with_resource">create_account_with_resource</a>(addr);
     };
-    <b>let</b> sequence_number = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(addr).sequence_number;
+    <b>let</b> sequence_number = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(<a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr)).sequence_number;
 
     <b>assert</b>!(
         (*sequence_number <b>as</b> u128) &lt; <a href="lite_account.md#0x1_lite_account_MAX_U64">MAX_U64</a>,
@@ -1031,8 +1096,9 @@ Methods only for compatibility with account module.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_guid_creation_number">guid_creation_number</a>(addr: <b>address</b>): u64 <b>acquires</b> <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
-    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(addr)) {
-        <b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(addr).creation_number
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
+    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(resource_addr)) {
+        <b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(resource_addr).creation_number
     } <b>else</b> {
         0
     }
@@ -1063,7 +1129,7 @@ Only used by account.move for migration.
     <b>if</b> (!<a href="lite_account.md#0x1_lite_account_account_resource_exists_at">account_resource_exists_at</a>(addr)) {
         <a href="lite_account.md#0x1_lite_account_create_account_with_resource">create_account_with_resource</a>(addr);
     };
-    <b>let</b> sequence_number = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(addr).sequence_number;
+    <b>let</b> sequence_number = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(<a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr)).sequence_number;
     <b>assert</b>!(
         (new_sequence_number <b>as</b> u128) &lt; <a href="lite_account.md#0x1_lite_account_MAX_U64">MAX_U64</a>,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="lite_account.md#0x1_lite_account_ESEQUENCE_NUMBER_OVERFLOW">ESEQUENCE_NUMBER_OVERFLOW</a>)
@@ -1096,13 +1162,13 @@ Only used by account.move for migration.
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     creation_number: u64
 ) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
-    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>if</b> (!<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(addr)) {
-        <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+    <b>if</b> (!<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(resource_addr)) {
+        <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr), <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
             creation_number: 0
         });
     };
-    <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(addr).creation_number = creation_number;
+    <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(resource_addr).creation_number = creation_number;
 }
 </code></pre>
 
@@ -1127,12 +1193,13 @@ Only used by account.move for migration.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_create_guid">create_guid</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): GUID <b>acquires</b> <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>if</b> (!<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(addr)) {
-        <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
+    <b>if</b> (!<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(resource_addr)) {
+        <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr), <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
             creation_number: 0
         });
     };
-    <b>let</b> number = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(addr).creation_number;
+    <b>let</b> number = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(resource_addr).creation_number;
     <a href="guid.md#0x1_guid_create">guid::create</a>(addr, number)
 }
 </code></pre>
@@ -1159,8 +1226,9 @@ Only used by account.move for migration.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_rotation_capability_offer">rotation_capability_offer</a>(
     addr: <b>address</b>,
 ): Option&lt;<b>address</b>&gt; <b>acquires</b> <a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a> {
-    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(addr)) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(addr).for)
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
+    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(resource_addr)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(resource_addr).for)
     } <b>else</b> {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }
@@ -1189,8 +1257,9 @@ Only used by account.move for migration.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_signer_capability_offer">signer_capability_offer</a>(
     addr: <b>address</b>,
 ): Option&lt;<b>address</b>&gt; <b>acquires</b> <a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a> {
-    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(addr)) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(addr).for)
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
+    <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(resource_addr)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<b>borrow_global</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(resource_addr).for)
     } <b>else</b> {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }
@@ -1221,15 +1290,16 @@ Only used by account.move for migration.
     offeree: Option&lt;<b>address</b>&gt;
 ) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&offeree)) {
         <b>let</b> offeree = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(offeree);
-        <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(addr)) {
-            <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(addr).for = offeree;
+        <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(resource_addr)) {
+            <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(resource_addr).for = offeree;
         } <b>else</b> {
-            <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a> { for: offeree })
+            <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr), <a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a> { for: offeree })
         }
-    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(addr)) {
-        <b>move_from</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(addr);
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(resource_addr)) {
+        <b>move_from</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyRotationCapabilityOffer">LegacyRotationCapabilityOffer</a>&gt;(resource_addr);
     }
 }
 </code></pre>
@@ -1258,15 +1328,16 @@ Only used by account.move for migration.
     offeree: Option&lt;<b>address</b>&gt;
 ) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&offeree)) {
         <b>let</b> offeree = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(offeree);
-        <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(addr)) {
-            <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(addr).for = offeree;
+        <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(resource_addr)) {
+            <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(resource_addr).for = offeree;
         } <b>else</b> {
-            <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a> { for: offeree })
+            <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(resource_addr), <a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a> { for: offeree })
         }
-    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(addr)) {
-        <b>move_from</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(addr);
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(resource_addr)) {
+        <b>move_from</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacySignerCapabilityOffer">LegacySignerCapabilityOffer</a>&gt;(resource_addr);
     }
 }
 </code></pre>
