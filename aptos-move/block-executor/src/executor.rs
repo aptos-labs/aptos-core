@@ -922,69 +922,70 @@ where
 
                 let start3 = Instant::now();
 
-             match last_commit_idx { 
-                Some(mut last_commit_idx) if *worker_id == 0 => {
-                    //need to process next task
-                    last_commit_idx += 1;
+                match last_commit_idx {
+                    Some(mut last_commit_idx) if *worker_id == 0 => {
+                        //need to process next task
+                        last_commit_idx += 1;
 
-                    if last_commit_idx <= 2 {
-                        let cur = Instant::now();
-                        println!("critical path, thread_id={}, transaction_id={}, trying fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
-                    }
-                    if let Some(incarnation) = scheduler.try_fallback(last_commit_idx) {
                         if last_commit_idx <= 2 {
                             let cur = Instant::now();
-                            println!("critical path, thread_id={}, transaction_id={}, inside fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                            println!("critical path, thread_id={}, transaction_id={}, trying fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
                         }
-                        if let Some(validation_mode) = Self::execute(
-                            last_commit_idx,
-                            incarnation,
-                            true,
-                            scheduler,
-                            block,
-                            last_input_output,
-                            versioned_cache,
-                            &executor,
-                            base_view,
-                            ParallelState::new(
-                                versioned_cache,
-                                scheduler,
-                                start_shared_counter,
-                                shared_counter,
-                            ),
-                            start_time_all,
-                            worker_id,
-                        )? {
-                            //if we are in fallback and won write => no need to validate
+                        if let Some(incarnation) = scheduler.try_fallback(last_commit_idx) {
                             if last_commit_idx <= 2 {
                                 let cur = Instant::now();
-                                println!("executed fallback on critical path, thread_id={}, transaction_id={}, time elapsed={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                                println!("critical path, thread_id={}, transaction_id={}, inside fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
                             }
-                            scheduler.finish_execution(
+                            if let Some(validation_mode) = Self::execute(
                                 last_commit_idx,
                                 incarnation,
-                                validation_mode,
-                            )?;
-                            let end3 = Instant::now();
-                            fallback_time += end3 - start3;
+                                true,
+                                scheduler,
+                                block,
+                                last_input_output,
+                                versioned_cache,
+                                &executor,
+                                base_view,
+                                ParallelState::new(
+                                    versioned_cache,
+                                    scheduler,
+                                    start_shared_counter,
+                                    shared_counter,
+                                ),
+                                start_time_all,
+                                worker_id,
+                            )? {
+                                //if we are in fallback and won write => no need to validate
+                                if last_commit_idx <= 2 {
+                                    let cur = Instant::now();
+                                    println!("executed fallback on critical path, thread_id={}, transaction_id={}, time elapsed={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                                }
+                                scheduler.finish_execution(
+                                    last_commit_idx,
+                                    incarnation,
+                                    validation_mode,
+                                )?;
+                                let end3 = Instant::now();
+                                fallback_time += end3 - start3;
 
-                            // TODO: drain if the last txn.
-                            continue;
-                        } else {
-                            let end3 = Instant::now();
-                            fallback_time += end3 - start3;
+                                // TODO: drain if the last txn.
+                                continue;
+                            } else {
+                                let end3 = Instant::now();
+                                fallback_time += end3 - start3;
+                            }
                         }
-                    }
-                },
-                _ => {
-                    let end = Instant::now();
-    
-                    drain_commit_queue()?;
-    
-                    commit_time += end - start;
-                },
-            };
-        
+                    },
+                    _ => {
+                        let end = Instant::now();
+
+                        drain_commit_queue()?;
+
+                        commit_time += end - start;
+                    },
+                };
+            }
+
             // TODO: also measure commit queue draining time.
 
             let start2 = Instant::now();
