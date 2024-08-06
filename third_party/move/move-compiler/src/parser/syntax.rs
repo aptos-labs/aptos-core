@@ -3299,7 +3299,7 @@ fn parse_module(
 //          "script" "{"
 //              (<Attributes> <UseDecl>)*
 //              (<Attributes> <ConstantDecl>)*
-//              <DocComments> <ModuleMemberModifiers> <Attributes> <FunctionDecl>
+//              <Attributes> <DocComments> <ModuleMemberModifiers> <FunctionDecl>
 //              (<Attributes> <SpecBlock>)*
 //          "}"
 fn parse_script(
