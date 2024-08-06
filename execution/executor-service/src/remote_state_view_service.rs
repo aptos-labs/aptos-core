@@ -184,7 +184,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
             let outbound_rpc_scheduler_clone = outbound_rpc_scheduler.clone();
             let rand_send_thread_idx = rng.gen_range(0, kv_tx[0].len());
-            tokio::task::spawn_blocking(move || {Self::handle_message(message, state_view, kv_txs,rand_send_thread_idx, outbound_rpc_scheduler_clone)});
+            Self::handle_message(message, state_view, kv_txs,rand_send_thread_idx, outbound_rpc_scheduler_clone);
         }
     }
 
