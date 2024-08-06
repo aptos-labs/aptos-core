@@ -384,12 +384,12 @@ impl ConsensusConfig {
             (
                 config.max_sending_block_txns,
                 config.max_receiving_block_txns,
-                "txns",
+                "send < recv for txns",
             ),
             (
                 config.max_sending_block_bytes,
                 config.max_receiving_block_bytes,
-                "bytes",
+                "send < recv for bytes",
             ),
         ];
         for (send, recv, label) in &send_recv_pairs {
@@ -412,22 +412,23 @@ impl ConsensusConfig {
             (
                 config.quorum_store.receiver_max_batch_txns as u64,
                 config.max_sending_block_txns,
-                "txns".to_string(),
+                "QS recv batch txns < max_sending_block_txns".to_string(),
             ),
             (
                 config.quorum_store.receiver_max_batch_txns as u64,
                 config.max_sending_block_txns_after_filtering,
-                "txns".to_string(),
+                "QS recv batch txns < max_sending_block_txns_after_filtering ".to_string(),
             ),
             (
                 config.quorum_store.receiver_max_batch_txns as u64,
                 config.min_max_txns_in_block_after_filtering_from_backpressure,
-                "txns".to_string(),
+                "QS recv batch txns < min_max_txns_in_block_after_filtering_from_backpressure"
+                    .to_string(),
             ),
             (
                 config.quorum_store.receiver_max_batch_bytes as u64,
                 config.max_sending_block_bytes,
-                "bytes".to_string(),
+                "QS recv batch bytes < max_sending_block_bytes".to_string(),
             ),
         ];
         for backpressure_values in &config.pipeline_backpressure {
@@ -435,7 +436,7 @@ impl ConsensusConfig {
                 config.quorum_store.receiver_max_batch_bytes as u64,
                 backpressure_values.max_sending_block_bytes_override,
                 format!(
-                    "backpressure {} ms: bytes",
+                    "backpressure {} ms: QS recv batch bytes < max_sending_block_bytes_override",
                     backpressure_values.back_pressure_pipeline_latency_limit_ms,
                 ),
             ));
@@ -445,7 +446,7 @@ impl ConsensusConfig {
                 config.quorum_store.receiver_max_batch_bytes as u64,
                 backoff_values.max_sending_block_bytes_override,
                 format!(
-                    "backoff {} %: bytes",
+                    "backoff {} %: bytes: QS recv batch bytes < max_sending_block_bytes_override",
                     backoff_values.backoff_if_below_participating_voting_power_percentage,
                 ),
             ));
