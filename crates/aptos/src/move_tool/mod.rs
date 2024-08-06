@@ -179,7 +179,7 @@ impl FrameworkPackageArgs {
         const SUPRA_FRAMEWORK: &str = "SupraFramework";
         const SUPRA_FRAMEWORK_GIT_PATH: &str = "https://github.com/Entropy-Foundation/aptos-core.git";
         const SUBDIR_PATH: &str = "aptos-move/framework/supra-framework";
-        const DEFAULT_BRANCH: &str = "integrate_consensus_key";
+        const DEFAULT_BRANCH: &str = "dev";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), prompt_options)?;
@@ -847,6 +847,9 @@ impl SupraCommand for PublishPackage {
             payload: package_publication_data.payload,
             profile: self.txn_options.profile_options.profile,
             rpc: self.txn_options.rest_options.url ,
+            gas_unit_price: self.txn_options.gas_options.gas_unit_price,
+            max_gas: self.txn_options.gas_options.max_gas,
+            expiration_secs: self.txn_options.gas_options.expiration_secs,
         })
     }
 }
@@ -1479,6 +1482,9 @@ impl SupraCommand for RunFunction {
             payload: TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
             profile: self.txn_options.profile_options.profile,
             rpc: self.txn_options.rest_options.url,
+            gas_unit_price: self.txn_options.gas_options.gas_unit_price,
+            max_gas: self.txn_options.gas_options.max_gas,
+            expiration_secs: self.txn_options.gas_options.expiration_secs,
         })
     }
 }
@@ -1544,6 +1550,9 @@ impl SupraCommand for RunScript {
             payload: self.script_function_args.create_script_payload(bytecode)?,
             profile: self.txn_options.profile_options.profile,
             rpc: self.txn_options.rest_options.url,
+            gas_unit_price: self.txn_options.gas_options.gas_unit_price,
+            max_gas: self.txn_options.gas_options.max_gas,
+            expiration_secs: self.txn_options.gas_options.expiration_secs,
         })
     }
 }
