@@ -770,6 +770,16 @@ module supra_framework::genesis {
 
 	#[test_only]
 	use aptos_std::ed25519;
+    #[test_only]
+    use supra_framework::multisig_account;
+
+    #[test_only]
+    fun generate_multisig_account(owner: &signer, addition_owner: vector<address>): address {
+        let owner_addr = aptos_std::signer::address_of(owner);
+        let multisig_addr = multisig_account::get_next_multisig_account_address(owner_addr);
+        multisig_account::create_with_owners(owner, addition_owner, 2, vector[], vector[], 300);
+        multisig_addr
+    }
 
     #[test(supra_framework = @0x1)]
 
@@ -960,12 +970,13 @@ module supra_framework::genesis {
             i = i + 1;
         };
         let principle_lockup_time = 100;
+        let multisig = generate_multisig_account(&account::create_signer_for_test(owner), vector[@0x12134]);
         let pbo_delegator_config = PboDelegatorConfiguration {
-            multisig_admin: owner,
-            unlock_period_duration: 0,
-            unlock_schedule_denominator: 0,
-            unlock_schedule_numerators: vector[],
-            unlock_startup_time_from_now: 0,
+            multisig_admin: multisig,
+            unlock_period_duration: 12,
+            unlock_schedule_denominator: 10,
+            unlock_schedule_numerators: vector[2, 2, 3],
+            unlock_startup_time_from_now: principle_lockup_time,
             delegator_config: DelegatorConfiguration{
                 owner_address: owner,
                 validator: validator_config_commission,
@@ -986,14 +997,14 @@ module supra_framework::genesis {
 		features::change_feature_flags_for_testing(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
         let owner1 = @0x121341;
-		create_account(supra_framework,@0x121341,0);
+        create_account(supra_framework,owner1,0);
 		let (_, pk_1)=stake::generate_identity();
 		let (_, pk_2)=stake::generate_identity();
 		let _pk_1 = ed25519::unvalidated_public_key_to_bytes(&pk_1);
 		let _pk_2 = ed25519::unvalidated_public_key_to_bytes(&pk_2);
         let validator_config_commission1 = ValidatorConfigurationWithCommission{
             validator_config: ValidatorConfiguration{
-                owner_address: @0x121341,
+                owner_address: owner1,
                 operator_address: @0x121342,
                 voter_address: @0x121343,
                 stake_amount: 100 * ONE_APT,
@@ -1016,12 +1027,13 @@ module supra_framework::genesis {
             i = i + 1;
         };
         let principle_lockup_time1 = 100;
+        let multisig1 = generate_multisig_account(&account::create_signer_for_test(owner1), vector[@0x121342]);
         let pbo_delegator_config1 = PboDelegatorConfiguration{
-            multisig_admin: owner1,
-            unlock_period_duration: 0,
-            unlock_schedule_denominator: 0,
-            unlock_schedule_numerators: vector[],
-            unlock_startup_time_from_now: 0,
+            multisig_admin: multisig1,
+            unlock_period_duration: 12,
+            unlock_schedule_denominator: 10,
+            unlock_schedule_numerators: vector[2, 2, 3],
+            unlock_startup_time_from_now: principle_lockup_time1,
             delegator_config: DelegatorConfiguration{
                 owner_address: owner1,
                 validator: validator_config_commission1,
@@ -1035,7 +1047,7 @@ module supra_framework::genesis {
         create_account(supra_framework, owner2, 0);
         let validator_config_commission2 = ValidatorConfigurationWithCommission{
             validator_config: ValidatorConfiguration{
-                owner_address: @0x121344,
+                owner_address: owner2,
                 operator_address: @0x121345,
                 voter_address: @0x121346,
                 stake_amount: 100 * ONE_APT,
@@ -1058,12 +1070,13 @@ module supra_framework::genesis {
             j = j + 1;
         };
         let principle_lockup_time2 = 200;
+        let multisig2 = generate_multisig_account(&account::create_signer_for_test(owner2), vector[@0x121347]);
         let pbo_delegator_config2 = PboDelegatorConfiguration{
-            multisig_admin: owner2,
-            unlock_period_duration: 0,
-            unlock_schedule_denominator: 0,
-            unlock_schedule_numerators: vector[],
-            unlock_startup_time_from_now: 0,
+            multisig_admin: multisig2,
+            unlock_period_duration: 12,
+            unlock_schedule_denominator: 10,
+            unlock_schedule_numerators: vector[2, 2, 3],
+            unlock_startup_time_from_now: principle_lockup_time2,
             delegator_config: DelegatorConfiguration{
                 owner_address: owner2,
                 validator: validator_config_commission2,
