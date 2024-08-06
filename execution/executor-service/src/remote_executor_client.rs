@@ -127,7 +127,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
                 let mut command_tx = vec![];
-                for _ in 0..std::cmp::min(1,num_threads/(2 * num_shards)) {
+                for _ in 0..std::cmp::max(1,num_threads/(2 * num_shards)) {
                     command_tx.push(Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone())));
                 }
                 let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
