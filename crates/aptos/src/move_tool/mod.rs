@@ -771,11 +771,8 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         let package =
             build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
 
-        let package_publication_data = create_package_publication_data_from_built_package(
-            package,
-            PublishType::AccountDeploy,
-            None,
-        )?;
+        let package_publication_data =
+            create_package_publication_data(package, PublishType::AccountDeploy, None)?;
 
         let size = bcs::serialized_size(&package_publication_data.payload)?;
         println!("package size {} bytes", size);
@@ -809,11 +806,8 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
         let package =
             build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
 
-        let chunked_publish_payloads = create_chunked_publish_payloads_from_built_package(
-            package,
-            PublishType::AccountDeploy,
-            None,
-        )?;
+        let chunked_publish_payloads =
+            create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?;
 
         let size = &chunked_publish_payloads
             .payloads
@@ -961,7 +955,7 @@ impl IncludedArtifacts {
 pub const MAX_PUBLISH_PACKAGE_SIZE: usize = 60_000;
 
 // Get publication data for standard publish mode, which submits a single transaction for publishing.
-fn create_package_publication_data_from_built_package(
+fn create_package_publication_data(
     package: BuiltPackage,
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
@@ -1000,7 +994,7 @@ fn create_package_publication_data_from_built_package(
 }
 
 // Get publication data for chunked publish mode, which submits multiple transactions for publishing.
-fn create_chunked_publish_payloads_from_built_package(
+fn create_chunked_publish_payloads(
     package: BuiltPackage,
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
@@ -1034,6 +1028,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         if self.chunked_publish_option.chunked_publish {
             let chunked_package_payloads: ChunkedPublishPayloads = (&self).async_try_into().await?;
+
             let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &chunked_package_payloads.payloads.len());
             println!("{}", message.bold());
             submit_chunked_publish_transactions(
@@ -1141,12 +1136,9 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
             let package =
                 build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
-            let mock_payloads = create_chunked_publish_payloads_from_built_package(
-                package,
-                PublishType::AccountDeploy,
-                None,
-            )?
-            .payloads;
+            let mock_payloads =
+                create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?
+                    .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
             self.txn_options.sequence_number(sender_address).await? + staging_tx_count + 1
         } else {
@@ -1167,12 +1159,8 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
-            let payloads = create_chunked_publish_payloads_from_built_package(
-                package,
-                PublishType::ObjectDeploy,
-                None,
-            )?
-            .payloads;
+            let payloads =
+                create_chunked_publish_payloads(package, PublishType::ObjectDeploy, None)?.payloads;
 
             let size = &payloads
                 .iter()
@@ -1184,7 +1172,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
 
             submit_chunked_publish_transactions(payloads, &self.txn_options).await
         } else {
-            let package_publication_data = create_package_publication_data_from_built_package(
+            let package_publication_data = create_package_publication_data(
                 package,
                 PublishType::ObjectDeploy,
                 Some(object_address),
@@ -1276,7 +1264,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
-            let payloads = create_chunked_publish_payloads_from_built_package(
+            let payloads = create_chunked_publish_payloads(
                 built_package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
@@ -1292,7 +1280,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             println!("{}", message.bold());
             submit_chunked_publish_transactions(payloads, &self.txn_options).await
         } else {
-            let payload = create_package_publication_data_from_built_package(
+            let payload = create_package_publication_data(
                 built_package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
@@ -1340,6 +1328,8 @@ pub struct DeployObjectCode {
     pub(crate) address_name: String,
     #[clap(flatten)]
     pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) chunked_publish_option: ChunkedPublishOption,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -1400,6 +1390,8 @@ pub struct UpgradeCodeObject {
     pub(crate) object_address: AccountAddress,
     #[clap(flatten)]
     pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) chunked_publish_option: ChunkedPublishOption,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -1487,7 +1479,9 @@ async fn submit_tx_and_check(
         return Err(CliError::UnexpectedError(format!(
             "The package is larger than {} bytes ({} bytes)! To lower the size \
             you may want to include fewer artifacts via `--included-artifacts`. \
-            You can also override this check with `--override-size-check",
+            You can also override this check with `--override-size-check. \
+            Alternatively, you can use the `--chunked-publish` to enable \
+            chunked publish mode, which chunks down the package and deploys it in several stages.",
             MAX_PUBLISH_PACKAGE_SIZE, size
         )));
     }
