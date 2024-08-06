@@ -15,7 +15,7 @@ use aptos_executor_types::{
     ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, warn};
 use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata_ext::BlockMetadataExt,
@@ -99,6 +99,23 @@ impl ExecutionPipeline {
         })
     }
 
+    fn log_execution_error(block_id: HashValue, error: ExecutorResult<PipelineExecutionResult>) {
+        match error {
+            Err(ExecutorError::CouldNotGetData) | Err(ExecutorError::BlockNotFound(_)) => {
+                warn!(
+                    block_id = block_id,
+                    "Internal error while executing block {}: {:?}.", block_id, error,
+                );
+            },
+            _ => {
+                error!(
+                    block_id = block_id,
+                    "Failed to execute block {}: {:?}.", block_id, error,
+                );
+            },
+        }
+    }
+
     async fn prepare_block(
         execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
         command: PrepareBlockCommand,
@@ -116,12 +133,7 @@ impl ExecutionPipeline {
         let input_txns = block_preparer.prepare_block(&block).await;
         if let Err(e) = input_txns {
             result_tx.send(Err(e)).unwrap_or_else(|err| {
-                error!(
-                    block_id = block.id(),
-                    "Failed to send back execution result for block {}: {:?}.",
-                    block.id(),
-                    err,
-                );
+                Self::log_execution_error(block.id(), err);
             });
             return;
         }
@@ -247,10 +259,7 @@ impl ExecutionPipeline {
                 PipelineExecutionResult::new(input_txns, output, execution_duration)
             });
             result_tx.send(pipe_line_res).unwrap_or_else(|err| {
-                error!(
-                    block_id = block_id,
-                    "Failed to send back execution result for block {}: {:?}", block_id, err,
-                );
+                Self::log_execution_error(block_id, err);
             });
         }
         debug!("ledger_apply stage quitting.");
