@@ -976,6 +976,9 @@ where
                             }
                         }
                     },
+                    _ if *worker_id == 0 => {
+                        continue;
+                    },
                     _ => {
                         let end = Instant::now();
 
