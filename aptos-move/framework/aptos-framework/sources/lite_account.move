@@ -9,8 +9,7 @@ module aptos_framework::lite_account {
     use aptos_framework::create_signer;
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
-    use aptos_framework::guid;
-    use aptos_framework::guid::GUID;
+    use aptos_framework::guid::{Self, GUID};
 
     friend aptos_framework::account;
     friend aptos_framework::resource_account;
@@ -47,36 +46,36 @@ module aptos_framework::lite_account {
     /// A shared resource group for storing new account resources together in storage.
     struct LiteAccountGroup {}
 
-    #[resource_group_member(group = aptos_framework::lite_account::LiteAccountGroup)]
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Resource representing an account object.
     struct Account has key {
         sequence_number: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::lite_account::LiteAccountGroup)]
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The native authenticator where the key is used for authenticator verification in native code.
     struct NativeAuthenticator has key, copy, drop {
         auth_key: Option<vector<u8>>,
     }
 
-    #[resource_group_member(group = aptos_framework::lite_account::LiteAccountGroup)]
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The dispatchable authenticator that defines how to authenticates this account in the specified module.
     /// An integral part of Account Abstraction.
     struct DispatchableAuthenticator has key, copy, drop {
         auth_function: FunctionInfo
     }
 
-    #[resource_group_member(group = aptos_framework::lite_account::LiteAccountGroup)]
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Legacy field from deprecated Account module.
     struct LegacyGUIDCreactionNumber has key {
         creation_number: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::lite_account::LiteAccountGroup)]
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Legacy field from deprecated Account module.
     struct LegacyRotationCapabilityOffer has key, drop { for: address }
 
-    #[resource_group_member(group = aptos_framework::lite_account::LiteAccountGroup)]
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Legacy field from deprecated Account module.
     struct LegacySignerCapabilityOffer has key, drop { for: address }
 
@@ -122,11 +121,18 @@ module aptos_framework::lite_account {
         );
     }
 
+    inline fun resource_addr(source: address): address {
+        create_user_derived_object_address_impl(source, @aptos_fungible_asset)
+    }
+
+    native fun create_user_derived_object_address_impl(source: address, derive_from: address): address;
+
     public(friend) fun update_native_authenticator_impl(
         account: &signer,
         new_auth_key_option: Option<vector<u8>>,
     ) acquires NativeAuthenticator {
         let addr = signer::address_of(account);
+        let resource_addr = resource_addr(signer::address_of(account));
         if (option::is_some(&new_auth_key_option)) {
             let new_auth_key = option::borrow(&new_auth_key_option);
             assert!(
@@ -134,33 +140,43 @@ module aptos_framework::lite_account {
                 error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
             );
             let native_auth_key = bcs::to_bytes(&addr);
-            if (exists<NativeAuthenticator>(addr)) {
+            if (exists<NativeAuthenticator>(resource_addr)) {
                 if (option::some(native_auth_key) == new_auth_key_option) {
-                    let NativeAuthenticator { auth_key } = move_from<NativeAuthenticator>(addr);
+                    let NativeAuthenticator { auth_key } = move_from<NativeAuthenticator>(resource_addr);
                     event::emit(
-                        UpdateNativeAuthenticator { account: addr, old_auth_key: auth_key, new_auth_key: new_auth_key_option }
+                        UpdateNativeAuthenticator {
+                            account: addr,
+                            old_auth_key: auth_key, new_auth_key: new_auth_key_option
+                        }
                     );
                 } else {
-                    let current = &mut borrow_global_mut<NativeAuthenticator>(addr).auth_key;
+                    let current = &mut borrow_global_mut<NativeAuthenticator>(resource_addr).auth_key;
                     if (*current != new_auth_key_option) {
                         event::emit(
-                            UpdateNativeAuthenticator { account: addr, old_auth_key: *current, new_auth_key: new_auth_key_option }
+                            UpdateNativeAuthenticator {
+                                account: addr,
+                                old_auth_key: *current, new_auth_key: new_auth_key_option
+                            }
                         );
                         *current = new_auth_key_option;
                     };
                 }
             } else if (new_auth_key != &native_auth_key) {
-                move_to(account, NativeAuthenticator { auth_key: new_auth_key_option });
+                move_to(
+                    &create_signer::create_signer(resource_addr),
+                    NativeAuthenticator { auth_key: new_auth_key_option }
+                );
                 event::emit(
                     UpdateNativeAuthenticator {
-                        account: addr, old_auth_key: option::some(
+                        account: addr,
+                        old_auth_key: option::some(
                             native_auth_key
                         ), new_auth_key: new_auth_key_option
                     }
                 )
             };
-        } else if (exists<NativeAuthenticator>(addr)) {
-            let authenticator = borrow_global_mut<NativeAuthenticator>(addr);
+        } else if (exists<NativeAuthenticator>(resource_addr)) {
+            let authenticator = borrow_global_mut<NativeAuthenticator>(resource_addr);
             if (option::is_some(&authenticator.auth_key)) {
                 event::emit(UpdateNativeAuthenticator {
                     account: addr,
@@ -172,10 +188,10 @@ module aptos_framework::lite_account {
         } else {
             event::emit(UpdateNativeAuthenticator {
                 account: addr,
-                old_auth_key: option::some(bcs::to_bytes(&addr)),
+                old_auth_key: option::some(bcs::to_bytes(&resource_addr)),
                 new_auth_key: option::none()
             });
-            move_to(account, NativeAuthenticator { auth_key: option::none() });
+            move_to(&create_signer::create_signer(resource_addr), NativeAuthenticator { auth_key: option::none() });
         };
     }
 
@@ -183,7 +199,8 @@ module aptos_framework::lite_account {
         account: &signer,
         auth_function_option: Option<FunctionInfo>,
     ) acquires DispatchableAuthenticator {
-        let account_address = signer::address_of(account);
+        let addr = signer::address_of(account);
+        let resource_addr = resource_addr(addr);
         if (option::is_some(&auth_function_option)) {
             let auth_function = option::destroy_some(auth_function_option);
             let dispatcher_auth_function_info = function_info::new_function_info_from_address(
@@ -195,12 +212,12 @@ module aptos_framework::lite_account {
                 function_info::check_dispatch_type_compatibility(&dispatcher_auth_function_info, &auth_function),
                 error::invalid_argument(EAUTH_FUNCTION_SIGNATURE_MISMATCH)
             );
-            if (exists<DispatchableAuthenticator>(account_address)) {
-                let current = &mut borrow_global_mut<DispatchableAuthenticator>(account_address).auth_function;
+            if (exists<DispatchableAuthenticator>(resource_addr)) {
+                let current = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_function;
                 if (*current != auth_function) {
                     event::emit(
                         UpdateDispatchableAuthenticator {
-                            account: account_address,
+                            account: addr,
                             old_auth_function: option::some(*current),
                             new_auth_function: option::some(auth_function)
                         }
@@ -208,19 +225,19 @@ module aptos_framework::lite_account {
                     *current = auth_function;
                 }
             } else {
-                move_to(account, DispatchableAuthenticator { auth_function });
+                move_to(&create_signer::create_signer(resource_addr), DispatchableAuthenticator { auth_function });
                 event::emit(
                     UpdateDispatchableAuthenticator {
-                        account: account_address,
+                        account: addr,
                         old_auth_function: option::none(),
                         new_auth_function: option::some(auth_function)
                     }
                 );
             }
-        } else if (exists<DispatchableAuthenticator>(account_address)) {
-            let DispatchableAuthenticator { auth_function } = move_from<DispatchableAuthenticator>(account_address);
+        } else if (exists<DispatchableAuthenticator>(resource_addr)) {
+            let DispatchableAuthenticator { auth_function } = move_from<DispatchableAuthenticator>(resource_addr);
             event::emit(UpdateDispatchableAuthenticator {
-                account: account_address,
+                account: addr,
                 old_auth_function: option::some(auth_function),
                 new_auth_function: option::none()
             });
@@ -231,7 +248,7 @@ module aptos_framework::lite_account {
     /// is returned. This way, the caller of this function can publish additional resources under
     /// `new_address`.
     public(friend) fun create_account(new_address: address): signer {
-        // there cannot be an Account resource under new_addr already.
+        // there cannot be an Account resource under new_address already.
         assert!(!account_resource_exists_at(new_address), error::already_exists(EACCOUNT_EXISTENCE));
 
         // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
@@ -251,7 +268,7 @@ module aptos_framework::lite_account {
     public(friend) fun create_account_with_resource(new_address: address): signer {
         let new_account = create_account(new_address);
         move_to(
-            &new_account,
+            &create_signer::create_signer(resource_addr(new_address)),
             Account {
                 sequence_number: 0,
             }
@@ -262,26 +279,29 @@ module aptos_framework::lite_account {
     #[view]
     /// Return `true` if Account resource exists at this address.
     public fun account_resource_exists_at(addr: address): bool {
-        exists<Account>(addr)
+        exists<Account>(resource_addr(addr))
     }
 
     #[view]
     /// Return `true` if the account could be authenticated with native authenticator.
     public fun using_native_authenticator(addr: address): bool acquires NativeAuthenticator {
-        !exists<NativeAuthenticator>(addr) || option::is_some(&borrow_global<NativeAuthenticator>(addr).auth_key)
+        let resource_addr = resource_addr(addr);
+        !exists<NativeAuthenticator>(resource_addr) || option::is_some(
+            &borrow_global<NativeAuthenticator>(resource_addr).auth_key
+        )
     }
 
     #[view]
     /// Return `true` if the account is an abstracted account that can be authenticated with dispatchable move authenticator.
     public fun using_dispatchable_authenticator(addr: address): bool {
-        exists<DispatchableAuthenticator>(addr)
+        exists<DispatchableAuthenticator>(resource_addr(addr))
     }
 
     #[view]
     /// Return the current sequence number.
     public fun get_sequence_number(addr: address): u64 acquires Account {
         if (account_resource_exists_at(addr)) {
-            borrow_global<Account>(addr).sequence_number
+            borrow_global<Account>(resource_addr(addr)).sequence_number
         } else {
             0
         }
@@ -290,8 +310,9 @@ module aptos_framework::lite_account {
     #[view]
     /// Return the current native authenticator. `None` means this authentication scheme is disabled.
     public fun native_authenticator(addr: address): Option<vector<u8>> acquires NativeAuthenticator {
-        if (exists<NativeAuthenticator>(addr)) {
-            borrow_global<NativeAuthenticator>(addr).auth_key
+        let resource_addr = resource_addr(addr);
+        if (exists<NativeAuthenticator>(resource_addr)) {
+            borrow_global<NativeAuthenticator>(resource_addr).auth_key
         } else {
             option::some(bcs::to_bytes(&addr))
         }
@@ -300,9 +321,10 @@ module aptos_framework::lite_account {
     #[view]
     /// Return the current dispatchable authenticator move function info. `None` means this authentication scheme is disabled.
     public fun dispatchable_authenticator(addr: address): Option<FunctionInfo> acquires DispatchableAuthenticator {
-        if (exists<DispatchableAuthenticator>(addr)) {
+        let resource_addr = resource_addr(addr);
+        if (exists<DispatchableAuthenticator>(resource_addr)) {
             option::some(
-                borrow_global<DispatchableAuthenticator>(addr).auth_function
+                borrow_global<DispatchableAuthenticator>(resource_addr).auth_function
             )
         } else { option::none() }
     }
@@ -312,7 +334,7 @@ module aptos_framework::lite_account {
         if (!account_resource_exists_at(addr)) {
             create_account_with_resource(addr);
         };
-        let sequence_number = &mut borrow_global_mut<Account>(addr).sequence_number;
+        let sequence_number = &mut borrow_global_mut<Account>(resource_addr(addr)).sequence_number;
 
         assert!(
             (*sequence_number as u128) < MAX_U64,
@@ -333,8 +355,9 @@ module aptos_framework::lite_account {
     ///////////////////////////////////////////////////////////////////////////
 
     public(friend) fun guid_creation_number(addr: address): u64 acquires LegacyGUIDCreactionNumber {
-        if (exists<LegacyGUIDCreactionNumber>(addr)) {
-            borrow_global<LegacyGUIDCreactionNumber>(addr).creation_number
+        let resource_addr = resource_addr(addr);
+        if (exists<LegacyGUIDCreactionNumber>(resource_addr)) {
+            borrow_global<LegacyGUIDCreactionNumber>(resource_addr).creation_number
         } else {
             0
         }
@@ -345,7 +368,7 @@ module aptos_framework::lite_account {
         if (!account_resource_exists_at(addr)) {
             create_account_with_resource(addr);
         };
-        let sequence_number = &mut borrow_global_mut<Account>(addr).sequence_number;
+        let sequence_number = &mut borrow_global_mut<Account>(resource_addr(addr)).sequence_number;
         assert!(
             (new_sequence_number as u128) < MAX_U64,
             error::out_of_range(ESEQUENCE_NUMBER_OVERFLOW)
@@ -358,31 +381,33 @@ module aptos_framework::lite_account {
         account: &signer,
         creation_number: u64
     ) acquires LegacyGUIDCreactionNumber {
-        let addr = signer::address_of(account);
-        if (!exists<LegacyGUIDCreactionNumber>(addr)) {
-            move_to(account, LegacyGUIDCreactionNumber {
+        let resource_addr = resource_addr(signer::address_of(account));
+        if (!exists<LegacyGUIDCreactionNumber>(resource_addr)) {
+            move_to(&create_signer::create_signer(resource_addr), LegacyGUIDCreactionNumber {
                 creation_number: 0
             });
         };
-        borrow_global_mut<LegacyGUIDCreactionNumber>(addr).creation_number = creation_number;
+        borrow_global_mut<LegacyGUIDCreactionNumber>(resource_addr).creation_number = creation_number;
     }
 
     public(friend) fun create_guid(account: &signer): GUID acquires LegacyGUIDCreactionNumber {
         let addr = signer::address_of(account);
-        if (!exists<LegacyGUIDCreactionNumber>(addr)) {
-            move_to(account, LegacyGUIDCreactionNumber {
+        let resource_addr = resource_addr(addr);
+        if (!exists<LegacyGUIDCreactionNumber>(resource_addr)) {
+            move_to(&create_signer::create_signer(resource_addr), LegacyGUIDCreactionNumber {
                 creation_number: 0
             });
         };
-        let number = &mut borrow_global_mut<LegacyGUIDCreactionNumber>(addr).creation_number;
+        let number = &mut borrow_global_mut<LegacyGUIDCreactionNumber>(resource_addr).creation_number;
         guid::create(addr, number)
     }
 
     public(friend) fun rotation_capability_offer(
         addr: address,
     ): Option<address> acquires LegacyRotationCapabilityOffer {
-        if (exists<LegacyRotationCapabilityOffer>(addr)) {
-            option::some(borrow_global<LegacyRotationCapabilityOffer>(addr).for)
+        let resource_addr = resource_addr(addr);
+        if (exists<LegacyRotationCapabilityOffer>(resource_addr)) {
+            option::some(borrow_global<LegacyRotationCapabilityOffer>(resource_addr).for)
         } else {
             option::none()
         }
@@ -391,8 +416,9 @@ module aptos_framework::lite_account {
     public(friend) fun signer_capability_offer(
         addr: address,
     ): Option<address> acquires LegacySignerCapabilityOffer {
-        if (exists<LegacySignerCapabilityOffer>(addr)) {
-            option::some(borrow_global<LegacySignerCapabilityOffer>(addr).for)
+        let resource_addr = resource_addr(addr);
+        if (exists<LegacySignerCapabilityOffer>(resource_addr)) {
+            option::some(borrow_global<LegacySignerCapabilityOffer>(resource_addr).for)
         } else {
             option::none()
         }
@@ -403,15 +429,16 @@ module aptos_framework::lite_account {
         offeree: Option<address>
     ) acquires LegacyRotationCapabilityOffer {
         let addr = signer::address_of(account);
+        let resource_addr = resource_addr(addr);
         if (option::is_some(&offeree)) {
             let offeree = option::destroy_some(offeree);
-            if (exists<LegacyRotationCapabilityOffer>(addr)) {
-                borrow_global_mut<LegacyRotationCapabilityOffer>(addr).for = offeree;
+            if (exists<LegacyRotationCapabilityOffer>(resource_addr)) {
+                borrow_global_mut<LegacyRotationCapabilityOffer>(resource_addr).for = offeree;
             } else {
-                move_to(account, LegacyRotationCapabilityOffer { for: offeree })
+                move_to(&create_signer::create_signer(resource_addr), LegacyRotationCapabilityOffer { for: offeree })
             }
-        } else if (exists<LegacyRotationCapabilityOffer>(addr)) {
-            move_from<LegacyRotationCapabilityOffer>(addr);
+        } else if (exists<LegacyRotationCapabilityOffer>(resource_addr)) {
+            move_from<LegacyRotationCapabilityOffer>(resource_addr);
         }
     }
 
@@ -420,15 +447,16 @@ module aptos_framework::lite_account {
         offeree: Option<address>
     ) acquires LegacySignerCapabilityOffer {
         let addr = signer::address_of(account);
+        let resource_addr = resource_addr(addr);
         if (option::is_some(&offeree)) {
             let offeree = option::destroy_some(offeree);
-            if (exists<LegacySignerCapabilityOffer>(addr)) {
-                borrow_global_mut<LegacySignerCapabilityOffer>(addr).for = offeree;
+            if (exists<LegacySignerCapabilityOffer>(resource_addr)) {
+                borrow_global_mut<LegacySignerCapabilityOffer>(resource_addr).for = offeree;
             } else {
-                move_to(account, LegacySignerCapabilityOffer { for: offeree })
+                move_to(&create_signer::create_signer(resource_addr), LegacySignerCapabilityOffer { for: offeree })
             }
-        } else if (exists<LegacySignerCapabilityOffer>(addr)) {
-            move_from<LegacySignerCapabilityOffer>(addr);
+        } else if (exists<LegacySignerCapabilityOffer>(resource_addr)) {
+            move_from<LegacySignerCapabilityOffer>(resource_addr);
         }
     }
 
@@ -440,21 +468,22 @@ module aptos_framework::lite_account {
     #[test(aaron = @0xcafe)]
     entry fun test_native_authenticator(aaron: &signer) acquires NativeAuthenticator, Account {
         let addr = signer::address_of(aaron);
+        let resource_addr = resource_addr(addr);
         assert!(!account_resource_exists_at(addr), 0);
         assert!(!using_dispatchable_authenticator(addr), 0);
         assert!(using_native_authenticator(addr), 0);
-        assert!(!exists<NativeAuthenticator>(addr), 0);
+        assert!(!exists<NativeAuthenticator>(resource_addr), 0);
         assert!(native_authenticator(addr) == option::some(bcs::to_bytes(&addr)), 0);
         assert!(get_sequence_number(addr) == 0, 0);
         update_native_authenticator(aaron, bcs::to_bytes(&@0x1));
         assert!(native_authenticator(addr) == option::some(bcs::to_bytes(&@0x1)), 0);
-        assert!(exists<NativeAuthenticator>(addr), 0);
+        assert!(exists<NativeAuthenticator>(resource_addr), 0);
         remove_native_authenticator(aaron);
         assert!(native_authenticator(addr) == option::none(), 0);
-        assert!(exists<NativeAuthenticator>(addr), 0);
+        assert!(exists<NativeAuthenticator>(resource_addr), 0);
         assert!(!using_native_authenticator(addr), 0);
         update_native_authenticator(aaron, bcs::to_bytes(&addr));
-        assert!(!exists<NativeAuthenticator>(addr), 0);
+        assert!(!exists<NativeAuthenticator>(resource_addr), 0);
         assert!(native_authenticator(addr) == option::some(bcs::to_bytes(&addr)), 0);
     }
 

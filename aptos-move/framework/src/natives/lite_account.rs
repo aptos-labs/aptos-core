@@ -54,7 +54,9 @@ pub fn make_all(
     let natives = [(
         "dispatchable_authenticate",
         native_dispatch as RawSafeNative,
-    )];
+    ),
+        ("create_user_derived_object_address_impl", super::object::native_create_user_derived_object_address_impl)
+    ];
 
     builder.make_named_natives(natives)
 }
