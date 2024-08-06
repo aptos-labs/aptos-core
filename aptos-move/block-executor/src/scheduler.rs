@@ -670,6 +670,21 @@ impl Scheduler {
         }
     }
 
+    pub(crate) fn has_lost_execution_flag_writing(&self, txn_idx: TxnIndex) -> bool {
+        let status = self.txn_status[txn_idx as usize].0.write();
+        match *status {
+            ExecutionStatus::Executing(_, _, ref flag)
+            | ExecutionStatus::ReadyToWakeUp(_, _, ref flag) => {
+                if *flag == ExecutingFlag::Writing {
+                    true
+                } else {
+                    false
+                }
+            },
+            _ => false,
+        }
+    }
+
     // TODO: comment, explain output convension: None -> lost.
     // Some(true) -> won, no need to validate. Some(false) -> won, need to validate
     pub(crate) fn try_set_execution_flag_writing<F>(

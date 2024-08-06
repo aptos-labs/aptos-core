@@ -262,14 +262,11 @@ fn compute_delayed_field_try_add_delta_outcome_from_history(
         true
     };
 
-    Ok((
-        result,
-        DelayedFieldRead::HistoryBounded {
-            restriction: history,
-            max_value,
-            inner_aggregator_value: base_aggregator_value,
-        },
-    ))
+    Ok((result, DelayedFieldRead::HistoryBounded {
+        restriction: history,
+        max_value,
+        inner_aggregator_value: base_aggregator_value,
+    }))
 }
 
 fn compute_delayed_field_try_add_delta_outcome_first_time(
@@ -297,14 +294,11 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         true
     };
 
-    Ok((
-        result,
-        DelayedFieldRead::HistoryBounded {
-            restriction: history,
-            max_value,
-            inner_aggregator_value: base_aggregator_value,
-        },
-    ))
+    Ok((result, DelayedFieldRead::HistoryBounded {
+        restriction: history,
+        max_value,
+        inner_aggregator_value: base_aggregator_value,
+    }))
 }
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
@@ -460,14 +454,26 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         }
     }
 
-    fn get_base_module(&self, key: &T::Key) -> Option<T::Value> {
-        use MVDataOutput::*;
+    fn get_base_module(
+        &self,
+        key: &T::Key,
+        txn_idx: TxnIndex,
+    ) -> PartialVMResult<Option<T::Value>> {
+        // check scheduler, possibly pass txn_idx, incarnation or whatever we need,
+        // if we already lost to fallback, return PartialVMResult Error of HaltSpeculativeExecution (like from dependency)
+
         // TODO: do not re-use data.
+        if self.scheduler.has_lost_execution_flag_writing(txn_idx) {
+            return Err(PartialVMError::new(
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+            ));
+        }
+
         match self.versioned_map.data().fetch_data(key, 0) {
             Ok(MVDataOutput::Versioned(_, ValueWithLayout::RawFromStorage(arc_value))) => {
-                Some(arc_value.as_ref().clone())
+                Ok(Some(arc_value.as_ref().clone()))
             },
-            Err(_) => None,
+            Err(_) => Ok(None),
             _ => unreachable!(),
         }
     }
@@ -1704,11 +1710,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                         Ok(None)
                     },
                     Err(NotFound) => {
-                        let from_storage = if let Some(cached) = state.get_base_module(state_key) {
-                            cached.as_state_value()
-                        } else {
-                            self.get_raw_base_value(state_key)?
-                        };
+                        // get_base_module will return Result/PartialVMResult of what it now, and ? here.
+                        let from_storage =
+                            if let Some(cached) = state.get_base_module(state_key, self.txn_idx)? {
+                                cached.as_state_value()
+                            } else {
+                                self.get_raw_base_value(state_key)?
+                            };
 
                         state.set_base_module(
                             state_key.clone(),
