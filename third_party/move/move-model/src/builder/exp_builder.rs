@@ -45,7 +45,7 @@ use std::{
     mem,
 };
 
-// DNS
+// DNY
 
 #[derive(Debug)]
 pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
