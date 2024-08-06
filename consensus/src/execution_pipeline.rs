@@ -104,13 +104,13 @@ impl ExecutionPipeline {
             Err(ExecutorError::CouldNotGetData) | Err(ExecutorError::BlockNotFound(_)) => {
                 warn!(
                     block_id = block_id,
-                    "Internal error while executing block {}: {:?}.", block_id, error,
+                    "Failed to send back execution result for block {}: {:?}.", block_id, error,
                 );
             },
             _ => {
                 error!(
                     block_id = block_id,
-                    "Failed to execute block {}: {:?}.", block_id, error,
+                    "Failed to send back execution result for block {}: {:?}.", block_id, error,
                 );
             },
         }
