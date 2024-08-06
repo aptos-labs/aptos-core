@@ -681,6 +681,7 @@ impl Scheduler {
                     false
                 }
             },
+            ExecutionStatus::Committed(_) => true,
             _ => false,
         }
     }
