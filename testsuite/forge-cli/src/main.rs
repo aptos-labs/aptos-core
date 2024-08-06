@@ -833,8 +833,9 @@ fn optimize_for_maximum_throughput(
     config.consensus.max_sending_block_txns = config
         .consensus
         .max_sending_block_txns
-        .max(max_txns_per_block as u64);
-    config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
+        .max(max_txns_per_block as u64 * 3 / 2);
+    config.consensus.max_receiving_block_txns =
+        (config.consensus.max_sending_block_txns as f64 * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
     config.consensus.pipeline_backpressure = vec![];
