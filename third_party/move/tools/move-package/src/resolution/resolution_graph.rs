@@ -599,12 +599,25 @@ impl ResolvingGraph {
                 confirm_git_available()?;
 
                 // If the cached folder does not exist, download and clone accordingly
-                Command::new("git")
-                    .args(["clone", git_url, git_path])
-                    .output()
-                    .map_err(|_| {
-                        anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name)
-                    })?;
+                if let Ok(mut output) = Command::new("git")
+                        .args(["clone", git_url, git_path])
+                        .spawn()
+                    {
+                        output.wait().map_err(|_| {
+                            anyhow::anyhow!(
+                                "Failed to clone Git repository for package '{}'",
+                                dep_name
+                            )
+                        })?;
+                        if output.stdout.is_some() {
+                            writeln!(writer, "{:?}", output)?;
+                        }
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "Failed to clone Git repository for package '{}'",
+                            dep_name
+                        ));
+                    }
                 Command::new("git")
                     .args(["-C", git_path, "checkout", git_rev])
                     .output()
@@ -657,30 +670,32 @@ impl ResolvingGraph {
                 // If the current folder exists, do a fetch and reset to ensure that the branch
                 // is up to date
                 // NOTE: this means that you must run the package system with a working network connection
-                let status = Command::new("git")
+                if let Ok(mut output) = Command::new("git")
                     .args([
                         "-C",
                         git_path,
                         "fetch",
                         "origin",
-                    ])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .map_err(|_| {
-                        anyhow::anyhow!(
-                            "Failed to fetch latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps",
+                        ])
+                        .spawn()
+                    {
+                        output.wait().map_err(|_| {
+                            anyhow::anyhow!(
+                                "Failed to fetch latest Git state for package '{}', to skip set \
+                             --skip-fetch-latest-git-deps",
+                                dep_name
+                            )
+                        })?;
+                        if output.stdout.is_some() {
+                            writeln!(writer, "{:?}", output)?;
+                        }
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "Failed to fetch latest Git state for package '{}', to skip set \
+                             --skip-fetch-latest-git-deps",
                             dep_name
-                        )
-                    })?;
-
-                if !status.success() {
-                    return Err(anyhow::anyhow!(
-                            "Failed to fetch to latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps | Exit status: {}",
-                            dep_name,
-                        status
                         ));
-                }
+                    }
                 let status = Command::new("git")
                     .args([
                         "-C",
