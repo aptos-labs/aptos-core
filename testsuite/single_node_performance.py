@@ -64,7 +64,7 @@ NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v5"
+CODE_PERF_VERSION = "v6"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
@@ -149,8 +149,8 @@ CALIBRATION_SEPARATOR = "	"
 CALIBRATION = """
 no-op	1	VM	0.896	1.057	41218.8
 no-op	1000	VM	0.902	1.030	22359.4
-coin-transfer	1	VM	0.891	1.056	28721.7
-coin-transfer	1	native	0.848	1.157	40469.1
+apt-fa-transfer	1	VM	0.891	1.056	28721.7
+apt-fa-transfer	1	native	0.848	1.157	40469.1
 account-generation	1	VM	0.888	1.030	22359.4
 account-generation	1	native	0.717	1.153	33440.0
 account-resource32-b	1	VM	0.934	1.074	36855.5
@@ -192,14 +192,63 @@ no-op-fee-payer	1	VM	0.922	1.022	2392.0
 no-op-fee-payer	50	VM	0.898	1.028	27699.5
 """
 
+
+# temporary table, until recalibration can be done.
+CALIBRATION_SEPARATOR = " "
+
+# transaction_type                                 module_working_set  executor      block_size    expected t/s    t/s
+CALIBRATION = """
+warmup                                                            1  VM                 10000             0    20373
+no-op                                                             1  VM                 10000         41218.8  33211
+no-op                                                          1000  VM                 10000         22359.4  20593
+apt-fa-transfer                                                   1  VM                 10000         28721.7  25699
+account-generation                                                1  VM                 10000         22359.4  20728
+account-resource32-b                                              1  VM                 10000         36855.5  30215
+modify-global-resource                                            1  VM                  3082          3082.9   2853
+modify-global-resource                                           10  VM                 10000         17905.3  16934
+publish-package                                                   1  VM                   143           143.9    149
+mix_publish_transfer                                              1  VM                  2173          2173.8   2272
+batch100-transfer                                                 1  VM                   667           667.8    768
+vector-picture30k                                                 1  VM                   110           110      110
+vector-picture30k                                                20  VM                  1347          1347.9   1124
+smart-table-picture30-k-with200-change                            1  VM                    21            21.4     22
+smart-table-picture30-k-with200-change                           20  VM                   182           182.6    191
+modify-global-resource-agg-v2                                     1  VM                 10000         39728.8  30580
+modify-global-flag-agg-v2                                         1  VM                  6111          6111.4   5288
+modify-global-bounded-agg-v2                                      1  VM                 10000         10494.1   9035
+modify-global-milestone-agg-v2                                    1  VM                 10000         29251.9  24582
+resource-groups-global-write-tag1-kb                              1  VM                  9389          9389.9   9271
+resource-groups-global-write-and-read-tag1-kb                     1  VM                  6446          6446.3   6276
+resource-groups-sender-write-tag1-kb                              1  VM                 10000         22359.4  21517
+resource-groups-sender-multi-change1-kb                           1  VM                 10000         17562.1  15941
+token-v1ft-mint-and-transfer                                      1  VM                  1347          1347.9   1271
+token-v1ft-mint-and-transfer                                     20  VM                 10000         12114.8  11409
+token-v1nft-mint-and-transfer-sequential                          1  VM                   812           812.9    815
+token-v1nft-mint-and-transfer-sequential                         20  VM                  7881          7881.5   7583
+coin-init-and-mint                                                1  VM                 10000         30932.7  27459
+coin-init-and-mint                                               20  VM                 10000         25786.3  23818
+fungible-asset-mint                                               1  VM                 10000         25331.5  21542
+fungible-asset-mint                                              20  VM                 10000         22763.8  19915
+no-op5-signers                                                    1  VM                 10000         41978.3  34432
+token-v2-ambassador-mint                                          1  VM                 10000         17905.3  15378
+token-v2-ambassador-mint                                         20  VM                 10000         17562.1  15351
+liquidity-pool-swap                                               1  VM                   975           975.7    973
+liquidity-pool-swap                                              20  VM                  8359          8359.6   8213
+liquidity-pool-swap-stable                                        1  VM                   957           957.5    952
+liquidity-pool-swap-stable                                       20  VM                  8035          8035.3   7993
+deserialize-u256                                                  1  VM                 10000         39728.8  32416
+no-op-fee-payer                                                   1  VM                  2392          2392     2193
+no-op-fee-payer                                                  50  VM                 10000         27699.5  25762
+"""
+
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
 # And then after a day or two - add calibration result for it above, removing expected_tps/waived fields.
 
 TESTS = [
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("account-resource32-b"), included_in=Flow.CONTINUOUS),
@@ -207,7 +256,7 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("mix_publish_transfer"), key_extra=RunGroupKeyExtra(
-        transaction_type_override="publish-package coin-transfer",
+        transaction_type_override="publish-package apt-fa-transfer",
         transaction_weights_override="1 500",
     ), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),

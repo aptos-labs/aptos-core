@@ -40,7 +40,7 @@ use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
-    TransactionType::{self, NonConflictingCoinTransfer},
+    TransactionType::{self, CoinTransfer},
 };
 use aptos_types::on_chain_config::Features;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
@@ -136,7 +136,7 @@ pub fn run_benchmark<V>(
 
         let mut num_accounts_to_skip = 0;
         for (transaction_type, _) in &transaction_mix {
-            if let NonConflictingCoinTransfer{..} = transaction_type {
+            if matches!(transaction_type, CoinTransfer { non_conflicting, .. } if *non_conflicting) {
                 // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
                 // `3*block_size` addresses is required:
                 // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
@@ -174,7 +174,8 @@ pub fn run_benchmark<V>(
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
         for (transaction_type, _) in mix {
-            if let NonConflictingCoinTransfer { .. } = transaction_type {
+            if matches!(transaction_type, CoinTransfer { non_conflicting, .. } if *non_conflicting)
+            {
                 // In case of non-conflicting coin transfer,
                 // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
                 // at least `block_size` number of accounts, all as signer only.
@@ -458,10 +459,9 @@ impl GasMeasurement {
             + Self::parallel_gas_counter(GasType::EXECUTION_GAS).get_sample_sum();
 
         let storage_fee = Self::sequential_gas_counter(GasType::STORAGE_FEE).get_sample_sum()
-            + Self::parallel_gas_counter(GasType::STORAGE_FEE).get_sample_sum() - (
-                Self::sequential_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum()
-            + Self::parallel_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum()
-        );
+            + Self::parallel_gas_counter(GasType::STORAGE_FEE).get_sample_sum()
+            - (Self::sequential_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum()
+                + Self::parallel_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum());
 
         let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
