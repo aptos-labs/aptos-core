@@ -48,7 +48,7 @@ jobs:
           CVC5_EXE: /home/runner/bin/cvc5
           DOTNET_ROOT: /home/runner/.dotnet
           BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: lcov_unit
           path: lcov_unit.info
@@ -79,7 +79,7 @@ jobs:
           CVC5_EXE: /home/runner/bin/cvc5
           DOTNET_ROOT: /home/runner/.dotnet
           BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: lcov_smoke
           path: lcov_smoke.info
@@ -96,10 +96,10 @@ jobs:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: lcov_unit
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: lcov_smoke
       - name: Upload coverage to Codecov

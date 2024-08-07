@@ -32,9 +32,9 @@ jobs:
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu"
       - name: Upload Binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: cli-builds
+          name: cli-builds-ubuntu-20.04
           path: aptos-cli-*.zip
 
   build-ubuntu22-binary:
@@ -48,9 +48,9 @@ jobs:
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu-22.04"
       - name: Upload Binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: cli-builds
+          name: cli-builds-ubuntu-22.04
           path: aptos-cli-*.zip
 
   build-windows-binary:
@@ -63,9 +63,9 @@ jobs:
       - name: Build CLI
         run: scripts\cli\build_cli_release.ps1
       - name: Upload Binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: cli-builds
+          name: cli-builds-windows
           path: aptos-cli-*.zip
 
   release-binaries:
@@ -81,9 +81,10 @@ jobs:
     if: ${{ inputs.dry_run }} == 'false'
     steps:
       - name: Download prebuilt binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: cli-builds
+          pattern: cli-builds-*
+          merge-multiple: true
       - name: Create GitHub Release
         uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # pin@v1.2.1
         with:

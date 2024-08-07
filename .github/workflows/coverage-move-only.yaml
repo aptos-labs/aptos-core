@@ -53,11 +53,11 @@ jobs:
       - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info --ignore-run-fail -p aptos-framework -p "move*"
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: lcov_unit
           path: lcov_unit.info
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: lcov_unit
       - name: Upload coverage to Codecov
