@@ -3,13 +3,15 @@
 
 use crate::{components::get_signer_arg, utils::*};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_types::on_chain_config::AptosVersion;
 use move_model::{code_writer::CodeWriter, emitln, model::Loc};
 
 pub fn generate_version_upgrade_proposal(
     version: &AptosVersion,
     is_testnet: bool,
-    next_execution_hash: Vec<u8>,
+    next_execution_hash: Option<HashValue>,
+    is_multi_step: bool,
 ) -> Result<Vec<(String, String)>> {
     let signer_arg = get_signer_arg(is_testnet, &next_execution_hash);
     let mut result = vec![];
@@ -19,7 +21,8 @@ pub fn generate_version_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        next_execution_hash.clone(),
+        next_execution_hash,
+        is_multi_step,
         &["aptos_framework::version"],
         |writer| {
             emitln!(

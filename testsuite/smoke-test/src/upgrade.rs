@@ -59,7 +59,7 @@ async fn test_upgrade_flow() {
     };
 
     let (_, update_gas_script) =
-        generate_gas_upgrade_proposal(None, &gas_schedule, true, "".to_owned().into_bytes())
+        generate_gas_upgrade_proposal(None, &gas_schedule, true, None, false)
             .unwrap()
             .pop()
             .unwrap();

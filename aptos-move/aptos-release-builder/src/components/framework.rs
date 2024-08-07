@@ -3,6 +3,7 @@
 
 use crate::{aptos_core_path, components::get_execution_hash};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
@@ -21,7 +22,7 @@ pub struct FrameworkReleaseConfig {
 pub fn generate_upgrade_proposals(
     config: &FrameworkReleaseConfig,
     is_testnet: bool,
-    next_execution_hash: Vec<u8>,
+    next_execution_hash: Option<HashValue>,
 ) -> Result<Vec<(String, String)>> {
     const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
 
@@ -54,7 +55,7 @@ pub fn generate_upgrade_proposals(
     // For generating multi-step proposal files, we need to generate them in the reverse order since
     // we need the hash of the next script.
     // We will reverse the order back when writing the files into a directory.
-    if !next_execution_hash.is_empty() {
+    if next_execution_hash.is_some() {
         package_path_list.reverse();
     }
 
@@ -103,15 +104,15 @@ pub fn generate_upgrade_proposals(
         let release = ReleasePackage::new(package)?;
 
         // If we're generating a single-step proposal on testnet
-        if is_testnet && next_execution_hash.is_empty() {
+        if is_testnet && next_execution_hash.is_none() {
             release.generate_script_proposal_testnet(account, move_script_path.clone())?;
             // If we're generating a single-step proposal on mainnet
-        } else if next_execution_hash.is_empty() {
+        } else if next_execution_hash.is_none() {
             release.generate_script_proposal(account, move_script_path.clone())?;
             // If we're generating a multi-step proposal
         } else {
             let next_execution_hash_bytes = if result.is_empty() {
-                next_execution_hash.clone()
+                next_execution_hash
             } else {
                 get_execution_hash(&result)
             };
