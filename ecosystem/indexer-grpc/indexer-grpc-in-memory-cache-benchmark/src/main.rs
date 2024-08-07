@@ -130,15 +130,13 @@ async fn run_transaction_test(
     expected_tps: f64,
 ) {
     let redis_connection = create_mock_redis(transaction_size);
-    let cache = Arc::new(
-        InMemoryCache::new_with_redis_connection(
-            InMemoryCacheConfig::default(),
-            redis_connection,
-            StorageFormat::Lz4CompressedProto,
-        )
-        .await
-        .unwrap(),
-    );
+    let cache = InMemoryCache::new_with_redis_connection(
+        InMemoryCacheConfig::default(),
+        redis_connection,
+        StorageFormat::Lz4CompressedProto,
+    )
+    .await
+    .unwrap();
     let tasks = (0..task_count)
         .map(|_| spawn_cache_consumption_task(cache.clone(), duration_in_secs))
         .collect::<Vec<_>>();
