@@ -138,16 +138,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         &self,
         bytes: &[u8],
     ) -> Result<Vec<MoveResource>> {
-        let resources_with_tag: Vec<(StructTag, Vec<u8>)> = bcs::from_bytes::<ResourceGroup>(bytes)
-            .map(|map| {
-                map.into_iter()
-                    .map(|(key, value)| (key, value))
-                    .collect::<Vec<_>>()
-            })?;
-
-        resources_with_tag
-            .iter()
-            .map(|(struct_tag, value_bytes)| self.try_into_resource(struct_tag, value_bytes))
+        bcs::from_bytes::<ResourceGroup>(bytes)?
+            .into_iter()
+            .map(|(struct_tag, value_bytes)| self.try_into_resource(&struct_tag, &value_bytes))
             .collect::<Result<Vec<_>>>()
     }
 
