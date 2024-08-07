@@ -14,6 +14,7 @@ pub enum TransactionTypeArg {
     // custom
     #[default]
     CoinTransfer,
+    AptFaTransfer,
     CoinTransferWithInvalid,
     NonConflictingCoinTransfer,
     AccountGeneration,
@@ -96,16 +97,26 @@ impl TransactionTypeArg {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
+                non_conflicting: false,
+                use_fa_transfer: false,
             },
-            TransactionTypeArg::NonConflictingCoinTransfer => {
-                TransactionType::NonConflictingCoinTransfer {
-                    invalid_transaction_ratio: 0,
-                    sender_use_account_pool,
-                }
+            TransactionTypeArg::AptFaTransfer => TransactionType::CoinTransfer {
+                invalid_transaction_ratio: 0,
+                sender_use_account_pool,
+                non_conflicting: false,
+                use_fa_transfer: true,
+            },
+            TransactionTypeArg::NonConflictingCoinTransfer => TransactionType::CoinTransfer {
+                invalid_transaction_ratio: 0,
+                sender_use_account_pool,
+                non_conflicting: true,
+                use_fa_transfer: false,
             },
             TransactionTypeArg::CoinTransferWithInvalid => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 10,
                 sender_use_account_pool,
+                non_conflicting: false,
+                use_fa_transfer: false,
             },
             TransactionTypeArg::AccountGeneration => TransactionType::AccountGeneration {
                 add_created_accounts_to_pool: true,
