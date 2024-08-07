@@ -49,7 +49,10 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveTypeLayout, MoveValue},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    DummyCodeStorage,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -382,6 +385,7 @@ fn exec_function(
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&storage),
+            &DummyCodeStorage,
         )
         .unwrap_or_else(|e| {
             panic!(
@@ -763,7 +767,7 @@ fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
         .map(|(c, _)| c.to_vec())
         .collect::<Vec<_>>();
     session
-        .publish_module_bundle(code, addr, &mut UnmeteredGasMeter)
+        .publish_module_bundle(code, addr, &mut UnmeteredGasMeter, &DummyCodeStorage)
         .unwrap_or_else(|e| {
             panic!(
                 "Failure publishing package `{}`: {:?}",

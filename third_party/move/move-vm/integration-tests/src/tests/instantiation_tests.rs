@@ -14,7 +14,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -118,7 +118,7 @@ fn instantiation_err() {
     cm.serialize(&mut mod_bytes).unwrap();
 
     session
-        .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
+        .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter, &DummyCodeStorage)
         .expect("Module must publish");
 
     let mut ty_arg = TypeTag::U128;
@@ -131,7 +131,7 @@ fn instantiation_err() {
         }));
     }
 
-    let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
+    let res = session.load_function(&DummyCodeStorage, &cm.self_id(), ident_str!("f"), &[ty_arg]);
     assert!(
         res.is_err(),
         "Instantiation must fail at load time when converting from type tag to type "
