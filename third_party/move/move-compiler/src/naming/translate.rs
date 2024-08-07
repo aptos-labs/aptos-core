@@ -1163,7 +1163,7 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
                 NL::Var(v)
             }
         },
-        EL::Unpack(tn, etys_opt, efields) => {
+        EL::Unpack(tn, etys_opt, efields, _) => {
             let msg = match case {
                 C::Bind => "deconstructing binding",
                 C::Assign => "deconstructing assignment",

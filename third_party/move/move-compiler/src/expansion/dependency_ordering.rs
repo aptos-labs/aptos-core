@@ -414,7 +414,7 @@ fn lvalues_with_range(context: &mut Context, sp!(_, ll): &E::LValueWithRangeList
 
 fn lvalue(context: &mut Context, sp!(_loc, a_): &E::LValue) {
     use E::LValue_ as L;
-    if let L::Unpack(m, bs_opt, f) = a_ {
+    if let L::Unpack(m, bs_opt, f, _) = a_ {
         module_access(context, m);
         types_opt(context, bs_opt);
         lvalues(context, f.iter().map(|(_, _, (_, b))| b));
