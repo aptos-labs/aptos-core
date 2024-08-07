@@ -195,6 +195,23 @@ pub static CORE_MEMPOOL_GAS_UPGRADED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static MEMPOOL_READ_TIMELINE_FREQUENCY: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_read_timeline",
+        "Number of times core mempool read_timeline is invoked"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_READ_TIMELINE_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_max_txns",
+        "Number of max txns being pulled in read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 pub fn core_mempool_txn_commit_latency(
     stage: &'static str,
     submitted_by: &'static str,
@@ -676,6 +693,25 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         )
         .unwrap(),
     )
+});
+
+pub static MEMPOOL_READ_TIMELINE_BEFORE: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_mempool_read_timeline_before",
+            "The before value passed as input to read_timeline"
+        )
+        .unwrap(),
+    )
+});
+
+pub static MEMPOOL_READ_TIMELINE_OUTPUT_SIZE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_read_timeline_output_size",
+        "The number of transactions returned by read_timeline",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
 });
 
 #[cfg(test)]
