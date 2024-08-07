@@ -65,6 +65,7 @@ use aptos_consensus_types::{
     delayed_qc_msg::DelayedQcMsg,
     epoch_retrieval::EpochRetrievalRequest,
     proof_of_store::ProofCache,
+    utils::PayloadTxnsSize,
 };
 use aptos_crypto::bls12381;
 use aptos_dkg::{
@@ -851,11 +852,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_client,
             self.time_service.clone(),
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
-            self.config.max_sending_block_txns,
+            PayloadTxnsSize::new(
+                self.config.max_sending_block_txns,
+                self.config.max_sending_block_bytes,
+            ),
             self.config.max_sending_block_txns_after_filtering,
-            self.config.max_sending_block_bytes,
-            self.config.max_sending_inline_txns,
-            self.config.max_sending_inline_bytes,
+            PayloadTxnsSize::new(
+                self.config.max_sending_inline_txns,
+                self.config.max_sending_inline_bytes,
+            ),
             onchain_consensus_config.max_failed_authors_to_store(),
             self.config
                 .min_max_txns_in_block_after_filtering_from_backpressure,

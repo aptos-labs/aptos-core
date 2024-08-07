@@ -68,23 +68,23 @@ impl PayloadClient for MixedPayloadClient {
             .pull(
                 params.max_poll_time,
                 min(
-                    params.max_txns.count,
+                    params.max_txns.count(),
                     self.validator_txn_config.per_block_limit_txn_count(),
                 ),
                 min(
-                    params.max_txns.bytes,
+                    params.max_txns.size_in_bytes(),
                     self.validator_txn_config.per_block_limit_total_bytes(),
                 ),
                 validator_txn_filter,
             )
             .await;
-        let vtxn_size = PayloadTxnsSize {
-            count: validator_txns.len() as u64,
-            bytes: validator_txns
+        let vtxn_size = PayloadTxnsSize::new(
+            validator_txns.len() as u64,
+            validator_txns
                 .iter()
                 .map(|txn| txn.size_in_bytes())
                 .sum::<usize>() as u64,
-        };
+        );
 
         validator_txns.extend(self.extra_test_only_vtxns());
 
