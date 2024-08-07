@@ -74,8 +74,10 @@ move-core-types = { workspace = true }
 move-coverage = { workspace = true }
 move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
+move-mutator = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
+move-spec-test = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true, features = ["debugging"] }
 move-vm-runtime = { workspace = true, features = ["testing"] }
