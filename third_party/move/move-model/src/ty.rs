@@ -1337,6 +1337,21 @@ impl Type {
     pub fn is_tuple(&self) -> bool {
         matches!(self, Type::Tuple(_))
     }
+
+    /// Return the index position in a tuple type where self is immutable and `other` is mutable reference
+    pub fn immutable_mut_pair_from_tuple(&self, other: &Type) -> Vec<usize> {
+        let mut ret = vec![];
+        if let (Type::Tuple(tys), Type::Tuple(other_tys)) = (self, other) {
+            if tys.len() == other_tys.len() {
+                for (i, (ty, other_ty)) in tys.iter().zip(other_tys).enumerate() {
+                    if ty.is_immutable_reference() && other_ty.is_mutable_reference() {
+                        ret.push(i);
+                    }
+                }
+            }
+        }
+        ret
+    }
 }
 
 /// A parameter for type unification that specifies the type compatibility rules to follow.
