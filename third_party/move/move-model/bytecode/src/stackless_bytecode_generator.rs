@@ -464,7 +464,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     vec![struct_ref_index],
                 ));
                 self.temp_count += 1;
-                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowField(..));
+                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowVariantField(..));
                 self.local_types.push(Type::Reference(
                     ReferenceKind::from_is_mut(is_mut),
                     Box::new(field_type),
@@ -495,7 +495,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     vec![struct_ref_index],
                 ));
                 self.temp_count += 1;
-                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowField(..));
+                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowVariantFieldGeneric(..));
                 self.local_types.push(Type::Reference(
                     ReferenceKind::from_is_mut(is_mut),
                     Box::new(field_type),

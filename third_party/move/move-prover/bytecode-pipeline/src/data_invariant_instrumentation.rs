@@ -111,6 +111,20 @@ impl<'a> Instrumenter<'a> {
                 // Emit a shallow assert of the data invariant.
                 self.emit_data_invariant_for_temp(false, PropKind::Assert, struct_temp);
             },
+            Call(id, dests, PackVariant(mid, sid, variant, targs), srcs, aa)
+                if self.for_verification =>
+            {
+                let struct_temp = dests[0];
+                self.builder.emit(Call(
+                    id,
+                    dests,
+                    PackVariant(mid, sid, variant, targs),
+                    srcs,
+                    aa,
+                ));
+                // Emit a shallow assert of the data invariant.
+                self.emit_data_invariant_for_temp(false, PropKind::Assert, struct_temp);
+            },
             Call(_, _, PackRef, srcs, _) if self.for_verification => {
                 // Emit a shallow assert of the data invariant.
                 self.emit_data_invariant_for_temp(false, PropKind::Assert, srcs[0]);
