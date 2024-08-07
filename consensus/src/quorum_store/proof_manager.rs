@@ -207,6 +207,7 @@ impl ProofManager {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
                 max_txns_after_filtering,
+                soft_max_txns_after_filtering,
                 max_bytes,
                 max_inline_txns,
                 max_inline_bytes,
@@ -228,6 +229,7 @@ impl ProofManager {
                         &excluded_batches,
                         max_txns,
                         max_txns_after_filtering,
+                        soft_max_txns_after_filtering,
                         max_bytes,
                         return_non_full,
                         block_timestamp,

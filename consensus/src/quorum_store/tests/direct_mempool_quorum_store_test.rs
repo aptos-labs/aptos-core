@@ -32,6 +32,7 @@ async fn test_block_request_no_txns() {
         .try_send(GetPayloadCommand::GetPayloadRequest(
             100,
             100,
+            100,
             1000,
             50,
             500,
