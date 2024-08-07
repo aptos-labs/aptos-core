@@ -582,6 +582,12 @@ module std::features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    const FA_MINT_BURN_EVENTS: u64 = 77;
+
+    public fun is_fa_mint_burn_events_enabled(): bool acquires Features {
+        is_enabled(FA_MINT_BURN_EVENTS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

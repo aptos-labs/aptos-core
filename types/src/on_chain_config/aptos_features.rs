@@ -92,6 +92,7 @@ pub enum FeatureFlag {
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
     REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+    FA_MINT_BURN_EVENTS = 77,
 }
 
 impl FeatureFlag {
