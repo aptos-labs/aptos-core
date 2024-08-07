@@ -39,6 +39,15 @@ module aptos_std::math128 {
         large
     }
 
+    /// Return least common multiple of `a` & `b`
+    public inline fun lcm(a: u128, b: u128): u128 {
+        if (a == 0 || b == 0) {
+            0
+        } else {
+            a / gcd(a, b) * b
+        }
+    }
+
     /// Returns a * b / c going through u256 to prevent intermediate overflow
     public inline fun mul_div(a: u128, b: u128, c: u128): u128 {
         // Inline functions cannot take constants, as then every module using it needs the constant
@@ -191,6 +200,28 @@ module aptos_std::math128 {
         assert!(gcd(10, 10) == 10, 0);
         assert!(gcd(1071, 462) == 21, 0);
         assert!(gcd(462, 1071) == 21, 0);
+    }
+
+    #[test]
+    fun test_lcm() {
+        assert!(lcm(0, 0) == 0, 0);
+        assert!(lcm(0, 1) == 0, 0);
+        assert!(lcm(1, 0) == 0, 0);
+        assert!(lcm(1, 1) == 1, 0);
+        assert!(lcm(1024, 144) == 9216, 0);
+        assert!(lcm(2, 17) == 34, 0);
+        assert!(lcm(17, 2) == 34, 0);
+        assert!(lcm(24, 54) == 216, 0);
+        assert!(lcm(115, 9) == 1035, 0);
+        assert!(lcm(101, 14) == 1414, 0);
+        assert!(lcm(110, 5) == 110, 0);
+        assert!(lcm(100, 8) == 200, 0);
+        assert!(lcm(32, 6) == 96, 0);
+        assert!(lcm(110, 13) == 1430, 0);
+        assert!(lcm(117, 13) == 117, 0);
+        assert!(lcm(100, 125) == 500, 0);
+        assert!(lcm(101, 3) == 303, 0);
+        assert!(lcm(115, 16) == 1840, 0);
     }
 
     #[test]
