@@ -5906,4 +5906,53 @@ module supra_framework::pbo_delegation_pool {
         let result = calculate_and_update_remaining_voting_power(pool_address, new_delegator_address, proposal1_id);
         assert!(result == 290 * ONE_APT, 1);
     }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    /// if delegator is not part of one of the principle stake holder, they can unlock/withdraw without restriction
+    public entry fun test_unlock_withdraw_delegator_not_part_of_principle_stak_success(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address, @0x020];
+        let principle_stake = vector[300 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(500 * ONE_APT);
+        let principle_lockup_time = 0;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator, 0, true, true, 0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        let new_delegator_address = @0x0215;
+        let new_delegator_address_signer = account::create_account_for_test(new_delegator_address);
+        let fee = get_add_stake_fee(pool_address, 100 * ONE_APT);
+
+        stake::mint(&new_delegator_address_signer, 100 * ONE_APT);
+        assert!(coin::balance<SupraCoin>(new_delegator_address) == (100 * ONE_APT), 0);
+
+        add_stake(&new_delegator_address_signer, pool_address, 100 * ONE_APT);
+        assert!(coin::balance<SupraCoin>(new_delegator_address) == 0, 0);
+
+        unlock(&new_delegator_address_signer, pool_address, (100 * ONE_APT));
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        withdraw(&new_delegator_address_signer, pool_address, (100 * ONE_APT));
+        assert!(coin::balance<SupraCoin>(new_delegator_address) == (100 * ONE_APT) - 1, 0);
+    }
 }
