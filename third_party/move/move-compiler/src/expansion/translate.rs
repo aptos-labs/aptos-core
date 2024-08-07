@@ -2699,6 +2699,10 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             },
         },
         PE::Cast(e, ty) => EE::Cast(exp(context, *e), type_(context, ty)),
+        PE::Test(e, tys) => EE::Test(
+            exp(context, *e),
+            tys.into_iter().map(|ty| type_(context, ty)).collect(),
+        ),
         PE::Index(e, i) => {
             if context.env.flags().lang_v2() || context.in_spec_context {
                 EE::Index(exp(context, *e), exp(context, *i))
@@ -3206,6 +3210,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         | EE::UnaryExp(_, e)
         | EE::Borrow(_, e)
         | EE::Cast(e, _)
+        | EE::Test(e, _)
         | EE::Annotate(e, _) => unbound_names_exp(unbound, e),
         EE::FieldMutate(ed, er) => {
             unbound_names_exp(unbound, er);

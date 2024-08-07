@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: variant `Circle` not declared in `m::Color`
+   ┌─ tests/checking/variants/variants_test_err.move:16:19
+   │
+16 │         (c is Red|Circle)
+   │                   ^^^^^^
+
+error: expected `Color` but found a value of type `Shape`
+   ┌─ tests/checking/variants/variants_test_err.move:20:19
+   │
+20 │         (c is Red|Shape::Circle)
+   │                   ^^^^^^^^^^^^^
+
+error: expected `Generic<T>` but found a value of type `Generic<u64>`
+   ┌─ tests/checking/variants/variants_test_err.move:29:15
+   │
+29 │         (x is Foo<u64>)
+   │               ^^^^^^^^
+
+error: expected `Generic<T>` but found a value of type `Generic<u64>`
+   ┌─ tests/checking/variants/variants_test_err.move:33:22
+   │
+33 │         (x is Foo<T>|Bar<u64>)
+   │                      ^^^^^^^^

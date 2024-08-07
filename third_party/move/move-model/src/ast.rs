@@ -1606,6 +1606,7 @@ pub enum Operation {
         StructId,
         /* fields from different variants */ Vec<FieldId>,
     ),
+    TestVariants(ModuleId, StructId, /* variants */ Vec<Symbol>),
 
     // Specification specific
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
@@ -2529,6 +2530,7 @@ impl Operation {
             EventStoreIncludedIn => false, // Spec
 
             // Operation with no effect
+            TestVariants(..) => true, // Cannot abort
             NoOp => true,
         }
     }
@@ -3259,6 +3261,17 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                     "select_variants {}",
                     fids.iter()
                         .map(|fid| self.field_str(mid, sid, fid))
+                        .join("|")
+                )
+            },
+            TestVariants(mid, sid, variants) => {
+                write!(
+                    f,
+                    "test_variants {}::{}",
+                    self.struct_str(mid, sid),
+                    variants
+                        .iter()
+                        .map(|v| v.display(self.env.symbol_pool()).to_string())
                         .join("|")
                 )
             },
