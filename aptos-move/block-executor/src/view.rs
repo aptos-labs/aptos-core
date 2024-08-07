@@ -27,8 +27,8 @@ use aptos_aggregator::{
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
-        GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
+        GroupReadResult, Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError,
+        MVGroupError, MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
         UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
@@ -1042,6 +1042,8 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X:
     base_view: &'a S,
     pub(crate) latest_view: ViewState<'a, T, X>,
     txn_idx: TxnIndex,
+    incarnation: Incarnation,
+    thread_id: usize,
     debug_state: RefCell<(
         (Duration, usize), // ResourceView
         (Duration, usize), // GroupView
@@ -1083,6 +1085,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             base_view,
             latest_view,
             txn_idx,
+            incarnation: 0,
+            thread_id: 0,
             debug_state: RefCell::new((
                 (Duration::ZERO, 0), // ResourceView
                 (Duration::ZERO, 0), // GroupView

@@ -891,53 +891,64 @@ where
         loop {
             let start = Instant::now();
 
-            if matches!(scheduler_task, SchedulerTask::Retry) {
-                let mut last_commit_idx = None;
-                while scheduler.should_coordinate_commits() {
-                    if let Some(last_idx) = self.prepare_and_queue_commit_ready_txns(
-                        &self.config.onchain.block_gas_limit_type,
-                        scheduler,
-                        versioned_cache,
-                        &mut scheduler_task,
-                        last_input_output,
-                        shared_commit_state,
-                        base_view,
-                        start_shared_counter,
-                        shared_counter,
-                        &executor,
-                        block,
-                        num_workers,
-                    )? {
-                        if last_idx <= 50 {
-                            let cur = Instant::now();
-                            println!("critical path, thread_id={}, transaction_id={}, commited at time={:?}", *worker_id, last_idx, cur-*start_time_all);
-                        }
-                        last_commit_idx.replace(last_idx);
-                    };
-                    scheduler.queueing_commits_mark_done();
+            if *worker_id == 0 && matches!(scheduler_task, SchedulerTask::Retry) {
+                if matches!(scheduler_task, SchedulerTask::Done) {
+                    drain_commit_queue()?;
+                    break;
                 }
-                let end = Instant::now();
-
-                commit_time += end - start;
-
-                let start3 = Instant::now();
-
-                match last_commit_idx {
-                    Some(mut last_commit_idx) if *worker_id == 0 => {
-                        //need to process next task
-                        last_commit_idx += 1;
-
-                        if last_commit_idx <= 2 {
-                            let cur = Instant::now();
-                            println!("critical path, thread_id={}, transaction_id={}, trying fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
-                        }
-                        if let Some(incarnation) = scheduler.try_fallback(last_commit_idx) {
-                            if last_commit_idx <= 2 {
+                assert!(matches!(scheduler_task, SchedulerTask::Retry));
+                {
+                    let mut last_commit_idx = None;
+                    while scheduler.should_coordinate_commits() {
+                        if let Some(last_idx) = self.prepare_and_queue_commit_ready_txns(
+                            &self.config.onchain.block_gas_limit_type,
+                            scheduler,
+                            versioned_cache,
+                            &mut scheduler_task,
+                            last_input_output,
+                            shared_commit_state,
+                            base_view,
+                            start_shared_counter,
+                            shared_counter,
+                            &executor,
+                            block,
+                            num_workers,
+                        )? {
+                            if last_idx <= 50 {
                                 let cur = Instant::now();
-                                println!("critical path, thread_id={}, transaction_id={}, inside fallback at time={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                                println!("critical path, thread_id={}, transaction_id={}, commited at time={:?}", *worker_id, last_idx, cur-*start_time_all);
+                            }
+                            last_commit_idx.replace(last_idx);
+                        };
+                        scheduler.queueing_commits_mark_done();
+                    }
+                    let end = Instant::now();
+
+                    commit_time += end - start;
+
+                    let start3 = Instant::now();
+
+                    //                    let next_commit_idx =
+                    if let Some(last_commit_idx) = last_commit_idx {
+                        let next_commit_idx = last_commit_idx + 1;
+                        //                        last_commit_idx + 1
+                        //                  } else {
+                        //                    scheduler.commit_state().0
+                        //              };
+
+                        //            {
+                        //need to process next task
+                        if next_commit_idx <= 2 {
+                            let cur = Instant::now();
+                            println!("critical path, thread_id={}, transaction_id={}, trying fallback at time={:?}", *worker_id, next_commit_idx, cur-*start_time_all);
+                        }
+                        if let Some(incarnation) = scheduler.try_fallback(next_commit_idx) {
+                            if next_commit_idx <= 2 {
+                                let cur = Instant::now();
+                                println!("critical path, thread_id={}, transaction_id={}, inside fallback at time={:?}", *worker_id, next_commit_idx, cur-*start_time_all);
                             }
                             if let Some(validation_mode) = Self::execute(
-                                last_commit_idx,
+                                next_commit_idx,
                                 incarnation,
                                 true,
                                 scheduler,
@@ -956,40 +967,41 @@ where
                                 worker_id,
                             )? {
                                 //if we are in fallback and won write => no need to validate
-                                if last_commit_idx <= 2 {
+                                if next_commit_idx <= 2 {
                                     let cur = Instant::now();
-                                    println!("executed fallback on critical path, thread_id={}, transaction_id={}, time elapsed={:?}", *worker_id, last_commit_idx, cur-*start_time_all);
+                                    println!("executed fallback on critical path, thread_id={}, transaction_id={}, time elapsed={:?}", *worker_id, next_commit_idx, cur-*start_time_all);
                                 }
                                 scheduler.finish_execution(
-                                    last_commit_idx,
+                                    next_commit_idx,
                                     incarnation,
                                     validation_mode,
                                 )?;
                                 let end3 = Instant::now();
                                 fallback_time += end3 - start3;
-
                                 // TODO: drain if the last txn.
-                                continue;
                             } else {
+                                println!("0 lost fallback, txn_idx={}", next_commit_idx);
                                 let end3 = Instant::now();
                                 fallback_time += end3 - start3;
                             }
-                        }
-                    },
-                    _ if *worker_id == 0 => {
-                        continue;
-                    },
-                    _ => {
-                        let end = Instant::now();
+                        };
+                    };
+                }
 
-                        drain_commit_queue()?;
-
-                        commit_time += end - start;
-                    },
-                };
+                if !scheduler.done() {
+                    println!("0 is alive");
+                    scheduler.print_status();
+                    //continue;
+                } else {
+                    scheduler.halt();
+                    println!("thread 0 done");
+                }
             }
+            let end = Instant::now();
 
-            // TODO: also measure commit queue draining time.
+            drain_commit_queue()?;
+
+            commit_time += end - start;
 
             let start2 = Instant::now();
 
@@ -1057,7 +1069,11 @@ where
                 },
                 SchedulerTask::Retry => {
                     /*println!("need to retry"); */
-                    scheduler.next_task()
+                    if *worker_id == 0 {
+                        scheduler.committer_next_task()
+                    } else {
+                        scheduler.next_task()
+                    }
                 },
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
