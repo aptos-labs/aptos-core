@@ -483,9 +483,9 @@ impl Scheduler {
 
         let commit_idx = self.commit_state().0;
         let proximity_interval = 2;
-        // if min(idx_to_validate, idx_to_execute) > commit_idx + proximity_interval {
-        //     return SchedulerTask::Retry;
-        // }
+        if min(idx_to_validate, idx_to_execute) > commit_idx + proximity_interval {
+            return SchedulerTask::Retry;
+        }
 
         self.next_task()
     }
