@@ -66,6 +66,10 @@ impl PersistentSafetyStorage {
         author: Author,
         consensus_private_key: bls12381::PrivateKey,
     ) -> Result<(), Error> {
+        warn!(
+            "0704 - writing consensus key 0x{} into secure storage",
+            hex::encode(consensus_private_key.to_bytes())
+        );
         let result = internal_store.set(CONSENSUS_KEY, consensus_private_key);
         // Attempting to re-initialize existing storage. This can happen in environments like
         // forge. Rather than be rigid here, leave it up to the developer to detect
@@ -101,10 +105,33 @@ impl PersistentSafetyStorage {
         version: bls12381::PublicKey,
     ) -> Result<bls12381::PrivateKey, Error> {
         let _timer = counters::start_timer("get", CONSENSUS_KEY);
-        let key: bls12381::PrivateKey = self.internal_store.get(CONSENSUS_KEY).map(|v| v.value)?;
+        let pk_hex = hex::encode(version.to_bytes());
+        let explicit_storage_key = format!("{}_{}", CONSENSUS_KEY, pk_hex);
+        let explicit_sk = self
+            .internal_store
+            .get::<bls12381::PrivateKey>(explicit_storage_key.as_str())
+            .map(|v| v.value);
+        let default_sk = self
+            .internal_store
+            .get::<bls12381::PrivateKey>(CONSENSUS_KEY)
+            .map(|v| v.value);
+        let key = match (explicit_sk, default_sk) {
+            (Ok(sk_0), _) => {
+                info!("0704 - sk_0");
+                sk_0
+            },
+            (Err(_), Ok(sk_1)) => {
+                info!("0704 - sk_1");
+                sk_1
+            },
+            (Err(_), Err(_)) => {
+                info!("0704 - err");
+                return Err(Error::ValidatorKeyNotFound("0704 - not found!".to_string()));
+            },
+        };
         if key.public_key() != version {
             return Err(Error::SecureStorageMissingDataError(format!(
-                "PrivateKey for {:?} not found",
+                "Incorrect sk saved for {:?} the expected pk",
                 version
             )));
         }
@@ -164,7 +191,6 @@ impl PersistentSafetyStorage {
         Ok(())
     }
 
-    #[cfg(any(test, feature = "testing"))]
     pub fn internal_store(&mut self) -> &mut Storage {
         &mut self.internal_store
     }

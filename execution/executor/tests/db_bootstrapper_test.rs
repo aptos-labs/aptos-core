@@ -36,6 +36,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use rand::SeedableRng;
+use std::sync::Arc;
 
 #[test]
 fn test_empty_db() {
@@ -189,7 +190,7 @@ fn test_new_genesis() {
     let waypoint = bootstrap_genesis::<AptosVM>(&db, &genesis_txn).unwrap();
     let signer = ValidatorSigner::new(
         genesis.1[0].data.owner_address,
-        genesis.1[0].consensus_key.clone(),
+        Arc::new(genesis.1[0].consensus_key.clone()),
     );
 
     // Mint for 2 demo accounts.

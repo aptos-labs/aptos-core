@@ -32,7 +32,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use serde::Serialize;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::Arc};
 
 pub(crate) fn next_round(round: Round) -> Result<Round, Error> {
     u64::checked_add(round, 1).ok_or(Error::IncorrectRound(round))
@@ -322,7 +322,7 @@ impl SafetyRules {
                     {
                         Ok(consensus_key) => {
                             self.validator_signer =
-                                Some(ValidatorSigner::new(author, consensus_key));
+                                Some(ValidatorSigner::new(author, Arc::new(consensus_key)));
                             Ok(())
                         },
                         Err(Error::SecureStorageMissingDataError(error)) => {

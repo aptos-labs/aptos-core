@@ -1308,6 +1308,7 @@ dependencies = [
  "aptos-network",
  "aptos-reliable-broadcast",
  "aptos-runtimes",
+ "aptos-safety-rules",
  "aptos-time-service",
  "aptos-types",
  "aptos-validator-transaction-pool",
@@ -2336,6 +2337,7 @@ dependencies = [
  "aptos-network",
  "aptos-reliable-broadcast",
  "aptos-runtimes",
+ "aptos-safety-rules",
  "aptos-time-service",
  "aptos-types",
  "aptos-validator-transaction-pool",
@@ -3028,7 +3030,6 @@ dependencies = [
  "aptos-peer-monitoring-service-server",
  "aptos-peer-monitoring-service-types",
  "aptos-runtimes",
- "aptos-safety-rules",
  "aptos-state-sync-driver",
  "aptos-storage-interface",
  "aptos-storage-service-client",
@@ -3497,7 +3498,6 @@ dependencies = [
 name = "aptos-safety-rules"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-config",
  "aptos-consensus-types",
  "aptos-crypto",
@@ -3512,6 +3512,7 @@ dependencies = [
  "aptos-vault-client",
  "claims",
  "criterion",
+ "hex",
  "once_cell",
  "proptest",
  "rand 0.7.3",
