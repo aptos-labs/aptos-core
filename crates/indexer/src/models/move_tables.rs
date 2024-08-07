@@ -56,6 +56,8 @@ impl TableItem {
         transaction_version: i64,
         transaction_block_height: i64,
     ) -> (Self, CurrentTableItem) {
+        println!("ICI indexer from_write_table_item write_table_item{write_table_item:?}",);
+
         (
             Self {
                 transaction_version,
@@ -64,7 +66,18 @@ impl TableItem {
                 key: write_table_item.key.to_string(),
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
                 decoded_key: write_table_item.data.as_ref().unwrap().key.clone(),
-                decoded_value: Some(write_table_item.data.as_ref().unwrap().value.clone()),
+                decoded_value: Some(
+                    write_table_item
+                        .data
+                        .as_ref()
+                        .map::<serde_json::Value, _>(|data| data.value.clone())
+                        .unwrap_or_default(),
+                ),
+
+                // .unwrap().value.clone()),
+
+                // // .map::<serde_json::Value, _>(|value| value.clone().into())
+                // // .unwrap_or_default(), //Hack because Tx doesn't have data,
                 is_deleted: false,
             },
             CurrentTableItem {

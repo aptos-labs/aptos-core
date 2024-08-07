@@ -383,13 +383,15 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
             )),
         },
         WriteSetChange::WriteTableItem(write_table_item) => {
-            let data = write_table_item.data.as_ref().unwrap_or_else(|| {
-                panic!(
-                    "Could not extract data from DecodedTableData '{:?}' with handle '{:?}'",
-                    write_table_item,
-                    write_table_item.handle.to_string(),
-                )
-            });
+            let data = write_table_item
+                .data
+                .as_ref()
+                .map(|data| transaction::WriteTableData {
+                    key: data.key.to_string(),
+                    key_type: data.key_type.clone(),
+                    value: data.value.to_string(),
+                    value_type: data.value_type.clone(),
+                });
             transaction::WriteSetChange {
                 r#type: transaction::write_set_change::Type::WriteTableItem as i32,
                 change: Some(transaction::write_set_change::Change::WriteTableItem(
@@ -399,12 +401,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
                         ),
                         handle: write_table_item.handle.to_string(),
                         key: write_table_item.key.to_string(),
-                        data: Some(transaction::WriteTableData {
-                            key: data.key.to_string(),
-                            key_type: data.key_type.clone(),
-                            value: data.value.to_string(),
-                            value_type: data.value_type.clone(),
-                        }),
+                        data,
                     },
                 )),
             }
