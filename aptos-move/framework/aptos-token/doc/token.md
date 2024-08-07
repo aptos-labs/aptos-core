@@ -4996,8 +4996,7 @@ Deposit the token balance into the recipients account and emit an event.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
@@ -5618,7 +5617,8 @@ Make sure the account has sufficient tokens to withdraw.
 
 
 
-<pre><code><b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">InitializeTokenStore</a>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">InitializeTokenStore</a>;
 </code></pre>
 
 

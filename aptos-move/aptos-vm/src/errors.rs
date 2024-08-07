@@ -97,6 +97,7 @@ pub fn convert_prologue_error(
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                     location, code, category, reason);
                     speculative_error!(log_context, err_msg.clone());
+                    println!("{:?}", err_msg);
                     return Err(VMStatus::error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                         Some(err_msg),
@@ -138,6 +139,7 @@ pub fn convert_prologue_error(
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                     location, code, category, reason);
                     speculative_error!(log_context, err_msg.clone());
+                    println!("{:?}", err_msg);
                     return Err(VMStatus::Error {
                         status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                         sub_status: None,
@@ -148,6 +150,7 @@ pub fn convert_prologue_error(
             VMStatus::error(new_major_status, None)
         },
         status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error { .. } => {
+            println!("{:?}", status);
             speculative_error!(
                 log_context,
                 format!("[aptos_vm] Unexpected prologue error: {:?}", status),
@@ -177,6 +180,7 @@ pub fn convert_epilogue_error(
             let (category, reason) = error_split(code);
             let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
 			location, code, category, reason);
+            println!("{:?}", err_msg);
             speculative_error!(log_context, err_msg.clone());
             VMStatus::error(
                 StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
@@ -190,6 +194,7 @@ pub fn convert_epilogue_error(
                 let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
 			    location, code, category, reason);
                 speculative_error!(log_context, err_msg.clone());
+                println!("{:?}", err_msg);
                 VMStatus::error(
                     StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                     Some(err_msg),
@@ -199,6 +204,7 @@ pub fn convert_epilogue_error(
         status => {
             let err_msg = format!("[aptos_vm] Unexpected success epilogue error: {:?}", status);
             speculative_error!(log_context, err_msg.clone());
+            println!("{:?}", err_msg);
             VMStatus::Error {
                 status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                 sub_status: status.sub_status(),
@@ -233,6 +239,7 @@ pub fn expect_only_successful_execution(
                 "[aptos_vm] Unexpected error from known Move function, '{}'. Error: {:?}",
                 function_name, status
             );
+            println!("{:?}", err_msg);
             speculative_warn!(log_context, err_msg.clone());
             VMStatus::Error {
                 status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,

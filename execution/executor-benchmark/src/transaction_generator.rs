@@ -12,7 +12,11 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{aptos_test_root_address, AccountResource},
+    account_config::{
+        aptos_test_root_address,
+        lite_account::{self, LiteAccountGroup},
+        AccountResource,
+    },
     chain_id::ChainId,
     state_store::MoveResourceExt,
     transaction::Transaction,
@@ -20,6 +24,7 @@ use aptos_types::{
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
+use move_core_types::move_resource::MoveStructType;
 #[cfg(test)]
 use rand::SeedableRng;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
@@ -59,7 +64,16 @@ fn get_sequence_number(address: AccountAddress, reader: Arc<dyn DbReader>) -> u6
 
     match AccountResource::fetch_move_resource(&db_state_view, &address).unwrap() {
         Some(account_resource) => account_resource.sequence_number(),
-        None => 0,
+        None => match lite_account::AccountResource::fetch_move_resource_from_group(
+            &db_state_view,
+            &address,
+            &LiteAccountGroup::struct_tag(),
+        )
+        .unwrap()
+        {
+            Some(account_resource) => account_resource.sequence_number,
+            None => 0,
+        },
     }
 }
 
@@ -783,10 +797,16 @@ impl TransactionGenerator {
                 let address = account.address();
                 let db_state_view = db.latest_state_checkpoint_view().unwrap();
                 assert_eq!(
-                    AccountResource::fetch_move_resource(&db_state_view, &address)
-                        .unwrap()
-                        .unwrap()
-                        .sequence_number(),
+                    match lite_account::AccountResource::fetch_move_resource_from_group(
+                        &db_state_view,
+                        &address,
+                        &LiteAccountGroup::struct_tag(),
+                    )
+                    .unwrap()
+                    {
+                        Some(account_resource) => account_resource.sequence_number,
+                        None => 0,
+                    },
                     account.sequence_number()
                 );
                 bar.inc(1);

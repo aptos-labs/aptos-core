@@ -790,7 +790,7 @@ module aptos_framework::coin {
             let paired_metadata_opt = paired_metadata<CoinType>();
             (option::is_some(
                 &paired_metadata_opt
-            ) && migrated_primary_fungible_store_exists(account_addr, option::destroy_some(paired_metadata_opt)))
+            ) && (features::new_accounts_default_to_fa_apt_store_enabled() || features::lite_account_enabled()))
         }
     }
 
@@ -908,10 +908,9 @@ module aptos_framework::coin {
             merge(&mut coin_store.coin, coin);
         } else {
             let metadata = paired_metadata<CoinType>();
-            if (option::is_some(&metadata) && migrated_primary_fungible_store_exists(
-                account_addr,
-                option::destroy_some(metadata)
-            )) {
+            if (option::is_some(&metadata) &&
+                (features::new_accounts_default_to_fa_apt_store_enabled() || features::lite_account_enabled())
+            ) {
                 primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
@@ -919,14 +918,17 @@ module aptos_framework::coin {
         }
     }
 
-    inline fun migrated_primary_fungible_store_exists(
+    inline fun primary_fungible_store_exists(
         account_address: address,
         metadata: Object<Metadata>
     ): bool {
-        let primary_store_address = primary_fungible_store::primary_store_address<Metadata>(account_address, metadata);
+        let primary_store_address = primary_fungible_store::primary_store_address<Metadata>(
+            account_address,
+            metadata
+        );
         fungible_asset::store_exists(primary_store_address) && (
             // migration flag is needed, until we start defaulting new accounts to APT PFS
-            features::new_accounts_default_to_fa_apt_store_enabled() || exists<MigrationFlag>(primary_store_address)
+            features::new_accounts_default_to_fa_apt_store_enabled() || features::lite_account_enabled()
         )
     }
 
@@ -941,13 +943,13 @@ module aptos_framework::coin {
             merge(&mut coin_store.coin, coin);
         } else {
             let metadata = paired_metadata<CoinType>();
-            if (option::is_some(&metadata) && migrated_primary_fungible_store_exists(
+            if (option::is_some(&metadata) && primary_fungible_store_exists(
                 account_addr,
                 option::destroy_some(metadata)
             )) {
                 let fa = coin_to_fungible_asset(coin);
                 let metadata = fungible_asset::asset_metadata(&fa);
-                let store = primary_fungible_store::primary_store(account_addr, metadata);
+                let store = primary_fungible_store::ensure_primary_store_exists(account_addr, metadata);
                 fungible_asset::deposit_internal(object::object_address(&store), fa);
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
@@ -2171,12 +2173,14 @@ module aptos_framework::coin {
         // Deposit FA to bob to created primary fungible store without `MigrationFlag`.
         primary_fungible_store::deposit(bob_addr, coin_to_fungible_asset(mint<FakeMoney>(100, &mint_cap)));
         assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
-        register<FakeMoney>(bob);
-        assert!(coin_store_exists<FakeMoney>(bob_addr), 0);
-        maybe_convert_to_fungible_store<FakeMoney>(bob_addr);
-        assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
-        register<FakeMoney>(bob);
-        assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
+        if (!features::lite_account_enabled()) {
+            register<FakeMoney>(bob);
+            assert!(coin_store_exists<FakeMoney>(bob_addr), 0);
+            maybe_convert_to_fungible_store<FakeMoney>(bob_addr);
+            assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
+            register<FakeMoney>(bob);
+            assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
+        };
 
         move_to(account, FakeMoneyCapabilities {
             burn_cap,
@@ -2198,9 +2202,7 @@ module aptos_framework::coin {
         assert!(coin_balance<FakeMoney>(account_addr) == 0, 0);
         assert!(balance<FakeMoney>(account_addr) == 100, 0);
         let coin = withdraw<FakeMoney>(account, 50);
-        assert!(!migrated_primary_fungible_store_exists(account_addr, ensure_paired_metadata<FakeMoney>()), 0);
         maybe_convert_to_fungible_store<FakeMoney>(account_addr);
-        assert!(migrated_primary_fungible_store_exists(account_addr, ensure_paired_metadata<FakeMoney>()), 0);
         deposit(account_addr, coin);
         assert!(coin_balance<FakeMoney>(account_addr) == 0, 0);
         assert!(balance<FakeMoney>(account_addr) == 100, 0);

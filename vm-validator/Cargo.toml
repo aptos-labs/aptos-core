@@ -20,6 +20,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-logging = { workspace = true }
 fail = { workspace = true }
+move-core-types = { workspace = true }
 rand = { workspace = true }
 
 [dev-dependencies]
@@ -31,7 +32,6 @@ aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-genesis = { workspace = true }
-move-core-types = { workspace = true }
 rand = { workspace = true }
 
 [features]

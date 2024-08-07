@@ -13,6 +13,7 @@ pub mod dispatchable_fungible_asset;
 pub mod event;
 pub mod function_info;
 pub mod hash;
+pub mod lite_account;
 pub mod object;
 pub mod object_code_deployment;
 pub mod randomness;
@@ -91,6 +92,7 @@ pub fn all_natives(
         "dispatchable_fungible_asset",
         dispatchable_fungible_asset::make_all(builder)
     );
+    add_natives_from_module!("lite_account", lite_account::make_all(builder));
 
     if inject_create_signer_for_gov_sim {
         add_natives_from_module!(

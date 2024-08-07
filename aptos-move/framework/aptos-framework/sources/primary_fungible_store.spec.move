@@ -124,13 +124,16 @@ spec aptos_framework::primary_fungible_store {
     /// Audited that the status of the frozen flag is updated correctly.
     /// </high-level-req>
     ///
+    ///
     spec module {
         // TODO: verification disabled until this module is specified.
         pragma verify = false;
     }
 
     spec fun spec_primary_store_exists<T: key>(account: address, metadata: Object<T>): bool {
-        fungible_asset::store_exists(spec_primary_store_address(account, metadata))
+        fungible_asset::store_exists(
+            spec_primary_store_address(account, metadata)
+        )
     }
 
     spec fun spec_primary_store_address<T: key>(owner: address, metadata: Object<T>): address {

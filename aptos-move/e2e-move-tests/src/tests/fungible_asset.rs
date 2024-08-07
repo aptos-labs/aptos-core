@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_types::account_address::{self, AccountAddress};
-use move_core_types::{
-    identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+use aptos_types::{
+    account_address::{self, AccountAddress},
+    account_config::{FungibleStoreResource, ObjectGroupResource},
 };
-use once_cell::sync::Lazy;
+use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use serde::Deserialize;
 use std::str::FromStr;
 
@@ -18,19 +17,6 @@ struct FungibleStore {
     allow_ungated_balance_transfer: bool,
 }
 
-pub static FUNGIBLE_STORE_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
-    address: AccountAddress::from_hex_literal("0x1").unwrap(),
-    module: Identifier::new("fungible_asset").unwrap(),
-    name: Identifier::new("FungibleStore").unwrap(),
-    type_args: vec![],
-});
-
-pub static OBJ_GROUP_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
-    address: AccountAddress::from_hex_literal("0x1").unwrap(),
-    module: Identifier::new("object").unwrap(),
-    name: Identifier::new("ObjectGroup").unwrap(),
-    type_args: vec![],
-});
 #[test]
 fn test_basic_fungible_token() {
     let mut h = MoveHarness::new();
@@ -148,16 +134,16 @@ fn test_basic_fungible_token() {
     let mut alice_store: FungibleStore = h
         .read_resource_from_resource_group(
             &alice_primary_store_addr,
-            OBJ_GROUP_TAG.clone(),
-            FUNGIBLE_STORE_TAG.clone(),
+            ObjectGroupResource::struct_tag(),
+            FungibleStoreResource::struct_tag(),
         )
         .unwrap();
 
     let bob_store: FungibleStore = h
         .read_resource_from_resource_group(
             &bob_primary_store_addr,
-            OBJ_GROUP_TAG.clone(),
-            FUNGIBLE_STORE_TAG.clone(),
+            ObjectGroupResource::struct_tag(),
+            FungibleStoreResource::struct_tag(),
         )
         .unwrap();
 
@@ -202,8 +188,8 @@ fn test_coin_to_fungible_asset_migration() {
     assert!(h
         .read_resource_from_resource_group::<FungibleStore>(
             &alice_primary_store_addr,
-            OBJ_GROUP_TAG.clone(),
-            FUNGIBLE_STORE_TAG.clone()
+            ObjectGroupResource::struct_tag(),
+            FungibleStoreResource::struct_tag()
         )
         .is_none());
 
@@ -218,8 +204,8 @@ fn test_coin_to_fungible_asset_migration() {
     assert!(h
         .read_resource_from_resource_group::<FungibleStore>(
             &alice_primary_store_addr,
-            OBJ_GROUP_TAG.clone(),
-            FUNGIBLE_STORE_TAG.clone()
+            ObjectGroupResource::struct_tag(),
+            FungibleStoreResource::struct_tag()
         )
         .is_some());
 }

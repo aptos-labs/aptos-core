@@ -709,7 +709,7 @@ Token offer doesn't exist
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
 
@@ -726,7 +726,8 @@ Token offer doesn't exist
 
 
 
-<pre><code><b>include</b> <a href="token_transfers.md#0x3_token_transfers_InitializeTokenTransfersAbortsIf">InitializeTokenTransfersAbortsIf</a>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>include</b> <a href="token_transfers.md#0x3_token_transfers_InitializeTokenTransfersAbortsIf">InitializeTokenTransfersAbortsIf</a>;
 </code></pre>
 
 

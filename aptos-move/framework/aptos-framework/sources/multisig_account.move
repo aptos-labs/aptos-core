@@ -1756,7 +1756,9 @@ module aptos_framework::multisig_account {
         );
         assert_multisig_account_exists(multisig_address);
         assert!(owners(multisig_address) == expected_owners, 0);
-        assert!(account::get_authentication_key(multisig_address) == ZERO_AUTH_KEY, 1);
+        if (!features::lite_account_enabled()) {
+            assert!(account::get_authentication_key(multisig_address) == ZERO_AUTH_KEY, 1);
+        };
         // Verify that all capability offers have been wiped.
         assert!(!account::is_rotation_capability_offered(multisig_address), 2);
         assert!(!account::is_signer_capability_offered(multisig_address), 3);

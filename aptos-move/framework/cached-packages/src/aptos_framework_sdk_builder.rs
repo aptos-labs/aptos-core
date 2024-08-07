@@ -37,6 +37,8 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    AccountMigrateToLiteAccount {},
+
     /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its rotation capability to only one other address at one time. If the account
     /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
@@ -78,6 +80,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Revoke any rotation capability offer in the specified account.
+    /// Account V1 only.
     AccountRevokeAnyRotationCapability {},
 
     /// Revoke any signer capability offer in the specified account.
@@ -430,6 +433,28 @@ pub enum EntryFunctionCall {
     DelegationPoolWithdraw {
         pool_address: AccountAddress,
         amount: u64,
+    },
+
+    /// Update dispatchable authenticator that disables account abstraction.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    LiteAccountRemoveDispatchableAuthenticator {},
+
+    /// Remove native authenticator so that this account could not be authenticated via native authenticator.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    LiteAccountRemoveNativeAuthenticator {},
+
+    /// Update dispatchable authenticator that enables account abstraction.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    LiteAccountUpdateDispatchableAuthenticator {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    /// Update native authenticator, FKA account rotation.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    LiteAccountUpdateNativeAuthenticator {
+        key: Vec<u8>,
     },
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
@@ -1028,6 +1053,7 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
+            AccountMigrateToLiteAccount {} => account_migrate_to_lite_account(),
             AccountOfferRotationCapability {
                 rotation_capability_sig_bytes,
                 account_scheme,
@@ -1258,6 +1284,22 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
+            LiteAccountRemoveDispatchableAuthenticator {} => {
+                lite_account_remove_dispatchable_authenticator()
+            },
+            LiteAccountRemoveNativeAuthenticator {} => lite_account_remove_native_authenticator(),
+            LiteAccountUpdateDispatchableAuthenticator {
+                module_address,
+                module_name,
+                function_name,
+            } => lite_account_update_dispatchable_authenticator(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            LiteAccountUpdateNativeAuthenticator { key } => {
+                lite_account_update_native_authenticator(key)
+            },
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -1649,6 +1691,21 @@ impl EntryFunctionCall {
     }
 }
 
+pub fn account_migrate_to_lite_account() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("migrate_to_lite_account").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
 /// An account can delegate its rotation capability to only one other address at one time. If the account
 /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
@@ -1726,6 +1783,7 @@ pub fn account_offer_signer_capability(
 }
 
 /// Revoke any rotation capability offer in the specified account.
+/// Account V1 only.
 pub fn account_revoke_any_rotation_capability() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -2781,6 +2839,82 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// Update dispatchable authenticator that disables account abstraction.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn lite_account_remove_dispatchable_authenticator() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lite_account").to_owned(),
+        ),
+        ident_str!("remove_dispatchable_authenticator").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Remove native authenticator so that this account could not be authenticated via native authenticator.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn lite_account_remove_native_authenticator() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lite_account").to_owned(),
+        ),
+        ident_str!("remove_native_authenticator").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Update dispatchable authenticator that enables account abstraction.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn lite_account_update_dispatchable_authenticator(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lite_account").to_owned(),
+        ),
+        ident_str!("update_dispatchable_authenticator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+/// Update native authenticator, FKA account rotation.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn lite_account_update_native_authenticator(key: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lite_account").to_owned(),
+        ),
+        ident_str!("update_native_authenticator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&key).unwrap()],
     ))
 }
 
@@ -4627,6 +4761,16 @@ pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> Transaction
 }
 mod decoder {
     use super::*;
+    pub fn account_migrate_to_lite_account(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountMigrateToLiteAccount {})
+        } else {
+            None
+        }
+    }
+
     pub fn account_offer_rotation_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5269,6 +5413,54 @@ mod decoder {
             Some(EntryFunctionCall::DelegationPoolWithdraw {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn lite_account_remove_dispatchable_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::LiteAccountRemoveDispatchableAuthenticator {})
+        } else {
+            None
+        }
+    }
+
+    pub fn lite_account_remove_native_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::LiteAccountRemoveNativeAuthenticator {})
+        } else {
+            None
+        }
+    }
+
+    pub fn lite_account_update_dispatchable_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::LiteAccountUpdateDispatchableAuthenticator {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn lite_account_update_native_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::LiteAccountUpdateNativeAuthenticator {
+                key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -6366,6 +6558,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
+            "account_migrate_to_lite_account".to_string(),
+            Box::new(decoder::account_migrate_to_lite_account),
+        );
+        map.insert(
             "account_offer_rotation_capability".to_string(),
             Box::new(decoder::account_offer_rotation_capability),
         );
@@ -6576,6 +6772,22 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
+        );
+        map.insert(
+            "lite_account_remove_dispatchable_authenticator".to_string(),
+            Box::new(decoder::lite_account_remove_dispatchable_authenticator),
+        );
+        map.insert(
+            "lite_account_remove_native_authenticator".to_string(),
+            Box::new(decoder::lite_account_remove_native_authenticator),
+        );
+        map.insert(
+            "lite_account_update_dispatchable_authenticator".to_string(),
+            Box::new(decoder::lite_account_update_dispatchable_authenticator),
+        );
+        map.insert(
+            "lite_account_update_native_authenticator".to_string(),
+            Box::new(decoder::lite_account_update_native_authenticator),
         );
         map.insert(
             "managed_coin_burn".to_string(),

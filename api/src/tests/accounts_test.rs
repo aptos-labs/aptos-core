@@ -27,7 +27,7 @@ async fn test_get_account_resources_by_address_0x0() {
     let address = "0x0";
 
     let resp = context
-        .expect_status_code(404)
+        .expect_status_code(200)
         .get(&account_resources(address))
         .await;
     context.check_golden_output(resp);
@@ -124,9 +124,9 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
         ))
         .await;
     let root_account = find_value(&ledger_version_1_resources, |f| {
-        f["type"] == "0x1::account::Account"
+        f["type"] == "0x1::lite_account::Account"
     });
-    assert_eq!(root_account["data"]["sequence_number"], "1");
+    assert_eq!(root_account.unwrap()["data"]["sequence_number"], "1");
 
     let ledger_version_0_resources = context
         .get(&account_resources_with_ledger_version(
@@ -135,9 +135,9 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
         ))
         .await;
     let root_account = find_value(&ledger_version_0_resources, |f| {
-        f["type"] == "0x1::account::Account"
+        f["type"] == "0x1::lite_account::Account"
     });
-    assert_eq!(root_account["data"]["sequence_number"], "0");
+    assert_eq!(root_account, None);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -224,7 +224,7 @@ async fn test_get_core_account_data() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_core_account_data_not_found() {
     let mut context = new_test_context(current_function_name!());
-    let resp = context.expect_status_code(404).get("/accounts/0xf").await;
+    let resp = context.expect_status_code(200).get("/accounts/0xf").await;
     context.check_golden_output(resp);
 }
 

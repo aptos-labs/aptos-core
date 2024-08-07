@@ -11,9 +11,12 @@ use aptos_crypto::{
 };
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    account_config::{
+        aptos_test_root_address, lite_account, lite_account::LiteAccountGroup, AccountResource,
+        CoinStoreResource, FungibleStoreResource, ObjectGroupResource,
+    },
     block_executor::config::BlockExecutorConfigFromOnchain,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -62,6 +65,7 @@ use move_transactional_test_runner::{
 };
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
+use serde::de::DeserializeOwned;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     convert::TryFrom,
@@ -415,60 +419,83 @@ impl<'a> AptosTestAdapter<'a> {
         (addresses, private_keys)
     }
 
-    /// Obtain a Rust representation of the account resource from storage, which is used to derive
-    /// a few default transaction parameters.
-    fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
-        let account_blob = self
-            .storage
-            .get_state_value_bytes(&StateKey::resource_typed::<AccountResource>(signer_addr)?)
+    fn read_resource_group(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
+        self.storage
+            .get_state_value_bytes(&StateKey::resource_group(addr, &struct_tag))
             .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                "Failed to fetch account resource under address {}. Has the account been created?",
-                signer_addr
+            .map(|data| bcs::from_bytes(&data).unwrap())
+    }
+
+    pub fn read_resource_raw(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<Vec<u8>> {
+        self.storage
+            .get_state_value_bytes(&StateKey::resource(addr, &struct_tag).unwrap())
+            .unwrap()
+            .map(|b| b.to_vec())
+    }
+
+    pub fn read_resource<T: DeserializeOwned>(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<T> {
+        Some(
+            bcs::from_bytes::<T>(&self.read_resource_raw(addr, struct_tag)?).expect(
+                "serialization expected to succeed (Rust type incompatible with Move type?)",
+            ),
+        )
+    }
+
+    fn read_resource_from_resource_group<T: DeserializeOwned>(
+        &self,
+        addr: &AccountAddress,
+        resource_group: StructTag,
+        struct_tag: StructTag,
+    ) -> Option<T> {
+        if let Some(group) = self.read_resource_group(addr, resource_group) {
+            if let Some(data) = group.get(&struct_tag) {
+                return Some(bcs::from_bytes::<T>(data).unwrap());
+            }
+        }
+        None
+    }
+
+    fn sequence_number(&self, addr: &AccountAddress) -> u64 {
+        if let Some(acct_v1) =
+            self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
+        {
+            acct_v1.sequence_number()
+        } else {
+            self.read_resource_from_resource_group::<lite_account::AccountResource>(
+                addr,
+                LiteAccountGroup::struct_tag(),
+                lite_account::AccountResource::struct_tag(),
             )
-            })?;
-        Ok(bcs::from_bytes(&account_blob).unwrap())
+            .unwrap_or_default()
+            .sequence_number
+        }
     }
 
     /// Obtain the AptosCoin amount under address `signer_addr`
-    fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
-        let aptos_coin_tag = CoinStoreResource::struct_tag();
-
-        let balance_blob = self
-            .storage
-            .get_state_value_bytes(&StateKey::resource(signer_addr, &aptos_coin_tag)?)
-            .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                    "Failed to fetch balance resource under address {}.",
-                    signer_addr
+    fn read_aptos_balance(&self, addr: &AccountAddress) -> u64 {
+        self.read_resource::<CoinStoreResource>(addr, CoinStoreResource::struct_tag())
+            .map(|c| c.coin())
+            .unwrap_or(0)
+            + self
+                .read_resource_from_resource_group::<FungibleStoreResource>(
+                    &aptos_types::account_config::fungible_store::primary_apt_store(*addr),
+                    ObjectGroupResource::struct_tag(),
+                    FungibleStoreResource::struct_tag(),
                 )
-            })?;
-
-        let annotated = AptosValueAnnotator::new(&self.storage)
-            .view_resource(&aptos_coin_tag, &balance_blob)?;
-
-        // Filter the Coin resource and return the resouce value
-        for (key, val) in annotated.value {
-            if key != Identifier::new("coin").unwrap() {
-                continue;
-            }
-
-            if let AnnotatedMoveValue::Struct(s) = val {
-                for (key, val) in s.value {
-                    if key != Identifier::new("value").unwrap() {
-                        continue;
-                    }
-
-                    if let AnnotatedMoveValue::U64(v) = val {
-                        return Ok(v);
-                    }
-                }
-            }
-        }
-
-        bail!("Failed to fetch balance under address {}.", signer_addr)
+                .map(|c| c.balance())
+                .unwrap_or(0)
     }
 
     /// Derive the default transaction parameters from the account and balance resources fetched
@@ -482,9 +509,7 @@ impl<'a> AptosTestAdapter<'a> {
         gas_unit_price: Option<u64>,
         max_gas_amount: Option<u64>,
     ) -> Result<TransactionParameters> {
-        let account_resource = self.fetch_account_resource(signer_addr)?;
-
-        let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
+        let sequence_number = sequence_number.unwrap_or_else(|| self.sequence_number(signer_addr));
         let max_number_of_gas_units =
             TransactionGasParameters::initial().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(1000);
@@ -492,7 +517,7 @@ impl<'a> AptosTestAdapter<'a> {
             if gas_unit_price == 0 {
                 u64::from(max_number_of_gas_units)
             } else {
-                let account_balance = self.fetch_account_balance(signer_addr).unwrap();
+                let account_balance = self.read_aptos_balance(signer_addr);
                 std::cmp::min(
                     u64::from(max_number_of_gas_units),
                     account_balance / gas_unit_price,
