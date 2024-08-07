@@ -2980,6 +2980,7 @@ dependencies = [
  "reqwest 0.11.23",
  "serde",
  "serde_json",
+ "serde_repr",
  "sha256",
  "tokio",
  "tracing",

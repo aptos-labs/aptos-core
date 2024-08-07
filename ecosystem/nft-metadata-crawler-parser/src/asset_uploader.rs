@@ -3,7 +3,10 @@
 
 use crate::{
     config::{AssetUploaderConfig, Server},
-    models::nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
+    models::{
+        nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
+        nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
+    },
     utils::{
         constants::{MAX_ASSET_UPLOAD_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
         database::upsert_uris,
@@ -19,6 +22,7 @@ use diesel::{
 use futures::{future::try_join_all, FutureExt};
 use reqwest::{multipart::Form, Client};
 use serde::{Deserialize, Serialize};
+use serde_repr::Deserialize_repr;
 use std::{sync::Arc, time::Duration};
 use tracing::{info, warn};
 use url::Url;
@@ -35,9 +39,21 @@ struct CloudflareImageUploadResponseResult {
     id: String,
 }
 
+#[derive(Debug, Deserialize_repr)]
+#[repr(u32)]
+enum CloudflareImageUploadErrorCode {
+    DuplicateAssetUri = 5409,
+}
+
+#[derive(Debug, Deserialize)]
+struct CloudflareImageUploadResponseError {
+    code: CloudflareImageUploadErrorCode,
+}
+
 #[derive(Debug, Deserialize)]
 struct CloudflareImageUploadResponse {
-    result: CloudflareImageUploadResponseResult,
+    errors: Vec<CloudflareImageUploadResponseError>,
+    result: Option<CloudflareImageUploadResponseResult>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,8 +80,15 @@ impl AssetUploaderContext {
 
     /// Uploads an asset to Cloudflare and returns the CDN URL used to access it
     /// The CDN URL uses the default variant specified in the config
+    /// Flow:
+    /// 1. Send a POST request to Cloudflare API to upload the asset
+    /// 2. If fails, handle the error
+    ///   2.1 If the asset already exists, check DB for asset and return the CDN URL if it exists
+    ///   2.2 If the asset does not exist, exit
+    /// 3. Retry with exponential backoff
     async fn upload_asset(&self, url: Url) -> anyhow::Result<String> {
         let hashed_url = sha256::digest(url.to_string());
+        let asset_uri = url.to_string();
         let op = || {
             async {
                 let client = Client::builder()
@@ -74,11 +97,11 @@ impl AssetUploaderContext {
                     .context("Failed to build reqwest client")?;
 
                 let form = Form::new()
-                    .text("id", hashed_url.clone()) // Replace with actual metadata
-                    .text("url", url.to_string());
+                    .text("id", hashed_url.clone())
+                    .text("url", asset_uri.clone());
 
                 info!(
-                    asset_uri = ?url,
+                    asset_uri,
                     "[Asset Uploader] Uploading asset to Cloudflare"
                 );
 
@@ -102,13 +125,54 @@ impl AssetUploaderContext {
                 let res = serde_json::from_str::<CloudflareImageUploadResponse>(&res_text)
                     .context("Failed to parse response to CloudflareImageUploadResponse")?;
 
-                Ok(format!(
-                    "{}/{}/{}/{}",
-                    self.asset_uploader_config.cloudflare_image_delivery_prefix,
-                    self.asset_uploader_config.cloudflare_account_hash,
-                    res.result.id,
-                    self.asset_uploader_config.cloudflare_default_variant,
-                ))
+                if let Some(result) = &res.result {
+                    info!(
+                        asset_uri,
+                        id = &result.id,
+                        "[Asset Uploader] Successfully uploaded asset to Cloudflare"
+                    );
+
+                    return Ok(format!(
+                        "{}/{}/{}/{}",
+                        self.asset_uploader_config.cloudflare_image_delivery_prefix,
+                        self.asset_uploader_config.cloudflare_account_hash,
+                        result.id,
+                        self.asset_uploader_config.cloudflare_default_variant,
+                    ));
+                }
+
+                for error in res.errors {
+                    match error.code {
+                        CloudflareImageUploadErrorCode::DuplicateAssetUri => {
+                            info!(
+                                asset_uri,
+                                "[Asset Uploader] Asset already exists, skipping asset upload"
+                            );
+
+                            let mut conn = self.pool.get().context("Failed to get connection")?;
+                            if let Some(model) = NFTMetadataCrawlerURIsQuery::get_by_asset_uri(&mut conn, url.as_ref()) {
+                                if let Some(cdn_image_uri) = model.cdn_image_uri {
+                                    info!(
+                                        asset_uri,
+                                        cdn_image_uri,
+                                        "[Asset Uploader] Asset already exists, skipping asset upload"
+                                    );
+                                    return Ok(cdn_image_uri);
+                                }
+
+                                // Do not continue with exponential backoff if the asset already exists but has no CDN URI because it will just continue to fail
+                                return Err(backoff::Error::permanent(anyhow::anyhow!(
+                                    "Asset already exists but has no CDN URI, skipping asset upload"
+                                )));
+                            }
+                        },
+                    }
+                }
+
+                // Use exponential backoff to try again
+                Err(backoff::Error::transient(anyhow::anyhow!(
+                    "Failed to upload asset to Cloudflare"
+                )))
             }
             .boxed()
         };
@@ -133,11 +197,12 @@ impl AssetUploaderContext {
         let self_clone = context.clone();
         for url in urls.urls.clone() {
             let self_clone = self_clone.clone();
+            let asset_uri = url.to_string();
             tasks.push(tokio::spawn(async move {
                 match self_clone.upload_asset(url.clone()).await {
                     Ok(cdn_url) => {
                         info!(
-                            asset_uri = ?url,
+                            asset_uri,
                             cdn_uri = cdn_url,
                             "[Asset Uploader] Writing to Postgres"
                         );
@@ -150,7 +215,7 @@ impl AssetUploaderContext {
                         Ok(cdn_url)
                     },
                     Err(e) => {
-                        warn!(error = ?e, asset_uri = ?url, "[Asset Uploader] Failed to upload asset");
+                        warn!(error = ?e, asset_uri, "[Asset Uploader] Failed to upload asset");
                         Err(e)
                     },
                 }
@@ -170,7 +235,7 @@ impl AssetUploaderContext {
                     }
                 }
 
-                info!(successes = ?successes, failures = ?failures, "[Asset Uploader] Uploaded assets");
+                info!(successes = ?successes, failures = ?failures, "[Asset Uploader] Request completed");
                 Json(AssetUploaderResponse {
                     successes,
                     failures,
