@@ -127,6 +127,7 @@ pub enum FeatureFlag {
     EnableEnumTypes,
     EnableResourceAccessControl,
     RejectUnstableBytecodeForScript,
+    UseBcsSerializedSizeNative,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -336,6 +337,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::RejectUnstableBytecodeForScript => {
                 AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT
             },
+            FeatureFlag::UseBcsSerializedSizeNative => {
+                AptosFeatureFlag::USE_BCS_SERIALIZED_SIZE_NATIVE
+            },
         }
     }
 }
@@ -473,6 +477,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT => {
                 FeatureFlag::RejectUnstableBytecodeForScript
+            },
+            AptosFeatureFlag::USE_BCS_SERIALIZED_SIZE_NATIVE => {
+                FeatureFlag::UseBcsSerializedSizeNative
             },
         }
     }

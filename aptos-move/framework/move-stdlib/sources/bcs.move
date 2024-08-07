@@ -3,13 +3,24 @@
 /// published on-chain. See https://github.com/aptos-labs/bcs#binary-canonical-serialization-bcs for more
 /// details on BCS.
 module std::bcs {
+    use std::features;
+    use std::vector;
+
     /// Returns the binary representation of `v` in BCS (Binary Canonical Serialization) format.
     /// Aborts with `0x1c5` error code if serialization fails.
     native public fun to_bytes<MoveValue>(v: &MoveValue): vector<u8>;
 
     /// Returns the size of the binary representation of `v` in BCS (Binary Canonical Serialization) format.
     /// Aborts with `0x1c5` error code if there is a failure when calculating serialized size.
-    native public fun serialized_size<MoveValue>(v: &MoveValue): u64;
+    public fun serialized_size<MoveValue>(v: &MoveValue): u64 {
+        if (features::use_bcs_serialized_size_feature()) {
+            serialized_size_impl(v)
+        } else {
+            vector::length(&to_bytes(v))
+        }
+    }
+
+    native fun serialized_size_impl<MoveValue>(v: &MoveValue): u64;
 
     // ==============================
     // Module Specification

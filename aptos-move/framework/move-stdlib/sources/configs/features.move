@@ -582,6 +582,19 @@ module std::features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    /// Whether the use native bcs::serialized_size implementation to calculate
+    /// serialized size of a Move value, or the old implementation which first
+    /// runs bcs::to_bytes and the returns the length of the vector.
+    ///
+    /// Lifetime: transient
+    const USE_BCS_SERIALIZED_SIZE: u64 = 77;
+
+    public fun get_use_bcs_serialized_size_feature(): u64 { USE_BCS_SERIALIZED_SIZE }
+
+    public fun use_bcs_serialized_size_feature(): bool acquires Features {
+        is_enabled(USE_BCS_SERIALIZED_SIZE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

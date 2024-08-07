@@ -281,3 +281,12 @@ fn test_package_manager() {
     ]);
     run_tests_for_pkg("package_manager", named_address);
 }
+
+#[test]
+fn test_rewards_pool() {
+    let named_address = BTreeMap::from([(
+        String::from("rewards_pool"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("rewards_pool", named_address);
+}
