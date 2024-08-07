@@ -39,6 +39,8 @@
 -  [Function `multisig_payload_internal`](#0x1_transaction_context_multisig_payload_internal)
 -  [Function `multisig_address`](#0x1_transaction_context_multisig_address)
 -  [Function `inner_entry_function_payload`](#0x1_transaction_context_inner_entry_function_payload)
+-  [Function `raw_txn_hash`](#0x1_transaction_context_raw_txn_hash)
+-  [Function `raw_txn_hash_internal`](#0x1_transaction_context_raw_txn_hash_internal)
 -  [Specification](#@Specification_1)
     -  [Function `get_txn_hash`](#@Specification_1_get_txn_hash)
     -  [Function `get_transaction_hash`](#@Specification_1_get_transaction_hash)
@@ -959,6 +961,53 @@ Returns the inner entry function payload of the multisig payload.
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.entry_function_payload
 }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_raw_txn_hash"></a>
+
+## Function `raw_txn_hash`
+
+Returns the hash of the current raw transaction.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_raw_txn_hash">raw_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_raw_txn_hash">raw_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="transaction_context.md#0x1_transaction_context_raw_txn_hash_internal">raw_txn_hash_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_raw_txn_hash_internal"></a>
+
+## Function `raw_txn_hash_internal`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_raw_txn_hash_internal">raw_txn_hash_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_raw_txn_hash_internal">raw_txn_hash_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
