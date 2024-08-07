@@ -64,6 +64,25 @@ impl FaucetManager {
             prerequisite_health_checkers,
         })
     }
+
+    pub fn new_for_indexer_testing(
+        prerequisite_health_checkers: HashSet<HealthChecker>,
+        faucet_port: u16,
+        test_dir: PathBuf,
+        node_api_url: Url,
+    ) -> Result<Self> {
+        Ok(Self {
+            config: RunConfig::build_for_cli(
+                node_api_url.clone(),
+                Ipv4Addr::LOCALHOST.to_string(),
+                faucet_port,
+                FunderKeyEnum::KeyFile(test_dir.join("mint.key")),
+                true,
+                None,
+            ),
+            prerequisite_health_checkers,
+        })
+    }
 }
 
 #[async_trait]
