@@ -21,6 +21,7 @@ use aptos_types::validator_verifier::ValidatorConsensusInfo;
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use move_core_types::account_address::AccountAddress;
 use crate::network::IncomingRpcRequest;
+use ff::{Field, PrimeField};
 
 /// Represent an in-progress MPC task.
 /// If dropped, the task is cancelled.
@@ -138,7 +139,7 @@ impl MPCManager {
         let epoch = self.epoch_state.epoch;
         let task = async move {
             tokio::time::sleep(Duration::from_millis(200)).await; //mpc todo: real work
-            let next_transcript = cur_transcript.unwrap_or_else(||thread_rng().gen::<[u8; 32]>().to_vec());
+            let next_transcript = cur_transcript.unwrap_or_else(||blstrs::Scalar::from_u128(128).to_bytes_be().to_vec());
             let reconfig_work_result = ReconfigWorkResult {
                 next_transcript,
             };

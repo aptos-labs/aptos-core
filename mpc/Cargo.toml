@@ -36,6 +36,7 @@ bcs = { workspace = true }
 blstrs = { workspace = true }
 bytes = { workspace = true }
 fail = { workspace = true }
+ff = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
 futures-util = { workspace = true }
