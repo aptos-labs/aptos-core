@@ -52,6 +52,7 @@ pub struct QuorumStoreConfig {
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
     pub batch_generation_poll_interval_ms: usize,
+    // No longer being used
     pub batch_generation_min_non_empty_interval_ms: usize,
     pub batch_generation_max_interval_ms: usize,
     /// The maximum number of transactions that the batch generator puts in a batch.
@@ -96,6 +97,9 @@ pub struct QuorumStoreConfig {
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
     pub allow_batches_without_pos_in_proposal: bool,
+    /// If batch generator pulls lesser than `minimum_batch_size` transactions from mempool, batch generator will
+    /// wait for more transactions to be available in mempool before creating a batch.
+    pub minimum_batch_size: u64,
 }
 
 impl Default for QuorumStoreConfig {
@@ -134,6 +138,7 @@ impl Default for QuorumStoreConfig {
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
             allow_batches_without_pos_in_proposal: true,
+            minimum_batch_size: 20,
         }
     }
 }
