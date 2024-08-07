@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(test)]
-mod fullnode_tests;
+pub mod managed_node;
+pub mod test_case;
+pub mod transaction_generator;
