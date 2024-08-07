@@ -305,6 +305,14 @@ module stablecoin::usdk {
         });
     }
 
+    public entry fun freeze_store(denylister: &signer, store: Object<FungibleStore>) acquires Management, State, Roles {
+        assert_not_paused();
+        let roles = borrow_global<Roles>(usdk_address());
+        assert!(signer::address_of(denylister) == roles.denylister, EUNAUTHORIZED);
+        let freeze_ref = &borrow_global<Management>(usdk_address()).transfer_ref;
+        fungible_asset::set_frozen_flag(freeze_ref, store, true);
+    }
+
     /// Add a new minter. This checks that the caller is the master minter and the account is not already a minter.
     public entry fun add_minter(admin: &signer, minter: address) acquires Roles, State {
         assert_not_paused();
