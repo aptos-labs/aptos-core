@@ -27,7 +27,7 @@
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        native_coin, parse_currency, with_context,
+        native_coin, parse_coin_currency, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -39,10 +39,7 @@ use aptos_crypto::{
 };
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_logger::debug;
-use aptos_sdk::{
-    move_types::language_storage::{StructTag, TypeTag},
-    transaction_builder::TransactionFactory,
-};
+use aptos_sdk::{move_types::language_storage::TypeTag, transaction_builder::TransactionFactory};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -556,14 +553,21 @@ async fn construction_parse(
                 module.name().as_str(),
                 function_name.as_str(),
             ) {
-                (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
-                    parse_transfer_operation(sender, &type_args, &args)?
+                (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION)
+                | (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_COINS_FUNCTION) => {
+                    parse_transfer_operation(&server_context, sender, &type_args, &args)?
                 },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
                     parse_account_transfer_operation(sender, &type_args, &args)?
                 },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
+                },
+                (AccountAddress::ONE, PRIMARY_FUNGIBLE_STORE_MODULE, TRANSFER_FUNCTION) => {
+                    parse_primary_fa_transfer_operation(&server_context, sender, &type_args, &args)?
+                },
+                (AccountAddress::ONE, FUNGIBLE_ASSET_MODULE, TRANSFER_FUNCTION) => {
+                    parse_fa_transfer_operation(&server_context, sender, &type_args, &args)?
                 },
                 (
                     AccountAddress::ONE,
@@ -663,6 +667,7 @@ fn parse_create_account_operation(
 
 /// Parses 0x1::coin::transfer<CoinType>(receiver: address, amount: u64)
 fn parse_transfer_operation(
+    server_context: &RosettaContext,
     sender: AccountAddress,
     type_args: &[TypeTag],
     args: &[Vec<u8>],
@@ -671,16 +676,7 @@ fn parse_transfer_operation(
 
     // Check coin is the native coin
     let currency = match type_args.first() {
-        Some(TypeTag::Struct(struct_tag)) => {
-            let StructTag {
-                address,
-                module,
-                name,
-                ..
-            } = &**struct_tag;
-
-            parse_currency(*address, module.as_str(), name.as_str())?
-        },
+        Some(TypeTag::Struct(struct_tag)) => parse_coin_currency(server_context, struct_tag)?,
         _ => {
             return Err(ApiError::TransactionParseError(Some(
                 "No coin type in transfer".to_string(),
@@ -768,6 +764,156 @@ fn parse_account_transfer_operation(
         amount,
     ));
     Ok(operations)
+}
+
+/// Parses 0x1::primary_fungible_store::transfer(metadata: address, receiver: address, amount: u64)
+fn parse_primary_fa_transfer_operation(
+    server_context: &RosettaContext,
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There should be one type arg
+    if type_args.len() == 1 {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Primary fungible store transfer should not have one type argument: {:?}",
+            type_args
+        ))));
+    }
+    let mut operations = Vec::new();
+
+    // Retrieve the args for the operations
+    let metadata: AccountAddress = if let Some(metadata) = args.first() {
+        bcs::from_bytes(metadata)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No metadata address in primary fungible transfer".to_string(),
+        )));
+    };
+    let receiver: AccountAddress = if let Some(receiver) = args.get(1) {
+        bcs::from_bytes(receiver)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No receiver address in primary fungible transfer".to_string(),
+        )));
+    };
+    let amount: u64 = if let Some(amount) = args.get(2) {
+        bcs::from_bytes(amount)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No amount in primary fungible transfer".to_string(),
+        )));
+    };
+
+    // Grab currency accordingly
+
+    let maybe_currency = server_context.currencies.iter().find(|currency| {
+        if let Some(CurrencyMetadata {
+            move_type: _,
+            fa_address: Some(ref fa_address),
+        }) = currency.metadata
+        {
+            fa_address == &metadata.to_string()
+        } else {
+            false
+        }
+    });
+
+    if let Some(currency) = maybe_currency {
+        operations.push(Operation::withdraw(
+            0,
+            None,
+            AccountIdentifier::base_account(sender),
+            currency.clone(),
+            amount,
+        ));
+        operations.push(Operation::deposit(
+            1,
+            None,
+            AccountIdentifier::base_account(receiver),
+            currency.clone(),
+            amount,
+        ));
+        Ok(operations)
+    } else {
+        Err(ApiError::UnsupportedCurrency(Some(metadata.to_string())))
+    }
+}
+
+/// Parses 0x1::fungible_asset::transfer(metadata: address, receiver: address, amount: u64)
+///
+/// This is only for using directly from a store, please prefer using primary fa.
+fn parse_fa_transfer_operation(
+    server_context: &RosettaContext,
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There is one type arg for the object
+    if type_args.len() == 1 {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Fungible asset transfer should have one type argument: {:?}",
+            type_args
+        ))));
+    }
+    let mut operations = Vec::new();
+
+    // Retrieve the args for the operations
+    let metadata: AccountAddress = if let Some(metadata) = args.first() {
+        bcs::from_bytes(metadata)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No metadata address in fungible asset transfer".to_string(),
+        )));
+    };
+    let receiver: AccountAddress = if let Some(receiver) = args.get(1) {
+        bcs::from_bytes(receiver)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No receiver address in fungible asset transfer".to_string(),
+        )));
+    };
+    let amount: u64 = if let Some(amount) = args.get(2) {
+        bcs::from_bytes(amount)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No amount in fungible transfer".to_string(),
+        )));
+    };
+
+    // Grab currency accordingly
+
+    let maybe_currency = server_context.currencies.iter().find(|currency| {
+        if let Some(CurrencyMetadata {
+            move_type: _,
+            fa_address: Some(ref fa_address),
+        }) = currency.metadata
+        {
+            fa_address == &metadata.to_string()
+        } else {
+            false
+        }
+    });
+
+    if let Some(currency) = maybe_currency {
+        operations.push(Operation::withdraw(
+            0,
+            None,
+            AccountIdentifier::base_account(sender),
+            currency.clone(),
+            amount,
+        ));
+        operations.push(Operation::deposit(
+            1,
+            None,
+            AccountIdentifier::base_account(receiver),
+            currency.clone(),
+            amount,
+        ));
+        Ok(operations)
+    } else {
+        Err(ApiError::UnsupportedCurrency(Some(metadata.to_string())))
+    }
 }
 
 /// Parses a specific BCS function argument to the given type
@@ -1050,7 +1196,7 @@ async fn construction_payloads(
     check_network(request.network_identifier, &server_context)?;
 
     // Retrieve the real operation we're doing, this identifies the sub-operations to a function
-    let mut operation = InternalOperation::extract(&request.operations)?;
+    let mut operation = InternalOperation::extract(&server_context, &request.operations)?;
 
     // For some reason, metadata is optional on the Rosetta spec, we enforce it here, otherwise we
     // can't build the [RawTransaction] offline.
@@ -1304,7 +1450,7 @@ async fn construction_preprocess(
     check_network(request.network_identifier, &server_context)?;
 
     // Determine the actual operation from the collection of Rosetta [Operation]
-    let internal_operation = InternalOperation::extract(&request.operations)?;
+    let internal_operation = InternalOperation::extract(&server_context, &request.operations)?;
 
     // Provide the accounts that need public keys (there's only one supported today)
     let required_public_keys = vec![AccountIdentifier::base_account(internal_operation.sender())];

@@ -8,10 +8,12 @@
 use aptos_config::config::{ApiConfig, DEFAULT_MAX_PAGE_SIZE};
 use aptos_logger::prelude::*;
 use aptos_node::AptosNodeArgs;
-use aptos_rosetta::bootstrap;
+use aptos_rosetta::{bootstrap, common::native_coin, types::Currency};
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use std::{
+    collections::HashSet,
+    fs::File,
     net::SocketAddr,
     path::PathBuf,
     sync::{
@@ -85,8 +87,13 @@ async fn main() {
 
     println!("aptos-rosetta: Starting rosetta");
     // Ensure runtime for Rosetta is up and running
-    let _rosetta = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
-        .expect("aptos-rosetta: Should bootstrap rosetta server");
+    let _rosetta = bootstrap(
+        args.chain_id(),
+        args.api_config(),
+        args.rest_client(),
+        args.supported_currencies(),
+    )
+    .expect("aptos-rosetta: Should bootstrap rosetta server");
 
     println!("aptos-rosetta: Rosetta started");
     // Run until there is an interrupt
@@ -106,6 +113,9 @@ trait ServerArgs {
 
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
+
+    /// Supported currencies for the service
+    fn supported_currencies(&self) -> HashSet<Currency>;
 }
 
 /// Aptos Rosetta API Server
@@ -146,6 +156,14 @@ impl ServerArgs for CommandArgs {
             CommandArgs::Online(args) => args.chain_id(),
         }
     }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        match self {
+            CommandArgs::OnlineRemote(args) => args.supported_currencies(),
+            CommandArgs::Offline(args) => args.supported_currencies(),
+            CommandArgs::Online(args) => args.supported_currencies(),
+        }
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -170,6 +188,9 @@ pub struct OfflineArgs {
     /// This can be configured to change performance characteristics
     #[clap(long, default_value_t = DEFAULT_MAX_PAGE_SIZE)]
     transactions_page_size: u16,
+
+    #[clap(long)]
+    currency_config_file: Option<PathBuf>,
 }
 
 impl ServerArgs for OfflineArgs {
@@ -191,6 +212,21 @@ impl ServerArgs for OfflineArgs {
 
     fn chain_id(&self) -> ChainId {
         self.chain_id
+    }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        let mut supported_currencies = HashSet::new();
+        supported_currencies.insert(native_coin());
+
+        if let Some(ref filepath) = self.currency_config_file {
+            let file = File::open(filepath).unwrap();
+            let currencies: Vec<Currency> = serde_json::from_reader(file).unwrap();
+            currencies.into_iter().for_each(|item| {
+                supported_currencies.insert(item);
+            });
+        }
+
+        supported_currencies
     }
 }
 
@@ -218,6 +254,10 @@ impl ServerArgs for OnlineRemoteArgs {
     fn chain_id(&self) -> ChainId {
         self.offline_args.chain_id
     }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        self.offline_args.supported_currencies()
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -241,6 +281,10 @@ impl ServerArgs for OnlineLocalArgs {
 
     fn chain_id(&self) -> ChainId {
         self.online_args.offline_args.chain_id
+    }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        self.online_args.offline_args.supported_currencies()
     }
 }
 
