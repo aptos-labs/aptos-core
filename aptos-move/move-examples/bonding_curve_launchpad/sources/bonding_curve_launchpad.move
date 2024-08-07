@@ -66,9 +66,11 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     }
 
     //---------------------------Views---------------------------
-    // Calculate the deterministic address of an FA using it's unique name and symbol combination within the
-    // "FA Generator" object.
     #[view]
+    /// Calculate the deterministic address of an FA using a combination of it's name and symbol, within the
+    /// "FA Generator" object. Although collisions are possible, this is the best solution for generating
+    /// a completely new FA. After the fact, we can use the Object<Metadata>'s unique identifier, described in:
+    /// https://aptos.dev/move/move-on-aptos/move-security-guidelines/#token-identifier-collision
     public fun get_fa_obj_address(
         name: String,
         symbol: String
@@ -81,8 +83,8 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         object::create_object_address(&fa_generator_address, fa_key_seed)
     }
 
-    // Retrieve the FA balance of a given user's address.
     #[view]
+    /// Retrieve the FA balance of a given user's address.
     public fun get_balance(
         name: String,
         symbol: String,
@@ -92,8 +94,8 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         primary_fungible_store::balance(user, fa_metadata_obj)
     }
 
-    // Retrieve the Metadata object of a given FA's unique name and symbol.
     #[view]
+    /// Retrieve the Metadata object of a given FA's name and symbol.
     public fun get_metadata(
         name: String,
         symbol: String
@@ -101,13 +103,14 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         object::address_to_object(get_fa_obj_address(name, symbol))
     }
 
-    // Retrieve frozen status of a given FA's unique name and symbol, from associated `liquidity_pair` state.
     #[view]
+    /// Retrieve frozen status of a given FA's name and symbol, from associated `liquidity_pair` state.
     public fun get_is_frozen(
         name: String,
         symbol: String
-    ): bool {
-        liquidity_pairs::get_is_frozen_metadata(name, symbol)
+    ): bool acquires LaunchPad {
+        // Liquidity_pairs uses the FA's Object<Metadata> for identifiers. Obtain this through the FA's name and symbol.
+        liquidity_pairs::get_is_frozen_metadata(object::address_to_object(get_fa_obj_address(name, symbol)))
     }
 
     //---------------------------Dispatchable Standard---------------------------
@@ -121,10 +124,8 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         store: Object<T>, amount: u64,
         transfer_ref: &TransferRef
     ): FungibleAsset {
-        let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
-        let name = fungible_asset::name(metadata);
-        let symbol = fungible_asset::symbol(metadata);
-        assert!(!liquidity_pairs::get_is_frozen_metadata(name, symbol), EFA_FROZEN);
+        let metadata_obj = fungible_asset::transfer_ref_metadata(transfer_ref);
+        assert!(!liquidity_pairs::get_is_frozen_metadata(metadata_obj), EFA_FROZEN);
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
@@ -149,8 +150,6 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         let transfer_ref = &borrow_global<FAController>(fa_address).transfer_ref;
         // Create the liquidity pair between APT and the new FA. Include the initial creator swap, if needed.
         liquidity_pairs::register_liquidity_pair(
-            name,
-            symbol,
             transfer_ref,
             creator,
             fa_metadata_obj,
@@ -177,9 +176,9 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         let transfer_ref = &borrow_global<FAController>(get_fa_obj_address(name, symbol)).transfer_ref;
         // Initiate the swap on the associated liquidity pair.
         if (swap_to_apt) {
-            liquidity_pairs::swap_fa_to_apt(name, symbol, transfer_ref, account, fa_metadata_obj, amount_in);
+            liquidity_pairs::swap_fa_to_apt(transfer_ref, account, fa_metadata_obj, amount_in);
         } else {
-            liquidity_pairs::swap_apt_to_fa(name, symbol, transfer_ref, account, fa_metadata_obj, amount_in);
+            liquidity_pairs::swap_apt_to_fa(transfer_ref, account, fa_metadata_obj, amount_in);
         };
     }
 
