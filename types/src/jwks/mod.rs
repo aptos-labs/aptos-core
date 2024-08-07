@@ -214,7 +214,7 @@ impl OnChainConfig for ObservedJWKs {
 }
 
 /// Reflection of Move type `0x1::jwks::ObservedJWKs`.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct PatchedJWKs {
     pub jwks: AllProvidersJWKs,
 }
@@ -239,6 +239,11 @@ impl PatchedJWKs {
 impl OnChainConfig for PatchedJWKs {
     const MODULE_IDENTIFIER: &'static str = "jwks";
     const TYPE_IDENTIFIER: &'static str = "PatchedJWKs";
+}
+
+impl MoveStructType for PatchedJWKs {
+    const MODULE_NAME: &'static IdentStr = ident_str!(PatchedJWKs::MODULE_IDENTIFIER);
+    const STRUCT_NAME: &'static IdentStr = ident_str!(PatchedJWKs::TYPE_IDENTIFIER);
 }
 
 /// A JWK update in format of `ProviderJWKs` and a multi-signature of it as a quorum certificate.

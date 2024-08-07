@@ -42,6 +42,7 @@ pub use bn254_circom::{
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Proof, Groth16ProofAndStatement, ZeroKnowledgeSig};
 pub use groth16_vk::Groth16VerificationKey;
+use move_core_types::account_address::AccountAddress;
 pub use openid_sig::{Claims, OpenIdSig};
 pub use zkp_sig::ZKP;
 
@@ -308,6 +309,29 @@ pub struct KeylessPublicKey {
     pub idc: IdCommitment,
 }
 
+/// Unlike a normal keyless account, a "federated" keyless account will accept JWKs published at a
+/// specific contract address.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct FederatedKeylessPublicKey {
+    pub jwk_addr: AccountAddress,
+    pub pk: KeylessPublicKey,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum AnyKeylessPublicKey {
+    Normal(KeylessPublicKey),
+    Federated(FederatedKeylessPublicKey),
+}
+
+impl AnyKeylessPublicKey {
+    pub fn inner_keyless_pk(&self) -> &KeylessPublicKey {
+        match self {
+            AnyKeylessPublicKey::Normal(pk) => pk,
+            AnyKeylessPublicKey::Federated(fed_pk) => &fed_pk.pk,
+        }
+    }
+}
+
 impl KeylessPublicKey {
     /// A reasonable upper bound for the number of bytes we expect in a keyless public key. This is
     /// enforced by our full nodes when they receive TXNs.
@@ -329,7 +353,7 @@ impl TryFrom<&[u8]> for KeylessPublicKey {
 
 pub fn get_authenticators(
     transaction: &SignedTransaction,
-) -> anyhow::Result<Vec<(KeylessPublicKey, KeylessSignature)>> {
+) -> anyhow::Result<Vec<(AnyKeylessPublicKey, KeylessSignature)>> {
     // Check all the signers in the TXN
     let single_key_authenticators = transaction
         .authenticator_ref()
@@ -339,7 +363,21 @@ pub fn get_authenticators(
         if let (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) =
             (authenticator.public_key(), authenticator.signature())
         {
-            authenticators.push((public_key.clone(), signature.clone()))
+            authenticators.push((
+                AnyKeylessPublicKey::Normal(public_key.clone()),
+                signature.clone(),
+            ))
+        }
+
+        if let (
+            AnyPublicKey::FederatedKeyless { public_key },
+            AnySignature::Keyless { signature },
+        ) = (authenticator.public_key(), authenticator.signature())
+        {
+            authenticators.push((
+                AnyKeylessPublicKey::Federated(public_key.clone()),
+                signature.clone(),
+            ))
         }
     }
     Ok(authenticators)

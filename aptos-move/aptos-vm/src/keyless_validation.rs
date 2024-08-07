@@ -8,8 +8,8 @@ use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
     keyless::{
-        get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
-        Groth16VerificationKey, KeylessPublicKey, KeylessSignature, ZKP,
+        get_public_inputs_hash, AnyKeylessPublicKey, Configuration, EphemeralCertificate,
+        Groth16ProofAndStatement, Groth16VerificationKey, KeylessPublicKey, KeylessSignature, ZKP,
     },
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
@@ -18,7 +18,10 @@ use aptos_types::{
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use move_binary_format::errors::Location;
-use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
+use move_core_types::{
+    account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS,
+    move_resource::MoveStructType,
+};
 use serde::Deserialize;
 
 macro_rules! value_deserialization_error {
@@ -33,20 +36,22 @@ macro_rules! value_deserialization_error {
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<T, VMStatus> {
+    get_resource_on_chain_at_addr(&CORE_CODE_ADDRESS, resolver)
+}
+
+fn get_resource_on_chain_at_addr<T: MoveStructType + for<'a> Deserialize<'a>>(
+    addr: &AccountAddress,
+    resolver: &impl AptosMoveResolver,
+) -> anyhow::Result<T, VMStatus> {
     let metadata = resolver.get_module_metadata(&T::struct_tag().module_id());
     let bytes = resolver
-        .get_resource_bytes_with_metadata_and_layout(
-            &CORE_CODE_ADDRESS,
-            &T::struct_tag(),
-            &metadata,
-            None,
-        )
+        .get_resource_bytes_with_metadata_and_layout(addr, &T::struct_tag(), &metadata, None)
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
         .0
         .ok_or_else(|| {
             value_deserialization_error!(format!(
                 "get_resource failed on {}::{}::{}",
-                CORE_CODE_ADDRESS.to_hex_literal(),
+                addr.to_hex_literal(),
                 T::struct_tag().module,
                 T::struct_tag().name
             ))
@@ -54,7 +59,7 @@ fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
     let obj = bcs::from_bytes::<T>(&bytes).map_err(|_| {
         value_deserialization_error!(format!(
             "could not deserialize {}::{}::{}",
-            CORE_CODE_ADDRESS.to_hex_literal(),
+            addr.to_hex_literal(),
             T::struct_tag().module,
             T::struct_tag().name
         ))
@@ -75,6 +80,13 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
         .ok_or_else(|| value_deserialization_error!("could not deserialize PatchedJWKs"))
 }
 
+fn get_federated_jwks_onchain(
+    resolver: &impl AptosMoveResolver,
+    jwk_addr: &AccountAddress,
+) -> anyhow::Result<PatchedJWKs, VMStatus> {
+    get_resource_on_chain_at_addr::<PatchedJWKs>(jwk_addr, resolver)
+}
+
 pub(crate) fn get_groth16_vk_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
@@ -87,6 +99,14 @@ fn get_configs_onchain(
     get_resource_on_chain::<Configuration>(resolver)
 }
 
+// Fetches a JWK from the PatchedJWKs dictionary (which maps each `iss` to its set of JWKs)
+//
+// This could fail for several reasons:
+//  - alg field mismatch: JWT header vs JWK
+//  - bad JWT header
+//  - bad Any serialization (something is really wrong)
+//  - did not find the JWK for the kid
+//  - found the JWK for the kid but it is an UnsupportedJWK
 fn get_jwk_for_authenticator(
     jwks: &PatchedJWKs,
     pk: &KeylessPublicKey,
@@ -95,6 +115,7 @@ fn get_jwk_for_authenticator(
     let jwt_header = sig
         .parse_jwt_header()
         .map_err(|_| invalid_signature!("Failed to parse JWT header"))?;
+
     let jwk_move_struct = jwks.get_jwk(&pk.iss_val, &jwt_header.kid).map_err(|_| {
         invalid_signature!(format!(
             "JWK for {} with KID {} was not found",
@@ -129,12 +150,12 @@ fn get_jwk_for_authenticator(
 /// Ensures that **all** keyless authenticators in the transaction are valid.
 pub(crate) fn validate_authenticators(
     pvk: &Option<PreparedVerifyingKey<Bn254>>,
-    authenticators: &Vec<(KeylessPublicKey, KeylessSignature)>,
+    authenticators: &Vec<(AnyKeylessPublicKey, KeylessSignature)>,
     features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
     let mut with_zk = false;
-    for (_, sig) in authenticators {
+    for (pk, sig) in authenticators {
         // Feature-gating for keyless TXNs (whether ZK or ZKless, whether passkey-based or not)
         if matches!(sig.cert, EphemeralCertificate::ZeroKnowledgeSig { .. }) {
             if !features.is_zk_keyless_enabled() {
@@ -151,6 +172,9 @@ pub(crate) fn validate_authenticators(
         if matches!(sig.ephemeral_signature, EphemeralSignature::WebAuthn { .. })
             && !features.is_keyless_with_passkeys_enabled()
         {
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+        }
+        if matches!(pk, AnyKeylessPublicKey::Federated { .. }) && !features.is_federated_keyless_enabled() {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
     }
@@ -192,7 +216,32 @@ pub(crate) fn validate_authenticators(
     };
 
     for (pk, sig) in authenticators {
-        let jwk = get_jwk_for_authenticator(&patched_jwks, pk, sig)?;
+        let jwk = match pk {
+            // 1. This is a federated keyless account; look in 0x1 and then in `jwk_addr` for JWKs
+            AnyKeylessPublicKey::Federated(fed_pk) => {
+                // 1.a: Try finding the JWK in 0x1.
+                match get_jwk_for_authenticator(&patched_jwks, pk.inner_keyless_pk(), sig) {
+                    // 1.a.i: If found in 0x1, then we consider that the ground truth & we are done.
+                    Ok(jwk) => jwk,
+                    // 1.a.ii: If not found in 0x1, we look in `jwk_addr` for the PK.
+                    Err(_) => {
+                        // Note: Maybe the PatchedJWKs at `jwk_addr` were not installed correctly (or the address was wrong)
+                        let federated_jwks = get_federated_jwks_onchain(resolver, &fed_pk.jwk_addr)
+                            .map_err(|_| {
+                                invalid_signature!(format!(
+                                    "Could not fetch federated PatchedJWKs at {}",
+                                    fed_pk.jwk_addr
+                                ))
+                            })?;
+
+                        // 1.a.ii.a: If not found in jwk_addr either, then we fail the validation.
+                        get_jwk_for_authenticator(&federated_jwks, pk.inner_keyless_pk(), sig)?
+                    },
+                }
+            },
+            // 2. This is not a federated keyless account; just look in 0x1 for JWKs
+            AnyKeylessPublicKey::Normal(pk) => get_jwk_for_authenticator(&patched_jwks, pk, sig)?,
+        };
 
         match &sig.cert {
             EphemeralCertificate::ZeroKnowledgeSig(zksig) => match jwk {
@@ -212,7 +261,10 @@ pub(crate) fn validate_authenticators(
                         ZKP::Groth16(groth16proof) => {
                             // let start = std::time::Instant::now();
                             let public_inputs_hash = get_public_inputs_hash(
-                                sig, pk, &rsa_jwk, config,
+                                sig,
+                                pk.inner_keyless_pk(),
+                                &rsa_jwk,
+                                config,
                             )
                             .map_err(|_| {
                                 // println!("[aptos-vm][groth16] PIH computation failed");
@@ -274,7 +326,12 @@ pub(crate) fn validate_authenticators(
                 match jwk {
                     JWK::RSA(rsa_jwk) => {
                         openid_sig
-                            .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, pk, config)
+                            .verify_jwt_claims(
+                                sig.exp_date_secs,
+                                &sig.ephemeral_pubkey,
+                                pk.inner_keyless_pk(),
+                                config,
+                            )
                             .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
 
                         // TODO(OpenIdSig): Implement batch verification for all RSA signatures in

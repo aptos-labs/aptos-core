@@ -92,6 +92,7 @@ pub enum FeatureFlag {
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
     REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+    FEDERATED_KEYLESS = 77,
 }
 
 impl FeatureFlag {
@@ -141,6 +142,7 @@ impl FeatureFlag {
             FeatureFlag::WEBAUTHN_SIGNATURE,
             // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
             FeatureFlag::KEYLESS_ACCOUNTS,
+            //FeatureFlag::FEDERATED_KEYLESS, // disabled by default
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
@@ -290,6 +292,10 @@ impl Features {
 
     pub fn is_keyless_with_passkeys_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
+    }
+
+    pub fn is_federated_keyless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::FEDERATED_KEYLESS)
     }
 
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {

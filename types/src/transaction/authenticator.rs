@@ -4,7 +4,10 @@
 
 use crate::{
     account_address::AccountAddress,
-    keyless::{EphemeralCertificate, KeylessPublicKey, KeylessSignature, TransactionAndProof},
+    keyless::{
+        EphemeralCertificate, FederatedKeylessPublicKey, KeylessPublicKey, KeylessSignature,
+        TransactionAndProof,
+    },
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
@@ -1066,6 +1069,9 @@ pub enum AnyPublicKey {
     },
     Keyless {
         public_key: KeylessPublicKey,
+    },
+    FederatedKeyless {
+        public_key: FederatedKeylessPublicKey,
     },
 }
 
