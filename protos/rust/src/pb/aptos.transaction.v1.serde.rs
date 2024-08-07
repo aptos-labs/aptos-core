@@ -36,6 +36,9 @@ impl serde::Serialize for AccountSignature {
                 account_signature::Signature::MultiKeySignature(v) => {
                     struct_ser.serialize_field("multiKeySignature", v)?;
                 }
+                account_signature::Signature::NoAccountSignature(v) => {
+                    struct_ser.serialize_field("noAccountSignature", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -56,6 +59,8 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
             "singleKeySignature",
             "multi_key_signature",
             "multiKeySignature",
+            "no_account_signature",
+            "noAccountSignature",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -65,6 +70,7 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
             MultiEd25519,
             SingleKeySignature,
             MultiKeySignature,
+            NoAccountSignature,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -91,6 +97,7 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                             "multiEd25519" | "multi_ed25519" => Ok(GeneratedField::MultiEd25519),
                             "singleKeySignature" | "single_key_signature" => Ok(GeneratedField::SingleKeySignature),
                             "multiKeySignature" | "multi_key_signature" => Ok(GeneratedField::MultiKeySignature),
+                            "noAccountSignature" | "no_account_signature" => Ok(GeneratedField::NoAccountSignature),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -148,6 +155,13 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                             signature__ = map.next_value::<::std::option::Option<_>>()?.map(account_signature::Signature::MultiKeySignature)
 ;
                         }
+                        GeneratedField::NoAccountSignature => {
+                            if signature__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("noAccountSignature"));
+                            }
+                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(account_signature::Signature::NoAccountSignature)
+;
+                        }
                     }
                 }
                 Ok(AccountSignature {
@@ -171,6 +185,7 @@ impl serde::Serialize for account_signature::Type {
             Self::MultiEd25519 => "TYPE_MULTI_ED25519",
             Self::SingleKey => "TYPE_SINGLE_KEY",
             Self::MultiKey => "TYPE_MULTI_KEY",
+            Self::NoAccountSignature => "TYPE_NO_ACCOUNT_SIGNATURE",
         };
         serializer.serialize_str(variant)
     }
@@ -187,6 +202,7 @@ impl<'de> serde::Deserialize<'de> for account_signature::Type {
             "TYPE_MULTI_ED25519",
             "TYPE_SINGLE_KEY",
             "TYPE_MULTI_KEY",
+            "TYPE_NO_ACCOUNT_SIGNATURE",
         ];
 
         struct GeneratedVisitor;
@@ -234,6 +250,7 @@ impl<'de> serde::Deserialize<'de> for account_signature::Type {
                     "TYPE_MULTI_ED25519" => Ok(account_signature::Type::MultiEd25519),
                     "TYPE_SINGLE_KEY" => Ok(account_signature::Type::SingleKey),
                     "TYPE_MULTI_KEY" => Ok(account_signature::Type::MultiKey),
+                    "TYPE_NO_ACCOUNT_SIGNATURE" => Ok(account_signature::Type::NoAccountSignature),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -5771,6 +5788,77 @@ impl<'de> serde::Deserialize<'de> for multisig_transaction_payload::Type {
             }
         }
         deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
+impl serde::Serialize for NoAccountSignature {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let len = 0;
+        let struct_ser = serializer.serialize_struct("aptos.transaction.v1.NoAccountSignature", len)?;
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for NoAccountSignature {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = NoAccountSignature;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.NoAccountSignature")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<NoAccountSignature, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                while map.next_key::<GeneratedField>()?.is_some() {
+                    let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                }
+                Ok(NoAccountSignature {
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.NoAccountSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for ScriptPayload {

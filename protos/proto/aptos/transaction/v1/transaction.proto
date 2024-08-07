@@ -579,6 +579,9 @@ message MultiKeySignature {
   uint32 signatures_required = 3;
 }
 
+message NoAccountSignature {
+}
+
 message SingleSender {
   AccountSignature sender = 1;
 }
@@ -590,6 +593,7 @@ message AccountSignature {
     TYPE_MULTI_ED25519 = 2;
     TYPE_SINGLE_KEY = 4;
     TYPE_MULTI_KEY = 5;
+    TYPE_NO_ACCOUNT_SIGNATURE = 6;
 
     reserved 3;
   }
@@ -601,6 +605,7 @@ message AccountSignature {
     // 4 is reserved.
     SingleKeySignature single_key_signature = 5;
     MultiKeySignature multi_key_signature = 6;
+    NoAccountSignature no_account_signature = 7;
   }
 }
 

@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
-use aptos_api_test_context::{current_function_name, TestContext};
+use aptos_api_test_context::{current_function_name, pretty, TestContext};
 use aptos_crypto::ed25519::Ed25519Signature;
-use aptos_types::transaction::{
-    authenticator::TransactionAuthenticator, EntryFunction, TransactionPayload,
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
+        EntryFunction, RawTransaction, SignedTransaction, TransactionPayload,
+    },
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
 use serde_json::json;
@@ -152,4 +156,273 @@ async fn test_simulate_txn_with_aggregator() {
     } else {
         unreachable!("Simulation uses Ed25519 authenticator.");
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_simulate_simple() {
+    let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
+
+    let mut context = new_test_context(current_function_name!());
+    let alice = &mut context.gen_account();
+    let bob = &mut context.gen_account();
+    let txn = context.mint_user_account(alice).await;
+    context.commit_block(&vec![txn]).await;
+
+    let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
+    let body = bcs::to_bytes(&txn).unwrap();
+
+    // expected to fail due to using a valid signature.
+    let _resp = context
+        .expect_status_code(400)
+        .post_bcs_txn("/transactions/simulate", body)
+        .await;
+
+    if let TransactionAuthenticator::Ed25519 {
+        public_key,
+        signature: _,
+    } = txn.authenticator_ref()
+    {
+        let txn = SignedTransaction::new_signed_transaction(
+            txn.clone().into_raw_transaction(),
+            TransactionAuthenticator::Ed25519 {
+                public_key: public_key.clone(),
+                signature: Ed25519Signature::dummy_signature(),
+            },
+        );
+
+        let body = bcs::to_bytes(&txn).unwrap();
+
+        // expected to succeed
+        let resp = context
+            .expect_status_code(200)
+            .post_bcs_txn("/transactions/simulate", body)
+            .await;
+
+        assert!(resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
+    } else {
+        unreachable!("Simulation uses Ed25519 authenticator.");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_simulate_without_auth_key_check() {
+    let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
+
+    let mut context = new_test_context(current_function_name!());
+    let alice = &mut context.gen_account();
+    let bob = &mut context.gen_account();
+    let txn = context.mint_user_account(alice).await;
+    context.commit_block(&vec![txn]).await;
+
+    // Construct a signed transaction.
+    let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
+    // Replace the authenticator with a NoAccountAuthenticator in the transaction.
+    let txn = SignedTransaction::new_signed_transaction(
+        txn.clone().into_raw_transaction(),
+        TransactionAuthenticator::SingleSender {
+            sender: AccountAuthenticator::NoAccountAuthenticator,
+        },
+    );
+
+    let body = bcs::to_bytes(&txn).unwrap();
+
+    // expected to succeed
+    let resp = context
+        .expect_status_code(200)
+        .post_bcs_txn("/transactions/simulate", body)
+        .await;
+    assert!(resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_simulate_fee_payer_transaction_without_gas_fee_check() {
+    let mut context = new_test_context(current_function_name!());
+    let alice = &mut context.gen_account();
+    let bob = &mut context.gen_account();
+    let txn = context.mint_user_account(alice).await;
+    context.commit_block(&vec![txn]).await;
+
+    let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
+    let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
+    let raw_txn = RawTransaction::new(
+        txn.sender(),
+        txn.sequence_number(),
+        txn.payload().clone(),
+        txn.max_gas_amount(),
+        100,
+        txn.expiration_timestamp_secs(),
+        txn.chain_id(),
+    );
+    let txn = SignedTransaction::new_signed_transaction(
+        raw_txn.clone(),
+        TransactionAuthenticator::FeePayer {
+            sender: AccountAuthenticator::NoAccountAuthenticator,
+            secondary_signer_addresses: vec![],
+            secondary_signers: vec![],
+            fee_payer_address: AccountAddress::ONE,
+            fee_payer_signer: AccountAuthenticator::NoAccountAuthenticator,
+        },
+    );
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(200)
+        .post_bcs_txn("/transactions/simulate", body)
+        .await;
+    assert!(!resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
+    assert!(
+        resp[0]["vm_status"]
+            .as_str()
+            .unwrap()
+            .contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"),
+        "{}",
+        pretty(&resp)
+    );
+
+    let txn = SignedTransaction::new_signed_transaction(
+        raw_txn.clone(),
+        TransactionAuthenticator::FeePayer {
+            sender: AccountAuthenticator::NoAccountAuthenticator,
+            secondary_signer_addresses: vec![],
+            secondary_signers: vec![],
+            fee_payer_address: AccountAddress::ZERO,
+            fee_payer_signer: AccountAuthenticator::NoAccountAuthenticator,
+        },
+    );
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(200)
+        .post_bcs_txn("/transactions/simulate", body)
+        .await;
+    assert!(resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_simulate_automated_account_creation() {
+    let mut context = new_test_context(current_function_name!());
+    let alice = &mut context.gen_account();
+    let bob = &mut context.gen_account();
+
+    let transfer_amount: u64 = 0;
+    let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
+    let raw_txn = RawTransaction::new(
+        txn.sender(),
+        txn.sequence_number(),
+        txn.payload().clone(),
+        txn.max_gas_amount(),
+        100,
+        txn.expiration_timestamp_secs(),
+        txn.chain_id(),
+    );
+    // Replace the authenticator with a NoAccountAuthenticator in the transaction.
+    let txn = SignedTransaction::new_signed_transaction(
+        raw_txn.clone(),
+        TransactionAuthenticator::SingleSender {
+            sender: AccountAuthenticator::NoAccountAuthenticator,
+        },
+    );
+
+    let body = bcs::to_bytes(&txn).unwrap();
+
+    let resp = context
+        .expect_status_code(200)
+        .post_bcs_txn("/transactions/simulate", body)
+        .await;
+    assert!(!resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
+    assert!(
+        resp[0]["vm_status"]
+            .as_str()
+            .unwrap()
+            .contains("SENDING_ACCOUNT_DOES_NOT_EXIST"),
+        "{}",
+        pretty(&resp)
+    );
+
+    let txn =
+        SignedTransaction::new_signed_transaction(raw_txn, TransactionAuthenticator::FeePayer {
+            sender: AccountAuthenticator::NoAccountAuthenticator,
+            secondary_signer_addresses: vec![],
+            secondary_signers: vec![],
+            fee_payer_address: AccountAddress::ZERO,
+            fee_payer_signer: AccountAuthenticator::NoAccountAuthenticator,
+        });
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(200)
+        .post_bcs_txn("/transactions/simulate", body)
+        .await;
+    assert!(resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_execute_simple_no_authenticator_fail() {
+    let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
+
+    let mut context = new_test_context(current_function_name!());
+    let alice = &mut context.gen_account();
+    let bob = &mut context.gen_account();
+    let txn = context.mint_user_account(alice).await;
+    context.commit_block(&vec![txn]).await;
+
+    // Construct a signed transaction.
+    let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
+    // Replace the authenticator with a NoAccountAuthenticator in the transaction.
+    let txn = SignedTransaction::new_signed_transaction(
+        txn.clone().into_raw_transaction(),
+        TransactionAuthenticator::SingleSender {
+            sender: AccountAuthenticator::NoAccountAuthenticator,
+        },
+    );
+
+    let body = bcs::to_bytes(&txn).unwrap();
+
+    // expected to fail due to the use of NoAccountAuthenticator in an actual execution
+    let resp = context
+        .expect_status_code(400)
+        .post_bcs_txn("/transactions", body)
+        .await;
+    assert!(resp["message"]
+        .as_str()
+        .unwrap()
+        .contains("INVALID_SIGNATURE"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_execute_fee_payer_transaction_no_authenticator_fail() {
+    let mut context = new_test_context(current_function_name!());
+    let alice = &mut context.gen_account();
+    let bob = &mut context.gen_account();
+    let txn = context.mint_user_account(alice).await;
+    context.commit_block(&vec![txn]).await;
+
+    let transfer_amount: u64 = SMALL_TRANSFER_AMOUNT;
+    let txn = context.account_transfer_to(alice, bob.address(), transfer_amount);
+    let raw_txn = RawTransaction::new(
+        txn.sender(),
+        txn.sequence_number(),
+        txn.payload().clone(),
+        txn.max_gas_amount(),
+        100,
+        txn.expiration_timestamp_secs(),
+        txn.chain_id(),
+    );
+
+    let txn = SignedTransaction::new_signed_transaction(
+        raw_txn.clone(),
+        TransactionAuthenticator::FeePayer {
+            sender: AccountAuthenticator::NoAccountAuthenticator,
+            secondary_signer_addresses: vec![],
+            secondary_signers: vec![],
+            fee_payer_address: AccountAddress::ZERO,
+            fee_payer_signer: AccountAuthenticator::NoAccountAuthenticator,
+        },
+    );
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(400)
+        .post_bcs_txn("/transactions", body)
+        .await;
+    assert!(resp["message"]
+        .as_str()
+        .unwrap()
+        .contains("INVALID_SIGNATURE"));
 }
