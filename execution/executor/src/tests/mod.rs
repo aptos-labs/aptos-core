@@ -292,12 +292,10 @@ fn test_executor_commit_twice() {
         .unwrap();
     let ledger_info = gen_ledger_info(6, output1.root_hash(), block1_id, 1);
     executor
-        .commit_blocks(vec![block1_id], ledger_info.clone())
+        .pre_commit_block(block1_id, executor.committed_block_id())
         .unwrap();
-    // commit with the same ledger info again.
-    executor
-        .commit_blocks(vec![block1_id], ledger_info)
-        .unwrap();
+    executor.commit_ledger(ledger_info.clone()).unwrap();
+    executor.commit_ledger(ledger_info).unwrap();
 }
 
 #[test]

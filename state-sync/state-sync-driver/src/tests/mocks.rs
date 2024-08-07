@@ -84,6 +84,9 @@ pub fn create_mock_reader_writer_with_version(
         .expect_get_synced_version()
         .returning(move || Ok(Some(highest_synced_version)));
     reader
+        .expect_get_pre_committed_version()
+        .returning(move || Ok(Some(highest_synced_version)));
+    reader
         .expect_get_latest_epoch_state()
         .returning(|| Ok(create_empty_epoch_state()));
     reader
@@ -236,6 +239,8 @@ mock! {
         fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
         fn get_synced_version(&self) -> Result<Option<Version>>;
+
+        fn get_pre_committed_version(&self) -> Result<Option<Version>>;
 
         fn get_latest_ledger_info_version(&self) -> Result<Version>;
 

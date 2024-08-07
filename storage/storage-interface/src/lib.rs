@@ -284,6 +284,11 @@ pub trait DbReader: Send + Sync {
         /// Returns the latest "synced" transaction version, potentially not "committed" yet.
         fn get_synced_version(&self) -> Result<Option<Version>>;
 
+        /// Returns the latest "pre-committed" transaction version, which includes those written to
+        /// the DB but yet to be certified by consensus or a verified LedgerInfo from a state sync
+        /// peer.
+        fn get_pre_committed_version(&self) -> Result<Option<Version>>;
+
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
 
@@ -496,6 +501,11 @@ pub trait DbReader: Send + Sync {
     fn expect_synced_version(&self) -> Version {
         self.ensure_synced_version()
             .expect("Failed to get synced version.")
+    }
+
+    fn ensure_pre_committed_version(&self) -> Result<Version> {
+        self.get_pre_committed_version()?
+            .ok_or_else(|| AptosDbError::NotFound("Pre-committed version not found.".to_string()))
     }
 }
 
