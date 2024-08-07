@@ -109,7 +109,7 @@ pub enum EntryFunctionCall {
     /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
     /// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
     /// `OriginatingAddress[new_addr_a]` -> `addr_a`
-    /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+    /// Alice has had a bad day: her laptop blew up and she needs to reset her account on a new one.
     /// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
     ///
     /// But Bob likes to mess with Alice.
@@ -1809,7 +1809,7 @@ pub fn account_revoke_signer_capability(
 /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
 /// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
 /// `OriginatingAddress[new_addr_a]` -> `addr_a`
-/// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+/// Alice has had a bad day: her laptop blew up and she needs to reset her account on a new one.
 /// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
 ///
 /// But Bob likes to mess with Alice.
