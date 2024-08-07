@@ -7,7 +7,7 @@ pub mod ast_simplifier;
 mod bytecode_generator;
 pub mod cyclic_instantiation_checker;
 pub mod env_pipeline;
-mod experiments;
+pub mod experiments;
 mod file_format_generator;
 pub mod flow_insensitive_checkers;
 pub mod function_checker;
