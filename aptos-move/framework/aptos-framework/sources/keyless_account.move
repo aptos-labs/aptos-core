@@ -29,7 +29,9 @@ module aptos_framework::keyless_account {
     struct Group {}
 
     #[resource_group_member(group = aptos_framework::keyless_account::Group)]
-    /// The 288-byte Groth16 verification key (VK) for the ZK relation that implements keyless accounts
+    /// The 288-byte Groth16 verification key (VK) for the ZK relation that implements keyless accounts.
+    ///
+    /// Deprecated by `SetupsVKs`.
     struct Groth16VerificationKey has key, store, drop {
         /// 32-byte serialization of `alpha * G`, where `G` is the generator of `G1`.
         alpha_g1: vector<u8>,
@@ -42,6 +44,22 @@ module aptos_framework::keyless_account {
         /// `\forall i \in {0, ..., \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H`, where
         /// `H` is the generator of `G1` and `\ell` is 1 for the ZK relation.
         gamma_abc_g1: vector<vector<u8>>,
+    }
+
+    struct SetupVKEntry has drop, store {
+        setup_id: String,
+        vk: Groth16VerificationKey,
+    }
+
+    /// Groth16 verification keys indexed by a setup ID.
+    ///
+    /// This is introduced to support zero-downtime VK rotation, where:
+    /// 0. a setup is done for a new circuit, yielding a new verification key (VK) and a new proving key (PK);
+    /// 1. the new VK is added to this collection;
+    /// 2. client-side proving intrastructures switch to the new PK;
+    /// 3. the old VK is removed from this collection.
+    struct SetupsVKs has drop, key, store {
+        entries: vector<SetupVKEntry>,
     }
 
     #[resource_group_member(group = aptos_framework::keyless_account::Group)]
@@ -87,6 +105,13 @@ module aptos_framework::keyless_account {
             gamma_g2,
             delta_g2,
             gamma_abc_g1,
+        }
+    }
+
+    public fun new_setup_vk_entry(setup_id: String, vk: Groth16VerificationKey): SetupVKEntry {
+        SetupVKEntry {
+            setup_id,
+            vk,
         }
     }
 
@@ -198,6 +223,11 @@ module aptos_framework::keyless_account {
         config_buffer::upsert<Groth16VerificationKey>(vk);
     }
 
+    public fun set_vk_map_for_next_epoch(fx: &signer, entries: vector<SetupVKEntry>) {
+        system_addresses::assert_aptos_framework(fx);
+        let map = SetupsVKs { entries };
+        config_buffer::upsert(map)
+    }
 
     /// Queues up a change to the keyless configuration. The change will only be effective after reconfiguration. Only
     /// callable via governance proposal.
@@ -288,7 +318,7 @@ module aptos_framework::keyless_account {
     }
 
     /// Only used in reconfigurations to apply the queued up configuration changes, if there are any.
-    public(friend) fun on_new_epoch(fx: &signer) acquires Groth16VerificationKey, Configuration {
+    public(friend) fun on_new_epoch(fx: &signer) acquires Groth16VerificationKey, Configuration, SetupsVKs {
         system_addresses::assert_aptos_framework(fx);
 
         if (config_buffer::does_exist<Groth16VerificationKey>()) {
@@ -308,5 +338,15 @@ module aptos_framework::keyless_account {
                 move_to(fx, config);
             }
         };
+
+        if (config_buffer::does_exist<SetupsVKs>()) {
+            let vk_map = config_buffer::extract();
+            if (exists<SetupsVKs>(@aptos_framework)) {
+                *borrow_global_mut<SetupsVKs>(@aptos_framework) = vk_map;
+            } else {
+                move_to(fx, vk_map);
+            }
+        };
+
     }
 }

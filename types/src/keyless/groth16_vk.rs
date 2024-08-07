@@ -142,3 +142,19 @@ impl Display for Groth16VerificationKey {
         Ok(())
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct SetupVKEntry {
+    pub setup_id: String,
+    pub vk: Groth16VerificationKey,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SetupsVKs {
+    pub setups: Vec<SetupVKEntry>,
+}
+
+impl MoveStructType for SetupsVKs {
+    const MODULE_NAME: &'static IdentStr = ident_str!(KEYLESS_ACCOUNT_MODULE_NAME);
+    const STRUCT_NAME: &'static IdentStr = ident_str!("SetupsVKs");
+}

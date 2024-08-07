@@ -21,9 +21,10 @@ use aptos_types::{
     keyless::{
         get_public_inputs_hash,
         test_utils::{
-            self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_esk,
-            get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field,
-            get_sample_iss, get_sample_jwk, get_sample_openid_sig_and_pk, get_upgraded_vk,
+            self, get_groth16_sig_and_pk_for_setup_2, get_groth16_sig_and_pk_for_upgraded_vk,
+            get_sample_esk, get_sample_groth16_sig_and_pk,
+            get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk,
+            get_sample_openid_sig_and_pk, get_upgraded_vk,
         },
         Configuration, EphemeralCertificate, Groth16ProofAndStatement, Groth16VerificationKey,
         KeylessPublicKey, KeylessSignature, TransactionAndProof, DEVNET_VERIFICATION_KEY,
@@ -40,7 +41,7 @@ use aptos_types::{
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use serde::de::DeserializeOwned;
-use std::{fmt::Debug, time::Duration};
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 // TODO(keyless): Test the override aud_val path
 
 #[tokio::test]
@@ -64,77 +65,105 @@ async fn test_keyless_rotate_vk() {
     let (tw_sk, config, jwk, swarm, mut cli, root_idx) = setup_local_net().await;
     let mut info = swarm.aptos_public_info();
 
-    let (old_sig, old_pk) = get_sample_groth16_sig_and_pk();
-    let signed_txn = sign_transaction(
-        &mut info,
-        old_sig.clone(),
-        old_pk.clone(),
-        &jwk,
-        &config,
-        Some(&tw_sk),
-        1,
-    )
-    .await;
+    info!("Initial on-chain state: default_setup=SETUP_0, vk_map={{}}");
 
-    info!("Submitting keyless Groth16 transaction w.r.t. to initial VK; should succeed");
-    let result = info
-        .client()
+    info!("A keyless transaction using SETUP_0 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_0", &jwk, &config, &tw_sk, 1)
+        .await
+        .is_ok());
+
+    info!("A keyless transaction using SETUP_1/SETUP_2 should fail.");
+    assert!(run_txn(&mut info, "SETUP_1", &jwk, &config, &tw_sk, 2)
+        .await
+        .is_err());
+    assert!(run_txn(&mut info, "SETUP_2", &jwk, &config, &tw_sk, 2)
+        .await
+        .is_err());
+
+    info!("Config update #1, target state: default_setup=SETUP_0, vk_map={{SETUP_1}}");
+    let vk = Groth16VerificationKey::from(get_upgraded_vk());
+    let mut vk_map_1 = HashMap::new();
+    vk_map_1.insert("SETUP_1".to_string(), vk);
+    rotate_vk_by_governance(&mut cli, &mut info, vk_map_1, root_idx).await;
+
+    info!("A keyless transaction using SETUP_0 should still succeed.");
+    assert!(run_txn(&mut info, "SETUP_0", &jwk, &config, &tw_sk, 2)
+        .await
+        .is_ok());
+
+    info!("A keyless transaction using SETUP_1 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_1", &jwk, &config, &tw_sk, 3)
+        .await
+        .is_ok());
+
+    info!("A keyless transaction using SETUP_2 should fail.");
+    assert!(run_txn(&mut info, "SETUP_2", &jwk, &config, &tw_sk, 4)
+        .await
+        .is_err());
+
+    info!("Config update #2, target state: default_setup=SETUP_0, vk_map={{SETUP_1, SETUP_2}}");
+    let vk_1 = Groth16VerificationKey::from(get_upgraded_vk());
+    let vk_2 = Groth16VerificationKey::from(get_upgraded_vk());
+    let mut vk_map_1 = HashMap::new();
+    vk_map_1.insert("SETUP_1".to_string(), vk_1);
+    vk_map_1.insert("SETUP_2".to_string(), vk_2);
+    rotate_vk_by_governance(&mut cli, &mut info, vk_map_1, root_idx).await;
+
+    info!("A keyless transaction using SETUP_0 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_0", &jwk, &config, &tw_sk, 4)
+        .await
+        .is_ok());
+
+    info!("A keyless transaction using SETUP_1 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_1", &jwk, &config, &tw_sk, 5)
+        .await
+        .is_ok());
+
+    info!("A keyless transaction using SETUP_2 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_2", &jwk, &config, &tw_sk, 6)
+        .await
+        .is_ok());
+
+    info!("Config update #3, target state: default_setup=SETUP_0, vk_map={{SETUP_2}}");
+    let vk_2 = Groth16VerificationKey::from(get_upgraded_vk());
+    let mut vk_map_1 = HashMap::new();
+    vk_map_1.insert("SETUP_2".to_string(), vk_2);
+    rotate_vk_by_governance(&mut cli, &mut info, vk_map_1, root_idx).await;
+
+    info!("A keyless transaction using SETUP_0 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_0", &jwk, &config, &tw_sk, 7)
+        .await
+        .is_ok());
+
+    info!("A keyless transaction using SETUP_1 should fail.");
+    assert!(run_txn(&mut info, "SETUP_1", &jwk, &config, &tw_sk, 8)
+        .await
+        .is_err());
+
+    info!("A keyless transaction using SETUP_2 should succeed.");
+    assert!(run_txn(&mut info, "SETUP_2", &jwk, &config, &tw_sk, 8)
+        .await
+        .is_ok());
+}
+
+async fn run_txn(
+    info: &mut AptosPublicInfo,
+    setup_id: &str,
+    jwk: &RSA_JWK,
+    config: &Configuration,
+    tw_sk: &Ed25519PrivateKey,
+    seq_num: usize,
+) -> anyhow::Result<()> {
+    let (sig, pk) = match setup_id {
+        "SETUP_0" => get_sample_groth16_sig_and_pk(),
+        "SETUP_1" => get_groth16_sig_and_pk_for_upgraded_vk(),
+        "SETUP_2" => get_groth16_sig_and_pk_for_setup_2(),
+        _ => unreachable!(),
+    };
+    let signed_txn = sign_transaction(info, sig, pk, jwk, config, Some(tw_sk), seq_num).await;
+    info.client()
         .submit_without_serializing_response(&signed_txn)
-        .await;
-
-    if let Err(e) = result {
-        panic!("Keyless Groth16 TXN with old proof for old VK should have succeeded verification: {:?}", e)
-    }
-
-    let (new_sig, new_pk) = get_groth16_sig_and_pk_for_upgraded_vk();
-    let signed_txn = sign_transaction(
-        &mut info,
-        new_sig.clone(),
-        new_pk.clone(),
-        &jwk,
-        &config,
-        Some(&tw_sk),
-        2,
-    )
-    .await;
-    info!("Submitting keyless Groth16 transaction w.r.t. to upgraded VK; should fail");
-    let result = info
-        .client()
-        .submit_without_serializing_response(&signed_txn)
-        .await;
-
-    if result.is_ok() {
-        panic!("Keyless Groth16 TXN with new proof for old VK should have failed verification")
-    }
-
-    info!("Rotating VK");
-    let vk = get_upgraded_vk().into();
-    rotate_vk_by_governance(&mut cli, &mut info, &vk, root_idx).await;
-
-    let signed_txn =
-        sign_transaction(&mut info, old_sig, old_pk, &jwk, &config, Some(&tw_sk), 2).await;
-
-    info!("Submitting keyless Groth16 transaction w.r.t. to old VK; should fail");
-    let result = info
-        .client()
-        .submit_without_serializing_response(&signed_txn)
-        .await;
-
-    if result.is_ok() {
-        panic!("Keyless Groth16 TXN with old proof for old VK should have failed verification")
-    }
-
-    let signed_txn =
-        sign_transaction(&mut info, new_sig, new_pk, &jwk, &config, Some(&tw_sk), 2).await;
-    info!("Submitting keyless Groth16 transaction w.r.t. to upgraded VK; should succeed");
-    let result = info
-        .client()
-        .submit_without_serializing_response(&signed_txn)
-        .await;
-
-    if let Err(e) = result {
-        panic!("Keyless Groth16 TXN with new proof for new VK should have succeeded verification: {:?}", e)
-    }
+        .await
 }
 
 #[tokio::test]
@@ -168,7 +197,8 @@ async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
     match &mut sig.cert {
-        EphemeralCertificate::ZeroKnowledgeSig(_) => panic!("Internal inconsistency"),
+        EphemeralCertificate::ZeroKnowledgeSig(_)
+        | EphemeralCertificate::ZeroKnowledgeSigV2 { .. } => panic!("Internal inconsistency"),
         EphemeralCertificate::OpenIdSig(openid_sig) => {
             openid_sig.jwt_sig = vec![0u8; 16] // Mauling the signature
         },
@@ -371,15 +401,16 @@ async fn sign_transaction<'a>(
 
     let esk = get_sample_esk();
 
-    let public_inputs_hash: Option<[u8; 32]> =
-        if let EphemeralCertificate::ZeroKnowledgeSig(_) = &sig.cert {
+    let public_inputs_hash: Option<[u8; 32]> = match &sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(_)
+        | EphemeralCertificate::ZeroKnowledgeSigV2 { .. } => {
             // This will only calculate the hash if it's needed, avoiding unnecessary computation.
             Some(fr_to_bytes_le(
                 &get_public_inputs_hash(&sig, &pk, jwk, config).unwrap(),
             ))
-        } else {
-            None
-        };
+        },
+        EphemeralCertificate::OpenIdSig(_) => None,
+    };
 
     let mut txn_and_zkp = TransactionAndProof {
         message: raw_txn.clone(),
@@ -388,7 +419,8 @@ async fn sign_transaction<'a>(
 
     // Compute the training wheels signature if not present
     match &mut sig.cert {
-        EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+        EphemeralCertificate::ZeroKnowledgeSig(proof)
+        | EphemeralCertificate::ZeroKnowledgeSigV2 { zk_sig: proof, .. } => {
             let proof_and_statement = Groth16ProofAndStatement {
                 proof: proof.proof.into(),
                 public_inputs_hash: public_inputs_hash.unwrap(),
@@ -656,45 +688,67 @@ async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
     response.into_inner()
 }
 
+#[allow(clippy::vec_init_then_push)]
 async fn rotate_vk_by_governance<'a>(
     cli: &mut CliTestFramework,
     info: &mut AptosPublicInfo,
-    vk: &Groth16VerificationKey,
+    vks: HashMap<String, Groth16VerificationKey>,
     root_idx: usize,
 ) {
-    let script = format!(
-        r#"
-script {{
-    use aptos_framework::{};
-    use aptos_framework::aptos_governance;
-    fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-        let vk = {}::new_groth16_verification_key(x"{}", x"{}", x"{}", x"{}", vector[x"{}", x"{}"]);
-        {}::set_groth16_verification_key_for_next_epoch(&framework_signer, vk);
-        aptos_governance::force_end_epoch(&framework_signer);
-    }}
-}}
-"#,
-        KEYLESS_ACCOUNT_MODULE_NAME,
-        KEYLESS_ACCOUNT_MODULE_NAME,
-        hex::encode(&vk.alpha_g1),
-        hex::encode(&vk.beta_g2),
-        hex::encode(&vk.gamma_g2),
-        hex::encode(&vk.delta_g2),
-        hex::encode(&vk.gamma_abc_g1[0]),
-        hex::encode(&vk.gamma_abc_g1[1]),
-        KEYLESS_ACCOUNT_MODULE_NAME
+    let mut lines = vec![];
+    lines.push("script {".to_string());
+    lines.push("    use aptos_framework::keyless_account;".to_string());
+    lines.push("    use aptos_framework::aptos_governance;".to_string());
+    lines.push("    use std::string::utf8;".to_string());
+    lines.push("    use std::vector;".to_string());
+    lines.push("    fun main(core_resources: &signer) {".to_string());
+    lines.push("        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);".to_string());
+    lines.push("        let entries = vector[];".to_string());
+    for (setup_id, vk) in vks {
+        lines.push(format!(r#"        let setup_id = utf8(b"{}");"#, setup_id));
+        lines.push(format!(
+            r#"        let alpha_g1 = x"{}";"#,
+            hex::encode(&vk.alpha_g1)
+        ));
+        lines.push(format!(
+            r#"        let beta_g2 = x"{}";"#,
+            hex::encode(&vk.beta_g2)
+        ));
+        lines.push(format!(
+            r#"        let gamma_g2 = x"{}";"#,
+            hex::encode(&vk.gamma_g2)
+        ));
+        lines.push(format!(
+            r#"        let delta_g2 = x"{}";"#,
+            hex::encode(&vk.delta_g2)
+        ));
+        lines.push(format!(
+            r#"        let gamma_abc_g1_0 = x"{}";"#,
+            hex::encode(&vk.gamma_abc_g1[0])
+        ));
+        lines.push(format!(
+            r#"        let gamma_abc_g1_1 = x"{}";"#,
+            hex::encode(&vk.gamma_abc_g1[1])
+        ));
+        lines
+            .push("        let gamma_abc_g1 = vector[gamma_abc_g1_0, gamma_abc_g1_1];".to_string());
+        lines.push("        let vk = keyless_account::new_groth16_verification_key(alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1);".to_string());
+        lines.push(
+            "        let entry = keyless_account::new_setup_vk_entry(setup_id, vk);".to_string(),
+        );
+        lines.push("        vector::push_back(&mut entries, entry);".to_string());
+    }
+    lines.push(
+        "        keyless_account::set_vk_map_for_next_epoch(&framework_signer, entries);"
+            .to_string(),
     );
-    debug!("Move script for changing VK follows below:\n{:?}", script);
+    lines.push("        aptos_governance::force_end_epoch(&framework_signer);".to_string());
+    lines.push("    }".to_string());
+    lines.push("}".to_string());
 
-    print_account_resource::<Groth16VerificationKey>(
-        info.client(),
-        AccountAddress::ONE,
-        KEYLESS_ACCOUNT_MODULE_NAME,
-        "Groth16VerificationKey",
-        "Keyless Groth16 VK before",
-    )
-    .await;
+    let script = lines.join("\n");
+
+    println!("Move script for changing VK follows below:\n{:?}", script);
 
     let gas_options = GasOptions {
         gas_unit_price: Some(100),
@@ -703,21 +757,12 @@ script {{
     };
     let txn_summary = cli
         .run_script_with_gas_options(root_idx, &script, Some(gas_options))
-        .await
-        .unwrap();
+        .await;
     debug!("txn_summary={:?}", txn_summary);
+    assert_eq!(Some(true), txn_summary.unwrap().success);
 
     // Increment sequence number as we ran a governance proposal
     info.root_account().increment_sequence_number();
-
-    print_account_resource::<Groth16VerificationKey>(
-        info.client(),
-        AccountAddress::ONE,
-        KEYLESS_ACCOUNT_MODULE_NAME,
-        "Groth16VerificationKey",
-        "Keyless Groth16 VK after",
-    )
-    .await;
 }
 
 async fn print_account_resource<T: DeserializeOwned + Debug>(

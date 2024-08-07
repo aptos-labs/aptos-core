@@ -61,6 +61,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<keyless_account::Configuration>;
         include config_buffer::OnNewEpochRequirement<keyless_account::Groth16VerificationKey>;
+        include config_buffer::OnNewEpochRequirement<keyless_account::SetupsVKs>;
     }
 
     spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
