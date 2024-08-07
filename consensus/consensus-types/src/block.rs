@@ -316,7 +316,8 @@ impl Block {
     /// If this is the genesis block, we skip these checks.
     pub fn validate_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         match self.block_data.block_type() {
-            BlockType::Genesis => bail!("We should not accept genesis from others"),
+            // TODO: revert back to not panic
+            BlockType::Genesis => panic!("We should not accept genesis from others"),
             BlockType::NilBlock { .. } => self.quorum_cert().verify(validator),
             BlockType::Proposal { author, .. } => {
                 let signature = self

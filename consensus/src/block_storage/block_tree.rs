@@ -288,6 +288,8 @@ impl BlockTree {
                 return None;
             }
         }
+        // The window order is lower round -> higher round
+        window.reverse();
         assert!(window.len() < window_size as usize);
         Some(OrderedBlockWindow::new(window))
     }
