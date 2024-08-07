@@ -11,7 +11,7 @@ use aptos_types::{
     transaction::Transaction,
     write_set::WriteSet,
 };
-use rocksdb::{DBWithThreadMode, SingleThreaded, DB};
+use rocksdb::{DBWithThreadMode, SingleThreaded};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -187,10 +187,11 @@ impl IndexReader {
     }
 }
 
+type DB = DBWithThreadMode<SingleThreaded>;
 struct DataManager {
     state_data_dir_path: PathBuf,
     write_set_dir_path: PathBuf,
-    db: DBWithThreadMode<SingleThreaded>,
+    db: DB,
 }
 
 impl DataManager {

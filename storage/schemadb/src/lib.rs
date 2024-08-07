@@ -106,12 +106,14 @@ impl SchemaBatch {
     }
 }
 
+pub(crate) type InnerDB = rocksdb::DBWithThreadMode<rocksdb::SingleThreaded>;
+
 /// This DB is a schematized RocksDB wrapper where all data passed in and out are typed according to
 /// [`Schema`]s.
 #[derive(Debug)]
 pub struct DB {
     name: String, // for logging
-    inner: rocksdb::DB,
+    inner: InnerDB,
 }
 
 impl DB {
@@ -162,7 +164,7 @@ impl DB {
         let all_cfds = cfds.into_iter().chain(unrecognized_cfds);
 
         let inner =
-            rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds).into_db_res()?;
+            InnerDB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds).into_db_res()?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -177,7 +179,7 @@ impl DB {
     ) -> DbResult<DB> {
         let error_if_log_file_exists = false;
         let inner =
-            rocksdb::DB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)
+            InnerDB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)
                 .into_db_res()?;
 
         Ok(Self::log_construct(name, inner))
@@ -190,7 +192,7 @@ impl DB {
         name: &str,
         cfs: Vec<ColumnFamilyName>,
     ) -> DbResult<DB> {
-        let inner = rocksdb::DB::open_cf_as_secondary(
+        let inner = InnerDB::open_cf_as_secondary(
             opts,
             primary_path.de_unc(),
             secondary_path.de_unc(),
@@ -200,7 +202,7 @@ impl DB {
         Ok(Self::log_construct(name, inner))
     }
 
-    fn log_construct(name: &str, inner: rocksdb::DB) -> DB {
+    fn log_construct(name: &str, inner: InnerDB) -> DB {
         info!(rocksdb_name = name, "Opened RocksDB.");
         DB {
             name: name.to_string(),

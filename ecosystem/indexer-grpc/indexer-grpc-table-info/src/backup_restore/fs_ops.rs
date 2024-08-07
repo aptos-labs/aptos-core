@@ -89,13 +89,15 @@ pub fn unpack_tar_gz(temp_file_path: &PathBuf, target_db_path: &PathBuf) -> anyh
 mod tests {
     use super::*;
     use rocksdb::{
-        ColumnFamilyDescriptor, DBWithThreadMode, IteratorMode, Options, SingleThreaded, DB,
+        ColumnFamilyDescriptor, DBWithThreadMode, IteratorMode, Options, SingleThreaded,
     };
     use std::{
         fs::File,
         io::{Read, Write},
     };
     use tempfile::tempdir;
+
+    type DB = DBWithThreadMode<SingleThreaded>;
 
     #[test]
     fn test_rename_db_folders_and_cleanup() {
