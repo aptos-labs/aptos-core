@@ -104,11 +104,22 @@ module 0xc0ffee::m {
     // Common fields
     enum CommonFields {
         Foo{x: u64, y: u64},
-        Bar{z: u64, x: u64}
+        Bar{x: u64, z: u64}
     }
 
     fun select_common_fields(s: CommonFields): u64 {
         s.x + (match (s) { Foo{x: _, y} => y, Bar{z, x: _} => z })
     }
 
+    enum CommonFieldsAtDifferentOffset has drop {
+       Foo{x: u64, y: u64},
+       Bar{x: u64, z: u64},
+       Baz{z: u64} // `z` at different offset
+       Balt{foo: u8, z: u64}
+    }
+
+    fun select_common_fields_different_offset(s: CommonFieldsAtDifferentOffset): u64 {
+        // We expect branching over the variant to select this field
+        s.z
+    }
 }

@@ -750,11 +750,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 impl<'env, 'builder, 'module_builder> UnificationContext
     for ExpTranslator<'env, 'builder, 'module_builder>
 {
-    fn get_struct_field_map(
+    fn get_struct_field_decls(
         &self,
         id: &QualifiedInstId<StructId>,
-    ) -> (BTreeMap<Symbol, Type>, bool) {
-        self.parent.parent.lookup_struct_fields(id)
+        field_name: Symbol,
+    ) -> (Vec<(Option<Symbol>, Type)>, bool) {
+        self.parent.parent.lookup_struct_field_decl(id, field_name)
     }
 
     fn get_receiver_function(
@@ -1889,7 +1890,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         locals
     }
 
-    /// Returns true if the struct with the name `struct_name` is originally an empty struct
+    /// Returns true if the struct with the name `struct_name` is originally an empty struct.
+    /// During translation, for downwards compatibility we are adding a dummy field to empty
+    /// structs, this allows us to distinguish whether it was originally empty.
     fn is_empty_struct(&self, struct_name: &QualifiedSymbol) -> bool {
         self.parent
             .parent
@@ -1944,38 +1947,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 field_name,
                             } => {
                                 // Resolve a field selection into the inferred struct type.
-                                if let Type::Struct(mid, sid, _) = self
+                                if let Type::Struct(mid, sid, inst) = self
                                     .subs
                                     .specialize_with_defaults(struct_ty)
                                     .skip_reference()
                                 {
-                                    let field = field_name.display(self.symbol_pool()).to_string();
-                                    let struct_name =
-                                        self.parent.parent.get_struct_name(mid.qualified(*sid));
-                                    if self.is_empty_struct(struct_name) {
-                                        self.error(
-                                            &loc,
-                                            &format!(
-                                                "empty struct `{}` cannot access the field `{}`",
-                                                struct_name.display(self.env()),
-                                                field
-                                            ),
-                                        );
-                                        return RewriteResult::Rewritten(
-                                            self.new_error_exp().into_exp(),
-                                        );
-                                    }
+                                    let oper = self.create_select_oper(
+                                        &loc,
+                                        &mid.qualified_inst(*sid, inst.clone()),
+                                        *field_name,
+                                    );
                                     RewriteResult::RewrittenAndDescend(
-                                        ExpData::Call(
-                                            id,
-                                            Operation::Select(
-                                                *mid,
-                                                *sid,
-                                                FieldId::new(*field_name),
-                                            ),
-                                            args,
-                                        )
-                                        .into_exp(),
+                                        ExpData::Call(id, oper, args).into_exp(),
                                     )
                                 } else {
                                     RewriteResult::Rewritten(self.new_error_exp().into_exp())
@@ -3603,20 +3586,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 self.set_node_instantiation(id, vec![ty.clone()]);
-                let oper = if let Type::Struct(mid, sid, _inst) = self.subs.specialize(&ty) {
-                    let struct_name = self.parent.parent.get_struct_name(mid.qualified(sid));
-                    if self.is_empty_struct(struct_name) {
-                        self.error(
-                            &loc,
-                            &format!(
-                                "empty struct `{}` cannot access the field `{}`",
-                                struct_name.display(self.env()),
-                                n.value.as_str()
-                            ),
-                        );
-                    }
+                let oper = if let Type::Struct(mid, sid, inst) = self.subs.specialize(&ty) {
                     // Struct known at this point
-                    Operation::Select(mid, sid, FieldId::new(field_name))
+                    self.create_select_oper(&loc, &mid.qualified_inst(sid, inst), field_name)
                 } else {
                     // Create a placeholder for later resolution.
                     self.placeholder_map
@@ -3628,6 +3600,49 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 };
                 ExpData::Call(id, oper, vec![exp.into_exp()])
             },
+        }
+    }
+
+    /// Creates a select operation for the given field name, the kind dependening on whether
+    /// variant fields or struct fields are selected.
+    fn create_select_oper(
+        &mut self,
+        loc: &Loc,
+        id: &QualifiedInstId<StructId>,
+        field_name: Symbol,
+    ) -> Operation {
+        let struct_name = self.parent.parent.get_struct_name(id.to_qualified_id());
+        if self.is_empty_struct(struct_name) {
+            self.error(
+                loc,
+                &format!(
+                    "empty struct `{}` cannot access the field `{}`",
+                    struct_name.display(self.env()),
+                    field_name.display(self.symbol_pool())
+                ),
+            );
+        }
+        let (decls, is_variant) = self.parent.parent.lookup_struct_field_decl(id, field_name);
+        let field_ids = decls
+            .into_iter()
+            .map(|(variant, _)| {
+                if let Some(v) = variant {
+                    // Selects a field variant, the id is qualified by the variant name.
+                    let pool = self.symbol_pool();
+                    FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                        pool.string(v).as_str(),
+                        pool.string(field_name).as_str(),
+                    )))
+                } else {
+                    FieldId::new(field_name)
+                }
+            })
+            .collect_vec();
+        if is_variant {
+            Operation::SelectVariants(id.module_id, id.id, field_ids)
+        } else {
+            assert!(field_ids.len() == 1);
+            Operation::Select(id.module_id, id.id, field_ids[0])
         }
     }
 
@@ -3659,14 +3674,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let struct_exp = self.translate_exp(args[0], expected_type);
             let expected_type = &self.subs.specialize(expected_type);
             if let Type::Struct(mid, sid, inst) = self.subs.specialize(expected_type) {
-                // field_map contains the instantiated field type.
-                let (field_map, _) = self
-                    .parent
-                    .parent
-                    .lookup_struct_fields(&mid.qualified_inst(sid, inst));
                 let field_name = self.symbol_pool().make(name.value.as_str());
-                let expected_field_type =
-                    field_map.get(&field_name).cloned().unwrap_or(Type::Error); // this error is reported via type unification
+                let (field_decls, _) = self
+                    .parent
+                    .parent
+                    .lookup_struct_field_decl(&mid.qualified_inst(sid, inst), field_name);
+                let expected_field_type = if let Some((_, ty)) = field_decls.into_iter().next() {
+                    ty
+                } else {
+                    Type::Error // this error is reported via type unification
+                };
                 let constraint = Constraint::SomeStruct(
                     [(field_name, expected_field_type.clone())]
                         .into_iter()

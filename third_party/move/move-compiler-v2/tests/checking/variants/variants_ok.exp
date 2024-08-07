@@ -28,6 +28,9 @@ module 0x815::m {
             x: u64,
             z: u32,
         }
+        Baz {
+            other: u32,
+        }
     }
     private fun t1(self: m::Color): bool {
         match (self) {
@@ -199,9 +202,9 @@ module 0x815::m {
 
     }
     private fun t9_common_field(self: m::CommonFields): u64 {
-        select m::CommonFields.x<m::CommonFields>(self)
+        select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<m::CommonFields>(self)
     }
     private fun t9_common_field_ref(self: &m::CommonFields): &u64 {
-        Borrow(Immutable)(select m::CommonFields.x<&m::CommonFields>(self))
+        Borrow(Immutable)(select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<&m::CommonFields>(self))
     }
 } // end 0x815::m

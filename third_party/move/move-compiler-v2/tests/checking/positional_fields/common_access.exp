@@ -9,6 +9,6 @@ module 0x42::test {
         }
     }
     private fun common_access(x: test::Foo): u8 {
-        select test::Foo.0<test::Foo>(x)
+        select_variants test::Foo.A.0|test::Foo.B.0<test::Foo>(x)
     }
 } // end 0x42::test

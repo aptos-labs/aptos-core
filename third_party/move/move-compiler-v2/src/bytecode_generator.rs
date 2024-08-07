@@ -10,7 +10,7 @@ use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
-        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
+        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
     },
     symbol::Symbol,
@@ -626,7 +626,28 @@ impl<'env> Generator<'env> {
                         target,
                         id,
                         mid.qualified_inst(*sid, inst.to_vec()),
-                        *fid,
+                        &[*fid],
+                        &arg,
+                    )
+                } else {
+                    self.internal_error(id, "inconsistent type in select expression")
+                }
+            },
+            Operation::SelectVariants(mid, sid, fids) => {
+                let target = self.require_unary_target(id, targets);
+                let arg = self.require_unary_arg(id, args);
+                // Get the instantiation of the struct. It is not contained in the select
+                // expression but in the type of it's operand.
+                if let Some((_, inst)) = self
+                    .get_node_type(arg.node_id())
+                    .skip_reference()
+                    .get_struct(self.env())
+                {
+                    self.gen_select(
+                        target,
+                        id,
+                        mid.qualified_inst(*sid, inst.to_vec()),
+                        fids,
                         &arg,
                     )
                 } else {
@@ -1073,7 +1094,17 @@ impl<'env> Generator<'env> {
                     id,
                     kind,
                     mid.qualified(*sid),
-                    *fid,
+                    &[*fid],
+                    &self.require_unary_arg(id, args),
+                )
+            },
+            ExpData::Call(_arg_id, Operation::SelectVariants(mid, sid, fids), args) => {
+                return self.gen_borrow_field(
+                    target,
+                    id,
+                    kind,
+                    mid.qualified(*sid),
+                    fids,
                     &self.require_unary_arg(id, args),
                 )
             },
@@ -1112,7 +1143,7 @@ impl<'env> Generator<'env> {
         id: NodeId,
         kind: ReferenceKind,
         struct_id: QualifiedId<StructId>,
-        field_id: FieldId,
+        fields: &[FieldId],
         oper: &Exp,
     ) {
         let temp = self.gen_auto_ref_arg(oper, kind);
@@ -1123,14 +1154,13 @@ impl<'env> Generator<'env> {
             .skip_reference()
             .get_struct(self.env())
         {
-            let struct_env = self.env().get_struct(struct_id);
-            let field_env = struct_env.get_field(field_id);
-            self.emit_call(
+            self.gen_borrow_field_operation(
                 id,
-                vec![target],
-                self.borrow_field_operation(struct_id.instantiate(inst.to_vec()), &field_env),
-                vec![temp],
-            );
+                target,
+                struct_id.instantiate(inst.to_vec()),
+                fields,
+                temp,
+            )
         } else {
             self.internal_error(id, "inconsistent type in select expression")
         }
@@ -1150,7 +1180,7 @@ impl<'env> Generator<'env> {
         target: TempIndex,
         id: NodeId,
         str: QualifiedInstId<StructId>,
-        field: FieldId,
+        fields: &[FieldId],
         oper: &Exp,
     ) {
         // Compile operand in reference mode, defaulting to immutable mode.
@@ -1189,14 +1219,7 @@ impl<'env> Generator<'env> {
         } else {
             target
         };
-        let struct_env = self.env().get_struct(str.to_qualified_id());
-        let field_env = struct_env.get_field(field);
-        self.emit_call(
-            id,
-            vec![borrow_dest],
-            self.borrow_field_operation(str, &field_env),
-            vec![oper_temp],
-        );
+        self.gen_borrow_field_operation(id, borrow_dest, str, fields, oper_temp);
         if need_read_ref {
             self.emit_call(id, vec![target], BytecodeOperation::ReadRef, vec![
                 borrow_dest,
@@ -1204,34 +1227,135 @@ impl<'env> Generator<'env> {
         }
     }
 
-    fn borrow_field_operation(
-        &self,
+    /// Generate a borrow field operation, possibly for a variant struct, which may require
+    /// switching over variants.
+    fn gen_borrow_field_operation(
+        &mut self,
+        id: NodeId,
+        dest: TempIndex,
         str: QualifiedInstId<StructId>,
-        field_env: &FieldEnv,
-    ) -> BytecodeOperation {
-        let struct_env = &field_env.struct_env;
+        fields: &[FieldId],
+        src: TempIndex,
+    ) {
+        let struct_env = self.env().get_struct(str.to_qualified_id());
         if struct_env.has_variants() {
-            // Need to generate a BorrowVariantField, specifying all the variants in
-            // which the field is defined.
-            let variants_with_field = struct_env
-                .get_variants()
-                .filter(|v| {
-                    struct_env.get_fields_of_variant(*v).any(|f| {
-                        f.get_name() == field_env.get_name() && f.get_type() == field_env.get_type()
-                    })
+            // Not all the fields in this operation maybe at the same offset, however,
+            // bytecode only supports selection of multiple variant fields at the same
+            // offset. A switch need to be generated over fields at the same offset.
+            let mut fields_by_offset: BTreeMap<usize, BTreeSet<FieldId>> = BTreeMap::new();
+            for field in fields {
+                fields_by_offset
+                    .entry(struct_env.get_field(*field).get_offset())
+                    .or_default()
+                    .insert(*field);
+            }
+            // Go over the groups, with the smallest group
+            // first, so the largest group is handled as the default, and directly maps
+            // to the native BorrowVariantField. This reduces the number of tests
+            // generated.
+            let mut ordered_groups = fields_by_offset
+                .iter()
+                .sorted_by(|g1, g2| g1.1.len().cmp(&g2.1.len()))
+                .collect_vec();
+            let mut bool_temp: Option<TempIndex> = None;
+            let end_label = if ordered_groups.len() > 1 {
+                Some(self.new_label(id))
+            } else {
+                None
+            };
+            while let Some((offset, group_fields)) = ordered_groups.pop() {
+                let next_group_label = if !ordered_groups.is_empty() {
+                    // Insert a test by generating the equivalent of
+                    // `src is V1 || src is V2 || ..` for all variants in this group
+                    // This can be done more efficiently once we have a switch opcode.
+                    let bool_temp = if let Some(t) = bool_temp {
+                        t
+                    } else {
+                        let t = self.new_temp(Type::new_prim(PrimitiveType::Bool));
+                        bool_temp = Some(t);
+                        t
+                    };
+                    let this_group_label = self.new_label(id);
+                    for field in group_fields {
+                        self.emit_call(
+                            id,
+                            vec![bool_temp],
+                            BytecodeOperation::TestVariant(
+                                str.module_id,
+                                str.id,
+                                self.env()
+                                    .get_struct(str.to_qualified_id())
+                                    .get_field(*field)
+                                    .get_variant()
+                                    .expect("variant field has variant name"),
+                                str.inst.clone(),
+                            ),
+                            vec![src],
+                        );
+                        self.branch_to_exit_if_true(id, bool_temp, this_group_label)
+                    }
+                    let next_group_label = self.new_label(id);
+                    self.emit_with(id, |attr| Bytecode::Jump(attr, next_group_label));
+                    self.emit_with(id, |attr| Bytecode::Label(attr, this_group_label));
+                    Some(next_group_label)
+                } else {
+                    None
+                };
+                // Generate the underlying borrow operation with all fields at the same offset.
+                let fields = group_fields.iter().cloned().collect_vec();
+                self.gen_borrow_field_same_offset(id, dest, str.clone(), &fields, *offset, src);
+                if let Some(label) = next_group_label {
+                    // Jump to end label
+                    self.emit_with(id, |attr| Bytecode::Jump(attr, end_label.unwrap()));
+                    // Next group continues here
+                    self.emit_with(id, |attr| Bytecode::Label(attr, label))
+                }
+            }
+            if let Some(label) = end_label {
+                self.emit_with(id, |attr| Bytecode::Label(attr, label))
+            }
+        } else {
+            assert_eq!(fields.len(), 1);
+            self.gen_borrow_field_same_offset(
+                id,
+                dest,
+                str.clone(),
+                fields,
+                struct_env.get_field(fields[0]).get_offset(),
+                src,
+            );
+        }
+    }
+
+    fn gen_borrow_field_same_offset(
+        &mut self,
+        id: NodeId,
+        dest: TempIndex,
+        str: QualifiedInstId<StructId>,
+        fields: &[FieldId],
+        offset: usize,
+        src: TempIndex,
+    ) {
+        let struct_env = self.env().get_struct(str.to_qualified_id());
+        debug_assert!(fields
+            .iter()
+            .all(|id| struct_env.get_field(*id).get_offset() == offset));
+        let oper = if struct_env.has_variants() {
+            let variants = fields
+                .iter()
+                .map(|id| {
+                    struct_env
+                        .get_field(*id)
+                        .get_variant()
+                        .expect("variant field has variant name")
                 })
                 .collect_vec();
-            BytecodeOperation::BorrowVariantField(
-                str.module_id,
-                str.id,
-                variants_with_field,
-                str.inst,
-                field_env.get_offset(),
-            )
+            BytecodeOperation::BorrowVariantField(str.module_id, str.id, variants, str.inst, offset)
         } else {
             // Regular BorrowField
-            BytecodeOperation::BorrowField(str.module_id, str.id, str.inst, field_env.get_offset())
-        }
+            BytecodeOperation::BorrowField(str.module_id, str.id, str.inst, offset)
+        };
+        self.emit_call(id, vec![dest], oper, vec![src])
     }
 }
 
@@ -1834,6 +1958,14 @@ impl<'env> Generator<'env> {
         let fall_through = self.new_label(id);
         self.emit_with(id, |attr| {
             Bytecode::Branch(attr, fall_through, exit_path, cond)
+        });
+        self.emit_with(id, |attr| Bytecode::Label(attr, fall_through))
+    }
+
+    fn branch_to_exit_if_true(&mut self, id: NodeId, cond: TempIndex, exit_path: Label) {
+        let fall_through = self.new_label(id);
+        self.emit_with(id, |attr| {
+            Bytecode::Branch(attr, exit_path, fall_through, cond)
         });
         self.emit_with(id, |attr| Bytecode::Label(attr, fall_through))
     }

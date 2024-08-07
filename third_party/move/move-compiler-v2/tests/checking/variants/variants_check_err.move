@@ -10,6 +10,12 @@ module 0x815::m {
         red: u64
     }
 
+    enum Fields {
+        V1{f1: u64},
+        V2{f1: u64, f2: u8},
+        V3{f1: u8, f2: u8}
+    }
+
     fun misspelled_variant(self: Color): bool {
         match (self) {
             Color::Rgb{red, green, blue} => false,
@@ -35,7 +41,12 @@ module 0x815::m {
         }
     }
 
-    fun select_variant_field(self: Color): u64 {
+    fun select_variant_field_ok(self: Color): u64 {
         self.red
     }
+
+    fun select_variant_field_err_multiple(self: Fields): u64 {
+        self.f1 + (self.f2 as u64)
+    }
+
 }
