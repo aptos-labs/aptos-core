@@ -190,6 +190,10 @@ impl OnChainRandomnessConfig {
         OnChainRandomnessConfig::V2(ConfigV2::default())
     }
 
+    pub fn default_v1() -> Self {
+        OnChainRandomnessConfig::V1(ConfigV1::default())
+    }
+
     pub fn default_disabled() -> Self {
         OnChainRandomnessConfig::Off
     }
