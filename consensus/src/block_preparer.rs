@@ -53,9 +53,10 @@ impl BlockPreparer {
         let mut max_txns_from_block_to_execute = None;
         loop {
             match futures.next().await {
-                Some(Ok((block_txns, max_txns))) => {
+                // TODO: we are turning off the max txns from block to execute feature for now
+                Some(Ok((block_txns, _max_txns))) => {
                     txns.extend(block_txns);
-                    max_txns_from_block_to_execute = max_txns;
+                    max_txns_from_block_to_execute = None;
                 },
                 Some(Err(e)) => {
                     return Err(e);
