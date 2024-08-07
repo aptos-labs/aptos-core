@@ -713,7 +713,6 @@ impl serde::Serialize for MoveStruct {
                 t.end()
             },
             Self::RuntimeVariant(tag, values) => {
-                // Variants need to be serialized as sequences, as the size is not statically known.
                 let tag_idx = *tag as usize;
                 let variant_tag = tag_idx as u32;
                 let variant_name = variant_name_placeholder((tag + 1) as usize)[tag_idx];

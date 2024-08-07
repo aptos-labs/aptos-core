@@ -3271,68 +3271,97 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
     for SerializationReadyValue<'c, 'l, 'v, MoveStructLayout, Vec<ValueImpl>, C>
 {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut values = self.value.as_slice();
-        if let Some((tag, variant_layouts)) = try_get_variant_field_layouts(self.layout, values) {
-            let tag_idx = tag as usize;
-            let variant_tag = tag_idx as u32;
-            let variant_name = value::variant_name_placeholder((tag + 1) as usize)[tag_idx];
-            values = &values[1..];
-            if variant_layouts.len() != values.len() {
-                return Err(invariant_violation::<S>(format!(
-                    "cannot serialize struct value {:?} as {:?} -- number of fields mismatch",
-                    self.value, self.layout
-                )));
-            }
-            match values.len() {
-                0 => serializer.serialize_unit_variant(
-                    value::MOVE_ENUM_NAME,
-                    variant_tag,
-                    variant_name,
-                ),
-                1 => serializer.serialize_newtype_variant(
-                    value::MOVE_ENUM_NAME,
-                    variant_tag,
-                    variant_name,
-                    &SerializationReadyValue {
+        let values = self.value.as_slice();
+        match self.layout {
+            MoveStructLayout::Runtime(field_layouts) => {
+                let mut t = serializer.serialize_tuple(values.len())?;
+                if field_layouts.len() != values.len() {
+                    return Err(invariant_violation::<S>(format!(
+                        "cannot serialize struct value {:?} as {:?} -- number of fields mismatch",
+                        self.value, self.layout
+                    )));
+                }
+                for (field_layout, value) in field_layouts.iter().zip(values.iter()) {
+                    t.serialize_element(&SerializationReadyValue {
                         custom_serializer: self.custom_serializer,
-                        layout: &variant_layouts[0],
-                        value: &values[0],
-                    },
-                ),
-                _ => {
-                    let mut t = serializer.serialize_tuple_variant(
-                        value::MOVE_ENUM_NAME,
-                        variant_tag,
-                        variant_name,
-                        values.len(),
-                    )?;
-                    for (layout, value) in variant_layouts.iter().zip(values) {
-                        t.serialize_field(&SerializationReadyValue {
-                            custom_serializer: self.custom_serializer,
-                            layout,
-                            value,
-                        })?
-                    }
-                    t.end()
-                },
-            }
-        } else {
-            let field_layouts = self.layout.fields(None);
-            let mut t = serializer.serialize_tuple(values.len())?;
-            if field_layouts.len() != values.len() {
-                return Err(invariant_violation::<S>(format!(
-                    "cannot serialize struct value {:?} as {:?} -- number of fields mismatch",
-                    self.value, self.layout
-                )));
-            }
-            for (field_layout, value) in field_layouts.iter().zip(values.iter()) {
-                t.serialize_element(&SerializationReadyValue {
+                        layout: field_layout,
+                        value,
+                    })?;
+                }
+                t.end()
+            },
+            MoveStructLayout::RuntimeVariants(variant_field_layouts) => {
+                let Some(ValueImpl::U16(tag)) = values.first() else {
+                    return Err(invariant_violation::<S>("expected variant tag".to_owned()));
+                };
+                if (*tag as usize) >= variant_field_layouts.len() {
+                    return Err(invariant_violation::<S>(
+                        "variant tag out of range".to_owned(),
+                    ));
+                }
+                self.serialize_variant(
+                    serializer,
+                    &values[1..],
+                    *tag,
+                    &variant_field_layouts[*tag as usize],
+                )
+            },
+            _ => Err(invariant_violation::<S>(
+                "cannot serialize with decorated layout".to_owned(),
+            )),
+        }
+    }
+}
+
+impl<'c, 'l, 'v, C: CustomSerializer>
+    SerializationReadyValue<'c, 'l, 'v, MoveStructLayout, Vec<ValueImpl>, C>
+{
+    fn serialize_variant<S: serde::Serializer>(
+        &self,
+        serializer: S,
+        values: &[ValueImpl],
+        tag: u16,
+        variant_layouts: &[MoveTypeLayout],
+    ) -> Result<S::Ok, S::Error> {
+        let tag_idx = tag as usize;
+        let variant_tag = tag_idx as u32;
+        let variant_name = value::variant_name_placeholder((tag + 1) as usize)[tag_idx];
+        if variant_layouts.len() != values.len() {
+            return Err(invariant_violation::<S>(format!(
+                "cannot serialize variant value {:?} as {:?} -- number of fields mismatch",
+                self.value, self.layout
+            )));
+        }
+        match values.len() {
+            0 => {
+                serializer.serialize_unit_variant(value::MOVE_ENUM_NAME, variant_tag, variant_name)
+            },
+            1 => serializer.serialize_newtype_variant(
+                value::MOVE_ENUM_NAME,
+                variant_tag,
+                variant_name,
+                &SerializationReadyValue {
                     custom_serializer: self.custom_serializer,
-                    layout: field_layout,
-                    value,
-                })?;
-            }
-            t.end()
+                    layout: &variant_layouts[0],
+                    value: &values[0],
+                },
+            ),
+            _ => {
+                let mut t = serializer.serialize_tuple_variant(
+                    value::MOVE_ENUM_NAME,
+                    variant_tag,
+                    variant_name,
+                    values.len(),
+                )?;
+                for (layout, value) in variant_layouts.iter().zip(values) {
+                    t.serialize_field(&SerializationReadyValue {
+                        custom_serializer: self.custom_serializer,
+                        layout,
+                        value,
+                    })?
+                }
+                t.end()
+            },
         }
     }
 }
@@ -3528,6 +3557,7 @@ impl<'d, 'c, 'l, C: CustomDeserializer> serde::de::Visitor<'d> for StructVariant
     where
         A: EnumAccess<'d>,
     {
+        panic!("visiting enum");
         let (tag, rest) = data.variant()?;
         if tag as usize >= self.1.len() {
             Err(A::Error::invalid_length(0, &self))

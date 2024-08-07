@@ -153,7 +153,7 @@ publish-package	1	VM	0.950	1.040	143.9
 mix_publish_transfer	1	VM	0.967	1.163	2173.8
 batch100-transfer	1	VM	0.859	1.021	667.8
 batch100-transfer	1	native	0.784	1.222	1862.1
-vector-picture30k	1	VM	0.935	1.023	110.0
+vector-picture30k	1	VM	0.935	1.023	138.5
 vector-picture30k	20	VM	0.819	1.038	1347.9
 smart-table-picture30-k-with200-change	1	VM	0.959	1.054	21.4
 smart-table-picture30-k-with200-change	20	VM	0.923	1.057	182.6
