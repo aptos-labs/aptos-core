@@ -132,10 +132,7 @@ impl BatchInfo {
     }
 
     pub fn size(&self) -> PayloadTxnsSize {
-        PayloadTxnsSize {
-            count: self.num_txns,
-            bytes: self.num_bytes,
-        }
+        PayloadTxnsSize::new(self.num_txns, self.num_bytes)
     }
 
     pub fn gas_bucket_start(&self) -> u64 {

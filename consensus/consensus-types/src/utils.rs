@@ -1,17 +1,31 @@
-#[derive(Debug, Clone, Copy)]
+use anyhow::{bail, ensure};
+use core::fmt;
+use serde::Serialize;
+use std::cmp::Ordering;
+
+#[derive(Debug, Clone, Copy, Serialize, Default)]
 pub struct PayloadTxnsSize {
-    pub count: u64,
-    pub bytes: u64,
+    count: u64,
+    bytes: u64,
 }
 
 impl PayloadTxnsSize {
     pub fn new(count: u64, bytes: u64) -> Self {
         assert!(count <= bytes);
+        assert!((count > 0 && bytes > 0) || (count == 0 && bytes == 0));
         Self { count, bytes }
     }
 
     pub fn zero() -> Self {
         Self { count: 0, bytes: 0 }
+    }
+
+    pub fn count(&self) -> u64 {
+        self.count
+    }
+
+    pub fn size_in_bytes(&self) -> u64 {
+        self.bytes
     }
 
     pub fn compute_pct(self, pct: u8) -> Self {
@@ -25,6 +39,53 @@ impl PayloadTxnsSize {
         Self {
             count: self.count.saturating_sub(rhs.count),
             bytes: self.bytes.saturating_sub(rhs.bytes),
+        }
+    }
+
+    pub fn set_count(&mut self, new_count: u64) {
+        self.try_set_count(new_count).expect("must be valid")
+    }
+
+    pub fn try_set_count(&mut self, new_count: u64) -> anyhow::Result<()> {
+        ensure!(new_count <= self.bytes);
+        self.count = new_count;
+        Ok(())
+    }
+
+    /// Computes a new [PayloadTxnsSize] whose size in bytes is the passed-in value and the
+    /// count is calculated proportional to bytes. If the existing PayloadTxnsSize is zero
+    /// then the new size replaces both the count and size in bytes.
+    pub fn compute_with_bytes(&self, new_size_in_bytes: u64) -> PayloadTxnsSize {
+        let new_count = if self.bytes > 0 {
+            let factor = new_size_in_bytes as f64 / self.bytes as f64;
+            (self.count as f64 * factor) as u64
+        } else {
+            // If bytes is zero, then count is zero. In this case, set the new
+            // count to be the same as bytes.
+            new_size_in_bytes
+        };
+        PayloadTxnsSize::new(new_count, new_size_in_bytes)
+    }
+
+    pub fn minimum(self, other: Self) -> Self {
+        match self.partial_cmp(&other) {
+            Some(order) => match order {
+                Ordering::Less => self,
+                Ordering::Equal => self,
+                Ordering::Greater => other,
+            },
+            None => PayloadTxnsSize::new(self.count.min(other.count), self.bytes.min(other.bytes)),
+        }
+    }
+
+    pub fn maximum(self, other: Self) -> Self {
+        match self.partial_cmp(&other) {
+            Some(order) => match order {
+                Ordering::Less => other,
+                Ordering::Equal => self,
+                Ordering::Greater => self,
+            },
+            None => PayloadTxnsSize::new(self.count.max(other.count), self.bytes.max(other.bytes)),
         }
     }
 }
@@ -72,25 +133,42 @@ impl PartialEq for PayloadTxnsSize {
 }
 
 impl PartialOrd for PayloadTxnsSize {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.count == other.count && self.bytes == other.bytes {
+            return Some(Ordering::Equal);
+        }
+
+        if self.count > other.count && self.bytes > other.bytes {
+            return Some(Ordering::Greater);
+        }
+
+        if self.count < other.count && self.bytes < other.bytes {
+            return Some(Ordering::Less);
+        }
+
+        None
     }
 }
 
 impl Eq for PayloadTxnsSize {}
 
-impl Ord for PayloadTxnsSize {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        assert!(self.count <= self.bytes || other.count <= other.bytes);
+impl fmt::Display for PayloadTxnsSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "PayloadTxnsSize[count: {}, bytes: {}]",
+            self.count, self.bytes
+        )
+    }
+}
 
-        if self.count == other.count && self.bytes == other.bytes {
-            return std::cmp::Ordering::Equal;
-        }
+mod tests {
+    use super::PayloadTxnsSize;
 
-        if self.count > other.count && self.bytes > other.bytes {
-            return std::cmp::Ordering::Greater;
-        }
-
-        std::cmp::Ordering::Less
+    #[test]
+    fn test_payload_txns_size_operations() {
+        let txns_size = PayloadTxnsSize::new(100, 100);
+        assert!(txns_size.compute_pct(90), PayloadTxnsSize::new(90, 90));
+        assert!(txns_size.compute_pct(50), PayloadTxnsSize::new(50, 50));
     }
 }

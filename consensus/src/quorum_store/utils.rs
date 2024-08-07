@@ -560,13 +560,11 @@ impl ProofQueue {
         }
         info!(
             // before non full check
-            byte_size = cur_all_txns.bytes,
-            block_total_txns = cur_all_txns.count,
+            block_total_txns = cur_all_txns,
             block_unique_txns = cur_unique_txns,
-            max_txns = max_txns.count,
+            max_txns = max_txns,
             max_txns_after_filtering = max_txns_after_filtering,
             soft_max_txns_after_filtering = soft_max_txns_after_filtering,
-            max_bytes = max_txns.bytes,
             batch_count = ret.len(),
             full = full,
             return_non_full = return_non_full,
@@ -575,10 +573,10 @@ impl ProofQueue {
 
         if full || return_non_full {
             counters::BLOCK_SIZE_WHEN_PULL.observe(cur_unique_txns as f64);
-            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns.count as f64);
+            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns.count() as f64);
             counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
-                .observe((cur_all_txns.count.saturating_sub(cur_unique_txns)) as f64);
-            counters::BLOCK_BYTES_WHEN_PULL.observe(cur_all_txns.bytes as f64);
+                .observe((cur_all_txns.count().saturating_sub(cur_unique_txns)) as f64);
+            counters::BLOCK_BYTES_WHEN_PULL.observe(cur_all_txns.size_in_bytes() as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
             // Number of proofs remaining in proof queue after the pull

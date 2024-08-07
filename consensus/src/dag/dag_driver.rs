@@ -262,15 +262,9 @@ impl DagDriver {
                     max_poll_time: Duration::from_millis(
                         self.payload_config.payload_pull_max_poll_time_ms,
                     ),
-                    max_txns: PayloadTxnsSize {
-                        count: max_txns,
-                        bytes: max_size_bytes,
-                    },
+                    max_txns: PayloadTxnsSize::new(max_txns, max_size_bytes),
                     max_unique_txns: max_txns,
-                    max_inline_txns: PayloadTxnsSize {
-                        count: 100,
-                        bytes: 100 * 1024,
-                    },
+                    max_inline_txns: PayloadTxnsSize::new(100, 100 * 1024),
                     opt_batch_txns_pct: 0,
                     user_txn_filter: payload_filter,
                     pending_ordering: false,

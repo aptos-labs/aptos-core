@@ -259,14 +259,14 @@ impl ProofManager {
                 let cur_txns = txns_with_proof_size + opt_batch_txns_size;
                 let (inline_block, inline_block_size) =
                     if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
-                        let mut max_inline_txns_to_pull = min(
-                            request.max_txns.saturating_sub(cur_txns),
-                            request.max_inline_txns,
-                        );
-                        max_inline_txns_to_pull.count = min(
-                            max_inline_txns_to_pull.count,
+                        let mut max_inline_txns_to_pull = request
+                            .max_txns
+                            .saturating_sub(cur_txns)
+                            .minimum(request.max_inline_txns);
+                        max_inline_txns_to_pull.set_count(min(
+                            max_inline_txns_to_pull.count(),
                             request.max_unique_txns.saturating_sub(cur_unique_txns),
-                        );
+                        ));
                         self.batch_queue.pull_batches(
                             max_inline_txns_to_pull,
                             excluded_batches
@@ -278,8 +278,8 @@ impl ProofManager {
                     } else {
                         (Vec::new(), PayloadTxnsSize::zero())
                     };
-                counters::NUM_INLINE_BATCHES.observe(inline_block_size.count as f64);
-                counters::NUM_INLINE_TXNS.observe(inline_block_size.bytes as f64);
+                counters::NUM_INLINE_BATCHES.observe(inline_block_size.count() as f64);
+                counters::NUM_INLINE_TXNS.observe(inline_block_size.size_in_bytes() as f64);
 
                 let response = if self.enable_opt_quorum_store {
                     let inline_batches = inline_block.into();
