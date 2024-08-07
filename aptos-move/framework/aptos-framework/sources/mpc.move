@@ -56,6 +56,7 @@ module aptos_framework::mpc {
     struct FeatureEnabledFlag has key {}
 
     public fun initialize(framework: &signer) {
+        debug::print(&utf8(b"0720 - mpc::initialize: begin"));
         system_addresses::assert_aptos_framework(framework);
         if (!exists<State>(@aptos_framework)) {
             let state = State {
@@ -64,55 +65,65 @@ module aptos_framework::mpc {
             };
             move_to(framework, state);
             move_to(framework, FeatureEnabledFlag {}); //mpc todo: this needs to be pulled out as part of mpc_config, just like randomness_config.
-        }
+        };
+        debug::print(&utf8(b"0720 - mpc::initialize: end"));
     }
 
     public fun on_async_reconfig_start() {
+        debug::print(&utf8(b"0720 - mpc::on_async_reconfig_start: begin"));
         if (exists<FeatureEnabledFlag>(@aptos_framework)) {
-            debug::print(&utf8(b"0722 - emitting mpc event"));
+            debug::print(&utf8(b"0720 - mpc::on_async_reconfig_start: emitting mpc event"));
             let event = MPCEventReconfigStart {
                 epoch: reconfiguration::current_epoch(),
                 next_validator_set: next_validator_set::load(),
             };
             emit(MPCEvent { variant: copyable_any::pack(event)});
-        }
+        };
+        debug::print(&utf8(b"0720 - mpc::on_async_reconfig_start: end"));
     }
 
     public(friend) fun ready_for_next_epoch(): bool acquires State {
+        debug::print(&utf8(b"0720 - mpc::ready_for_next_epoch: begin"));
         if (!exists<FeatureEnabledFlag>(@aptos_framework)) {
-            debug::print(&utf8(b"0722 - mpc ready 0"));
+            debug::print(&utf8(b"0720 - mpc::ready_for_next_epoch: end, mpc ready 0"));
             return true
         };
 
         if (!exists<State>(@aptos_framework)) {
-            debug::print(&utf8(b"0722 - mpc not ready 1"));
+            debug::print(&utf8(b"0720 - mpc::ready_for_next_epoch: end, mpc not ready 1"));
             return false
         };
 
         let state = borrow_global<State>(@aptos_framework);
         let num_secrets = vector::length(&state.shared_secrets);
         if (num_secrets == 0) {
-            debug::print(&utf8(b"0722 - mpc not ready 2"));
+            debug::print(&utf8(b"0720 - mpc::ready_for_next_epoch: end, mpc not ready 2"));
             return false
         };
 
         let secret_state = vector::borrow(&state.shared_secrets, 0);
         let maybe_trx = &secret_state.transcript_for_next_epoch;
         if (option::is_none(maybe_trx)) {
-            debug::print(&utf8(b"0722 - mpc not ready 3"));
+            debug::print(&utf8(b"0720 - mpc::ready_for_next_epoch: end, mpc not ready 3"));
             return false
         };
 
-        debug::print(&utf8(b"0722 - mpc ready 4"));
+        debug::print(&utf8(b"0720 - mpc::ready_for_next_epoch: end, mpc ready 4"));
         true
     }
 
-    public(friend) fun on_new_epoch(_framework: &signer) acquires State {
+    public(friend) fun on_new_epoch(framework: &signer) acquires State {
+        debug::print(&utf8(b"0720 - mpc::on_new_epoch: begin"));
+        initialize(framework);
         //mpc todo: should clean up any in-progress session states.
         let state = borrow_global_mut<State>(@aptos_framework);
-        let main_secret_state = vector::borrow_mut(&mut state.shared_secrets, 0);
-        let trx = option::extract(&mut main_secret_state.transcript_for_next_epoch);
-        main_secret_state.transcript_for_cur_epoch = option::some(trx);
+        if (vector::length(&state.shared_secrets) >= 1) {
+            debug::print(&utf8(b"0720 - mpc::on_new_epoch: found main secret"));
+            let main_secret_state = vector::borrow_mut(&mut state.shared_secrets, 0);
+            main_secret_state.transcript_for_cur_epoch = main_secret_state.transcript_for_next_epoch;
+            main_secret_state.transcript_for_next_epoch = option::none();
+        };
+        debug::print(&utf8(b"0720 - mpc::on_new_epoch: end"));
     }
 
 
@@ -147,10 +158,10 @@ module aptos_framework::mpc {
 
     /// When a MPC task is done, this is invoked by validator transactions.
     fun publish_reconfig_work_result(trx: vector<u8>) acquires State {
-        debug::print(&utf8(b"0720 - publish_reconfig_work_result: begin"));
+        debug::print(&utf8(b"0720 - mpc::publish_reconfig_work_result: begin"));
         let state = borrow_global_mut<State>(@aptos_framework);
         if (vector::length(&state.shared_secrets) == 0) {
-            debug::print(&utf8(b"0720 - publish_reconfig_work_result: we will have a new secret."));
+            debug::print(&utf8(b"0720 - mpc::publish_reconfig_work_result: we will have a new secret."));
             let secret_state = SharedSecretState {
                 transcript_for_next_epoch: option::none(),
                 transcript_for_cur_epoch: option::none(),
@@ -159,20 +170,20 @@ module aptos_framework::mpc {
         };
         let secret_state = vector::borrow_mut(&mut state.shared_secrets, 0);
         if (option::is_none(&secret_state.transcript_for_next_epoch)) {
-            debug::print(&utf8(b"0720 - publish_reconfig_work_result: apply"));
+            debug::print(&utf8(b"0720 - mpc::publish_reconfig_work_result: apply"));
             secret_state.transcript_for_next_epoch = option::some(trx);
         };
-        debug::print(&utf8(b"0720 - publish_reconfig_work_result: end"));
+        debug::print(&utf8(b"0720 - mpc::publish_reconfig_work_result: end"));
     }
 
     fun publish_task_result(idx: u64, result: vector<u8>) acquires State {
-        debug::print(&utf8(b"0720 - publish_task_result: begin"));
+        debug::print(&utf8(b"0720 - mpc::publish_task_result: begin"));
         let state = borrow_global_mut<State>(@aptos_framework);
         let task_state = vector::borrow_mut(&mut state.tasks, idx);
         if (option::is_none(&task_state.result)) {
-            debug::print(&utf8(b"0720 - publish_task_result: apply"));
+            debug::print(&utf8(b"0720 - mpc::publish_task_result: apply"));
             task_state.result = option::some(result);
         };
-        debug::print(&utf8(b"0720 - publish_task_result: end"));
+        debug::print(&utf8(b"0720 - mpc::publish_task_result: end"));
     }
 }

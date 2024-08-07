@@ -24,17 +24,17 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Trigger a reconfiguration with DKG.
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
-        debug::print(&utf8(b"0722 - try_start: begin"));
+        debug::print(&utf8(b"0720 - reconfiguration_with_dkg::try_start: begin"));
         if (!reconfiguration_state::is_in_progress()) {
-            debug::print(&utf8(b"0722 - try_start: mark start"));
+            debug::print(&utf8(b"0720 - reconfiguration_with_dkg::try_start: mark start"));
             reconfiguration_state::on_reconfig_start();
             stake::finalize_next_validator_set();
-            debug::print(&utf8(b"0722 - try_start: work on dkg"));
+            debug::print(&utf8(b"0720 - reconfiguration_with_dkg::try_start: work on dkg"));
             dkg::on_async_reconfig_start();
-            debug::print(&utf8(b"0722 - try_start: work on mpc"));
+            debug::print(&utf8(b"0720 - reconfiguration_with_dkg::try_start: work on mpc"));
             mpc::on_async_reconfig_start();
         };
-        debug::print(&utf8(b"0722 - try_start: done"));
+        debug::print(&utf8(b"0720 - reconfiguration_with_dkg::try_start: end"));
     }
 
     /// Clear incomplete DKG session, if it exists.
@@ -42,8 +42,10 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Re-enable validator set changes.
     /// Run the default reconfiguration to enter the new epoch.
     public(friend) fun finish(framework: &signer) {
+        debug::print(&utf8(b"0720 - reconfiguration_with_dkg::finish: begin"));
         system_addresses::assert_aptos_framework(framework);
         dkg::try_clear_incomplete_session(framework);
+        debug::print(&utf8(b"0720 - reconfiguration_with_dkg::finish: before mpc"));
         mpc::on_new_epoch(framework);
 
         // Apply buffered config changes.
@@ -59,6 +61,7 @@ module aptos_framework::reconfiguration_with_dkg {
         randomness_config::on_new_epoch(framework);
         randomness_api_v0_config::on_new_epoch(framework);
         reconfiguration::reconfigure();
+        debug::print(&utf8(b"0720 - reconfiguration_with_dkg::finish: end"));
     }
 
     /// Complete the current reconfiguration with DKG if possible.

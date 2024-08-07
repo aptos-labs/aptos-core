@@ -307,6 +307,7 @@ This resource exists under 0x1 iff MPC is enabled.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="mpc.md#0x1_mpc_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_initialize">mpc::initialize</a>: begin"));
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (!<b>exists</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework)) {
         <b>let</b> state = <a href="mpc.md#0x1_mpc_State">State</a> {
@@ -315,7 +316,8 @@ This resource exists under 0x1 iff MPC is enabled.
         };
         <b>move_to</b>(framework, state);
         <b>move_to</b>(framework, <a href="mpc.md#0x1_mpc_FeatureEnabledFlag">FeatureEnabledFlag</a> {}); //<a href="mpc.md#0x1_mpc">mpc</a> todo: this needs <b>to</b> be pulled out <b>as</b> part of mpc_config, just like <a href="randomness_config.md#0x1_randomness_config">randomness_config</a>.
-    }
+    };
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_initialize">mpc::initialize</a>: end"));
 }
 </code></pre>
 
@@ -339,14 +341,16 @@ This resource exists under 0x1 iff MPC is enabled.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="mpc.md#0x1_mpc_on_async_reconfig_start">on_async_reconfig_start</a>() {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_on_async_reconfig_start">mpc::on_async_reconfig_start</a>: begin"));
     <b>if</b> (<b>exists</b>&lt;<a href="mpc.md#0x1_mpc_FeatureEnabledFlag">FeatureEnabledFlag</a>&gt;(@aptos_framework)) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0722 - emitting <a href="mpc.md#0x1_mpc">mpc</a> <a href="event.md#0x1_event">event</a>"));
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_on_async_reconfig_start">mpc::on_async_reconfig_start</a>: emitting <a href="mpc.md#0x1_mpc">mpc</a> <a href="event.md#0x1_event">event</a>"));
         <b>let</b> <a href="event.md#0x1_event">event</a> = <a href="mpc.md#0x1_mpc_MPCEventReconfigStart">MPCEventReconfigStart</a> {
             epoch: <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>(),
             <a href="next_validator_set.md#0x1_next_validator_set">next_validator_set</a>: <a href="next_validator_set.md#0x1_next_validator_set_load">next_validator_set::load</a>(),
         };
         emit(<a href="mpc.md#0x1_mpc_MPCEvent">MPCEvent</a> { variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="event.md#0x1_event">event</a>)});
-    }
+    };
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_on_async_reconfig_start">mpc::on_async_reconfig_start</a>: end"));
 }
 </code></pre>
 
@@ -370,31 +374,32 @@ This resource exists under 0x1 iff MPC is enabled.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_ready_for_next_epoch">ready_for_next_epoch</a>(): bool <b>acquires</b> <a href="mpc.md#0x1_mpc_State">State</a> {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_ready_for_next_epoch">mpc::ready_for_next_epoch</a>: begin"));
     <b>if</b> (!<b>exists</b>&lt;<a href="mpc.md#0x1_mpc_FeatureEnabledFlag">FeatureEnabledFlag</a>&gt;(@aptos_framework)) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0722 - <a href="mpc.md#0x1_mpc">mpc</a> ready 0"));
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_ready_for_next_epoch">mpc::ready_for_next_epoch</a>: end, <a href="mpc.md#0x1_mpc">mpc</a> ready 0"));
         <b>return</b> <b>true</b>
     };
 
     <b>if</b> (!<b>exists</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework)) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0722 - <a href="mpc.md#0x1_mpc">mpc</a> not ready 1"));
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_ready_for_next_epoch">mpc::ready_for_next_epoch</a>: end, <a href="mpc.md#0x1_mpc">mpc</a> not ready 1"));
         <b>return</b> <b>false</b>
     };
 
     <b>let</b> state = <b>borrow_global</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework);
     <b>let</b> num_secrets = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&state.shared_secrets);
     <b>if</b> (num_secrets == 0) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0722 - <a href="mpc.md#0x1_mpc">mpc</a> not ready 2"));
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_ready_for_next_epoch">mpc::ready_for_next_epoch</a>: end, <a href="mpc.md#0x1_mpc">mpc</a> not ready 2"));
         <b>return</b> <b>false</b>
     };
 
     <b>let</b> secret_state = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&state.shared_secrets, 0);
     <b>let</b> maybe_trx = &secret_state.transcript_for_next_epoch;
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(maybe_trx)) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0722 - <a href="mpc.md#0x1_mpc">mpc</a> not ready 3"));
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_ready_for_next_epoch">mpc::ready_for_next_epoch</a>: end, <a href="mpc.md#0x1_mpc">mpc</a> not ready 3"));
         <b>return</b> <b>false</b>
     };
 
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0722 - <a href="mpc.md#0x1_mpc">mpc</a> ready 4"));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_ready_for_next_epoch">mpc::ready_for_next_epoch</a>: end, <a href="mpc.md#0x1_mpc">mpc</a> ready 4"));
     <b>true</b>
 }
 </code></pre>
@@ -409,7 +414,7 @@ This resource exists under 0x1 iff MPC is enabled.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_on_new_epoch">on_new_epoch</a>(_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -418,12 +423,18 @@ This resource exists under 0x1 iff MPC is enabled.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_on_new_epoch">on_new_epoch</a>(_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="mpc.md#0x1_mpc_State">State</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="mpc.md#0x1_mpc_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="mpc.md#0x1_mpc_State">State</a> {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_on_new_epoch">mpc::on_new_epoch</a>: begin"));
+    <a href="mpc.md#0x1_mpc_initialize">initialize</a>(framework);
     //<a href="mpc.md#0x1_mpc">mpc</a> todo: should clean up <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> in-progress session states.
     <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework);
-    <b>let</b> main_secret_state = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> state.shared_secrets, 0);
-    <b>let</b> trx = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> main_secret_state.transcript_for_next_epoch);
-    main_secret_state.transcript_for_cur_epoch = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(trx);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&state.shared_secrets) &gt;= 1) {
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_on_new_epoch">mpc::on_new_epoch</a>: found main secret"));
+        <b>let</b> main_secret_state = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> state.shared_secrets, 0);
+        main_secret_state.transcript_for_cur_epoch = main_secret_state.transcript_for_next_epoch;
+        main_secret_state.transcript_for_next_epoch = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_on_new_epoch">mpc::on_new_epoch</a>: end"));
 }
 </code></pre>
 
@@ -517,10 +528,10 @@ When a MPC task is done, this is invoked by validator transactions.
 
 
 <pre><code><b>fun</b> <a href="mpc.md#0x1_mpc_publish_reconfig_work_result">publish_reconfig_work_result</a>(trx: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="mpc.md#0x1_mpc_State">State</a> {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_reconfig_work_result: begin"));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_publish_reconfig_work_result">mpc::publish_reconfig_work_result</a>: begin"));
     <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&state.shared_secrets) == 0) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_reconfig_work_result: we will have a new secret."));
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_publish_reconfig_work_result">mpc::publish_reconfig_work_result</a>: we will have a new secret."));
         <b>let</b> secret_state = <a href="mpc.md#0x1_mpc_SharedSecretState">SharedSecretState</a> {
             transcript_for_next_epoch: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
             transcript_for_cur_epoch: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
@@ -529,10 +540,10 @@ When a MPC task is done, this is invoked by validator transactions.
     };
     <b>let</b> secret_state = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> state.shared_secrets, 0);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&secret_state.transcript_for_next_epoch)) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_reconfig_work_result: <b>apply</b>"));
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_publish_reconfig_work_result">mpc::publish_reconfig_work_result</a>: <b>apply</b>"));
         secret_state.transcript_for_next_epoch = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(trx);
     };
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_reconfig_work_result: end"));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_publish_reconfig_work_result">mpc::publish_reconfig_work_result</a>: end"));
 }
 </code></pre>
 
@@ -556,14 +567,14 @@ When a MPC task is done, this is invoked by validator transactions.
 
 
 <pre><code><b>fun</b> <a href="mpc.md#0x1_mpc_publish_task_result">publish_task_result</a>(idx: u64, result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="mpc.md#0x1_mpc_State">State</a> {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_task_result: begin"));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_publish_task_result">mpc::publish_task_result</a>: begin"));
     <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="mpc.md#0x1_mpc_State">State</a>&gt;(@aptos_framework);
     <b>let</b> task_state = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> state.tasks, idx);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&task_state.result)) {
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_task_result: <b>apply</b>"));
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_publish_task_result">mpc::publish_task_result</a>: <b>apply</b>"));
         task_state.result = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(result);
     };
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - publish_task_result: end"));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"0720 - <a href="mpc.md#0x1_mpc_publish_task_result">mpc::publish_task_result</a>: end"));
 }
 </code></pre>
 

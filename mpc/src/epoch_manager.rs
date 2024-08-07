@@ -76,12 +76,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn on_mpc_event_notification(&mut self, notification: EventNotification) -> Result<()> {
         debug!(
             epoch = self.epoch_state.as_ref().unwrap().epoch,
-            "0722 - on_mpc_event_notification: start"
+            "0720 - EpochManager::on_mpc_event_notification: start"
         );
         if let Some(tx) = self.mpc_event_tx.as_ref() {
             debug!(
                 epoch = self.epoch_state.as_ref().unwrap().epoch,
-                "0722 - on_mpc_event_notification: has tx to MPCManager"
+                "0720 - EpochManager::on_mpc_event_notification: has tx to MPCManager"
             );
             let EventNotification {
                 subscribed_events, ..
@@ -89,19 +89,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             for event in subscribed_events {
                 debug!(
                     epoch = self.epoch_state.as_ref().unwrap().epoch,
-                    "0722 - on_mpc_event_notification: notification contains 1+ events"
+                    "0720 - EpochManager::on_mpc_event_notification: notification contains 1+ events"
                 );
                 match MPCEventMoveStruct::try_from(&event) {
                     Ok(mpc_event) => {
                         debug!(
                             epoch = self.epoch_state.as_ref().unwrap().epoch,
-                            "0722 - on_mpc_event_notification: cast succeeded"
+                            "0720 - EpochManager::on_mpc_event_notification: cast succeeded"
                         );
                         let _ = tx.push((), mpc_event);
                         return Ok(());
                     },
                     Err(e) => {
-                        error!("[MPC] on_mpc_event_notification: failed with event conversion error: {e}");
+                        error!("[MPC] EpochManager::on_mpc_event_notification: failed with event conversion error: {e}");
                     }
                 }
             }
