@@ -262,11 +262,14 @@ fn compute_delayed_field_try_add_delta_outcome_from_history(
         true
     };
 
-    Ok((result, DelayedFieldRead::HistoryBounded {
-        restriction: history,
-        max_value,
-        inner_aggregator_value: base_aggregator_value,
-    }))
+    Ok((
+        result,
+        DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value,
+            inner_aggregator_value: base_aggregator_value,
+        },
+    ))
 }
 
 fn compute_delayed_field_try_add_delta_outcome_first_time(
@@ -294,11 +297,14 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         true
     };
 
-    Ok((result, DelayedFieldRead::HistoryBounded {
-        restriction: history,
-        max_value,
-        inner_aggregator_value: base_aggregator_value,
-    }))
+    Ok((
+        result,
+        DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value,
+            inner_aggregator_value: base_aggregator_value,
+        },
+    ))
 }
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
@@ -1043,7 +1049,7 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X:
     pub(crate) latest_view: ViewState<'a, T, X>,
     txn_idx: TxnIndex,
     incarnation: Incarnation,
-    thread_id: usize,
+    worker_id: usize,
     debug_state: RefCell<(
         (Duration, usize), // ResourceView
         (Duration, usize), // GroupView
@@ -1080,13 +1086,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         base_view: &'a S,
         latest_view: ViewState<'a, T, X>,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        worker_id: usize,
     ) -> Self {
         Self {
             base_view,
             latest_view,
             txn_idx,
-            incarnation: 0,
-            thread_id: 0,
+            incarnation,
+            worker_id,
             debug_state: RefCell::new((
                 (Duration::ZERO, 0), // ResourceView
                 (Duration::ZERO, 0), // GroupView
@@ -2691,6 +2699,8 @@ mod test {
             &base_view,
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
+            0,
+            0,
         );
 
         // Test id -- value exchange for a value that does not contain delayed fields
@@ -2976,6 +2986,8 @@ mod test {
             &h.base_view,
             ViewState::Unsync(sequential_state),
             1,
+            0,
+            0,
         )
     }
 
@@ -3018,6 +3030,8 @@ mod test {
                         &self.counter,
                     )),
                     1,
+                    0,
+                    0,
                 );
 
             ViewsComparison {
