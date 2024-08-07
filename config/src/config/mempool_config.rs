@@ -120,14 +120,14 @@ impl Default for MempoolConfig {
             default_failovers: 1,
             enable_intelligent_peer_prioritization: true,
             shared_mempool_peer_update_interval_ms: 1_000,
-            shared_mempool_priority_update_interval_secs: 600, // 10 minutes (frequent reprioritization is expensive)
+            shared_mempool_priority_update_interval_secs: 100, // 10 minutes (frequent reprioritization is expensive)
             shared_mempool_failover_delay_ms: 500,
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
             eager_expire_threshold_ms: Some(15_000),
             eager_expire_time_ms: 6_000,
-            include_ready_time_in_broadcast: false,
+            include_ready_time_in_broadcast: true,
             usecase_stats_num_blocks_to_track: 40,
             usecase_stats_num_top_to_track: 5,
             num_sender_buckets: 4,
