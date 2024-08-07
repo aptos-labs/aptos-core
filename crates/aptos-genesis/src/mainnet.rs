@@ -47,6 +47,8 @@ pub struct MainnetGenesisInfo {
     pub voting_duration_secs: u64,
     /// Percent of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+    /// Timestamp for Genesis in microseconds
+    pub genesis_timestamp_in_microseconds: u64,
 
     // MAINNET SPECIFIC FIELDS.
     /// Initial accounts and balances.
@@ -102,6 +104,7 @@ impl MainnetGenesisInfo {
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
+            genesis_timestamp_in_microseconds: genesis_config.genesis_timestamp_in_microseconds,
             employee_vesting_start,
             employee_vesting_period_duration,
             initial_features_override: genesis_config.initial_features_override.clone(),
@@ -138,6 +141,7 @@ impl MainnetGenesisInfo {
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
                 voting_power_increase_limit: self.voting_power_increase_limit,
+                genesis_timestamp_in_microseconds: self.genesis_timestamp_in_microseconds,
                 employee_vesting_start: self.employee_vesting_start,
                 employee_vesting_period_duration: self.employee_vesting_period_duration,
                 initial_features_override: self.initial_features_override.clone(),

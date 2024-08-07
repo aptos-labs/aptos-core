@@ -121,6 +121,7 @@ module supra_framework::genesis {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
+        genesis_timestamp_in_microseconds: u64,
     ) {
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
@@ -173,7 +174,7 @@ module supra_framework::genesis {
         reconfiguration::initialize(&supra_framework_account);
         block::initialize(&supra_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&supra_framework_account);
-        timestamp::set_time_has_started(&supra_framework_account);
+        timestamp::set_time_has_started(&supra_framework_account, genesis_timestamp_in_microseconds);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -662,7 +663,8 @@ module supra_framework::genesis {
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
-            voting_power_increase_limit
+            voting_power_increase_limit,
+            0,
         );
         features::change_feature_flags_for_verification(supra_framework, vector[1, 2, 11], vector[]);
         initialize_supra_coin(supra_framework);
@@ -696,6 +698,7 @@ module supra_framework::genesis {
             1,
             1,
             30,
+            0,
         )
 
     }

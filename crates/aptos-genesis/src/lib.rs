@@ -69,6 +69,8 @@ pub struct GenesisInfo {
     pub voting_duration_secs: u64,
     /// Percent of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+    /// Timestamp for Genesis in microseconds
+    pub genesis_timestamp_in_microseconds: u64,
 
     pub consensus_config: OnChainConsensusConfig,
     pub execution_config: OnChainExecutionConfig,
@@ -109,6 +111,7 @@ impl GenesisInfo {
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
+            genesis_timestamp_in_microseconds: genesis_config.genesis_timestamp_in_microseconds,
             consensus_config: genesis_config.consensus_config.clone(),
             execution_config: genesis_config.execution_config.clone(),
             gas_schedule: genesis_config.gas_schedule.clone(),
@@ -150,6 +153,7 @@ impl GenesisInfo {
                 initial_features_override: self.initial_features_override.clone(),
                 randomness_config_override: self.randomness_config_override.clone(),
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
+                genesis_timestamp_in_microseconds: self.genesis_timestamp_in_microseconds,
             },
             &self.consensus_config,
             &self.execution_config,
