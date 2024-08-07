@@ -25,6 +25,7 @@ pub mod request_response;
 pub mod safety_data;
 pub mod sync_info;
 pub mod timeout_2chain;
+pub mod utils;
 pub mod vote;
 pub mod vote_data;
 pub mod vote_msg;
