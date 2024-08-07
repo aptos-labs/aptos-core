@@ -17,7 +17,7 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-infallible = { workspace = true }
 aptos-log-derive = { workspace = true }
-aptos-node-identity = { workspace = true }
+aptos-node-identity = { workspace = true, optional = true }
 backtrace = { workspace = true }
 chrono = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
@@ -40,6 +40,7 @@ pretty_assertions = { workspace = true }
 [features]
 default = []
 tokio-console = ["console-subscriber"]
+node-identity = ["aptos-node-identity"]
 
 [package.metadata.cargo-machete]
 ignored = ["strum"]
