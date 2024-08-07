@@ -45,6 +45,8 @@ use std::{
     mem,
 };
 
+// DNY
+
 #[derive(Debug)]
 pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub parent: &'module_translator mut ModuleBuilder<'env, 'translator>,
