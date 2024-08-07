@@ -347,7 +347,7 @@ impl DBIndexer {
     }
 
     fn get_num_of_transactions(&self, version: Version) -> Result<u64> {
-        let highest_version = self.main_db_reader.get_synced_version()?;
+        let highest_version = self.main_db_reader.ensure_synced_version()?;
         if version > highest_version {
             // In case main db is not synced yet or recreated
             return Ok(0);

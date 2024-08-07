@@ -16,12 +16,20 @@ use anyhow::anyhow;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{block_info::BlockInfo, db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
-    account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
-    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    state_store::state_storage_usage::StateStorageUsage, transaction::Version,
+    account_config::NewBlockEvent,
+    block_info::BlockHeight,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::state_storage_usage::StateStorageUsage,
+    transaction::{AtomicVersion, Version},
 };
 use arc_swap::ArcSwap;
-use std::{ops::Deref, path::Path, sync::Arc};
+use std::{
+    ops::Deref,
+    path::Path,
+    sync::{atomic::Ordering, Arc},
+};
 
 fn get_latest_ledger_info_in_db_impl(db: &DB) -> Result<Option<LedgerInfoWithSignatures>> {
     let mut iter = db.iter::<LedgerInfoSchema>()?;
@@ -37,16 +45,23 @@ pub(crate) struct LedgerMetadataDb {
     /// cache it in memory in order to avoid reading DB and deserializing the object frequently. It
     /// should be updated every time new ledger info and signatures are persisted.
     latest_ledger_info: ArcSwap<Option<LedgerInfoWithSignatures>>,
+
+    next_pre_commit_version: AtomicVersion,
 }
 
 impl LedgerMetadataDb {
     pub(super) fn new(db: Arc<DB>) -> Self {
-        let ledger_info = get_latest_ledger_info_in_db_impl(&db)
-            .expect("Reading latest ledger info from DB should work.");
+        let latest_ledger_info = get_latest_ledger_info_in_db_impl(&db).expect("DB read failed.");
+        let latest_ledger_info = ArcSwap::from(Arc::new(latest_ledger_info));
+
+        let synced_version =
+            get_progress(&db, &DbMetadataKey::OverallCommitProgress).expect("DB read failed.");
+        let next_pre_commit_version = AtomicVersion::new(synced_version.map_or(0, |v| v + 1));
 
         Self {
             db,
-            latest_ledger_info: ArcSwap::from(Arc::new(ledger_info)),
+            latest_ledger_info,
+            next_pre_commit_version,
         }
     }
 
@@ -73,10 +88,22 @@ impl LedgerMetadataDb {
         self.db.write_schemas(batch)
     }
 
-    pub(crate) fn get_synced_version(&self) -> Result<Version> {
-        get_progress(&self.db, &DbMetadataKey::OverallCommitProgress)?.ok_or(
-            AptosDbError::NotFound("No OverallCommitProgress in db.".to_string()),
-        )
+    pub(crate) fn get_synced_version(&self) -> Result<Option<Version>> {
+        get_progress(&self.db, &DbMetadataKey::OverallCommitProgress)
+    }
+
+    pub(crate) fn get_pre_committed_version(&self) -> Option<Version> {
+        let next_version = self.next_pre_commit_version.load(Ordering::Acquire);
+        if next_version == 0 {
+            None
+        } else {
+            Some(next_version - 1)
+        }
+    }
+
+    pub(crate) fn set_pre_committed_version(&self, version: Version) {
+        self.next_pre_commit_version
+            .store(version + 1, Ordering::Release);
     }
 
     pub(crate) fn get_ledger_commit_progress(&self) -> Result<Version> {
@@ -99,6 +126,12 @@ impl LedgerMetadataDb {
         let ledger_info_ptr = self.latest_ledger_info.load();
         let ledger_info: &Option<_> = ledger_info_ptr.deref();
         ledger_info.clone()
+    }
+
+    pub(crate) fn get_committed_version(&self) -> Option<Version> {
+        let ledger_info_ptr = self.latest_ledger_info.load();
+        let ledger_info: &Option<_> = ledger_info_ptr.deref();
+        ledger_info.as_ref().map(|li| li.ledger_info().version())
     }
 
     /// Returns the latest ledger info, or NOT_FOUND if it doesn't exist.
