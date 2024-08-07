@@ -651,7 +651,7 @@ async fn test_wait_pending_transaction_by_hash() {
     // return after waiting for pending to become committed
     assert!(start_time.elapsed().as_millis() > 2_000);
 
-    // The pending txn response from the POST request doesn't the type field,
+    // The pending txn response from the POST request doesn't have the type field,
     // since it is a PendingTransaction, not a Transaction. Remove it from the
     // response from the GET request and confirm it is correct before doing the
     // JSON comparison.
