@@ -138,6 +138,11 @@ fn test_message_board() {
 }
 
 #[test]
+fn test_dispatching() {
+    test_common("dispatching");
+}
+
+#[test]
 fn test_fungible_asset() {
     let named_address = BTreeMap::from([
         (
