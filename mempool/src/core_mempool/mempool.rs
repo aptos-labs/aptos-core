@@ -8,7 +8,7 @@ use crate::{
     core_mempool::{
         index::TxnPointer,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
-        transaction_store::TransactionStore,
+        transaction_store::{sender_bucket, TransactionStore},
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
@@ -319,6 +319,14 @@ impl Mempool {
         let now = aptos_infallible::duration_since_epoch().as_millis() as u64;
 
         if status.code == MempoolStatusCode::Accepted {
+            counters::SENDER_BUCKET_FREQUENCIES
+                .with_label_values(&[sender_bucket(
+                    &sender,
+                    self.transactions.num_sender_buckets(),
+                )
+                .to_string()
+                .as_str()])
+                .inc();
             if let Some(ready_time_at_sender) = ready_time_at_sender {
                 let bucket = self.transactions.get_bucket(ranking_score, &sender);
                 counters::core_mempool_txn_commit_latency(
