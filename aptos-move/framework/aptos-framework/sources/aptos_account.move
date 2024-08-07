@@ -199,7 +199,7 @@ module aptos_framework::aptos_account {
     /// This would create the recipient APT PFS first, which also registers it to receive APT, before transferring.
     /// TODO: once migration is complete, rename to just "transfer_only" and make it an entry function (for cheapest way
     /// to transfer APT) - if we want to allow APT PFS without account itself
-    fun fungible_transfer_only(
+    public(friend) entry fun fungible_transfer_only(
         source: &signer, to: address, amount: u64
     ) {
         let sender_store = ensure_primary_fungible_store_exists(signer::address_of(source));
