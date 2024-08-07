@@ -134,6 +134,7 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
+    "experimental/storage/hexy",
     "experimental/storage/layered-map",
     "keyless/circuit",
     "keyless/common",
@@ -328,6 +329,7 @@ aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-experimental-hexy = { path = "experimental/storage/hexy" }
 aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
@@ -467,6 +469,7 @@ anstyle = "1.0.1"
 arbitrary = { version = "1.3.2", features = ["derive"] }
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
+arrayvec = "0.7.4"
 ark-bls12-381 = "0.4.0"
 ark-bn254 = "0.4.0"
 ark-ec = "0.4.0"

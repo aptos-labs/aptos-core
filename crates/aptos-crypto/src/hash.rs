@@ -637,6 +637,16 @@ define_hasher! {
 }
 
 define_hasher! {
+    /// The hasher used to compute the hash of an internal node in the Sparse Merkle Tree.
+    (
+        HexyHasher,
+        HEXY_HASHER,
+        HEXY_SEED,
+        b"Hexy"
+    )
+}
+
+define_hasher! {
     /// The hasher used as a placeholder.
     (
         DummyHasher,
@@ -665,6 +675,10 @@ pub static ACCUMULATOR_PLACEHOLDER_HASH: Lazy<HashValue> =
 /// Placeholder hash of `SparseMerkleTree`.
 pub static SPARSE_MERKLE_PLACEHOLDER_HASH: Lazy<HashValue> =
     Lazy::new(|| create_literal_hash("SPARSE_MERKLE_PLACEHOLDER_HASH"));
+
+/// Placeholder hash of hot state tier Merkle Tree.
+pub static HOT_STATE_PLACE_HOLDER_HASH: Lazy<HashValue> =
+    Lazy::new(|| create_literal_hash("HOT_STATE_PLACEHOLDER_HASH"));
 
 /// Block id reserved as the id of parent block of the genesis block.
 pub static PRE_GENESIS_BLOCK_ID: Lazy<HashValue> =
