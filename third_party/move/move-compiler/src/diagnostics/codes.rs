@@ -139,8 +139,7 @@ codes!(
         InvalidNonPhantomUse:
             { msg: "invalid non-phantom type parameter usage", severity: Warning },
         InvalidAttribute: { msg: "invalid attribute", severity: NonblockingError },
-        // TODO(https://github.com/aptos-labs/aptos-core/issues/9411) turn into NonblockingError when safe to do so.
-        UnknownAttribute: { msg: "unknown attribute", severity: Warning },
+        UnknownAttribute: { msg: "unknown attribute", severity: NonblockingError },
     ],
     // errors name resolution, mostly expansion/translate and naming/translate
     NameResolution: [

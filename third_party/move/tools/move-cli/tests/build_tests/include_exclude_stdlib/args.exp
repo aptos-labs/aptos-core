@@ -1,6 +1,6 @@
 Command `build -v`:
 BUILDING build_include_exclude_stdlib
-warning[W02016]: unknown attribute
+error[E02016]: unknown attribute
   ┌─ ./sources/UseSigner.move:1:3
   │
 1 │ #[evm_contract] // for passing evm test flavor
@@ -21,7 +21,7 @@ error[E03002]: unbound module
 Command `-d -v build`:
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING build_include_exclude_stdlib
-warning[W02016]: unknown attribute
+error[E02016]: unknown attribute
   ┌─ ./sources/UseSigner.move:1:3
   │
 1 │ #[evm_contract] // for passing evm test flavor

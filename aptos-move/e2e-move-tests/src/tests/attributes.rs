@@ -128,7 +128,11 @@ fn test_bad_attribute_in_code() {
     let path = builder.write_to_temp().unwrap();
 
     // unknown attributes are not compiled into the code
-    assert_success!(h.publish_package(&account, path.path()));
+    let options = BuildOptions {
+        skip_attribute_checks: true,
+        ..BuildOptions::default()
+    };
+    assert_success!(h.publish_package_with_options(&account, path.path(), options));
 }
 
 #[test]
@@ -147,8 +151,12 @@ fn test_bad_fun_attribute_in_compiled_module() {
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package(path.path().to_path_buf(), BuildOptions::default())
-        .expect("building package must succeed");
+    let options = BuildOptions {
+        skip_attribute_checks: true,
+        ..BuildOptions::default()
+    };
+    let package =
+        build_package(path.path().to_path_buf(), options).expect("building package must succeed");
     let code = package.extract_code();
     // There should only be the above module
     assert!(code.len() == 1);

@@ -1,10 +1,10 @@
-warning[W02016]: unknown attribute
+error[E02016]: unknown attribute
   ┌─ tests/move_check/parser/aptos_stdlib_attributes.move:4:7
   │
 4 │     #[a, a(x = 0)]
   │       ^ Attribute name 'a' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
 
-warning[W02016]: unknown attribute
+error[E02016]: unknown attribute
   ┌─ tests/move_check/parser/aptos_stdlib_attributes.move:4:10
   │
 4 │     #[a, a(x = 0)]
@@ -18,13 +18,13 @@ error[E02001]: duplicate declaration, item, or annotation
   │       │   
   │       Attribute previously given here
 
-warning[W02016]: unknown attribute
+error[E02016]: unknown attribute
   ┌─ tests/move_check/parser/aptos_stdlib_attributes.move:7:7
   │
 7 │     #[testonly]
   │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
 
-warning[W02016]: unknown attribute
+error[E02016]: unknown attribute
   ┌─ tests/move_check/parser/aptos_stdlib_attributes.move:8:7
   │
 8 │     #[b(a, a = 0, a(x = 1))]
