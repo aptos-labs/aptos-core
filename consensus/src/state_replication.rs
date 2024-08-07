@@ -58,6 +58,7 @@ pub trait StateComputer: Send + Sync {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        async_reconfig_v2_enabled: bool,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

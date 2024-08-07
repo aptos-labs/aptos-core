@@ -70,6 +70,8 @@ const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
 const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
+const MPC_MODULE_NAME: &str = "mpc";
+const NEXT_VALIDATOR_SET_MODULE_NAME: &str = "next_validator_set";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
@@ -275,6 +277,8 @@ pub fn encode_genesis_change_set(
     initialize_randomness_config_seqnum(&mut session);
     initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
+    initialize_mpc(&mut session);
+    initialize_next_validator_set(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
@@ -545,6 +549,27 @@ fn initialize_randomness_resources(session: &mut SessionExt) {
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
 }
+
+fn initialize_mpc(session: &mut SessionExt) {
+    exec_function(
+        session,
+        MPC_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_next_validator_set(session: &mut SessionExt) {
+    exec_function(
+        session,
+        NEXT_VALIDATOR_SET_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
 
 fn initialize_reconfiguration_state(session: &mut SessionExt) {
     exec_function(

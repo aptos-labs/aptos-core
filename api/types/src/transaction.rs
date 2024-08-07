@@ -589,15 +589,17 @@ pub struct BlockMetadataTransaction {
 pub enum ValidatorTransaction {
     ObservedJwkUpdate(JWKUpdateTransaction),
     DkgResult(DKGResultTransaction),
+    MPCReconfigWorkDone(MPCReconfigWorkDoneTransaction),
+    MPCUserRequestDone(MPCUserRequestDoneTransaction),
 }
 
 impl ValidatorTransaction {
     pub fn type_str(&self) -> &'static str {
         match self {
-            ValidatorTransaction::ObservedJwkUpdate(_) => {
-                "validator_transaction__observed_jwk_update"
-            },
+            ValidatorTransaction::ObservedJwkUpdate(_) => "validator_transaction__observed_jwk_update",
             ValidatorTransaction::DkgResult(_) => "validator_transaction__dkg_result",
+            ValidatorTransaction::MPCUserRequestDone(_) => "validator_transaction__mpc_user_request_done",
+            ValidatorTransaction::MPCReconfigWorkDone(_) => "validator_transaction__mpc_reconfig_work_done",
         }
     }
 
@@ -605,6 +607,8 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &t.info,
             ValidatorTransaction::DkgResult(t) => &t.info,
+            ValidatorTransaction::MPCReconfigWorkDone(t) => &t.info,
+            ValidatorTransaction::MPCUserRequestDone(t) => &t.info,
         }
     }
 
@@ -612,6 +616,8 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &mut t.info,
             ValidatorTransaction::DkgResult(t) => &mut t.info,
+            ValidatorTransaction::MPCReconfigWorkDone(t) => &mut t.info,
+            ValidatorTransaction::MPCUserRequestDone(t) => &mut t.info,
         }
     }
 
@@ -619,6 +625,8 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => t.timestamp,
             ValidatorTransaction::DkgResult(t) => t.timestamp,
+            ValidatorTransaction::MPCReconfigWorkDone(t) => t.timestamp,
+            ValidatorTransaction::MPCUserRequestDone(t) => t.timestamp,
         }
     }
 
@@ -626,6 +634,8 @@ impl ValidatorTransaction {
         match self {
             ValidatorTransaction::ObservedJwkUpdate(t) => &t.events,
             ValidatorTransaction::DkgResult(t) => &t.events,
+            ValidatorTransaction::MPCReconfigWorkDone(t) => &t.events,
+            ValidatorTransaction::MPCUserRequestDone(t) => &t.events,
         }
     }
 }
@@ -662,6 +672,16 @@ impl
                 events,
                 timestamp: U64::from(timestamp),
                 quorum_certified_update: quorum_certified_update.into(),
+            }),
+            aptos_types::validator_txn::ValidatorTransaction::MPCUserRequestDone(_result) => Self::MPCUserRequestDone(MPCUserRequestDoneTransaction {
+                info,
+                events,
+                timestamp: U64::from(timestamp),
+            }),
+            aptos_types::validator_txn::ValidatorTransaction::MPCReconfigWorkDone(_result) => Self::MPCReconfigWorkDone(MPCReconfigWorkDoneTransaction {
+                info,
+                events,
+                timestamp: U64::from(timestamp),
             }),
         }
     }
@@ -737,6 +757,24 @@ impl From<ProviderJWKs> for ExportedProviderJWKs {
             }).collect(),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct MPCUserRequestDoneTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub events: Vec<Event>,
+    pub timestamp: U64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct MPCReconfigWorkDoneTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub events: Vec<Event>,
+    pub timestamp: U64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]

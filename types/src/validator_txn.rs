@@ -3,7 +3,7 @@
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::dkg::DKGTranscriptMetadata;
-use crate::{dkg::DKGTranscript, jwks};
+use crate::{dkg::DKGTranscript, jwks, mpc};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use move_core_types::account_address::AccountAddress;
@@ -14,6 +14,8 @@ use std::fmt::Debug;
 pub enum ValidatorTransaction {
     DKGResult(DKGTranscript),
     ObservedJWKUpdate(jwks::QuorumCertifiedUpdate),
+    MPCReconfigWorkDone(mpc::ReconfigWorkResult),
+    MPCUserRequestDone(mpc::TaskResult),
 }
 
 impl ValidatorTransaction {
@@ -38,6 +40,8 @@ impl ValidatorTransaction {
             ValidatorTransaction::ObservedJWKUpdate(update) => {
                 Topic::JWK_CONSENSUS(update.update.issuer.clone())
             },
+            ValidatorTransaction::MPCReconfigWorkDone(_) => Topic::MPC_RECONFIG,
+            ValidatorTransaction::MPCUserRequestDone(result) => Topic::MPC_USER_REQUEST(result.task_idx),
         }
     }
 
@@ -47,6 +51,8 @@ impl ValidatorTransaction {
             ValidatorTransaction::ObservedJWKUpdate(_) => {
                 "validator_transaction__observed_jwk_update"
             },
+            ValidatorTransaction::MPCUserRequestDone(_) => "validator_transaction__mpc_user_request_done",
+            ValidatorTransaction::MPCReconfigWorkDone(_) => "validator_transaction__mpc_reconfig_work_done",
         }
     }
 }
@@ -56,4 +62,6 @@ impl ValidatorTransaction {
 pub enum Topic {
     DKG,
     JWK_CONSENSUS(jwks::Issuer),
+    MPC_RECONFIG,
+    MPC_USER_REQUEST(usize),
 }

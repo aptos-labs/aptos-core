@@ -199,6 +199,7 @@ pub struct AptosHandle {
     _consensus_publisher_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
+    _mpc_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
     _indexer_runtime: Option<Runtime>,
     _indexer_table_info_runtime: Option<Runtime>,
@@ -636,6 +637,7 @@ pub fn setup_environment_and_start_node(
         consensus_observer_reconfig_subscription,
         consensus_reconfig_subscription,
         dkg_subscriptions,
+        mpc_subscriptions,
         jwk_consensus_subscriptions,
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
@@ -646,6 +648,7 @@ pub fn setup_environment_and_start_node(
         consensus_network_interfaces,
         consensus_observer_network_interfaces,
         dkg_network_interfaces,
+        mpc_network_interfaces,
         jwk_consensus_network_interfaces,
         mempool_network_interfaces,
         peer_monitoring_service_network_interfaces,
@@ -718,6 +721,8 @@ pub fn setup_environment_and_start_node(
     let (vtxn_pool, dkg_runtime) =
         consensus::create_dkg_runtime(&mut node_config, dkg_subscriptions, dkg_network_interfaces);
 
+    let mpc_runtime = consensus::create_mpc_runtime(&mut node_config, mpc_subscriptions, mpc_network_interfaces, &vtxn_pool);
+
     // Create the JWK consensus runtime
     let jwk_consensus_runtime = consensus::create_jwk_consensus_runtime(
         &mut node_config,
@@ -767,6 +772,7 @@ pub fn setup_environment_and_start_node(
         _consensus_publisher_runtime: consensus_publisher_runtime,
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
+        _mpc_runtime: mpc_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_runtime: indexer_runtime,
         _indexer_table_info_runtime: indexer_table_info_runtime,

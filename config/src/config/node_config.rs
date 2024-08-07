@@ -26,6 +26,7 @@ use std::{
     fmt::Debug,
     path::{Path, PathBuf},
 };
+use crate::config::mpc_config::MPCConfig;
 
 /// The node configuration defines the configuration for a single Aptos
 /// node (i.e., validator or fullnode). It is composed of module
@@ -68,6 +69,8 @@ pub struct NodeConfig {
     pub logger: LoggerConfig,
     #[serde(default)]
     pub mempool: MempoolConfig,
+    #[serde(default)]
+    pub mpc: MPCConfig,
     #[serde(default)]
     pub netbench: Option<NetbenchConfig>,
     #[serde(default)]

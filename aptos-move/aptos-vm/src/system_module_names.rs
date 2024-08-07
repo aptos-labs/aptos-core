@@ -29,6 +29,7 @@ pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 
 pub const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
 pub const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
+pub const BLOCK_PROLOGUE_EXT_V2: &IdentStr = ident_str!("block_prologue_ext_v2");
 
 pub static RECONFIGURATION_WITH_DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
@@ -38,6 +39,25 @@ pub static RECONFIGURATION_WITH_DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 });
 
 pub const FINISH_WITH_DKG_RESULT: &IdentStr = ident_str!("finish_with_dkg_result");
+
+pub static DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("dkg").to_owned(),
+    )
+});
+
+pub const FINISH: &IdentStr = ident_str!("finish");
+
+pub static MPC_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("mpc").to_owned(),
+    )
+});
+
+pub const PUBLISH_USER_REQUEST_RESULT: &IdentStr = ident_str!("publish_task_result");
+pub const PUBLISH_RECONFIG_WORK_RESULT: &IdentStr = ident_str!("publish_reconfig_work_result");
 
 pub static JWKS_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(

@@ -43,6 +43,7 @@ aptos-jwk-consensus = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
+aptos-mpc = { workspace = true }
 aptos-network = { workspace = true }
 aptos-network-benchmark = { workspace = true }
 aptos-network-builder = { workspace = true }
