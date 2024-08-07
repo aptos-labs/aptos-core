@@ -5044,7 +5044,12 @@ module supra_framework::pbo_delegation_pool {
             delegator_address,
             principle_stake,
             coin,
-            principle_lockup_time);
+            option::none(),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12,
+        );
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -5154,7 +5159,12 @@ module supra_framework::pbo_delegation_pool {
             delegator_address,
             principle_stake,
             coin,
-            principle_lockup_time);
+            option::none(),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -5201,7 +5211,12 @@ module supra_framework::pbo_delegation_pool {
             delegator_address,
             principle_stake,
             coin,
-            principle_lockup_time);
+            option::none(),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -5249,7 +5264,12 @@ module supra_framework::pbo_delegation_pool {
             delegator_address,
             principle_stake,
             coin,
-            principle_lockup_time);
+            option::none(),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12,
+        );
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -5279,7 +5299,12 @@ module supra_framework::pbo_delegation_pool {
             delegator_address,
             principle_stake,
             coin,
-            principle_lockup_time);
+            option::none(),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -5356,7 +5381,11 @@ module supra_framework::pbo_delegation_pool {
         delegator_address: vector<address>,
         principle_stake: vector<u64>,
         coin: Coin<SupraCoin>,
+        multisig_admin: option::Option<address>,
+        unlock_numerators: vector<u64>,
+        unlock_denominator: u64,
         principle_lockup_time: u64,
+        unlock_duration: u64,
     ): u64 acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         supra_governance::initialize_for_test(supra_framework,(10 * ONE_APT as u128), 100
             * ONE_APT, 1000,);
@@ -5370,11 +5399,11 @@ module supra_framework::pbo_delegation_pool {
             delegator_address,
             principle_stake,
             coin,
-            option::none(),
-            vector[2, 2, 3],
-            10,
+            multisig_admin,
+            unlock_numerators,
+            unlock_denominator,
             principle_lockup_time,
-            12
+            unlock_duration
         );
 
         let validator_address = signer::address_of(validator);
@@ -5583,6 +5612,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     #[expected_failure(abort_code = 327716, location = Self)]
+    /// if admin is option::none() calling to `replace_delegator` should fail
     public entry fun test_repalce_delegration_without_multisig_failure(
         supra_framework: &signer,
         validator: &signer
@@ -5612,6 +5642,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     #[expected_failure(abort_code = EADMIN_NOT_MULTISIG, location = Self)]
+    /// if admin is a single signer account pool creation should fail
     public entry fun test_initialize_delegation_pool_with_single_multisig_owner_failure(
         supra_framework: &signer,
         validator: &signer
@@ -5640,6 +5671,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     #[expected_failure(abort_code = 327716, location = Self)]
+    /// if admin is multi signer calling `replace_delegator` if it's not the same signer which was initialized, it should fail
     public entry fun test_repalce_delegration_with_different_multisig_failure(
         supra_framework: &signer,
         validator: &signer
@@ -5669,5 +5701,209 @@ module supra_framework::pbo_delegation_pool {
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
         replace_delegator(&multisig_signer, pool_address, @0x010, @0x0101);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123)]
+    /// if admin is authorized multi signer, `replace_delegator` should succeed
+    public entry fun test_repalce_delegration_multisig_success(
+        supra_framework: &signer,
+        validator: &signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = vector[@0x010, @0x020];
+        let principle_stake = vector[100 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(300 * ONE_APT);
+        let principle_lockup_time = 0;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator, 0, true, true, 0,
+            delegator_address,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
+
+        let multisig_signer = account::create_signer_for_test(multisig);
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+        replace_delegator(&multisig_signer, pool_address, @0x010, @0x0101);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    /// if old_delegator has already unlocked 100, the new_delegator should be able to withdraw 100 coins
+    public entry fun test_repalce_delegration_before_withdraw_and_after_withdraw_success(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address, @0x020];
+        let principle_stake = vector[300 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(500 * ONE_APT);
+        let principle_lockup_time = 0;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator, 0, true, true, 0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        unlock(delegator, pool_address, 100 * ONE_APT);
+        assert_delegation(delegator_address, pool_address, 200 * ONE_APT, 0, 100 * ONE_APT);
+
+        let multisig_signer = account::create_signer_for_test(multisig);
+        let new_delegator_address = @0x0101;
+        replace_delegator(&multisig_signer, pool_address, delegator_address, new_delegator_address);
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        withdraw(&account::create_signer_for_test(new_delegator_address), pool_address, 100 * ONE_APT);
+        assert!(coin::balance<SupraCoin>(new_delegator_address) == (100 * ONE_APT) - 1, 0);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 65545, location = Self)]
+    /// after replace_delegator` succeeds, old_delegator must not be able to perform unlock or withdraw or vote (if partial_voting is enable)
+    public entry fun test_repalce_delegration_after_withdraw_using_old_address_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address, @0x020];
+        let principle_stake = vector[300 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(500 * ONE_APT);
+        let principle_lockup_time = 0;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator, 0, true, true, 0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        let multisig_signer = account::create_signer_for_test(multisig);
+        let new_delegator_address = @0x0101;
+        replace_delegator(&multisig_signer, pool_address, delegator_address, new_delegator_address);
+
+        unlock(delegator, pool_address, 100 * ONE_APT);
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        withdraw(delegator, pool_address, 100 * ONE_APT);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    /// after replace_delegator succeeds, new_delegator should be able to perform unlock and withdraw on the funds as per unlocking schedule
+    public entry fun test_repalce_delegration_unlock_and_withdraw_success(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address, @0x020];
+        let principle_stake = vector[300 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(500 * ONE_APT);
+        let principle_lockup_time = 0;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator, 0, true, true, 0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+        let multisig_signer = account::create_signer_for_test(multisig);
+        let new_delegator_address = @0x0101;
+        let new_delegator_address_signer = &account::create_signer_for_test(new_delegator_address);
+        replace_delegator(&multisig_signer, pool_address, delegator_address, new_delegator_address);
+
+        unlock(new_delegator_address_signer, pool_address, 100 * ONE_APT);
+        assert_delegation(new_delegator_address, pool_address, 200 * ONE_APT, 0, 100 * ONE_APT);
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        withdraw(new_delegator_address_signer, pool_address, 100 * ONE_APT);
+        assert!(coin::balance<SupraCoin>(new_delegator_address) == (100 * ONE_APT) - 1, 0);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    /// after replace_delegator new_delegator should be able to vote (if partial_voting is enable), or should be able to delegate voting
+    public entry fun test_repalce_delegration_and_vote_delegate_voting_success(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address, @0x020];
+        let principle_stake = vector[300 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(500 * ONE_APT);
+        let principle_lockup_time = 0;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+        let multisig_signer = account::create_signer_for_test(multisig);
+
+        // partial voing hasn't been enabled yet. A proposal has been created by the validator.
+        let proposal1_id = setup_vote(supra_framework,
+            validator,
+            true,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+        let new_delegator_address = @0x0101;
+        let new_delegator_address_signer = &account::create_signer_for_test(new_delegator_address);
+        replace_delegator(&multisig_signer, pool_address, delegator_address, new_delegator_address);
+
+        vote(new_delegator_address_signer, pool_address, proposal1_id, 10 * ONE_APT, true);
+        let result = calculate_and_update_remaining_voting_power(pool_address, new_delegator_address, proposal1_id);
+        assert!(result == 290 * ONE_APT, 1);
     }
 }
