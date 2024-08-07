@@ -14,11 +14,13 @@ pub mod validator;
 
 #[async_trait::async_trait]
 pub trait PayloadClient: Send + Sync {
+    #[allow(clippy::too_many_arguments)]
     async fn pull_payload(
         &self,
         max_poll_time: Duration,
         max_items: u64,
-        max_unique_items: u64,
+        max_items_after_filtering: u64,
+        soft_max_items_after_filtering: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
