@@ -1205,6 +1205,49 @@ impl Client {
         self.get_bcs(url).await
     }
 
+    pub async fn get_account_events_by_creation_number(
+        &self,
+        address: AccountAddress,
+        creation_number: u64,
+        start: Option<u64>,
+        limit: Option<u16>,
+    ) -> AptosResult<Response<Vec<VersionedEvent>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/events/{}",
+            address.to_hex_literal(),
+            creation_number,
+        ))?;
+
+        let mut request = self.inner.get(url);
+        if let Some(start) = start {
+            request = request.query(&[("start", start)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+
+        let response = request.send().await?;
+        self.json(response).await
+    }
+
+    pub async fn get_account_events_by_creation_number_bcs(
+        &self,
+        address: AccountAddress,
+        creation_number: u64,
+        start: Option<u64>,
+        limit: Option<u16>,
+    ) -> AptosResult<Response<Vec<EventWithVersion>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/events/{}",
+            address.to_hex_literal(),
+            creation_number,
+        ))?;
+
+        let response = self.get_bcs_with_page(url, start, limit).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_account_events(
         &self,
         address: AccountAddress,
