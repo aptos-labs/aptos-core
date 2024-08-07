@@ -29,7 +29,7 @@ use std::collections::HashMap;
 /// Holds the various options that we support while disassembling code.
 #[derive(Debug, Default, Parser)]
 pub struct DisassemblerOptions {
-    /// Only print non-private functions
+    /// Only print public functions.
     #[clap(long = "only-public")]
     pub only_externally_visible: bool,
 
@@ -44,6 +44,10 @@ pub struct DisassemblerOptions {
     /// Print the locals inside each function body.
     #[clap(long = "print-locals")]
     pub print_locals: bool,
+
+    /// Print bytecode statistics for the module.
+    #[clap(long = "print-bytecode-stats")]
+    pub print_bytecode_stats: bool,
 }
 
 impl DisassemblerOptions {
@@ -53,6 +57,7 @@ impl DisassemblerOptions {
             print_code: true,
             print_basic_blocks: true,
             print_locals: true,
+            print_bytecode_stats: false,
         }
     }
 }
@@ -236,6 +241,17 @@ impl<'a> Disassembler<'a> {
         {
             Ok(definition) => Ok(definition),
             Err(err) => Err(Error::new(err)),
+        }
+    }
+
+    fn get_instruction_count(&self) -> usize {
+        match self.source_mapper.bytecode {
+            BinaryIndexedView::Module(module) => module
+                .function_defs
+                .iter()
+                .map(|function| function.code.as_ref().map(|c| c.code.len()).unwrap_or(0))
+                .sum(),
+            BinaryIndexedView::Script(script) => script.code.code.len(),
         }
     }
 
@@ -1504,18 +1520,27 @@ impl<'a> Disassembler<'a> {
                 })
                 .collect::<Result<Vec<String>>>()?,
         };
+
+        let stats = if self.options.print_bytecode_stats {
+            let count = self.get_instruction_count();
+            format!("\n\n// Total number of instructions: {}\n", count)
+        } else {
+            "".to_owned()
+        };
+
         let imports_str = if imports.is_empty() {
             "".to_string()
         } else {
             format!("\n{}\n\n", imports.join("\n"))
         };
         Ok(format!(
-            "// Move bytecode v{version}\n{header} {{{imports}\n{struct_defs}\n\n{function_defs}\n}}",
+            "// Move bytecode v{version}\n{header} {{{imports}\n{struct_defs}\n\n{function_defs}\n}}{stats}",
             version = version,
             header = header,
             imports = &imports_str,
             struct_defs = &struct_defs.join("\n"),
-            function_defs = &function_defs.join("\n")
+            function_defs = &function_defs.join("\n"),
+            stats = stats
         ))
     }
 }
