@@ -1,0 +1,84 @@
+{
+    "enabled_clusters": ["aptos-forge-0"],
+    "all_clusters": ["aptos-forge-0", "aptos-forge-1"],
+    "test_suites": {
+      "continuous": {
+        "name": "continuous",
+        "all_tests": {
+          "compat": { "name": "compat" },
+          "land_blocking": { "name": "land_blocking" },
+          "single_vfn_perf": { "name": "single_vfn_perf" },
+          "validators_join_and_leave": { "name": "validators_join_and_leave" }
+        },
+        "enabled_tests": {
+          "compat": { "name": "compat" },
+          "single_vfn_perf": { "name": "single_vfn_perf" }
+        }
+      },
+      "prerelease": {
+        "name": "prerelease",
+        "all_tests": {
+          "compat": { "name": "compat" },
+          "land_blocking": { "name": "land_blocking" }
+        },
+        "enabled_tests": {}
+      },
+      "default": {
+        "name": "default",
+        "all_tests": { "land_blocking": { "name": "land_blocking" } },
+        "enabled_tests": { "land_blocking": { "name": "land_blocking" } }
+      },
+      "land_blocking": {
+        "name": "land_blocking",
+        "all_tests": { "land_blocking": { "name": "land_blocking" } },
+        "enabled_tests": { "land_blocking": { "name": "land_blocking" } }
+      }
+    },
+    "default_helm_values": {
+      "aptos-node": {
+        "enablePrivilegedMode": true,
+        "fullnode": {
+          "nodeSelector": { "eks.amazonaws.com/nodegroup": "validators" },
+          "storage": { "class": "gp3" },
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "aptos.org/nodepool",
+              "value": "validators"
+            }
+          ]
+        },
+        "haproxy": {
+          "enabled": false,
+          "image": {
+            "pullPolicy": "IfNotPresent",
+            "repo": "323143817725.dkr.ecr.us-west-2.amazonaws.com/haproxy",
+            "tag": "2.2.14@sha256:36aa98fff27dcb2d12c93e68515a6686378c783ea9b1ab1d01ce993a5cbc73e1"
+          },
+          "nodeSelector": { "eks.amazonaws.com/nodegroup": "utilities" }
+        },
+        "validator": {
+          "image": {
+            "pullPolicy": "IfNotPresent",
+            "repo": "323143817725.dkr.ecr.us-west-2.amazonaws.com/aptos/validator"
+          },
+          "nodeSelector": { "eks.amazonaws.com/nodegroup": "validators" },
+          "storage": { "class": "gp3" },
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "aptos.org/nodepool",
+              "value": "validators"
+            }
+          ]
+        }
+      },
+      "aptos-genesis": {
+        "genesis": {
+          "image": {
+            "repo": "323143817725.dkr.ecr.us-west-2.amazonaws.com/aptos/tools"
+          }
+        }
+      }
+    }
+  }
