@@ -1135,6 +1135,7 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         // "(" Comma<Exp> ")"
         // "(" <Exp> ":" <Type> ")"
         // "(" <Exp> "as" <Type> ")"
+        // "(" <Exp> "is" <Type> ( "|" <Type> )* ")"
         Tok::LParen => {
             let list_loc = context.tokens.start_loc();
             context.tokens.advance()?; // consume the LParen
@@ -1142,7 +1143,8 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                 Exp_::Unit
             } else {
                 // If there is a single expression inside the parens,
-                // then it may be followed by a colon and a type annotation.
+                // then it may be followed by a colon and a type annotation, an 'as' and a type,
+                // or an 'is' and a list of variants.
                 let e = parse_exp(context)?;
                 if match_token(context.tokens, Tok::Colon)? {
                     let ty = parse_type(context)?;
@@ -1152,6 +1154,22 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                     let ty = parse_type(context)?;
                     consume_token(context.tokens, Tok::RParen)?;
                     Exp_::Cast(Box::new(e), ty)
+                } else if context.tokens.peek() == Tok::Identifier
+                    && context.tokens.content() == "is"
+                {
+                    require_move_2(
+                        context,
+                        current_token_loc(context.tokens),
+                        "`is` expression",
+                    );
+                    context.tokens.advance()?;
+                    let types = parse_list(
+                        context,
+                        |ctx| match_token(ctx.tokens, Tok::Pipe),
+                        parse_type,
+                    )?;
+                    consume_token(context.tokens, Tok::RParen)?;
+                    Exp_::Test(Box::new(e), types)
                 } else {
                     if context.tokens.peek() != Tok::RParen {
                         consume_token(context.tokens, Tok::Comma)?;

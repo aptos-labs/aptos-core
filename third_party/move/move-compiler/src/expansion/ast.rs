@@ -509,6 +509,7 @@ pub enum Exp_ {
 
     Cast(Box<Exp>, Type),
     Annotate(Box<Exp>, Type),
+    Test(Box<Exp>, Vec<Type>),
 
     Spec(SpecId, BTreeSet<Name>, BTreeSet<Name>),
 
@@ -1719,6 +1720,16 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
                 w.write(" as ");
                 ty.ast_debug(w);
+                w.write(")");
+            },
+            E::Test(e, tys) => {
+                w.write("(");
+                e.ast_debug(w);
+                w.write(" is ");
+                w.list(tys, "|", |w, item| {
+                    item.ast_debug(w);
+                    false
+                });
                 w.write(")");
             },
             E::Index(oper, index) => {

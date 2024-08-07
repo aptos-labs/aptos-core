@@ -1838,6 +1838,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     vec![exp.into_exp()],
                 )
             },
+            EA::Exp_::Test(exp, tys) => self.translate_test(&loc, exp, tys, expected_type, context),
             EA::Exp_::Annotate(exp, typ) => {
                 let ty = self.translate_type(typ);
                 let exp =
@@ -2386,6 +2387,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             maccess,
                             generics,
                             None,
+                            false,
                         ) {
                             pat
                         } else {
@@ -2404,6 +2406,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     maccess,
                     generics,
                     Some(args),
+                    false,
                 ) {
                     pat
                 } else {
@@ -2445,6 +2448,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         maccess: &EA::ModuleAccess,
         generics: &Option<Vec<EA::Type>>,
         fields: Option<&EA::Fields<EA::LValue>>,
+        no_args_check: bool, // skip evaluating any arguments
     ) -> Option<Pattern> {
         // Check whether the requested type is a reference. If so, we remember this and
         // the target type of the reference. The reference expectation is pushed down
@@ -2512,44 +2516,47 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         // Process argument list
         let mut args = BTreeMap::new();
-        let (field_decls, _is_positional) = self.get_field_decls_for_pack_unpack(
-            &struct_entry,
-            &struct_name,
-            &struct_name_loc,
-            variant,
-        )?;
-        let field_decls = field_decls.clone();
-        if let Some(fields) = fields {
-            // Check whether all fields are covered.
-            self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
-            // Translate fields
-            for (_, name, (_, value)) in fields.iter() {
-                let field_name = self.symbol_pool().make(name);
-                if let Some(field_data) = field_decls.get(&field_name) {
-                    let field_ty = field_data.ty.instantiate(&instantiation);
-                    let expected_field_ty = if let Some(kind) = ref_expected {
-                        Type::Reference(kind, Box::new(field_ty.clone()))
-                    } else {
-                        field_ty.clone()
-                    };
-                    let translated = self.translate_lvalue(
-                        value,
-                        &expected_field_ty,
-                        expected_order,
-                        match_locals,
-                        context,
-                    );
-                    args.insert(field_data.offset, translated);
+        debug_assert!(!no_args_check || fields.is_none());
+        if !no_args_check {
+            let (field_decls, _is_positional) = self.get_field_decls_for_pack_unpack(
+                &struct_entry,
+                &struct_name,
+                &struct_name_loc,
+                variant,
+            )?;
+            let field_decls = field_decls.clone();
+            if let Some(fields) = fields {
+                // Check whether all fields are covered.
+                self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
+                // Translate fields
+                for (_, name, (_, value)) in fields.iter() {
+                    let field_name = self.symbol_pool().make(name);
+                    if let Some(field_data) = field_decls.get(&field_name) {
+                        let field_ty = field_data.ty.instantiate(&instantiation);
+                        let expected_field_ty = if let Some(kind) = ref_expected {
+                            Type::Reference(kind, Box::new(field_ty.clone()))
+                        } else {
+                            field_ty.clone()
+                        };
+                        let translated = self.translate_lvalue(
+                            value,
+                            &expected_field_ty,
+                            expected_order,
+                            match_locals,
+                            context,
+                        );
+                        args.insert(field_data.offset, translated);
+                    }
                 }
+            } else if !field_decls.is_empty() {
+                self.error(
+                    loc,
+                    &format!(
+                        "no arguments provided for unpack, expected {}",
+                        field_decls.len()
+                    ),
+                )
             }
-        } else if !field_decls.is_empty() {
-            self.error(
-                loc,
-                &format!(
-                    "no arguments provided for unpack, expected {}",
-                    field_decls.len()
-                ),
-            )
         }
 
         let struct_id = struct_entry
@@ -2560,7 +2567,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .sorted_by_key(|(i, _)| *i)
             .map(|(_, value)| value)
             .collect_vec();
-        if variant.is_none() && args.is_empty() {
+        if !no_args_check && variant.is_none() && args.is_empty() {
             // The v1 move compiler inserts a dummy field with the value of false
             // for structs with no fields. We simulate this here for now.
             let id = self.new_node_id_with_type_loc(&Type::new_prim(PrimitiveType::Bool), loc);
@@ -3718,6 +3725,72 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 loc,
                 "second argument of `update_field` must be a field name",
             );
+            self.new_error_exp()
+        }
+    }
+
+    fn translate_test(
+        &mut self,
+        loc: &Loc,
+        exp: &EA::Exp,
+        tys: &[EA::Type],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let (exp_ty, exp) = self.translate_exp_free(exp);
+        let mut variants = vec![];
+        let mut struct_id = None;
+        for ty in tys {
+            let loc = self.to_loc(&ty.loc);
+            if let EA::Type_::Apply(maccess, generics) = &ty.value {
+                let pat = self.translate_lvalue_unpack(
+                    &exp_ty,
+                    WideningOrder::LeftToRight,
+                    false,
+                    &ErrorMessageContext::General,
+                    &loc,
+                    maccess,
+                    &Some(generics.clone()),
+                    None,
+                    true,
+                );
+                match pat {
+                    Some(Pattern::Struct(_, str_id, Some(variant), _)) => {
+                        variants.push(variant);
+                        struct_id = Some(str_id)
+                    },
+                    None | Some(Pattern::Error(_)) => {
+                        // error reported
+                    },
+                    Some(_) => self.error(&loc, "expected enum variant"),
+                }
+            } else {
+                self.error(&loc, "expected enum variant")
+            }
+        }
+        self.check_type(
+            loc,
+            &Type::new_prim(PrimitiveType::Bool),
+            expected_type,
+            context,
+        );
+        if let Some(QualifiedInstId {
+            module_id,
+            id,
+            inst,
+        }) = struct_id
+        {
+            let node_id = self.new_node_id_with_type_loc(expected_type, loc);
+            if !inst.is_empty() {
+                self.set_node_instantiation(node_id, inst)
+            }
+            ExpData::Call(
+                node_id,
+                Operation::TestVariants(module_id, id, variants),
+                vec![exp.into_exp()],
+            )
+        } else {
+            // Error report
             self.new_error_exp()
         }
     }
