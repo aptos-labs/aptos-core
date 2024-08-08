@@ -16,7 +16,7 @@ use move_core_types::{
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use move_vm_runtime::{config::VMConfig, is_loader_v2_test_env, move_vm::MoveVM};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -109,11 +109,14 @@ impl WarmVmCache {
         //
         // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
-        #[allow(deprecated)]
-        let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            resolver,
-        );
+        if !is_loader_v2_test_env() {
+            // If we are not in the test environment, this must be a V1 loader and should not be called.
+            #[allow(deprecated)]
+            let _ = vm.load_module(
+                &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
+                resolver,
+            );
+        }
     }
 }
 

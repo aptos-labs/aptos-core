@@ -17,6 +17,7 @@ use aptos_types::{
     on_chain_config::Features, transaction::Multisig,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
@@ -27,9 +28,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::{
-    logging::expect_no_verification_errors, module_traversal::TraversalContext, DummyCodeStorage,
-};
+use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::TraversalContext};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 
@@ -73,6 +72,7 @@ impl TransactionValidation {
 
 pub(crate) fn run_script_prologue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
@@ -144,7 +144,7 @@ pub(crate) fn run_script_prologue(
             serialize_values(&args),
             &mut gas_meter,
             traversal_context,
-            &DummyCodeStorage,
+            module_storage,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -158,6 +158,7 @@ pub(crate) fn run_script_prologue(
 /// match that hash.
 pub(crate) fn run_multisig_prologue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     txn_data: &TransactionMetadata,
     payload: &Multisig,
     features: &Features,
@@ -188,7 +189,7 @@ pub(crate) fn run_multisig_prologue(
             ]),
             &mut UnmeteredGasMeter,
             traversal_context,
-            &DummyCodeStorage,
+            module_storage,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -197,6 +198,7 @@ pub(crate) fn run_multisig_prologue(
 
 fn run_epilogue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
@@ -230,7 +232,7 @@ fn run_epilogue(
             serialize_values(&args),
             &mut UnmeteredGasMeter,
             traversal_context,
-            &DummyCodeStorage,
+            module_storage,
         )
     } else {
         // Regular tx, run the normal epilogue
@@ -251,7 +253,7 @@ fn run_epilogue(
             serialize_values(&args),
             &mut UnmeteredGasMeter,
             traversal_context,
-            &DummyCodeStorage,
+            module_storage,
         )
     }
     .map(|_return_vals| ())
@@ -259,7 +261,7 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, fee_statement, traversal_context)?;
+        emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -269,6 +271,7 @@ fn run_epilogue(
 
 fn emit_fee_statement(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
@@ -280,7 +283,7 @@ fn emit_fee_statement(
             vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
             &mut UnmeteredGasMeter,
             traversal_context,
-            &DummyCodeStorage,
+            module_storage,
         )
         .map(|_return_vals| ())
 }
@@ -289,6 +292,7 @@ fn emit_fee_statement(
 /// in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_success_epilogue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     features: &Features,
@@ -305,6 +309,7 @@ pub(crate) fn run_success_epilogue(
 
     run_epilogue(
         session,
+        module_storage,
         gas_remaining,
         fee_statement,
         txn_data,
@@ -318,6 +323,7 @@ pub(crate) fn run_success_epilogue(
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
     session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     features: &Features,
@@ -327,6 +333,7 @@ pub(crate) fn run_failure_epilogue(
 ) -> Result<(), VMStatus> {
     run_epilogue(
         session,
+        module_storage,
         gas_remaining,
         fee_statement,
         txn_data,

@@ -18,7 +18,6 @@ use std::sync::Arc;
 
 /// An error which is returned in case unimplemented code is reached. This is just a safety
 /// precaution to avoid panics in case we forget some gating.
-#[macro_export]
 macro_rules! unexpected_unimplemented_error {
     () => {
         Err(
@@ -26,6 +25,19 @@ macro_rules! unexpected_unimplemented_error {
                 .with_message("New loader and code cache are not yet implemented".to_string()),
         )
     };
+}
+
+// Temporary infra to enable loader V2 in test & run things e2e locally.
+pub fn is_loader_v2_test_env() -> bool {
+    std::env::var("SKIP_LOADER_V2_VERIFICATION").is_ok()
+}
+
+pub(crate) fn ok_if_loader_v2_test_env() -> PartialVMResult<()> {
+    if is_loader_v2_test_env() {
+        Ok(())
+    } else {
+        unexpected_unimplemented_error!()
+    }
 }
 
 /// Dummy implementation of code storage (for modules and scripts), to be removed in the future.
@@ -54,7 +66,7 @@ impl ModuleStorage for DummyCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<&[Metadata]> {
+    ) -> PartialVMResult<Vec<Metadata>> {
         unexpected_unimplemented_error!()
     }
 
@@ -99,7 +111,7 @@ pub struct DummyVerifier;
 
 impl Verifier for DummyVerifier {
     fn verify_script(&self, _script: &CompiledScript) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+        ok_if_loader_v2_test_env()
     }
 
     fn verify_script_with_dependencies<'a>(
@@ -107,11 +119,11 @@ impl Verifier for DummyVerifier {
         _script: &CompiledScript,
         _dependencies: impl IntoIterator<Item = &'a Module>,
     ) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+        ok_if_loader_v2_test_env()
     }
 
     fn verify_module(&self, _module: &CompiledModule) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+        ok_if_loader_v2_test_env()
     }
 
     fn verify_module_with_dependencies<'a>(
@@ -119,6 +131,6 @@ impl Verifier for DummyVerifier {
         _module: &CompiledModule,
         _dependencies: impl IntoIterator<Item = &'a Module>,
     ) -> PartialVMResult<()> {
-        unexpected_unimplemented_error!()
+        ok_if_loader_v2_test_env()
     }
 }

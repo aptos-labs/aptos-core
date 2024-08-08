@@ -12,7 +12,7 @@ use move_core_types::{account_address::AccountAddress, ident_str, identifier::Id
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction, DummyCodeStorage,
+    native_functions::NativeFunction, TestModuleStorage, TestScriptStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -152,23 +152,30 @@ fn main() -> Result<()> {
     ));
 
     let vm = MoveVM::new(natives);
-    let mut storage = InMemoryStorage::new();
+    let deserializer_config = &vm.vm_config().deserializer_config;
 
+    let mut resource_storage = InMemoryStorage::new();
+    let mut serialized_modules = vec![];
     let test_modules = compile_test_modules();
     for module in &test_modules {
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(module.self_id(), blob);
+        resource_storage.publish_or_overwrite_module(module.self_id(), blob.clone());
+        serialized_modules.push((module.self_addr(), module.self_name(), blob.into()))
     }
 
-    let mut extensions = NativeContextExtensions::default();
-    extensions.add(NativeTableContext::new([0; 32], &storage));
-
-    let mut sess = vm.new_session_with_extensions(&storage, extensions);
     let traversal_storage = TraversalStorage::new();
 
     let src = fs::read_to_string(&args[1])?;
     if let Ok(script_blob) = Compiler::new(test_modules.iter().collect()).into_script_blob(&src) {
+        let module_storage =
+            TestModuleStorage::with_serialized_modules(deserializer_config, serialized_modules);
+        let script_storage = TestScriptStorage::empty_with_config(deserializer_config);
+
+        let mut extensions = NativeContextExtensions::default();
+        extensions.add(NativeTableContext::new([0; 32], &resource_storage));
+        let mut sess = vm.new_session_with_extensions(&resource_storage, extensions);
+
         let args: Vec<Vec<u8>> = vec![];
         sess.execute_script(
             script_blob,
@@ -176,20 +183,22 @@ fn main() -> Result<()> {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
-            &DummyCodeStorage,
+            &module_storage,
+            &script_storage,
         )?;
     } else {
         let module = Compiler::new(test_modules.iter().collect()).into_compiled_module(&src)?;
         let mut module_blob = vec![];
         module.serialize(&mut module_blob)?;
+        resource_storage.publish_or_overwrite_module(module.self_id(), module_blob.clone());
+        serialized_modules.push((module.self_addr(), module.self_name(), module_blob.into()));
+        let module_storage =
+            TestModuleStorage::with_serialized_modules(deserializer_config, serialized_modules);
 
-        sess.publish_module(
-            module_blob,
-            *module.self_id().address(),
-            &mut UnmeteredGasMeter,
-            &DummyCodeStorage,
-        )?;
+        let mut extensions = NativeContextExtensions::default();
+        extensions.add(NativeTableContext::new([0; 32], &resource_storage));
+        let mut sess = vm.new_session_with_extensions(&resource_storage, extensions);
+
         let args: Vec<Vec<u8>> = vec![];
         let res = sess.execute_function_bypass_visibility(
             &module.self_id(),
@@ -198,7 +207,7 @@ fn main() -> Result<()> {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )?;
         println!("{:?}", res);
     }

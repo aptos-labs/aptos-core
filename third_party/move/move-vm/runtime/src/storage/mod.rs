@@ -13,3 +13,6 @@ pub mod verifier;
 
 // TODO(George): Remove when we no longer need the dummy implementation.
 pub mod dummy;
+mod test_utils;
+#[cfg(any(test, feature = "testing"))]
+pub use test_utils::{TestModuleStorage, TestScriptStorage};

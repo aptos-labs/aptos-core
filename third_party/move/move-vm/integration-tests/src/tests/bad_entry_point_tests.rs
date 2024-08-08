@@ -10,7 +10,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage};
 use move_vm_test_utils::{BlankStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -19,9 +19,12 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 #[test]
 fn call_non_existent_module() {
     let vm = MoveVM::new(vec![]);
-    let storage = BlankStorage;
 
-    let mut sess = vm.new_session(&storage);
+    let deserializer_config = &vm.vm_config().deserializer_config;
+    let module_storage = TestModuleStorage::empty(deserializer_config);
+    let resource_storage = BlankStorage;
+
+    let mut sess = vm.new_session(&resource_storage);
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -34,7 +37,7 @@ fn call_non_existent_module() {
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap_err();
 
@@ -47,32 +50,35 @@ fn call_non_existent_function() {
         module {{ADDR}}::M {}
     "#;
     let code = code.replace("{{ADDR}}", &format!("0x{}", TEST_ADDR.to_hex()));
-
     let mut units = compile_units(&code).unwrap();
     let m = as_module(units.pop().unwrap());
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();
 
-    let mut storage = InMemoryStorage::new();
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
-    storage.publish_or_overwrite_module(module_id.clone(), blob);
-
     let vm = MoveVM::new(vec![]);
-    let mut sess = vm.new_session(&storage);
 
+    let deserializer_config = &vm.vm_config().deserializer_config;
+    let module_storage = TestModuleStorage::with_serialized_modules(deserializer_config, [(
+        m.self_addr(),
+        m.self_name(),
+        blob.clone().into(),
+    )]);
+    let mut resource_storage = InMemoryStorage::new();
+    resource_storage.publish_or_overwrite_module(m.self_id(), blob);
+
+    let mut sess = vm.new_session(&resource_storage);
     let fun_name = Identifier::new("foo").unwrap();
-
     let storage = TraversalStorage::new();
 
     let err = sess
         .execute_function_bypass_visibility(
-            &module_id,
+            &m.self_id(),
             &fun_name,
             vec![],
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&storage),
-            &DummyCodeStorage,
+            &module_storage,
         )
         .unwrap_err();
 

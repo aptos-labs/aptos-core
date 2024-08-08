@@ -4,7 +4,7 @@
 
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
-    module_traversal::TraversalContext, native_functions::NativeFunctions,
+    module_traversal::TraversalContext, native_functions::NativeFunctions, script_hash,
     storage::module_storage::ModuleStorage as ModuleStorageV2,
 };
 use hashbrown::Equivalent;
@@ -53,22 +53,21 @@ mod type_loader;
 use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     storage::{
-        dummy::DummyVerifier,
-        loader::LoaderV2,
-        script_storage::{script_hash, ScriptStorage},
-        struct_name_index_map::StructNameIndexMap,
-        struct_type_storage::LoaderV1StructTypeStorage,
+        dummy::DummyVerifier, loader::LoaderV2, script_storage::ScriptStorage,
+        struct_name_index_map::StructNameIndexMap, struct_type_storage::LoaderV1StructTypeStorage,
     },
 };
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
-pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
+pub use modules::Module;
+pub(crate) use modules::{ModuleCache, ModuleStorage, ModuleStorageAdapter};
 use move_binary_format::file_format::{
     StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
     VariantFieldInstantiationIndex, VariantIndex,
 };
 use move_vm_types::loaded_data::runtime_types::{StructLayout, TypeBuilder};
-pub(crate) use script::{Script, ScriptCache};
+pub use script::Script;
+pub(crate) use script::ScriptCache;
 use type_loader::intern_type;
 
 type ScriptHash = [u8; 32];
@@ -130,7 +129,6 @@ lazy_static! {
 #[derive(Clone)]
 pub(crate) enum Loader {
     V1(LoaderV1),
-    #[allow(dead_code)]
     V2(LoaderV2<DummyVerifier>),
 }
 
@@ -154,7 +152,7 @@ impl Loader {
 
     versioned_loader_getter!(ty_cache, RwLock<TypeCache>);
 
-    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
+    pub(crate) fn v1(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::empty()),
@@ -164,6 +162,10 @@ impl Loader {
             module_cache_hits: RwLock::new(BTreeSet::new()),
             vm_config,
         })
+    }
+
+    pub(crate) fn v2(natives: NativeFunctions, vm_config: VMConfig) -> Self {
+        Self::V2(LoaderV2::new(natives, vm_config, DummyVerifier))
     }
 
     /// Flush this cache if it is marked as invalidated.
@@ -268,7 +270,7 @@ impl Loader {
             Self::V1(loader) => loader.load_script(script_blob, ty_args, data_store, module_store),
             Self::V2(loader) => loader
                 .load_script(module_storage, script_storage, script_blob, ty_args)
-                .map_err(|e| e.finish(Location::Undefined)),
+                .map_err(|e| e.finish(Location::Script)),
         }
     }
 
@@ -1726,7 +1728,7 @@ pub(crate) struct TypeCache {
 }
 
 impl TypeCache {
-    fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             structs: hashbrown::HashMap::new(),
             depth_formula: hashbrown::HashMap::new(),

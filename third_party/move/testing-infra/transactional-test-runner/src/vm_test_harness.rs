@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript,
+    compatibility::Compatibility, deserializer::DeserializerConfig, file_format::CompiledScript,
     file_format_common, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
@@ -38,11 +38,8 @@ use move_resource_viewer::MoveValueAnnotator;
 use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
-    config::VMConfig,
-    module_traversal::*,
-    move_vm::MoveVM,
-    session::{SerializedReturnValues, Session},
-    DummyCodeStorage,
+    config::VMConfig, is_loader_v2_test_env, module_traversal::*, move_vm::MoveVM,
+    session::SerializedReturnValues, TestModuleStorage, TestScriptStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -60,7 +57,10 @@ const STD_ADDR: AccountAddress = AccountAddress::ONE;
 
 struct SimpleVMTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-    storage: InMemoryStorage,
+    vm: MoveVM,
+    resource_storage: InMemoryStorage,
+    module_storage: TestModuleStorage,
+    script_storage: TestScriptStorage,
     default_syntax: SyntaxChoice,
     comparison_mode: bool,
     run_config: TestRunConfig,
@@ -141,6 +141,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             }
             named_address_mapping.insert(name, addr);
         }
+
+        let vm = Self::create_vm();
         let mut adapter = Self {
             compiled_state: CompiledState::new(
                 named_address_mapping,
@@ -151,31 +153,43 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             default_syntax,
             comparison_mode,
             run_config,
-            storage: InMemoryStorage::new(),
+            vm,
+            resource_storage: InMemoryStorage::new(),
+            module_storage: TestModuleStorage::empty(&DeserializerConfig::default()),
+            script_storage: TestScriptStorage::empty_with_config(&DeserializerConfig::default()),
         };
 
-        adapter
-            .perform_session_action(None, |session, gas_status| {
-                for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-                    .into_iter()
-                    .map(|tmod| &tmod.named_module.module)
-                {
-                    let mut module_bytes = vec![];
-                    module
-                        .serialize_for_version(
-                            Some(file_format_common::VERSION_MAX),
-                            &mut module_bytes,
-                        )
-                        .unwrap();
-                    let id = module.self_id();
-                    let sender = *id.address();
-                    session
-                        .publish_module(module_bytes, sender, gas_status, &DummyCodeStorage)
-                        .unwrap();
-                }
-                Ok(())
-            })
-            .unwrap();
+        for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+            .into_iter()
+            .map(|tmod| &tmod.named_module.module)
+        {
+            let mut module_bytes = vec![];
+            module
+                .serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)
+                .unwrap();
+            let id = module.self_id();
+            let sender = *id.address();
+
+            let mut session = adapter.vm.new_session(&adapter.resource_storage);
+            session
+                .verify_module_bundle_before_publishing(
+                    &[module.clone()],
+                    sender,
+                    &adapter.module_storage,
+                )
+                .unwrap();
+            drop(session);
+
+            adapter.module_storage.unsync_add_module(
+                module.self_addr(),
+                module.self_name(),
+                module_bytes.clone().into(),
+            );
+            adapter
+                .resource_storage
+                .publish_or_overwrite_module(module.self_id(), module_bytes);
+        }
+
         let mut addr_to_name_mapping = BTreeMap::new();
         for (name, addr) in move_stdlib_named_addresses() {
             let prev = addr_to_name_mapping.insert(addr, Symbol::from(name));
@@ -199,7 +213,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         &mut self,
         module: CompiledModule,
         _named_addr_opt: Option<Identifier>,
-        gas_budget: Option<u64>,
+        _gas_budget: Option<u64>,
         extra_args: Self::ExtraPublishArgs,
     ) -> Result<(Option<String>, CompiledModule)> {
         let mut module_bytes = vec![];
@@ -208,25 +222,36 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let id = module.self_id();
         let sender = *id.address();
         let verbose = extra_args.verbose;
-        let result = self.perform_session_action(gas_budget, |session, gas_status| {
-            let compat = if extra_args.skip_check_struct_and_pub_function_linking {
-                Compatibility::no_check()
-            } else {
-                Compatibility::new(
-                    !extra_args.skip_check_struct_layout,
-                    !extra_args.skip_check_friend_linking,
-                )
-            };
-            session.publish_module_bundle_with_compat_config(
-                vec![module_bytes],
-                sender,
-                gas_status,
-                &DummyCodeStorage,
-                compat,
+
+        let compat = if extra_args.skip_check_struct_and_pub_function_linking {
+            Compatibility::no_check()
+        } else {
+            Compatibility::new(
+                !extra_args.skip_check_struct_layout,
+                !extra_args.skip_check_friend_linking,
             )
-        });
+        };
+
+        let mut session = self.vm.new_session(&self.resource_storage);
+        let result = session.verify_module_bundle_before_publishing_with_compat_config(
+            &[module.clone()],
+            sender,
+            &self.module_storage,
+            compat,
+        );
+        drop(session);
+
         match result {
-            Ok(()) => Ok((None, module)),
+            Ok(()) => {
+                self.module_storage.unsync_add_module(
+                    module.self_addr(),
+                    module.self_name(),
+                    module_bytes.clone().into(),
+                );
+                self.resource_storage
+                    .publish_or_overwrite_module(module.self_id(), module_bytes);
+                Ok((None, module))
+            },
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
                 module.self_id(),
@@ -267,26 +292,57 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
-        self.perform_session_action(gas_budget, |session, gas_status| {
-            session.execute_script(
-                script_bytes,
-                type_args,
-                args,
-                gas_status,
-                &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
-                &DummyCodeStorage,
-            )
-        })
-        .map_err(|vm_error| {
-            anyhow!(
-                "Script execution failed with VMError: {}",
-                vm_error.format_test_output(
-                    move_test_debug() || verbose,
-                    !move_test_debug() && self.comparison_mode
-                )
-            )
-        })?;
+
+        let mut gas_status = self.get_gas_status(gas_budget);
+        let change_set = {
+            if is_loader_v2_test_env() {
+                let mut session = self.vm.new_session(&self.resource_storage);
+                session
+                    .execute_script(
+                        script_bytes,
+                        type_args,
+                        args,
+                        &mut gas_status,
+                        &mut TraversalContext::new(&traversal_storage),
+                        &self.module_storage,
+                        &self.script_storage,
+                    )
+                    .map_err(|vm_error| {
+                        anyhow!(
+                            "Script execution failed with VMError: {}",
+                            vm_error.format_test_output(
+                                move_test_debug() || verbose,
+                                !move_test_debug() && self.comparison_mode
+                            )
+                        )
+                    })?;
+                session.finish()?
+            } else {
+                let vm = Self::create_vm();
+                let mut session = vm.new_session(&self.resource_storage);
+                session
+                    .execute_script(
+                        script_bytes,
+                        type_args,
+                        args,
+                        &mut gas_status,
+                        &mut TraversalContext::new(&traversal_storage),
+                        &self.module_storage,
+                        &self.script_storage,
+                    )
+                    .map_err(|vm_error| {
+                        anyhow!(
+                            "Script execution failed with VMError: {}",
+                            vm_error.format_test_output(
+                                move_test_debug() || verbose,
+                                !move_test_debug() && self.comparison_mode
+                            )
+                        )
+                    })?;
+                session.finish()?
+            }
+        };
+        self.resource_storage.apply(change_set).unwrap();
         Ok(None)
     }
 
@@ -318,27 +374,55 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
 
-        let serialized_return_values = self
-            .perform_session_action(gas_budget, |session, gas_status| {
-                session.execute_function_bypass_visibility(
+        let mut gas_status = self.get_gas_status(gas_budget);
+
+        let (serialized_return_values, change_set) = if is_loader_v2_test_env() {
+            let mut session = self.vm.new_session(&self.resource_storage);
+            let results = session
+                .execute_function_bypass_visibility(
                     module,
                     function,
                     type_args,
                     args,
-                    gas_status,
+                    &mut gas_status,
                     &mut TraversalContext::new(&traversal_storage),
-                    &DummyCodeStorage,
+                    &self.module_storage,
                 )
-            })
-            .map_err(|vm_error| {
-                anyhow!(
-                    "Function execution failed with VMError: {}",
-                    vm_error.format_test_output(
-                        move_test_debug() || verbose,
-                        !move_test_debug() && self.comparison_mode
+                .map_err(|vm_error| {
+                    anyhow!(
+                        "Function execution failed with VMError: {}",
+                        vm_error.format_test_output(
+                            move_test_debug() || verbose,
+                            !move_test_debug() && self.comparison_mode
+                        )
                     )
+                })?;
+            (results, session.finish()?)
+        } else {
+            let vm = Self::create_vm();
+            let mut session = vm.new_session(&self.resource_storage);
+            let results = session
+                .execute_function_bypass_visibility(
+                    module,
+                    function,
+                    type_args,
+                    args,
+                    &mut gas_status,
+                    &mut TraversalContext::new(&traversal_storage),
+                    &self.module_storage,
                 )
-            })?;
+                .map_err(|vm_error| {
+                    anyhow!(
+                        "Function execution failed with VMError: {}",
+                        vm_error.format_test_output(
+                            move_test_debug() || verbose,
+                            !move_test_debug() && self.comparison_mode
+                        )
+                    )
+                })?;
+            (results, session.finish()?)
+        };
+        self.resource_storage.apply(change_set).unwrap();
         Ok((None, serialized_return_values))
     }
 
@@ -356,15 +440,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             type_args,
         };
         match self
-            .storage
+            .resource_storage
             .get_resource_bytes_with_metadata_and_layout(&address, &tag, &[], None)
             .unwrap()
             .0
         {
             None => Ok("[No Resource Exists]".to_owned()),
             Some(data) => {
-                let annotated =
-                    MoveValueAnnotator::new(self.storage.clone()).view_resource(&tag, &data)?;
+                let annotated = MoveValueAnnotator::new(self.resource_storage.clone())
+                    .view_resource(&tag, &data)?;
                 Ok(format!("{}", annotated))
             },
         }
@@ -376,41 +460,28 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 }
 
 impl<'a> SimpleVMTestAdapter<'a> {
-    fn perform_session_action<Ret>(
-        &mut self,
-        gas_budget: Option<u64>,
-        f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
-    ) -> VMResult<Ret> {
+    fn create_vm() -> MoveVM {
         let vm_config = VMConfig {
             verifier_config: VerifierConfig::production(),
             paranoid_type_checks: true,
             ..VMConfig::default()
         };
-        let vm = MoveVM::new_with_config(
+        MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 STD_ADDR,
                 // TODO: come up with a suitable gas schedule
                 move_stdlib::natives::GasParameters::zeros(),
             ),
             vm_config,
-        );
-        let (mut session, mut gas_status) = {
-            let gas_status = get_gas_status(
-                &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
-                gas_budget,
-            )
-            .unwrap();
-            let session = vm.new_session(&self.storage);
-            (session, gas_status)
-        };
+        )
+    }
 
-        // perform op
-        let res = f(&mut session, &mut gas_status)?;
-
-        // save changeset
-        let changeset = session.finish()?;
-        self.storage.apply(changeset).unwrap();
-        Ok(res)
+    fn get_gas_status(&self, gas_budget: Option<u64>) -> GasStatus {
+        get_gas_status(
+            &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
+            gas_budget,
+        )
+        .unwrap()
     }
 }
 
