@@ -61,6 +61,8 @@ pub struct Layout {
     pub voting_duration_secs: u64,
     /// % of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+    /// Timestamp for Genesis in microseconds
+    pub genesis_timestamp_in_microseconds: u64,
     /// Total supply of coins
     pub total_supply: Option<u64>,
     /// Timestamp (in seconds) when employee vesting starts.
@@ -110,6 +112,7 @@ impl Default for Layout {
             rewards_apy_percentage: 10,
             voting_duration_secs: 43_200,
             voting_power_increase_limit: 20,
+            genesis_timestamp_in_microseconds: 0,
             total_supply: None,
             employee_vesting_start: Some(1663456089),
             employee_vesting_period_duration: Some(5 * 60), // 5 minutes
