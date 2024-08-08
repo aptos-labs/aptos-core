@@ -41,6 +41,7 @@ use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use move_ir_types::location::{sp, Spanned};
 use num::{BigInt, FromPrimitive, Zero};
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet, LinkedList},
     mem,
 };
@@ -78,7 +79,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// `accessed_locals`. See also documentation of function `mark_context_scopes`.
     pub outer_context_scopes: usize,
     /// A flag to indicate whether errors have been generated so far.
-    pub had_errors: bool,
+    pub had_errors: RefCell<bool>,
     /// Set containing all the functions called during translation.
     pub called_spec_funs: BTreeSet<(ModuleId, SpecFunId)>,
     /// A mapping from SpecId to SpecBlock (expansion ast)
@@ -150,7 +151,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             node_counter_start,
             accessed_locals: BTreeSet::new(),
             outer_context_scopes: 0,
-            had_errors: false,
+            had_errors: RefCell::default(),
             called_spec_funs: BTreeSet::new(),
             spec_block_map: BTreeMap::new(),
             placeholder_map: BTreeMap::new(),
@@ -265,19 +266,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Shortcut for reporting an error.
-    pub fn error(&mut self, loc: &Loc, msg: &str) {
+    pub fn error(&self, loc: &Loc, msg: &str) {
         self.error_with_notes(loc, msg, vec![])
     }
 
     /// Shortcut for reporting an error.
-    pub fn error_with_notes(&mut self, loc: &Loc, msg: &str, notes: Vec<String>) {
-        self.had_errors = true;
+    pub fn error_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
+        *self.had_errors.borrow_mut() = true;
         self.parent.parent.error_with_notes(loc, msg, notes);
     }
 
     /// Shortcut for reporting an error.
-    pub fn error_with_labels(&mut self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
-        self.had_errors = true;
+    pub fn error_with_labels(&self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
+        *self.had_errors.borrow_mut() = true;
         self.env().error_with_labels(loc, msg, labels);
     }
 
@@ -289,13 +290,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         notes: Vec<String>,
         labels: Vec<(Loc, String)>,
     ) {
-        self.had_errors = true;
+        *self.had_errors.borrow_mut() = true;
         self.env()
             .diag_with_primary_notes_and_labels(Severity::Error, loc, msg, "", notes, labels);
     }
 
     /// Shortcut for reporting a bug
-    pub fn bug(&mut self, loc: &Loc, msg: &str) {
+    pub fn bug(&self, loc: &Loc, msg: &str) {
         self.env().diag(Severity::Bug, loc, msg)
     }
 
@@ -378,7 +379,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Finalizes types in this translator, producing errors if some could not be inferred
     /// and remained incomplete.
     pub fn finalize_types(&mut self) {
-        if !self.had_errors {
+        if !*self.had_errors.borrow() {
             let mut reported_vars = BTreeSet::new();
             for i in self.node_counter_start..self.env().next_free_node_number() {
                 let node_id = NodeId::new(i);
@@ -627,6 +628,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             depth -= 1;
         }
         None
+    }
+
+    pub fn lookup_struct_entry(&self, name: &QualifiedSymbol) -> &StructEntry {
+        self.parent.parent.lookup_struct_entry_by_name(name)
     }
 
     /// Analyzes the sequence of type parameters as they are provided via the source AST and enters
@@ -2387,7 +2392,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             maccess,
                             generics,
                             None,
-                            false,
                         ) {
                             pat
                         } else {
@@ -2406,7 +2410,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     maccess,
                     generics,
                     Some(args),
-                    false,
                 ) {
                     pat
                 } else {
@@ -2448,21 +2451,118 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         maccess: &EA::ModuleAccess,
         generics: &Option<Vec<EA::Type>>,
         fields: Option<&EA::Fields<EA::LValue>>,
-        no_args_check: bool, // skip evaluating any arguments
     ) -> Option<Pattern> {
-        // Check whether the requested type is a reference. If so, we remember this and
-        // the target type of the reference. The reference expectation is pushed down
-        // to the arguments of the unpack if needed.
-        let (ref_expected, expected_type) =
-            if let Type::Reference(kind, ty) = self.subs.specialize(expected_type) {
-                (Some(kind), *ty)
-            } else {
-                (None, expected_type.clone())
-            };
+        // Translate constructor name
+        let expected_type = self.subs.specialize(expected_type);
+        let Some((
+            QualifiedInstId {
+                module_id,
+                id,
+                inst,
+            },
+            variant,
+        )) = self.translate_constructor_name(
+            &expected_type,
+            expected_order,
+            context,
+            loc,
+            maccess,
+            generics,
+        )
+        else {
+            // error reported by `translate_constructor_name`
+            return None;
+        };
+        let struct_name = self
+            .parent
+            .parent
+            .get_struct_name(module_id.qualified(id))
+            .clone();
+        let struct_name_loc = self.to_loc(&maccess.loc);
+        let ref_expected = expected_type.try_reference_kind();
 
-        // Determine whether expected type has variants
-        let variant_struct_info = if let Type::Struct(mid, sid, _) = &expected_type {
-            let entry = self.parent.parent.lookup_struct_entry(mid.qualified(*sid));
+        // Process argument list
+        let mut args = BTreeMap::new();
+        let (field_decls, _is_positional) =
+            self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
+        let field_decls = field_decls.clone();
+        if let Some(fields) = fields {
+            // Check whether all fields are covered.
+            self.check_missing_or_undeclared_fields(
+                loc,
+                struct_name.clone(),
+                &field_decls,
+                fields,
+            )?;
+            // Translate fields
+            for (_, name, (_, value)) in fields.iter() {
+                let field_name = self.symbol_pool().make(name);
+                if let Some(field_data) = field_decls.get(&field_name) {
+                    let field_ty = field_data.ty.instantiate(&inst);
+                    let expected_field_ty = if let Some(kind) = ref_expected {
+                        Type::Reference(kind, Box::new(field_ty.clone()))
+                    } else {
+                        field_ty.clone()
+                    };
+                    let translated = self.translate_lvalue(
+                        value,
+                        &expected_field_ty,
+                        expected_order,
+                        match_locals,
+                        context,
+                    );
+                    args.insert(field_data.offset, translated);
+                }
+            }
+        } else if !field_decls.is_empty() {
+            self.error(
+                loc,
+                &format!(
+                    "no arguments provided for unpack, expected {}",
+                    field_decls.len()
+                ),
+            )
+        }
+
+        let mut args = args
+            .into_iter()
+            .sorted_by_key(|(i, _)| *i)
+            .map(|(_, value)| value)
+            .collect_vec();
+        if variant.is_none() && args.is_empty() {
+            // The v1 move compiler inserts a dummy field with the value of false
+            // for structs with no fields. We simulate this here for now.
+            let id = self.new_node_id_with_type_loc(&Type::new_prim(PrimitiveType::Bool), loc);
+            args.push(Pattern::Wildcard(id))
+        }
+
+        let struct_id = module_id.qualified_inst(id, inst);
+        let node_ty = if let Some(kind) = ref_expected {
+            Type::Reference(kind, Box::new(struct_id.to_type()))
+        } else {
+            struct_id.to_type()
+        };
+        let node_id = self.new_node_id_with_type_loc(&node_ty, loc);
+        Some(Pattern::Struct(node_id, struct_id, variant, args))
+    }
+
+    /// Translates a constructor name based on the given module access and
+    /// optional generic type arguments, using the expected_type for name
+    /// resolution.
+    fn translate_constructor_name(
+        &mut self,
+        expected_type: &Type,
+        expected_order: WideningOrder,
+        context: &ErrorMessageContext,
+        loc: &Loc,
+        maccess: &EA::ModuleAccess,
+        generics: &Option<Vec<EA::Type>>,
+    ) -> Option<(QualifiedInstId<StructId>, Option<Symbol>)> {
+        let expected_type = self.subs.specialize(expected_type).drop_reference();
+        // Determine whether expected type is known to have variants (at this
+        // point during inference). If so, they are used for name resolution.
+        let variant_struct_info = if let Type::Struct(mid, sid, _) = expected_type {
+            let entry = self.parent.parent.lookup_struct_entry(mid.qualified(sid));
             if let StructLayout::Variants(variants) = &entry.layout {
                 Some((
                     entry,
@@ -2514,78 +2614,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
         }
 
-        // Process argument list
-        let mut args = BTreeMap::new();
-        debug_assert!(!no_args_check || fields.is_none());
-        if !no_args_check {
-            let (field_decls, _is_positional) = self.get_field_decls_for_pack_unpack(
-                &struct_entry,
-                &struct_name,
-                &struct_name_loc,
-                variant,
-            )?;
-            let field_decls = field_decls.clone();
-            if let Some(fields) = fields {
-                // Check whether all fields are covered.
-                self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
-                // Translate fields
-                for (_, name, (_, value)) in fields.iter() {
-                    let field_name = self.symbol_pool().make(name);
-                    if let Some(field_data) = field_decls.get(&field_name) {
-                        let field_ty = field_data.ty.instantiate(&instantiation);
-                        let expected_field_ty = if let Some(kind) = ref_expected {
-                            Type::Reference(kind, Box::new(field_ty.clone()))
-                        } else {
-                            field_ty.clone()
-                        };
-                        let translated = self.translate_lvalue(
-                            value,
-                            &expected_field_ty,
-                            expected_order,
-                            match_locals,
-                            context,
-                        );
-                        args.insert(field_data.offset, translated);
-                    }
-                }
-            } else if !field_decls.is_empty() {
-                self.error(
-                    loc,
-                    &format!(
-                        "no arguments provided for unpack, expected {}",
-                        field_decls.len()
-                    ),
-                )
-            }
-        }
-
+        // Verify type derived from reference with expected type.
         let struct_id = struct_entry
             .module_id
             .qualified_inst(struct_entry.struct_id, instantiation);
-        let mut args = args
-            .into_iter()
-            .sorted_by_key(|(i, _)| *i)
-            .map(|(_, value)| value)
-            .collect_vec();
-        if !no_args_check && variant.is_none() && args.is_empty() {
-            // The v1 move compiler inserts a dummy field with the value of false
-            // for structs with no fields. We simulate this here for now.
-            let id = self.new_node_id_with_type_loc(&Type::new_prim(PrimitiveType::Bool), loc);
-            args.push(Pattern::Wildcard(id))
-        }
         let ty = struct_id.to_type();
         let ty = self.check_type_with_order(expected_order, loc, &ty, &expected_type, context);
-        let node_ty = if let Some(kind) = ref_expected {
-            Type::Reference(kind, Box::new(ty.clone()))
-        } else {
-            ty.clone()
-        };
-        let id = self.new_node_id_with_type_loc(&node_ty, loc);
-        let mut std = struct_id;
+        // Convert the unified type back to struct id
+        let mut struct_id = struct_id;
         if let Type::Struct(_, _, types) = ty {
-            std.inst = types;
+            struct_id.inst = types;
         }
-        Some(Pattern::Struct(id, std, variant, args))
+
+        Some((struct_id, variant))
     }
 
     fn new_error_pat(&mut self, loc: &Loc) -> Pattern {
@@ -3408,7 +3449,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         );
         let idx_exp_e =
             self.translate_exp_in_context(idx_exp, &Type::Primitive(PrimitiveType::U64), context);
-        if self.had_errors {
+        if *self.had_errors.borrow() {
             return self.new_error_exp();
         }
         if let (Some(mid), Some(fid)) = self.get_vector_borrow(mutable) {
@@ -3743,29 +3784,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         for ty in tys {
             let loc = self.to_loc(&ty.loc);
             if let EA::Type_::Apply(maccess, generics) = &ty.value {
-                let pat = self.translate_lvalue_unpack(
+                if let Some((inferred_struct_id, variant)) = self.translate_constructor_name(
                     &exp_ty,
                     WideningOrder::LeftToRight,
-                    false,
-                    &ErrorMessageContext::General,
+                    context,
                     &loc,
                     maccess,
                     &Some(generics.clone()),
-                    None,
-                    true,
-                );
-                match pat {
-                    Some(Pattern::Struct(_, str_id, Some(variant), _)) => {
+                ) {
+                    if let Some(variant) = variant {
+                        // Any time in the loop is the same if type unification succeeds, so
+                        // we can take the first
+                        struct_id.get_or_insert(inferred_struct_id);
                         variants.push(variant);
-                        struct_id = Some(str_id)
-                    },
-                    None | Some(Pattern::Error(_)) => {
-                        // error reported
-                    },
-                    Some(_) => self.error(&loc, "expected enum variant"),
+                    } else {
+                        self.error(
+                            &loc,
+                            &format!(
+                                "expected variant of enum type but found type `{}`",
+                                self.env().display(&inferred_struct_id)
+                            ),
+                        )
+                    }
+                } else {
+                    // Error reported by call to `translate_constructor_name`
                 }
-            } else {
-                self.error(&loc, "expected enum variant")
             }
         }
         self.check_type(
@@ -4411,12 +4454,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // is equivalent.
         let mut bindings = BTreeMap::new();
         let mut args = BTreeMap::new();
-        let (field_decls, is_positional_constructor) = self.get_field_decls_for_pack_unpack(
-            &struct_entry,
-            &struct_name,
-            &struct_name_loc,
-            variant,
-        )?;
+        let (field_decls, is_positional_constructor) =
+            self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
         let field_decls = field_decls.clone();
         if is_positional_constructor != expected_positional_constructor {
             let struct_name_display = struct_name.display(self.env());
@@ -4576,14 +4615,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         false
     }
 
-    fn get_field_decls_for_pack_unpack<'a>(
-        &'a mut self,
-        s: &'a StructEntry,
+    fn get_field_decls_for_pack_unpack(
+        &mut self,
         struct_name: &QualifiedSymbol,
         struct_name_loc: &Loc,
         variant: Option<Symbol>,
     ) -> Option<(&BTreeMap<Symbol, FieldData>, bool)> {
-        match (&s.layout, variant) {
+        let struct_entry = self.lookup_struct_entry(struct_name);
+        match (&struct_entry.layout, variant) {
             (StructLayout::Singleton(fields, is_positional), None) => {
                 Some((fields, *is_positional))
             },
