@@ -5939,7 +5939,6 @@ module supra_framework::pbo_delegation_pool {
 
         let new_delegator_address = @0x0215;
         let new_delegator_address_signer = account::create_account_for_test(new_delegator_address);
-        let fee = get_add_stake_fee(pool_address, 100 * ONE_APT);
 
         stake::mint(&new_delegator_address_signer, 100 * ONE_APT);
         assert!(coin::balance<SupraCoin>(new_delegator_address) == (100 * ONE_APT), 0);
@@ -5954,5 +5953,60 @@ module supra_framework::pbo_delegation_pool {
 
         withdraw(&new_delegator_address_signer, pool_address, (100 * ONE_APT));
         assert!(coin::balance<SupraCoin>(new_delegator_address) == (100 * ONE_APT) - 1, 0);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    /// say unlocking schedule is 3 month cliff, monthly unlocking of 10% and principle stake is 100 coins then
+    /// at the end of 2 months, one can only unlock rewards (say if 100 becomes 110)
+    /// between 3 and 4 months, only unlock rewards (check if they try to unlock more in which case it should fail, so add both positive and negative case)
+    /// after 4 months only 90 should remain locked
+    /// arfter 5 months only 80 should remain locked
+    /// Try with vesting schedule length of 3 and period passed is 2, 3 and 4 (so that it can reuse the last fraction)
+    public entry fun test_unlocking_flow_success(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address, @0x020];
+        let principle_stake = vector[100 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(300 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator, 0, true, true, 0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        unlock(delegator, pool_address, 201000000); // 201000000 reward of 2 month stack
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        withdraw(delegator, pool_address, 201000000);
+        assert!(coin::balance<SupraCoin>(delegator_address) == (201000000 - 1), 0);
+
+        // after 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        unlock(delegator, pool_address, 1385940098);
     }
 }
