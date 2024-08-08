@@ -44,7 +44,10 @@ use futures::{
     FutureExt, StreamExt,
 };
 use std::{
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{Duration, Instant, SystemTime},
 };
 use tokio::{runtime::Handle, time::interval};
@@ -142,6 +145,10 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
     let mempool = smp.mempool.clone();
     let mempool_validator = smp.validator.clone();
     let use_case_history = smp.use_case_history.clone();
+    let num_committed_txns_recieved_since_peers_updated = smp
+        .network_interface
+        .num_committed_txns_received_since_peers_updated
+        .clone();
 
     tokio::spawn(async move {
         while let Some(commit_notification) = mempool_listener.next().await {
@@ -150,6 +157,7 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
                 &mempool_validator,
                 &use_case_history,
                 commit_notification,
+                &num_committed_txns_recieved_since_peers_updated,
             );
         }
     });
@@ -177,7 +185,8 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
                 counters::CLIENT_EVENT_LABEL,
                 counters::START_LABEL,
             );
-            smp.network_interface.num_txns_received_since_peers_updated += 1;
+            smp.network_interface
+                .num_mempool_txns_received_since_peers_updated += 1;
             bounded_executor
                 .spawn(tasks::process_client_transaction_submission(
                     smp.clone(),
@@ -218,6 +227,7 @@ fn handle_commit_notification<TransactionValidator>(
     mempool_validator: &Arc<RwLock<TransactionValidator>>,
     use_case_history: &Arc<Mutex<UseCaseHistory>>,
     msg: MempoolCommitNotification,
+    num_committed_txns_recieved_since_peers_updated: &Arc<AtomicU64>,
 ) where
     TransactionValidator: TransactionValidation,
 {
@@ -233,6 +243,8 @@ fn handle_commit_notification<TransactionValidator>(
         counters::COMMIT_STATE_SYNC_LABEL,
         msg.transactions.len(),
     );
+    num_committed_txns_recieved_since_peers_updated
+        .fetch_add(msg.transactions.len() as u64, Ordering::Relaxed);
     process_committed_transactions(
         mempool,
         use_case_history,
@@ -289,7 +301,8 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
-    smp.network_interface.num_txns_received_since_peers_updated += transactions.len() as u64;
+    smp.network_interface
+        .num_mempool_txns_received_since_peers_updated += transactions.len() as u64;
     let smp_clone = smp.clone();
     let peer = PeerNetworkId::new(network_id, peer_id);
     let ineligible_for_broadcast = (smp.network_interface.is_validator()

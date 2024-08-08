@@ -77,14 +77,14 @@ pub struct Options {
     /// Sources to compile (positional arg, therefore last).
     /// Each source should be a path to either (1) a Move file or (2) a directory containing Move
     /// files, all to be compiled (e.g., not the root directory of a package---which contains
-    /// Move.toml---but a specific subdirectorysuch as `sources`, `scripts`, and/or `tests`,
+    /// Move.toml---but a specific subdirectory such as `sources`, `scripts`, and/or `tests`,
     /// depending on compilation mode).
     pub sources: Vec<String>,
 
     /// Dependencies to compile but not treat as a test/docgen/warning/prover target.
     /// Each source_dep should be a path to either (1) a Move file or (2) a directory containing
     /// Move files, all to be compiled (e.g., not the root directory of a package---which contains
-    /// Move.toml---but a specific subdirectorysuch as `sources`).
+    /// Move.toml---but a specific subdirectory such as `sources`).
     #[clap(skip)]
     pub sources_deps: Vec<String>,
 

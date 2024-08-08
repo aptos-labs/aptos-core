@@ -195,16 +195,14 @@ B0:
 B1:
 	2: MoveLoc[0](Arg0: u64)
 	3: Call consume(u64)
-	4: Branch(11)
+	4: Branch(9)
 B2:
-	5: LdU64(1)
-	6: StLoc[2](loc0: u64)
-	7: MoveLoc[0](Arg0: u64)
-	8: MoveLoc[2](loc0: u64)
-	9: Add
-	10: Pop
+	5: MoveLoc[0](Arg0: u64)
+	6: LdU64(1)
+	7: Add
+	8: Pop
 B3:
-	11: Ret
+	9: Ret
 }
 }
 ============ bytecode verification succeeded ========

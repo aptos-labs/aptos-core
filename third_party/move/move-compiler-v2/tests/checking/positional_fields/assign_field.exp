@@ -1,0 +1,96 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    enum E {
+        V1 {
+            0: u8,
+            1: bool,
+        }
+        V2 {
+            0: test::S3,
+        }
+    }
+    struct S0 {
+        x: u8,
+    }
+    struct S1 {
+        0: u64,
+        1: bool,
+    }
+    struct S2 {
+        0: test::S0,
+        1: u8,
+    }
+    struct S3 {
+        0: test::S2,
+        1: test::S0,
+        2: test::S2,
+    }
+    private fun assign0(a: u64,b: bool) {
+        {
+          let x: test::S1 = pack test::S1(a, b);
+          loop {
+            if select test::S1.1<test::S1>(x) {
+              x: test::S1 = pack test::S1(Sub<u64>(select test::S1.0<test::S1>(x), 1), Ge<u64>(select test::S1.0<test::S1>(x), 1));
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    private fun assign1(x: test::S1): u64 {
+        {
+          let count: u64 = 0;
+          loop {
+            if select test::S1.1<test::S1>(x) {
+              {
+                let y: u64 = if Gt<u64>(select test::S1.0<test::S1>(x), 0) {
+                  Sub<u64>(select test::S1.0<test::S1>(x), 1)
+                } else {
+                  0
+                };
+                x: test::S1 = pack test::S1(y, Ge<u64>(y, 1));
+                count: u64 = Add<u64>(count, 1);
+                Tuple()
+              }
+            } else {
+              break
+            }
+          };
+          count
+        }
+    }
+    private fun assign_chained(x: test::S3) {
+        Add<u8>(Add<u8>(select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.0<test::S3>(x))), select test::S0.x<test::S0>(select test::S3.1<test::S3>(x))), select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.2<test::S3>(x))));
+        select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.0<test::S3>(x))) = 0;
+        select test::S0.x<test::S0>(select test::S3.1<test::S3>(x)) = 1;
+        select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.2<test::S3>(x))) = 2;
+        Tuple()
+    }
+    private fun assign_enum(x: &mut test::E) {
+        match (x) {
+          test::E::V1{ 0: x, 1: y } => {
+            x = 42;
+            y = true;
+            Tuple()
+          }
+          test::E::V2{ 0: x } => {
+            select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.0<&mut test::S3>(x))) = 0;
+            select test::S0.x<test::S0>(select test::S3.1<&mut test::S3>(x)) = 1;
+            select test::S0.x<test::S0>(select test::S2.0<test::S2>(select test::S3.2<&mut test::S3>(x))) = 2;
+            Tuple()
+          }
+        }
+
+    }
+    private fun simple(x: test::S1) {
+        select test::S1.0<test::S1>(x) = 42;
+        select test::S1.1<test::S1>(x) = true;
+        Tuple()
+    }
+    private fun simple_ref(x: &mut test::S1) {
+        select test::S1.0<&mut test::S1>(x) = 42;
+        select test::S1.1<&mut test::S1>(x) = true;
+        Tuple()
+    }
+} // end 0x42::test

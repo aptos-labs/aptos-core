@@ -164,16 +164,14 @@ L2:	loc1: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: StLoc[1](loc0: u64)
-	2: LdU64(1)
-	3: StLoc[2](loc1: u64)
-	4: MoveLoc[0](Arg0: u64)
-	5: MoveLoc[2](loc1: u64)
-	6: Add
-	7: StLoc[0](Arg0: u64)
-	8: MoveLoc[1](loc0: u64)
-	9: MoveLoc[0](Arg0: u64)
-	10: Call add(u64, u64): u64
-	11: Ret
+	2: MoveLoc[0](Arg0: u64)
+	3: LdU64(1)
+	4: Add
+	5: StLoc[0](Arg0: u64)
+	6: MoveLoc[1](loc0: u64)
+	7: MoveLoc[0](Arg0: u64)
+	8: Call add(u64, u64): u64
+	9: Ret
 }
 }
 ============ bytecode verification succeeded ========

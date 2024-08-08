@@ -136,12 +136,10 @@ B1:
 	3: StLoc[1](Arg1: u64)
 	4: Branch(5)
 B2:
-	5: LdU64(1)
-	6: StLoc[2](loc0: u64)
-	7: MoveLoc[1](Arg1: u64)
-	8: MoveLoc[2](loc0: u64)
-	9: Add
-	10: Ret
+	5: MoveLoc[1](Arg1: u64)
+	6: LdU64(1)
+	7: Add
+	8: Ret
 }
 }
 ============ bytecode verification succeeded ========

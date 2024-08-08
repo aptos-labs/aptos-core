@@ -316,25 +316,19 @@ B1:
 	2: CopyLoc[3](loc0: u64)
 	3: CopyLoc[0](Arg0: u64)
 	4: Lt
-	5: BrFalse(17)
+	5: BrFalse(11)
 B2:
-	6: MoveLoc[2](Arg2: u64)
-	7: StLoc[1](Arg1: u64)
-	8: MoveLoc[1](Arg1: u64)
-	9: StLoc[2](Arg2: u64)
-	10: LdU64(1)
-	11: StLoc[1](Arg1: u64)
-	12: MoveLoc[3](loc0: u64)
-	13: MoveLoc[1](Arg1: u64)
-	14: Add
-	15: StLoc[3](loc0: u64)
-	16: Branch(18)
+	6: MoveLoc[3](loc0: u64)
+	7: LdU64(1)
+	8: Add
+	9: StLoc[3](loc0: u64)
+	10: Branch(12)
 B3:
-	17: Branch(19)
+	11: Branch(13)
 B4:
-	18: Branch(2)
+	12: Branch(2)
 B5:
-	19: Ret
+	13: Ret
 }
 public test2(Arg0: u64, Arg1: u64) /* def_idx: 1 */ {
 L2:	loc0: u64
@@ -345,21 +339,19 @@ B1:
 	2: CopyLoc[1](Arg1: u64)
 	3: CopyLoc[0](Arg0: u64)
 	4: Lt
-	5: BrFalse(13)
+	5: BrFalse(11)
 B2:
-	6: LdU64(1)
-	7: StLoc[2](loc0: u64)
-	8: MoveLoc[1](Arg1: u64)
-	9: MoveLoc[2](loc0: u64)
-	10: Add
-	11: StLoc[1](Arg1: u64)
-	12: Branch(14)
+	6: MoveLoc[1](Arg1: u64)
+	7: LdU64(1)
+	8: Add
+	9: StLoc[1](Arg1: u64)
+	10: Branch(12)
 B3:
-	13: Branch(15)
+	11: Branch(13)
 B4:
-	14: Branch(2)
+	12: Branch(2)
 B5:
-	15: Ret
+	13: Ret
 }
 }
 ============ bytecode verification succeeded ========
