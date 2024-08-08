@@ -1356,13 +1356,8 @@ impl<'env> Generator<'env> {
         variants: Vec<Symbol>,
         src: TempIndex,
     ) {
-        let bool_temp = if let Some(t) = *bool_temp {
-            t
-        } else {
-            let t = self.new_temp(Type::new_prim(PrimitiveType::Bool));
-            *bool_temp = Some(t);
-            t
-        };
+        let bool_temp =
+            *bool_temp.get_or_insert_with(|| self.new_temp(Type::new_prim(PrimitiveType::Bool)));
         for variant in variants {
             self.emit_call(
                 id,
