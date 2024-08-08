@@ -1150,7 +1150,9 @@ impl ConsensusObserver {
                 _ = progress_check_interval.select_next_some() => {
                     self.check_progress().await;
                 }
-            else => break,
+                else => {
+                    break; // Exit the consensus observer loop
+                }
             }
         }
 
