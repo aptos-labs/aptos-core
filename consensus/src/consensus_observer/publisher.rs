@@ -14,7 +14,7 @@ use crate::consensus_observer::{
 use aptos_channels::aptos_channel::Receiver;
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_infallible::RwLock;
-use aptos_logger::{info, warn};
+use aptos_logger::{error, info, warn};
 use aptos_network::application::interface::NetworkClient;
 use futures::{SinkExt, StreamExt};
 use futures_channel::mpsc;
@@ -228,8 +228,15 @@ impl ConsensusPublisher {
                 _ = garbage_collection_interval.select_next_some() => {
                     self.garbage_collect_subscriptions();
                 },
+                else => {
+                    break; // Exit the consensus publisher loop
+                }
             }
         }
+
+        // Log the exit of the consensus publisher loop
+        error!(LogSchema::new(LogEntry::ConsensusPublisher)
+            .message("The consensus publisher loop exited unexpectedly!"));
     }
 }
 
