@@ -281,7 +281,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter:
-            // For debugging:
+            // For debugging (dump_bytecode set DumpLevel::AllStages)
              Some(vec![
                INITIAL_BYTECODE_STAGE,
                "ReferenceSafetyProcessor",
