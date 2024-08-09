@@ -915,6 +915,8 @@ enum ReadMode {
     Copy,
     /// The local is transferred as an argument to another function
     Argument,
+    /// The local is used as a branch condition
+    BranchCondition,
 }
 
 impl<'env> LifeTimeAnalysis<'env> {
@@ -1042,6 +1044,26 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                                 self.display(local)
                             ),
                             "passed here",
+                            self.borrow_info(label, |_| true)
+                                .into_iter()
+                                .chain(usage_info()),
+                        );
+                        false
+                    } else {
+                        true
+                    }
+                },
+                ReadMode::BranchCondition => {
+                    // Mutable borrow not allowed
+                    if self.state.has_mut_edges(label) {
+                        self.error_with_hints(
+                            loc,
+                            format!(
+                                "cannot use {} which is still mutably \
+                                    borrowed as branch condition",
+                                self.display(local)
+                            ),
+                            "used in this context",
                             self.borrow_info(label, |_| true)
                                 .into_iter()
                                 .chain(usage_info()),
@@ -1990,6 +2012,9 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                 step.assign(*dest, *src, *kind);
             },
             Ret(_, srcs) => step.return_(srcs),
+            Branch(_, _, _, src) => {
+                step.check_read_local(*src, ReadMode::BranchCondition);
+            },
             Call(_, dests, oper, srcs, _) => {
                 use Operation::*;
                 match oper {

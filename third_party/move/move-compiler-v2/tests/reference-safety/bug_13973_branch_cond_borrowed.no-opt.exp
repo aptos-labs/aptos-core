@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot use local `x` which is still mutably borrowed as branch condition
+  ┌─ tests/reference-safety/bug_13973_branch_cond_borrowed.move:4:9
+  │
+3 │           let y: &mut bool =  &mut x;
+  │                               ------ previous mutable local borrow
+4 │ ╭         if (x) {
+5 │ │         } else {
+6 │ │             *y= false;
+  │ │             --------- conflicting reference `y` used here
+7 │ │         };
+  │ ╰─────────^ used in this context
