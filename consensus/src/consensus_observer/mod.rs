@@ -14,3 +14,4 @@ pub mod payload_store;
 pub mod pending_blocks;
 pub mod publisher;
 mod subscription;
+mod subscription_manager;
