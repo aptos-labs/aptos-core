@@ -5,7 +5,8 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     consensus_observer::{
-        network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
+        network::observer_message::ConsensusObserverMessage,
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     counters::{self, log_executor_error_occurred},
     monitor,

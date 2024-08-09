@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_observer::{
+use crate::consensus_observer::common::{
     error::Error,
     logging::{LogEntry, LogSchema},
 };

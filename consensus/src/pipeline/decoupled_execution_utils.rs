@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::publisher::ConsensusPublisher,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     network::{IncomingCommitRequest, NetworkSender},
     pipeline::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
