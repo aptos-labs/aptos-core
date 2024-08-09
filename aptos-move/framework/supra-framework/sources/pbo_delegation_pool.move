@@ -5614,7 +5614,7 @@ module supra_framework::pbo_delegation_pool {
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     #[expected_failure(abort_code = 327716, location = Self)]
     /// if admin is option::none() calling to `replace_delegator` should fail
-    public entry fun test_repalce_delegration_without_multisig_failure(
+    public entry fun test_repalce_delegation_without_multisig_failure(
         supra_framework: &signer,
         validator: &signer
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
@@ -5630,7 +5630,7 @@ module supra_framework::pbo_delegation_pool {
             delegator_address,
             principle_stake,
             coin,
-            option::some(multisig),
+            option::none(),
             vector[2, 2, 3],
             10,
             principle_lockup_time,
@@ -5638,7 +5638,7 @@ module supra_framework::pbo_delegation_pool {
         );
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
-        replace_delegator(validator, pool_address, @0x010, @0x0101);
+        replace_delegator(&account::create_signer_for_test(multisig), pool_address, @0x010, @0x0101);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
@@ -5673,7 +5673,7 @@ module supra_framework::pbo_delegation_pool {
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     #[expected_failure(abort_code = 327716, location = Self)]
     /// if admin is multi signer calling `replace_delegator` if it's not the same signer which was initialized, it should fail
-    public entry fun test_repalce_delegration_with_different_multisig_failure(
+    public entry fun test_repalce_delegation_with_different_multisig_failure(
         supra_framework: &signer,
         validator: &signer
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
@@ -5706,7 +5706,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     /// if admin is authorized multi signer, `replace_delegator` should succeed
-    public entry fun test_repalce_delegration_multisig_success(
+    public entry fun test_repalce_delegation_multisig_success(
         supra_framework: &signer,
         validator: &signer
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
@@ -5737,7 +5737,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     /// if old_delegator has already unlocked 100, the new_delegator should be able to withdraw 100 coins
-    public entry fun test_repalce_delegration_before_withdraw_and_after_withdraw_success(
+    public entry fun test_repalce_delegation_before_withdraw_and_after_withdraw_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer,
@@ -5782,7 +5782,7 @@ module supra_framework::pbo_delegation_pool {
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 65545, location = Self)]
     /// after replace_delegator` succeeds, old_delegator must not be able to perform unlock or withdraw or vote (if partial_voting is enable)
-    public entry fun test_repalce_delegration_after_withdraw_using_old_address_failure(
+    public entry fun test_repalce_delegation_after_withdraw_using_old_address_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer,
@@ -5824,7 +5824,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     /// after replace_delegator succeeds, new_delegator should be able to perform unlock and withdraw on the funds as per unlocking schedule
-    public entry fun test_repalce_delegration_unlock_and_withdraw_success(
+    public entry fun test_repalce_delegation_unlock_and_withdraw_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer,
@@ -5868,7 +5868,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     /// after replace_delegator new_delegator should be able to vote (if partial_voting is enable), or should be able to delegate voting
-    public entry fun test_repalce_delegration_and_vote_delegate_voting_success(
+    public entry fun test_repalce_delegation_and_vote_delegate_voting_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -5910,7 +5910,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     /// if delegator is not part of one of the principle stake holder, they can unlock/withdraw without restriction
-    public entry fun test_unlock_withdraw_delegator_not_part_of_principle_stak_success(
+    public entry fun test_unlock_withdraw_delegator_not_part_of_principle_stake_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
