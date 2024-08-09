@@ -23,9 +23,8 @@ impl TransactionFilter {
     ) -> Vec<SignedTransaction> {
         // Special case for no filter to avoid unnecessary iteration through all transactions in the default case
         let num_txns_before = txns.len();
-        txns.retain(|txn| {
-            Duration::from_micros(timestamp).as_secs() < txn.expiration_timestamp_secs()
-        });
+        let current_time = Duration::from_micros(timestamp).as_secs();
+        txns.retain(|txn| current_time < txn.expiration_timestamp_secs());
         NUM_EXPIRED_TXNS_IN_TXN_FILTER.observe((num_txns_before - txns.len()) as f64);
 
         if self.filter.is_empty() {
