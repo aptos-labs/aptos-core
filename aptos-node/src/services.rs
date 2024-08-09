@@ -6,8 +6,9 @@ use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
-    consensus_observer::publisher::ConsensusPublisher, network_interface::ConsensusMsg,
-    persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
+    network_interface::ConsensusMsg, persistent_liveness_storage::StorageWriteProxy,
+    quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;

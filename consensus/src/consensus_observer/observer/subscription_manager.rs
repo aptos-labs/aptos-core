@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
-    error::Error,
-    logging::{LogEntry, LogSchema},
-    metrics,
-    network_client::ConsensusObserverClient,
-    network_message::{
-        ConsensusObserverMessage, ConsensusObserverRequest, ConsensusObserverResponse,
+    common::{
+        error::Error,
+        logging::{LogEntry, LogSchema},
+        metrics,
     },
-    publisher::ConsensusPublisher,
-    subscription,
-    subscription::ConsensusObserverSubscription,
+    network::{
+        observer_client::ConsensusObserverClient,
+        observer_message::{
+            ConsensusObserverMessage, ConsensusObserverRequest, ConsensusObserverResponse,
+        },
+    },
+    observer::{subscription, subscription::ConsensusObserverSubscription},
+    publisher::consensus_publisher::ConsensusPublisher,
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_logger::{error, info, warn};

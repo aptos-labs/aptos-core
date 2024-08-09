@@ -4,9 +4,12 @@
 
 use crate::{
     consensus_observer::{
-        network_client::ConsensusObserverClient, network_handler::ConsensusObserverNetworkMessage,
-        network_message::ConsensusObserverMessage, observer::ConsensusObserver,
-        publisher::ConsensusPublisher,
+        network::{
+            network_handler::ConsensusObserverNetworkMessage,
+            observer_client::ConsensusObserverClient, observer_message::ConsensusObserverMessage,
+        },
+        observer::consensus_observer::ConsensusObserver,
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     counters,
     epoch_manager::EpochManager,

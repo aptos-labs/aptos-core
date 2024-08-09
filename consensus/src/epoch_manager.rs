@@ -8,7 +8,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
-    consensus_observer::publisher::ConsensusPublisher,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},

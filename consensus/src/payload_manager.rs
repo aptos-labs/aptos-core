@@ -3,9 +3,9 @@
 
 use crate::{
     consensus_observer::{
-        network_message::{BlockTransactionPayload, ConsensusObserverMessage},
-        payload_store::BlockPayloadStatus,
-        publisher::ConsensusPublisher,
+        network::observer_message::{BlockTransactionPayload, ConsensusObserverMessage},
+        observer::payload_store::BlockPayloadStatus,
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},

@@ -3,19 +3,23 @@
 
 use crate::{
     consensus_observer::{
-        logging::{LogEntry, LogSchema},
-        metrics,
-        network_client::ConsensusObserverClient,
-        network_handler::ConsensusObserverNetworkMessage,
-        network_message::{
-            BlockPayload, CommitDecision, ConsensusObserverDirectSend, ConsensusObserverMessage,
-            OrderedBlock,
+        common::{
+            logging::{LogEntry, LogSchema},
+            metrics,
         },
-        ordered_blocks::OrderedBlockStore,
-        payload_store::BlockPayloadStore,
-        pending_blocks::PendingBlockStore,
-        publisher::ConsensusPublisher,
-        subscription_manager::SubscriptionManager,
+        network::{
+            network_handler::ConsensusObserverNetworkMessage,
+            observer_client::ConsensusObserverClient,
+            observer_message::{
+                BlockPayload, CommitDecision, ConsensusObserverDirectSend,
+                ConsensusObserverMessage, OrderedBlock,
+            },
+        },
+        observer::{
+            ordered_blocks::OrderedBlockStore, payload_store::BlockPayloadStore,
+            pending_blocks::PendingBlockStore, subscription_manager::SubscriptionManager,
+        },
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     dag::DagCommitSigner,
     network::{IncomingCommitRequest, IncomingRandGenRequest},

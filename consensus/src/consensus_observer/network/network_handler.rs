@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
-    logging::{LogEntry, LogSchema},
-    network_events::{ConsensusObserverNetworkEvents, NetworkMessage, ResponseSender},
-    network_message::{
-        ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
+    common::logging::{LogEntry, LogSchema},
+    network::{
+        network_events::{ConsensusObserverNetworkEvents, NetworkMessage, ResponseSender},
+        observer_message::{
+            ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
+        },
     },
 };
 use aptos_channels::{
@@ -232,14 +234,14 @@ impl ConsensusObserverNetworkHandler {
 
 #[cfg(test)]
 mod test {
-    use crate::consensus_observer::{
-        network_client::ConsensusObserverClient,
+    use crate::consensus_observer::network::{
         network_events::ConsensusObserverNetworkEvents,
         network_handler::{
             ConsensusObserverNetworkHandler, ConsensusObserverNetworkMessage,
             ConsensusPublisherNetworkMessage,
         },
-        network_message::{
+        observer_client::ConsensusObserverClient,
+        observer_message::{
             ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
         },
     };

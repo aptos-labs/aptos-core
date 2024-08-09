@@ -7,14 +7,16 @@ use aptos_channels::aptos_channel::Receiver;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
     consensus_observer::{
-        network_client::ConsensusObserverClient,
-        network_events::ConsensusObserverNetworkEvents,
-        network_handler::{
-            ConsensusObserverNetworkHandler, ConsensusObserverNetworkMessage,
-            ConsensusPublisherNetworkMessage,
+        network::{
+            network_events::ConsensusObserverNetworkEvents,
+            network_handler::{
+                ConsensusObserverNetworkHandler, ConsensusObserverNetworkMessage,
+                ConsensusPublisherNetworkMessage,
+            },
+            observer_client::ConsensusObserverClient,
+            observer_message::ConsensusObserverMessage,
         },
-        network_message::ConsensusObserverMessage,
-        publisher::ConsensusPublisher,
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     consensus_provider::start_consensus_observer,
     network_interface::ConsensusMsg,
