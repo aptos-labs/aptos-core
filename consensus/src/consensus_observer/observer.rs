@@ -3,20 +3,19 @@
 
 use crate::{
     consensus_observer::{
-        error::Error,
         logging::{LogEntry, LogSchema},
         metrics,
         network_client::ConsensusObserverClient,
         network_handler::ConsensusObserverNetworkMessage,
         network_message::{
             BlockPayload, CommitDecision, ConsensusObserverDirectSend, ConsensusObserverMessage,
-            ConsensusObserverRequest, ConsensusObserverResponse, OrderedBlock,
+            OrderedBlock,
         },
         ordered_blocks::OrderedBlockStore,
         payload_store::BlockPayloadStore,
         pending_blocks::PendingBlockStore,
         publisher::ConsensusPublisher,
-        subscription::{self, ConsensusObserverSubscription},
+        subscription_manager::SubscriptionManager,
     },
     dag::DagCommitSigner,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
@@ -28,15 +27,14 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_channels::{aptos_channel, aptos_channel::Receiver, message_queues::QueueStyle};
-use aptos_config::{config::NodeConfig, network_id::PeerNetworkId};
+use aptos_config::config::NodeConfig;
 use aptos_consensus_types::{pipeline, pipelined_block::PipelinedBlock};
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, info, warn};
 use aptos_network::{
-    application::{interface::NetworkClient, metadata::PeerMetadata},
-    protocols::wire::handshake::v1::ProtocolId,
+    application::interface::NetworkClient, protocols::wire::handshake::v1::ProtocolId,
 };
 use aptos_reliable_broadcast::DropGuard;
 use aptos_storage_interface::DbReader;
@@ -57,7 +55,7 @@ use futures::{
 };
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
@@ -68,9 +66,6 @@ const LOG_MESSAGES_AT_INFO_LEVEL: bool = true;
 pub struct ConsensusObserver {
     // The configuration of the node
     node_config: NodeConfig,
-    // The consensus observer client to send network messages
-    consensus_observer_client:
-        Arc<ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>>,
 
     // The current epoch state
     epoch_state: Option<Arc<EpochState>>,
@@ -96,14 +91,11 @@ pub struct ConsensusObserver {
     // The reconfiguration event listener to refresh on-chain configs
     reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
 
-    // The consensus publisher to forward payload messages
+    // The subscription manager
+    subscription_manager: SubscriptionManager,
+
+    // The consensus publisher
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
-    // The currently active consensus observer subscription
-    active_observer_subscription: Option<ConsensusObserverSubscription>,
-    // A handle to storage (used to read the latest state and check progress)
-    db_reader: Arc<dyn DbReader>,
-    // The time service (used to check progress)
-    time_service: TimeService,
 }
 
 impl ConsensusObserver {
@@ -127,10 +119,18 @@ impl ConsensusObserver {
         // Get the consensus observer config
         let consensus_observer_config = node_config.consensus_observer;
 
+        // Create the subscription manager
+        let subscription_manager = SubscriptionManager::new(
+            consensus_observer_client,
+            node_config.consensus_observer,
+            consensus_publisher.clone(),
+            db_reader.clone(),
+            time_service.clone(),
+        );
+
         // Create the consensus observer
         Self {
             node_config,
-            consensus_observer_client,
             epoch_state: None,
             quorum_store_enabled: false, // Updated on epoch changes
             root: Arc::new(Mutex::new(root)),
@@ -141,10 +141,8 @@ impl ConsensusObserver {
             sync_handle: None,
             sync_notification_sender,
             reconfig_events,
+            subscription_manager,
             consensus_publisher,
-            active_observer_subscription: None,
-            db_reader,
-            time_service,
         }
     }
 
@@ -175,88 +173,15 @@ impl ConsensusObserver {
             return;
         }
 
-        // Get the peer ID of the currently active subscription (if any)
-        let active_subscription_peer = self
-            .active_observer_subscription
-            .as_ref()
-            .map(|subscription| subscription.get_peer_network_id());
-
-        // If we have an active subscription, verify that the subscription
-        // is still healthy. If not, the subscription should be terminated.
-        if let Some(active_subscription_peer) = active_subscription_peer {
-            if let Err(error) = self.check_active_subscription() {
-                // Log the subscription termination
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Terminating subscription to peer: {:?}! Error: {:?}",
-                        active_subscription_peer, error
-                    ))
-                );
-
-                // Unsubscribe from the peer
-                self.unsubscribe_from_peer(active_subscription_peer);
-
-                // Update the subscription termination metrics
-                self.update_subscription_termination_metrics(active_subscription_peer, error);
-            }
+        // Otherwise, check the health of the active subscription
+        let new_subscription_created = self
+            .subscription_manager
+            .check_and_manage_subscriptions()
+            .await;
+        if new_subscription_created {
+            // Clear the pending block state (a new subscription was created)
+            self.clear_pending_block_state().await;
         }
-
-        // If we don't have a subscription, we should select a new peer to
-        // subscribe to. If we had a previous subscription, it should be
-        // excluded from the selection process.
-        if self.active_observer_subscription.is_none() {
-            // Create a new observer subscription
-            self.create_new_observer_subscription(active_subscription_peer)
-                .await;
-
-            // If we successfully created a new subscription, clear the state and update the metrics
-            if let Some(active_subscription) = &self.active_observer_subscription {
-                // Clear the block state
-                self.clear_pending_block_state().await;
-
-                // Update the subscription creation metrics
-                self.update_subscription_creation_metrics(
-                    active_subscription.get_peer_network_id(),
-                );
-            }
-        }
-    }
-
-    /// Checks if the active subscription is still healthy. If not, an error is returned.
-    fn check_active_subscription(&mut self) -> Result<(), Error> {
-        let active_observer_subscription = self.active_observer_subscription.take();
-        if let Some(mut active_subscription) = active_observer_subscription {
-            // Check if the peer for the subscription is still connected
-            let peer_network_id = active_subscription.get_peer_network_id();
-            let peer_still_connected = self
-                .get_connected_peers_and_metadata()
-                .map_or(false, |peers_and_metadata| {
-                    peers_and_metadata.contains_key(&peer_network_id)
-                });
-
-            // Verify the peer is still connected
-            if !peer_still_connected {
-                return Err(Error::SubscriptionDisconnected(
-                    "The peer is no longer connected!".to_string(),
-                ));
-            }
-
-            // Verify the subscription has not timed out
-            active_subscription.check_subscription_timeout()?;
-
-            // Verify that the DB is continuing to sync and commit new data
-            active_subscription.check_syncing_progress()?;
-
-            // Verify that the subscription peer is optimal
-            if let Some(peers_and_metadata) = self.get_connected_peers_and_metadata() {
-                active_subscription.check_subscription_peer_optimality(peers_and_metadata)?;
-            }
-
-            // The subscription seems healthy, we can keep it
-            self.active_observer_subscription = Some(active_subscription);
-        }
-
-        Ok(())
     }
 
     /// Clears the pending block state (this is useful for changing
@@ -316,103 +241,6 @@ impl ConsensusObserver {
                 *root = ledger_info;
             }
         })
-    }
-
-    /// Creates a new observer subscription by sending subscription requests to
-    /// appropriate peers and waiting for a successful response. If `previous_subscription_peer`
-    /// is provided, it will be excluded from the selection process.
-    async fn create_new_observer_subscription(
-        &mut self,
-        previous_subscription_peer: Option<PeerNetworkId>,
-    ) {
-        // Get a set of sorted peers to service our subscription request
-        let sorted_peers = match self.sort_peers_for_subscription(previous_subscription_peer) {
-            Some(sorted_peers) => sorted_peers,
-            None => {
-                error!(LogSchema::new(LogEntry::ConsensusObserver)
-                    .message("Failed to sort peers for subscription requests!"));
-                return;
-            },
-        };
-
-        // Verify that we have potential peers
-        if sorted_peers.is_empty() {
-            warn!(LogSchema::new(LogEntry::ConsensusObserver)
-                .message("There are no peers to subscribe to!"));
-            return;
-        }
-
-        // Go through the sorted peers and attempt to subscribe to a single peer.
-        // The first peer that responds successfully will be the selected peer.
-        for selected_peer in &sorted_peers {
-            info!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Attempting to subscribe to peer: {}!",
-                    selected_peer
-                ))
-            );
-
-            // Send a subscription request to the peer and wait for the response.
-            // Note: it is fine to block here because we assume only a single active subscription.
-            let subscription_request = ConsensusObserverRequest::Subscribe;
-            let request_timeout_ms = self
-                .node_config
-                .consensus_observer
-                .network_request_timeout_ms;
-            let response = self
-                .consensus_observer_client
-                .send_rpc_request_to_peer(selected_peer, subscription_request, request_timeout_ms)
-                .await;
-
-            // Process the response and update the active subscription
-            match response {
-                Ok(ConsensusObserverResponse::SubscribeAck) => {
-                    info!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Successfully subscribed to peer: {}!",
-                            selected_peer
-                        ))
-                    );
-
-                    // Update the active subscription
-                    let subscription = ConsensusObserverSubscription::new(
-                        self.node_config.consensus_observer,
-                        self.db_reader.clone(),
-                        *selected_peer,
-                        self.time_service.clone(),
-                    );
-                    self.active_observer_subscription = Some(subscription);
-
-                    return; // Return after successfully subscribing
-                },
-                Ok(response) => {
-                    // We received an invalid response
-                    warn!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Got unexpected response type: {:?}",
-                            response.get_label()
-                        ))
-                    );
-                },
-                Err(error) => {
-                    // We encountered an error while sending the request
-                    error!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Failed to send subscription request to peer: {}! Error: {:?}",
-                            selected_peer, error
-                        ))
-                    );
-                },
-            }
-        }
-
-        // We failed to connect to any peers
-        warn!(
-            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Failed to subscribe to any peers! Num peers attempted: {:?}",
-                sorted_peers.len()
-            ))
-        );
     }
 
     /// Finalizes the ordered block by sending it to the execution pipeline
@@ -483,27 +311,6 @@ impl ConsensusObserver {
         } else {
             // Return the root ledger info
             self.root.lock().commit_info().clone()
-        }
-    }
-
-    /// Gets the connected peers and metadata. If an error occurred,
-    /// it is logged and None is returned.
-    fn get_connected_peers_and_metadata(&self) -> Option<HashMap<PeerNetworkId, PeerMetadata>> {
-        match self
-            .consensus_observer_client
-            .get_peers_and_metadata()
-            .get_connected_peers_and_metadata()
-        {
-            Ok(connected_peers_and_metadata) => Some(connected_peers_and_metadata),
-            Err(error) => {
-                error!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to get connected peers and metadata! Error: {:?}",
-                        error
-                    ))
-                );
-                None
-            },
         }
     }
 
@@ -710,31 +517,19 @@ impl ConsensusObserver {
         let (peer_network_id, message) = network_message.into_parts();
 
         // Verify the message is from the peer we've subscribed to
-        if let Some(active_subscription) = &mut self.active_observer_subscription {
-            if let Err(error) = active_subscription.verify_message_sender(&peer_network_id) {
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Message failed subscription sender verification! Error: {:?}",
-                        error,
-                    ))
-                );
-
-                // Send another unsubscription request to the peer
-                self.unsubscribe_from_peer(peer_network_id);
-                return;
-            }
-        } else {
+        if let Err(error) = self
+            .subscription_manager
+            .verify_message_sender(peer_network_id)
+        {
             warn!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Received message from unexpected peer: {}! No active subscription found!",
-                    peer_network_id
+                    "Message failed subscription sender verification! Error: {:?}",
+                    error,
                 ))
             );
 
-            // Send an unsubscription request to the peer
-            self.unsubscribe_from_peer(peer_network_id);
             return;
-        };
+        }
 
         // Increment the received message counter
         metrics::increment_request_counter(
@@ -930,87 +725,6 @@ impl ConsensusObserver {
         }
     }
 
-    /// Produces a list of sorted peers to service our subscription request. Peers
-    /// are prioritized by validator distance and latency.
-    /// Note: if `previous_subscription_peer` is provided, it will be excluded
-    /// from the selection process. Likewise, all peers currently subscribed to us
-    /// will be excluded from the selection process.
-    fn sort_peers_for_subscription(
-        &mut self,
-        previous_subscription_peer: Option<PeerNetworkId>,
-    ) -> Option<Vec<PeerNetworkId>> {
-        if let Some(mut peers_and_metadata) = self.get_connected_peers_and_metadata() {
-            // Remove the previous subscription peer (if provided)
-            if let Some(previous_subscription_peer) = previous_subscription_peer {
-                let _ = peers_and_metadata.remove(&previous_subscription_peer);
-            }
-
-            // Remove any peers that are currently subscribed to us
-            if let Some(consensus_publisher) = &self.consensus_publisher {
-                for peer_network_id in consensus_publisher.get_active_subscribers() {
-                    let _ = peers_and_metadata.remove(&peer_network_id);
-                }
-            }
-
-            // Sort the peers by validator distance and latency
-            let sorted_peers = subscription::sort_peers_by_distance_and_latency(peers_and_metadata);
-
-            // Return the sorted peers
-            Some(sorted_peers)
-        } else {
-            None // No connected peers were found
-        }
-    }
-
-    /// Unsubscribes from the given peer by sending an unsubscribe request
-    fn unsubscribe_from_peer(&self, peer_network_id: PeerNetworkId) {
-        // Send an unsubscribe request to the peer and process the response.
-        // Note: we execute this asynchronously, as we don't need to wait for the response.
-        let consensus_observer_client = self.consensus_observer_client.clone();
-        let consensus_observer_config = self.node_config.consensus_observer;
-        tokio::spawn(async move {
-            // Send the unsubscribe request to the peer
-            let unsubscribe_request = ConsensusObserverRequest::Unsubscribe;
-            let response = consensus_observer_client
-                .send_rpc_request_to_peer(
-                    &peer_network_id,
-                    unsubscribe_request,
-                    consensus_observer_config.network_request_timeout_ms,
-                )
-                .await;
-
-            // Process the response
-            match response {
-                Ok(ConsensusObserverResponse::UnsubscribeAck) => {
-                    info!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Successfully unsubscribed from peer: {}!",
-                            peer_network_id
-                        ))
-                    );
-                },
-                Ok(response) => {
-                    // We received an invalid response
-                    warn!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Got unexpected response type: {:?}",
-                            response.get_label()
-                        ))
-                    );
-                },
-                Err(error) => {
-                    // We encountered an error while sending the request
-                    error!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Failed to send unsubscribe request to peer: {}! Error: {:?}",
-                            peer_network_id, error
-                        ))
-                    );
-                },
-            }
-        });
-    }
-
     /// Updates the metrics for the processed blocks
     fn update_processed_blocks_metrics(&self) {
         // Update the payload store metrics
@@ -1021,44 +735,6 @@ impl ConsensusObserver {
 
         // Update the pending block metrics
         self.ordered_block_store.update_ordered_blocks_metrics();
-    }
-
-    /// Updates the subscription creation metrics for the given peer
-    fn update_subscription_creation_metrics(&self, peer_network_id: PeerNetworkId) {
-        // Set the number of active subscriptions
-        metrics::set_gauge(
-            &metrics::OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS,
-            &peer_network_id.network_id(),
-            1,
-        );
-
-        // Update the number of created subscriptions
-        metrics::increment_request_counter(
-            &metrics::OBSERVER_CREATED_SUBSCRIPTIONS,
-            metrics::CREATED_SUBSCRIPTION_LABEL,
-            &peer_network_id,
-        );
-    }
-
-    /// Updates the subscription termination metrics for the given peer
-    fn update_subscription_termination_metrics(
-        &self,
-        peer_network_id: PeerNetworkId,
-        error: Error,
-    ) {
-        // Reset the number of active subscriptions
-        metrics::set_gauge(
-            &metrics::OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS,
-            &peer_network_id.network_id(),
-            0,
-        );
-
-        // Update the number of terminated subscriptions
-        metrics::increment_request_counter(
-            &metrics::OBSERVER_TERMINATED_SUBSCRIPTIONS,
-            error.get_label(),
-            &peer_network_id,
-        );
     }
 
     /// Waits for a new epoch to start
