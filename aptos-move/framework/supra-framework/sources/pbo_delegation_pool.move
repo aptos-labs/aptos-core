@@ -115,14 +115,16 @@ module supra_framework::pbo_delegation_pool {
     use std::signer;
     use std::vector;
     use std::option::{Self, Option};
-    use std::fixed_point32::{Self, FixedPoint32};
+    
 
     use aptos_std::math64;
+    use aptos_std::math128;
     use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
     use aptos_std::table::{Self, Table};
     use aptos_std::smart_table::{Self, SmartTable};
-    use supra_framework::coin::Coin;
+    use aptos_std::fixed_point64::{Self,FixedPoint64};
 
+    use supra_framework::coin::Coin;
     use supra_framework::account;
     use supra_framework::aptos_account;
     use supra_framework::supra_coin::SupraCoin;
@@ -291,7 +293,7 @@ module supra_framework::pbo_delegation_pool {
         // will vest 1/24 of the original total amount. From the third month only, 1/48 will vest until the vesting fund
         // runs out.
         // u32/u32 should be sufficient to support vesting schedule fractions.
-        schedule: vector<FixedPoint32>,
+        schedule: vector<FixedPoint64>,
         // When the vesting should start.
         start_timestamp_secs: u64,
         // In seconds. How long each vesting period is. For example 1 month.
@@ -299,7 +301,7 @@ module supra_framework::pbo_delegation_pool {
         // Last vesting period, 1-indexed. For example if 2 months have passed, the last vesting period, if distribution
         // was requested, would be 2. Default value is 0 which means there have been no vesting periods yet.
         last_unlock_period: u64,
-        cumulative_unlocked_fraction: FixedPoint32,
+        cumulative_unlocked_fraction: FixedPoint64,
     }
 
     struct DelegationPool has key {
@@ -835,7 +837,7 @@ module supra_framework::pbo_delegation_pool {
         let schedule = vector::empty();
         vector::for_each_ref(&unlock_numerators,
             |e| {
-                let fraction = fixed_point32::create_from_rational(*e, unlock_denominator);
+                let fraction = fixed_point64::create_from_rational((*e as u128), (unlock_denominator as u128));
                 vector::push_back(&mut schedule, fraction);
             });
 
@@ -854,7 +856,7 @@ module supra_framework::pbo_delegation_pool {
                     start_timestamp_secs: unlock_start_time,
                     period_duration: unlock_duration,
                     last_unlock_period: 0,
-                    cumulative_unlocked_fraction: fixed_point32::create_from_rational(0, 1),
+                    cumulative_unlocked_fraction: fixed_point64::create_from_rational(0, 1),
                 },
                 principle_stake: principle_stake_table,
                 add_stake_events: account::new_event_handle<AddStakeEvent>(&stake_pool_signer),
@@ -1518,13 +1520,7 @@ module supra_framework::pbo_delegation_pool {
 
     }
 
-    #[view]
-    public fun fixed_point32_add(a: FixedPoint32, b: FixedPoint32): FixedPoint32 {
-        fixed_point32::create_from_raw_value(fixed_point32::get_raw_value(a) + fixed_point32::get_raw_value(
-                b
-            ))
-    }
-
+   
     #[view]
     /// Provides how much amount is unlockable based on `principle_unlock_schedule.cumulative_unlocked_fraction`
     /// Note that `cumulative_unlocked_fraction` is not updated in this function so the information may not be
@@ -1538,10 +1534,10 @@ module supra_framework::pbo_delegation_pool {
         let delegator_principle_stake = *table::borrow(&pool.principle_stake, delegator_addr);
 
         //To avoid problem even if fraction is slightly above 1
-        let unlockable_principle_stake = math64::min(fixed_point32::multiply_u64(
-                delegator_principle_stake, unlockable_fraction
+        let unlockable_principle_stake = (math128::min(fixed_point64::multiply_u128(
+                (delegator_principle_stake as u128), unlockable_fraction
             ),
-            delegator_principle_stake);
+            (delegator_principle_stake as u128)) as u64);
         let locked_amount = delegator_principle_stake - unlockable_principle_stake;
 
         assert!(delegator_active_balance >= locked_amount,
@@ -1576,7 +1572,7 @@ module supra_framework::pbo_delegation_pool {
             let next_fraction = if (schedule_length <= last_unlocked_period) {
                 *vector::borrow(&unlock_schedule.schedule, schedule_length - 1)
             } else { *vector::borrow(&unlock_schedule.schedule, last_unlocked_period) };
-            cfraction = fixed_point32_add(cfraction, next_fraction);
+            cfraction = fixed_point64::add(cfraction,next_fraction);
 
             last_unlocked_period = last_unlocked_period + 1;
         };
@@ -2115,8 +2111,6 @@ module supra_framework::pbo_delegation_pool {
 
     #[test_only]
     use supra_framework::reconfiguration;
-    #[test_only]
-    use aptos_std::fixed_point64;
     #[test_only]
     use supra_framework::stake::fast_forward_to_unlock;
     #[test_only]
