@@ -192,6 +192,12 @@ module 0xc0ffee::m {
     private fun select_common_fields_different_offset(s: m::CommonFieldsAtDifferentOffset): u64 {
         select_variants m::CommonFieldsAtDifferentOffset.Bar.z|m::CommonFieldsAtDifferentOffset.Baz.z|m::CommonFieldsAtDifferentOffset.Balt.z<m::CommonFieldsAtDifferentOffset>(s)
     }
+    private fun test_common(s: m::CommonFields): bool {
+        test_variants m::CommonFields::Foo|Bar(s)
+    }
+    private fun test_common_ref(s: &m::CommonFields): bool {
+        test_variants m::CommonFields::Foo|Bar(s)
+    }
 } // end 0xc0ffee::m
 
 ============ initial bytecode ================
@@ -606,15 +612,15 @@ fun m::select_common_fields_different_offset($t0: m::CommonFieldsAtDifferentOffs
   0: $t2 := borrow_local($t0)
   1: $t4 := test_variant m::CommonFieldsAtDifferentOffset::Bar($t2)
   2: if ($t4) goto 8 else goto 3
-  3: label L2
+  3: label L3
   4: $t4 := test_variant m::CommonFieldsAtDifferentOffset::Balt($t2)
   5: if ($t4) goto 8 else goto 6
-  6: label L3
+  6: label L4
   7: goto 11
-  8: label L1
+  8: label L2
   9: $t3 := borrow_variant_field<m::CommonFieldsAtDifferentOffset::Bar|Balt>.z($t2)
  10: goto 13
- 11: label L4
+ 11: label L1
  12: $t3 := borrow_variant_field<m::CommonFieldsAtDifferentOffset::Baz>.z($t2)
  13: label L0
  14: $t1 := read_ref($t3)
@@ -622,4 +628,39 @@ fun m::select_common_fields_different_offset($t0: m::CommonFieldsAtDifferentOffs
 }
 
 
-============ bytecode verification succeeded ========
+[variant baseline]
+fun m::test_common($t0: m::CommonFields): bool {
+     var $t1: bool
+     var $t2: &m::CommonFields
+  0: $t2 := borrow_local($t0)
+  1: $t1 := test_variant m::CommonFields::Foo($t2)
+  2: if ($t1) goto 7 else goto 3
+  3: label L1
+  4: $t1 := test_variant m::CommonFields::Bar($t2)
+  5: if ($t1) goto 7 else goto 6
+  6: label L2
+  7: label L0
+  8: return $t1
+}
+
+
+[variant baseline]
+fun m::test_common_ref($t0: &m::CommonFields): bool {
+     var $t1: bool
+  0: $t1 := test_variant m::CommonFields::Foo($t0)
+  1: if ($t1) goto 6 else goto 2
+  2: label L1
+  3: $t1 := test_variant m::CommonFields::Bar($t0)
+  4: if ($t1) goto 6 else goto 5
+  5: label L2
+  6: label L0
+  7: return $t1
+}
+
+
+Diagnostics:
+error: local `s` of type `m::CommonFields` does not have the `drop` ability
+    ┌─ tests/bytecode-generator/matching_ok.move:128:10
+    │
+128 │         (s is Foo|Bar)
+    │          ^ still borrowed but will be implicitly dropped later since it is no longer used

@@ -749,6 +749,9 @@ impl<'env> Generator<'env> {
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
+            Operation::TestVariants(mid, sid, variants) => {
+                self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
+            },
             Operation::Cast => self.gen_cast_call(targets, id, args),
             Operation::Add => self.gen_op_call(targets, id, BytecodeOperation::Add, args),
             Operation::Sub => self.gen_op_call(targets, id, BytecodeOperation::Sub, args),
@@ -823,6 +826,31 @@ impl<'env> Generator<'env> {
                 format!("unsupported specification construct: `{:?}`", op),
             ),
         }
+    }
+
+    fn gen_test_variants(
+        &mut self,
+        targets: Vec<TempIndex>,
+        id: NodeId,
+        struct_id: QualifiedId<StructId>,
+        variants: &[Symbol],
+        args: &[Exp],
+    ) {
+        let target = self.require_unary_target(id, targets);
+        let temp =
+            self.gen_auto_ref_arg(&self.require_unary_arg(id, args), ReferenceKind::Immutable);
+        let mut bool_temp = Some(target);
+        let success_label = self.new_label(id);
+        let inst = self.env().get_node_instantiation(id);
+        self.gen_test_variants_operation(
+            id,
+            &mut bool_temp,
+            success_label,
+            &struct_id.instantiate(inst),
+            variants.to_vec(),
+            temp,
+        );
+        self.emit_with(id, |attr| Bytecode::Label(attr, success_label))
     }
 
     fn gen_cast_call(&mut self, targets: Vec<TempIndex>, id: NodeId, args: &[Exp]) {
@@ -1265,37 +1293,28 @@ impl<'env> Generator<'env> {
             };
             while let Some((offset, group_fields)) = ordered_groups.pop() {
                 let next_group_label = if !ordered_groups.is_empty() {
-                    // Insert a test by generating the equivalent of
-                    // `src is V1 || src is V2 || ..` for all variants in this group
-                    // This can be done more efficiently once we have a switch opcode.
-                    let bool_temp = if let Some(t) = bool_temp {
-                        t
-                    } else {
-                        let t = self.new_temp(Type::new_prim(PrimitiveType::Bool));
-                        bool_temp = Some(t);
-                        t
-                    };
+                    let next_group_label = self.new_label(id);
                     let this_group_label = self.new_label(id);
-                    for field in group_fields {
-                        self.emit_call(
-                            id,
-                            vec![bool_temp],
-                            BytecodeOperation::TestVariant(
-                                str.module_id,
-                                str.id,
+                    self.gen_test_variants_operation(
+                        id,
+                        &mut bool_temp,
+                        this_group_label,
+                        &str,
+                        group_fields
+                            .iter()
+                            .map(|fid| {
                                 self.env()
                                     .get_struct(str.to_qualified_id())
-                                    .get_field(*field)
+                                    .get_field(*fid)
                                     .get_variant()
-                                    .expect("variant field has variant name"),
-                                str.inst.clone(),
-                            ),
-                            vec![src],
-                        );
-                        self.branch_to_exit_if_true(id, bool_temp, this_group_label)
-                    }
-                    let next_group_label = self.new_label(id);
+                                    .expect("variant name defined")
+                            })
+                            .collect(),
+                        src,
+                    );
+                    // Ending here means no test succeeded
                     self.emit_with(id, |attr| Bytecode::Jump(attr, next_group_label));
+                    // Ending here means some test succeeded
                     self.emit_with(id, |attr| Bytecode::Label(attr, this_group_label));
                     Some(next_group_label)
                 } else {
@@ -1327,6 +1346,30 @@ impl<'env> Generator<'env> {
         }
     }
 
+    /// Generate a test for variants.
+    fn gen_test_variants_operation(
+        &mut self,
+        id: NodeId,
+        bool_temp: &mut Option<TempIndex>,
+        success_label: Label,
+        str: &QualifiedInstId<StructId>,
+        variants: Vec<Symbol>,
+        src: TempIndex,
+    ) {
+        let bool_temp =
+            *bool_temp.get_or_insert_with(|| self.new_temp(Type::new_prim(PrimitiveType::Bool)));
+        for variant in variants {
+            self.emit_call(
+                id,
+                vec![bool_temp],
+                BytecodeOperation::TestVariant(str.module_id, str.id, variant, str.inst.clone()),
+                vec![src],
+            );
+            self.branch_to_exit_if_true(id, bool_temp, success_label)
+        }
+    }
+
+    /// Generate field borrow for fields at the same offset.
     fn gen_borrow_field_same_offset(
         &mut self,
         id: NodeId,

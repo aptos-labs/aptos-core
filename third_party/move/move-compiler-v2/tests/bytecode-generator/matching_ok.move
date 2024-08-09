@@ -122,4 +122,13 @@ module 0xc0ffee::m {
         // We expect branching over the variant to select this field
         s.z
     }
+
+    // Variant tests
+    fun test_common(s: CommonFields): bool {
+        (s is Foo|Bar)
+    }
+
+    fun test_common_ref(s: &CommonFields): bool {
+        (s is Foo|Bar)
+    }
 }

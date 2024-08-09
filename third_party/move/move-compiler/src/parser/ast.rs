@@ -705,6 +705,9 @@ pub enum Exp_ {
     // (e: t)
     Annotate(Box<Exp>, Type),
 
+    // (e is t1 | .. | tn)
+    Test(Box<Exp>, Vec<Type>),
+
     // spec { ... }
     Spec(SpecBlock),
 
@@ -1931,6 +1934,16 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
                 w.write(" as ");
                 ty.ast_debug(w);
+                w.write(")");
+            },
+            E::Test(e, tys) => {
+                w.write("(");
+                e.ast_debug(w);
+                w.write(" is ");
+                w.list(tys, "|", |w, item| {
+                    item.ast_debug(w);
+                    false
+                });
                 w.write(")");
             },
             E::Index(e, i) => {

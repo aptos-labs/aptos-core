@@ -1107,8 +1107,8 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
             assert!(context.env.has_errors());
             NE::UnresolvedError
         },
-        // Matches variants only allowed in Move 2
-        EE::Match(..) => {
+        // Variants only allowed in Move 2
+        EE::Match(..) | EE::Test(..) => {
             panic!("ICE unexpected Move 2 construct")
         },
         // Matches variants only allowed in specs (we handle the allowed ones above)

@@ -500,6 +500,10 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             exp(context, e);
             type_(context, ty)
         },
+        E::Test(e, tys) => {
+            exp(context, e);
+            tys.iter().for_each(|ty| type_(context, ty))
+        },
 
         E::Lambda(ll, e) => {
             lvalues(context, &ll.value);
