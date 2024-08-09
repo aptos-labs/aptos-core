@@ -1634,8 +1634,8 @@ fn parse_match_arms(
 // Parse a pack, call, or other reference to a name:
 //      NameExp =
 //          <NameAccessChain> <OptionalTypeArgs> "{" Comma<ExpField> "}"
-//          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<Exp> ")"
-//          | <NameAccessChain> "!" "(" Comma<Exp> ")"
+//          | <NameAccessChain> <OptionalTypeArgs> <CallArgs>
+//          | <NameAccessChain> "!" <CallArgs>
 //          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     let n = parse_name_access_chain(context, false, || {
@@ -1672,7 +1672,7 @@ fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
             Ok(Exp_::Pack(n, tys, fs))
         },
 
-        // Call: "(" Comma<Exp> ")"
+        // Call: <CallArgs>
         Tok::Exclaim | Tok::LParen => {
             let rhs = parse_call_args(context)?;
             Ok(Exp_::Call(n, CallKind::Regular, tys, rhs))
@@ -1683,7 +1683,9 @@ fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     }
 }
 
-// Parse the arguments to a call: "(" Comma<Exp> ")"
+// Parse the arguments to a call:
+//      CallArgs =
+//          "(" Comma<Exp> ")"
 fn parse_call_args(context: &mut Context) -> Result<Spanned<Vec<Exp>>, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let args = parse_comma_list(
