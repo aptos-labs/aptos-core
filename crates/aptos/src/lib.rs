@@ -16,6 +16,7 @@ pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 pub mod update;
+pub mod supra_specific;
 
 use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},

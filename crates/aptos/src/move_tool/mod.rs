@@ -845,11 +845,10 @@ impl SupraCommand for PublishPackage {
         let package_publication_data: PackagePublicationData = (&self).try_into()?;
         Ok(SupraCommandArguments {
             payload: package_publication_data.payload,
-            profile: self.txn_options.profile_options.profile,
-            rpc: self.txn_options.rest_options.url ,
-            gas_unit_price: self.txn_options.gas_options.gas_unit_price,
-            max_gas: self.txn_options.gas_options.max_gas,
-            expiration_secs: self.txn_options.gas_options.expiration_secs,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
         })
     }
 }
@@ -1480,11 +1479,10 @@ impl SupraCommand for RunFunction {
     fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
         Ok(SupraCommandArguments {
             payload: TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
-            profile: self.txn_options.profile_options.profile,
-            rpc: self.txn_options.rest_options.url,
-            gas_unit_price: self.txn_options.gas_options.gas_unit_price,
-            max_gas: self.txn_options.gas_options.max_gas,
-            expiration_secs: self.txn_options.gas_options.expiration_secs,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
         })
     }
 }
@@ -1548,11 +1546,10 @@ impl SupraCommand for RunScript {
             .compile("RunScript", self.txn_options.prompt_options)?;
         Ok(SupraCommandArguments {
             payload: self.script_function_args.create_script_payload(bytecode)?,
-            profile: self.txn_options.profile_options.profile,
-            rpc: self.txn_options.rest_options.url,
-            gas_unit_price: self.txn_options.gas_options.gas_unit_price,
-            max_gas: self.txn_options.gas_options.max_gas,
-            expiration_secs: self.txn_options.gas_options.expiration_secs,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
         })
     }
 }

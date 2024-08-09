@@ -18,6 +18,7 @@ use std::{
 const MULTISIG_ACCOUNT_DOMAIN_SEPARATOR: &[u8] = b"supra_framework::multisig_account";
 const STAKING_CONTRACT_DOMAIN_SEPARATOR: &[u8] = b"supra_framework::staking_contract";
 const VESTING_POOL_DOMAIN_SEPARATOR: &[u8] = b"supra_framework::vesting";
+const PBO_MODULE_SALT: &str = "supra_framework::pbo_delegation_pool";
 
 /// A wrapper struct that gives better error messages when the account address
 /// can't be deserialized in a human readable format
@@ -234,6 +235,12 @@ pub fn create_resource_address(address: AccountAddress, seed: &[u8]) -> AccountA
     input.push(Scheme::DeriveResourceAccountAddress as u8);
     let hash = HashValue::sha3_256_of(&input);
     AccountAddress::from_bytes(hash.as_ref()).unwrap()
+}
+
+pub fn create_seed_for_pbo_module(user_seed: &[u8]) -> Vec<u8> {
+    let mut input = PBO_MODULE_SALT.as_bytes().to_vec();
+    input.extend(user_seed);
+    input
 }
 
 pub fn create_multisig_account_address(

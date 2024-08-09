@@ -319,7 +319,7 @@ module supra_framework::block {
                 previous_block_votes_bitvec: vector::empty(),
                 proposer: @vm_reserved,
                 failed_proposer_indices: vector::empty(),
-                time_microseconds: 0,
+                time_microseconds: timestamp::now_microseconds(),
             },
             NewBlock {
                 hash: genesis_id,
@@ -329,7 +329,7 @@ module supra_framework::block {
                 previous_block_votes_bitvec: vector::empty(),
                 proposer: @vm_reserved,
                 failed_proposer_indices: vector::empty(),
-                time_microseconds: 0,
+                time_microseconds: timestamp::now_microseconds(),
             }
         );
     }
