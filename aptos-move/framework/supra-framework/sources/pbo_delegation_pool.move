@@ -5956,6 +5956,52 @@ module supra_framework::pbo_delegation_pool {
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 65561, location = Self)]
+    /// say unlocking schedule is 3 month cliff, monthly unlocking of 10% and principle stake is 100 coins then
+    /// between 3 and 4 months, only unlock rewards (check if they try to unlock more in which case it should fail
+    public entry fun test_unlocking_more_reward_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address, @0x020];
+        let principle_stake = vector[100 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(300 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 3 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        unlock(delegator, pool_address, 303020000); // they can able to withdraw till after 3 month 303010000
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     /// say unlocking schedule is 3 month cliff, monthly unlocking of 10% and principle stake is 100 coins then
     /// at the end of 2 months, one can only unlock rewards (say if 100 becomes 110)
     /// between 3 and 4 months, only unlock rewards (check if they try to unlock more in which case it should fail, so add both positive and negative case)
@@ -5970,18 +6016,22 @@ module supra_framework::pbo_delegation_pool {
         initialize_for_test(supra_framework);
         account::create_account_for_test(signer::address_of(validator));
         let delegator_address = signer::address_of(delegator);
-        let delegator_address_vec = vector[delegator_address, @0x020];
-        let principle_stake = vector[100 * ONE_APT, 200 * ONE_APT];
-        let coin = stake::mint_coins(300 * ONE_APT);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
         let principle_lockup_time = 7776000;  // 3 month cliff
         let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
 
-        initialize_test_validator(validator, 0, true, true, 0,
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
             delegator_address_vec,
             principle_stake,
             coin,
             option::some(multisig),
-            vector[2, 2, 3],
+            vector[1],
             10,
             principle_lockup_time,
             LOCKUP_CYCLE_SECONDS // monthly unlocking
@@ -5995,7 +6045,7 @@ module supra_framework::pbo_delegation_pool {
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
 
-        unlock(delegator, pool_address, 201000000); // 201000000 reward of 2 month stack
+        unlock(delegator, pool_address, 201000000); // 201000000 reward of 2 month stak
 
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
@@ -6003,10 +6053,16 @@ module supra_framework::pbo_delegation_pool {
         withdraw(delegator, pool_address, 201000000);
         assert!(coin::balance<SupraCoin>(delegator_address) == (201000000 - 1), 0);
 
-        // after 3 month
+        // after 3 months
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
 
-        unlock(delegator, pool_address, 1385940098);
+        unlock(delegator, pool_address, 293009998);
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        withdraw(delegator, pool_address, 293009998);
+
     }
 }
