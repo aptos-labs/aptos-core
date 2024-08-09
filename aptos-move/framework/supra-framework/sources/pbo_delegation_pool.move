@@ -116,6 +116,7 @@ module supra_framework::pbo_delegation_pool {
     use std::vector;
     use std::option::{Self, Option};
     use std::fixed_point32::{Self, FixedPoint32};
+    use std::string;
 
     use aptos_std::math64;
     use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
@@ -1580,7 +1581,7 @@ module supra_framework::pbo_delegation_pool {
 
             last_unlocked_period = last_unlocked_period + 1;
         };
-        
+
         unlock_schedule.cumulative_unlocked_fraction = cfraction;
         unlock_schedule.last_unlock_period = unlock_periods_passed;
         let unlockable_amount = cached_unlockable_balance(delegator_addr, pool_address);
@@ -5956,10 +5957,10 @@ module supra_framework::pbo_delegation_pool {
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
-    #[expected_failure(abort_code = 65561, location = Self)]
+    #[expected_failure(abort_code = 10, location = Self)]
     /// say unlocking schedule is 3 month cliff, monthly unlocking of 10% and principle stake is 100 coins then
-    /// between 3 and 4 months, only unlock rewards (check if they try to unlock more in which case it should fail
-    public entry fun test_unlocking_more_reward_failure(
+    /// between 3 and 4 months, check that it's can't unlock there principal stacke
+    public entry fun test_unlocking_before_cliff_period_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -5990,7 +5991,7 @@ module supra_framework::pbo_delegation_pool {
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
 
-        // after 3 month unlock reward
+        // 3 month
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
@@ -5998,17 +5999,17 @@ module supra_framework::pbo_delegation_pool {
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
 
-        unlock(delegator, pool_address, 303020000); // they can able to withdraw till after 3 month 303010000
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 10);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
-    /// say unlocking schedule is 3 month cliff, monthly unlocking of 10% and principle stake is 100 coins then
-    /// at the end of 2 months, one can only unlock rewards (say if 100 becomes 110)
-    /// between 3 and 4 months, only unlock rewards (check if they try to unlock more in which case it should fail, so add both positive and negative case)
+    /// say unlocking schedule is 3 month cliff, monthly unlocking of (2,3,1) tange and principle stake is 100 coins then
+    /// at the end of 3 months, one can't unlock there principal stacke
     /// after 4 months only 90 should remain locked
-    /// arfter 5 months only 80 should remain locked
-    /// Try with vesting schedule length of 3 and period passed is 2, 3 and 4 (so that it can reuse the last fraction)
-    public entry fun test_unlocking_flow_success(
+    /// arfter 5 months only 80 should remain locked and so on
+    public entry fun test_unlocking_prinicple_stake_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6031,7 +6032,7 @@ module supra_framework::pbo_delegation_pool {
             principle_stake,
             coin,
             option::some(multisig),
-            vector[1],
+            vector[2,3,1],
             10,
             principle_lockup_time,
             LOCKUP_CYCLE_SECONDS // monthly unlocking
@@ -6045,24 +6046,642 @@ module supra_framework::pbo_delegation_pool {
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
 
-        unlock(delegator, pool_address, 201000000); // 201000000 reward of 2 month stak
-
+        // 3 month
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
 
-        withdraw(delegator, pool_address, 201000000);
-        assert!(coin::balance<SupraCoin>(delegator_address) == (201000000 - 1), 0);
-
-        // after 3 months
+        // after 4 months
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
 
-        unlock(delegator, pool_address, 293009998);
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 11);
 
+        // after 5 months
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (50 * ONE_APT) - 9);
+        assert!(unlock_coin, 12);
 
-        withdraw(delegator, pool_address, 293009998);
+        // after 6 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (60 * ONE_APT) - 9);
+        assert!(unlock_coin, 13);
 
+        // after 7 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (70 * ONE_APT) - 9);
+        assert!(unlock_coin, 14);
+
+        // after 8 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (80 * ONE_APT) - 9);
+        assert!(unlock_coin, 15);
+
+        // after 9 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (90 * ONE_APT) - 9);
+        assert!(unlock_coin, 16);
+
+        // after 10 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (100 * ONE_APT) - 10);
+        assert!(unlock_coin, 17);
+
+        // after 11 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, 100 * ONE_APT);
+        assert!(unlock_coin, 18);
     }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 20, location = Self)]
+    public entry fun test_unlocking_more_prinicple_stake_after_4_month_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) + 1);
+        assert!(unlock_coin, 20);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 20, location = Self)]
+    public entry fun test_unlocking_more_prinicple_stake_after_5_month_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 11);
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (50 * ONE_APT) + 1 );
+        assert!(unlock_coin, 20);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 20, location = Self)]
+    public entry fun test_unlocking_more_prinicple_stake_after_6_month_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 11);
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (50 * ONE_APT) - 9);
+        assert!(unlock_coin, 12);
+
+        // after 6 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (60 * ONE_APT) + 1);
+        assert!(unlock_coin, 20);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 20, location = Self)]
+    public entry fun test_unlocking_more_prinicple_stake_after_7_month_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 11);
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (50 * ONE_APT) - 9);
+        assert!(unlock_coin, 12);
+
+        // after 6 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (60 * ONE_APT) - 9);
+        assert!(unlock_coin, 13);
+
+        // after 7 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (70 * ONE_APT) + 1);
+        assert!(unlock_coin, 20);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 20, location = Self)]
+    public entry fun test_unlocking_more_prinicple_stake_after_8_month_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 11);
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (50 * ONE_APT) - 9);
+        assert!(unlock_coin, 12);
+
+        // after 6 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (60 * ONE_APT) - 9);
+        assert!(unlock_coin, 13);
+
+        // after 7 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (70 * ONE_APT) - 9);
+        assert!(unlock_coin, 14);
+
+        // after 8 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (80 * ONE_APT) + 1);
+        assert!(unlock_coin, 20);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 20, location = Self)]
+    public entry fun test_unlocking_more_prinicple_stake_after_9_month_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 11);
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (50 * ONE_APT) - 9);
+        assert!(unlock_coin, 12);
+
+        // after 6 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (60 * ONE_APT) - 9);
+        assert!(unlock_coin, 13);
+
+        // after 7 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (70 * ONE_APT) - 9);
+        assert!(unlock_coin, 14);
+
+        // after 8 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (80 * ONE_APT) - 9);
+        assert!(unlock_coin, 15);
+
+        // after 9 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (90 * ONE_APT) + 1);
+        assert!(unlock_coin, 20);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 20, location = Self)]
+    public entry fun test_unlocking_more_prinicple_stake_after_10_month_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 11);
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (50 * ONE_APT) - 9);
+        assert!(unlock_coin, 12);
+
+        // after 6 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (60 * ONE_APT) - 9);
+        assert!(unlock_coin, 13);
+
+        // after 7 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (70 * ONE_APT) - 9);
+        assert!(unlock_coin, 14);
+
+        // after 8 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (80 * ONE_APT) - 9);
+        assert!(unlock_coin, 15);
+
+        // after 9 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (90 * ONE_APT) - 9);
+        assert!(unlock_coin, 16);
+
+        // after 10 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (100 * ONE_APT) + 1);
+        assert!(unlock_coin, 20);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 20, location = Self)]
+    public entry fun test_unlocking_more_prinicple_stake_after_11_month_failure(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (20 * ONE_APT) - 9);
+        assert!(unlock_coin, 11);
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (50 * ONE_APT) - 9);
+        assert!(unlock_coin, 12);
+
+        // after 6 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (60 * ONE_APT) - 9);
+        assert!(unlock_coin, 13);
+
+        // after 7 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (70 * ONE_APT) - 9);
+        assert!(unlock_coin, 14);
+
+        // after 8 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (80 * ONE_APT) - 9);
+        assert!(unlock_coin, 15);
+
+        // after 9 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (90 * ONE_APT) - 9);
+        assert!(unlock_coin, 16);
+
+        // after 10 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (100 * ONE_APT) - 10);
+        assert!(unlock_coin, 17);
+
+        // after 11 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        let unlock_coin = can_principle_unlock(delegator_address, pool_address, (100 * ONE_APT) + 1 );
+        assert!(unlock_coin, 20);
+    }
+
 }
