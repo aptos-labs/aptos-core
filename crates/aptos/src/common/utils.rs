@@ -591,6 +591,9 @@ pub fn explorer_transaction_link(
             network
         )
     } else {
-        format!("https://explorer.aptoslabs.com/txn/{}", hash)
+        format!(
+            "https://explorer.aptoslabs.com/txn/{}",
+            hash.to_hex_literal()
+        )
     }
 }
