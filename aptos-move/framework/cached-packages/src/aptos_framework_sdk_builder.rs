@@ -467,6 +467,13 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    ExternalObjectInitializeExternalObject {},
+
+    ExternalObjectTransfer {
+        external_bytes: Vec<u8>,
+        to: AccountAddress,
+    },
+
     /// This can be called to install or update a set of JWKs for a federated OIDC provider.  This function should
     /// be invoked to intially install a set of JWKs or to update a set of JWKs when a keypair is rotated.
     ///
@@ -1394,6 +1401,12 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
+            ExternalObjectInitializeExternalObject {} => {
+                external_object_initialize_external_object()
+            },
+            ExternalObjectTransfer { external_bytes, to } => {
+                external_object_transfer(external_bytes, to)
+            },
             JwksUpdateFederatedJwkSet {
                 iss,
                 kid_vec,
@@ -3017,6 +3030,39 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
         vec![
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+pub fn external_object_initialize_external_object() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("external_object").to_owned(),
+        ),
+        ident_str!("initialize_external_object").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn external_object_transfer(external_bytes: Vec<u8>, to: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("external_object").to_owned(),
+        ),
+        ident_str!("transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&external_bytes).unwrap(),
+            bcs::to_bytes(&to).unwrap(),
         ],
     ))
 }
@@ -5707,6 +5753,27 @@ mod decoder {
         }
     }
 
+    pub fn external_object_initialize_external_object(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ExternalObjectInitializeExternalObject {})
+        } else {
+            None
+        }
+    }
+
+    pub fn external_object_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ExternalObjectTransfer {
+                external_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                to: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn jwks_update_federated_jwk_set(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7080,6 +7147,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
+        );
+        map.insert(
+            "external_object_initialize_external_object".to_string(),
+            Box::new(decoder::external_object_initialize_external_object),
+        );
+        map.insert(
+            "external_object_transfer".to_string(),
+            Box::new(decoder::external_object_transfer),
         );
         map.insert(
             "jwks_update_federated_jwk_set".to_string(),
