@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.11
 
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
@@ -31,6 +31,9 @@ class Flow(Flag):
     AGG_V2 = auto()
     # Test resource groups
     RESOURCE_GROUPS = auto()
+    #
+    COMPRESSSED_TOKENS = auto()
+
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -232,6 +235,7 @@ fungible-asset-mint                                              20  VM         
 no-op5-signers                                                    1  VM                 10000         41978.3  34432
 token-v2-ambassador-mint                                          1  VM                 10000         17905.3  15378
 token-v2-ambassador-mint                                         20  VM                 10000         17562.1  15351
+compressed-token-ambassador-mint                                  1  VM                 10000         17905.3   3000
 liquidity-pool-swap                                               1  VM                   975           975.7    973
 liquidity-pool-swap                                              20  VM                  8359          8359.6   8213
 liquidity-pool-swap-stable                                        1  VM                   957           957.5    952
@@ -306,8 +310,10 @@ TESTS = [
 
     RunGroupConfig(key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
    
-    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.COMPRESSSED_TOKENS),
     RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+
+    RunGroupConfig(key=RunGroupKey("compressed-token-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.COMPRESSSED_TOKENS),
 
     RunGroupConfig(key=RunGroupKey("liquidity-pool-swap"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("liquidity-pool-swap", module_working_set_size=20), included_in=Flow.CONTINUOUS),
