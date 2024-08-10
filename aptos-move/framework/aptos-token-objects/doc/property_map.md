@@ -39,6 +39,7 @@ represent types and storing values in bcs format.
 -  [Function `add`](#0x4_property_map_add)
 -  [Function `add_typed`](#0x4_property_map_add_typed)
 -  [Function `add_internal`](#0x4_property_map_add_internal)
+-  [Function `add_typed_to_struct`](#0x4_property_map_add_typed_to_struct)
 -  [Function `update`](#0x4_property_map_update)
 -  [Function `update_typed`](#0x4_property_map_update_typed)
 -  [Function `update_internal`](#0x4_property_map_update_internal)
@@ -67,7 +68,7 @@ should keep track of what keys are what types, and parse them accordingly.
 
 
 <pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
-<b>struct</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> <b>has</b> drop, key
+<b>struct</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> <b>has</b> drop, store, key
 </code></pre>
 
 
@@ -1124,6 +1125,31 @@ Add a property that isn't already encoded as a <code><a href="../../aptos-framew
     <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(ref.self);
     <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = <b>borrow_global_mut</b>&lt;<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>&gt;(ref.self);
     <a href="../../aptos-framework/../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> <a href="property_map.md#0x4_property_map">property_map</a>.inner, key, <a href="property_map.md#0x4_property_map_PropertyValue">PropertyValue</a> { type, value });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_property_map_add_typed_to_struct"></a>
+
+## Function `add_typed_to_struct`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_add_typed_to_struct">add_typed_to_struct</a>&lt;T: drop&gt;(<a href="property_map.md#0x4_property_map">property_map</a>: &<b>mut</b> <a href="property_map.md#0x4_property_map_PropertyMap">property_map::PropertyMap</a>, key: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, value: T)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_add_typed_to_struct">add_typed_to_struct</a>&lt;T: drop&gt;(<a href="property_map.md#0x4_property_map">property_map</a>: &<b>mut</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>, key: String, value: T) {
+    <b>let</b> type = <a href="property_map.md#0x4_property_map_type_info_to_internal_type">type_info_to_internal_type</a>&lt;T&gt;();
+    <a href="../../aptos-framework/../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> <a href="property_map.md#0x4_property_map">property_map</a>.inner, key, <a href="property_map.md#0x4_property_map_PropertyValue">PropertyValue</a> { type, value: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&value)});
 }
 </code></pre>
 

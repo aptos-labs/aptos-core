@@ -234,12 +234,8 @@ module ambassador::ambassador {
 
         // Initialize the property map and the ambassador rank as Bronze
         let properties = property_map::prepare_input(vector[], vector[], vector[]);
+        property_map::add_typed_to_struct(&mut properties, string::utf8(b"Rank"), string::utf8(RANK_BRONZE));
         property_map::init(&constructor_ref, properties);
-        property_map::add_typed(
-            &property_mutator_ref,
-            string::utf8(b"Rank"),
-            string::utf8(RANK_BRONZE)
-        );
 
         // Publishes the AmbassadorToken resource with the refs.
         let ambassador_token = AmbassadorToken {
