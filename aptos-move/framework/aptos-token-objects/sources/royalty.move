@@ -20,7 +20,7 @@ module aptos_token_objects::royalty {
     ///
     /// Royalties are optional for a collection.  Royalty percentage is calculated
     /// by (numerator / denominator) * 100%
-    struct Royalty has copy, drop, key {
+    struct Royalty has copy, drop, key, store {
         numerator: u64,
         denominator: u64,
         /// The recipient of royalty payments. See the `shared_account` for how to handle multiple
@@ -66,9 +66,9 @@ module aptos_token_objects::royalty {
         exists<Royalty>(addr)
     }
 
-    public(friend) fun delete(addr: address) acquires Royalty {
+    public(friend) fun delete(addr: address): Royalty acquires Royalty {
         assert!(exists<Royalty>(addr), error::not_found(EROYALTY_DOES_NOT_EXIST));
-        move_from<Royalty>(addr);
+        move_from<Royalty>(addr)
     }
 
     // Accessors

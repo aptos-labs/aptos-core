@@ -10,7 +10,9 @@ module aptos_token_objects::token {
     use std::string::{Self, String};
     use std::signer;
     use std::vector;
+    use aptos_std::copyable_any_map::{Self, AnyMap};
     use aptos_framework::aggregator_v2::{Self, AggregatorSnapshot, DerivedStringSnapshot};
+    use aptos_framework::compressed_object;
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
     use aptos_token_objects::collection::{Self, Collection};
@@ -50,8 +52,8 @@ module aptos_token_objects::token {
         /// Was populated until concurrent_token_v2_enabled feature flag was enabled.
         ///
         /// Unique identifier within the collection, optional, 0 means unassigned
+        /// DEPRECATED
         index: u64,
-        // DEPRECATED
         /// A brief description of the token.
         description: String,
         /// Deprecated in favor of `name` inside TokenIdentifiers.
@@ -59,8 +61,8 @@ module aptos_token_objects::token {
         ///
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
+        /// DEPRECATED
         name: String,
-        // DEPRECATED
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
@@ -98,6 +100,10 @@ module aptos_token_objects::token {
     /// This enables mutating description and URI by higher level services.
     struct MutatorRef has drop, store {
         self: address,
+    }
+
+    struct CompressionRef has drop, store {
+        inner: object::DeleteAndRecreateRef,
     }
 
     /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
@@ -466,6 +472,12 @@ module aptos_token_objects::token {
         BurnRef { self, inner }
     }
 
+    public fun generate_compression_ref(ref: &ConstructorRef): CompressionRef {
+        CompressionRef {
+            inner: object::generate_delete_and_recreate_ref(ref),
+        }
+    }
+
     /// Extracts the tokens address from a BurnRef.
     public fun address_from_burn_ref(ref: &BurnRef): address {
         if (option::is_some(&ref.inner)) {
@@ -600,7 +612,7 @@ module aptos_token_objects::token {
         };
 
         if (royalty::exists_at(addr)) {
-            royalty::delete(addr)
+            royalty::delete(addr);
         };
 
         let Token {
@@ -1174,5 +1186,89 @@ module aptos_token_objects::token {
     fun get_collection_from_ref(extend_ref: &ExtendRef): Object<Collection> {
         let collection_address = signer::address_of(&object::generate_signer_for_extending(extend_ref));
         object::address_to_object<Collection>(collection_address)
+    }
+
+
+    const ECOLLECTION_ALREADY_COMPRESSED: u64 = 30;
+    const ECOLLECTION_NOT_COMPRESSED: u64 = 31;
+
+    struct CompressedToken has drop, store {
+        /// The collection from which this token resides.
+        collection: Object<Collection>,
+        /// Unique identifier within the collection, optional, 0 means unassigned
+        index: u64, // TODO change to AggregatorSnapshot
+        /// A brief description of the token.
+        description: String,
+        /// The name of the token, which should be unique within the collection; the length of name
+        /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
+        name: String, // TODO change to AggregatorSnapshot
+        /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
+        /// storage; the URL length will likely need a maximum any suggestions?
+        uri: String,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Represents the common fields for a collection.
+    struct CompressedCollection has key {
+    }
+
+    public fun collection_enable_compressed_tokens(
+        constructor_ref: ConstructorRef, // TODO - should we support with ExtendRef with existing collections?
+    ) {
+        let object_signer = object::generate_signer(&constructor_ref);
+
+        let compressed_collection = CompressedCollection {
+        };
+        assert!(!exists<CompressedCollection>(signer::address_of(&object_signer)), error::invalid_argument(ECOLLECTION_ALREADY_COMPRESSED));
+        move_to(&object_signer, compressed_collection);
+    }
+
+    public fun compress_token(
+        creator: &signer,
+        compression_ref: CompressionRef,
+        resources: AnyMap
+    ) acquires Token, TokenIdentifiers{
+        let object_addr = object::address_from_delete_and_recreate_ref(&compression_ref.inner);
+
+        let Token {
+            collection,
+            index: deprecated_index,
+            description,
+            name: deprecated_name,
+            uri,
+            mutation_events,
+        } = move_from<Token>(object_addr);
+
+        assert!(object::owner(collection) == signer::address_of(creator), error::unauthenticated(ENOT_OWNER));
+        assert!(exists<CompressedCollection>(object::object_address(&collection)), error::invalid_argument(ECOLLECTION_NOT_COMPRESSED));
+
+        event::destroy_handle(mutation_events);
+
+        let (index, name) = if (exists<TokenIdentifiers>(object_addr)) {
+            let TokenIdentifiers {
+                index,
+                name,
+            } = move_from<TokenIdentifiers>(object_addr);
+            (aggregator_v2::read_snapshot(&index), aggregator_v2::read_derived_string(&name))
+        } else {
+            (deprecated_index, deprecated_name)
+        };
+
+        let compressed_token = CompressedToken {
+            collection,
+            index,
+            description,
+            name,
+            uri,
+        };
+
+        copyable_any_map::add(&mut resources, compressed_token);
+
+        if (royalty::exists_at(object_addr)) {
+            copyable_any_map::add(&mut resources, royalty::delete(object_addr));
+        };
+
+        let CompressionRef { inner } = compression_ref;
+        compressed_object::compress_existing_object(inner, resources)
     }
 }
