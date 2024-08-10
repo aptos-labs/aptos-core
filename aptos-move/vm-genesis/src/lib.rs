@@ -88,6 +88,7 @@ pub struct GenesisConfiguration {
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voting_power_increase_limit: u64,
+    pub genesis_timestamp_in_microseconds: u64,
     pub employee_vesting_start: u64,
     pub employee_vesting_period_duration: u64,
     pub initial_features_override: Option<Features>,
@@ -432,6 +433,7 @@ fn initialize(
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
             MoveValue::U64(genesis_config.voting_power_increase_limit),
+            MoveValue::U64(genesis_config.genesis_timestamp_in_microseconds),
         ]),
     );
 }
@@ -959,6 +961,7 @@ pub fn generate_test_genesis(
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
+            genesis_timestamp_in_microseconds: 0,
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
             initial_features_override: None,
@@ -1009,6 +1012,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         rewards_apy_percentage: 10,
         voting_duration_secs: 7 * 24 * 3600, // 7 days
         voting_power_increase_limit: 30,
+        genesis_timestamp_in_microseconds: 0,
         employee_vesting_start: 1663456089,
         employee_vesting_period_duration: 5 * 60, // 5 minutes
         initial_features_override: None,
