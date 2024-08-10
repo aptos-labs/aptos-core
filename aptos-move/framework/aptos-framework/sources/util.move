@@ -1,5 +1,6 @@
 /// Utility functions used by the framework modules.
 module aptos_framework::util {
+    friend aptos_framework::compressed_state;
     friend aptos_framework::code;
     friend aptos_framework::gas_schedule;
 

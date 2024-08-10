@@ -921,6 +921,8 @@ pub enum EntryFunctionCall {
 
     TransactionFeeConvertToAptosFaBurnRef {},
 
+    UniqueKeyInitializeAtAddress {},
+
     /// Used in on-chain governances to update the major version for the next epoch.
     /// Example usage:
     /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
@@ -1588,6 +1590,7 @@ impl EntryFunctionCall {
             TransactionFeeConvertToAptosFaBurnRef {} => {
                 transaction_fee_convert_to_aptos_fa_burn_ref()
             },
+            UniqueKeyInitializeAtAddress {} => unique_key_initialize_at_address(),
             VersionSetForNextEpoch { major } => version_set_for_next_epoch(major),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
@@ -4286,6 +4289,21 @@ pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
     ))
 }
 
+pub fn unique_key_initialize_at_address() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("unique_key").to_owned(),
+        ),
+        ident_str!("initialize_at_address").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Used in on-chain governances to update the major version for the next epoch.
 /// Example usage:
 /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
@@ -6179,6 +6197,16 @@ mod decoder {
         }
     }
 
+    pub fn unique_key_initialize_at_address(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::UniqueKeyInitializeAtAddress {})
+        } else {
+            None
+        }
+    }
+
     pub fn version_set_for_next_epoch(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetForNextEpoch {
@@ -6893,6 +6921,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),
             Box::new(decoder::transaction_fee_convert_to_aptos_fa_burn_ref),
+        );
+        map.insert(
+            "unique_key_initialize_at_address".to_string(),
+            Box::new(decoder::unique_key_initialize_at_address),
         );
         map.insert(
             "version_set_for_next_epoch".to_string(),
