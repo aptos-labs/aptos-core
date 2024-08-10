@@ -477,7 +477,8 @@ Note: This method may occasionally cost much more gas when triggering bucket spl
     <b>let</b> e = <a href="smart_table.md#0x1_smart_table_Entry">Entry</a> { <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>, key, value };
     <b>if</b> (<a href="table.md#0x1_table">table</a>.target_bucket_size == 0) {
         <b>let</b> estimated_entry_size = max(size_of_val(&e), 1);
-        <a href="table.md#0x1_table">table</a>.target_bucket_size = max(1024 /* free_write_quota */ / estimated_entry_size, 1);
+        // <b>with</b> default 75% fill rate, targets slightly less than 4KB
+        <a href="table.md#0x1_table">table</a>.target_bucket_size = max(5 * 1024 / estimated_entry_size, 1);
     };
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(bucket, e);
     <a href="table.md#0x1_table">table</a>.size = <a href="table.md#0x1_table">table</a>.size + 1;

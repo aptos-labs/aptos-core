@@ -143,7 +143,8 @@ module aptos_std::smart_table {
         let e = Entry { hash, key, value };
         if (table.target_bucket_size == 0) {
             let estimated_entry_size = max(size_of_val(&e), 1);
-            table.target_bucket_size = max(1024 /* free_write_quota */ / estimated_entry_size, 1);
+            // with default 75% fill rate, targets slightly less than 4KB
+            table.target_bucket_size = max(5 * 1024 / estimated_entry_size, 1);
         };
         vector::push_back(bucket, e);
         table.size = table.size + 1;
