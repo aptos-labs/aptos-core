@@ -46,7 +46,7 @@ A handle for an event such that:
 
 
 <pre><code>#[deprecated]
-<b>struct</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T: drop, store&gt; <b>has</b> store
+<b>struct</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T: drop, store&gt; <b>has</b> drop, store
 </code></pre>
 
 
@@ -264,7 +264,7 @@ Destroy a unique handle.
 
 
 <pre><code>#[deprecated]
-<b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(handle: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
+<b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(self: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -273,8 +273,8 @@ Destroy a unique handle.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop + store&gt;(handle: <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt;) {
-    <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; { counter: _, <a href="guid.md#0x1_guid">guid</a>: _ } = handle;
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop + store&gt;(self: <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt;) {
+    <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; { counter: _, <a href="guid.md#0x1_guid">guid</a>: _ } = self;
 }
 </code></pre>
 
@@ -466,7 +466,7 @@ Native function use opaque.
 
 
 <pre><code>#[deprecated]
-<b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(handle: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
+<b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(self: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
 </code></pre>
 
 
