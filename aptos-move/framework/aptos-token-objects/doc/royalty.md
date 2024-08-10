@@ -41,7 +41,7 @@ by (numerator / denominator) * 100%
 
 
 <pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
-<b>struct</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> <b>has</b> <b>copy</b>, drop, key
+<b>struct</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> <b>has</b> <b>copy</b>, drop, store, key
 </code></pre>
 
 
@@ -277,7 +277,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="royalty.md#0x4_royalty_delete">delete</a>(addr: <b>address</b>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="royalty.md#0x4_royalty_delete">delete</a>(addr: <b>address</b>): <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>
 </code></pre>
 
 
@@ -286,9 +286,9 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="royalty.md#0x4_royalty_delete">delete</a>(addr: <b>address</b>) <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="royalty.md#0x4_royalty_delete">delete</a>(addr: <b>address</b>): <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="royalty.md#0x4_royalty_EROYALTY_DOES_NOT_EXIST">EROYALTY_DOES_NOT_EXIST</a>));
-    <b>move_from</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr);
+    <b>move_from</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr)
 }
 </code></pre>
 
