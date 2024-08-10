@@ -7,4 +7,13 @@ module 0xCAFE::Module0 {
         };
         if (copy x) { } else { };
     }
+
+    public fun f2(x: bool) {
+        let y: &mut bool =  &mut x;
+        while (x) {
+            *y= false;
+        };
+        if (copy x) { } else { };
+    }
+
 }
