@@ -51,7 +51,7 @@ module aptos_token_objects::property_map {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A Map for typed key to value mapping, the contract using it
     /// should keep track of what keys are what types, and parse them accordingly.
-    struct PropertyMap has drop, key {
+    struct PropertyMap has drop, key, store {
         inner: SimpleMap<String, PropertyValue>,
     }
 
@@ -313,6 +313,11 @@ module aptos_token_objects::property_map {
         assert_exists(ref.self);
         let property_map = borrow_global_mut<PropertyMap>(ref.self);
         simple_map::add(&mut property_map.inner, key, PropertyValue { type, value });
+    }
+
+    public fun add_typed_to_struct<T: drop>(property_map: &mut PropertyMap, key: String, value: T) {
+        let type = type_info_to_internal_type<T>();
+        simple_map::add(&mut property_map.inner, key, PropertyValue { type, value: bcs::to_bytes(&value)});
     }
 
     /// Updates a property in place already bcs encoded
