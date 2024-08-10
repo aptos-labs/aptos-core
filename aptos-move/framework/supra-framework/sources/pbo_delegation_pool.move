@@ -5782,11 +5782,10 @@ module supra_framework::pbo_delegation_pool {
         unlock(delegator1, pool_address, 1 * ONE_APT);
         assert_delegation(delegator1_address, pool_address, 0, 0, 110462212);
         stake::assert_stake_pool(pool_address,9941599156152340933,0,0,110462212);
-        // unlock(delegator1, pool_address, 1 * ONE_APT);
         stake::assert_stake_pool(pool_address,9941599156152340933,0,0,110462212);
         assert_delegation(delegator1_address, pool_address, 0, 0, 110462212);
         assert_delegation(delegator2_address, pool_address, 9941599128700840588, 0, 0);
-        // unlock(delegator2, pool_address, 1 * ONE_APT);
-        // assert_delegation(delegator2_address, pool_address, 9941599128600840588, 0, 100000000);
+        unlock(delegator2, pool_address, 1 * ONE_APT);
+        assert_delegation(delegator2_address, pool_address, 9941599128600840588, 0, 100000000);
     }
 }
