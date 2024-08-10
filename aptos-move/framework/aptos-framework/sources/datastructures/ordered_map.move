@@ -24,6 +24,8 @@
 ///
 module aptos_std::ordered_map {
     friend aptos_std::big_ordered_map;
+    // Friend until iterator API is finalized
+    friend aptos_std::any_map;
 
     use std::vector;
 
