@@ -169,6 +169,7 @@ fn main() {
         EntryPoints::TokenV1MintAndTransferFT,
         EntryPoints::TokenV1MintAndTransferNFTSequential,
         EntryPoints::TokenV2AmbassadorMint { numbered: true },
+        EntryPoints::CompressedTokenAmbassadorMint { numbered: true },
         EntryPoints::LiquidityPoolSwap { is_stable: true },
         EntryPoints::LiquidityPoolSwap { is_stable: false },
         EntryPoints::CoinInitAndMint,

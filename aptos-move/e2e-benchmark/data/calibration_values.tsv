@@ -33,3 +33,7 @@ VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, rep
 VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	6	0.925	1.001	277.0
 VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	6	0.925	1.001	12146.6
 VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	6	0.925	1.001	7098
+TokenV2AmbassadorMint { numbered: false }	60	0.951	1.057	516.6
+TokenV2AmbassadorMint { numbered: true }	60	0.951	1.057	516.6
+CompressedTokenAmbassadorMint { numbered: false }	60	0.951	1.057	516.6
+CompressedTokenAmbassadorMint { numbered: true }	60	0.951	1.057	516.6
