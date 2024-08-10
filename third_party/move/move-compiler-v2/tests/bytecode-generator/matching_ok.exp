@@ -13,6 +13,23 @@ module 0xc0ffee::m {
             z: u64,
         }
     }
+    enum CommonFieldsAtDifferentOffset {
+        Foo {
+            x: u64,
+            y: u64,
+        }
+        Bar {
+            x: u64,
+            z: u64,
+        }
+        Baz {
+            z: u64,
+        }
+        Balt {
+            foo: u8,
+            z: u64,
+        }
+    }
     enum Inner {
         Inner1 {
             x: u64,
@@ -162,7 +179,7 @@ module 0xc0ffee::m {
 
     }
     private fun select_common_fields(s: m::CommonFields): u64 {
-        Add<u64>(select m::CommonFields.x<m::CommonFields>(s), match (s) {
+        Add<u64>(select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<m::CommonFields>(s), match (s) {
           m::CommonFields::Foo{ x: _, y } => {
             y
           }
@@ -171,6 +188,9 @@ module 0xc0ffee::m {
           }
         }
         )
+    }
+    private fun select_common_fields_different_offset(s: m::CommonFieldsAtDifferentOffset): u64 {
+        select_variants m::CommonFieldsAtDifferentOffset.Bar.z|m::CommonFieldsAtDifferentOffset.Baz.z|m::CommonFieldsAtDifferentOffset.Balt.z<m::CommonFieldsAtDifferentOffset>(s)
     }
 } // end 0xc0ffee::m
 
@@ -574,6 +594,31 @@ fun m::select_common_fields($t0: m::CommonFields): u64 {
  20: label L0
  21: $t1 := +($t2, $t5)
  22: return $t1
+}
+
+
+[variant baseline]
+fun m::select_common_fields_different_offset($t0: m::CommonFieldsAtDifferentOffset): u64 {
+     var $t1: u64
+     var $t2: &m::CommonFieldsAtDifferentOffset
+     var $t3: &u64
+     var $t4: bool
+  0: $t2 := borrow_local($t0)
+  1: $t4 := test_variant m::CommonFieldsAtDifferentOffset::Bar($t2)
+  2: if ($t4) goto 8 else goto 3
+  3: label L2
+  4: $t4 := test_variant m::CommonFieldsAtDifferentOffset::Balt($t2)
+  5: if ($t4) goto 8 else goto 6
+  6: label L3
+  7: goto 11
+  8: label L1
+  9: $t3 := borrow_variant_field<m::CommonFieldsAtDifferentOffset::Bar|Balt>.z($t2)
+ 10: goto 13
+ 11: label L4
+ 12: $t3 := borrow_variant_field<m::CommonFieldsAtDifferentOffset::Baz>.z($t2)
+ 13: label L0
+ 14: $t1 := read_ref($t3)
+ 15: return $t1
 }
 
 

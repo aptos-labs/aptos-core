@@ -100,6 +100,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/operator_eval/",
     // Creates different code if optimized
     "no-v1-comparison/enum/enum_field_select.move",
+    "no-v1-comparison/enum/enum_field_select_different_offsets.move",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
