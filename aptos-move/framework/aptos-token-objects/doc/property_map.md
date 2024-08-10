@@ -44,6 +44,8 @@ represent types and storing values in bcs format.
 -  [Function `update_typed`](#0x4_property_map_update_typed)
 -  [Function `update_internal`](#0x4_property_map_update_internal)
 -  [Function `remove`](#0x4_property_map_remove)
+-  [Function `exists_at`](#0x4_property_map_exists_at)
+-  [Function `delete`](#0x4_property_map_delete)
 -  [Function `assert_end_to_end_input`](#0x4_property_map_assert_end_to_end_input)
 
 
@@ -1257,6 +1259,54 @@ Removes a property from the map, ensuring that it does in fact exist
     <a href="property_map.md#0x4_property_map_assert_exists">assert_exists</a>(ref.self);
     <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = <b>borrow_global_mut</b>&lt;<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>&gt;(ref.self);
     <a href="../../aptos-framework/../aptos-stdlib/doc/simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(&<b>mut</b> <a href="property_map.md#0x4_property_map">property_map</a>.inner, key);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_property_map_exists_at"></a>
+
+## Function `exists_at`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="property_map.md#0x4_property_map_exists_at">exists_at</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="property_map.md#0x4_property_map_exists_at">exists_at</a>(addr: <b>address</b>): bool {
+    <b>exists</b>&lt;<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>&gt;(addr)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_property_map_delete"></a>
+
+## Function `delete`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="property_map.md#0x4_property_map_delete">delete</a>(addr: <b>address</b>): <a href="property_map.md#0x4_property_map_PropertyMap">property_map::PropertyMap</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="property_map.md#0x4_property_map_delete">delete</a>(addr: <b>address</b>): <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+    <b>move_from</b>&lt;<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>&gt;(addr)
 }
 </code></pre>
 

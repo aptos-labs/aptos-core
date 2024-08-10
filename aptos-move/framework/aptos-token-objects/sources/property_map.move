@@ -11,6 +11,8 @@ module aptos_token_objects::property_map {
     use aptos_std::type_info;
     use aptos_framework::object::{Self, ConstructorRef, Object, ExtendRef, ObjectCore};
 
+    friend aptos_token_objects::token;
+
     // Errors
     /// The property map does not exist
     const EPROPERTY_MAP_DOES_NOT_EXIST: u64 = 1;
@@ -345,6 +347,14 @@ module aptos_token_objects::property_map {
         assert_exists(ref.self);
         let property_map = borrow_global_mut<PropertyMap>(ref.self);
         simple_map::remove(&mut property_map.inner, key);
+    }
+
+    public(friend) fun exists_at(addr: address): bool {
+        exists<PropertyMap>(addr)
+    }
+
+    public(friend) fun delete(addr: address): PropertyMap acquires PropertyMap {
+        move_from<PropertyMap>(addr)
     }
 
     // Tests
