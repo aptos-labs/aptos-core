@@ -202,6 +202,7 @@ pub fn start_consensus_observer(
 
     // Start the consensus observer
     consensus_observer_runtime.spawn(consensus_observer.start(
+        node_config.consensus_observer,
         consensus_observer_message_receiver,
         sync_notification_listener,
     ));
