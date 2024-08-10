@@ -5614,7 +5614,7 @@ module supra_framework::pbo_delegation_pool {
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     #[expected_failure(abort_code = 327716, location = Self)]
     /// if admin is option::none() calling to `replace_delegator` should fail
-    public entry fun test_repalce_delegation_without_multisig_failure(
+    public entry fun test_replace_delegation_without_multisig_failure(
         supra_framework: &signer,
         validator: &signer
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
@@ -5673,7 +5673,7 @@ module supra_framework::pbo_delegation_pool {
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     #[expected_failure(abort_code = 327716, location = Self)]
     /// if admin is multi signer calling `replace_delegator` if it's not the same signer which was initialized, it should fail
-    public entry fun test_repalce_delegation_with_different_multisig_failure(
+    public entry fun test_replace_delegation_with_different_multisig_failure(
         supra_framework: &signer,
         validator: &signer
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
@@ -5706,20 +5706,21 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     /// if admin is authorized multi signer, `replace_delegator` should succeed
-    public entry fun test_repalce_delegation_multisig_success(
+    public entry fun test_replace_delegation_multisig_success(
         supra_framework: &signer,
         validator: &signer
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(supra_framework);
         account::create_account_for_test(signer::address_of(validator));
-        let delegator_address = vector[@0x010, @0x020];
+        let old_delegator = @0x010;
+        let delegator_address_vec = vector[old_delegator, @0x020];
         let principle_stake = vector[100 * ONE_APT, 200 * ONE_APT];
         let coin = stake::mint_coins(300 * ONE_APT);
         let principle_lockup_time = 0;
         let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
 
         initialize_test_validator(validator, 0, true, true, 0,
-            delegator_address,
+            delegator_address_vec,
             principle_stake,
             coin,
             option::some(multisig),
@@ -5732,12 +5733,16 @@ module supra_framework::pbo_delegation_pool {
         let multisig_signer = account::create_signer_for_test(multisig);
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
-        replace_delegator(&multisig_signer, pool_address, @0x010, @0x0101);
+        let new_delegator = @0x0101;
+        assert_delegation(old_delegator, pool_address, 100 * ONE_APT, 0, 0);
+
+        replace_delegator(&multisig_signer, pool_address, @0x010, new_delegator);
+        assert_delegation(new_delegator, pool_address, 100 * ONE_APT, 0, 0);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     /// if old_delegator has already unlocked 100, the new_delegator should be able to withdraw 100 coins
-    public entry fun test_repalce_delegation_before_withdraw_and_after_withdraw_success(
+    public entry fun test_replace_delegation_before_withdraw_and_after_withdraw_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer,
@@ -5782,7 +5787,7 @@ module supra_framework::pbo_delegation_pool {
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 65545, location = Self)]
     /// after replace_delegator` succeeds, old_delegator must not be able to perform unlock or withdraw or vote (if partial_voting is enable)
-    public entry fun test_repalce_delegation_after_withdraw_using_old_address_failure(
+    public entry fun test_replace_delegation_after_withdraw_using_old_address_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer,
@@ -5824,7 +5829,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     /// after replace_delegator succeeds, new_delegator should be able to perform unlock and withdraw on the funds as per unlocking schedule
-    public entry fun test_repalce_delegation_unlock_and_withdraw_success(
+    public entry fun test_replace_delegation_unlock_and_withdraw_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer,
@@ -5868,7 +5873,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     /// after replace_delegator new_delegator should be able to vote (if partial_voting is enable), or should be able to delegate voting
-    public entry fun test_repalce_delegation_and_vote_delegate_voting_success(
+    public entry fun test_replace_delegation_and_vote_delegate_voting_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6008,8 +6013,8 @@ module supra_framework::pbo_delegation_pool {
     /// say unlocking schedule is 3 month cliff, monthly unlocking of (2,3,1) tange and principle stake is 100 coins then
     /// at the end of 3 months, one can't unlock there principal stacke
     /// after 4 months only 90 should remain locked
-    /// arfter 5 months only 80 should remain locked and so on
-    public entry fun test_unlocking_prinicple_stake_success(
+    /// after 5 months only 80 should remain locked and so on
+    public entry fun test_unlocking_principle_stake_success(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6103,7 +6108,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
-    public entry fun test_unlocking_more_prinicple_stake_after_4_month_failure(
+    public entry fun test_unlocking_more_principle_stake_after_4_month_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6154,7 +6159,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
-    public entry fun test_unlocking_more_prinicple_stake_after_5_month_failure(
+    public entry fun test_unlocking_more_principle_stake_after_5_month_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6212,7 +6217,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
-    public entry fun test_unlocking_more_prinicple_stake_after_6_month_failure(
+    public entry fun test_unlocking_more_principle_stake_after_6_month_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6276,7 +6281,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
-    public entry fun test_unlocking_more_prinicple_stake_after_7_month_failure(
+    public entry fun test_unlocking_more_principle_stake_after_7_month_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6346,7 +6351,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
-    public entry fun test_unlocking_more_prinicple_stake_after_8_month_failure(
+    public entry fun test_unlocking_more_principle_stake_after_8_month_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6422,7 +6427,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
-    public entry fun test_unlocking_more_prinicple_stake_after_9_month_failure(
+    public entry fun test_unlocking_more_principle_stake_after_9_month_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6504,7 +6509,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
-    public entry fun test_unlocking_more_prinicple_stake_after_10_month_failure(
+    public entry fun test_unlocking_more_principle_stake_after_10_month_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
@@ -6592,7 +6597,7 @@ module supra_framework::pbo_delegation_pool {
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
-    public entry fun test_unlocking_more_prinicple_stake_after_11_month_failure(
+    public entry fun test_unlocking_more_principle_stake_after_11_month_failure(
         supra_framework: &signer,
         validator: &signer,
         delegator :&signer
