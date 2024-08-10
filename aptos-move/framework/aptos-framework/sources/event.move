@@ -31,7 +31,7 @@ module aptos_framework::event {
     /// A handle for an event such that:
     /// 1. Other modules can emit events to this handle.
     /// 2. Storage can use this handle to prove the total number of events that happened in the past.
-    struct EventHandle<phantom T: drop + store> has store {
+    struct EventHandle<phantom T: drop + store> has drop, store {
         /// Total number of events emitted to this event stream.
         counter: u64,
         /// A globally unique ID for this event stream.

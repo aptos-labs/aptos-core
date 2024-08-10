@@ -46,7 +46,7 @@ A handle for an event such that:
 
 
 <pre><code>#[deprecated]
-<b>struct</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T: drop, store&gt; <b>has</b> store
+<b>struct</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T: drop, store&gt; <b>has</b> drop, store
 </code></pre>
 
 

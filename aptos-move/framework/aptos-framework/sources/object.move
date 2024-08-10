@@ -143,6 +143,11 @@ module aptos_framework::object {
         self: address,
     }
 
+    /// Used to remove an object from storage, such that it can be created again
+    struct DeleteAndRecreateRef has drop, store {
+        self: address,
+    }
+
     /// Used to create events or move additional resources into object storage.
     struct ExtendRef has drop, store {
         self: address,
@@ -163,6 +168,18 @@ module aptos_framework::object {
     /// Used to create derived objects from a given objects.
     struct DeriveRef has drop, store {
         self: address,
+    }
+
+    /// Used to (re)create object at a given address
+    enum CreateAtAddressRef has drop, store {
+        RecreateV1 {
+            object: address,
+            owner: address,
+            guid_creation_num: u64,
+            untransferable: bool,
+            allow_ungated_transfer: bool,
+            transfer_events: event::EventHandle<TransferEvent>
+        },
     }
 
     /// Emitted whenever the object's owner field is changed.
@@ -240,8 +257,8 @@ module aptos_framework::object {
     native fun exists_at<T: key>(object: address): bool;
 
     /// Returns the address of within an ObjectId.
-    public fun object_address<T: key>(object: &Object<T>): address {
-        object.inner
+    public fun object_address<T: key>(self: &Object<T>): address {
+        self.inner
     }
 
     /// Convert Object<X> to Object<Y>.
@@ -272,6 +289,40 @@ module aptos_framework::object {
         let unique_address = transaction_context::generate_auid_address();
         create_object_internal(owner_address, unique_address, true)
     }
+
+    // TODO this should probably not return ConstructorRef
+    public fun create_object_at_address_from_ref(create_ref: CreateAtAddressRef): ConstructorRef {
+        let CreateAtAddressRef::RecreateV1 {
+            object, owner, guid_creation_num, untransferable, allow_ungated_transfer, transfer_events,
+        } = create_ref;
+
+        assert!(!exists<ObjectCore>(object), error::already_exists(EOBJECT_EXISTS));
+
+        let object_signer = create_signer(object);
+        let transfer_events_guid = guid::create(object, &mut guid_creation_num);
+
+        move_to(
+            &object_signer,
+            ObjectCore {
+                guid_creation_num,
+                owner,
+                allow_ungated_transfer,
+                transfer_events,
+            },
+        );
+
+        if (untransferable) {
+            move_to(&object_signer, Untransferable {});
+        };
+        ConstructorRef { self: object, can_delete: true }
+    }
+
+    // /// Create an address where we can create an object in the future.
+    // public fun create_at_address_ref(): CreateAtAddressRef {
+    //     CreateAtAddressRef {
+    //         object: transaction_context::generate_auid_address(),
+    //     }
+    // }
 
     /// Same as `create_object` except the object to be created will be undeletable.
     public fun create_sticky_object(owner_address: address): ConstructorRef {
@@ -349,6 +400,11 @@ module aptos_framework::object {
         DeleteRef { self: ref.self }
     }
 
+    public fun generate_delete_and_recreate_ref(self: &ConstructorRef): DeleteAndRecreateRef {
+        assert!(self.can_delete, error::permission_denied(ECANNOT_DELETE));
+        DeleteAndRecreateRef { self: self.self }
+    }
+
     /// Generates the ExtendRef, which can be used to add new events and resources to the object.
     public fun generate_extend_ref(ref: &ConstructorRef): ExtendRef {
         ExtendRef { self: ref.self }
@@ -371,18 +427,22 @@ module aptos_framework::object {
     }
 
     /// Returns the address associated with the constructor
-    public fun address_from_constructor_ref(ref: &ConstructorRef): address {
-        ref.self
+    public fun address_from_constructor_ref(self: &ConstructorRef): address {
+        self.self
     }
 
     /// Returns an Object<T> from within a ConstructorRef
-    public fun object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T> {
-        address_to_object<T>(ref.self)
+    public fun object_from_constructor_ref<T: key>(self: &ConstructorRef): Object<T> {
+        address_to_object<T>(self.self)
     }
 
     /// Returns whether or not the ConstructorRef can be used to create DeleteRef
     public fun can_generate_delete_ref(ref: &ConstructorRef): bool {
         ref.can_delete
+    }
+
+    public fun address_from_create_at_ref(ref: &CreateAtAddressRef): address {
+        ref.object
     }
 
     // Signer required functions
@@ -428,6 +488,41 @@ module aptos_framework::object {
         };
 
         event::destroy_handle(transfer_events);
+    }
+
+    /// Returns the address associated with the constructor
+    public fun address_from_delete_and_recreate_ref(self: &DeleteAndRecreateRef): address {
+        self.self
+    }
+
+    /// Returns an Object<T> from within a DeleteRef.
+    public fun object_from_delete_and_recreate_ref<T: key>(self: &DeleteAndRecreateRef): Object<T> {
+        address_to_object<T>(self.self)
+    }
+
+    /// Removes from the specified Object from global storage, and returns a handle to be able to recreate it
+    public fun delete_and_can_recreate(self: DeleteAndRecreateRef): CreateAtAddressRef acquires Untransferable, ObjectCore {
+        let object_core = move_from<ObjectCore>(self.self);
+        let ObjectCore {
+            guid_creation_num,
+            owner,
+            allow_ungated_transfer,
+            transfer_events,
+        } = object_core;
+
+        let untransferable = exists<Untransferable>(self.self);
+        if (untransferable) {
+            let Untransferable {} = move_from<Untransferable>(self.self);
+        };
+
+        CreateAtAddressRef::RecreateV1 {
+            object: self.self,
+            owner,
+            guid_creation_num,
+            untransferable,
+            allow_ungated_transfer,
+            transfer_events,
+        }
     }
 
     // Extension helpers
