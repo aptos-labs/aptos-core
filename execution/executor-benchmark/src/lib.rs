@@ -1062,8 +1062,8 @@ mod tests {
         println!("run_benchmark");
 
         super::run_benchmark::<E>(
-            10, /* block_size */
-            30, /* num_blocks */
+            30, /* block_size */
+            100, /* num_blocks */
             transaction_type.map_or_else(
                 || BenchmarkWorkload::Transfer {
                     connected_tx_grps: 0,
@@ -1077,9 +1077,9 @@ mod tests {
                     )])
                 },
             ),
-            2,  /* transactions per sender */
-            25, /* num_main_signer_accounts */
-            30, /* num_dst_pool_accounts */
+            4,  /* transactions per sender */
+            35, /* num_main_signer_accounts */
+            35, /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
@@ -1114,7 +1114,7 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeConfig::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVMBlockExecutor>(
-            Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
+            Some(TransactionTypeArg::CompressedTokenAmbassadorMint),
             true,
         );
     }
