@@ -71,6 +71,7 @@ const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
+const COMPRESSED_OBJECT_MODULE_NAME: &str = "compressed_object";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -287,6 +288,7 @@ pub fn encode_genesis_change_set(
     initialize_jwk_consensus_config(&mut session, &jwk_consensus_config);
     initialize_jwks_resources(&mut session);
     initialize_keyless_accounts(&mut session, chain_id);
+    initialize_compressed_objects(&mut session);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -666,6 +668,23 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
             ]),
         );
     }
+}
+
+fn initialize_compressed_objects(session: &mut SessionExt) {
+    exec_function(
+        session,
+        "unique_key",
+        "initialize_at_address",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+    exec_function(
+        session,
+        COMPRESSED_OBJECT_MODULE_NAME,
+        "initialize_compressed_object",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
 }
 
 fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {

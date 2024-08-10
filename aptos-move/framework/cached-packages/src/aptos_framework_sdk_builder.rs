@@ -323,6 +323,8 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    CompressedObjectInitializeCompressedObject {},
+
     /// Add `amount` of coins to the delegation pool `pool_address`.
     DelegationPoolAddStake {
         pool_address: AccountAddress,
@@ -1195,6 +1197,9 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            CompressedObjectInitializeCompressedObject {} => {
+                compressed_object_initialize_compressed_object()
+            },
             DelegationPoolAddStake {
                 pool_address,
                 amount,
@@ -2437,6 +2442,21 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ),
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
+        vec![],
+    ))
+}
+
+pub fn compressed_object_initialize_compressed_object() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("compressed_object").to_owned(),
+        ),
+        ident_str!("initialize_compressed_object").to_owned(),
+        vec![],
         vec![],
     ))
 }
@@ -5108,6 +5128,16 @@ mod decoder {
         }
     }
 
+    pub fn compressed_object_initialize_compressed_object(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::CompressedObjectInitializeCompressedObject {})
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolAddStake {
@@ -6580,6 +6610,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "compressed_object_initialize_compressed_object".to_string(),
+            Box::new(decoder::compressed_object_initialize_compressed_object),
         );
         map.insert(
             "delegation_pool_add_stake".to_string(),

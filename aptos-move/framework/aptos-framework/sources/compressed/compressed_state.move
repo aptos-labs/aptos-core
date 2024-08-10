@@ -12,6 +12,8 @@ module aptos_framework::compressed_state {
     use aptos_framework::util;
     use aptos_framework::unique_key;
 
+    friend aptos_framework::compressed_object;
+
     const EHASH_DOESNT_MATCH: u64 = 1;
     /// compressed_id already exists
     const ECOMPRESSED_ID_ALREADY_PRESENT: u64 = 2;
