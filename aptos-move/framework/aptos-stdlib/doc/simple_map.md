@@ -30,6 +30,7 @@ This module provides a solution for unsorted maps, that is it has the properties
 -  [Function `to_vec_pair`](#0x1_simple_map_to_vec_pair)
 -  [Function `destroy`](#0x1_simple_map_destroy)
 -  [Function `remove`](#0x1_simple_map_remove)
+-  [Function `remove_if_present`](#0x1_simple_map_remove_if_present)
 -  [Function `find`](#0x1_simple_map_find)
 -  [Specification](#@Specification_1)
     -  [Struct `SimpleMap`](#@Specification_1_SimpleMap)
@@ -618,6 +619,42 @@ Remove a key/value pair from the map. The key must exist.
     <b>let</b> placement = <a href="../../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maybe_idx);
     <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value } = <a href="../../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> map.data, placement);
     (key, value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_simple_map_remove_if_present"></a>
+
+## Function `remove_if_present`
+
+Remove a key/value pair from the map, if present.
+Otherwise returns none.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_remove_if_present">remove_if_present</a>&lt;Key: drop, store, Value: store&gt;(map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: &Key): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;Value&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_remove_if_present">remove_if_present</a>&lt;Key: store + drop, Value: store&gt;(
+    map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
+    key: &Key,
+): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;Value&gt; {
+    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find">find</a>(map, key);
+    <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_idx)) {
+        <b>let</b> placement = <a href="../../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maybe_idx);
+        <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key: _, value } = <a href="../../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> map.data, placement);
+        <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(value)
+    } <b>else</b> {
+        <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
 }
 </code></pre>
 

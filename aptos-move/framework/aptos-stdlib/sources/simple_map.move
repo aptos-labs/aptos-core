@@ -185,6 +185,22 @@ module aptos_std::simple_map {
         (key, value)
     }
 
+    /// Remove a key/value pair from the map, if present.
+    /// Otherwise returns none.
+    public fun remove_if_present<Key: store + drop, Value: store>(
+        map: &mut SimpleMap<Key, Value>,
+        key: &Key,
+    ): option::Option<Value> {
+        let maybe_idx = find(map, key);
+        if (option::is_some(&maybe_idx)) {
+            let placement = option::extract(&mut maybe_idx);
+            let Element { key: _, value } = vector::swap_remove(&mut map.data, placement);
+            option::some(value)
+        } else {
+            option::none()
+        }
+    }
+
     fun find<Key: store, Value: store>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
