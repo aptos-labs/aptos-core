@@ -15,8 +15,11 @@ token are:
 -  [Resource `ConcurrentTokenIdentifiers`](#0x4_token_ConcurrentTokenIdentifiers)
 -  [Struct `BurnRef`](#0x4_token_BurnRef)
 -  [Struct `MutatorRef`](#0x4_token_MutatorRef)
+-  [Struct `CompressionRef`](#0x4_token_CompressionRef)
 -  [Struct `MutationEvent`](#0x4_token_MutationEvent)
 -  [Struct `Mutation`](#0x4_token_Mutation)
+-  [Struct `CompressedToken`](#0x4_token_CompressedToken)
+-  [Resource `CompressedCollection`](#0x4_token_CompressedCollection)
 -  [Constants](#@Constants_0)
 -  [Function `create_common`](#0x4_token_create_common)
 -  [Function `create_common_with_collection`](#0x4_token_create_common_with_collection)
@@ -41,6 +44,8 @@ token are:
 -  [Function `generate_mutator_ref`](#0x4_token_generate_mutator_ref)
 -  [Function `generate_burn_ref`](#0x4_token_generate_burn_ref)
 -  [Function `address_from_burn_ref`](#0x4_token_address_from_burn_ref)
+-  [Function `generate_compression_ref`](#0x4_token_generate_compression_ref)
+-  [Function `address_from_compression_ref`](#0x4_token_address_from_compression_ref)
 -  [Function `borrow`](#0x4_token_borrow)
 -  [Function `creator`](#0x4_token_creator)
 -  [Function `collection_name`](#0x4_token_collection_name)
@@ -55,11 +60,16 @@ token are:
 -  [Function `set_description`](#0x4_token_set_description)
 -  [Function `set_name`](#0x4_token_set_name)
 -  [Function `set_uri`](#0x4_token_set_uri)
+-  [Function `collection_enable_compressed_tokens`](#0x4_token_collection_enable_compressed_tokens)
+-  [Function `compress_token`](#0x4_token_compress_token)
+-  [Function `decompress_token`](#0x4_token_decompress_token)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2">0x1::aggregator_v2</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/any_map.md#0x1_any_map">0x1::any_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-framework/doc/external_object.md#0x1_external_object">0x1::external_object</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -67,6 +77,7 @@ token are:
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="collection.md#0x4_collection">0x4::collection</a>;
+<b>use</b> <a href="property_map.md#0x4_property_map">0x4::property_map</a>;
 <b>use</b> <a href="royalty.md#0x4_royalty">0x4::royalty</a>;
 </code></pre>
 
@@ -104,6 +115,7 @@ Represents the common fields to all tokens.
  Was populated until concurrent_token_v2_enabled feature flag was enabled.
 
  Unique identifier within the collection, optional, 0 means unassigned
+ DEPRECATED
 </dd>
 <dt>
 <code>description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
@@ -120,6 +132,7 @@ Represents the common fields to all tokens.
 
  The name of the token, which should be unique within the collection; the length of name
  should be smaller than 128, characters, eg: "Aptos Animal #1234"
+ DEPRECATED
 </dd>
 <dt>
 <code>uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
@@ -275,6 +288,33 @@ This enables mutating description and URI by higher level services.
 
 </details>
 
+<a id="0x4_token_CompressionRef"></a>
+
+## Struct `CompressionRef`
+
+
+
+<pre><code><b>struct</b> <a href="token.md#0x4_token_CompressionRef">CompressionRef</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>inner: <a href="../../aptos-framework/doc/object.md#0x1_object_DeleteAndRecreateRef">object::DeleteAndRecreateRef</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x4_token_MutationEvent"></a>
 
 ## Struct `MutationEvent`
@@ -362,6 +402,88 @@ directly understand the behavior in a writeset.
 
 </details>
 
+<a id="0x4_token_CompressedToken"></a>
+
+## Struct `CompressedToken`
+
+
+
+<pre><code><b>struct</b> <a href="token.md#0x4_token_CompressedToken">CompressedToken</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="collection.md#0x4_collection_Collection">collection::Collection</a>&gt;</code>
+</dt>
+<dd>
+ The collection from which this token resides.
+</dd>
+<dt>
+<code>index: u64</code>
+</dt>
+<dd>
+ Unique identifier within the collection, optional, 0 means unassigned
+</dd>
+<dt>
+<code>description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ A brief description of the token.
+</dd>
+<dt>
+<code>name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The name of the token, which should be unique within the collection; the length of name
+ should be smaller than 128, characters, eg: "Aptos Animal #1234"
+</dd>
+<dt>
+<code>uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
+ storage; the URL length will likely need a maximum any suggestions?
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x4_token_CompressedCollection"></a>
+
+## Resource `CompressedCollection`
+
+Represents the common fields for a collection.
+
+
+<pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="token.md#0x4_token_CompressedCollection">CompressedCollection</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -421,6 +543,24 @@ The description is over the maximum length
 
 
 <pre><code><b>const</b> <a href="token.md#0x4_token_MAX_DESCRIPTION_LENGTH">MAX_DESCRIPTION_LENGTH</a>: u64 = 2048;
+</code></pre>
+
+
+
+<a id="0x4_token_ECOLLECTION_ALREADY_COMPRESSED"></a>
+
+
+
+<pre><code><b>const</b> <a href="token.md#0x4_token_ECOLLECTION_ALREADY_COMPRESSED">ECOLLECTION_ALREADY_COMPRESSED</a>: u64 = 30;
+</code></pre>
+
+
+
+<a id="0x4_token_ECOLLECTION_NOT_COMPRESSED"></a>
+
+
+
+<pre><code><b>const</b> <a href="token.md#0x4_token_ECOLLECTION_NOT_COMPRESSED">ECOLLECTION_NOT_COMPRESSED</a>: u64 = 31;
 </code></pre>
 
 
@@ -1458,6 +1598,56 @@ Extracts the tokens address from a BurnRef.
 
 </details>
 
+<a id="0x4_token_generate_compression_ref"></a>
+
+## Function `generate_compression_ref`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_generate_compression_ref">generate_compression_ref</a>(ref: &<a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="token.md#0x4_token_CompressionRef">token::CompressionRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_generate_compression_ref">generate_compression_ref</a>(ref: &ConstructorRef): <a href="token.md#0x4_token_CompressionRef">CompressionRef</a> {
+    <a href="token.md#0x4_token_CompressionRef">CompressionRef</a> {
+        inner: <a href="../../aptos-framework/doc/object.md#0x1_object_generate_delete_and_recreate_ref">object::generate_delete_and_recreate_ref</a>(ref),
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_token_address_from_compression_ref"></a>
+
+## Function `address_from_compression_ref`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_address_from_compression_ref">address_from_compression_ref</a>(ref: &<a href="token.md#0x4_token_CompressionRef">token::CompressionRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_address_from_compression_ref">address_from_compression_ref</a>(ref: &<a href="token.md#0x4_token_CompressionRef">CompressionRef</a>): <b>address</b> {
+    ref.inner.address_from_delete_and_recreate_ref()
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x4_token_borrow"></a>
 
 ## Function `borrow`
@@ -1768,7 +1958,7 @@ as that would prohibit transactions to be executed in parallel.
     };
 
     <b>if</b> (<a href="royalty.md#0x4_royalty_exists_at">royalty::exists_at</a>(addr)) {
-        <a href="royalty.md#0x4_royalty_delete">royalty::delete</a>(addr)
+        <a href="royalty.md#0x4_royalty_delete">royalty::delete</a>(addr);
     };
 
     <b>let</b> <a href="token.md#0x4_token_Token">Token</a> {
@@ -1933,6 +2123,181 @@ as that would prohibit transactions to be executed in parallel.
         );
     };
     <a href="token.md#0x4_token">token</a>.uri = uri;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_token_collection_enable_compressed_tokens"></a>
+
+## Function `collection_enable_compressed_tokens`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_collection_enable_compressed_tokens">collection_enable_compressed_tokens</a>(constructor_ref: <a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_collection_enable_compressed_tokens">collection_enable_compressed_tokens</a>(
+    constructor_ref: ConstructorRef, // TODO - should we support <b>with</b> ExtendRef <b>with</b> existing collections?
+) {
+    <b>let</b> object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(&constructor_ref);
+
+    <b>let</b> compressed_collection = <a href="token.md#0x4_token_CompressedCollection">CompressedCollection</a> {
+    };
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="token.md#0x4_token_CompressedCollection">CompressedCollection</a>&gt;(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer)), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x4_token_ECOLLECTION_ALREADY_COMPRESSED">ECOLLECTION_ALREADY_COMPRESSED</a>));
+    <b>move_to</b>(&object_signer, compressed_collection);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_token_compress_token"></a>
+
+## Function `compress_token`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_compress_token">compress_token</a>&lt;P: drop, store&gt;(compression_ref: <a href="token.md#0x4_token_CompressionRef">token::CompressionRef</a>, resources: <a href="../../aptos-framework/../aptos-stdlib/doc/any_map.md#0x1_any_map_AnyMap">any_map::AnyMap</a>, mut_permission: P)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_compress_token">compress_token</a>&lt;P: drop + store&gt;(
+    // TODO: should we gate it <b>to</b> <a href="collection.md#0x4_collection">collection</a> creator? do a permission/ref? anyone? owner of the <a href="token.md#0x4_token">token</a> only?
+    // creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    compression_ref: <a href="token.md#0x4_token_CompressionRef">CompressionRef</a>,
+    resources: AnyMap,
+    mut_permission: P,
+) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a> {
+    <b>let</b> object_addr = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_delete_and_recreate_ref">object::address_from_delete_and_recreate_ref</a>(&compression_ref.inner);
+
+    <b>let</b> <a href="token.md#0x4_token_Token">Token</a> {
+        <a href="collection.md#0x4_collection">collection</a>,
+        index: deprecated_index,
+        description,
+        name: deprecated_name,
+        uri,
+        mutation_events,
+    } = <b>move_from</b>&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;(object_addr);
+
+    // <b>assert</b>!(<a href="../../aptos-framework/doc/object.md#0x1_object_owner">object::owner</a>(<a href="collection.md#0x4_collection">collection</a>) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="token.md#0x4_token_ENOT_OWNER">ENOT_OWNER</a>));
+    <b>assert</b>!(<b>exists</b>&lt;<a href="token.md#0x4_token_CompressedCollection">CompressedCollection</a>&gt;(<a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="collection.md#0x4_collection">collection</a>)), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x4_token_ECOLLECTION_NOT_COMPRESSED">ECOLLECTION_NOT_COMPRESSED</a>));
+
+    <a href="../../aptos-framework/doc/event.md#0x1_event_destroy_handle">event::destroy_handle</a>(mutation_events);
+
+    <b>let</b> (index, name) = <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a>&gt;(object_addr)) {
+        <b>let</b> <a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a> {
+            index,
+            name,
+        } = <b>move_from</b>&lt;<a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a>&gt;(object_addr);
+        (<a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&index), <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_derived_string">aggregator_v2::read_derived_string</a>(&name))
+    } <b>else</b> {
+        (deprecated_index, deprecated_name)
+    };
+
+    <b>let</b> compressed_token = <a href="token.md#0x4_token_CompressedToken">CompressedToken</a> {
+        <a href="collection.md#0x4_collection">collection</a>,
+        index,
+        description,
+        name,
+        uri,
+    };
+
+    resources.add(compressed_token);
+
+    <b>if</b> (<a href="royalty.md#0x4_royalty_exists_at">royalty::exists_at</a>(object_addr)) {
+        resources.add(<a href="royalty.md#0x4_royalty_delete">royalty::delete</a>(object_addr));
+    };
+
+    <b>if</b> (<a href="property_map.md#0x4_property_map_exists_at">property_map::exists_at</a>(object_addr)) {
+        resources.add(<a href="property_map.md#0x4_property_map_delete">property_map::delete</a>(object_addr));
+    };
+
+    <b>let</b> <a href="token.md#0x4_token_CompressionRef">CompressionRef</a> { inner } = compression_ref;
+    <a href="../../aptos-framework/doc/external_object.md#0x1_external_object_move_existing_object_to_external_storage">external_object::move_existing_object_to_external_storage</a>(inner, resources, mut_permission)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_token_decompress_token"></a>
+
+## Function `decompress_token`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_decompress_token">decompress_token</a>&lt;P: drop, store&gt;(external_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, mut_permission: P): (<a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, <a href="../../aptos-framework/doc/external_object.md#0x1_external_object_MovingToStateObject">external_object::MovingToStateObject</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_decompress_token">decompress_token</a>&lt;P: drop + store&gt;(
+    // TODO: should we gate it <b>to</b> <a href="collection.md#0x4_collection">collection</a> creator? do a permission/ref? anyone? owner of the <a href="token.md#0x4_token">token</a> only?
+    // creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+    external_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    mut_permission: P,
+): (ConstructorRef, MovingToStateObject) {
+    <b>let</b> (constructor_ref, resources_to_move) = <a href="../../aptos-framework/doc/external_object.md#0x1_external_object_move_external_object_to_state">external_object::move_external_object_to_state</a>(external_bytes, mut_permission);
+
+    <b>let</b> object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(&constructor_ref);
+
+    <b>let</b> <a href="token.md#0x4_token_CompressedToken">CompressedToken</a> {
+        <a href="collection.md#0x4_collection">collection</a>,
+        index,
+        description,
+        name,
+        uri,
+    } = resources_to_move.get_resources_mut().remove();
+
+    <b>let</b> deprecated_index = 0;
+    <b>let</b> deprecated_name = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"");
+
+    <b>let</b> token_concurrent = <a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a> {
+        index: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(index),
+        name: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_derived_string">aggregator_v2::create_derived_string</a>(name),
+    };
+    <b>move_to</b>(&object_signer, token_concurrent);
+
+    <b>let</b> <a href="token.md#0x4_token">token</a> = <a href="token.md#0x4_token_Token">Token</a> {
+        <a href="collection.md#0x4_collection">collection</a>,
+        index: deprecated_index,
+        description,
+        name: deprecated_name,
+        uri,
+        mutation_events: <a href="../../aptos-framework/doc/object.md#0x1_object_new_event_handle">object::new_event_handle</a>(&object_signer),
+    };
+    <b>move_to</b>(&object_signer, <a href="token.md#0x4_token">token</a>);
+
+    <b>let</b> <a href="royalty.md#0x4_royalty">royalty</a> = <a href="../../aptos-framework/../aptos-stdlib/doc/any_map.md#0x1_any_map_remove_if_present">any_map::remove_if_present</a>&lt;Royalty&gt;(resources_to_move.get_resources_mut());
+    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="royalty.md#0x4_royalty">royalty</a>)) {
+        <a href="royalty.md#0x4_royalty_init">royalty::init</a>(&constructor_ref, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> <a href="royalty.md#0x4_royalty">royalty</a>))
+    };
+    <b>let</b> <a href="property_map.md#0x4_property_map">property_map</a> = <a href="../../aptos-framework/../aptos-stdlib/doc/any_map.md#0x1_any_map_remove_if_present">any_map::remove_if_present</a>&lt;PropertyMap&gt;(resources_to_move.get_resources_mut());
+    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="property_map.md#0x4_property_map">property_map</a>)) {
+        <a href="property_map.md#0x4_property_map_init">property_map::init</a>(&constructor_ref, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> <a href="property_map.md#0x4_property_map">property_map</a>))
+    };
+
+    (constructor_ref, resources_to_move)
 }
 </code></pre>
 

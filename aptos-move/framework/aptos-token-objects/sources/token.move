@@ -11,11 +11,14 @@ module aptos_token_objects::token {
     use std::string::{Self, String};
     use std::signer;
     use std::vector;
+    use aptos_std::any_map::{Self, AnyMap};
     use aptos_framework::aggregator_v2::{Self, AggregatorSnapshot, DerivedStringSnapshot};
+    use aptos_framework::external_object::{Self, MovingToStateObject};
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
     use aptos_token_objects::collection::{Self, Collection};
     use aptos_token_objects::royalty::{Self, Royalty};
+    use aptos_token_objects::property_map::{Self, PropertyMap};
 
     #[test_only]
     use aptos_framework::object::ExtendRef;
@@ -53,8 +56,8 @@ module aptos_token_objects::token {
         /// Was populated until concurrent_token_v2_enabled feature flag was enabled.
         ///
         /// Unique identifier within the collection, optional, 0 means unassigned
+        /// DEPRECATED
         index: u64,
-        // DEPRECATED
         /// A brief description of the token.
         description: String,
         /// Deprecated in favor of `name` inside TokenIdentifiers.
@@ -62,8 +65,8 @@ module aptos_token_objects::token {
         ///
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
+        /// DEPRECATED
         name: String,
-        // DEPRECATED
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
@@ -101,6 +104,10 @@ module aptos_token_objects::token {
     /// This enables mutating description and URI by higher level services.
     struct MutatorRef has drop, store {
         self: address,
+    }
+
+    struct CompressionRef has drop, store {
+        inner: object::DeleteAndRecreateRef,
     }
 
     /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
@@ -624,6 +631,16 @@ module aptos_token_objects::token {
         }
     }
 
+    public fun generate_compression_ref(ref: &ConstructorRef): CompressionRef {
+        CompressionRef {
+            inner: object::generate_delete_and_recreate_ref(ref),
+        }
+    }
+
+    public fun address_from_compression_ref(ref: &CompressionRef): address {
+        ref.inner.address_from_delete_and_recreate_ref()
+    }
+
     // Accessors
 
     inline fun borrow<T: key>(token: &Object<T>): &Token acquires Token {
@@ -749,7 +766,7 @@ module aptos_token_objects::token {
         };
 
         if (royalty::exists_at(addr)) {
-            royalty::delete(addr)
+            royalty::delete(addr);
         };
 
         let Token {
@@ -1433,5 +1450,144 @@ module aptos_token_objects::token {
     fun get_collection_from_ref(extend_ref: &ExtendRef): Object<Collection> {
         let collection_address = signer::address_of(&object::generate_signer_for_extending(extend_ref));
         object::address_to_object<Collection>(collection_address)
+    }
+
+
+    const ECOLLECTION_ALREADY_COMPRESSED: u64 = 30;
+    const ECOLLECTION_NOT_COMPRESSED: u64 = 31;
+
+    struct CompressedToken has drop, store {
+        /// The collection from which this token resides.
+        collection: Object<Collection>,
+        /// Unique identifier within the collection, optional, 0 means unassigned
+        index: u64, // TODO change to AggregatorSnapshot
+        /// A brief description of the token.
+        description: String,
+        /// The name of the token, which should be unique within the collection; the length of name
+        /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
+        name: String, // TODO change to AggregatorSnapshot
+        /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
+        /// storage; the URL length will likely need a maximum any suggestions?
+        uri: String,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Represents the common fields for a collection.
+    struct CompressedCollection has key {
+    }
+
+    public fun collection_enable_compressed_tokens(
+        constructor_ref: ConstructorRef, // TODO - should we support with ExtendRef with existing collections?
+    ) {
+        let object_signer = object::generate_signer(&constructor_ref);
+
+        let compressed_collection = CompressedCollection {
+        };
+        assert!(!exists<CompressedCollection>(signer::address_of(&object_signer)), error::invalid_argument(ECOLLECTION_ALREADY_COMPRESSED));
+        move_to(&object_signer, compressed_collection);
+    }
+
+    public fun compress_token<P: drop + store>(
+        // TODO: should we gate it to collection creator? do a permission/ref? anyone? owner of the token only?
+        // creator: &signer,
+        compression_ref: CompressionRef,
+        resources: AnyMap,
+        mut_permission: P,
+    ) acquires Token, TokenIdentifiers {
+        let object_addr = object::address_from_delete_and_recreate_ref(&compression_ref.inner);
+
+        let Token {
+            collection,
+            index: deprecated_index,
+            description,
+            name: deprecated_name,
+            uri,
+            mutation_events,
+        } = move_from<Token>(object_addr);
+
+        // assert!(object::owner(collection) == signer::address_of(creator), error::unauthenticated(ENOT_OWNER));
+        assert!(exists<CompressedCollection>(object::object_address(&collection)), error::invalid_argument(ECOLLECTION_NOT_COMPRESSED));
+
+        event::destroy_handle(mutation_events);
+
+        let (index, name) = if (exists<TokenIdentifiers>(object_addr)) {
+            let TokenIdentifiers {
+                index,
+                name,
+            } = move_from<TokenIdentifiers>(object_addr);
+            (aggregator_v2::read_snapshot(&index), aggregator_v2::read_derived_string(&name))
+        } else {
+            (deprecated_index, deprecated_name)
+        };
+
+        let compressed_token = CompressedToken {
+            collection,
+            index,
+            description,
+            name,
+            uri,
+        };
+
+        resources.add(compressed_token);
+
+        if (royalty::exists_at(object_addr)) {
+            resources.add(royalty::delete(object_addr));
+        };
+
+        if (property_map::exists_at(object_addr)) {
+            resources.add(property_map::delete(object_addr));
+        };
+
+        let CompressionRef { inner } = compression_ref;
+        external_object::move_existing_object_to_external_storage(inner, resources, mut_permission)
+    }
+
+    public fun decompress_token<P: drop + store>(
+        // TODO: should we gate it to collection creator? do a permission/ref? anyone? owner of the token only?
+        // creator: &signer
+        external_bytes: vector<u8>,
+        mut_permission: P,
+    ): (ConstructorRef, MovingToStateObject) {
+        let (constructor_ref, resources_to_move) = external_object::move_external_object_to_state(external_bytes, mut_permission);
+
+        let object_signer = object::generate_signer(&constructor_ref);
+
+        let CompressedToken {
+            collection,
+            index,
+            description,
+            name,
+            uri,
+        } = resources_to_move.get_resources_mut().remove();
+
+        let deprecated_index = 0;
+        let deprecated_name = string::utf8(b"");
+
+        let token_concurrent = TokenIdentifiers {
+            index: aggregator_v2::create_snapshot(index),
+            name: aggregator_v2::create_derived_string(name),
+        };
+        move_to(&object_signer, token_concurrent);
+
+        let token = Token {
+            collection,
+            index: deprecated_index,
+            description,
+            name: deprecated_name,
+            uri,
+            mutation_events: object::new_event_handle(&object_signer),
+        };
+        move_to(&object_signer, token);
+
+        let royalty = any_map::remove_if_present<Royalty>(resources_to_move.get_resources_mut());
+        if (option::is_some(&royalty)) {
+            royalty::init(&constructor_ref, option::extract(&mut royalty))
+        };
+        let property_map = any_map::remove_if_present<PropertyMap>(resources_to_move.get_resources_mut());
+        if (option::is_some(&property_map)) {
+            property_map::init(&constructor_ref, option::extract(&mut property_map))
+        };
+
+        (constructor_ref, resources_to_move)
     }
 }
