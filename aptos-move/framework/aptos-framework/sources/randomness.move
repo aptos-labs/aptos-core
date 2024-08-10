@@ -92,7 +92,7 @@ module aptos_framework::randomness {
         let c = 0;
         while (c < n) {
             let blob = next_32_bytes();
-            vector::append(&mut v, blob);
+            vector::reverse_append(&mut v, blob);
 
             c = c + 32;
         };
@@ -299,6 +299,8 @@ module aptos_framework::randomness {
     /// Generate a permutation of `[0, 1, ..., n-1]` uniformly at random.
     /// If n is 0, returns the empty vector.
     public fun permutation(n: u64): vector<u64> acquires PerBlockRandomness {
+        event::emit(RandomnessGeneratedEvent {});
+
         let values = vector[];
 
         if(n == 0) {
@@ -337,8 +339,6 @@ module aptos_framework::randomness {
             tail = tail - 1;
         };
 
-        event::emit(RandomnessGeneratedEvent {});
-
         values
     }
 
@@ -350,14 +350,14 @@ module aptos_framework::randomness {
     }
 
     /// Compute `(a + b) % m`, assuming `m >= 1, 0 <= a < m, 0<= b < m`.
-    inline fun safe_add_mod(a: u256, b: u256, m: u256): u256 {
+    fun safe_add_mod(a: u256, b: u256, m: u256): u256 {
+        let a_clone = a;
         let neg_b = m - b;
-        if (a < neg_b) {
-            a + b
-        } else {
-            a - neg_b
-        }
+        let a_less = a < neg_b;
+        take_first(if (a_less) { a + b } else { a_clone - neg_b }, if (!a_less) { a_clone - neg_b } else { a + b })
     }
+
+    fun take_first(x: u256, _y: u256 ): u256 { x }
 
     #[verify_only]
     fun safe_add_mod_for_verification(a: u256, b: u256, m: u256): u256 {

@@ -769,7 +769,7 @@ impl std::fmt::Display for ProposalMetadata {
     }
 }
 
-fn compile_in_temp_dir(
+pub fn compile_in_temp_dir(
     script_name: &str,
     script_path: &Path,
     framework_package_args: &FrameworkPackageArgs,

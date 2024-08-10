@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
-    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, Histogram,
+    HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -374,34 +376,47 @@ pub fn pos_to_commit(bucket: u64, secs: f64) {
 // Proof Queue
 //////////////////////
 
-pub static PROOFS_WITHOUT_BATCH_DATA: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static PROOFS_WITHOUT_BATCH_SUMMARY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
         "quorum_store_proofs_without_batch_data",
-        "Number of proofs received without batch data"
+        "Number of proofs received without batch data",
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub static TXNS_WITH_DUPLICATE_BATCHES: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static PROOFS_WITH_BATCH_SUMMARY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_proofs_with_batch_data",
+        "Number of proofs received without batch data",
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static TXNS_WITH_DUPLICATE_BATCHES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
         "quorum_store_txns_with_duplicate_batches",
-        "Number of transactions received with duplicate batches"
+        "Number of transactions received with duplicate batches",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub static TXNS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_txns_in_proof_queue",
-        "Number of transactions in the proof queue"
+pub static TXNS_IN_PROOFS_WITH_SUMMARIES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_txns_in_proof_queue_with_summaries",
+        "Number of transactions in the proof queue",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-pub static PROOFS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_proofs_in_proof_queue",
-        "Number of proofs in the proof queue"
+pub static TXNS_IN_PROOFS_WITHOUT_SUMMARIES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_txns_in_proof_queue_without_summaries",
+        "Number of transactions in the proof queue",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -732,10 +747,25 @@ pub static RECEIVED_BATCH_RESPONSE_ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static RECEIVED_BATCH_FROM_SUBSCRIPTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_from_subscription_count",
+        "Count of the number of batches received via batch store subscription."
+    )
+    .unwrap()
+});
+
 pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_backpressure_txn_count",
         "Indicator of whether Quorum Store is backpressured due to txn count exceeding threshold.",
+    )
+});
+
+pub static QS_BACKPRESSURE_MAKE_STRICTER_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "quorum_store_backpressure_make_stricter_txn_count",
+        "Indicator of whether Quorum Store txn count backpressure is being made stricter.",
     )
 });
 

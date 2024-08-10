@@ -7,7 +7,8 @@ use crate::{
     consensus_observer::{
         network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
     },
-    counters, monitor,
+    counters::{self, log_executor_error_occurred},
+    monitor,
     network::{IncomingCommitRequest, NetworkSender},
     network_interface::ConsensusMsg,
     pipeline::{
@@ -24,11 +25,8 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::{
-    common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
-};
+use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -382,7 +380,11 @@ impl BufferManager {
             }
             if item.block_id() == target_block_id {
                 let aggregated_item = item.unwrap_aggregated();
-                let block = aggregated_item.executed_blocks.last().unwrap().block();
+                let block = aggregated_item
+                    .executed_blocks
+                    .last()
+                    .expect("executed_blocks should be not empty")
+                    .block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // As all the validators broadcast commit votes directly to all other validators,
                 // the proposer do not have to broadcast commit decision again.
@@ -393,9 +395,8 @@ impl BufferManager {
                     self.reset().await;
                 }
                 if let Some(consensus_publisher) = &self.consensus_publisher {
-                    let message = ConsensusObserverMessage::new_commit_decision_message(
-                        CommitDecision::new(commit_proof.clone()),
-                    );
+                    let message =
+                        ConsensusObserverMessage::new_commit_decision_message(commit_proof.clone());
                     consensus_publisher.publish_message(message).await;
                 }
                 self.persisting_phase_tx
@@ -488,6 +489,7 @@ impl BufferManager {
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
+    #[allow(clippy::unwrap_used)]
     async fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { block_id, inner } = response;
         // find the corresponding item, may not exist if a reset or aggregated happened
@@ -498,16 +500,12 @@ impl BufferManager {
 
         let executed_blocks = match inner {
             Ok(result) => result,
-            Err(ExecutorError::CouldNotGetData) => {
-                warn!("Execution error - CouldNotGetData {}", block_id);
-                return;
-            },
-            Err(ExecutorError::BlockNotFound(block_id)) => {
-                warn!("Execution error BlockNotFound {}", block_id);
-                return;
-            },
             Err(e) => {
-                error!("Execution error {:?} for {}", e, block_id);
+                log_executor_error_occurred(
+                    e,
+                    &counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT,
+                    block_id,
+                );
                 return;
             },
         };

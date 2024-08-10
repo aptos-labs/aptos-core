@@ -617,5 +617,18 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
         | Bytecode::VecPopBack(_)
         | Bytecode::VecUnpack(..)
         | Bytecode::VecSwap(_) => unimplemented!("Vector bytecode not supported yet"),
+        Bytecode::TestVariant(_)
+        | Bytecode::TestVariantGeneric(_)
+        | Bytecode::PackVariant(_)
+        | Bytecode::PackVariantGeneric(_)
+        | Bytecode::UnpackVariant(_)
+        | Bytecode::UnpackVariantGeneric(_)
+        | Bytecode::MutBorrowVariantField(_)
+        | Bytecode::MutBorrowVariantFieldGeneric(_)
+        | Bytecode::ImmBorrowVariantField(_)
+        | Bytecode::ImmBorrowVariantFieldGeneric(_) => {
+            // TODO(#13806): consider implementing for struct variants
+            unimplemented!("Enum types bytecode not supported yet")
+        },
     }
 }

@@ -46,23 +46,27 @@ impl QuorumStoreClient {
     async fn pull_internal(
         &self,
         max_items: u64,
-        max_unique_items: u64,
+        max_items_after_filtering: u64,
+        soft_max_items_after_filtering: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
         return_non_full: bool,
         exclude_payloads: PayloadFilter,
+        block_timestamp: Duration,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
         let req = GetPayloadCommand::GetPayloadRequest(
             max_items,
-            max_unique_items,
+            max_items_after_filtering,
+            soft_max_items_after_filtering,
             max_bytes,
             max_inline_items,
             max_inline_bytes,
             return_non_full,
             exclude_payloads.clone(),
             callback,
+            block_timestamp,
         );
         // send to shared mempool
         self.consensus_to_quorum_store_sender
@@ -90,7 +94,8 @@ impl UserPayloadClient for QuorumStoreClient {
         &self,
         max_poll_time: Duration,
         max_items: u64,
-        max_unique_items: u64,
+        max_items_after_filtering: u64,
+        soft_max_items_after_filtering: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
@@ -99,6 +104,7 @@ impl UserPayloadClient for QuorumStoreClient {
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
+        block_timestamp: Duration,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let return_non_full = recent_max_fill_fraction
             < self.wait_for_full_blocks_above_recent_fill_threshold
@@ -120,12 +126,14 @@ impl UserPayloadClient for QuorumStoreClient {
             let payload = self
                 .pull_internal(
                     max_items,
-                    max_unique_items,
+                    max_items_after_filtering,
+                    soft_max_items_after_filtering,
                     max_bytes,
                     max_inline_items,
                     max_inline_bytes,
                     return_non_full || return_empty || done,
                     exclude.clone(),
+                    block_timestamp,
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
@@ -142,7 +150,8 @@ impl UserPayloadClient for QuorumStoreClient {
             max_poll_time_ms = max_poll_time.as_millis() as u64,
             payload_len = payload.len(),
             max_items = max_items,
-            max_unique_items = max_unique_items,
+            max_items_after_filtering = max_items_after_filtering,
+            soft_max_items_after_filtering = soft_max_items_after_filtering,
             max_bytes = max_bytes,
             max_inline_items = max_inline_items,
             max_inline_bytes = max_inline_bytes,

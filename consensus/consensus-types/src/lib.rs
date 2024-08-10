@@ -13,6 +13,7 @@ pub mod epoch_retrieval;
 pub mod order_vote;
 pub mod order_vote_msg;
 pub mod order_vote_proposal;
+pub mod payload;
 pub mod pipeline;
 pub mod pipelined_block;
 pub mod proof_of_store;

@@ -14,11 +14,13 @@ pub mod validator;
 
 #[async_trait::async_trait]
 pub trait PayloadClient: Send + Sync {
+    #[allow(clippy::too_many_arguments)]
     async fn pull_payload(
         &self,
         max_poll_time: Duration,
         max_items: u64,
-        max_unique_items: u64,
+        max_items_after_filtering: u64,
+        soft_max_items_after_filtering: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
@@ -28,7 +30,6 @@ pub trait PayloadClient: Send + Sync {
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
+        block_timestamp: Duration,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError>;
-
-    fn trace_payloads(&self) {}
 }

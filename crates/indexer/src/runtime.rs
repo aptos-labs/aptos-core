@@ -39,7 +39,7 @@ impl MovingAverage {
     }
 
     pub fn tick_now(&mut self, value: u64) {
-        let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+        let now = chrono::Utc::now().timestamp_millis() as u64;
         self.tick(now, value);
     }
 

@@ -4,8 +4,11 @@
 
 use crate::{
     core_mempool::CoreMempool,
-    shared_mempool::{start_shared_mempool, types::MultiBatchId},
-    tests::{common, common::TestTransaction},
+    shared_mempool::{
+        start_shared_mempool,
+        types::{MempoolMessageId, MempoolSenderBucket},
+    },
+    tests::common::{self, TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -22,15 +25,15 @@ use aptos_network::{
         interface::{NetworkClient, NetworkServiceEvents},
         storage::PeersAndMetadata,
     },
-    peer_manager::{
-        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
-        PeerManagerRequestSender,
-    },
+    peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
-        direct_send::Message,
-        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
-        rpc::InboundRpcRequest,
-        wire::handshake::v1::ProtocolId::MempoolDirectSend,
+        network::{
+            NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage,
+        },
+        wire::{
+            handshake::v1::ProtocolId::MempoolDirectSend,
+            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+        },
     },
     testutils::{
         builder::TestFrameworkBuilder,
@@ -254,28 +257,43 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
         let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
-        let batch_id = MultiBatchId::from_timeline_ids(&vec![1].into(), &vec![10].into());
+        let message_id_in_request = MempoolMessageId::from_timeline_ids(vec![(
+            0 as MempoolSenderBucket,
+            (vec![1].into(), vec![10].into()),
+        )]);
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: batch_id.clone(),
+            message_id: message_id_in_request.clone(),
             transactions: sign_transactions(txns),
         };
-        let data = protocol_id.to_bytes(&msg).unwrap().into();
+        let data = protocol_id.to_bytes(&msg).unwrap();
         let (notif, maybe_receiver) = match protocol_id {
             ProtocolId::MempoolDirectSend => (
-                PeerManagerNotification::RecvMessage(remote_peer_id, Message {
-                    protocol_id,
-                    mdata: data,
-                }),
+                ReceivedMessage {
+                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                        protocol_id,
+                        priority: 0,
+                        raw_msg: data,
+                    }),
+                    sender: PeerNetworkId::new(network_id, remote_peer_id),
+                    receive_timestamp_micros: 0,
+                    rpc_replier: None,
+                },
                 None,
             ),
             ProtocolId::MempoolRpc => {
                 let (res_tx, res_rx) = oneshot::channel();
-                let notif = PeerManagerNotification::RecvRpc(remote_peer_id, InboundRpcRequest {
-                    protocol_id,
-                    data,
-                    res_tx,
-                });
-                (notif, Some(res_rx))
+                let rmsg = ReceivedMessage {
+                    message: NetworkMessage::RpcRequest(RpcRequest {
+                        protocol_id,
+                        request_id: 0,
+                        priority: 0,
+                        raw_request: data,
+                    }),
+                    sender: PeerNetworkId::new(network_id, remote_peer_id),
+                    receive_timestamp_micros: 0,
+                    rpc_replier: Some(Arc::new(res_tx)),
+                };
+                (rmsg, Some(res_rx))
             },
 
             protocol_id => panic!("Invalid protocol id found: {:?}", protocol_id),
@@ -298,12 +316,12 @@ impl MempoolNode {
             }
         };
         if let MempoolSyncMsg::BroadcastTransactionsResponse {
-            request_id,
+            message_id: message_id_in_response,
             retry,
             backoff,
         } = response
         {
-            assert_eq!(batch_id, request_id);
+            assert_eq!(message_id_in_response, message_id_in_request);
             assert!(!retry);
             assert!(!backoff);
         } else {
@@ -362,9 +380,9 @@ impl MempoolNode {
         };
         assert_eq!(peer_id, expected_peer_id);
         let mempool_message = common::decompress_and_deserialize(&data.to_vec());
-        let request_id = match mempool_message {
+        let message_id = match mempool_message {
             MempoolSyncMsg::BroadcastTransactionsRequest {
-                request_id,
+                message_id,
                 transactions,
             } => {
                 if !block_only_contains_transactions(&transactions, expected_txns) {
@@ -387,14 +405,42 @@ impl MempoolNode {
                         txns, expected_txns
                     );
                 }
-                request_id
+                message_id
+            },
+            MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
+                message_id,
+                transactions,
+            } => {
+                let transactions: Vec<_> =
+                    transactions.iter().map(|(txn, _, _)| txn.clone()).collect();
+                if !block_only_contains_transactions(&transactions, expected_txns) {
+                    let txns: Vec<_> = transactions
+                        .iter()
+                        .map(|txn| (txn.sender(), txn.sequence_number()))
+                        .collect();
+                    let expected_txns: Vec<_> = expected_txns
+                        .iter()
+                        .map(|txn| {
+                            (
+                                TestTransaction::get_address(txn.address),
+                                txn.sequence_number,
+                            )
+                        })
+                        .collect();
+
+                    panic!(
+                        "Request doesn't match. Actual: {:?} Expected: {:?}",
+                        txns, expected_txns
+                    );
+                }
+                message_id
             },
             MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                 panic!("We aren't supposed to be getting as response here");
             },
         };
         let response = MempoolSyncMsg::BroadcastTransactionsResponse {
-            request_id,
+            message_id,
             retry,
             backoff,
         };
@@ -403,10 +449,16 @@ impl MempoolNode {
         if let Some(rpc_sender) = maybe_rpc_sender {
             rpc_sender.send(Ok(bytes.into())).unwrap();
         } else {
-            let notif = PeerManagerNotification::RecvMessage(peer_id, Message {
-                protocol_id,
-                mdata: bytes.into(),
-            });
+            let notif = ReceivedMessage {
+                message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+                    protocol_id,
+                    priority: 0,
+                    raw_msg: bytes,
+                }),
+                sender: PeerNetworkId::new(network_id, peer_id),
+                receive_timestamp_micros: 0,
+                rpc_replier: None,
+            };
             inbound_handle
                 .inbound_message_sender
                 .push((peer_id, protocol_id), notif)

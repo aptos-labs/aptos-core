@@ -24,7 +24,6 @@ use aptos_config::config::{
     merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
 };
 use aptos_framework::ReleaseBundle;
-use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
@@ -513,7 +512,6 @@ where
 
     // Configure the validator network
     let validator_network = node_config.validator_network.as_mut().unwrap();
-    validator_network.max_concurrent_network_reqs = 1;
     validator_network.connectivity_check_interval_ms = 10000;
     validator_network.max_connection_delay_ms = 10000;
     validator_network.ping_interval_ms = 10000;
@@ -521,7 +519,6 @@ where
 
     // Configure the fullnode network
     let fullnode_network = node_config.full_node_networks.get_mut(0).unwrap();
-    fullnode_network.max_concurrent_network_reqs = 1;
     fullnode_network.connectivity_check_interval_ms = 10000;
     fullnode_network.max_connection_delay_ms = 10000;
     fullnode_network.ping_interval_ms = 10000;
@@ -610,7 +607,7 @@ pub fn setup_environment_and_start_node(
     let mut admin_service = services::start_admin_service(&node_config);
 
     // Set up the storage database and any RocksDB checkpoints
-    let (db_rw, backup_service, genesis_waypoint) =
+    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
 
     admin_service.set_aptos_db(db_rw.clone().into());
@@ -667,8 +664,6 @@ pub fn setup_environment_and_start_node(
         db_rw.reader.clone(),
     );
 
-    let internal_indexer_db = InternalIndexerDBService::get_indexer_db(&node_config);
-
     // Start state sync and get the notification endpoints for mempool and consensus
     let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
@@ -677,7 +672,6 @@ pub fn setup_environment_and_start_node(
             genesis_waypoint,
             event_subscription_service,
             db_rw.clone(),
-            internal_indexer_db.clone(),
         )?;
 
     // Start the node inspection service
@@ -695,12 +689,7 @@ pub fn setup_environment_and_start_node(
         indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
-    ) = services::bootstrap_api_and_indexer(
-        &node_config,
-        db_rw.clone(),
-        chain_id,
-        internal_indexer_db,
-    )?;
+    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id, indexer_db_opt)?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =

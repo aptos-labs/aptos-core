@@ -10,6 +10,7 @@ use crate::{
     },
 };
 use aptos_config::config::LedgerPrunerConfig;
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::Mutex;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
@@ -104,11 +105,16 @@ impl PrunerManager for LedgerPrunerManager {
 
 impl LedgerPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(ledger_db: Arc<LedgerDb>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
+    pub fn new(
+        ledger_db: Arc<LedgerDb>,
+        ledger_pruner_config: LedgerPrunerConfig,
+        internal_indexer_db: Option<InternalIndexerDB>,
+    ) -> Self {
         let pruner_worker = if ledger_pruner_config.enable {
             Some(Self::init_pruner(
                 Arc::clone(&ledger_db),
                 ledger_pruner_config,
+                internal_indexer_db,
             ))
         } else {
             None
@@ -135,9 +141,12 @@ impl LedgerPrunerManager {
     fn init_pruner(
         ledger_db: Arc<LedgerDb>,
         ledger_pruner_config: LedgerPrunerConfig,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> PrunerWorker {
-        let pruner =
-            Arc::new(LedgerPruner::new(ledger_db).expect("Failed to create ledger pruner."));
+        let pruner = Arc::new(
+            LedgerPruner::new(ledger_db, internal_indexer_db)
+                .expect("Failed to create ledger pruner."),
+        );
 
         PRUNER_WINDOW
             .with_label_values(&["ledger_pruner"])

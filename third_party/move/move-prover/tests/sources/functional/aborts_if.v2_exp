@@ -95,7 +95,6 @@ error: function does not abort under this condition
     =     at tests/sources/functional/aborts_if.move:113: multi_abort5_incorrect
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:114: multi_abort5_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:117: multi_abort5_incorrect
     =     at tests/sources/functional/aborts_if.move:119: multi_abort5_incorrect (spec)
 
@@ -103,7 +102,7 @@ error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/aborts_if.move:139:5
     │
 137 │           if (x == 2 || x == 3) abort 1;
-    │                                 ------- abort happened here with code 0x1
+    │                         ------ abort happened here with code 0x1
 138 │       }
 139 │ ╭     spec abort_at_2_or_3_total_incorrect {
 140 │ │         // Counter check that we get an error message without the pragma.
@@ -114,8 +113,6 @@ error: abort not covered by any of the `aborts_if` clauses
     │
     =     at tests/sources/functional/aborts_if.move:136: abort_at_2_or_3_total_incorrect
     =         x = <redacted>
-    =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
@@ -132,8 +129,6 @@ error: function does not abort under this condition
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
     =     at tests/sources/functional/aborts_if.move:147: abort_at_2_or_3_spec_incorrect
     =     at tests/sources/functional/aborts_if.move:151: abort_at_2_or_3_spec_incorrect (spec)
 
@@ -141,7 +136,7 @@ error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/aborts_if.move:157:5
     │
 155 │           if (x == 2 || x == 3) abort 1;
-    │                                 ------- abort happened here with code 0x1
+    │                         ------ abort happened here with code 0x1
 156 │       }
 157 │ ╭     spec abort_at_2_or_3_strict_incorrect {
 158 │ │         // When the strict mode is enabled, no aborts_if clause means aborts_if false.
@@ -151,8 +146,6 @@ error: abort not covered by any of the `aborts_if` clauses
     │
     =     at tests/sources/functional/aborts_if.move:154: abort_at_2_or_3_strict_incorrect
     =         x = <redacted>
-    =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect

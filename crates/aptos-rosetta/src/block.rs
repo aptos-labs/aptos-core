@@ -27,8 +27,8 @@ pub fn block_route(
 
 /// Retrieves a block (in this case a single transaction) given it's identifier.
 ///
-/// Our implementation allows for by `index`, which is the ledger `version` or by
-/// transaction `hash`.
+/// Our implementation allows for by `index`(block height) or by transaction `hash`.
+/// If both are provided, `index` is used
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/BlockApi.html#block)
 async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResult<BlockResponse> {
@@ -41,7 +41,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 
     check_network(request.network_identifier, &server_context)?;
 
-    // Retrieve by block or by hash, both or neither is not allowed
+    // Retrieve by block index or by hash, neither is not allowed
     let block_index =
         get_block_index_from_request(&server_context, request.block_identifier).await?;
 
@@ -52,11 +52,15 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     )
     .await?;
 
+    // A hack to reduce overhead, if set, it will drop empty transactions (no operations0 from the
+    // block to reduce traffic sent
     let keep_empty_transactions = request
         .metadata
         .as_ref()
         .and_then(|inner| inner.keep_empty_transactions)
         .unwrap_or_default();
+
+    // Build the block accordingly from the input data
     let block = build_block(
         &server_context,
         parent_transaction,
@@ -77,7 +81,7 @@ async fn build_block(
     chain_id: ChainId,
     keep_empty_transactions: bool,
 ) -> ApiResult<Block> {
-    // note: timestamps are in microseconds, so we convert to milliseconds
+    // NOTE: timestamps are in microseconds, so we convert to milliseconds for Rosetta
     let timestamp = get_timestamp(block.block_timestamp);
     let block_identifier = BlockIdentifier::from_block(&block, chain_id);
 
@@ -85,15 +89,19 @@ async fn build_block(
     let mut transactions: Vec<Transaction> = Vec::new();
     // TODO: Parallelize these and then sort at end
     if let Some(txns) = block.transactions {
+        // Convert transactions to Rosetta format
         for txn in txns {
             let transaction = Transaction::from_transaction(server_context, txn).await?;
+
+            // Skip transactions that don't have any operations, since that's the only thing that's being used by Rosetta
             if keep_empty_transactions || !transaction.operations.is_empty() {
                 transactions.push(transaction)
             }
         }
     }
 
-    // Ensure the transactions are sorted in order
+    // Ensure the transactions are sorted in order, this is required by Rosetta
+    // NOTE: sorting may be pretty expensive, depending on the size of the block
     transactions.sort_by(|first, second| first.metadata.version.0.cmp(&second.metadata.version.0));
 
     Ok(Block {
@@ -104,7 +112,7 @@ async fn build_block(
     })
 }
 
-/// Retrieves a block by its index
+/// Retrieves a block by its index (block height)
 async fn get_block_by_index(
     block_cache: &BlockRetriever,
     block_height: u64,
@@ -132,6 +140,7 @@ async fn get_block_by_index(
     }
 }
 
+/// Abbreviated information about a Block without transactions
 #[derive(Clone, Debug)]
 pub struct BlockInfo {
     /// Block identifier (block hash & block height)
@@ -170,6 +179,7 @@ impl BlockRetriever {
         }
     }
 
+    /// Retrieves block abbreviated info by height
     pub async fn get_block_info_by_height(
         &self,
         height: u64,
@@ -191,11 +201,14 @@ impl BlockRetriever {
         Ok(BlockInfo::from_block(&block, chain_id))
     }
 
+    /// Retrieves the block by height
     pub async fn get_block_by_height(
         &self,
         height: u64,
         with_transactions: bool,
     ) -> ApiResult<aptos_rest_client::aptos_api_types::BcsBlock> {
+        // If we request transactions, we have to provide the page size, it ideally is bigger than
+        // the maximum block size.  If not, transactions will be missed.
         if with_transactions {
             Ok(self
                 .rest_client

@@ -21,6 +21,7 @@ mod page;
 mod response;
 mod runtime;
 mod set_failpoints;
+pub mod spec;
 mod state;
 #[cfg(test)]
 pub mod tests;

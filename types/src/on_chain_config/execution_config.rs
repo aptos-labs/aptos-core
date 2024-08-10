@@ -70,11 +70,7 @@ impl OnChainExecutionConfig {
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
         OnChainExecutionConfig::V4(ExecutionConfigV4 {
-            transaction_shuffler_type: TransactionShufflerType::Fairness {
-                sender_conflict_window_size: 32,
-                module_conflict_window_size: 1,
-                entry_fun_conflict_window_size: 2,
-            },
+            transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
@@ -152,11 +148,26 @@ pub enum TransactionShufflerType {
     NoShuffling,
     DeprecatedSenderAwareV1(u32),
     SenderAwareV2(u32),
-    Fairness {
+    DeprecatedFairness {
         sender_conflict_window_size: u32,
         module_conflict_window_size: u32,
         entry_fun_conflict_window_size: u32,
     },
+    UseCaseAware {
+        sender_spread_factor: usize,
+        platform_use_case_spread_factor: usize,
+        user_use_case_spread_factor: usize,
+    },
+}
+
+impl TransactionShufflerType {
+    pub fn default_for_genesis() -> Self {
+        TransactionShufflerType::UseCaseAware {
+            sender_spread_factor: 32,
+            platform_use_case_spread_factor: 0,
+            user_use_case_spread_factor: 4,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -341,29 +352,29 @@ mod test {
     #[test]
     fn test_config_serialization() {
         let config = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
         });
 
         let s = serde_yaml::to_string(&config).unwrap();
         let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
-        assert!(matches!(
+        assert_eq!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
-        ));
+            TransactionShufflerType::default_for_genesis(),
+        );
 
         // V2 test with random per-block gas limit
         let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
         let config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit: Some(rand_gas_limit),
         });
 
         let s = serde_yaml::to_string(&config).unwrap();
         let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
-        assert!(matches!(
+        assert_eq!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
-        ));
+            TransactionShufflerType::default_for_genesis(),
+        );
         assert_eq!(
             result.block_gas_limit_type(),
             BlockGasLimitType::Limit(rand_gas_limit)
@@ -371,16 +382,16 @@ mod test {
 
         // V2 test with no per-block gas limit
         let config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit: None,
         });
 
         let s = serde_yaml::to_string(&config).unwrap();
         let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
-        assert!(matches!(
+        assert_eq!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
-        ));
+            TransactionShufflerType::default_for_genesis(),
+        );
         assert_eq!(result.block_gas_limit_type(), BlockGasLimitType::NoLimit);
     }
 

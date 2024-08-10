@@ -314,8 +314,8 @@ fn spawn_message_serializer_and_sender(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::consensus_observer::network_message::BlockTransactionPayload;
     use aptos_config::network_id::NetworkId;
-    use aptos_consensus_types::pipeline::commit_decision::CommitDecision;
     use aptos_crypto::HashValue;
     use aptos_network::{
         application::{metadata::ConnectionState, storage::PeersAndMetadata},
@@ -492,10 +492,15 @@ mod test {
         }
 
         // Publish a message to the active subscribers
-        let block_payload_message = ConsensusObserverMessage::new_block_payload_message(
-            BlockInfo::empty(),
+        let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
+            vec![],
             vec![],
             Some(10),
+            vec![],
+        );
+        let block_payload_message = ConsensusObserverMessage::new_block_payload_message(
+            BlockInfo::empty(),
+            transaction_payload,
         );
         consensus_publisher
             .publish_message(block_payload_message.clone())
@@ -516,12 +521,11 @@ mod test {
         process_unsubscription_for_peer(&consensus_publisher, &peer_network_id_1);
 
         // Publish another message to the active subscribers
-        let commit_decision_message = ConsensusObserverMessage::new_commit_decision_message(
-            CommitDecision::new(LedgerInfoWithSignatures::new(
+        let commit_decision_message =
+            ConsensusObserverMessage::new_commit_decision_message(LedgerInfoWithSignatures::new(
                 LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                 AggregateSignature::empty(),
-            )),
-        );
+            ));
         consensus_publisher
             .publish_message(commit_decision_message.clone())
             .await;
@@ -539,8 +543,10 @@ mod test {
         }
 
         // Publish another message to the active subscribers
-        let block_payload_message =
-            ConsensusObserverMessage::new_block_payload_message(BlockInfo::empty(), vec![], None);
+        let block_payload_message = ConsensusObserverMessage::new_block_payload_message(
+            BlockInfo::empty(),
+            BlockTransactionPayload::empty(),
+        );
         consensus_publisher
             .publish_message(block_payload_message.clone())
             .await;

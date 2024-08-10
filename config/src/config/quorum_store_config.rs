@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
+pub const DEFEAULT_MAX_BATCH_TXNS: usize = 250;
 const DEFAULT_MAX_NUM_BATCHES: usize = 20;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
@@ -22,6 +23,7 @@ pub struct QuorumStoreBackPressureConfig {
     pub decrease_fraction: f64,
     pub dynamic_min_txn_per_s: u64,
     pub dynamic_max_txn_per_s: u64,
+    pub additive_increase_when_no_backpressure: u64,
 }
 
 impl Default for QuorumStoreBackPressureConfig {
@@ -29,14 +31,17 @@ impl Default for QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
             // Roughly, target TPS * commit latency seconds
-            backlog_txn_limit_count: 12_000,
+            backlog_txn_limit_count: 36_000,
             // QS will create batches at the max rate until this number is reached
-            backlog_per_validator_batch_limit_count: 4,
+            backlog_per_validator_batch_limit_count: 20,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
             dynamic_min_txn_per_s: 160,
-            dynamic_max_txn_per_s: 4000,
+            dynamic_max_txn_per_s: 12000,
+            // When the QS is no longer backpressured, we increase number of txns to be pulled from mempool
+            // by this amount every second until we reach dynamic_max_txn_per_s
+            additive_increase_when_no_backpressure: 2000,
         }
     }
 }
@@ -99,9 +104,9 @@ impl Default for QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_generation_poll_interval_ms: 25,
-            batch_generation_min_non_empty_interval_ms: 200,
+            batch_generation_min_non_empty_interval_ms: 100,
             batch_generation_max_interval_ms: 250,
-            sender_max_batch_txns: 250,
+            sender_max_batch_txns: DEFEAULT_MAX_BATCH_TXNS,
             // TODO: on next release, remove BATCH_PADDING_BYTES
             sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,

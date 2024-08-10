@@ -23,6 +23,9 @@ move-vm-types = { workspace = true, features = ["fuzzing"] }
 once_cell = { workspace = true }
 rayon = { workspace = true }
 
+[features]
+disabled = []
+
 [[bin]]
 name = "move_bytecode_verifier_code_unit"
 path = "fuzz_targets/move/bytecode_verifier_code_unit.rs"
@@ -40,27 +43,37 @@ name = "move_value_deserialize"
 path = "fuzz_targets/move/value_deserialize.rs"
 test = false
 doc = false
+required-features = ["disabled"]
 
 [[bin]]
 name = "move_move_value_deserialize"
 path = "fuzz_targets/move/move_value_deserialize.rs"
 test = false
 doc = false
+required-features = ["disabled"]
 
 [[bin]]
 name = "move_move_value_decorate"
 path = "fuzz_targets/move/move_value_decorate.rs"
 test = false
 doc = false
+required-features = ["disabled"]
 
 [[bin]]
 name = "signed_transaction_deserialize"
 path = "fuzz_targets/signed_transaction_deserialize.rs"
 test = false
 doc = false
+required-features = ["disabled"]
 
 [[bin]]
 name = "move_aptosvm_publish_and_run"
 path = "fuzz_targets/move/aptosvm_publish_and_run.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_aptosvm_publish"
+path = "fuzz_targets/move/aptosvm_publish.rs"
 test = false
 doc = false

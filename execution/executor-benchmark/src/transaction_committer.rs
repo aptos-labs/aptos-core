@@ -91,7 +91,7 @@ where
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
             self.executor
-                .commit_blocks_ext(vec![block_id], ledger_info_with_sigs, false)
+                .commit_blocks(vec![block_id], ledger_info_with_sigs)
                 .unwrap();
 
             report_block(

@@ -7,7 +7,8 @@ use crate::{
     file_format::{
         Bytecode, CodeUnit, CompiledModule, CompiledScript, FieldInstantiationIndex,
         FunctionInstantiationIndex, IdentifierIndex, ModuleHandleIndex, SignatureIndex,
-        SignatureToken, StructDefInstantiationIndex, StructFieldInformation, TableIndex,
+        SignatureToken, StructDefInstantiationIndex, StructFieldInformation,
+        StructVariantInstantiationIndex, TableIndex, VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::vm_status::StatusCode;
@@ -134,6 +135,22 @@ impl<'a> BinaryComplexityMeter<'a> {
         self.meter_signature(struct_inst.type_parameters)
     }
 
+    fn meter_struct_variant_instantiation(
+        &self,
+        struct_inst_idx: StructVariantInstantiationIndex,
+    ) -> PartialVMResult<()> {
+        let struct_variant_insts =
+            self.resolver
+                .struct_variant_instantiations()
+                .ok_or_else(|| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                        "Can't get enum type instantiation -- not a module.".to_string(),
+                    )
+                })?;
+        let struct_variant_inst = safe_get_table(struct_variant_insts, struct_inst_idx.0)?;
+        self.meter_signature(struct_variant_inst.type_parameters)
+    }
+
     fn meter_struct_def_instantiations(&self) -> PartialVMResult<()> {
         let struct_insts = self.resolver.struct_instantiations().ok_or_else(|| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -155,6 +172,23 @@ impl<'a> BinaryComplexityMeter<'a> {
                 .with_message("Can't get field instantiations -- not a module.".to_string())
         })?;
         let field_inst = safe_get_table(field_insts, field_inst_idx.0)?;
+
+        self.meter_signature(field_inst.type_parameters)
+    }
+
+    fn meter_variant_field_instantiation(
+        &self,
+        variant_field_inst_idx: VariantFieldInstantiationIndex,
+    ) -> PartialVMResult<()> {
+        let variant_field_insts =
+            self.resolver
+                .variant_field_instantiations()
+                .ok_or_else(|| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                        "Can't get variant field instantiations -- not a module.".to_string(),
+                    )
+                })?;
+        let field_inst = safe_get_table(variant_field_insts, variant_field_inst_idx.0)?;
 
         self.meter_signature(field_inst.type_parameters)
     }
@@ -201,13 +235,20 @@ impl<'a> BinaryComplexityMeter<'a> {
         })?;
 
         for sdef in struct_defs {
-            let fields = match &sdef.field_information {
+            match &sdef.field_information {
                 StructFieldInformation::Native => continue,
-                StructFieldInformation::Declared(fields) => fields,
-            };
-
-            for field in fields {
-                self.charge(field.signature.0.num_nodes() as u64)?;
+                StructFieldInformation::Declared(fields) => {
+                    for field in fields {
+                        self.charge(field.signature.0.num_nodes() as u64)?;
+                    }
+                },
+                StructFieldInformation::DeclaredVariants(variants) => {
+                    for variant in variants {
+                        for field in &variant.fields {
+                            self.charge(field.signature.0.num_nodes() as u64)?;
+                        }
+                    }
+                },
             }
         }
         Ok(())
@@ -226,6 +267,9 @@ impl<'a> BinaryComplexityMeter<'a> {
                 PackGeneric(idx) | UnpackGeneric(idx) => {
                     self.meter_struct_instantiation(*idx)?;
                 },
+                PackVariantGeneric(idx) | UnpackVariantGeneric(idx) | TestVariantGeneric(idx) => {
+                    self.meter_struct_variant_instantiation(*idx)?;
+                },
                 ExistsGeneric(idx)
                 | MoveFromGeneric(idx)
                 | MoveToGeneric(idx)
@@ -235,6 +279,9 @@ impl<'a> BinaryComplexityMeter<'a> {
                 },
                 ImmBorrowFieldGeneric(idx) | MutBorrowFieldGeneric(idx) => {
                     self.meter_field_instantiation(*idx)?;
+                },
+                ImmBorrowVariantFieldGeneric(idx) | MutBorrowVariantFieldGeneric(idx) => {
+                    self.meter_variant_field_instantiation(*idx)?;
                 },
                 VecPack(idx, _)
                 | VecLen(idx)
@@ -249,14 +296,70 @@ impl<'a> BinaryComplexityMeter<'a> {
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.
-                Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_) | LdU8(_) | LdU16(_) | LdU32(_)
-                | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_) | CastU8 | CastU16 | CastU32
-                | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | Call(_) | Pack(_)
-                | Unpack(_) | ReadRef | WriteRef | FreezeRef | Add | Sub | Mul | Mod | Div
-                | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le
-                | Ge | CopyLoc(_) | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_)
-                | MutBorrowField(_) | ImmBorrowField(_) | MutBorrowGlobal(_)
-                | ImmBorrowGlobal(_) | Exists(_) | MoveTo(_) | MoveFrom(_) | Abort | Nop => (),
+                Pop
+                | Ret
+                | Branch(_)
+                | BrTrue(_)
+                | BrFalse(_)
+                | LdU8(_)
+                | LdU16(_)
+                | LdU32(_)
+                | LdU64(_)
+                | LdU128(_)
+                | LdU256(_)
+                | LdConst(_)
+                | CastU8
+                | CastU16
+                | CastU32
+                | CastU64
+                | CastU128
+                | CastU256
+                | LdTrue
+                | LdFalse
+                | Call(_)
+                | Pack(_)
+                | Unpack(_)
+                | PackVariant(_)
+                | UnpackVariant(_)
+                | TestVariant(_)
+                | ReadRef
+                | WriteRef
+                | FreezeRef
+                | Add
+                | Sub
+                | Mul
+                | Mod
+                | Div
+                | BitOr
+                | BitAnd
+                | Xor
+                | Shl
+                | Shr
+                | Or
+                | And
+                | Not
+                | Eq
+                | Neq
+                | Lt
+                | Gt
+                | Le
+                | Ge
+                | CopyLoc(_)
+                | MoveLoc(_)
+                | StLoc(_)
+                | MutBorrowLoc(_)
+                | ImmBorrowLoc(_)
+                | MutBorrowField(_)
+                | ImmBorrowField(_)
+                | MutBorrowVariantField(_)
+                | ImmBorrowVariantField(_)
+                | MutBorrowGlobal(_)
+                | ImmBorrowGlobal(_)
+                | Exists(_)
+                | MoveTo(_)
+                | MoveFrom(_)
+                | Abort
+                | Nop => (),
             }
         }
         Ok(())

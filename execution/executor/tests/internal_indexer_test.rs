@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, RocksdbConfig};
 use aptos_db::AptosDB;
-use aptos_db_indexer::{db_indexer::DBIndexer, db_ops::open_internal_indexer_db};
+use aptos_db_indexer::db_indexer::DBIndexer;
 use aptos_executor_test_helpers::{
     gen_block_id, gen_ledger_info_with_sigs, integration_test_impl::create_db_and_executor,
 };
 use aptos_executor_types::BlockExecutorTrait;
+use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
@@ -138,29 +138,32 @@ fn test_db_indexer_data() {
     let (aptos_db, core_account) = create_test_db();
     let total_version = aptos_db.get_synced_version().unwrap();
     assert_eq!(total_version, 11);
-    let rocksdb_config = RocksdbConfig::default();
     let temp_path = TempPath::new();
-    let db = Arc::new(
-        open_internal_indexer_db(temp_path.as_ref(), &rocksdb_config)
-            .expect("Failed to open up indexer db initially"),
-    );
-    let db_indexer = DBIndexer::new(
-        db.clone(),
-        aptos_db.clone(),
-        &InternalIndexerDBConfig::new(true, true, true, 2),
-    );
+    let mut node_config = aptos_config::config::NodeConfig::default();
+    node_config.storage.dir = temp_path.path().to_path_buf();
+    node_config.indexer_db_config.enable_event = true;
+    node_config.indexer_db_config.enable_transaction = true;
+    node_config.indexer_db_config.enable_statekeys = true;
+
+    let internal_indexer_db = InternalIndexerDBService::get_indexer_db(&node_config).unwrap();
+
+    let db_indexer = DBIndexer::new(internal_indexer_db.clone(), aptos_db.clone());
     // assert the data matches the expected data
-    let mut version = db_indexer.get_persisted_version().unwrap();
-    assert_eq!(version, 0);
-    while version < total_version {
-        version = db_indexer.process_a_batch(Some(version)).unwrap();
+    let version = internal_indexer_db.get_persisted_version().unwrap();
+    assert_eq!(version, None);
+    let mut start_version = version.map_or(0, |v| v + 1);
+    while start_version < total_version {
+        start_version = db_indexer.process_a_batch(start_version).unwrap();
     }
     // wait for the commit to finish
     thread::sleep(Duration::from_millis(100));
     // indexer has process all the transactions
-    assert_eq!(db_indexer.get_persisted_version().unwrap(), total_version);
+    assert_eq!(
+        internal_indexer_db.get_persisted_version().unwrap(),
+        Some(total_version)
+    );
 
-    let txn_iter = db_indexer
+    let txn_iter = internal_indexer_db
         .get_account_transaction_version_iter(core_account.address(), 0, 1000, total_version)
         .unwrap();
     let res: Vec<_> = txn_iter.collect();
@@ -169,7 +172,7 @@ fn test_db_indexer_data() {
     assert!(res.len() == 7);
     assert!(res[0].as_ref().unwrap().1 == 2);
 
-    let x = db_indexer.get_event_by_key_iter().unwrap();
+    let x = internal_indexer_db.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
     assert_eq!(res.len(), 27);
 

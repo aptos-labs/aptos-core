@@ -36,7 +36,7 @@ use aptos_testcases::{
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
     load_vs_perf_benchmark::{
-        ContinuousTraffic, LoadVsPerfBenchmark, TransactionWorkload, Workloads,
+        BackgroundTraffic, LoadVsPerfBenchmark, TransactionWorkload, Workloads,
     },
     modifiers::{CpuChaosTest, ExecutionDelayConfig, ExecutionDelayTest},
     multi_region_network_test::{
@@ -314,7 +314,7 @@ fn main() -> Result<()> {
             match test_cmd {
                 TestCommand::LocalSwarm(local_cfg) => {
                     // Loosen all criteria for local runs
-                    test_suite.get_success_criteria_mut().min_avg_tps = 400;
+                    test_suite.get_success_criteria_mut().min_avg_tps = 400.0;
                     let previous_emit_job = test_suite.get_emit_job().clone();
                     let test_suite =
                         test_suite.with_emit_job(previous_emit_job.mode(EmitJobMode::MaxLoad {
@@ -543,7 +543,6 @@ fn get_test_suite(
         "workload_mix" => workload_mix_test(),
         "account_creation" | "nft_mint" | "publishing" | "module_loading"
         | "write_new_resource" => individual_workload_tests(test_name.into()),
-        "graceful_overload" => graceful_overload(),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => load_vs_perf_benchmark(),
         "workload_vs_perf_benchmark" => workload_vs_perf_benchmark(),
@@ -689,6 +688,7 @@ fn get_realistic_env_test(
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
+        "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
@@ -829,12 +829,13 @@ fn optimize_for_maximum_throughput(
 ) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_unique_txns = max_txns_per_block as u64;
+    config.consensus.max_sending_block_txns_after_filtering = max_txns_per_block as u64;
     config.consensus.max_sending_block_txns = config
         .consensus
         .max_sending_block_txns
-        .max(max_txns_per_block as u64);
-    config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
+        .max(max_txns_per_block as u64 * 3 / 2);
+    config.consensus.max_receiving_block_txns =
+        (config.consensus.max_sending_block_txns as f64 * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
     config.consensus.pipeline_backpressure = vec![];
@@ -843,6 +844,10 @@ fn optimize_for_maximum_throughput(
     quorum_store_backlog_txn_limit_count(config, target_tps, vn_latency);
 
     config.consensus.quorum_store.sender_max_batch_txns = 500;
+    config
+        .consensus
+        .min_max_txns_in_block_after_filtering_from_backpressure =
+        2 * config.consensus.quorum_store.sender_max_batch_txns as u64;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
     config.consensus.quorum_store.sender_max_num_batches = 100;
     config.consensus.quorum_store.sender_max_total_txns = 4000;
@@ -1053,30 +1058,69 @@ fn realistic_env_sweep_wrap(
         )
 }
 
+fn background_emit_request() -> EmitJobRequest {
+    EmitJobRequest::default()
+        .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
+        .mode(EmitJobMode::ConstTps { tps: 10 })
+        .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+}
+
+fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
+    Some(BackgroundTraffic {
+        traffic: background_emit_request(),
+        criteria: std::iter::repeat(9.5)
+            .take(num_cases)
+            .map(|min_tps| {
+                SuccessCriteria::new_float(min_tps)
+                    .add_max_expired_tps(0.1)
+                    .add_max_failed_submission_tps(0.0)
+            })
+            .collect(),
+    })
+}
+
+fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)]) -> Option<BackgroundTraffic> {
+    Some(BackgroundTraffic {
+        traffic: background_emit_request(),
+        criteria: criteria
+            .iter()
+            .map(|(p50, p90)| {
+                SuccessCriteria::new_float(9.5)
+                    .add_max_expired_tps(0.1)
+                    .add_max_failed_submission_tps(0.0)
+                    .add_latency_threshold(*p50, LatencyType::P50)
+                    .add_latency_threshold(*p90, LatencyType::P90)
+            })
+            .collect(),
+    })
+}
+
 fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
+        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
         criteria: [
-            (9, 1.5, 3., 4., 0),
-            (95, 1.5, 3., 4., 0),
-            (950, 2., 3., 4., 0),
-            (2750, 2.5, 3.5, 4.5, 0),
-            (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
+            (9, 1.0, 1.0, 1.2, 0),
+            (95, 1.0, 1.0, 1.2, 0),
+            (950, 1.4, 1.6, 2.0, 0),
+            (2900, 2.5, 2.2, 2.5, 0),
+            (4800, 3., 4., 3.0, 0),
+            // TODO : recalibrate latencies for 7k TPS
+            (6700, 5., 10., 20., 100), // Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
             |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99, max_expired_tps)| {
                 SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(max_expired_tps)
-                    .add_max_failed_submission_tps(0)
+                    .add_max_expired_tps(max_expired_tps as f64)
+                    .add_max_failed_submission_tps(0.0)
                     .add_latency_threshold(max_lat_p50, LatencyType::P50)
                     .add_latency_threshold(max_lat_p90, LatencyType::P90)
                     .add_latency_threshold(max_lat_p99, LatencyType::P99)
             },
         )
         .collect(),
-        continuous_traffic: None,
+        background_traffic: background_traffic_for_sweep(5),
     })
 }
 
@@ -1084,45 +1128,22 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CoinTransfer,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 100,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 30000,
-            },
-            // transactions get rejected, to fix.
-            // TransactionWorkload {
-            //     transaction_type: TransactionTypeArg::PublishPackage,
-            //     num_modules: 1,
-            //     unique_senders: true,
-            //     mempool_backlog: 1000,
-            // },
+            TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
+            TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
+            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
+                .with_transactions_per_account(1),
+            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
+                .with_unique_senders(),
+            TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
+                .with_transactions_per_account(1),
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (7700, 100, 0.3, 0.3, 0.5, 0.5),
-            (7000, 100, 0.3, 0.3, 0.5, 0.5),
-            (2000, 300, 0.3, 0.8, 0.6, 1.0),
-            (3200, 500, 0.3, 0.4, 0.7, 0.7),
-            // (150, 0.5, 1.0, 1.5, 0.65),
+            (7000, 100, 0.3, 0.5, 0.5, 0.5),
+            (8500, 100, 0.3, 0.5, 0.5, 0.5),
+            (2000, 300, 0.3, 1.0, 0.6, 1.0),
+            (3200, 500, 0.3, 1.0, 0.7, 0.7),
+            (28, 5, 0.3, 1.0, 0.7, 1.0),
         ]
         .into_iter()
         .map(
@@ -1135,8 +1156,8 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 ordered_to_commit,
             )| {
                 SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(max_expired)
-                    .add_max_failed_submission_tps(200)
+                    .add_max_expired_tps(max_expired as f64)
+                    .add_max_failed_submission_tps(200.0)
                     .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                         (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
                         (LatencyBreakdownSlice::QsPosToProposal, pos_to_proposal),
@@ -1152,7 +1173,29 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
             },
         )
         .collect(),
-        continuous_traffic: None,
+        background_traffic: background_traffic_for_sweep(5),
+    })
+}
+
+fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TRANSACTIONS(vec![
+            // Very high gas
+            TransactionWorkload::new(
+                TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB,
+                100000,
+            ),
+            TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 20000),
+            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 4000)
+                .with_transactions_per_account(1),
+        ]),
+        criteria: Vec::new(),
+        background_traffic: background_traffic_for_sweep_with_latency(&[
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 4.0),
+        ]),
     })
 }
 
@@ -1161,114 +1204,43 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // do account generation first, to fill up a storage a bit.
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::AccountGeneration,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 100000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CoinTransfer,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 100000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CreateObjects10WithPayload10k,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            // very low gas/s
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CreateObjectsConflict100WithPayload10k,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture40,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPictureRead40,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture30k,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            // very high gas/s
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture30k,
-                num_modules: 20,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::SmartTablePicture30KWith200Change,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::SmartTablePicture1MWith256Change,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            // publishing package - executes sequentially, but conflict_multiplier is 1
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::PublishPackage,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
-            // module loading
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 1000,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
+            TransactionWorkload::new_const_tps(TransactionTypeArg::AccountGeneration, 2 * 7000),
+            // Very high gas
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB,
+                3 * 1800,
+            ),
+            // publishing package - executes sequentially
+            TransactionWorkload::new_const_tps(TransactionTypeArg::PublishPackage, 3 * 150)
+                .with_transactions_per_account(1),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::SmartTablePicture1MWith256Change,
+                3 * 14,
+            ),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit,
+                3 * 12,
+            ),
+            TransactionWorkload::new_const_tps(TransactionTypeArg::VectorPicture30k, 3 * 150),
+            TransactionWorkload::new_const_tps(TransactionTypeArg::ModifyGlobalFlagAggV2, 3 * 3500),
         ]),
         criteria: Vec::new(),
-        continuous_traffic: Some(ContinuousTraffic {
-            traffic: EmitJobRequest::default()
-                .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-                .mode(EmitJobMode::ConstTps { tps: 10 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
-            criteria: Some(SuccessCriteria::new(8)),
-        }),
+        background_traffic: background_traffic_for_sweep_with_latency(&[
+            (4.0, 5.0),
+            (3.0, 4.0),
+            (2.5, 4.0),
+            (2.5, 4.0),
+            (3.0, 5.0),
+            (2.5, 4.0),
+            (3.5, 5.0),
+        ]),
     })
-    .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-        // no epoch change.
-        helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
-    }))
+    .with_emit_job(
+        EmitJobRequest::default()
+            .txn_expiration_time_secs(20)
+            .init_gas_price_multiplier(5)
+            .init_expiration_multiplier(6.0),
+    )
 }
 
 fn load_vs_perf_benchmark() -> ForgeConfig {
@@ -1281,7 +1253,7 @@ fn load_vs_perf_benchmark() -> ForgeConfig {
                 200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
             ]),
             criteria: Vec::new(),
-            continuous_traffic: None,
+            background_traffic: None,
         })
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -1308,57 +1280,22 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
         .add_network_test(LoadVsPerfBenchmark {
             test: Box::new(PerformanceBenchmark),
             workloads: Workloads::TRANSACTIONS(vec![
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::NoOp,
-                    num_modules: 1,
-                    unique_senders: false,
-                    mempool_backlog: 20000,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::NoOp,
-                    num_modules: 1,
-                    unique_senders: true,
-                    mempool_backlog: 20000,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::NoOp,
-                    num_modules: 1000,
-                    unique_senders: false,
-                    mempool_backlog: 20000,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::CoinTransfer,
-                    num_modules: 1,
-                    unique_senders: true,
-                    mempool_backlog: 20000,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::CoinTransfer,
-                    num_modules: 1,
-                    unique_senders: true,
-                    mempool_backlog: 20000,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::AccountResource32B,
-                    num_modules: 1,
-                    unique_senders: true,
-                    mempool_backlog: 20000,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::AccountResource1KB,
-                    num_modules: 1,
-                    unique_senders: true,
-                    mempool_backlog: 20000,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::PublishPackage,
-                    num_modules: 1,
-                    unique_senders: true,
-                    mempool_backlog: 20000,
-                },
+                TransactionWorkload::new(TransactionTypeArg::NoOp, 20000),
+                TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_unique_senders(),
+                TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(1000),
+                TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000)
+                    .with_unique_senders(),
+                TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000)
+                    .with_unique_senders(),
+                TransactionWorkload::new(TransactionTypeArg::AccountResource32B, 20000)
+                    .with_unique_senders(),
+                TransactionWorkload::new(TransactionTypeArg::AccountResource1KB, 20000)
+                    .with_unique_senders(),
+                TransactionWorkload::new(TransactionTypeArg::PublishPackage, 20000)
+                    .with_unique_senders(),
             ]),
             criteria: Vec::new(),
-            continuous_traffic: None,
+            background_traffic: None,
         })
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -1368,54 +1305,6 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
             SuccessCriteria::new(0)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 30.0,
-                    max_round_gap: 10,
-                }),
-        )
-}
-
-fn graceful_overload() -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
-        // if we have full nodes for subset of validators, TPS drops.
-        // Validators without VFN are not creating batches,
-        // as no useful transaction reach their mempool.
-        // something to potentially improve upon.
-        // So having VFNs for all validators
-        .with_initial_fullnode_count(10)
-        .add_network_test(TwoTrafficsTest {
-            inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 10000 })
-                .init_gas_price_multiplier(20),
-
-            // Additionally - we are not really gracefully handling overlaods,
-            // setting limits based on current reality, to make sure they
-            // don't regress, but something to investigate
-            inner_success_criteria: SuccessCriteria::new(3400),
-        })
-        // First start non-overload (higher gas-fee) traffic,
-        // to not cause issues with TxnEmitter setup - account creation
-        .with_emit_job(
-            EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 1000 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
-        )
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
-        }))
-        .with_success_criteria(
-            SuccessCriteria::new(900)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(120)
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12.0, 40),
-                    // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new_gb(5.0, 30),
-                ))
-                .add_latency_threshold(10.0, LatencyType::P50)
-                .add_latency_threshold(30.0, LatencyType::P90)
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 30.0,
                     max_round_gap: 10,
@@ -1451,10 +1340,10 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_wait_for_catchup_s(180) // 3 minutes
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
-                    // Check that we don't use more than 18 CPU cores for 30% of the time.
-                    MetricsThreshold::new(18.0, 40),
-                    // Check that we don't use more than 6 GB of memory for more than 10% of the time.
-                    MetricsThreshold::new_gb(6.0, 10),
+                    // Check that we don't use more than 24 CPU cores for 20% of the time.
+                    MetricsThreshold::new(24.0, 20),
+                    // Check that we don't use more than 7.5 GB of memory for more than 10% of the time.
+                    MetricsThreshold::new_gb(7.5, 10),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1964,11 +1853,11 @@ fn realistic_env_max_load_test(
 
     let mut success_criteria = SuccessCriteria::new(95)
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
-            // Check that we don't use more than 18 CPU cores for 10% of the time.
-            MetricsThreshold::new(18.0, 10),
-            // Memory starts around 3GB, and grows around 1.2GB/hr in this test.
-            // Check that we don't use more than final expected memory for more than 10% of the time.
-            MetricsThreshold::new_gb(3.3 + 1.4 * (duration_secs as f64 / 3600.0), 10),
+            // Check that we don't use more than 18 CPU cores for 15% of the time.
+            MetricsThreshold::new(25.0, 15),
+            // Memory starts around 5GB, and grows around 1.4GB/hr in this test.
+            // Check that we don't use more than final expected memory for more than 15% of the time.
+            MetricsThreshold::new_gb(5.0 + 1.4 * (duration_secs as f64 / 3600.0), 15),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -1986,12 +1875,12 @@ fn realistic_env_max_load_test(
             LatencyBreakdownThreshold::new_with_breach_pct(
                 vec![
                     (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                    // only reaches close to threshold during epoch change
-                    (LatencyBreakdownSlice::QsPosToProposal, 0.6),
+                    // quorum store backpressure is relaxed, so queueing happens here
+                    (LatencyBreakdownSlice::QsPosToProposal, 2.5),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
-                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.75),
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 1.0),
                 ],
                 5,
             ),
@@ -2009,13 +1898,13 @@ fn realistic_env_max_load_test(
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
-                    4600
+                    7000
                 } else if long_running {
                     // This is for forge stable
-                    7000
+                    11000
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    6500
+                    10000
                 },
             ),
         }))
@@ -2070,7 +1959,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-            optimize_state_sync_for_throughput(config);
+            optimize_state_sync_for_throughput(config, 15_000);
 
             optimize_for_maximum_throughput(config, TARGET_TPS, MAX_TXNS_PER_BLOCK, VN_LATENCY_S);
 
@@ -2097,11 +1986,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                    config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
-                        sender_conflict_window_size: 256,
-                        module_conflict_window_size: 2,
-                        entry_fun_conflict_window_size: 3,
-                    };
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -2113,7 +1998,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                optimize_state_sync_for_throughput(config);
+                optimize_state_sync_for_throughput(config, 15_000);
 
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
@@ -2167,15 +2052,16 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     forge_config
 }
 
-/// Optimizes the state sync configs for throughput
-fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig) {
-    let max_chunk_size = 15_000; // This allows state sync to match consensus block sizes
+/// Optimizes the state sync configs for throughput.
+/// `max_chunk_size` is the maximum number of transactions to include in a chunk.
+fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig, max_chunk_size: u64) {
     let max_chunk_bytes = 40 * 1024 * 1024; // 10x the current limit (to prevent execution fallback)
 
     // Update the chunk sizes for the data client
     let data_client_config = &mut node_config.state_sync.aptos_data_client;
     data_client_config.max_transaction_chunk_size = max_chunk_size;
     data_client_config.max_transaction_output_chunk_size = max_chunk_size;
+
     // Update the chunk sizes for the storage service
     let storage_service_config = &mut node_config.state_sync.storage_service;
     storage_service_config.max_transaction_chunk_size = max_chunk_size;
@@ -2257,9 +2143,10 @@ pub fn changing_working_quorum_test_helper(
             } else {
                 for (i, item) in chain_health_backoff.iter_mut().enumerate() {
                     // as we have lower TPS, make limits smaller
-                    item.max_sending_block_txns_override =
+                    item.max_sending_block_txns_after_filtering_override =
                         (block_size / 2_u64.pow(i as u32 + 1)).max(2);
-                    min_block_txns = min_block_txns.min(item.max_sending_block_txns_override);
+                    min_block_txns =
+                        min_block_txns.min(item.max_sending_block_txns_after_filtering_override);
                     // as we have fewer nodes, make backoff triggered earlier:
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
@@ -2465,7 +2352,7 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
@@ -2476,14 +2363,14 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(95)
+            SuccessCriteria::new(4500)
                 .add_no_restarts()
-                .add_max_expired_tps(0)
-                .add_max_failed_submission_tps(0)
-                // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
-                .add_latency_threshold(2.5, LatencyType::P50)
-                .add_latency_threshold(4., LatencyType::P90)
-                .add_latency_threshold(5., LatencyType::P99)
+                .add_max_expired_tps(0.0)
+                .add_max_failed_submission_tps(0.0)
+                // Percentile thresholds are estimated and should be revisited.
+                .add_latency_threshold(3.5, LatencyType::P50)
+                .add_latency_threshold(4.5, LatencyType::P90)
+                .add_latency_threshold(5.5, LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),

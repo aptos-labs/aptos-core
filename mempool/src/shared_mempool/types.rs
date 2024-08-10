@@ -6,10 +6,11 @@
 use crate::{
     core_mempool::CoreMempool,
     network::{MempoolNetworkInterface, MempoolSyncMsg},
+    shared_mempool::use_case_history::UseCaseHistory,
 };
 use anyhow::Result;
 use aptos_config::{
-    config::{MempoolConfig, RoleType},
+    config::{MempoolConfig, NodeType},
     network_id::PeerNetworkId,
 };
 use aptos_consensus_types::common::{
@@ -31,7 +32,7 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
     pin::Pin,
     sync::Arc,
@@ -39,6 +40,9 @@ use std::{
     time::{Instant, SystemTime},
 };
 use tokio::runtime::Handle;
+
+pub type MempoolSenderBucket = u8;
+pub type TimelineIndexIdentifier = u8;
 
 /// Struct that owns all dependencies required by shared mempool routines.
 #[derive(Clone)]
@@ -50,6 +54,7 @@ pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub validator: Arc<RwLock<TransactionValidator>>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     pub broadcast_within_validator_network: Arc<RwLock<bool>>,
+    pub use_case_history: Arc<Mutex<UseCaseHistory>>,
 }
 
 impl<
@@ -64,9 +69,14 @@ impl<
         db: Arc<dyn DbReader>,
         validator: Arc<RwLock<TransactionValidator>>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
-        role: RoleType,
+        node_type: NodeType,
     ) -> Self {
-        let network_interface = MempoolNetworkInterface::new(network_client, role, config.clone());
+        let network_interface =
+            MempoolNetworkInterface::new(network_client, node_type, config.clone());
+        let use_case_history = UseCaseHistory::new(
+            config.usecase_stats_num_blocks_to_track,
+            config.usecase_stats_num_top_to_track,
+        );
         SharedMempool {
             mempool,
             config,
@@ -75,6 +85,7 @@ impl<
             validator,
             subscribers,
             broadcast_within_validator_network: Arc::new(RwLock::new(true)),
+            use_case_history: Arc::new(Mutex::new(use_case_history)),
         }
     }
 
@@ -236,15 +247,32 @@ pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
 /// `is_alive` - is connection healthy
 #[derive(Clone, Debug)]
 pub(crate) struct PeerSyncState {
-    pub timeline_id: MultiBucketTimelineIndexIds,
+    pub timelines: HashMap<MempoolSenderBucket, MultiBucketTimelineIndexIds>,
     pub broadcast_info: BroadcastInfo,
 }
 
 impl PeerSyncState {
-    pub fn new(num_broadcast_buckets: usize) -> Self {
+    pub fn new(num_broadcast_buckets: usize, num_sender_buckets: MempoolSenderBucket) -> Self {
+        let mut timelines = HashMap::new();
+        for i in 0..num_sender_buckets {
+            timelines.insert(
+                i as MempoolSenderBucket,
+                MultiBucketTimelineIndexIds::new(num_broadcast_buckets),
+            );
+        }
         PeerSyncState {
-            timeline_id: MultiBucketTimelineIndexIds::new(num_broadcast_buckets),
+            timelines,
             broadcast_info: BroadcastInfo::new(),
+        }
+    }
+
+    // TODO: Need to be updated
+    pub(crate) fn update(&mut self, message_id: &MempoolMessageId) {
+        let decoded_message = message_id.decode();
+        for (sender, batch_id) in decoded_message {
+            if let Some(timeline) = self.timelines.get_mut(&sender) {
+                timeline.update(batch_id);
+            }
         }
     }
 }
@@ -279,13 +307,20 @@ impl MultiBucketTimelineIndexIds {
         }
     }
 
-    pub(crate) fn update(&mut self, batch_id: &MultiBatchId) {
-        if self.id_per_bucket.len() != batch_id.0.len() {
+    pub(crate) fn update(&mut self, start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>) {
+        if self.id_per_bucket.len() != start_end_pairs.len() {
             return;
         }
 
-        for (cur, &(_start, end)) in self.id_per_bucket.iter_mut().zip(batch_id.0.iter()) {
-            *cur = std::cmp::max(*cur, end)
+        for index_identifier in start_end_pairs.keys() {
+            if *index_identifier as usize >= self.id_per_bucket.len() {
+                return;
+            }
+        }
+
+        for (index_identifier, (_start, end)) in start_end_pairs {
+            self.id_per_bucket[index_identifier as usize] =
+                std::cmp::max(self.id_per_bucket[index_identifier as usize], end);
         }
     }
 }
@@ -298,33 +333,77 @@ impl From<Vec<u64>> for MultiBucketTimelineIndexIds {
     }
 }
 
+// MempoolMessageId is used to identify a mempool message (set of transactions) sent to a peer.
+// Each tuple (a, b) indicates a range of the timeline index IDs read from the core mempool
+// timeline index that produced the txns in this message.
+// Each tuple (a, b) is encoded as follows:
+// The first byte of a, b indicates the sender bucket (hash of the sender address).
+// Each sender bucket is further subdivided into timelines (One timeline per range of txn fees).
+// A timeline is a queue of transactions.
+// The second byte of a, b indicates the index of the timeline inside the sender bucket.
+// The remaining bytes of a, b indicate the start and end pointers inside the timeline.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct MultiBatchId(pub Vec<(u64, u64)>);
+pub struct MempoolMessageId(pub Vec<(u64, u64)>);
 
-impl MultiBatchId {
+impl MempoolMessageId {
     pub(crate) fn from_timeline_ids(
-        old: &MultiBucketTimelineIndexIds,
-        new: &MultiBucketTimelineIndexIds,
+        timeline_ids: Vec<(
+            MempoolSenderBucket,
+            (MultiBucketTimelineIndexIds, MultiBucketTimelineIndexIds),
+        )>,
     ) -> Self {
         Self(
-            old.id_per_bucket
+            timeline_ids
                 .iter()
-                .cloned()
-                .zip(new.id_per_bucket.iter().cloned())
+                .flat_map(|(sender_bucket, (old, new))| {
+                    old.id_per_bucket
+                        .iter()
+                        .cloned()
+                        .zip(new.id_per_bucket.iter().cloned())
+                        .enumerate()
+                        .map(move |(index, (old, new))| {
+                            let sender_bucket = *sender_bucket as u64;
+                            let timeline_index_identifier = index as u64;
+                            assert!(timeline_index_identifier < 128);
+                            assert!(sender_bucket < 128);
+                            (
+                                sender_bucket << 56 | timeline_index_identifier << 48 | old,
+                                sender_bucket << 56 | timeline_index_identifier << 48 | new,
+                            )
+                        })
+                })
                 .collect(),
         )
     }
+
+    pub(crate) fn decode(
+        &self,
+    ) -> HashMap<MempoolSenderBucket, HashMap<TimelineIndexIdentifier, (u64, u64)>> {
+        let mut result = HashMap::new();
+        for (start, end) in self.0.iter() {
+            let sender_bucket = (start >> 56) as MempoolSenderBucket;
+            let timeline_index_identifier = (start >> 48 & 0xFF) as TimelineIndexIdentifier;
+            // Remove the leading two bytes that indicates the sender bucket.
+            let start = start & 0x0000FFFFFFFFFFFF;
+            let end = end & 0x0000FFFFFFFFFFFF;
+            result
+                .entry(sender_bucket)
+                .or_insert_with(HashMap::new)
+                .insert(timeline_index_identifier, (start, end));
+        }
+        result
+    }
 }
 
-impl PartialOrd for MultiBatchId {
-    fn partial_cmp(&self, other: &MultiBatchId) -> Option<std::cmp::Ordering> {
+impl PartialOrd for MempoolMessageId {
+    fn partial_cmp(&self, other: &MempoolMessageId) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 // Note: in rev order to check significant pairs first (right -> left)
-impl Ord for MultiBatchId {
-    fn cmp(&self, other: &MultiBatchId) -> std::cmp::Ordering {
+impl Ord for MempoolMessageId {
+    fn cmp(&self, other: &MempoolMessageId) -> std::cmp::Ordering {
         for (&self_pair, &other_pair) in self.0.iter().rev().zip(other.0.iter().rev()) {
             let ordering = self_pair.cmp(&other_pair);
             if ordering != Ordering::Equal {
@@ -337,24 +416,46 @@ impl Ord for MultiBatchId {
 
 #[cfg(test)]
 mod test {
-    use crate::shared_mempool::types::{MultiBatchId, MultiBucketTimelineIndexIds};
+    use crate::shared_mempool::types::{
+        MempoolMessageId, MultiBucketTimelineIndexIds, TimelineIndexIdentifier,
+    };
+    use std::collections::HashMap;
 
     #[test]
     fn test_multi_bucket_timeline_ids_update() {
         let mut timeline_ids = MultiBucketTimelineIndexIds {
             id_per_bucket: vec![1, 2, 3],
         };
-        let batch_id = MultiBatchId(vec![(1, 3), (1, 1), (3, 6)]);
-        timeline_ids.update(&batch_id);
+        let mut batch_id = HashMap::<TimelineIndexIdentifier, (u64, u64)>::new();
+        batch_id.insert(0, (1, 3));
+        batch_id.insert(1, (1, 1));
+        batch_id.insert(2, (3, 6));
+        timeline_ids.update(batch_id);
         assert_eq!(vec![3, 2, 6], timeline_ids.id_per_bucket);
     }
 
     #[test]
-    fn test_multi_batch_id_ordering() {
-        let left = MultiBatchId(vec![(0, 3), (1, 4), (2, 5)]);
-        let right = MultiBatchId(vec![(2, 5), (1, 4), (0, 3)]);
-
+    fn test_message_id_ordering() {
+        let left = MempoolMessageId(vec![(0, 3), (1, 4), (2, 5)]);
+        let right = MempoolMessageId(vec![(2, 5), (1, 4), (0, 3)]);
         assert!(left > right);
+
+        let left = MempoolMessageId(vec![(0, 3), (1, 4), (2, 5)]);
+        let sender = 1 << 56;
+        let right = MempoolMessageId(vec![(2, 5), (1, 4), (sender, 3)]);
+        assert!(right > left);
+
+        let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 4), (2 | sender, 3)]);
+        let right = MempoolMessageId(vec![(2 | sender, 5), (1, 4), (0, 5)]);
+        assert!(left > right);
+
+        let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 4), (2, 3)]);
+        let right = MempoolMessageId(vec![(2 | sender, 5), (1, 4), (2, 3)]);
+        assert!(left > right);
+
+        let left = MempoolMessageId(vec![(sender, 3), (1 | sender, 3), (2, 3)]);
+        let right = MempoolMessageId(vec![(2 | sender, 5), (1 | sender, 4), (2, 3)]);
+        assert!(right > left);
     }
 }
 
@@ -362,9 +463,9 @@ mod test {
 #[derive(Clone, Debug)]
 pub struct BroadcastInfo {
     // Sent broadcasts that have not yet received an ack.
-    pub sent_batches: BTreeMap<MultiBatchId, SystemTime>,
+    pub sent_messages: BTreeMap<MempoolMessageId, SystemTime>,
     // Broadcasts that have received a retry ack and are pending a resend.
-    pub retry_batches: BTreeSet<MultiBatchId>,
+    pub retry_messages: BTreeSet<MempoolMessageId>,
     // Whether broadcasting to this peer is in backoff mode, e.g. broadcasting at longer intervals.
     pub backoff_mode: bool,
 }
@@ -372,8 +473,8 @@ pub struct BroadcastInfo {
 impl BroadcastInfo {
     fn new() -> Self {
         Self {
-            sent_batches: BTreeMap::new(),
-            retry_batches: BTreeSet::new(),
+            sent_messages: BTreeMap::new(),
+            retry_messages: BTreeSet::new(),
             backoff_mode: false,
         }
     }

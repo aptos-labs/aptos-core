@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_restore::{
-    StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch,
-    StateValueWriter,
+    StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch, StateValueWriter,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::{
     mock_tree_store::MockTreeStore,
@@ -88,7 +88,7 @@ where
         Ok(())
     }
 
-    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
+    fn kv_finish(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
         self.usage_store.write().insert(version, usage);
         Ok(())
     }

@@ -113,7 +113,6 @@ async fn setup_test(
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
-        cli.addresses(),
     )
     .await
     .unwrap();
@@ -2092,7 +2091,7 @@ async fn create_account_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         txn_expiry_duration.unwrap_or(DEFAULT_MAX_WAIT_DURATION),
@@ -2116,7 +2115,7 @@ async fn simple_transfer_and_wait(
     sender_key: &Ed25519PrivateKey,
     receiver: AccountAddress,
     amount: u64,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     transfer_and_wait(
         node_clients,
         sender_key,
@@ -2139,7 +2138,7 @@ async fn transfer_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         txn_expiry_duration.unwrap_or(DEFAULT_MAX_WAIT_DURATION),
@@ -2164,7 +2163,7 @@ async fn set_operator_and_wait(
     sender_key: &Ed25519PrivateKey,
     old_operator: Option<AccountAddress>,
     new_operator: AccountAddress,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2189,7 +2188,7 @@ async fn set_voter_and_wait(
     sender_key: &Ed25519PrivateKey,
     operator: Option<AccountAddress>,
     new_voter: AccountAddress,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2216,7 +2215,7 @@ async fn create_stake_pool_and_wait(
     voter: Option<AccountAddress>,
     stake_amount: Option<u64>,
     commission_percentage: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2242,7 +2241,7 @@ async fn reset_lockup_and_wait(
     node_clients: &NodeClients<'_>,
     sender_key: &Ed25519PrivateKey,
     operator: Option<AccountAddress>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2266,7 +2265,7 @@ async fn update_commission_and_wait(
     sender_key: &Ed25519PrivateKey,
     operator: Option<AccountAddress>,
     new_commission_percentage: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2291,7 +2290,7 @@ async fn unlock_stake_and_wait(
     sender_key: &Ed25519PrivateKey,
     operator: Option<AccountAddress>,
     amount: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2316,7 +2315,7 @@ async fn distribute_staking_rewards_and_wait(
     sender_key: &Ed25519PrivateKey,
     operator: AccountAddress,
     staker: AccountAddress,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2343,7 +2342,7 @@ async fn submit_transaction<
     rest_client: &aptos_rest_client::Client,
     txn_expiry_duration: Duration,
     transaction_builder: F,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
 
     let txn_hash = transaction_builder(expiry_time.as_secs())
@@ -2359,7 +2358,7 @@ async fn wait_for_transaction(
     rest_client: &aptos_rest_client::Client,
     expiry_time: Duration,
     txn_hash: String,
-) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+) -> Result<UserTransaction, UserTransaction> {
     let hash_value = HashValue::from_str(&txn_hash).unwrap();
     let response = rest_client
         .wait_for_transaction_by_hash(
@@ -2410,7 +2409,7 @@ async fn add_delegated_stake_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
         .add_delegated_stake(
@@ -2443,7 +2442,7 @@ async fn unlock_delegated_stake_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
         .unlock_delegated_stake(
@@ -2475,7 +2474,7 @@ async fn withdraw_undelegated_stake_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
         .withdraw_undelegated_stake(
@@ -2710,5 +2709,5 @@ async fn test_delegation_pool_operations() {
 #[derive(Debug)]
 pub enum ErrorWrapper {
     BeforeSubmission(anyhow::Error),
-    AfterSubmission(Box<UserTransaction>),
+    AfterSubmission(UserTransaction),
 }

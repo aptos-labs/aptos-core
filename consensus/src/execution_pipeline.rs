@@ -5,6 +5,7 @@
 
 use crate::{
     block_preparer::BlockPreparer,
+    counters::{self, log_executor_error_occurred},
     monitor,
     state_computer::{PipelineExecutionResult, StateComputeResultFut},
 };
@@ -26,9 +27,13 @@ use aptos_types::{
 use fail::fail_point;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{mpsc, oneshot};
 
+#[allow(clippy::unwrap_used)]
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -48,6 +53,7 @@ impl ExecutionPipeline {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
+
         runtime.spawn(Self::prepare_block_stage(
             prepare_block_rx,
             execute_block_tx,
@@ -110,18 +116,13 @@ impl ExecutionPipeline {
         debug!("prepare_block received block {}.", block.id());
         let input_txns = block_preparer.prepare_block(&block).await;
         if let Err(e) = input_txns {
-            result_tx.send(Err(e)).unwrap_or_else(|err| {
-                error!(
-                    block_id = block.id(),
-                    "Failed to send back execution result for block {}: {:?}.",
-                    block.id(),
-                    err,
-                );
+            result_tx.send(Err(e)).unwrap_or_else(|value| {
+                process_failed_to_send_result(value, block.id(), "prepare")
             });
             return;
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-        let input_txns = input_txns.unwrap();
+        let input_txns = input_txns.expect("input_txns must be Some.");
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
@@ -185,11 +186,14 @@ impl ExecutionPipeline {
                             error: "Injected error in compute".into(),
                         })
                     });
-                    executor.execute_and_state_checkpoint(
-                        block,
-                        parent_block_id,
-                        block_executor_onchain_config,
-                    )
+                    let start = Instant::now();
+                    executor
+                        .execute_and_state_checkpoint(
+                            block,
+                            parent_block_id,
+                            block_executor_onchain_config,
+                        )
+                        .map(|output| (output, start.elapsed()))
                 })
                 .await
             )
@@ -216,29 +220,30 @@ impl ExecutionPipeline {
             input_txns,
             block_id,
             parent_block_id,
-            state_checkpoint_output,
+            state_checkpoint_output: execution_result,
             result_tx,
         }) = block_rx.recv().await
         {
             debug!("ledger_apply stage received block {}.", block_id);
             let res = async {
+                let (state_checkpoint_output, execution_duration) = execution_result?;
                 let executor = executor.clone();
                 monitor!(
                     "ledger_apply",
                     tokio::task::spawn_blocking(move || {
-                        executor.ledger_update(block_id, parent_block_id, state_checkpoint_output?)
+                        executor.ledger_update(block_id, parent_block_id, state_checkpoint_output)
                     })
                 )
                 .await
                 .expect("Failed to spawn_blocking().")
+                .map(|output| (output, execution_duration))
             }
             .await;
-            let pipe_line_res = res.map(|output| PipelineExecutionResult::new(input_txns, output));
-            result_tx.send(pipe_line_res).unwrap_or_else(|err| {
-                error!(
-                    block_id = block_id,
-                    "Failed to send back execution result for block {}: {:?}", block_id, err,
-                );
+            let pipe_line_res = res.map(|(output, execution_duration)| {
+                PipelineExecutionResult::new(input_txns, output, execution_duration)
+            });
+            result_tx.send(pipe_line_res).unwrap_or_else(|value| {
+                process_failed_to_send_result(value, block_id, "ledger_apply")
             });
         }
         debug!("ledger_apply stage quitting.");
@@ -267,6 +272,26 @@ struct LedgerApplyCommand {
     input_txns: Vec<SignedTransaction>,
     block_id: HashValue,
     parent_block_id: HashValue,
-    state_checkpoint_output: ExecutorResult<StateCheckpointOutput>,
+    state_checkpoint_output: ExecutorResult<(StateCheckpointOutput, Duration)>,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+}
+
+fn process_failed_to_send_result(
+    value: Result<PipelineExecutionResult, ExecutorError>,
+    block_id: HashValue,
+    from_stage: &str,
+) {
+    error!(
+        block_id = block_id,
+        is_err = value.is_err(),
+        "Failed to send back execution result from {from_stage} stage",
+    );
+    if let Err(e) = value {
+        // receive channel discarding error, log for debugging.
+        log_executor_error_occurred(
+            e,
+            &counters::PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT,
+            block_id,
+        );
+    }
 }

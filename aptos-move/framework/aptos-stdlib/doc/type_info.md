@@ -283,8 +283,7 @@ analysis of vector size dynamism.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_size_of_val">size_of_val</a>&lt;T&gt;(val_ref: &T): u64 {
-    // Return <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a> length of vectorized BCS representation.
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&<a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(val_ref))
+    <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialized_size">bcs::serialized_size</a>(val_ref)
 }
 </code></pre>
 
@@ -451,8 +450,7 @@ analysis of vector size dynamism.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_size_of_val">spec_size_of_val</a>&lt;T&gt;(val_ref);
+<pre><code><b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_size_of_val">spec_size_of_val</a>&lt;T&gt;(val_ref);
 </code></pre>
 
 

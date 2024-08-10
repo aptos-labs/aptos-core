@@ -21,7 +21,6 @@ use aptos_data_streaming_service::{
     streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_logger::{prelude::*, sample::SampleRate};
-use aptos_schemadb::DB;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     epoch_change::Verifier,
@@ -324,9 +323,6 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
 
     // The epoch states verified by this node (held in memory)
     verified_epoch_states: VerifiedEpochStates,
-
-    // The internal indexer db used to store state value index
-    internal_indexer_db: Option<Arc<DB>>,
 }
 
 impl<
@@ -342,7 +338,6 @@ impl<
         streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
         storage_synchronizer: StorageSyncer,
-        internal_indexer_db: Option<Arc<DB>>,
     ) -> Self {
         // Load the latest epoch state from storage
         let latest_epoch_state = utils::fetch_latest_epoch_state(storage.clone())
@@ -362,7 +357,6 @@ impl<
             storage,
             storage_synchronizer,
             verified_epoch_states,
-            internal_indexer_db,
         }
     }
 
@@ -1000,7 +994,6 @@ impl<
                 epoch_change_proofs,
                 ledger_info_to_sync,
                 transaction_output_to_sync.clone(),
-                self.internal_indexer_db.clone(),
             )?;
             self.state_value_syncer.initialized_state_snapshot_receiver = true;
         }

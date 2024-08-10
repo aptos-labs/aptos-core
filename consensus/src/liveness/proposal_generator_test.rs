@@ -30,7 +30,7 @@ fn empty_callback() -> BoxFuture<'static, ()> {
 async fn test_proposal_generation_empty_tree() {
     let signer = ValidatorSigner::random(None);
     let block_store = build_empty_tree();
-    let mut proposal_generator = ProposalGenerator::new(
+    let proposal_generator = ProposalGenerator::new(
         signer.author(),
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
@@ -42,19 +42,21 @@ async fn test_proposal_generation_empty_tree() {
         1,
         10,
         10,
+        1,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
     );
-    let mut proposer_election =
-        UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(vec![signer.author()], 1)));
+    let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
+        RotatingProposer::new(vec![signer.author()], 1),
+    )));
     let genesis = block_store.ordered_root();
 
     // Generate proposals for an empty tree.
     let proposal_data = proposal_generator
-        .generate_proposal(1, &mut proposer_election, empty_callback())
+        .generate_proposal(1, proposer_election.clone(), empty_callback())
         .await
         .unwrap();
     let proposal = Block::new_proposal_from_block_data(proposal_data, &signer).unwrap();
@@ -65,7 +67,7 @@ async fn test_proposal_generation_empty_tree() {
 
     // Duplicate proposals on the same round are not allowed
     let proposal_err = proposal_generator
-        .generate_proposal(1, &mut proposer_election, empty_callback())
+        .generate_proposal(1, proposer_election.clone(), empty_callback())
         .await
         .err();
     assert!(proposal_err.is_some());
@@ -75,7 +77,7 @@ async fn test_proposal_generation_empty_tree() {
 async fn test_proposal_generation_parent() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
-    let mut proposal_generator = ProposalGenerator::new(
+    let proposal_generator = ProposalGenerator::new(
         inserter.signer().author(),
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
@@ -87,15 +89,15 @@ async fn test_proposal_generation_parent() {
         1,
         500,
         10,
+        1,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
-        vec![inserter.signer().author()],
-        1,
+    let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
+        RotatingProposer::new(vec![inserter.signer().author()], 1),
     )));
     let genesis = block_store.ordered_root();
     let a1 = inserter
@@ -106,7 +108,7 @@ async fn test_proposal_generation_parent() {
         .await;
 
     let original_res = proposal_generator
-        .generate_proposal(10, &mut proposer_election, empty_callback())
+        .generate_proposal(10, proposer_election.clone(), empty_callback())
         .await
         .unwrap();
     // With no certifications the parent is genesis
@@ -120,7 +122,7 @@ async fn test_proposal_generation_parent() {
     // Once a1 is certified, it should be the one to choose from
     inserter.insert_qc_for_block(a1.as_ref(), None);
     let a1_child_res = proposal_generator
-        .generate_proposal(11, &mut proposer_election, empty_callback())
+        .generate_proposal(11, proposer_election.clone(), empty_callback())
         .await
         .unwrap();
     assert_eq!(a1_child_res.parent_id(), a1.id());
@@ -135,7 +137,7 @@ async fn test_proposal_generation_parent() {
     // Once b1 is certified, it should be the one to choose from
     inserter.insert_qc_for_block(b1.as_ref(), None);
     let b1_child_res = proposal_generator
-        .generate_proposal(15, &mut proposer_election, empty_callback())
+        .generate_proposal(15, proposer_election.clone(), empty_callback())
         .await
         .unwrap();
     assert_eq!(b1_child_res.parent_id(), b1.id());
@@ -152,7 +154,7 @@ async fn test_proposal_generation_parent() {
 async fn test_old_proposal_generation() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
-    let mut proposal_generator = ProposalGenerator::new(
+    let proposal_generator = ProposalGenerator::new(
         inserter.signer().author(),
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
@@ -164,15 +166,15 @@ async fn test_old_proposal_generation() {
         1,
         500,
         10,
+        1,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
-        vec![inserter.signer().author()],
-        1,
+    let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
+        RotatingProposer::new(vec![inserter.signer().author()], 1),
     )));
     let genesis = block_store.ordered_root();
     let a1 = inserter
@@ -181,7 +183,7 @@ async fn test_old_proposal_generation() {
     inserter.insert_qc_for_block(a1.as_ref(), None);
 
     let proposal_err = proposal_generator
-        .generate_proposal(1, &mut proposer_election, empty_callback())
+        .generate_proposal(1, proposer_election.clone(), empty_callback())
         .await
         .err();
     assert!(proposal_err.is_some());
@@ -194,7 +196,7 @@ async fn test_correct_failed_authors() {
     let peer1 = Author::random();
     let peer2 = Author::random();
     let block_store = inserter.block_store();
-    let mut proposal_generator = ProposalGenerator::new(
+    let proposal_generator = ProposalGenerator::new(
         author,
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
@@ -206,20 +208,20 @@ async fn test_correct_failed_authors() {
         1,
         500,
         10,
+        1,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
-        vec![author, peer1, peer2],
-        1,
+    let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
+        RotatingProposer::new(vec![author, peer1, peer2], 1),
     )));
     let genesis = block_store.ordered_root();
 
     let result = proposal_generator
-        .generate_proposal(6, &mut proposer_election, empty_callback())
+        .generate_proposal(6, proposer_election.clone(), empty_callback())
         .await
         .unwrap();
     // With no certifications the parent is genesis

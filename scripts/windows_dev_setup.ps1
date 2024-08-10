@@ -78,7 +78,7 @@ function update_versions {
     $url = "https://raw.githubusercontent.com/aptos-labs/aptos-core/main/scripts/dev_setup.sh"
 
     # Retrieve the content of the file and store it in a variable
-    $content = (Invoke-WebRequest -Uri $url -UseBasicParsing | Select-Object -ExpandProperty Content -First 50) -join "`n"
+    $content = (Invoke-WebRequest -UseBasicParsing -Uri $url | Select-Object -ExpandProperty Content -First 50) -join "`n"
 
     $packages = @($global:grcov_version, $global:protoc_version, $global:dotnet_version, $global:z3_version, $global:boogie_version)
 
@@ -151,7 +151,7 @@ function check_os {
 }
 
 function install_winget {
-  $xaml_url = "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.8.6"
+  $xaml_url = "https://globalcdn.nuget.org/packages/microsoft.ui.xaml.2.8.6.nupkg"
   $xaml_downloadpath = "Microsoft.UI.Xaml.2.8.6.nupkg.zip"
   $xaml_filepath = "Microsoft.UI.Xaml.2.8.6.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.8.appx"
 
@@ -165,18 +165,18 @@ function install_winget {
   $license_downloadpath = "license.xml"
 
   # Download and extract XAML (dependency)
-  Invoke-WebRequest -Uri $xaml_url -OutFile $xaml_downloadpath -ErrorAction SilentlyContinue
+  Safe-Download-File $xaml_url -Destination $xaml_downloadpath
   Expand-Archive $xaml_downloadpath -ErrorAction SilentlyContinue
 
   # Download and install VCLibs and XAML (dependencies)
-  Invoke-WebRequest -Uri $vclib_url -OutFile $vclib_downloadpath -ErrorAction SilentlyContinue
-  Add-AppxPackage $vclib_downloadpath -ErrorAction SilentlyContinue
-  Add-AppxPackage $xaml_filepath -ErrorAction SilentlyContinue
+  Safe-Download-File -Source $vclib_url -Destination $vclib_downloadpath
+  Add-AppxPackage $vclib_downloadpath
+  Add-AppxPackage $xaml_filepath
 
   # Download and install WinGet
-  Invoke-WebRequest -Uri $installer_url -OutFile $installer_downloadpath -ErrorAction SilentlyContinue
-  Invoke-WebRequest -Uri $license_url -OutFile $license_downloadpath -ErrorAction SilentlyContinue
-  Add-AppxProvisionedPackage -Online -PackagePath $installer_downloadpath -LicensePath $license_downloadpath -ErrorAction SilentlyContinue
+  Safe-Download-File -Source $installer_url -Destination $installer_downloadpath
+  Safe-Download-File -Source $license_url -Destination $license_downloadpath
+  Add-AppxProvisionedPackage -Online -PackagePath $installer_downloadpath -LicensePath $license_downloadpath
 
   # Cleanup
   Remove-Item $xaml_filepath
@@ -302,7 +302,7 @@ function install_protoc {
     $protoc_url = "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/$protoc_zip"
 
     # Download and extract Protoc
-    Invoke-WebRequest -Uri $protoc_url -OutFile (New-Item -Path "$env:USERPROFILE\Downloads\$protoc_zip" -Force) -ErrorAction SilentlyContinue
+    Safe-Download-File $protoc_url -Destination (New-Item -Path "$env:USERPROFILE\Downloads\$protoc_zip" -Force)
     Expand-Archive -Path "$env:USERPROFILE\Downloads\$protoc_zip" -DestinationPath "$env:USERPROFILE\$protoc_folder" -ErrorAction SilentlyContinue
     Remove-Item "$env:USERPROFILE\Downloads\$protoc_zip"
 
@@ -326,10 +326,10 @@ function install_cargo_plugins {  # Installs Grcov, protoc components, and cargo
 function install_llvm {
   $result = check_package "LLVM"
   if ($result) {
-    winget install LLVM.LLVM --silent --accept-source-agreementst
+    winget install LLVM.LLVM --silent --accept-source-agreements
 	}
   else {
-    winget upgrade --id LLVM.LLVM --accept-source-agreementsM
+    winget upgrade --id LLVM.LLVM --accept-source-agreements
   }
 }
 
@@ -346,22 +346,22 @@ function install_openssl {
 function install_nodejs {
   $result = check_package "Node.js"
   if ($result) {
-    winget install OpenJS.NodeJS --silent --accept-source-agreementst
+    winget install OpenJS.NodeJS --silent --accept-source-agreements
 	}
   else {
-    winget upgrade --id OpenJS.NodeJS --silent --accept-source-agreementst
+    winget upgrade --id OpenJS.NodeJS --silent --accept-source-agreements
   }
 }
 
 function install_python {
   $result = check_package "Python"
   if ($result) {
-    winget install Python.Python.3.11 --silent --accept-source-agreementst
+    winget install Python.Python.3.11 --silent --accept-source-agreements
     # Reload the PATH environment variables for this session
     $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
 	}
   else {
-    winget upgrade --id Python.Python.3.11 --silent --accept-source-agreementst
+    winget upgrade --id Python.Python.3.11 --silent --accept-source-agreements
   }
   python -m pip install --upgrade pip
   python -m pip install schemathesis
@@ -373,7 +373,7 @@ function install_pnpm {
     winget install pnpm.pnpm --silent --accept-source-agreements
 	}
   else {
-    winget upgrade --id pnpm.pnpm --accept-source-agreementsm
+    winget upgrade --id pnpm.pnpm --accept-source-agreements
   }
 }
 
@@ -433,7 +433,7 @@ function install_z3 {
     $z3_filepath = "$env:USERPROFILE\$z3_zip"
 
     # Download and extract Z3
-    Invoke-WebRequest -Uri "https://github.com/Z3Prover/z3/releases/download/$uri/$z3_zip" -OutFile (New-Item -Path "$z3_filepath" -Force) -ErrorAction SilentlyContinue
+    Safe-Download-File -Source "https://github.com/Z3Prover/z3/releases/download/$uri/$z3_zip" -Destination (New-Item -Path "$z3_filepath" -Force)
     Expand-Archive $z3_filepath -DestinationPath "$env:USERPROFILE" -ErrorAction SilentlyContinue
     Remove-Item $z3_filepath
 
@@ -480,6 +480,29 @@ function install_move_prover {
   install_boogie
   install_z3
   install_git
+}
+
+function Safe-Download-File {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Source,
+
+        [Parameter(Mandatory=$true)]
+        [string]$Destination
+    )
+
+    # Check if the file exists
+    if (Test-Path -Path $Destination) {
+        Write-Host "File already exists at $Destination. Deleting the existing file..." -ForegroundColor Yellow
+        # Remove the existing file
+        Remove-Item -Path $Destination -Force
+        Write-Host "Existing file deleted." -ForegroundColor Green
+    }
+    
+    # Start the download
+    Write-Host "Starting the download from $Source to $Destination..." -ForegroundColor Blue
+    Start-BitsTransfer -Source $Source -Destination $Destination
+    Write-Host "Download completed successfully." -ForegroundColor Green
 }
 
 verify_architecture

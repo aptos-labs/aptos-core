@@ -285,6 +285,42 @@ fn load_struct_def_inst_index(
     )?))
 }
 
+fn load_variant_field_handle_index(
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<VariantFieldHandleIndex> {
+    Ok(VariantFieldHandleIndex(read_uleb_internal(
+        cursor,
+        TABLE_INDEX_MAX,
+    )?))
+}
+
+fn load_variant_field_inst_index(
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<VariantFieldInstantiationIndex> {
+    Ok(VariantFieldInstantiationIndex(read_uleb_internal(
+        cursor,
+        TABLE_INDEX_MAX,
+    )?))
+}
+
+fn load_struct_variant_handle_index(
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<StructVariantHandleIndex> {
+    Ok(StructVariantHandleIndex(read_uleb_internal(
+        cursor,
+        TABLE_INDEX_MAX,
+    )?))
+}
+
+fn load_struct_variant_inst_index(
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<StructVariantInstantiationIndex> {
+    Ok(StructVariantInstantiationIndex(read_uleb_internal(
+        cursor,
+        TABLE_INDEX_MAX,
+    )?))
+}
+
 fn load_constant_pool_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<ConstantPoolIndex> {
     Ok(ConstantPoolIndex(read_uleb_internal(
         cursor,
@@ -306,6 +342,10 @@ fn load_acquires_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> 
 
 fn load_field_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
     read_uleb_internal(cursor, FIELD_COUNT_MAX)
+}
+
+fn load_variant_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
+    read_uleb_internal(cursor, VARIANT_COUNT_MAX)
 }
 
 fn load_type_parameter_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<usize> {
@@ -342,6 +382,10 @@ fn load_type_parameter_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult
 
 fn load_field_offset(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u16> {
     read_uleb_internal(cursor, FIELD_OFFSET_MAX)
+}
+
+fn load_variant_offset(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u16> {
+    read_uleb_internal(cursor, VARIANT_OFFSET_MAX)
 }
 
 fn load_table_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
@@ -501,6 +545,23 @@ fn check_tables(tables: &mut Vec<Table>, binary_len: usize) -> BinaryLoaderResul
     Ok(current_offset)
 }
 
+impl Table {
+    /// Generic function to deserialize a table into a vector of given type.
+    fn load<T>(
+        &self,
+        binary: &VersionedBinary,
+        result: &mut Vec<T>,
+        deserializer: impl Fn(&mut VersionedCursor) -> BinaryLoaderResult<T>,
+    ) -> BinaryLoaderResult<()> {
+        let start = self.offset as usize;
+        let end = start + self.count as usize;
+        let mut cursor = binary.new_cursor(start, end);
+        while cursor.position() < self.count as u64 {
+            result.push(deserializer(&mut cursor)?)
+        }
+        Ok(())
+    }
+}
 //
 // Trait to read common tables from CompiledScript or CompiledModule
 //
@@ -624,22 +685,28 @@ fn build_common_tables(
     for table in tables {
         match table.kind {
             TableType::MODULE_HANDLES => {
-                load_module_handles(binary, table, common.get_module_handles())?;
+                table.load(binary, common.get_module_handles(), load_module_handle)?;
             },
             TableType::STRUCT_HANDLES => {
-                load_struct_handles(binary, table, common.get_struct_handles())?;
+                table.load(binary, common.get_struct_handles(), load_struct_handle)?;
             },
             TableType::FUNCTION_HANDLES => {
-                load_function_handles(binary, table, common.get_function_handles())?;
+                table.load(binary, common.get_function_handles(), |cursor| {
+                    load_function_handle(binary.version(), cursor)
+                })?;
             },
             TableType::FUNCTION_INST => {
-                load_function_instantiations(binary, table, common.get_function_instantiations())?;
+                table.load(
+                    binary,
+                    common.get_function_instantiations(),
+                    load_function_instantiation,
+                )?;
             },
             TableType::SIGNATURES => {
-                load_signatures(binary, table, common.get_signatures())?;
+                table.load(binary, common.get_signatures(), load_signature)?;
             },
             TableType::CONSTANT_POOL => {
-                load_constant_pool(binary, table, common.get_constant_pool())?;
+                table.load(binary, common.get_constant_pool(), load_constant)?;
             },
             TableType::METADATA => {
                 if binary.version() < VERSION_5 {
@@ -650,18 +717,22 @@ fn build_common_tables(
                         )),
                     );
                 }
-                load_metadata(binary, table, common.get_metadata())?;
+                table.load(binary, common.get_metadata(), load_metadata_entry)?;
             },
             TableType::IDENTIFIERS => {
-                load_identifiers(binary, table, common.get_identifiers())?;
+                table.load(binary, common.get_identifiers(), load_identifier)?;
             },
             TableType::ADDRESS_IDENTIFIERS => {
-                load_address_identifiers(binary, table, common.get_address_identifiers())?;
+                table.load(
+                    binary,
+                    common.get_address_identifiers(),
+                    load_address_identifier,
+                )?;
             },
             TableType::FUNCTION_DEFS
             | TableType::STRUCT_DEFS
             | TableType::STRUCT_DEF_INST
-            | TableType::FIELD_HANDLE
+            | TableType::FIELD_HANDLES
             | TableType::FIELD_INST => continue,
             TableType::FRIEND_DECLS => {
                 // friend declarations do not exist before VERSION_2
@@ -671,6 +742,19 @@ fn build_common_tables(
                     ));
                 }
                 continue;
+            },
+            TableType::VARIANT_FIELD_HANDLES
+            | TableType::VARIANT_FIELD_INST
+            | TableType::STRUCT_VARIANT_HANDLES
+            | TableType::STRUCT_VARIANT_INST => {
+                if binary.version() < VERSION_7 {
+                    return Err(
+                        PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                            "Enum types not available for bytecode version {}",
+                            binary.version()
+                        )),
+                    );
+                }
             },
         }
     }
@@ -686,23 +770,60 @@ fn build_module_tables(
     for table in tables {
         match table.kind {
             TableType::STRUCT_DEFS => {
-                load_struct_defs(binary, table, &mut module.struct_defs)?;
+                table.load(binary, &mut module.struct_defs, load_struct_def)?;
             },
             TableType::STRUCT_DEF_INST => {
-                load_struct_instantiations(binary, table, &mut module.struct_def_instantiations)?;
+                table.load(
+                    binary,
+                    &mut module.struct_def_instantiations,
+                    load_struct_instantiation,
+                )?;
             },
             TableType::FUNCTION_DEFS => {
-                load_function_defs(binary, table, &mut module.function_defs)?;
+                table.load(binary, &mut module.function_defs, load_function_def)?;
             },
-            TableType::FIELD_HANDLE => {
-                load_field_handles(binary, table, &mut module.field_handles)?;
+            TableType::FIELD_HANDLES => {
+                table.load(binary, &mut module.field_handles, load_field_handle)?;
             },
             TableType::FIELD_INST => {
-                load_field_instantiations(binary, table, &mut module.field_instantiations)?;
+                table.load(
+                    binary,
+                    &mut module.field_instantiations,
+                    load_field_instantiation,
+                )?;
             },
             TableType::FRIEND_DECLS => {
-                load_module_handles(binary, table, &mut module.friend_decls)?;
+                table.load(binary, &mut module.friend_decls, load_module_handle)?;
             },
+            TableType::VARIANT_FIELD_HANDLES => {
+                table.load(
+                    binary,
+                    &mut module.variant_field_handles,
+                    load_variant_field_handle,
+                )?;
+            },
+            TableType::VARIANT_FIELD_INST => {
+                table.load(
+                    binary,
+                    &mut module.variant_field_instantiations,
+                    load_variant_field_instantiation,
+                )?;
+            },
+            TableType::STRUCT_VARIANT_HANDLES => {
+                table.load(
+                    binary,
+                    &mut module.struct_variant_handles,
+                    load_struct_variant_handle,
+                )?;
+            },
+            TableType::STRUCT_VARIANT_INST => {
+                table.load(
+                    binary,
+                    &mut module.struct_variant_instantiations,
+                    load_struct_variant_instantiation,
+                )?;
+            },
+            // The remaining are handled via common tables
             TableType::MODULE_HANDLES
             | TableType::STRUCT_HANDLES
             | TableType::FUNCTION_HANDLES
@@ -742,8 +863,12 @@ fn build_script_tables(
             | TableType::STRUCT_DEF_INST
             | TableType::FUNCTION_DEFS
             | TableType::FIELD_INST
-            | TableType::FIELD_HANDLE
-            | TableType::FRIEND_DECLS => {
+            | TableType::FIELD_HANDLES
+            | TableType::FRIEND_DECLS
+            | TableType::VARIANT_FIELD_HANDLES
+            | TableType::VARIANT_FIELD_INST
+            | TableType::STRUCT_VARIANT_HANDLES
+            | TableType::STRUCT_VARIANT_INST => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
                     .with_message("Bad table in Script".to_string()));
             },
@@ -752,213 +877,109 @@ fn build_script_tables(
     Ok(())
 }
 
-/// Builds the `ModuleHandle` table.
-fn load_module_handles(
-    binary: &VersionedBinary,
-    table: &Table,
-    module_handles: &mut Vec<ModuleHandle>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < table.count as u64 {
-        let address = load_address_identifier_index(&mut cursor)?;
-        let name = load_identifier_index(&mut cursor)?;
-        module_handles.push(ModuleHandle { address, name });
-    }
-    Ok(())
+fn load_module_handle(cursor: &mut VersionedCursor) -> Result<ModuleHandle, PartialVMError> {
+    let address = load_address_identifier_index(cursor)?;
+    let name = load_identifier_index(cursor)?;
+    Ok(ModuleHandle { address, name })
 }
 
-/// Builds the `StructHandle` table.
-fn load_struct_handles(
-    binary: &VersionedBinary,
-    table: &Table,
-    struct_handles: &mut Vec<StructHandle>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < table.count as u64 {
-        let module = load_module_handle_index(&mut cursor)?;
-        let name = load_identifier_index(&mut cursor)?;
-        let abilities = load_ability_set(&mut cursor, AbilitySetPosition::StructHandle)?;
-        let type_parameters = load_struct_type_parameters(&mut cursor)?;
-        struct_handles.push(StructHandle {
-            module,
-            name,
-            abilities,
-            type_parameters,
-        });
-    }
-    Ok(())
+fn load_struct_handle(cursor: &mut VersionedCursor) -> Result<StructHandle, PartialVMError> {
+    let module = load_module_handle_index(cursor)?;
+    let name = load_identifier_index(cursor)?;
+    let abilities = load_ability_set(cursor, AbilitySetPosition::StructHandle)?;
+    let type_parameters = load_struct_type_parameters(cursor)?;
+    Ok(StructHandle {
+        module,
+        name,
+        abilities,
+        type_parameters,
+    })
 }
 
-/// Builds the `FunctionHandle` table.
-fn load_function_handles(
-    binary: &VersionedBinary,
-    table: &Table,
-    function_handles: &mut Vec<FunctionHandle>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < table.count as u64 {
-        let module = load_module_handle_index(&mut cursor)?;
-        let name = load_identifier_index(&mut cursor)?;
-        let parameters = load_signature_index(&mut cursor)?;
-        let return_ = load_signature_index(&mut cursor)?;
-        let type_parameters =
-            load_ability_sets(&mut cursor, AbilitySetPosition::FunctionTypeParameters)?;
+fn load_function_handle(
+    version: u32,
+    cursor: &mut VersionedCursor,
+) -> Result<FunctionHandle, PartialVMError> {
+    let module = load_module_handle_index(cursor)?;
+    let name = load_identifier_index(cursor)?;
+    let parameters = load_signature_index(cursor)?;
+    let return_ = load_signature_index(cursor)?;
+    let type_parameters = load_ability_sets(cursor, AbilitySetPosition::FunctionTypeParameters)?;
 
-        let accesses = if binary.version() >= VERSION_7 {
-            load_access_specifiers(&mut cursor)?
-        } else {
-            None
-        };
+    let accesses = if version >= VERSION_7 {
+        load_access_specifiers(cursor)?
+    } else {
+        None
+    };
 
-        function_handles.push(FunctionHandle {
-            module,
-            name,
-            parameters,
-            return_,
-            type_parameters,
-            access_specifiers: accesses,
-        });
-    }
-    Ok(())
+    Ok(FunctionHandle {
+        module,
+        name,
+        parameters,
+        return_,
+        type_parameters,
+        access_specifiers: accesses,
+    })
 }
 
-/// Builds the `StructInstantiation` table.
-fn load_struct_instantiations(
-    binary: &VersionedBinary,
-    table: &Table,
-    struct_insts: &mut Vec<StructDefInstantiation>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-
-    while cursor.position() < table.count as u64 {
-        let def = load_struct_def_index(&mut cursor)?;
-        let type_parameters = load_signature_index(&mut cursor)?;
-        struct_insts.push(StructDefInstantiation {
-            def,
-            type_parameters,
-        });
-    }
-    Ok(())
+fn load_struct_instantiation(
+    cursor: &mut VersionedCursor,
+) -> Result<StructDefInstantiation, PartialVMError> {
+    let def = load_struct_def_index(cursor)?;
+    let type_parameters = load_signature_index(cursor)?;
+    Ok(StructDefInstantiation {
+        def,
+        type_parameters,
+    })
 }
 
-/// Builds the `FunctionInstantiation` table.
-fn load_function_instantiations(
-    binary: &VersionedBinary,
-    table: &Table,
-    func_insts: &mut Vec<FunctionInstantiation>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < table.count as u64 {
-        let handle = load_function_handle_index(&mut cursor)?;
-        let type_parameters = load_signature_index(&mut cursor)?;
-        func_insts.push(FunctionInstantiation {
-            handle,
-            type_parameters,
-        });
-    }
-    Ok(())
+fn load_function_instantiation(
+    cursor: &mut VersionedCursor,
+) -> Result<FunctionInstantiation, PartialVMError> {
+    let handle = load_function_handle_index(cursor)?;
+    let type_parameters = load_signature_index(cursor)?;
+    Ok(FunctionInstantiation {
+        handle,
+        type_parameters,
+    })
 }
 
-/// Builds the `IdentifierPool`.
-fn load_identifiers(
-    binary: &VersionedBinary,
-    table: &Table,
-    identifiers: &mut IdentifierPool,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < u64::from(table.count) {
-        let size = load_identifier_size(&mut cursor)?;
-        let mut buffer: Vec<u8> = vec![0u8; size];
-        if let Ok(count) = cursor.read(&mut buffer) {
-            if count != size {
-                return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Bad Identifier pool size".to_string()));
-            }
-            let s = Identifier::from_utf8(buffer).map_err(|_| {
-                PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Invalid Identifier".to_string())
-            })?;
-            identifiers.push(s);
-        }
+fn load_identifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Identifier> {
+    let size = load_identifier_size(cursor)?;
+    let mut buffer: Vec<u8> = vec![0u8; size];
+    if !cursor.read(&mut buffer).map(|count| count == size).unwrap() {
+        Err(PartialVMError::new(StatusCode::MALFORMED)
+            .with_message("Bad Identifier pool size".to_string()))?
     }
-    Ok(())
+    Identifier::from_utf8(buffer).map_err(|_| {
+        PartialVMError::new(StatusCode::MALFORMED).with_message("Invalid Identifier".to_string())
+    })
 }
 
-/// Builds the `AddressIdentifierPool`.
-fn load_address_identifiers(
-    binary: &VersionedBinary,
-    table: &Table,
-    addresses: &mut AddressIdentifierPool,
-) -> BinaryLoaderResult<()> {
-    let mut start = table.offset as usize;
-    if table.count as usize % AccountAddress::LENGTH != 0 {
-        return Err(PartialVMError::new(StatusCode::MALFORMED)
-            .with_message("Bad Address Identifier pool size".to_string()));
+fn load_address_identifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AccountAddress> {
+    let mut buffer: Vec<u8> = vec![0u8; AccountAddress::LENGTH];
+    if !cursor
+        .read(&mut buffer)
+        .map(|count| count == AccountAddress::LENGTH)
+        .unwrap()
+    {
+        Err(PartialVMError::new(StatusCode::MALFORMED)
+            .with_message("Bad Address pool size".to_string()))?
     }
-    for _i in 0..table.count as usize / AccountAddress::LENGTH {
-        let end_addr = start + AccountAddress::LENGTH;
-        let address = binary.slice(start, end_addr).try_into();
-        if address.is_err() {
-            return Err(PartialVMError::new(StatusCode::MALFORMED)
-                .with_message("Invalid Address format".to_string()));
-        }
-        start = end_addr;
-
-        addresses.push(address.unwrap());
-    }
-    Ok(())
+    buffer.try_into().map_err(|_| {
+        PartialVMError::new(StatusCode::MALFORMED)
+            .with_message("Invalid Address format".to_string())
+    })
 }
 
-/// Builds the `ConstantPool`.
-fn load_constant_pool(
-    binary: &VersionedBinary,
-    table: &Table,
-    constants: &mut ConstantPool,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < u64::from(table.count) {
-        constants.push(load_constant(&mut cursor)?)
-    }
-    Ok(())
-}
-
-/// Build a single `Constant`
+/// Build a `Constant`
 fn load_constant(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Constant> {
     let type_ = load_signature_token(cursor)?;
     let data = load_byte_blob(cursor, load_constant_size)?;
     Ok(Constant { type_, data })
 }
 
-/// Builds a metadata vector.
-fn load_metadata(
-    binary: &VersionedBinary,
-    table: &Table,
-    metadata: &mut Vec<Metadata>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < u64::from(table.count) {
-        metadata.push(load_metadata_entry(&mut cursor)?)
-    }
-    Ok(())
-}
-
-/// Build a single metadata entry.
+/// Build a metadata entry.
 fn load_metadata_entry(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Metadata> {
     let key = load_byte_blob(cursor, load_metadata_key_size)?;
     let value = load_byte_blob(cursor, load_metadata_value_size)?;
@@ -983,19 +1004,8 @@ fn load_byte_blob(
     Ok(data)
 }
 
-/// Builds the `SignaturePool`.
-fn load_signatures(
-    binary: &VersionedBinary,
-    table: &Table,
-    signatures: &mut SignaturePool,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < u64::from(table.count) {
-        signatures.push(Signature(load_signature_tokens(&mut cursor)?));
-    }
-    Ok(())
+fn load_signature(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Signature> {
+    Ok(Signature(load_signature_tokens(cursor)?))
 }
 
 fn load_signature_tokens(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec<SignatureToken>> {
@@ -1352,37 +1362,39 @@ fn load_struct_type_parameter(
     })
 }
 
-/// Builds the `StructDefinition` table.
-fn load_struct_defs(
-    binary: &VersionedBinary,
-    table: &Table,
-    struct_defs: &mut Vec<StructDefinition>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < u64::from(table.count) {
-        let struct_handle = load_struct_handle_index(&mut cursor)?;
-        let field_information_flag = match cursor.read_u8() {
-            Ok(byte) => SerializedNativeStructFlag::from_u8(byte)?,
-            Err(_) => {
-                return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Invalid field info in struct".to_string()));
-            },
-        };
-        let field_information = match field_information_flag {
-            SerializedNativeStructFlag::NATIVE => StructFieldInformation::Native,
-            SerializedNativeStructFlag::DECLARED => {
-                let fields = load_field_defs(&mut cursor)?;
-                StructFieldInformation::Declared(fields)
-            },
-        };
-        struct_defs.push(StructDefinition {
-            struct_handle,
-            field_information,
-        });
-    }
-    Ok(())
+fn load_struct_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<StructDefinition> {
+    let struct_handle = load_struct_handle_index(cursor)?;
+    let field_information_flag = match cursor.read_u8() {
+        Ok(byte) => SerializedNativeStructFlag::from_u8(byte)?,
+        Err(_) => {
+            return Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("Invalid field info in struct".to_string()));
+        },
+    };
+    let field_information = match field_information_flag {
+        SerializedNativeStructFlag::NATIVE => StructFieldInformation::Native,
+        SerializedNativeStructFlag::DECLARED => {
+            let fields = load_field_defs(cursor)?;
+            StructFieldInformation::Declared(fields)
+        },
+        SerializedNativeStructFlag::DECLARED_VARIANTS => {
+            if cursor.version() >= VERSION_7 {
+                let variants = load_variants(cursor)?;
+                StructFieldInformation::DeclaredVariants(variants)
+            } else {
+                return Err(
+                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                        "Enum types not supported in version {}",
+                        cursor.version()
+                    )),
+                );
+            }
+        },
+    };
+    Ok(StructDefinition {
+        struct_handle,
+        field_information,
+    })
 }
 
 fn load_field_defs(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec<FieldDefinition>> {
@@ -1403,64 +1415,90 @@ fn load_field_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<FieldDefin
     })
 }
 
-/// Builds the `FunctionDefinition` table.
-fn load_function_defs(
-    binary: &VersionedBinary,
-    table: &Table,
-    func_defs: &mut Vec<FunctionDefinition>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    while cursor.position() < u64::from(table.count) {
-        let func_def = load_function_def(&mut cursor)?;
-        func_defs.push(func_def);
+fn load_variants(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec<VariantDefinition>> {
+    let mut variants = Vec::new();
+    let variant_count = load_variant_count(cursor)?;
+    for _ in 0..variant_count {
+        variants.push(load_variant(cursor)?);
     }
-    Ok(())
+    Ok(variants)
 }
 
-fn load_field_handles(
-    binary: &VersionedBinary,
-    table: &Table,
-    field_handles: &mut Vec<FieldHandle>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    loop {
-        if cursor.position() == u64::from(table.count) {
-            break;
-        }
-        let struct_idx = load_struct_def_index(&mut cursor)?;
-        let offset = load_field_offset(&mut cursor)?;
-        field_handles.push(FieldHandle {
-            owner: struct_idx,
-            field: offset,
-        });
-    }
-    Ok(())
+#[inline(always)]
+fn load_variant(cursor: &mut VersionedCursor) -> BinaryLoaderResult<VariantDefinition> {
+    let name = load_identifier_index(cursor)?;
+    let fields = load_field_defs(cursor)?;
+    Ok(VariantDefinition { name, fields })
 }
 
-fn load_field_instantiations(
-    binary: &VersionedBinary,
-    table: &Table,
-    field_insts: &mut Vec<FieldInstantiation>,
-) -> BinaryLoaderResult<()> {
-    let start = table.offset as usize;
-    let end = start + table.count as usize;
-    let mut cursor = binary.new_cursor(start, end);
-    loop {
-        if cursor.position() == u64::from(table.count) {
-            break;
-        }
-        let handle = load_field_handle_index(&mut cursor)?;
-        let type_parameters = load_signature_index(&mut cursor)?;
-        field_insts.push(FieldInstantiation {
-            handle,
-            type_parameters,
-        });
+fn load_field_handle(cursor: &mut VersionedCursor) -> Result<FieldHandle, PartialVMError> {
+    let struct_idx = load_struct_def_index(cursor)?;
+    let offset = load_field_offset(cursor)?;
+    Ok(FieldHandle {
+        owner: struct_idx,
+        field: offset,
+    })
+}
+
+fn load_field_instantiation(
+    cursor: &mut VersionedCursor,
+) -> Result<FieldInstantiation, PartialVMError> {
+    let handle = load_field_handle_index(cursor)?;
+    let type_parameters = load_signature_index(cursor)?;
+    Ok(FieldInstantiation {
+        handle,
+        type_parameters,
+    })
+}
+
+fn load_variant_field_handle(
+    cursor: &mut VersionedCursor,
+) -> Result<VariantFieldHandle, PartialVMError> {
+    let owner = load_struct_def_index(cursor)?;
+    let offset = load_field_offset(cursor)?;
+    let variant_count = load_variant_count(cursor)?;
+    let mut variants = vec![];
+    for _ in 0..variant_count {
+        variants.push(load_variant_offset(cursor)?)
     }
-    Ok(())
+    Ok(VariantFieldHandle {
+        struct_index: owner,
+        variants,
+        field: offset,
+    })
+}
+
+fn load_variant_field_instantiation(
+    cursor: &mut VersionedCursor,
+) -> Result<VariantFieldInstantiation, PartialVMError> {
+    let handle = load_variant_field_handle_index(cursor)?;
+    let type_parameters = load_signature_index(cursor)?;
+    Ok(VariantFieldInstantiation {
+        handle,
+        type_parameters,
+    })
+}
+
+fn load_struct_variant_handle(
+    cursor: &mut VersionedCursor,
+) -> Result<StructVariantHandle, PartialVMError> {
+    let struct_index = load_struct_def_index(cursor)?;
+    let variant = load_variant_offset(cursor)?;
+    Ok(StructVariantHandle {
+        struct_index,
+        variant,
+    })
+}
+
+fn load_struct_variant_instantiation(
+    cursor: &mut VersionedCursor,
+) -> Result<StructVariantInstantiation, PartialVMError> {
+    let handle = load_struct_variant_handle_index(cursor)?;
+    let type_parameters = load_signature_index(cursor)?;
+    Ok(StructVariantInstantiation {
+        handle,
+        type_parameters,
+    })
 }
 
 /// Deserializes a `FunctionDefinition`.
@@ -1581,15 +1619,32 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             | Opcodes::VEC_PUSH_BACK
             | Opcodes::VEC_POP_BACK
             | Opcodes::VEC_UNPACK
-            | Opcodes::VEC_SWAP => {
-                if cursor.version() < VERSION_4 {
-                    return Err(
-                        PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                            "Vector operations not available before bytecode version {}",
-                            VERSION_4
-                        )),
-                    );
-                }
+            | Opcodes::VEC_SWAP
+                if cursor.version() < VERSION_4 =>
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                        "Vector operations not available before bytecode version {}",
+                        VERSION_4
+                    )),
+                );
+            },
+            Opcodes::TEST_VARIANT
+            | Opcodes::TEST_VARIANT_GENERIC
+            | Opcodes::PACK_VARIANT
+            | Opcodes::PACK_VARIANT_GENERIC
+            | Opcodes::IMM_BORROW_VARIANT_FIELD
+            | Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC
+            | Opcodes::MUT_BORROW_VARIANT_FIELD
+            | Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC
+                if cursor.version() < VERSION_7 =>
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                        "Enum type operations not available before bytecode version {}",
+                        VERSION_7
+                    )),
+                );
             },
             _ => {},
         };
@@ -1654,12 +1709,42 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::IMM_BORROW_FIELD_GENERIC => {
                 Bytecode::ImmBorrowFieldGeneric(load_field_inst_index(cursor)?)
             },
+            Opcodes::MUT_BORROW_VARIANT_FIELD => {
+                Bytecode::MutBorrowVariantField(load_variant_field_handle_index(cursor)?)
+            },
+            Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC => {
+                Bytecode::MutBorrowVariantFieldGeneric(load_variant_field_inst_index(cursor)?)
+            },
+            Opcodes::IMM_BORROW_VARIANT_FIELD => {
+                Bytecode::ImmBorrowVariantField(load_variant_field_handle_index(cursor)?)
+            },
+            Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC => {
+                Bytecode::ImmBorrowVariantFieldGeneric(load_variant_field_inst_index(cursor)?)
+            },
             Opcodes::CALL => Bytecode::Call(load_function_handle_index(cursor)?),
             Opcodes::CALL_GENERIC => Bytecode::CallGeneric(load_function_inst_index(cursor)?),
             Opcodes::PACK => Bytecode::Pack(load_struct_def_index(cursor)?),
             Opcodes::PACK_GENERIC => Bytecode::PackGeneric(load_struct_def_inst_index(cursor)?),
             Opcodes::UNPACK => Bytecode::Unpack(load_struct_def_index(cursor)?),
             Opcodes::UNPACK_GENERIC => Bytecode::UnpackGeneric(load_struct_def_inst_index(cursor)?),
+            Opcodes::PACK_VARIANT => {
+                Bytecode::PackVariant(load_struct_variant_handle_index(cursor)?)
+            },
+            Opcodes::UNPACK_VARIANT => {
+                Bytecode::UnpackVariant(load_struct_variant_handle_index(cursor)?)
+            },
+            Opcodes::PACK_VARIANT_GENERIC => {
+                Bytecode::PackVariantGeneric(load_struct_variant_inst_index(cursor)?)
+            },
+            Opcodes::UNPACK_VARIANT_GENERIC => {
+                Bytecode::UnpackVariantGeneric(load_struct_variant_inst_index(cursor)?)
+            },
+            Opcodes::TEST_VARIANT => {
+                Bytecode::TestVariant(load_struct_variant_handle_index(cursor)?)
+            },
+            Opcodes::TEST_VARIANT_GENERIC => {
+                Bytecode::TestVariantGeneric(load_struct_variant_inst_index(cursor)?)
+            },
             Opcodes::READ_REF => Bytecode::ReadRef,
             Opcodes::WRITE_REF => Bytecode::WriteRef,
             Opcodes::ADD => Bytecode::Add,
@@ -1749,10 +1834,14 @@ impl TableType {
             0xA => Ok(TableType::STRUCT_DEFS),
             0xB => Ok(TableType::STRUCT_DEF_INST),
             0xC => Ok(TableType::FUNCTION_DEFS),
-            0xD => Ok(TableType::FIELD_HANDLE),
+            0xD => Ok(TableType::FIELD_HANDLES),
             0xE => Ok(TableType::FIELD_INST),
             0xF => Ok(TableType::FRIEND_DECLS),
             0x10 => Ok(TableType::METADATA),
+            0x11 => Ok(TableType::VARIANT_FIELD_HANDLES),
+            0x12 => Ok(TableType::VARIANT_FIELD_INST),
+            0x13 => Ok(TableType::STRUCT_VARIANT_HANDLES),
+            0x14 => Ok(TableType::STRUCT_VARIANT_INST),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_TABLE_TYPE)),
         }
     }
@@ -1825,6 +1914,7 @@ impl SerializedNativeStructFlag {
         match value {
             0x1 => Ok(SerializedNativeStructFlag::NATIVE),
             0x2 => Ok(SerializedNativeStructFlag::DECLARED),
+            0x3 => Ok(SerializedNativeStructFlag::DECLARED_VARIANTS),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_NATIVE_STRUCT_FLAG)),
         }
     }
@@ -1910,6 +2000,17 @@ impl Opcodes {
             0x4B => Ok(Opcodes::CAST_U16),
             0x4C => Ok(Opcodes::CAST_U32),
             0x4D => Ok(Opcodes::CAST_U256),
+            // Since bytecode version 7
+            0x4E => Ok(Opcodes::IMM_BORROW_VARIANT_FIELD),
+            0x4F => Ok(Opcodes::MUT_BORROW_VARIANT_FIELD),
+            0x50 => Ok(Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC),
+            0x51 => Ok(Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC),
+            0x52 => Ok(Opcodes::PACK_VARIANT),
+            0x53 => Ok(Opcodes::PACK_VARIANT_GENERIC),
+            0x54 => Ok(Opcodes::UNPACK_VARIANT),
+            0x55 => Ok(Opcodes::UNPACK_VARIANT_GENERIC),
+            0x56 => Ok(Opcodes::TEST_VARIANT),
+            0x57 => Ok(Opcodes::TEST_VARIANT_GENERIC),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)),
         }
     }
@@ -1927,7 +2028,7 @@ impl SerializedBool {
 }
 
 impl SerializedOption {
-    /// Returns a boolean to indice NONE or SOME (NONE = false)
+    /// Returns a boolean to indicate NONE or SOME (NONE = false)
     fn from_u8(value: u8) -> BinaryLoaderResult<bool> {
         match value {
             0x1 => Ok(false),

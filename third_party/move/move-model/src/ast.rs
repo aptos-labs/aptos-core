@@ -60,6 +60,8 @@ pub struct SpecFunDecl {
     pub body: Option<Exp>,
     pub callees: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub is_recursive: RefCell<Option<bool>>,
+    /// The instantiations for which this function is known to use generic type reflection.
+    pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
 }
 
 // =================================================================================================
@@ -1598,11 +1600,16 @@ pub enum Operation {
     MoveFunction(ModuleId, FunId),
     Pack(ModuleId, StructId, /*variant*/ Option<Symbol>),
     Tuple,
+    Select(ModuleId, StructId, FieldId),
+    SelectVariants(
+        ModuleId,
+        StructId,
+        /* fields from different variants */ Vec<FieldId>,
+    ),
 
     // Specification specific
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     Closure(ModuleId, FunId),
-    Select(ModuleId, StructId, FieldId),
     UpdateField(ModuleId, StructId, FieldId),
     Result(usize),
     Index,
@@ -2428,8 +2435,9 @@ impl Operation {
             Closure(..) => false,      // Spec
             Pack(..) => false,         // Could yield an undroppable value
             Tuple => true,
-            Select(..) => false,      // Move-related
-            UpdateField(..) => false, // Move-related
+            Select(..) => false,         // Move-related
+            SelectVariants(..) => false, // Move-related
+            UpdateField(..) => false,    // Move-related
 
             // Specification specific
             Result(..) => false, // Spec
@@ -3245,6 +3253,15 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
             Select(mid, sid, fid) => {
                 write!(f, "select {}", self.field_str(mid, sid, fid))
             },
+            SelectVariants(mid, sid, fids) => {
+                write!(
+                    f,
+                    "select_variants {}",
+                    fids.iter()
+                        .map(|fid| self.field_str(mid, sid, fid))
+                        .join("|")
+                )
+            },
             UpdateField(mid, sid, fid) => {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
             },
@@ -3287,8 +3304,7 @@ impl<'a> OperationDisplay<'a> {
     }
 
     fn field_str(&self, mid: &ModuleId, sid: &StructId, fid: &FieldId) -> String {
-        let struct_env = self.env.get_module(*mid).into_struct(*sid);
-        let field_name = struct_env.get_field(*fid).get_name();
+        let field_name = fid.symbol();
         format!(
             "{}.{}",
             self.struct_str(mid, sid),

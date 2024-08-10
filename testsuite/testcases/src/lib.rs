@@ -29,8 +29,8 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result,
-    Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
+    EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt,
+    Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
@@ -46,8 +46,8 @@ use std::{
 };
 use tokio::runtime::{Handle, Runtime};
 
-const WARMUP_DURATION_FRACTION: f32 = 0.07;
-const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
+pub const WARMUP_DURATION_FRACTION: f32 = 0.07;
+pub const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
 
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,
@@ -254,7 +254,6 @@ impl NetworkTest for dyn NetworkLoadTest {
             .await
             .context("no clients replied for start version")?;
         let emit_job_request = ctx.emit_job.clone();
-        let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
         let stats_by_phase = self
             .network_load_test(
@@ -263,7 +262,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 duration,
                 WARMUP_DURATION_FRACTION,
                 COOLDOWN_DURATION_FRACTION,
-                rng,
+                None,
             )
             .await?;
 
@@ -328,6 +327,159 @@ impl NetworkTest for dyn NetworkLoadTest {
     }
 }
 
+pub async fn create_buffered_load(
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+    nodes_to_send_load_to: &[PeerId],
+    emit_job_request: EmitJobRequest,
+    duration: Duration,
+    warmup_duration_fraction: f32,
+    cooldown_duration_fraction: f32,
+    mut inner_test_and_report: Option<(&dyn NetworkLoadTest, &mut TestReport)>,
+    mut synchronized_with_job: Option<&mut EmitJob>,
+) -> Result<Vec<LoadTestPhaseStats>> {
+    // Generate some traffic
+    let (mut emitter, emit_job_request) = create_emitter_and_request(
+        swarm.clone(),
+        emit_job_request,
+        nodes_to_send_load_to,
+        StdRng::from_entropy(),
+    )
+    .await
+    .context("create emitter")?;
+
+    let clients = swarm
+        .read()
+        .await
+        .get_clients_for_peers(nodes_to_send_load_to, Duration::from_secs(10));
+
+    let mut stats_tracking_phases = emit_job_request.get_num_phases();
+    assert!(stats_tracking_phases > 0 && stats_tracking_phases != 2);
+    if stats_tracking_phases == 1 {
+        stats_tracking_phases = 3;
+    }
+
+    info!("Starting emitting txns for {}s", duration.as_secs());
+    let mut job = emitter
+        .start_job(
+            swarm.read().await.chain_info().root_account,
+            emit_job_request,
+            stats_tracking_phases,
+        )
+        .await
+        .context("start emitter job")?;
+
+    let total_start = PhaseTimingStart::now();
+
+    let warmup_duration = duration.mul_f32(warmup_duration_fraction);
+    let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
+    let test_duration = duration - warmup_duration - cooldown_duration;
+    let phase_duration = test_duration.div_f32((stats_tracking_phases - 2) as f32);
+
+    job = job.periodic_stat_forward(warmup_duration, 60).await;
+    info!("{}s warmup finished", warmup_duration.as_secs());
+
+    if let Some(job) = synchronized_with_job.as_mut() {
+        job.start_next_phase()
+    }
+
+    let mut phase_timing = Vec::new();
+    let mut phase_start_network_state = Vec::new();
+    let test_start = Instant::now();
+    for i in 0..stats_tracking_phases - 2 {
+        phase_start_network_state.push(NetworkState::new(&clients).await);
+        job.start_next_phase();
+
+        if i > 0 {
+            info!(
+                "Starting test phase {} out of {}",
+                i,
+                stats_tracking_phases - 2,
+            );
+        }
+        let phase_start = PhaseTimingStart::now();
+
+        let join_stats = Handle::current().spawn(job.periodic_stat_forward(phase_duration, 60));
+        if let Some((inner_test, context)) = inner_test_and_report.as_mut() {
+            inner_test
+                .test(swarm.clone(), context, phase_duration)
+                .await
+                .context("test NetworkLoadTest")?;
+        }
+        job = join_stats.await.context("join stats")?;
+        phase_timing.push(phase_start.elapsed());
+    }
+    let actual_test_duration = test_start.elapsed();
+    info!(
+        "{}s test finished after {}s",
+        test_duration.as_secs(),
+        actual_test_duration.as_secs()
+    );
+
+    phase_start_network_state.push(NetworkState::new(&clients).await);
+    job.start_next_phase();
+    if let Some(job) = synchronized_with_job.as_mut() {
+        job.start_next_phase()
+    }
+    let cooldown_start = Instant::now();
+
+    let cooldown_used = cooldown_start.elapsed();
+    if cooldown_used < cooldown_duration {
+        job = job
+            .periodic_stat_forward(cooldown_duration - cooldown_used, 60)
+            .await;
+    }
+    info!("{}s cooldown finished", cooldown_duration.as_secs());
+
+    let total_timing = total_start.elapsed();
+    info!(
+        "Emitting txns ran for {} secs(from {} to {}), stopping job...",
+        duration.as_secs(),
+        total_timing.start_unixtime_s,
+        total_timing.end_unixtime_s,
+    );
+    let stats_by_phase = job.stop_job().await;
+
+    info!("Stopped job");
+    info!("Warmup stats: {}", stats_by_phase[0].rate());
+
+    let mut stats: Option<TxnStats> = None;
+    let mut stats_by_phase_filtered = Vec::new();
+    for i in 0..stats_tracking_phases - 2 {
+        let next_i = i + 1;
+        let cur = &stats_by_phase[next_i];
+        info!("Test stats [test phase {}]: {}", i, cur.rate());
+        stats = if let Some(previous) = stats {
+            Some(&previous + cur)
+        } else {
+            Some(cur.clone())
+        };
+        let latency_breakdown = fetch_latency_breakdown(
+            swarm.clone(),
+            phase_timing[i].start_unixtime_s,
+            phase_timing[i].end_unixtime_s,
+        )
+        .await?;
+        info!(
+            "Latency breakdown details for phase {}: from {} to {}: {:?}",
+            i, phase_timing[i].start_unixtime_s, phase_timing[i].end_unixtime_s, latency_breakdown
+        );
+        stats_by_phase_filtered.push(LoadTestPhaseStats {
+            emitter_stats: cur.clone(),
+            actual_duration: phase_timing[i].duration,
+            phase_start_unixtime_s: phase_timing[i].start_unixtime_s,
+            phase_end_unixtime_s: phase_timing[i].end_unixtime_s,
+            ledger_transactions: NetworkState::ledger_transactions(
+                &phase_start_network_state[i],
+                &phase_start_network_state[next_i],
+            ),
+            latency_breakdown,
+        });
+    }
+    info!("Cooldown stats: {}", stats_by_phase.last().unwrap().rate());
+
+    Ok(stats_by_phase_filtered)
+}
+
 impl dyn NetworkLoadTest + '_ {
     pub async fn network_load_test<'a>(
         &self,
@@ -336,147 +488,22 @@ impl dyn NetworkLoadTest + '_ {
         duration: Duration,
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
-        rng: StdRng,
+        synchronized_with_job: Option<&mut EmitJob>,
     ) -> Result<Vec<LoadTestPhaseStats>> {
         let destination = self.setup(ctx).await.context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm.clone()).await;
 
-        // Generate some traffic
-
-        let (mut emitter, emit_job_request) = create_emitter_and_request(
+        create_buffered_load(
             ctx.swarm.clone(),
-            emit_job_request,
             &nodes_to_send_load_to,
-            rng,
+            emit_job_request,
+            duration,
+            warmup_duration_fraction,
+            cooldown_duration_fraction,
+            Some((self, ctx.report)),
+            synchronized_with_job,
         )
         .await
-        .context("create emitter")?;
-
-        let clients = ctx
-            .swarm
-            .read()
-            .await
-            .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
-
-        let mut stats_tracking_phases = emit_job_request.get_num_phases();
-        assert!(stats_tracking_phases > 0 && stats_tracking_phases != 2);
-        if stats_tracking_phases == 1 {
-            stats_tracking_phases = 3;
-        }
-
-        info!("Starting emitting txns for {}s", duration.as_secs());
-        let mut job = emitter
-            .start_job(
-                ctx.swarm.read().await.chain_info().root_account,
-                emit_job_request,
-                stats_tracking_phases,
-            )
-            .await
-            .context("start emitter job")?;
-
-        let total_start = PhaseTimingStart::now();
-
-        let warmup_duration = duration.mul_f32(warmup_duration_fraction);
-        let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
-        let test_duration = duration - warmup_duration - cooldown_duration;
-        let phase_duration = test_duration.div_f32((stats_tracking_phases - 2) as f32);
-
-        job = job.periodic_stat_forward(warmup_duration, 60).await;
-        info!("{}s warmup finished", warmup_duration.as_secs());
-
-        let mut phase_timing = Vec::new();
-        let mut phase_start_network_state = Vec::new();
-        let test_start = Instant::now();
-        for i in 0..stats_tracking_phases - 2 {
-            phase_start_network_state.push(NetworkState::new(&clients).await);
-            job.start_next_phase();
-
-            if i > 0 {
-                info!(
-                    "Starting test phase {} out of {}",
-                    i,
-                    stats_tracking_phases - 2,
-                );
-            }
-            let phase_start = PhaseTimingStart::now();
-
-            let join_stats = Handle::current().spawn(job.periodic_stat_forward(phase_duration, 60));
-            self.test(ctx.swarm.clone(), ctx.report, phase_duration)
-                .await
-                .context("test NetworkLoadTest")?;
-            job = join_stats.await.context("join stats")?;
-            phase_timing.push(phase_start.elapsed());
-        }
-        let actual_test_duration = test_start.elapsed();
-        info!(
-            "{}s test finished after {}s",
-            test_duration.as_secs(),
-            actual_test_duration.as_secs()
-        );
-
-        phase_start_network_state.push(NetworkState::new(&clients).await);
-        job.start_next_phase();
-        let cooldown_start = Instant::now();
-
-        let cooldown_used = cooldown_start.elapsed();
-        if cooldown_used < cooldown_duration {
-            job = job
-                .periodic_stat_forward(cooldown_duration - cooldown_used, 60)
-                .await;
-        }
-        info!("{}s cooldown finished", cooldown_duration.as_secs());
-
-        let total_timing = total_start.elapsed();
-        info!(
-            "Emitting txns ran for {} secs(from {} to {}), stopping job...",
-            duration.as_secs(),
-            total_timing.start_unixtime_s,
-            total_timing.end_unixtime_s,
-        );
-        let stats_by_phase = job.stop_job().await;
-
-        info!("Stopped job");
-        info!("Warmup stats: {}", stats_by_phase[0].rate());
-
-        let mut stats: Option<TxnStats> = None;
-        let mut stats_by_phase_filtered = Vec::new();
-        for i in 0..stats_tracking_phases - 2 {
-            let next_i = i + 1;
-            let cur = &stats_by_phase[next_i];
-            info!("Test stats [test phase {}]: {}", i, cur.rate());
-            stats = if let Some(previous) = stats {
-                Some(&previous + cur)
-            } else {
-                Some(cur.clone())
-            };
-            let latency_breakdown = fetch_latency_breakdown(
-                ctx.swarm.clone(),
-                phase_timing[i].start_unixtime_s,
-                phase_timing[i].end_unixtime_s,
-            )
-            .await?;
-            info!(
-                "Latency breakdown details for phase {}: from {} to {}: {:?}",
-                i,
-                phase_timing[i].start_unixtime_s,
-                phase_timing[i].end_unixtime_s,
-                latency_breakdown
-            );
-            stats_by_phase_filtered.push(LoadTestPhaseStats {
-                emitter_stats: cur.clone(),
-                actual_duration: phase_timing[i].duration,
-                phase_start_unixtime_s: phase_timing[i].start_unixtime_s,
-                phase_end_unixtime_s: phase_timing[i].end_unixtime_s,
-                ledger_transactions: NetworkState::ledger_transactions(
-                    &phase_start_network_state[i],
-                    &phase_start_network_state[next_i],
-                ),
-                latency_breakdown,
-            });
-        }
-        info!("Cooldown stats: {}", stats_by_phase.last().unwrap().rate());
-
-        Ok(stats_by_phase_filtered)
     }
 }
 
