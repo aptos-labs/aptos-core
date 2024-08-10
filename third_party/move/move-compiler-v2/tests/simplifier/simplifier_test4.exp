@@ -63,3 +63,11 @@ error: cannot immutably borrow since mutable references exist
    │                 ^^^^^^^^^    --------------------- requirement enforced here
    │                 │
    │                 immutable borrow attempted here
+
+error: cannot freeze local `s` since other mutable usages for this reference exist
+   ┌─ tests/simplifier/simplifier_test4.move:11:17
+   │
+11 │             foo(freeze(s), { *({x = x + 1; f}) = 0; 1 })
+   │                 ^^^^^^^^^                  - used here
+   │                 │
+   │                 frozen here
