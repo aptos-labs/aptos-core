@@ -186,7 +186,10 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let loader_v2_module_write_set = publish_framework(&mut session, &module_storage, framework);
     let (additional_change_set, loader_v1_module_write_set) =
         session.finish(&configs, &module_storage).unwrap();
-    assert!(!loader_v2_module_write_set.is_empty() && !loader_v1_module_write_set.is_empty());
+    assert!(
+        loader_v2_module_write_set.is_empty() && !loader_v1_module_write_set.is_empty()
+            || !loader_v2_module_write_set.is_empty() && loader_v1_module_write_set.is_empty()
+    );
 
     change_set
         .squash_additional_change_set(additional_change_set)
@@ -326,7 +329,10 @@ pub fn encode_genesis_change_set(
     let loader_v2_module_write_set = publish_framework(&mut session, &module_storage, framework);
     let (additional_change_set, loader_v1_module_write_set) =
         session.finish(&configs, &module_storage).unwrap();
-    assert!(!loader_v2_module_write_set.is_empty() && !loader_v1_module_write_set.is_empty());
+    assert!(
+        loader_v2_module_write_set.is_empty() && !loader_v1_module_write_set.is_empty()
+            || !loader_v2_module_write_set.is_empty() && loader_v1_module_write_set.is_empty()
+    );
 
     change_set
         .squash_additional_change_set(additional_change_set)
