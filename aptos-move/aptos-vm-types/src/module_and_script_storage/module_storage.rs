@@ -4,7 +4,7 @@
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
-use move_vm_runtime::{DummyCodeStorage, ModuleStorage};
+use move_vm_runtime::ModuleStorage;
 
 /// Represents module storage used by the Aptos blockchain.
 pub trait AptosModuleStorage: ModuleStorage {
@@ -21,21 +21,4 @@ pub trait AptosModuleStorage: ModuleStorage {
         &self,
         state_key: &StateKey,
     ) -> PartialVMResult<Option<usize>>;
-}
-
-impl AptosModuleStorage for DummyCodeStorage {
-    fn fetch_state_value_metadata(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> PartialVMResult<Option<StateValueMetadata>> {
-        Ok(None)
-    }
-
-    fn fetch_module_size_by_state_key(
-        &self,
-        _state_key: &StateKey,
-    ) -> PartialVMResult<Option<usize>> {
-        Ok(None)
-    }
 }

@@ -15,11 +15,11 @@ use aptos_types::{
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     environment::Environment,
+    module_and_script_storage::code_storage::AptosCodeStorage,
     resolver::{ExecutorView, ResourceGroupView},
 };
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
-use move_vm_runtime::DummyCodeStorage;
 use std::sync::Arc;
 
 pub(crate) struct AptosExecutorTask {
@@ -45,6 +45,7 @@ impl ExecutorTask for AptosExecutorTask {
     fn execute_transaction(
         &self,
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
+        code_storage: &impl AptosCodeStorage,
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
@@ -58,7 +59,7 @@ impl ExecutorTask for AptosExecutorTask {
             .as_move_resolver_with_group_view(executor_with_group_view);
         match self
             .vm
-            .execute_single_transaction(txn, &resolver, &DummyCodeStorage, &log_context)
+            .execute_single_transaction(txn, &resolver, code_storage, &log_context)
         {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {

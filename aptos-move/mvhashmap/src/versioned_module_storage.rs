@@ -1,243 +1,197 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{Flag, ShiftedTxnIndex, TxnIndex};
+use crate::types::{ShiftedTxnIndex, TxnIndex};
+use aptos_types::{executable::ModulePath, vm::modules::ModuleStorageEntry};
 use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
-use std::{collections::BTreeMap, hash::Hash, ops::Deref, sync::Arc};
+use move_binary_format::errors::VMResult;
+use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
 
-#[derive(Debug, Eq, PartialEq)]
-pub enum ModuleReadError {
-    /// There is no entry for this module yet, and it has to be initialized.
-    Uninitialized,
-    /// A dependency on some other transaction has been found, or there is a
-    /// pending code publish which has not yet been committed.
-    Dependency(TxnIndex),
+/// Result of a read query on the versioned module storage.
+#[derive(Debug)]
+pub enum ModuleStorageReadResult {
+    /// An existing module at certain index (either base storage or corresponding to
+    /// some committed transaction).
+    Versioned(ShiftedTxnIndex, Arc<ModuleStorageEntry>),
+    /// If module is not found in storage.
+    DoesNotExist,
 }
 
-/// An entry in versioned module storage. We distinguish between modules (and
-/// whatever other associated information that is cached) which are:
-///   1. Pending to be published, i.e., writes created but the transaction has not
-///      yet been committed. Reading a pending module always yields a dependency.
-///   2. Published - a module that has been committed, and we are guaranteed there
-///      is no speculative information.
-enum Entry<M> {
-    Pending { flag: Flag, entry: Arc<M> },
-    Published { entry: Arc<M> },
-}
-
-impl<M: Hash> Entry<M> {
-    fn mark_estimate(&mut self) {
+impl ModuleStorageReadResult {
+    /// If the entry exists, returns it together with its index. Otherwise, returns [None].
+    pub fn into_module_module_storage_entry_at_idx(
+        self,
+    ) -> Option<(ShiftedTxnIndex, Arc<ModuleStorageEntry>)> {
         match self {
-            Entry::Pending { flag, .. } => {
-                *flag = Flag::Estimate;
-            },
-            Entry::Published { .. } => {
-                unreachable!("Published entries can no longer be marked as estimates")
-            },
+            Self::Versioned(idx, entry) => Some((idx, entry)),
+            Self::DoesNotExist => None,
         }
-    }
-
-    fn publish_if_pending(&mut self) {
-        if let Entry::Pending { flag, entry } = self {
-            assert!(
-                *flag == Flag::Done,
-                "Estimated module storage entries cannot be published"
-            );
-            let entry = Arc::clone(entry);
-            *self = Entry::Published { entry };
-        };
     }
 }
 
 /// Represents different versions of module storage information for different
-/// transaction indices (including the storage version).
-struct VersionedEntry<M> {
-    versions: BTreeMap<ShiftedTxnIndex, CachePadded<Entry<M>>>,
+/// transaction indices (including the base storage version).
+struct VersionedEntry {
+    versions: BTreeMap<ShiftedTxnIndex, CachePadded<Option<Arc<ModuleStorageEntry>>>>,
 }
 
-impl<M: Hash> VersionedEntry<M> {
+impl VersionedEntry {
+    /// A new versioned entry with no written versions yet.
     fn empty() -> Self {
         Self {
             versions: BTreeMap::new(),
         }
     }
 
-    fn mark_estimate(&mut self, txn_idx: TxnIndex) {
+    /// Returns the "latest" module entry under the specified index. If such an
+    /// entry does nto exist, [None] is returned.
+    fn get(&self, txn_idx: ShiftedTxnIndex) -> Option<ModuleStorageReadResult> {
+        use ModuleStorageReadResult::*;
+
         self.versions
-            .get_mut(&ShiftedTxnIndex::new(txn_idx))
-            .expect("Entry must exist to be marked as an estimate")
-            .mark_estimate();
-    }
-
-    fn read(&self, txn_idx: TxnIndex) -> Result<Arc<M>, ModuleReadError> {
-        match self
-            .versions
-            .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
+            .range(ShiftedTxnIndex::zero_idx()..txn_idx)
             .next_back()
-        {
-            Some((shifted_idx, entry)) => {
-                match entry.deref() {
-                    Entry::Pending { .. } => {
-                        // If module is pending to be published, we ALWAYS treat it
-                        // as an estimate to avoid speculative module loading. As a
-                        // result, execution will wait until the module is published,
-                        // and the dependency is resolved.
-                        let idx = shifted_idx
-                            .idx()
-                            .expect("Storage version is always published");
-                        Err(ModuleReadError::Dependency(idx))
-                    },
-                    Entry::Published { entry } => Ok(Arc::clone(entry)),
-                }
-            },
-            None => Err(ModuleReadError::Uninitialized),
-        }
+            .map(|(idx, entry)| match entry.as_ref() {
+                Some(entry) => Versioned(*idx, entry.clone()),
+                None => DoesNotExist,
+            })
     }
 }
 
-pub struct VersionedModuleStorage<K, M> {
-    entries: DashMap<K, VersionedEntry<M>>,
+/// Module storage, versioned so that we can keep track of module writes of each transaction. In
+/// particular, for each key we keep track the writes of all transactions (see [VersionedEntry]).
+pub struct VersionedModuleStorage<K> {
+    entries: DashMap<K, VersionedEntry>,
 }
 
-impl<K: Hash + Clone + Eq, M: Hash> VersionedModuleStorage<K, M> {
+impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
+    /// Returns a new empty versioned module storage.
     pub(crate) fn empty() -> Self {
         Self {
             entries: DashMap::new(),
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn num_keys(&self) -> usize {
-        self.entries.len()
+    /// Returns the module entry from the module storage. If the entry does
+    /// not exist, [ModuleStorageReadResult::DoesNotExist] is returned. If
+    /// there is a pending code publish below the queried index, again the
+    /// same [ModuleStorageReadResult::DoesNotExist] is returned as all
+    /// pending publishes are treated as non-existent modules.
+    pub fn get(&self, key: &K, txn_idx: ShiftedTxnIndex) -> ModuleStorageReadResult {
+        let v = self
+            .entries
+            .entry(key.clone())
+            .or_insert_with(VersionedEntry::empty);
+        v.get(txn_idx)
+            .unwrap_or(ModuleStorageReadResult::DoesNotExist)
     }
 
-    pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
-        self.entries
-            .get_mut(key)
-            .expect("Versioned entry must always exist to be marked as an estimate")
-            .mark_estimate(txn_idx);
+    /// Similar to [VersionedModuleStorage::get]. The difference is that if the module does not
+    /// exist in module storage, the passed closure is used to initialize it. In contrast,
+    /// [VersionedModuleStorage::get] returns [ModuleStorageReadResult::DoesNotExist].
+    pub fn get_or_else<F>(
+        &self,
+        key: &K,
+        txn_idx: ShiftedTxnIndex,
+        init_func: F,
+    ) -> VMResult<ModuleStorageReadResult>
+    where
+        F: FnOnce() -> VMResult<Option<Arc<ModuleStorageEntry>>>,
+    {
+        use ModuleStorageReadResult::*;
+
+        let mut v = self
+            .entries
+            .entry(key.clone())
+            .or_insert_with(VersionedEntry::empty);
+
+        // Module entry exists in versioned entry, return it.
+        if let Some(result) = v.get(txn_idx) {
+            return Ok(result);
+        }
+
+        // Otherwise, use the passed closure to compute thw base storage value.
+        let zero = ShiftedTxnIndex::zero_idx();
+        let maybe_entry = init_func()?;
+        let result = Ok(match &maybe_entry {
+            Some(entry) => Versioned(zero, entry.clone()),
+            None => DoesNotExist,
+        });
+        v.versions.insert(zero, CachePadded::new(maybe_entry));
+        result
     }
 
+    /// Removes an existing entry at a given index.
     pub fn remove(&self, key: &K, txn_idx: TxnIndex) {
         let mut versioned_entry = self
             .entries
             .get_mut(key)
-            .expect("Versioned entry must always exist before removal");
-        assert_some!(
-            versioned_entry
-                .versions
-                .remove(&ShiftedTxnIndex::new(txn_idx)),
-            "Entry should always exist before removal"
-        );
+            .expect("Versioned entry should always exist before removal");
+        let removed = versioned_entry
+            .versions
+            .remove(&ShiftedTxnIndex::new(txn_idx));
+        assert_some!(removed, "Entry should always exist before removal");
     }
 
-    pub fn read(&self, key: &K, txn_idx: TxnIndex) -> Result<Arc<M>, ModuleReadError> {
-        self.entries
-            .get(key)
-            .map(|v| v.read(txn_idx))
-            .unwrap_or(Err(ModuleReadError::Uninitialized))
+    /// Marks an entry in module storage as "pending", i.e., yet to be published.
+    /// The implementation simply treats pending writes as non-existent modules,
+    /// so that transactions with higher indices observe non-existent modules and
+    /// deterministically fail with a non-speculative error.
+    pub fn write_pending(&self, key: K, txn_idx: TxnIndex) {
+        let mut v = self
+            .entries
+            .entry(key)
+            .or_insert_with(VersionedEntry::empty);
+        v.versions
+            .insert(ShiftedTxnIndex::new(txn_idx), CachePadded::new(None));
     }
 
-    pub fn publish(&self, key: &K, idx_to_publish: TxnIndex) {
+    /// Writes a published module to the storage, which is also visible for
+    /// the transactions with higher indices.
+    pub fn write_published(&self, key: &K, idx_to_publish: TxnIndex, entry: ModuleStorageEntry) {
         let mut versioned_entry = self
             .entries
             .get_mut(key)
             .expect("Versioned entry must always exist before publishing");
-        versioned_entry
+
+        let prev = versioned_entry.versions.insert(
+            ShiftedTxnIndex::new(idx_to_publish),
+            CachePadded::new(Some(Arc::new(entry))),
+        );
+        assert_some!(prev);
+    }
+
+    /// Write the new module storage entry to the specified key-index pair unless
+    /// the existing entry has been already verified. Note that the index at which
+    /// the modules are verified must always be the index of a committed transaction.
+    pub fn write_if_not_verified(
+        &self,
+        key: &K,
+        committed_idx: ShiftedTxnIndex,
+        entry: ModuleStorageEntry,
+    ) {
+        let mut versioned_entry = self
+            .entries
+            .get_mut(key)
+            .expect("Versioned entry must always exist before it is set as verified");
+
+        let prev_entry = versioned_entry
             .versions
-            .get_mut(&ShiftedTxnIndex::new(idx_to_publish))
-            .expect("There is always an entry at publish index")
-            .publish_if_pending();
-    }
-
-    pub fn add_pending(&self, key: K, txn_idx: TxnIndex, entry: Arc<M>) {
-        let mut v = self
-            .entries
-            .entry(key)
-            .or_insert_with(|| VersionedEntry::empty());
-        v.versions.insert(
-            ShiftedTxnIndex::new(txn_idx),
-            CachePadded::new(Entry::Pending {
-                flag: Flag::Done,
-                entry,
-            }),
-        );
-    }
-
-    pub fn set_base_value(&self, key: K, entry: Arc<M>) {
-        let mut v = self
-            .entries
-            .entry(key)
-            .or_insert_with(|| VersionedEntry::empty());
-        v.versions.insert(
-            ShiftedTxnIndex::zero_idx(),
-            CachePadded::new(Entry::Published { entry }),
-        );
+            .get(&committed_idx)
+            .expect("At least the base storage version must exist")
+            .as_ref()
+            .expect("Entry must exist before it is marked as verified");
+        if !prev_entry.is_verified() {
+            versioned_entry
+                .versions
+                .insert(committed_idx, CachePadded::new(Some(Arc::new(entry))));
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::types::test::KeyType;
-    use claims::{assert_err_eq, assert_ok_eq};
-
-    #[test]
-    fn test_uninitialized_and_storage_entries() {
-        let map = VersionedModuleStorage::<KeyType<Vec<u8>>, usize>::empty();
-
-        let key = KeyType(b"/foo/a".to_vec());
-        assert_err_eq!(map.read(&key, 4), ModuleReadError::Uninitialized);
-
-        // Now, set the base value. It must be initialized and be published.
-        map.set_base_value(key.clone(), Arc::new(0));
-        assert_ok_eq!(map.read(&key, 0), Arc::new(0));
-        assert_ok_eq!(map.read(&key, 4), Arc::new(0));
-    }
-
-    #[test]
-    fn test_pending_publish() {
-        let map = VersionedModuleStorage::<KeyType<Vec<u8>>, usize>::empty();
-
-        let key = KeyType(b"/foo/a".to_vec());
-        assert_err_eq!(map.read(&key, 4), ModuleReadError::Uninitialized);
-
-        // If there is a pending write, it must be visible for transactions of higher versions.
-        map.add_pending(key.clone(), 3, Arc::new(3));
-        assert_err_eq!(map.read(&key, 2), ModuleReadError::Uninitialized);
-        assert_err_eq!(map.read(&key, 4), ModuleReadError::Dependency(3));
-
-        map.set_base_value(key.clone(), Arc::new(0));
-        assert_ok_eq!(map.read(&key, 2), Arc::new(0));
-        assert_err_eq!(map.read(&key, 4), ModuleReadError::Dependency(3));
-
-        // Resolve code publishing.
-        map.publish(&key, 3);
-        assert_ok_eq!(map.read(&key, 2), Arc::new(0));
-        assert_ok_eq!(map.read(&key, 4), Arc::new(3));
-    }
-
-    #[test]
-    fn test_mark_estimate() {
-        let map = VersionedModuleStorage::<KeyType<Vec<u8>>, usize>::empty();
-
-        let key = KeyType(b"/foo/a".to_vec());
-        assert_err_eq!(map.read(&key, 4), ModuleReadError::Uninitialized);
-
-        map.add_pending(key.clone(), 3, Arc::new(3));
-        map.mark_estimate(&key, 3);
-
-        assert_err_eq!(map.read(&key, 2), ModuleReadError::Uninitialized);
-        assert_err_eq!(map.read(&key, 4), ModuleReadError::Dependency(3));
-
-        // New pending entry would still create a dependency.
-        map.add_pending(key.clone(), 3, Arc::new(33));
-        assert_err_eq!(map.read(&key, 2), ModuleReadError::Uninitialized);
-        assert_err_eq!(map.read(&key, 4), ModuleReadError::Dependency(3));
-
-        map.publish(&key, 3);
-        assert_ok_eq!(map.read(&key, 4), Arc::new(33));
-    }
+    // TODO(loader_v2): Implement new set of tests.
 }
