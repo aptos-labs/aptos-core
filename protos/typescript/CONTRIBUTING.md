@@ -21,4 +21,4 @@ To release a new version of the package do the following.
   b. Compare the summary with the public npm package summary on npmjs. The number of files and sizes should not vary too much.
 1. Run `pnpm build`
 1. Run `NODE_AUTH_TOKEN=<token> pnpm publish --non-interactive`.
-1. Double check that the release worked by visitng npmjs: https://www.npmjs.com/package/aptos-protos.
+1. Double check that the release worked by visiting npmjs: https://www.npmjs.com/package/aptos-protos.
