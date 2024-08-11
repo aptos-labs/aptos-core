@@ -44,15 +44,17 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
+    vm::modules::ModuleStorageEntry,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
-use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
+use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize, environment::fetch_runtime_environment};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
 use fail::fail_point;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::RuntimeEnvironment;
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -110,14 +112,21 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
         base_view: &S,
+        runtime_environment: &RuntimeEnvironment,
         parallel_state: ParallelState<T, X>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
-        let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        let sync_view = LatestView::new(
+            base_view,
+            runtime_environment,
+            ViewState::Sync(parallel_state),
+            idx_to_execute,
+        );
+        let execute_result =
+            executor.execute_transaction(&sync_view, &sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
             .modified_keys::<true>(idx_to_execute)
@@ -217,7 +226,15 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     needs_suffix_validation = true;
                 }
-                versioned_cache.modules().write(k, idx_to_execute, v);
+                if runtime_environment.vm_config().use_loader_v2 {
+                    // TODO(loader_v2): We do not need to clone out all module writes in V2 design
+                    //                  since we do not store them anymore.
+                    versioned_cache
+                        .module_storage()
+                        .write_pending(k, idx_to_execute)
+                } else {
+                    versioned_cache.modules().write(k, idx_to_execute, v);
+                }
             }
 
             // Then, apply deltas.
@@ -316,7 +333,13 @@ where
             use KeyKind::*;
             match kind {
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
-                Module => versioned_cache.modules().remove(&k, idx_to_execute),
+                Module => {
+                    if runtime_environment.vm_config().use_loader_v2 {
+                        versioned_cache.module_storage().remove(&k, idx_to_execute);
+                    } else {
+                        versioned_cache.modules().remove(&k, idx_to_execute);
+                    }
+                },
                 Group(tags) => {
                     // A change in state observable during speculative execution
                     // (which includes group metadata and size) changes, suffix
@@ -349,6 +372,7 @@ where
             result,
             resource_write_set,
             group_keys_and_tags,
+            runtime_environment,
         ) {
             // Module R/W is an expected fallback behavior, no alert is required.
             debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
@@ -382,15 +406,16 @@ where
         // (i.e. not re-execute unless some other part of the validation fails or
         // until commit, but mark as estimates).
 
-        // TODO: validate modules when there is no r/w fallback.
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
+            && read_set.validate_module_reads(versioned_cache.module_storage(), idx_to_validate)
     }
 
     fn update_transaction_on_abort(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        runtime_environment: &RuntimeEnvironment,
     ) {
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
@@ -403,7 +428,13 @@ where
                 use KeyKind::*;
                 match kind {
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
-                    Module => versioned_cache.modules().mark_estimate(&k, txn_idx),
+                    Module => {
+                        // In V2 loader implementation, all modules writes are "estimates":
+                        // they are pending and not visible until committed.
+                        if !runtime_environment.vm_config().use_loader_v2 {
+                            versioned_cache.modules().mark_estimate(&k, txn_idx)
+                        }
+                    },
                     Group(tags) => {
                         // Validation for both group size and metadata is based on values.
                         // Execution may wait for estimates.
@@ -436,11 +467,17 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
+        runtime_environment: &RuntimeEnvironment,
     ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
         if aborted {
-            Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
+            Self::update_transaction_on_abort(
+                txn_idx,
+                last_input_output,
+                versioned_cache,
+                runtime_environment,
+            );
             scheduler.finish_abort(txn_idx, incarnation)
         } else {
             scheduler.finish_validation(txn_idx, validation_wave);
@@ -502,6 +539,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
+        runtime_environment: &RuntimeEnvironment,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
@@ -511,10 +549,17 @@ where
         let mut block_limit_processor = shared_commit_state.acquire();
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
+            let mut executed_at_commit = false;
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
+                executed_at_commit = true;
 
-                Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
+                Self::update_transaction_on_abort(
+                    txn_idx,
+                    last_input_output,
+                    versioned_cache,
+                    runtime_environment,
+                );
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
@@ -527,6 +572,7 @@ where
                     versioned_cache,
                     executor,
                     base_view,
+                    runtime_environment,
                     ParallelState::new(
                         versioned_cache,
                         scheduler,
@@ -547,6 +593,19 @@ where
                         txn_idx, validation_result
                     ))
                     .into());
+                }
+            }
+
+            if runtime_environment.vm_config().use_loader_v2 {
+                if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
+                    for (key, v) in module_write_set.into_iter() {
+                        let entry =
+                            ModuleStorageEntry::from_transaction_write(runtime_environment, v)?;
+                        versioned_cache
+                            .module_storage()
+                            .write_published(&key, txn_idx, entry);
+                    }
+                    scheduler.finish_module_publishing_after_commit(txn_idx, executed_at_commit);
                 }
             }
 
@@ -688,6 +747,7 @@ where
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
+        runtime_environment: &RuntimeEnvironment,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::<T, X>::new(
@@ -696,7 +756,12 @@ where
             start_shared_counter,
             shared_counter,
         );
-        let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
+        let latest_view = LatestView::new(
+            base_view,
+            runtime_environment,
+            ViewState::Sync(parallel_state),
+            txn_idx,
+        );
 
         let finalized_groups = groups_to_finalize!(last_input_output, txn_idx)
             .map(|((group_key, metadata_op), is_read_needing_exchange)| {
@@ -786,6 +851,7 @@ where
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
+        runtime_environment: &RuntimeEnvironment,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
@@ -811,6 +877,7 @@ where
                     shared_counter,
                     last_input_output,
                     base_view,
+                    runtime_environment,
                     final_results,
                 )?;
             }
@@ -837,6 +904,7 @@ where
                     last_input_output,
                     shared_commit_state,
                     base_view,
+                    runtime_environment,
                     start_shared_counter,
                     shared_counter,
                     &executor,
@@ -859,6 +927,7 @@ where
                         last_input_output,
                         versioned_cache,
                         scheduler,
+                        runtime_environment,
                     )?
                 },
                 SchedulerTask::ExecutionTask(
@@ -866,6 +935,7 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
+                    // println!("Executing txn {}", txn_idx);
                     let needs_suffix_validation = Self::execute(
                         txn_idx,
                         incarnation,
@@ -874,6 +944,7 @@ where
                         versioned_cache,
                         &executor,
                         base_view,
+                        runtime_environment,
                         ParallelState::new(
                             versioned_cache,
                             scheduler,
@@ -952,6 +1023,7 @@ where
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
+        let runtime_environment = fetch_runtime_environment();
         self.executor_thread_pool.scope(|s| {
             for _ in 0..num_workers {
                 s.spawn(|_| {
@@ -962,6 +1034,7 @@ where
                         &versioned_cache,
                         &scheduler,
                         base_view,
+                        &runtime_environment,
                         start_shared_counter,
                         &shared_counter,
                         &shared_commit_state,
@@ -1015,6 +1088,7 @@ where
     }
 
     fn apply_output_sequential(
+        runtime_environment: &RuntimeEnvironment,
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         output: &E::Output,
         resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
@@ -1035,7 +1109,13 @@ where
         }
 
         for (key, write_op) in output.module_write_set().into_iter() {
-            unsync_map.write_module(key, write_op);
+            if runtime_environment.vm_config().use_loader_v2 {
+                let entry =
+                    ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
+                unsync_map.write_module_storage_entry(key, entry);
+            } else {
+                unsync_map.write_module(key, write_op);
+            }
         }
 
         let mut second_phase = Vec::new();
@@ -1112,13 +1192,16 @@ where
         let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
             TxnLastInputOutput::new(num_txns as TxnIndex);
 
+        let runtime_environment = fetch_runtime_environment();
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
+                runtime_environment.as_ref(),
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+            let res =
+                executor.execute_transaction(&latest_view, &latest_view, txn, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {
@@ -1188,11 +1271,14 @@ where
                             )
                         });
 
-                    if last_input_output.check_and_append_module_rw_conflict(
-                        sequential_reads.module_reads.iter(),
-                        output.module_write_set().keys(),
-                    ) {
-                        block_limit_processor.process_module_rw_conflict();
+                    #[allow(clippy::collapsible_if)]
+                    if !runtime_environment.vm_config().use_loader_v2 {
+                        if last_input_output.check_and_append_module_rw_conflict(
+                            sequential_reads.module_reads.iter(),
+                            output.module_write_set().keys(),
+                        ) {
+                            block_limit_processor.process_module_rw_conflict();
+                        }
                     }
 
                     block_limit_processor.accumulate_fee_statement(
@@ -1299,6 +1385,7 @@ where
                     // Apply the writes.
                     let resource_write_set = output.resource_write_set();
                     Self::apply_output_sequential(
+                        runtime_environment.as_ref(),
                         &unsync_map,
                         &output,
                         resource_write_set.clone(),
