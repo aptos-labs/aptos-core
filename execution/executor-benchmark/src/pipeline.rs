@@ -15,15 +15,10 @@ use aptos_types::{
     transaction::{Transaction, Version},
 };
 use derivative::Derivative;
-use std::{
-    marker::PhantomData,
-    sync::{
-        mpsc::{self, SyncSender},
-        Arc,
-    },
-    thread::JoinHandle,
-    time::{Duration, Instant},
-};
+use std::{marker::PhantomData, process, sync::{
+    mpsc::{self, SyncSender},
+    Arc,
+}, thread::JoinHandle, time::{Duration, Instant}};
 
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
@@ -192,6 +187,7 @@ where
                 }
 
                 overall_measuring.print_end("Overall execution", executed);
+                process::exit(0);
                 start_commit_tx.map(|tx| tx.send(()));
             })
             .expect("Failed to spawn transaction executor thread.");
