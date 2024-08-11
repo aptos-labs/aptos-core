@@ -102,7 +102,7 @@ where
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        fallback: bool,
+        is_fallback: bool,
         scheduler: &Scheduler,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -121,18 +121,19 @@ where
             ViewState::Sync(parallel_state),
             idx_to_execute,
             incarnation,
+            is_fallback,
             worker_id,
         );
 
         let execute_result =
-            executor.execute_transaction(&sync_view, txn, idx_to_execute, incarnation, fallback);
+            executor.execute_transaction(&sync_view, txn, idx_to_execute, incarnation, is_fallback);
 
         // TODO: add to speculative_info for monitoring.
         // sync_view.print_debug_info();
 
         let mut read_set = sync_view.take_parallel_reads();
 
-        let validation_function = if fallback {
+        let validation_function = if is_fallback {
             None
         } else {
             Some(|| -> bool {
@@ -400,7 +401,7 @@ where
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
         // Any logs from the aborted execution should be cleared and not reported.
-        clear_speculative_txn_logs(txn_idx as usize);
+        clear_speculative_txn_logs(txn_idx as usize, false);
 
         // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
         if let Some(keys) = last_input_output.modified_keys(txn_idx) {
@@ -735,7 +736,8 @@ where
             base_view,
             ViewState::Sync(parallel_state),
             txn_idx,
-            0, // dummy incarnation.
+            0,     // dummy incarnation.
+            false, // TODO: should we provide based on whether fallback got committed?
             worker_id,
         );
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
@@ -889,12 +891,15 @@ where
                             ),
                             worker_id,
                         )? {
-                            //if we are in fallback and won write => no need to validate
+                            // fallback won, no need to validate
                             scheduler.finish_execution(
                                 next_commit_idx,
                                 incarnation,
                                 validation_mode,
                             )?;
+                        } else {
+                            // fallback lost, clear the corresponding speculative log slot.
+                            clear_speculative_txn_logs(next_commit_idx as usize, true);
                         }
                     };
                 };
@@ -915,11 +920,10 @@ where
                         scheduler,
                     )?
                 },
-
                 SchedulerTask::ExecutionTask(
                     txn_idx,
                     incarnation,
-                    ExecutionTaskType::Execution, // ATTENTION
+                    ExecutionTaskType::Execution,
                 ) => {
                     if let Some(validation_mode) = Self::execute(
                         txn_idx,
@@ -941,6 +945,9 @@ where
                     )? {
                         scheduler.finish_execution(txn_idx, incarnation, validation_mode)?
                     } else {
+                        // lost to fallback, clear the corresponding speculative log slot.
+                        clear_speculative_txn_logs(txn_idx as usize, false);
+
                         SchedulerTask::Retry
                     }
                 },
@@ -1175,6 +1182,7 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
                 0, // incarnation
+                false,
                 0, // worker_id
             );
 
@@ -1480,7 +1488,8 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.len());
+            // Every second (odd indexed) slot is dedicated to corresponding fallback executions.
+            init_speculative_logs(signature_verified_block.len() * 2);
 
             info!("parallel execution requiring fallback");
         }
@@ -1507,7 +1516,8 @@ where
                 // and whether clearing them below is needed at all.
                 // All logs from the first pass of sequential execution should be cleared and not reported.
                 // Clear by re-initializing the speculative logs.
-                init_speculative_logs(signature_verified_block.len());
+                // Every second (odd indexed) slot is dedicated to corresponding fallback executions.
+                init_speculative_logs(signature_verified_block.len() * 2);
 
                 let sequential_result = self.execute_transactions_sequential(
                     env,

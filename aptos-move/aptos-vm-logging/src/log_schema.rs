@@ -26,10 +26,12 @@ pub struct AdapterLogSchema {
     // transaction position in the list of transactions in the block,
     // 0 if the transaction is not part of a block (i.e. validation).
     txn_idx: usize,
+
+    is_fallback: bool,
 }
 
 impl AdapterLogSchema {
-    pub fn new(view_id: StateViewId, txn_idx: usize) -> Self {
+    pub fn new(view_id: StateViewId, txn_idx: usize, is_fallback: bool) -> Self {
         match view_id {
             StateViewId::BlockExecution { block_id } => Self {
                 name: LogEntry::Execution,
@@ -37,6 +39,7 @@ impl AdapterLogSchema {
                 first_version: None,
                 base_version: None,
                 txn_idx,
+                is_fallback,
             },
             StateViewId::ChunkExecution { first_version } => Self {
                 name: LogEntry::Execution,
@@ -44,6 +47,7 @@ impl AdapterLogSchema {
                 first_version: Some(first_version),
                 base_version: None,
                 txn_idx,
+                is_fallback,
             },
             StateViewId::TransactionValidation { base_version } => Self {
                 name: LogEntry::Validation,
@@ -51,6 +55,7 @@ impl AdapterLogSchema {
                 first_version: None,
                 base_version: Some(base_version),
                 txn_idx,
+                is_fallback,
             },
             StateViewId::Replay => Self {
                 name: LogEntry::Execution,
@@ -58,6 +63,7 @@ impl AdapterLogSchema {
                 first_version: None,
                 base_version: None,
                 txn_idx,
+                is_fallback,
             },
             StateViewId::Miscellaneous => Self {
                 name: LogEntry::Miscellaneous,
@@ -65,6 +71,7 @@ impl AdapterLogSchema {
                 first_version: None,
                 base_version: None,
                 txn_idx,
+                is_fallback,
             },
         }
     }
@@ -75,12 +82,16 @@ impl AdapterLogSchema {
         matches!(self.name, LogEntry::Execution)
     }
 
-    pub(crate) fn get_txn_idx(&self) -> usize {
-        self.txn_idx
+    pub(crate) fn get_speculative_log_idx(&self) -> usize {
+        if self.is_fallback {
+            self.txn_idx * 2 + 1
+        } else {
+            self.txn_idx * 2
+        }
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
     Execution,

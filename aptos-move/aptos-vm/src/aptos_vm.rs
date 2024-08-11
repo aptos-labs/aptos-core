@@ -376,7 +376,7 @@ impl AptosVM {
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
     #[cfg(any(test, feature = "testing"))]
     pub fn gas_params(&self) -> Result<&AptosGasParameters, VMStatus> {
-        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
+        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0, false);
         get_or_vm_startup_failure(&self.gas_params, &log_context)
     }
 
@@ -779,10 +779,11 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
-                module_id.address(),
-                module_id.name(),
-            )])?;
+            session.check_dependencies_and_charge_gas(
+                gas_meter,
+                traversal_context,
+                [(module_id.address(), module_id.name())],
+            )?;
         }
 
         let function =
@@ -2207,7 +2208,7 @@ impl AptosVM {
     ) -> ViewFunctionOutput {
         let vm = AptosVM::new(state_view);
 
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
 
         let vm_gas_params = match get_or_vm_startup_failure(&vm.gas_params, &log_context) {
             Ok(gas_params) => gas_params.vm.clone(),
@@ -2514,7 +2515,7 @@ impl VMExecutor for AptosVM {
                 None,
             ))
         });
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
         info!(
             log_context,
             "Executing block, transaction count: {}",
@@ -2551,7 +2552,7 @@ impl VMExecutor for AptosVM {
         state_view: Arc<S>,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
         info!(
             log_context,
             "Executing block, transaction count: {}",
@@ -2591,7 +2592,7 @@ impl VMValidator for AptosVM {
         state_view: &impl StateView,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
 
         if !self
             .features()
@@ -2700,7 +2701,7 @@ impl AptosSimulationVM {
         );
 
         let vm = Self::new(state_view);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
 
         let resolver = state_view.as_move_resolver();
         let (vm_status, vm_output) =

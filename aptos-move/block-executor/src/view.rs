@@ -665,7 +665,6 @@ impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
                 Err(Dependency(dep_idx)) => {
                     match wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
                         Err(e) => {
-                            error!("Error {:?} in wait for dependency", e);
                             self.captured_reads.borrow_mut().mark_incorrect_use();
                             return ReadResult::HaltSpeculativeExecution(format!(
                                 "Error {:?} in wait for dependency",
@@ -1018,7 +1017,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for VMInitView<
                     if ret.is_err() {
                         // Reading from base view should not return an error.
                         // Thus, this critical error log and count does not need to be buffered.
-                        let log_context = AdapterLogSchema::new(self.base_view.id(), 0);
+                        let log_context = AdapterLogSchema::new(self.base_view.id(), 0, false);
                         alert!(
                             log_context,
                             "[VM, StateView] Error getting data from storage for {:?}",
@@ -1039,17 +1038,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for VMInitView<
             }
         } else {
             match self.versioned_map.data().fetch_data(state_key, 0) {
-                Ok(MVDataOutput::Versioned(_, ValueWithLayout::RawFromStorage(arc_value))) => {
+                Ok(MVDataOutput::Versioned(_, ValueWithLayout::RawFromStorage(arc_value)))
+                | Ok(MVDataOutput::Versioned(_, ValueWithLayout::Exchanged(arc_value, None))) => {
                     return Ok(arc_value.as_ref().as_state_value());
                 },
                 Ok(MVDataOutput::Resolved(_))
-                | Ok(MVDataOutput::Versioned(_, ValueWithLayout::Exchanged(_, _)))
                 | Err(
                     MVDataError::Unresolved(_)
                     | MVDataError::Dependency(_)
                     | MVDataError::DeltaApplicationFailure,
                 ) => {
                     unreachable!("Impossible during block initialization")
+                },
+                Ok(MVDataOutput::Versioned(_, ValueWithLayout::Exchanged(_, Some(_)))) => {
+                    // Value was cached but already exchanged and contains delayed fields. Must
+                    // return non-exchanged value. TODO: optimize by still caching non-exchanged value.
+                    return self.base_view.get_state_value(state_key);
                 },
                 Err(Uninitialized) => {},
             }
@@ -1064,6 +1068,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for VMInitView<
             );
             Ok(ret)
         }
+    }
+
+    fn id(&self) -> StateViewId {
+        self.base_view.id()
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
@@ -1092,8 +1100,9 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     base_view: &'a S,
     pub(crate) latest_view: ViewState<'a, T>,
     txn_idx: TxnIndex,
-    incarnation: Incarnation,
-    worker_id: usize,
+    _incarnation: Incarnation,
+    is_fallback: bool,
+    _worker_id: usize,
     debug_state: RefCell<(
         (Duration, usize), // ResourceView
         (Duration, usize), // GroupView
@@ -1130,15 +1139,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         base_view: &'a S,
         latest_view: ViewState<'a, T>,
         txn_idx: TxnIndex,
-        incarnation: Incarnation,
-        worker_id: usize,
+        _incarnation: Incarnation,
+        is_fallback: bool,
+        _worker_id: usize,
     ) -> Self {
         Self {
             base_view,
             latest_view,
             txn_idx,
-            incarnation,
-            worker_id,
+            is_fallback,
+            _incarnation,
+            _worker_id,
             debug_state: RefCell::new((
                 (Duration::ZERO, 0), // ResourceView
                 (Duration::ZERO, 0), // GroupView
@@ -1200,7 +1211,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
             // Thus, this critical error log and count does not need to be buffered.
-            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+            let log_context =
+                AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize, self.is_fallback);
             alert!(
                 log_context,
                 "[VM, StateView] Error getting data from storage for {:?}",
@@ -1230,8 +1242,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 match res {
                     Ok((value, _)) => Some(value),
                     Err(err) => {
-                        let log_context =
-                            AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+                        let log_context = AdapterLogSchema::new(
+                            self.base_view.id(),
+                            self.txn_idx as usize,
+                            self.is_fallback,
+                        );
                         alert!(
                             log_context,
                             "[VM, ResourceView] Error during value to id replacement: {}",
@@ -2704,6 +2719,7 @@ mod test {
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
             0,
+            false,
             0,
         );
 
@@ -2991,6 +3007,7 @@ mod test {
             ViewState::Unsync(sequential_state),
             1,
             0,
+            false,
             0,
         )
     }
@@ -3034,6 +3051,7 @@ mod test {
                 )),
                 1,
                 0,
+                false,
                 0,
             );
 

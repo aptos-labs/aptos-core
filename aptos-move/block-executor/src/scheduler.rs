@@ -5,6 +5,7 @@
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
 use aptos_aggregator::types::code_invariant_error;
 use aptos_infallible::Mutex;
+use aptos_logger::{debug, info};
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::delayed_fields::PanicError;
 use concurrent_queue::{ConcurrentQueue, PopError};
@@ -729,7 +730,7 @@ impl Scheduler {
                                     Some(old_incarnation),
                                 )
                             } else {
-                                println!("critical path, failed validation, txn_idx={}", txn_idx);
+                                info!("TXN {} failed validation, deferring to fallback", txn_idx);
                                 None
                             }
                         },
@@ -905,10 +906,6 @@ impl TWaitForDependency for Scheduler {
             ));
         }
 
-        println!(
-            "wait for dependency txn={}, dep_txn={}",
-            txn_idx, dep_txn_idx
-        );
         // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
         // usually has just observed the read dependency.
 
@@ -1211,7 +1208,7 @@ impl Scheduler {
                 *status = ExecutionStatus::ReadyToWakeUp(
                     *incarnation,
                     dep_condvar.clone(),
-                    ExecutingFlag::Main, // IMPORTANT: Fallback should never be suspanded
+                    ExecutingFlag::Main, // IMPORTANT: Fallback should never be suspended
                 );
                 Ok(())
             },
@@ -1223,7 +1220,8 @@ impl Scheduler {
         }
     }
 
-    pub(crate) fn print_status(&self) {
+    #[allow(dead_code)]
+    pub(crate) fn debug_print_status(&self) {
         let temp = self.commit_state().0;
         if temp == self.num_txns - 1 {
             return;
@@ -1231,7 +1229,7 @@ impl Scheduler {
 
         let status = self.txn_status[(temp + 1) as usize].0.read();
 
-        println!(
+        debug!(
             "commit idx={}, validation_idx={}, execution_idx={}, status={:?}",
             temp,
             Self::unpack_validation_idx(self.validation_idx.load(Ordering::SeqCst)).0,

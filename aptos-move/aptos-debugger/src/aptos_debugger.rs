@@ -108,7 +108,7 @@ impl AptosDebugger {
         txn: SignedTransaction,
     ) -> Result<(VMStatus, VMOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
         let txn = txn
             .check_signature()
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;

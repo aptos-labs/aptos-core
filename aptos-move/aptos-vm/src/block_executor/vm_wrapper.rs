@@ -47,13 +47,14 @@ impl ExecutorTask for AptosExecutorTask {
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
         _incarnation: Incarnation,
-        _is_fallback: bool,
+        is_fallback: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
-        let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
+        let log_context = AdapterLogSchema::new(self.id, txn_idx as usize, is_fallback);
+
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
