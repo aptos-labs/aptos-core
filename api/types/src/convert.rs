@@ -998,7 +998,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         }
     }
 
-    fn explain_vm_status(
+    pub fn explain_vm_status(
         &self,
         status: &ExecutionStatus,
         txn_aux_data: Option<TransactionAuxiliaryData>,
