@@ -9,4 +9,10 @@ module 0x8675309::Tester {
         freeze(result);
         returned_ref
     }
+
+    fun test_return_ref_no_use(result: &mut u64) {
+        let _returned_ref = foo(result);
+        freeze(result);
+    }
+
 }
