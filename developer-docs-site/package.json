@@ -44,7 +44,7 @@
     "rehype-katex": "5",
     "remark-math": "3",
     "shelljs": "^0.8.5",
-    "stream": "^0.0.2",
+    "stream": "^0.0.3",
     "unist-util-visit": "4.1.2",
     "unist-util-visit-children": "2.0.0",
     "url": "^0.11.0"
