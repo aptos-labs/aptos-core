@@ -115,15 +115,15 @@ module supra_framework::pbo_delegation_pool {
     use std::signer;
     use std::vector;
     use std::option::{Self, Option};
-    use std::fixed_point32::{Self, FixedPoint32};
-    use std::string;
 
     use aptos_std::math64;
+    use aptos_std::math128;
     use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
     use aptos_std::table::{Self, Table};
     use aptos_std::smart_table::{Self, SmartTable};
-    use supra_framework::coin::Coin;
+    use aptos_std::fixed_point64::{Self,FixedPoint64};
 
+    use supra_framework::coin::Coin;
     use supra_framework::account;
     use supra_framework::aptos_account;
     use supra_framework::supra_coin::SupraCoin;
@@ -267,7 +267,7 @@ module supra_framework::pbo_delegation_pool {
     /// be worth a lot if current share price is high).
     /// This constraint is not enforced on inactive pools as they only allow redeems
     /// (can lose at most 1 coin regardless of current share price).
-    const MIN_COINS_ON_SHARES_POOL: u64 = 1000000000;
+    const MIN_COINS_ON_SHARES_POOL: u64 = 100000000;
 
     /// Scaling factor of shares pools used within the delegation pool
     const SHARES_SCALING_FACTOR: u64 = 10000000000000000;
@@ -292,7 +292,7 @@ module supra_framework::pbo_delegation_pool {
         // will vest 1/24 of the original total amount. From the third month only, 1/48 will vest until the vesting fund
         // runs out.
         // u32/u32 should be sufficient to support vesting schedule fractions.
-        schedule: vector<FixedPoint32>,
+        schedule: vector<FixedPoint64>,
         // When the vesting should start.
         start_timestamp_secs: u64,
         // In seconds. How long each vesting period is. For example 1 month.
@@ -300,7 +300,7 @@ module supra_framework::pbo_delegation_pool {
         // Last vesting period, 1-indexed. For example if 2 months have passed, the last vesting period, if distribution
         // was requested, would be 2. Default value is 0 which means there have been no vesting periods yet.
         last_unlock_period: u64,
-        cumulative_unlocked_fraction: FixedPoint32,
+        cumulative_unlocked_fraction: FixedPoint64,
     }
 
     struct DelegationPool has key {
@@ -836,7 +836,7 @@ module supra_framework::pbo_delegation_pool {
         let schedule = vector::empty();
         vector::for_each_ref(&unlock_numerators,
             |e| {
-                let fraction = fixed_point32::create_from_rational(*e, unlock_denominator);
+                let fraction = fixed_point64::create_from_rational((*e as u128), (unlock_denominator as u128));
                 vector::push_back(&mut schedule, fraction);
             });
 
@@ -855,7 +855,7 @@ module supra_framework::pbo_delegation_pool {
                     start_timestamp_secs: unlock_start_time,
                     period_duration: unlock_duration,
                     last_unlock_period: 0,
-                    cumulative_unlocked_fraction: fixed_point32::create_from_rational(0, 1),
+                    cumulative_unlocked_fraction: fixed_point64::create_from_rational(0, 1),
                 },
                 principle_stake: principle_stake_table,
                 add_stake_events: account::new_event_handle<AddStakeEvent>(&stake_pool_signer),
@@ -1519,13 +1519,7 @@ module supra_framework::pbo_delegation_pool {
 
     }
 
-    #[view]
-    public fun fixed_point32_add(a: FixedPoint32, b: FixedPoint32): FixedPoint32 {
-        fixed_point32::create_from_raw_value(fixed_point32::get_raw_value(a) + fixed_point32::get_raw_value(
-                b
-            ))
-    }
-
+   
     #[view]
     /// Provides how much amount is unlockable based on `principle_unlock_schedule.cumulative_unlocked_fraction`
     /// Note that `cumulative_unlocked_fraction` is not updated in this function so the information may not be
@@ -1539,10 +1533,10 @@ module supra_framework::pbo_delegation_pool {
         let delegator_principle_stake = *table::borrow(&pool.principle_stake, delegator_addr);
 
         //To avoid problem even if fraction is slightly above 1
-        let unlockable_principle_stake = math64::min(fixed_point32::multiply_u64(
-                delegator_principle_stake, unlockable_fraction
+        let unlockable_principle_stake = (math128::min(fixed_point64::multiply_u128(
+                (delegator_principle_stake as u128), unlockable_fraction
             ),
-            delegator_principle_stake);
+            (delegator_principle_stake as u128)) as u64);
         let locked_amount = delegator_principle_stake - unlockable_principle_stake;
 
         assert!(delegator_active_balance >= locked_amount,
@@ -1577,7 +1571,7 @@ module supra_framework::pbo_delegation_pool {
             let next_fraction = if (schedule_length <= last_unlocked_period) {
                 *vector::borrow(&unlock_schedule.schedule, schedule_length - 1)
             } else { *vector::borrow(&unlock_schedule.schedule, last_unlocked_period) };
-            cfraction = fixed_point32_add(cfraction, next_fraction);
+            cfraction = fixed_point64::add(cfraction,next_fraction);
 
             last_unlocked_period = last_unlocked_period + 1;
         };
@@ -2117,8 +2111,6 @@ module supra_framework::pbo_delegation_pool {
     #[test_only]
     use supra_framework::reconfiguration;
     #[test_only]
-    use aptos_std::fixed_point64;
-    #[test_only]
     use supra_framework::stake::fast_forward_to_unlock;
     #[test_only]
     use supra_framework::timestamp::fast_forward_seconds;
@@ -2164,8 +2156,16 @@ module supra_framework::pbo_delegation_pool {
 
     #[test_only]
     public fun initialize_for_test(supra_framework: &signer) {
-        initialize_for_test_custom(supra_framework, 100 * ONE_APT, 10000000 * ONE_APT,
-            LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
+        initialize_for_test_custom(
+            supra_framework,
+            100 * ONE_APT,
+            100000000000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            100,
+            1000000
+        );
     }
 
     #[test_only]
@@ -3087,18 +3087,17 @@ module supra_framework::pbo_delegation_pool {
         add_stake(validator, pool_address, 30 * ONE_APT);
         unlock(validator, pool_address, 10 * ONE_APT);
 
-        assert_delegation(validator_address, pool_address, 1999999999, 0, 1000000000);
+        assert_delegation(validator_address, pool_address, 2000000000, 0, 999999999);
         // the pending withdrawal should be reported as still pending
-        assert_pending_withdrawal(validator_address, pool_address, true, 2, false,
-            1000000000);
+        assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 999999999);
 
         balance = coin::balance<SupraCoin>(validator_address);
         // pending_inactive balance would be under threshold => redeem entire balance
         withdraw(validator, pool_address, 1);
         // pending_inactive balance has been withdrawn and the pending withdrawal executed
-        assert_delegation(validator_address, pool_address, 1999999999, 0, 0);
-        assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
-        assert!(coin::balance<SupraCoin>(validator_address) == balance + 1000000000, 0);
+        assert_delegation(validator_address, pool_address, 2000000000, 0, 999999998);
+        assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 999999998);
+        assert!(coin::balance<SupraCoin>(validator_address) == balance + 1, 0);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
@@ -4041,11 +4040,11 @@ module supra_framework::pbo_delegation_pool {
         assert_delegation(delegator2_address, pool_address, 10807241561, 10175463001, 0);
         unlock(delegator2, pool_address, 100 * ONE_APT);
         // 10807241561 - 100 APT < `MIN_COINS_ON_SHARES_POOL` thus active stake is entirely unlocked
-        assert_delegation(delegator2_address, pool_address, 0, 0, 10807241561);
+        assert_delegation(delegator2_address, pool_address, 807241561, 0, 9999999999);
         end_aptos_epoch();
 
         // in-flight pending_inactive commission can coexist with previous inactive commission
-        assert_delegation(validator_address, pool_address, 227532711, 25536996, 13671160);
+        assert_delegation(validator_address, pool_address, 228553872, 25536996, 12649999);
         assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 25536996);
 
         // distribute in-flight pending_inactive commission, implicitly executing the inactive withdrawal of operator
@@ -4055,9 +4054,8 @@ module supra_framework::pbo_delegation_pool {
 
         // in-flight commission has been synced, implicitly used to buy shares for operator
         // expect operator stake to be slightly less than previously reported by `Self::get_stake`
-        assert_delegation(validator_address, pool_address, 227532711, 0, 13671159);
-        assert_pending_withdrawal(validator_address, pool_address, true, 1, false,
-            13671159);
+        assert_delegation(validator_address, pool_address, 228553872, 0, 12649998);
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 12649998);
     }
 
     #[test(supra_framework = @supra_framework, old_operator = @0x123, delegator = @0x010, new_operator = @0x020)]
@@ -4411,11 +4409,11 @@ module supra_framework::pbo_delegation_pool {
         assert_delegation(delegator1_address, pool_address, 5000000000, 0, 0);
         // pending_inactive balance would be under threshold => move MIN_COINS_ON_SHARES_POOL coins
         unlock(delegator1, pool_address, MIN_COINS_ON_SHARES_POOL - 1);
-        assert_delegation(delegator1_address, pool_address, 3999999999, 0, 1000000001);
+        assert_delegation(delegator1_address, pool_address, 4899999999, 0, 100000001);
 
         // pending_inactive balance is over threshold
         reactivate_stake(delegator1, pool_address, 1);
-        assert_delegation(delegator1_address, pool_address, 4000000000, 0, 1000000000);
+        assert_delegation(delegator1_address, pool_address, 4900000000, 0, 100000000);
 
         // pending_inactive balance would be under threshold => move entire balance
         reactivate_stake(delegator1, pool_address, 1);
@@ -4427,64 +4425,63 @@ module supra_framework::pbo_delegation_pool {
 
         // active balance would be under threshold => move MIN_COINS_ON_SHARES_POOL coins
         reactivate_stake(delegator1, pool_address, 1);
-        assert_delegation(delegator1_address, pool_address, 1000000001, 0, 3999999999);
+        assert_delegation(delegator1_address, pool_address, 100000001, 0, 4899999999);
 
         // active balance is over threshold
         unlock(delegator1, pool_address, 1);
-        assert_delegation(delegator1_address, pool_address, 1000000000, 0, 4000000000);
+        assert_delegation(delegator1_address, pool_address, 100000000, 0, 4900000000);
 
         // pending_inactive balance would be under threshold => move entire balance
-        reactivate_stake(delegator1, pool_address, 4000000000 - (MIN_COINS_ON_SHARES_POOL
-                    - 1));
-        assert_delegation(delegator1_address, pool_address, 5000000000, 0, 0);
+        reactivate_stake(delegator1, pool_address, 4000000000 - (MIN_COINS_ON_SHARES_POOL - 1));
+        assert_delegation(delegator1_address, pool_address, 4000000001, 0, 999999999);
 
         // active + pending_inactive balance < 2 * MIN_COINS_ON_SHARES_POOL
         // stake can live on only one of the shares pools
         assert_delegation(delegator2_address, pool_address, 16 * ONE_APT, 0, 0);
         unlock(delegator2, pool_address, 1);
-        assert_delegation(delegator2_address, pool_address, 0, 0, 16 * ONE_APT);
+        assert_delegation(delegator2_address, pool_address, 1499999999, 0, 100000001);
         reactivate_stake(delegator2, pool_address, 1);
-        assert_delegation(delegator2_address, pool_address, 16 * ONE_APT, 0, 0);
+        assert_delegation(delegator2_address, pool_address, 1500000000, 0, 100000000);
 
         unlock(delegator2, pool_address, ONE_APT);
-        assert_delegation(delegator2_address, pool_address, 0, 0, 16 * ONE_APT);
+        assert_delegation(delegator2_address, pool_address, 1400000000, 0, 200000000);
         reactivate_stake(delegator2, pool_address, 2 * ONE_APT);
         assert_delegation(delegator2_address, pool_address, 16 * ONE_APT, 0, 0);
 
         // share price becomes 1.01 on both pools
         unlock(delegator1, pool_address, 1);
-        assert_delegation(delegator1_address, pool_address, 3999999999, 0, 1000000001);
+        assert_delegation(delegator1_address, pool_address, 4000000000, 0, 1000000000);
         end_aptos_epoch();
-        assert_delegation(delegator1_address, pool_address, 4039999998, 0, 1010000001);
+        assert_delegation(delegator1_address, pool_address, 4040000000, 0, 1010000000);
 
         // pending_inactive balance is over threshold
         reactivate_stake(delegator1, pool_address, 10000001);
-        assert_delegation(delegator1_address, pool_address, 4049999998, 0, 1000000001);
+        assert_delegation(delegator1_address, pool_address, 4049999999, 0, 1000000000);
 
         // 1 coin < 1.01 so no shares are redeemed
         reactivate_stake(delegator1, pool_address, 1);
-        assert_delegation(delegator1_address, pool_address, 4049999998, 0, 1000000001);
+        assert_delegation(delegator1_address, pool_address, 4049999999, 0, 1000000000);
 
         // pending_inactive balance is over threshold
         // requesting 2 coins actually redeems 1 coin from pending_inactive pool
         reactivate_stake(delegator1, pool_address, 2);
-        assert_delegation(delegator1_address, pool_address, 4049999999, 0, 1000000000);
+        assert_delegation(delegator1_address, pool_address, 4050000000, 0, 999999999);
 
         // 1 coin < 1.01 so no shares are redeemed
         reactivate_stake(delegator1, pool_address, 1);
-        assert_delegation(delegator1_address, pool_address, 4049999999, 0, 1000000000);
+        assert_delegation(delegator1_address, pool_address, 4050000000, 0, 999999999);
 
         // pending_inactive balance would be under threshold => move entire balance
         reactivate_stake(delegator1, pool_address, 2);
-        assert_delegation(delegator1_address, pool_address, 5049999999, 0, 0);
+        assert_delegation(delegator1_address, pool_address, 4050000001, 0, 999999998);
 
         // pending_inactive balance would be under threshold => move MIN_COINS_ON_SHARES_POOL coins
         unlock(delegator1, pool_address, MIN_COINS_ON_SHARES_POOL - 1);
-        assert_delegation(delegator1_address, pool_address, 4049999998, 0, 1000000000);
+        assert_delegation(delegator1_address, pool_address, 3950000003, 0, 1099999996);
 
         // pending_inactive balance would be under threshold => move entire balance
         reactivate_stake(delegator1, pool_address, 1);
-        assert_delegation(delegator1_address, pool_address, 5049999998, 0, 0);
+        assert_delegation(delegator1_address, pool_address, 3950000003, 0, 1099999996);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010)]
@@ -5704,6 +5701,125 @@ module supra_framework::pbo_delegation_pool {
         replace_delegator(&multisig_signer, pool_address, @0x010, @0x0101);
     }
 
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
+    public entry fun test_lose_shares_small(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator1: &signer,
+        delegator2: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        let delegator_address = vector[@0x010, @0x020];
+        let principle_stake = vector[ONE_APT, 1000 * ONE_APT];
+        let coin = stake::mint_coins(1001 * ONE_APT);
+        let principle_lockup_time = 0;
+        initialize_test_validator(
+            validator,
+            100*ONE_APT,
+            true,
+            true,
+            0,
+            delegator_address,
+            principle_stake,
+            coin,
+            option::none(),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12);
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+        stake::mint(validator, 150 * ONE_APT);
+        add_stake(validator, pool_address, 150 * ONE_APT);
+        let one_year_in_secs = 31536000;
+        let reward_period_start_time_in_sec = timestamp::now_seconds();
+        staking_config::initialize_rewards(
+            supra_framework,
+            fixed_point64::create_from_rational(1, 100),
+            fixed_point64::create_from_rational(1, 100),
+            one_year_in_secs,
+            reward_period_start_time_in_sec,
+            fixed_point64::create_from_rational(0, 100),
+        );
+        let index = 0;
+        while (index < 1828) {
+            end_aptos_epoch();
+            index = index + 1;
+        };
+        let delegator1_address = signer::address_of(delegator1);
+        let delegator2_address = signer::address_of(delegator2);
+        assert_delegation(delegator1_address, pool_address, 7933617798152065, 0, 0);
+        stake::assert_stake_pool(pool_address,9913173264836398460,0,0,0);
+        unlock(delegator1, pool_address, 1 * ONE_APT);
+        assert_delegation(delegator1_address, pool_address, 7933617698152064, 0, 100000000);
+        stake::assert_stake_pool(pool_address,9913173264736398460,0,0,100000000);
+        unlock(delegator1, pool_address, 1 * ONE_APT);
+        stake::assert_stake_pool(pool_address,9913173264636398461,0,0,199999999);
+        assert_delegation(delegator1_address, pool_address, 7933617598152064, 0, 199999999);
+        assert_delegation(delegator2_address, pool_address, 7933617798152065133, 0, 0);
+        unlock(delegator2, pool_address, 1000 * ONE_APT);
+        assert_delegation(delegator2_address, pool_address, 7933617698152065134, 0, 99999999999);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
+    public entry fun test_lose_shares_large(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator1: &signer,
+        delegator2: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        let delegator_address = vector[@0x010, @0x020];
+        let principle_stake = vector[ONE_APT, 90000000000 * ONE_APT];
+        let coin = stake::mint_coins(90000000001 * ONE_APT);
+        let principle_lockup_time = 0;
+        initialize_test_validator(
+            validator,
+            100*ONE_APT,
+            true,
+            true,
+            0,
+            delegator_address,
+            principle_stake,
+            coin,
+            option::none(),
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12);
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+        stake::mint(validator, 150 * ONE_APT);
+        add_stake(validator, pool_address, 150 * ONE_APT);
+        let one_year_in_secs = 31536000;
+        let reward_period_start_time_in_sec = timestamp::now_seconds();
+        staking_config::initialize_rewards(
+            supra_framework,
+            fixed_point64::create_from_rational(1, 100),
+            fixed_point64::create_from_rational(1, 100),
+            one_year_in_secs,
+            reward_period_start_time_in_sec,
+            fixed_point64::create_from_rational(0, 100),
+        );
+        let index = 0;
+        while (index < 10) {
+            end_aptos_epoch();
+            index = index + 1;
+        };
+        let delegator1_address = signer::address_of(delegator1);
+        let delegator2_address = signer::address_of(delegator2);
+        assert_delegation(delegator1_address, pool_address, 110462212, 0, 0);
+        stake::assert_stake_pool(pool_address,9941599156262803145,0,0,0);
+        unlock(delegator1, pool_address, 1 * ONE_APT);
+        assert_delegation(delegator1_address, pool_address, 0, 0, 110462212);
+        stake::assert_stake_pool(pool_address,9941599156152340933,0,0,110462212);
+        stake::assert_stake_pool(pool_address,9941599156152340933,0,0,110462212);
+        assert_delegation(delegator1_address, pool_address, 0, 0, 110462212);
+        assert_delegation(delegator2_address, pool_address, 9941599128700840588, 0, 0);
+        unlock(delegator2, pool_address, 1 * ONE_APT);
+        assert_delegation(delegator2_address, pool_address, 9941599128600840588, 0, 100000000);
+    }
+    
     #[test(supra_framework = @supra_framework, validator = @0x123)]
     /// if admin is authorized multi signer, `replace_delegator` should succeed
     public entry fun test_replace_delegation_multisig_success(
@@ -6688,5 +6804,4 @@ module supra_framework::pbo_delegation_pool {
         let unlock_coin = can_principle_unlock(delegator_address, pool_address, (100 * ONE_APT) + 1 );
         assert!(unlock_coin, 20);
     }
-
 }
