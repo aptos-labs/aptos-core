@@ -56,6 +56,7 @@ async fn get_proposal(
     let req = GetPayloadCommand::GetPayloadRequest(
         max_txns,
         max_txns,
+        max_txns,
         1000000,
         max_txns / 2,
         100000,

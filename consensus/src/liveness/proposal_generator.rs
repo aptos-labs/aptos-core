@@ -195,9 +195,10 @@ impl PipelineBackpressureConfig {
                 .sorted()
                 .collect::<Vec<_>>();
             if sizes.len() >= config.min_blocks_to_activate {
-                let calibrated_block_size = *sizes
+                let calibrated_block_size = (*sizes
                     .get(((config.percentile * sizes.len() as f64) as usize).min(sizes.len() - 1))
-                    .expect("guaranteed to be within vector size");
+                    .expect("guaranteed to be within vector size"))
+                .max(config.min_calibrated_txns_per_block);
                 PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS.observe(calibrated_block_size as f64);
                 // Check if calibrated block size is reduction in size, to turn on backpressure.
                 if max_block_txns > calibrated_block_size {
@@ -449,12 +450,14 @@ impl ProposalGenerator {
                 .collect();
             let validator_txn_filter =
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+
             let (validator_txns, mut payload) = self
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     self.max_block_txns,
                     max_block_txns_after_filtering,
+                    max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering),
                     max_block_bytes,
                     // TODO: Set max_inline_txns and max_inline_bytes correctly
                     self.max_inline_txns,

@@ -33,6 +33,28 @@ fn proof_of_store(
     )
 }
 
+fn proof_of_store_with_size(
+    author: PeerId,
+    batch_id: BatchId,
+    gas_bucket_start: u64,
+    expiration: u64,
+    num_txns: u64,
+) -> ProofOfStore {
+    ProofOfStore::new(
+        BatchInfo::new(
+            author,
+            batch_id,
+            0,
+            expiration,
+            HashValue::random(),
+            num_txns,
+            num_txns,
+            gas_bucket_start,
+        ),
+        AggregateSignature::empty(),
+    )
+}
+
 #[test]
 fn test_proof_queue_sorting() {
     let my_peer_id = PeerId::random();
@@ -66,6 +88,7 @@ fn test_proof_queue_sorting() {
         4,
         2,
         2,
+        2,
         true,
         aptos_infallible::duration_since_epoch(),
     );
@@ -93,6 +116,7 @@ fn test_proof_queue_sorting() {
     let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(
         &hashset![],
         6,
+        4,
         4,
         4,
         true,
@@ -474,6 +498,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         &hashset![],
         8,
         4,
+        4,
         400,
         true,
         Duration::from_micros(now_in_usecs),
@@ -500,6 +525,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         &hashset![info_0.clone()],
         8,
         4,
+        4,
         400,
         true,
         Duration::from_micros(now_in_usecs),
@@ -514,6 +540,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         &hashset![],
         8,
         5,
+        5,
         400,
         true,
         Duration::from_micros(now_in_usecs + 500_100),
@@ -525,6 +552,7 @@ fn test_proof_pull_proofs_with_duplicates() {
     let result = proof_queue.pull_proofs(
         &hashset![],
         8,
+        5,
         5,
         400,
         true,
@@ -539,6 +567,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         &hashset![],
         8,
         4,
+        4,
         400,
         true,
         Duration::from_micros(now_in_usecs + 1_200_100),
@@ -551,6 +580,7 @@ fn test_proof_pull_proofs_with_duplicates() {
     let result = proof_queue.pull_proofs(
         &hashset![],
         8,
+        4,
         4,
         400,
         true,
@@ -565,6 +595,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         &hashset![],
         8,
         4,
+        4,
         400,
         true,
         Duration::from_micros(now_in_usecs + 2_500_100),
@@ -575,6 +606,7 @@ fn test_proof_pull_proofs_with_duplicates() {
     let result = proof_queue.pull_proofs(
         &hashset![info_7],
         8,
+        4,
         4,
         400,
         true,
@@ -589,6 +621,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         &hashset![],
         8,
         4,
+        4,
         400,
         true,
         Duration::from_micros(now_in_usecs + 3_000_100),
@@ -601,6 +634,7 @@ fn test_proof_pull_proofs_with_duplicates() {
     let result = proof_queue.pull_proofs(
         &hashset![],
         8,
+        4,
         4,
         400,
         true,
@@ -615,6 +649,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         &hashset![],
         8,
         4,
+        4,
         400,
         true,
         Duration::from_micros(now_in_usecs + 4_000_100),
@@ -623,4 +658,47 @@ fn test_proof_pull_proofs_with_duplicates() {
     // txn_0, txn_1, txn_2 are expired.
     assert_eq!(result.0.len(), 2);
     assert_eq!(result.1, 0);
+}
+
+#[test]
+fn test_proof_queue_soft_limit() {
+    let my_peer_id = PeerId::random();
+    let mut proof_queue = ProofQueue::new(my_peer_id);
+
+    let author = PeerId::random();
+
+    let author_batches = vec![
+        proof_of_store_with_size(author, BatchId::new_for_test(0), 100, 1, 10),
+        proof_of_store_with_size(author, BatchId::new_for_test(1), 200, 1, 10),
+        proof_of_store_with_size(author, BatchId::new_for_test(2), 200, 1, 10),
+    ];
+    for batch in author_batches {
+        proof_queue.push(batch);
+    }
+
+    let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(
+        &hashset![],
+        100,
+        12,
+        12,
+        100,
+        true,
+        aptos_infallible::duration_since_epoch(),
+    );
+
+    assert_eq!(pulled.len(), 1);
+    assert_eq!(num_unique_txns, 10);
+
+    let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(
+        &hashset![],
+        100,
+        30,
+        12,
+        100,
+        true,
+        aptos_infallible::duration_since_epoch(),
+    );
+
+    assert_eq!(pulled.len(), 2);
+    assert_eq!(num_unique_txns, 20);
 }
