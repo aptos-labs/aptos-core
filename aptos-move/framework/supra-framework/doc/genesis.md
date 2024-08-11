@@ -889,8 +889,6 @@ If it exists, it just returns the signer.
     // Destroy the aptos framework <a href="account.md#0x1_account">account</a>'s ability <b>to</b> mint coins now that we're done <b>with</b> setting up the initial
     // validators.
     <a href="supra_coin.md#0x1_supra_coin_destroy_mint_cap">supra_coin::destroy_mint_cap</a>(supra_framework);
-
-    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
 }
 </code></pre>
 
@@ -1367,6 +1365,7 @@ The last step of genesis.
 
 
 <pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
     <a href="chain_status.md#0x1_chain_status_set_genesis_end">chain_status::set_genesis_end</a>(supra_framework);
 }
 </code></pre>

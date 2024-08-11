@@ -134,6 +134,8 @@ impl GenesisInfo {
         aptos_vm_genesis::encode_genesis_transaction(
             self.root_key.clone(),
             &self.validators,
+            &[],
+            &[],
             &self.framework,
             self.chain_id,
             &aptos_vm_genesis::GenesisConfiguration {

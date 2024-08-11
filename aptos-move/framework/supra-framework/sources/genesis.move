@@ -60,11 +60,11 @@ module supra_framework::genesis {
 		vpool_locking_percentage : u8,
 		vesting_numerators : vector<u64>,
 		vesting_denominator : u64,
-		//Withdrawal address for the pool
+		// Withdrawal address for the pool
 		withdrawal_address: address,
 		// Shareholders in the vesting pool
 		shareholders : vector<address>,
-		//Cliff duration in seconds
+		// Cliff duration in seconds
 		cliff_period_in_seconds: u64,
 		// Each vesting period duration in seconds
 		period_duration_in_seconds: u64,
@@ -351,8 +351,6 @@ module supra_framework::genesis {
         // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
         // validators.
         supra_coin::destroy_mint_cap(supra_framework);
-
-        stake::on_new_epoch();
     }
 
     /// Sets up the initial validator set for the network.

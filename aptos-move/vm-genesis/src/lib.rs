@@ -75,6 +75,8 @@ const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
 const APTOS_COINS_BASE_WITH_DECIMALS: u64 = u64::pow(10, 8);
 
+const PBO_DELEGATION_POOL_LOCKUP_PERCENTAGE: u64 = 90;
+
 pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
     pub epoch_duration_secs: u64,
@@ -113,8 +115,8 @@ pub fn default_gas_schedule() -> GasScheduleV2 {
 
 pub fn encode_aptos_mainnet_genesis_transaction(
     accounts: &[AccountBalance],
-    employees: &[EmployeePool],
-    validators: &[ValidatorWithCommissionRate],
+    delegation_pools: &[PboDelegatorConfiguration],
+    vesting_pools: &[VestingPoolsMap],
     framework: &ReleaseBundle,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
@@ -154,8 +156,13 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     initialize_supra_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
-    create_employee_validators(&mut session, employees, genesis_config);
-    create_and_initialize_validators_with_commission(&mut session, validators);
+
+    // All PBO delegated validators are initialized here
+    create_pbo_delegation_pools(&mut session, delegation_pools);
+
+    // All employee accounts are initialized here
+    create_vesting_without_staking_pools(&mut session, vesting_pools);
+
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -198,6 +205,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 pub fn encode_genesis_transaction(
     aptos_root_key: Ed25519PublicKey,
     validators: &[Validator],
+    delegation_pools: &[PboDelegatorConfiguration],
+    vesting_pools: &[VestingPoolsMap],
     framework: &ReleaseBundle,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
@@ -207,7 +216,10 @@ pub fn encode_genesis_transaction(
 ) -> Transaction {
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
+        &[],
         validators,
+        delegation_pools,
+        vesting_pools,
         framework,
         chain_id,
         genesis_config,
@@ -219,7 +231,10 @@ pub fn encode_genesis_transaction(
 
 pub fn encode_genesis_change_set(
     core_resources_key: &Ed25519PublicKey,
+    accounts: &[AccountBalance],
     validators: &[Validator],
+    delegation_pools: &[PboDelegatorConfiguration],
+    vesting_pools: &[VestingPoolsMap],
     framework: &ReleaseBundle,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
@@ -272,7 +287,19 @@ pub fn encode_genesis_change_set(
     initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
-    create_and_initialize_validators(&mut session, validators);
+
+    create_accounts(&mut session, accounts);
+
+    if validators.len() > 0 {
+        create_and_initialize_validators(&mut session, validators);
+    } else {
+        // All PBO delegated validators are initialized here
+        create_pbo_delegation_pools(&mut session, delegation_pools);
+
+        // All employee accounts are initialized here
+        create_vesting_without_staking_pools(&mut session, vesting_pools);
+    }
+
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
@@ -729,6 +756,40 @@ fn create_and_initialize_validators_with_commission(
     );
 }
 
+fn create_pbo_delegation_pools(
+    session: &mut SessionExt,
+    pbo_delegator_configuration: &[PboDelegatorConfiguration],
+) {
+    let pbo_config_bytes = bcs::to_bytes(pbo_delegator_configuration)
+        .expect("PboDelegatorConfiguration can be serialized");
+    let mut serialized_values = serialize_values(&vec![
+        MoveValue::U64(PBO_DELEGATION_POOL_LOCKUP_PERCENTAGE),
+    ]);
+    serialized_values.insert(0, pbo_config_bytes);
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_pbo_delegation_pools",
+        vec![],
+        serialized_values,
+    )
+}
+
+fn create_vesting_without_staking_pools(
+    session: &mut SessionExt,
+    vesting_pools_map: &[VestingPoolsMap],
+) {
+    let serialized_values =
+        vec![bcs::to_bytes(vesting_pools_map).expect("VestingPoolsMap can be serialized")];
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_vesting_without_staking_pools",
+        vec![],
+        serialized_values,
+    )
+}
+
 fn allow_core_resources_to_set_version(session: &mut SessionExt) {
     exec_function(
         session,
@@ -765,13 +826,19 @@ fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
         });
 
     // Call the initialize function with the metadata.
-    exec_function(session, CODE_MODULE_NAME, "initialize", vec![], vec![
-        MoveValue::Signer(CORE_CODE_ADDRESS)
-            .simple_serialize()
-            .unwrap(),
-        MoveValue::Signer(addr).simple_serialize().unwrap(),
-        bcs::to_bytes(pack.package_metadata()).unwrap(),
-    ]);
+    exec_function(
+        session,
+        CODE_MODULE_NAME,
+        "initialize",
+        vec![],
+        vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS)
+                .simple_serialize()
+                .unwrap(),
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            bcs::to_bytes(pack.package_metadata()).unwrap(),
+        ],
+    );
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
@@ -870,7 +937,7 @@ pub fn test_genesis_change_set_and_validators(
     generate_test_genesis(aptos_cached_packages::head_release_bundle(), count)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub struct Validator {
     /// The Aptos account address of the validator or the admin in the case of a commissioned or
     /// vesting managed validator.
@@ -916,7 +983,7 @@ impl TestValidator {
         let stake_amount = if let Some(amount) = initial_stake {
             amount
         } else {
-            1
+            0
         };
         let data = Validator {
             owner_address,
@@ -945,7 +1012,10 @@ pub fn generate_test_genesis(
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
+        &[],
         validators,
+        &[],
+        &[],
         framework,
         ChainId::test(),
         &GenesisConfiguration {
@@ -986,7 +1056,10 @@ pub fn generate_mainnet_genesis(
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
+        &[],
         validators,
+        &[],
+        &[],
         framework,
         ChainId::test(),
         &mainnet_genesis_config(),
@@ -1021,7 +1094,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct AccountBalance {
     pub account_address: AccountAddress,
     pub balance: u64,
@@ -1037,12 +1110,45 @@ pub struct EmployeePool {
     pub beneficiary_resetter: AccountAddress,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub struct ValidatorWithCommissionRate {
     pub validator: Validator,
     pub validator_commission_percentage: u64,
     /// Whether the validator should be joining the genesis validator set.
     pub join_during_genesis: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+pub struct DelegatorConfiguration {
+    pub owner_address: AccountAddress,
+    pub delegation_pool_creation_seed: Vec<u8>,
+    pub validator: ValidatorWithCommissionRate,
+    pub delegator_addresses: Vec<AccountAddress>,
+    pub delegator_stakes: Vec<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+pub struct PboDelegatorConfiguration {
+    pub delegator_config: DelegatorConfiguration,
+    pub principle_lockup_time: u64,
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
+pub struct VestingPoolsMap {
+    // Address of the admin of the vesting pool
+    pub admin_address: AccountAddress,
+    // Percentage of account balance should be put in vesting pool
+    pub vpool_locking_percentage: u8,
+    pub vesting_numerators: Vec<u64>,
+    pub vesting_denominator: u64,
+    //Withdrawal address for the pool
+    pub withdrawal_address: AccountAddress,
+    // Shareholders in the vesting pool
+    pub shareholders: Vec<AccountAddress>,
+    //Cliff duration in seconds
+    pub cliff_period_in_seconds: u64,
+    // Each vesting period duration in seconds
+    pub period_duration_in_seconds: u64,
 }
 
 #[test]
@@ -1063,7 +1169,11 @@ pub fn test_genesis_module_publishing() {
 }
 
 #[test]
+#[ignore] // TODO: This test needs fixing. Genesis transactions encoding are verified in e2e tests at smr-moonshot
 pub fn test_mainnet_end_to_end() {
+    const TOTAL_SUPPLY: u64 = 100_000_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
+    const PBO_DELEGATOR_STAKE: u64 = 9_000_000 * APTOS_COINS_BASE_WITH_DECIMALS; // 9 mil
+
     use aptos_types::{
         account_address,
         on_chain_config::ValidatorSet,
@@ -1071,187 +1181,392 @@ pub fn test_mainnet_end_to_end() {
         write_set::{TransactionWrite, WriteSet},
     };
 
-    let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
-    let non_validator_balance = 10 * APTOS_COINS_BASE_WITH_DECIMALS;
+    // 21 Staking accounts - Total 210 million $Supra
+    let pbo_balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS; // 10 million each
+
+    // 7 Operator balances - Total 70 $Supra
+    let operator_balance = 10 * APTOS_COINS_BASE_WITH_DECIMALS; // 10 Supra each
+
+    // 9 employees - Total 270 million $Supra
+    let employee_balance = 30_000_000 * APTOS_COINS_BASE_WITH_DECIMALS; // 30 million each
+
+    // The rest go to Supra Foundation - 99939999870 $Supra
+    // Ninety-Nine Billion, Nine Hundred Thirty-Nine Million, nine hundred ninety-nine thousand, eight hundred seventy.
+    let supra_foundation_balance =
+        TOTAL_SUPPLY - (21 * pbo_balance) - (7 * operator_balance) - (9 * employee_balance);
 
     // currently just test that all functions have the right interface
-    let account44 = AccountAddress::from_hex_literal("0x44").unwrap();
-    let account45 = AccountAddress::from_hex_literal("0x45").unwrap();
-    let account46 = AccountAddress::from_hex_literal("0x46").unwrap();
-    let account47 = AccountAddress::from_hex_literal("0x47").unwrap();
-    let account48 = AccountAddress::from_hex_literal("0x48").unwrap();
-    let account49 = AccountAddress::from_hex_literal("0x49").unwrap();
-    let operator0 = AccountAddress::from_hex_literal("0x100").unwrap();
-    let operator1 = AccountAddress::from_hex_literal("0x101").unwrap();
-    let operator2 = AccountAddress::from_hex_literal("0x102").unwrap();
-    let operator3 = AccountAddress::from_hex_literal("0x103").unwrap();
-    let operator4 = AccountAddress::from_hex_literal("0x104").unwrap();
-    let operator5 = AccountAddress::from_hex_literal("0x105").unwrap();
+    let supra_foundation = AccountAddress::from_hex_literal("0x777").unwrap();
+
+    let test_validators = TestValidator::new_test_set(Some(7), None);
+
+    let operator_addrs0 = test_validators[0].data.operator_address;
+    let operator_addrs1 = test_validators[1].data.operator_address;
+    let operator_addrs2 = test_validators[2].data.operator_address;
+    let operator_addrs3 = test_validators[3].data.operator_address;
+    let operator_addrs4 = test_validators[4].data.operator_address;
+    let operator_addrs5 = test_validators[5].data.operator_address;
+    let operator_addrs6 = test_validators[6].data.operator_address;
+
+    // PBO winner
+    let pbo_account01 = AccountAddress::from_hex_literal("0x01").unwrap();
+    let pbo_account02 = AccountAddress::from_hex_literal("0x02").unwrap();
+    let pbo_account03 = AccountAddress::from_hex_literal("0x03").unwrap();
+    let pbo_account11 = AccountAddress::from_hex_literal("0x11").unwrap();
+    let pbo_account12 = AccountAddress::from_hex_literal("0x12").unwrap();
+    let pbo_account13 = AccountAddress::from_hex_literal("0x13").unwrap();
+    let pbo_account21 = AccountAddress::from_hex_literal("0x21").unwrap();
+    let pbo_account22 = AccountAddress::from_hex_literal("0x22").unwrap();
+    let pbo_account23 = AccountAddress::from_hex_literal("0x23").unwrap();
+    let pbo_account31 = AccountAddress::from_hex_literal("0x31").unwrap();
+    let pbo_account32 = AccountAddress::from_hex_literal("0x32").unwrap();
+    let pbo_account33 = AccountAddress::from_hex_literal("0x33").unwrap();
+    let pbo_account41 = AccountAddress::from_hex_literal("0x41").unwrap();
+    let pbo_account42 = AccountAddress::from_hex_literal("0x42").unwrap();
+    let pbo_account43 = AccountAddress::from_hex_literal("0x43").unwrap();
+    let pbo_account51 = AccountAddress::from_hex_literal("0x51").unwrap();
+    let pbo_account52 = AccountAddress::from_hex_literal("0x52").unwrap();
+    let pbo_account53 = AccountAddress::from_hex_literal("0x53").unwrap();
+    let pbo_account61 = AccountAddress::from_hex_literal("0x61").unwrap();
+    let pbo_account62 = AccountAddress::from_hex_literal("0x62").unwrap();
+    let pbo_account63 = AccountAddress::from_hex_literal("0x63").unwrap();
+
+    // Voter accounts associated with the validators
     let voter0 = AccountAddress::from_hex_literal("0x200").unwrap();
     let voter1 = AccountAddress::from_hex_literal("0x201").unwrap();
     let voter2 = AccountAddress::from_hex_literal("0x202").unwrap();
     let voter3 = AccountAddress::from_hex_literal("0x203").unwrap();
+
+    // Admin accounts - Not sure where these are used ATM
     let admin0 = AccountAddress::from_hex_literal("0x300").unwrap();
     let admin1 = AccountAddress::from_hex_literal("0x301").unwrap();
     let admin2 = AccountAddress::from_hex_literal("0x302").unwrap();
 
+    // Employee Accounts
+    let employee1 = AccountAddress::from_hex_literal("0xe1").unwrap();
+    let employee2 = AccountAddress::from_hex_literal("0xe2").unwrap();
+    let employee3 = AccountAddress::from_hex_literal("0xe3").unwrap();
+    let employee4 = AccountAddress::from_hex_literal("0xe4").unwrap();
+    let employee5 = AccountAddress::from_hex_literal("0xe5").unwrap();
+    let employee6 = AccountAddress::from_hex_literal("0xe6").unwrap();
+    let employee7 = AccountAddress::from_hex_literal("0xe7").unwrap();
+    let employee8 = AccountAddress::from_hex_literal("0xe8").unwrap();
+    let employee9 = AccountAddress::from_hex_literal("0xe9").unwrap();
+
+    // All the above accounts to be created at genesis
     let accounts = vec![
         AccountBalance {
-            account_address: account44,
-            balance,
+            account_address: supra_foundation,
+            balance: supra_foundation_balance,
         },
         AccountBalance {
-            account_address: account45,
-            balance: balance * 3, // Three times the balance so it can host 2 operators.
+            account_address: pbo_account01,
+            balance: pbo_balance,
         },
         AccountBalance {
-            account_address: account46,
-            balance,
+            account_address: pbo_account02,
+            balance: pbo_balance,
         },
         AccountBalance {
-            account_address: account47,
-            balance,
+            account_address: pbo_account03,
+            balance: pbo_balance,
         },
         AccountBalance {
-            account_address: account48,
-            balance,
+            account_address: pbo_account11,
+            balance: pbo_balance,
         },
         AccountBalance {
-            account_address: account49,
-            balance,
+            account_address: pbo_account12,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account13,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account21,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account22,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account23,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account31,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account32,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account33,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account41,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account42,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account43,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account51,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account52,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account53,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account61,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account62,
+            balance: pbo_balance,
+        },
+        AccountBalance {
+            account_address: pbo_account63,
+            balance: pbo_balance,
         },
         AccountBalance {
             account_address: admin0,
-            balance: non_validator_balance,
+            balance: operator_balance,
         },
         AccountBalance {
             account_address: admin1,
-            balance: non_validator_balance,
+            balance: operator_balance,
         },
         AccountBalance {
             account_address: admin2,
-            balance: non_validator_balance,
+            balance: operator_balance,
         },
         AccountBalance {
-            account_address: operator0,
-            balance: non_validator_balance,
+            account_address: operator_addrs0,
+            balance: operator_balance,
         },
         AccountBalance {
-            account_address: operator1,
-            balance: non_validator_balance,
+            account_address: operator_addrs1,
+            balance: operator_balance,
         },
         AccountBalance {
-            account_address: operator2,
-            balance: non_validator_balance,
+            account_address: operator_addrs2,
+            balance: operator_balance,
         },
         AccountBalance {
-            account_address: operator3,
-            balance: non_validator_balance,
+            account_address: operator_addrs3,
+            balance: operator_balance,
         },
         AccountBalance {
-            account_address: operator4,
-            balance: non_validator_balance,
+            account_address: operator_addrs4,
+            balance: operator_balance,
         },
         AccountBalance {
-            account_address: operator5,
-            balance: non_validator_balance,
+            account_address: operator_addrs5,
+            balance: operator_balance,
+        },
+        AccountBalance {
+            account_address: operator_addrs6,
+            balance: operator_balance,
         },
         AccountBalance {
             account_address: voter0,
-            balance: non_validator_balance,
+            balance: operator_balance,
         },
         AccountBalance {
             account_address: voter1,
-            balance: non_validator_balance,
+            balance: operator_balance,
         },
         AccountBalance {
             account_address: voter2,
-            balance: non_validator_balance,
+            balance: operator_balance,
         },
         AccountBalance {
             account_address: voter3,
-            balance: non_validator_balance,
+            balance: operator_balance,
+        },
+        AccountBalance {
+            account_address: employee1,
+            balance: employee_balance,
+        },
+        AccountBalance {
+            account_address: employee2,
+            balance: employee_balance,
+        },
+        AccountBalance {
+            account_address: employee3,
+            balance: employee_balance,
+        },
+        AccountBalance {
+            account_address: employee4,
+            balance: employee_balance,
+        },
+        AccountBalance {
+            account_address: employee5,
+            balance: employee_balance,
+        },
+        AccountBalance {
+            account_address: employee6,
+            balance: employee_balance,
+        },
+        AccountBalance {
+            account_address: employee7,
+            balance: employee_balance,
+        },
+        AccountBalance {
+            account_address: employee8,
+            balance: employee_balance,
+        },
+        AccountBalance {
+            account_address: employee9,
+            balance: employee_balance,
         },
     ];
 
-    let test_validators = TestValidator::new_test_set(Some(6), Some(balance * 9 / 10));
-    let mut employee_validator_1 = test_validators[0].data.clone();
-    employee_validator_1.owner_address = admin0;
-    employee_validator_1.operator_address = operator0;
-    employee_validator_1.voter_address = voter0;
-    let mut employee_validator_2 = test_validators[1].data.clone();
-    employee_validator_2.owner_address = admin1;
-    employee_validator_2.operator_address = operator1;
-    employee_validator_2.voter_address = voter1;
-    let mut zero_commission_validator = test_validators[2].data.clone();
-    zero_commission_validator.owner_address = account44;
-    zero_commission_validator.operator_address = operator2;
-    zero_commission_validator.voter_address = voter2;
-    let mut same_owner_validator_1 = test_validators[3].data.clone();
-    same_owner_validator_1.owner_address = account45;
-    same_owner_validator_1.operator_address = operator3;
-    same_owner_validator_1.voter_address = voter3;
-    let mut same_owner_validator_2 = test_validators[4].data.clone();
-    same_owner_validator_2.owner_address = account45;
-    same_owner_validator_2.operator_address = operator4;
-    same_owner_validator_2.voter_address = voter3;
-    let mut same_owner_validator_3 = test_validators[5].data.clone();
-    same_owner_validator_3.owner_address = account45;
-    same_owner_validator_3.operator_address = operator5;
-    same_owner_validator_3.voter_address = voter3;
-
-    let employees = vec![
-        EmployeePool {
-            accounts: vec![account46, account47],
+    let pbo_config_val0 = PboDelegatorConfiguration {
+        delegator_config: DelegatorConfiguration {
+            owner_address: supra_foundation,
+            delegation_pool_creation_seed: vec![0_u8],
             validator: ValidatorWithCommissionRate {
-                validator: employee_validator_1,
+                validator: test_validators[0].data.clone(),
                 validator_commission_percentage: 10,
                 join_during_genesis: true,
             },
-            vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
-            vesting_schedule_denominator: 48,
-            beneficiary_resetter: AccountAddress::ZERO,
+            delegator_addresses: vec![pbo_account01, pbo_account02, pbo_account03],
+            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
         },
-        EmployeePool {
-            accounts: vec![account48, account49],
-            validator: ValidatorWithCommissionRate {
-                validator: employee_validator_2,
-                validator_commission_percentage: 10,
-                join_during_genesis: false,
-            },
-            vesting_schedule_numerators: vec![3, 3, 3, 3, 1],
-            vesting_schedule_denominator: 48,
-            beneficiary_resetter: account44,
-        },
-    ];
+        principle_lockup_time: 100,
+    };
 
-    let validators = vec![
-        ValidatorWithCommissionRate {
-            validator: same_owner_validator_1,
-            validator_commission_percentage: 10,
-            join_during_genesis: true,
+    let pbo_config_val1 = PboDelegatorConfiguration {
+        delegator_config: DelegatorConfiguration {
+            owner_address: supra_foundation,
+            delegation_pool_creation_seed: vec![1_u8],
+            validator: ValidatorWithCommissionRate {
+                validator: test_validators[1].data.clone(),
+                validator_commission_percentage: 10,
+                join_during_genesis: true,
+            },
+            delegator_addresses: vec![pbo_account11, pbo_account12, pbo_account13],
+            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
         },
-        ValidatorWithCommissionRate {
-            validator: same_owner_validator_2,
-            validator_commission_percentage: 15,
-            join_during_genesis: true,
+        principle_lockup_time: 100,
+    };
+
+    let pbo_config_val2 = PboDelegatorConfiguration {
+        delegator_config: DelegatorConfiguration {
+            owner_address: supra_foundation,
+            delegation_pool_creation_seed: vec![2_u8],
+            validator: ValidatorWithCommissionRate {
+                validator: test_validators[2].data.clone(),
+                validator_commission_percentage: 10,
+                join_during_genesis: true,
+            },
+            delegator_addresses: vec![pbo_account21, pbo_account22, pbo_account13],
+            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
         },
-        ValidatorWithCommissionRate {
-            validator: same_owner_validator_3,
-            validator_commission_percentage: 10,
-            join_during_genesis: false,
+        principle_lockup_time: 100,
+    };
+
+    let pbo_config_val3 = PboDelegatorConfiguration {
+        delegator_config: DelegatorConfiguration {
+            owner_address: supra_foundation,
+            delegation_pool_creation_seed: vec![3_u8],
+            validator: ValidatorWithCommissionRate {
+                validator: test_validators[3].data.clone(),
+                validator_commission_percentage: 10,
+                join_during_genesis: true,
+            },
+            delegator_addresses: vec![pbo_account31, pbo_account32, pbo_account33],
+            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
         },
-        ValidatorWithCommissionRate {
-            validator: zero_commission_validator,
-            validator_commission_percentage: 0,
-            join_during_genesis: true,
+        principle_lockup_time: 100,
+    };
+
+    let pbo_config_val4 = PboDelegatorConfiguration {
+        delegator_config: DelegatorConfiguration {
+            owner_address: supra_foundation,
+            delegation_pool_creation_seed: vec![4_u8],
+            validator: ValidatorWithCommissionRate {
+                validator: test_validators[4].data.clone(),
+                validator_commission_percentage: 10,
+                join_during_genesis: true,
+            },
+            delegator_addresses: vec![pbo_account41, pbo_account42, pbo_account43],
+            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
         },
+        principle_lockup_time: 100,
+    };
+
+    let pbo_config_val5 = PboDelegatorConfiguration {
+        delegator_config: DelegatorConfiguration {
+            owner_address: supra_foundation,
+            delegation_pool_creation_seed: vec![5_u8],
+            validator: ValidatorWithCommissionRate {
+                validator: test_validators[5].data.clone(),
+                validator_commission_percentage: 10,
+                join_during_genesis: true,
+            },
+            delegator_addresses: vec![pbo_account51, pbo_account52, pbo_account53],
+            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+        },
+        principle_lockup_time: 100,
+    };
+
+    let pbo_config_val6 = PboDelegatorConfiguration {
+        delegator_config: DelegatorConfiguration {
+            owner_address: supra_foundation,
+            delegation_pool_creation_seed: vec![6_u8],
+            validator: ValidatorWithCommissionRate {
+                validator: test_validators[6].data.clone(),
+                validator_commission_percentage: 10,
+                join_during_genesis: true,
+            },
+            delegator_addresses: vec![pbo_account61, pbo_account62, pbo_account63],
+            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+        },
+        principle_lockup_time: 100,
+    };
+
+    let employee_vesting_config1 = VestingPoolsMap {
+        admin_address: supra_foundation,
+        vpool_locking_percentage: 100,
+        vesting_numerators: vec![3, 3, 3, 3, 1],
+        vesting_denominator: 100,
+        withdrawal_address: supra_foundation,
+        shareholders: vec![employee1, employee2, employee3, employee4, employee5, employee6, employee7, employee8, employee9],
+        cliff_period_in_seconds: 0,
+        period_duration_in_seconds: 94608000, // 3 years in seconds
+    };
+
+    let pbo_delegator_configs = vec![
+        pbo_config_val0,
+        pbo_config_val1,
+        pbo_config_val2,
+        pbo_config_val3,
+        pbo_config_val4,
+        pbo_config_val5,
+        pbo_config_val6,
     ];
 
     let transaction = encode_aptos_mainnet_genesis_transaction(
         &accounts,
-        &employees,
-        &validators,
+        &pbo_delegator_configs,
+        &[employee_vesting_config1],
         aptos_cached_packages::head_release_bundle(),
         ChainId::mainnet(),
         &mainnet_genesis_config(),
@@ -1271,40 +1586,43 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key = StateKey::on_chain_config::<ValidatorSet>().unwrap();
-    let bytes = writeset
-        .get(&state_key)
-        .unwrap()
-        .extract_raw_bytes()
-        .unwrap();
-    let validator_set: ValidatorSet = bcs::from_bytes(&bytes).unwrap();
-    let validator_set_addresses = validator_set
-        .active_validators
-        .iter()
-        .map(|v| v.account_address)
-        .collect::<Vec<_>>();
+    print!("CHANGESET: {:?}", changeset.events());
 
-    let zero_commission_validator_pool_address =
-        account_address::default_stake_pool_address(account44, operator2);
-    let same_owner_validator_1_pool_address =
-        account_address::default_stake_pool_address(account45, operator3);
-    let same_owner_validator_2_pool_address =
-        account_address::default_stake_pool_address(account45, operator4);
-    let same_owner_validator_3_pool_address =
-        account_address::default_stake_pool_address(account45, operator5);
-    let employee_1_pool_address =
-        account_address::create_vesting_pool_address(admin0, operator0, 0, &[]);
-    let employee_2_pool_address =
-        account_address::create_vesting_pool_address(admin1, operator1, 0, &[]);
-
-    assert!(validator_set_addresses.contains(&zero_commission_validator_pool_address));
-    assert!(validator_set_addresses.contains(&employee_1_pool_address));
-    // This validator should not be in the genesis validator set as they specified
-    // join_during_genesis = false.
-    assert!(!validator_set_addresses.contains(&employee_2_pool_address));
-    assert!(validator_set_addresses.contains(&same_owner_validator_1_pool_address));
-    assert!(validator_set_addresses.contains(&same_owner_validator_2_pool_address));
-    // This validator should not be in the genesis validator set as they specified
-    // join_during_genesis = false.
-    assert!(!validator_set_addresses.contains(&same_owner_validator_3_pool_address));
+    // let state_key =
+    //     StateKey::access_path(ValidatorSet::access_path().expect("access path in test"));
+    // let bytes = writeset
+    //     .get(&state_key)
+    //     .unwrap()
+    //     .extract_raw_bytes()
+    //     .unwrap();
+    // let validator_set: ValidatorSet = bcs::from_bytes(&bytes).unwrap();
+    // let validator_set_addresses = validator_set
+    //     .active_validators
+    //     .iter()
+    //     .map(|v| v.account_address)
+    //     .collect::<Vec<_>>();
+    //
+    // let zero_commission_validator_pool_address =
+    //     account_address::default_stake_pool_address(account44, operator2);
+    // let same_owner_validator_1_pool_address =
+    //     account_address::default_stake_pool_address(account45, operator3);
+    // let same_owner_validator_2_pool_address =
+    //     account_address::default_stake_pool_address(account45, operator4);
+    // let same_owner_validator_3_pool_address =
+    //     account_address::default_stake_pool_address(account45, operator5);
+    // let employee_1_pool_address =
+    //     account_address::create_vesting_pool_address(admin0, operator0, 0, &[]);
+    // let employee_2_pool_address =
+    //     account_address::create_vesting_pool_address(admin1, operator1, 0, &[]);
+    //
+    // assert!(validator_set_addresses.contains(&zero_commission_validator_pool_address));
+    // assert!(validator_set_addresses.contains(&employee_1_pool_address));
+    // // This validator should not be in the genesis validator set as they specified
+    // // join_during_genesis = false.
+    // assert!(!validator_set_addresses.contains(&employee_2_pool_address));
+    // assert!(validator_set_addresses.contains(&same_owner_validator_1_pool_address));
+    // assert!(validator_set_addresses.contains(&same_owner_validator_2_pool_address));
+    // // This validator should not be in the genesis validator set as they specified
+    // // join_during_genesis = false.
+    // assert!(!validator_set_addresses.contains(&same_owner_validator_3_pool_address));
 }

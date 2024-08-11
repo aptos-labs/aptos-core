@@ -833,7 +833,7 @@ reconfiguration event.
             previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
             proposer: @vm_reserved,
             failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
-            time_microseconds: 0,
+            time_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>(),
         },
         <a href="block.md#0x1_block_NewBlock">NewBlock</a> {
             <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: genesis_id,
@@ -843,7 +843,7 @@ reconfiguration event.
             previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
             proposer: @vm_reserved,
             failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
-            time_microseconds: 0,
+            time_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>(),
         }
     );
 }
