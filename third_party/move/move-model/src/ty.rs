@@ -981,6 +981,24 @@ impl Type {
         }
     }
 
+    /// Drop reference, consuming the type.
+    pub fn drop_reference(self) -> Type {
+        if let Type::Reference(_, bt) = self {
+            *bt
+        } else {
+            self
+        }
+    }
+
+    /// If this is a reference, return its kind.
+    pub fn try_reference_kind(&self) -> Option<ReferenceKind> {
+        if let Type::Reference(k, _) = self {
+            Some(*k)
+        } else {
+            None
+        }
+    }
+
     /// If this is a struct type, replace the type instantiation.
     pub fn replace_struct_instantiation(&self, inst: &[Type]) -> Type {
         match self {
