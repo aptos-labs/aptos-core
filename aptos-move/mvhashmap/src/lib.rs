@@ -39,10 +39,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
-
-    // TODO(George): Redirect from modules to module_storage.
-    #[allow(dead_code)]
-    module_storage: VersionedModuleStorage<K, ()>,
+    module_storage: VersionedModuleStorage<K>,
 }
 
 impl<
@@ -95,6 +92,10 @@ impl<
 
     pub fn modules(&self) -> &VersionedModules<K, V, X> {
         &self.modules
+    }
+
+    pub fn module_storage(&self) -> &VersionedModuleStorage<K> {
+        &self.module_storage
     }
 }
 

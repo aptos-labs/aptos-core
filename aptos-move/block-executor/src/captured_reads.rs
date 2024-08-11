@@ -9,13 +9,13 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::{
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        ValueWithLayout, Version,
+        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, ShiftedTxnIndex,
+        StorageVersion, TxnIndex, ValueWithLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
-    versioned_module_storage::{ModuleReadError, VersionedModuleStorage},
+    versioned_module_storage::{ModuleStorageReadResult, VersionedModuleStorage},
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
@@ -286,6 +286,32 @@ impl DelayedFieldRead {
     }
 }
 
+/// Read captured from the module storage.
+// TODO(loader_v2): Just like for resource, optimize the representation here so we can resolve
+//                  based on it instead of going to the multi-version data structure.
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub(crate) enum ModuleStorageRead {
+    /// Whether the read module existed or not. Modules that are pending to be
+    /// published and committed yield this as well.
+    Exists(bool),
+    /// A version in multi-version data structure at which a module was read. This
+    /// includes storage version (thanks to [ShiftedTxnIndex]) and allows us to treat
+    /// all reads uniformly. These reads can only come from committed modules, as
+    /// otherwise we read that the module does not exist.
+    Versioned(ShiftedTxnIndex),
+}
+
+impl ModuleStorageRead {
+    /// Returns  a new read based on the result returned from a module storage query.
+    pub(crate) fn new(result: &ModuleStorageReadResult) -> Self {
+        use ModuleStorageReadResult::*;
+        match result {
+            Versioned(idx, _) => Self::Versioned(*idx),
+            DoesNotExist => Self::Exists(false),
+        }
+    }
+}
+
 /// Serves as a "read-set" of a transaction execution, and provides APIs for capturing reads,
 /// resolving new reads based on already captured reads when possible, and for validation.
 ///
@@ -298,9 +324,14 @@ impl DelayedFieldRead {
 pub(crate) struct CapturedReads<T: Transaction> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
-    // Currently, we record paths for triggering module R/W fallback.
-    // TODO: implement a general functionality once the fallback is removed.
+    /// Captured module reads if V1 loader is used.
     pub(crate) module_reads: Vec<T::Key>,
+    /// Captured module reads if V2 loader is used. Here, using a vector is important for
+    /// the correctness of the current implementation which always resolves reads through
+    /// the multi-version data structure. If we were to use something like a hash map, it
+    /// would have been possible for a transaction to observe different read results for
+    /// the same module, but only log one, thus not failing the validation!
+    module_storage_reads: Vec<(T::Key, ModuleStorageRead)>,
 
     delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
 
@@ -476,6 +507,16 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
+    /// Captures the read of a module storage entry.
+    pub(crate) fn capture_module_storage_read(
+        &mut self,
+        key: T::Key,
+        read_result: &ModuleStorageReadResult,
+    ) {
+        let read = ModuleStorageRead::new(read_result);
+        self.module_storage_reads.push((key.clone(), read));
+    }
+
     pub(crate) fn capture_delayed_field_read(
         &mut self,
         id: T::Identifier,
@@ -584,27 +625,22 @@ impl<T: Transaction> CapturedReads<T> {
         })
     }
 
-    #[allow(dead_code)]
     pub(crate) fn validate_module_reads(
         &self,
-        // TODO(George): Add concrete or generic type for module storage entry instead of unit.
-        module_storage: &VersionedModuleStorage<T::Key, ()>,
+        module_storage: &VersionedModuleStorage<T::Key>,
         idx_to_validate: TxnIndex,
     ) -> bool {
-        if self.speculative_failure {
+        if self.non_delayed_field_speculative_failure {
             return false;
         }
 
-        self.module_reads.iter().all(|k| {
-            use ModuleReadError::*;
-
-            match module_storage.read(k, idx_to_validate) {
-                Ok(_) => {
-                    // TODO(George): Use hash or transaction index to distinguish the reads.
-                    true
-                },
-                Err(Dependency(_)) | Err(Uninitialized) => false,
-            }
+        // Only successful module storage reads are captured. In case there were no base value,
+        // and fetching it returned an error, the error is not recorded. Hence, it is safe here
+        // to simply treat such errors as a non-existent value.
+        self.module_storage_reads.iter().all(|(k, previous_read)| {
+            let result = module_storage.get(k, ShiftedTxnIndex::new(idx_to_validate));
+            let new_read = ModuleStorageRead::new(&result);
+            previous_read == &new_read
         })
     }
 
@@ -716,6 +752,7 @@ impl<T: Transaction> CapturedReads<T> {
             }
         }
 
+        // TODO(loader_v2): We have a new set of reads now. We probably need to feature gate here as well?
         for key in &self.module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
@@ -747,6 +784,7 @@ impl<T: Transaction> CapturedReads<T> {
 pub(crate) struct UnsyncReadSet<T: Transaction> {
     pub(crate) resource_reads: HashSet<T::Key>,
     pub(crate) module_reads: HashSet<T::Key>,
+    pub(crate) module_storage_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<T::Identifier>,
 }
@@ -766,7 +804,11 @@ impl<T: Transaction> UnsyncReadSet<T> {
             }
         }
 
+        // TODO(loader_v2): Should we be using a feature flag here?
         for key in &self.module_reads {
+            ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+        for key in &self.module_storage_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
 

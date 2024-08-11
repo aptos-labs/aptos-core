@@ -667,7 +667,7 @@ impl Module {
         self.struct_instantiations[idx as usize].field_count
     }
 
-    pub(crate) fn module(&self) -> &CompiledModule {
+    pub fn module(&self) -> &CompiledModule {
         &self.module
     }
 

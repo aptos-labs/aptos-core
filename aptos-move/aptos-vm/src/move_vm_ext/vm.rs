@@ -19,7 +19,10 @@ use aptos_types::{
     vm::configs::aptos_prod_vm_config,
 };
 use aptos_vm_types::{
-    environment::{aptos_default_ty_builder, aptos_prod_ty_builder, Environment},
+    environment::{
+        aptos_default_ty_builder, aptos_prod_ty_builder, fetch_runtime_environment,
+        set_runtime_environment, Environment,
+    },
     module_and_script_storage::{AptosCodeStorageAdapter, AsAptosCodeStorage},
     storage::change_set_configs::ChangeSetConfigs,
 };
@@ -151,13 +154,15 @@ impl MoveVmExt {
             .features()
             .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
 
+        // TODO(loader_v2): Instead, propagate environment down to Block-STM.
+        set_runtime_environment(
+            vm_config.clone(),
+            aptos_natives_with_builder(&mut builder, inject_create_signer_for_gov_sim),
+        );
         let vm = if env.features().is_loader_v2_enabled() {
             // TODO(loader_v2): For now re-create the VM every time. Later we can have a
             //                  single VM created once.
-            MoveVM::new_with_config(
-                aptos_natives_with_builder(&mut builder, inject_create_signer_for_gov_sim),
-                vm_config,
-            )
+            MoveVM::new_with_runtime_environment(fetch_runtime_environment())
         } else {
             WarmVmCache::get_warm_vm(
                 builder,

@@ -48,9 +48,9 @@ pub(crate) struct LoaderV2 {
 }
 
 impl LoaderV2 {
-    pub(crate) fn new(runtime_env: RuntimeEnvironment) -> Self {
+    pub(crate) fn new(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
         Self {
-            runtime_environment: Arc::new(runtime_env),
+            runtime_environment,
             ty_cache: RwLock::new(TypeCache::empty()),
         }
     }
