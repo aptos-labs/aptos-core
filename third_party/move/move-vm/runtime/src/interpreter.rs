@@ -841,8 +841,8 @@ impl Interpreter {
                 )
             },
         };
-        let struct_name = &*loader.get_struct_name(struct_idx);
-        if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
+        let struct_name = loader.get_struct_name(struct_idx);
+        if let Some(access) = AccessInstance::new(kind, &struct_name, instance, addr) {
             self.access_control.check_access(access)?
         }
         Ok(())
