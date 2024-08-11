@@ -55,6 +55,7 @@ use bytes::Bytes;
 use claims::assert_ok;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::RuntimeEnvironment;
 use move_vm_types::{
     delayed_values::delayed_field_id::ExtractUniqueIndex,
     value_serde::{
@@ -160,7 +161,7 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
-    captured_reads: RefCell<CapturedReads<T>>,
+    pub(crate) captured_reads: RefCell<CapturedReads<T>>,
 }
 
 fn get_delayed_field_value_impl<T: Transaction>(
@@ -962,18 +963,21 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// must be set according to the latest transaction that the worker was / is executing.
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
+    pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T, X>,
-    txn_idx: TxnIndex,
+    pub(crate) txn_idx: TxnIndex,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
     pub(crate) fn new(
         base_view: &'a S,
+        runtime_environment: &'a RuntimeEnvironment,
         latest_view: ViewState<'a, T, X>,
         txn_idx: TxnIndex,
     ) -> Self {
         Self {
             base_view,
+            runtime_environment,
             latest_view,
             txn_idx,
         }
@@ -1021,7 +1025,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    fn get_raw_base_value(&self, state_key: &T::Key) -> PartialVMResult<Option<StateValue>> {
+    pub(crate) fn get_raw_base_value(
+        &self,
+        state_key: &T::Key,
+    ) -> PartialVMResult<Option<StateValue>> {
         let ret = self.base_view.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Unexpected storage error for {:?}: {:?}",
@@ -1534,6 +1541,21 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
             state_key,
         );
 
+        // Enforce feature gating V2 loader implementation: TModuleView is no longer used in
+        // V2 interfaces because we implement storage traits directly. Use a debug assert to
+        // panic in tests, adn invariant violation for non-debug builds.
+        if self.runtime_environment.vm_config().use_loader_v2 {
+            let msg =
+                "ModuleView trait should not be used when loader V2 implementation is enabled"
+                    .to_string();
+            let err = Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg),
+            );
+            debug_assert!(err.is_ok());
+            return err;
+        }
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 use MVModulesError::*;
@@ -1556,10 +1578,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                     .borrow_mut()
                     .module_reads
                     .insert(state_key.clone());
-                state.unsync_map.fetch_module(state_key).map_or_else(
-                    || self.get_raw_base_value(state_key),
-                    |v| Ok(v.as_state_value()),
-                )
+                state
+                    .unsync_map
+                    .fetch_module_for_loader_v2(state_key)
+                    .map_or_else(
+                        || self.get_raw_base_value(state_key),
+                        |v| Ok(v.as_state_value()),
+                    )
             },
         }
     }
@@ -2441,8 +2466,13 @@ mod test {
         let counter = RefCell::new(5);
         let base_view = MockStateView::new(HashMap::new());
         let start_counter = 5;
+
+        // FIXME
+        let runtime_environment = RuntimeEnvironment::test();
+
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
+            &runtime_environment,
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
         );
@@ -2705,6 +2735,7 @@ mod test {
         unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
         counter: RefCell<u32>,
         base_view: MockStateView,
+        runtime_environment: RuntimeEnvironment,
     }
 
     impl Holder {
@@ -2712,10 +2743,14 @@ mod test {
             let unsync_map = UnsyncMap::new();
             let counter = RefCell::new(start_counter);
             let base_view = MockStateView::new(data);
+
+            // FIXME
+            let runtime_environment = RuntimeEnvironment::test();
             Self {
                 unsync_map,
                 counter,
                 base_view,
+                runtime_environment,
             }
         }
     }
@@ -2728,6 +2763,7 @@ mod test {
 
         LatestView::<'a, TestTransactionType, MockStateView, MockExecutable>::new(
             &h.base_view,
+            &h.runtime_environment,
             ViewState::Unsync(sequential_state),
             1,
         )
@@ -2738,6 +2774,7 @@ mod test {
         holder: Holder,
         counter: AtomicU32,
         base_view: MockStateView,
+        runtime_environment: RuntimeEnvironment,
         versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
         scheduler: Scheduler,
     }
@@ -2750,11 +2787,15 @@ mod test {
             let versioned_map = MVHashMap::new();
             let scheduler = Scheduler::new(30);
 
+            // FIXME
+            let runtime_environment = RuntimeEnvironment::test();
+
             Self {
                 start_counter,
                 holder,
                 counter,
                 base_view,
+                runtime_environment,
                 versioned_map,
                 scheduler,
             }
@@ -2765,6 +2806,7 @@ mod test {
             let latest_view_par =
                 LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
                     &self.base_view,
+                    &self.runtime_environment,
                     ViewState::Sync(ParallelState::new(
                         &self.versioned_map,
                         &self.scheduler,

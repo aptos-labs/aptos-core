@@ -5,15 +5,37 @@ use aptos_gas_schedule::{gas_feature_versions::RELEASE_V1_15, AptosGasParameters
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{
-        ConfigurationResource, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
-        TimedFeaturesBuilder,
+        ConfigurationResource, FeatureFlag, Features, OnChainConfig, TimedFeatureOverride,
+        TimedFeatures, TimedFeaturesBuilder,
     },
     state_store::StateView,
     vm::configs::{aptos_prod_vm_config, get_timed_feature_override},
 };
-use move_vm_runtime::config::VMConfig;
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_vm_runtime::{
+    config::VMConfig, native_functions::NativeFunction, use_loader_v2_based_on_env,
+    RuntimeEnvironment,
+};
 use move_vm_types::loaded_data::runtime_types::TypeBuilder;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+// TODO(loader_v2): Remove this, it is for tests only.
+static ENV: OnceLock<Arc<RuntimeEnvironment>> = OnceLock::new();
+
+pub fn set_runtime_environment(
+    vm_config: VMConfig,
+    natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+) {
+    ENV.set(Arc::new(RuntimeEnvironment::new(vm_config, natives, None)))
+        .ok();
+}
+
+pub fn fetch_runtime_environment() -> Arc<RuntimeEnvironment> {
+    match ENV.get() {
+        Some(runtime_environment) => runtime_environment.clone(),
+        None => unreachable!(),
+    }
+}
 
 // TODO(George): move configs here from types crate.
 pub fn aptos_prod_ty_builder(
@@ -49,7 +71,10 @@ pub struct Environment {
 
 impl Environment {
     pub fn new(state_view: &impl StateView) -> Self {
-        let features = Features::fetch_config(state_view).unwrap_or_default();
+        let mut features = Features::fetch_config(state_view).unwrap_or_default();
+        if use_loader_v2_based_on_env() {
+            features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        }
 
         // If no chain ID is in storage, we assume we are in a testing environment.
         let chain_id = ChainId::fetch_config(state_view).unwrap_or_else(ChainId::test);
