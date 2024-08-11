@@ -1134,6 +1134,7 @@ dependencies = [
  "crossbeam-channel",
  "dashmap",
  "either",
+ "fastrand 2.0.1",
  "hex",
  "indicatif 0.15.0",
  "itertools 0.12.1",

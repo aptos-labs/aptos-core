@@ -26,6 +26,7 @@ use std::{
     fmt::{Debug, Formatter},
     sync::Arc,
 };
+use std::time::SystemTime;
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -279,13 +280,12 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        let _timer;
-            let mut do_metrics = false;
-            if fastrand::u32(0..500) < 1 {
-               do_metrics = true;
-            }
+        let mut do_metrics = false;
+        if fastrand::u32(0..500) < 1 {
+           do_metrics = true;
+        }
         if do_metrics {
-            _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
+            let curr_time1 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos() as u64;
             // First check if the cache has the state value.
             let timer1 = TIMER.with_label_values(&["get_state_value_dash_map_lock"]).start_timer();
             if let Some(version_and_value_opt) = self
@@ -295,6 +295,8 @@ impl TStateView for CachedStateView {
             {
                 // This can return None, which means the value has been deleted from the DB.
                 let value_opt = &version_and_value_opt.1;
+                let curr_time2 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos() as u64;
+                TIMER.with_label_values(&["get_state_value_cache"]).observe((curr_time2 - curr_time1) as f64 / (1000 * 1000 * 1000) as f64);
                 return Ok(value_opt.clone());
             }
             drop(timer1);
@@ -311,6 +313,8 @@ impl TStateView for CachedStateView {
                 .or_insert(version_and_state_value_option);
             drop(timer3);
             let value_opt = &new_version_and_value.1;
+            let curr_time2 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos() as u64;
+            TIMER.with_label_values(&["get_state_value_internal"]).observe((curr_time2 - curr_time1) as f64 / (1000 * 1000 * 1000) as f64);
             Ok(value_opt.clone())
         }
         else {

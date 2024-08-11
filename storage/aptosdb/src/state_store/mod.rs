@@ -146,18 +146,51 @@ impl DbReader for StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        let mut read_opts = ReadOptions::default();
-        // We want `None` if the state_key changes in iteration.
-        read_opts.set_prefix_same_as_start(true);
-        let mut iter = self
-            .state_kv_db
-            .db_shard(state_key.get_shard_id())
-            .iter::<StateValueSchema>(read_opts)?;
-        iter.seek(&(state_key.clone(), version))?;
-        Ok(iter
-            .next()
-            .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+        let mut do_metrics = false;
+        if fastrand::u32(0..500) < 1 {
+            do_metrics = true;
+        }
+        if do_metrics {
+            let timer1 = OTHER_TIMERS_SECONDS
+                .with_label_values(&["get_state_value_with_version_by_version_set_prefix"])
+                .start_timer();
+            let mut read_opts = ReadOptions::default();
+            // We want `None` if the state_key changes in iteration.
+            read_opts.set_prefix_same_as_start(true);
+            drop(timer1);
+            let timer2 = OTHER_TIMERS_SECONDS
+                .with_label_values(&["get_state_value_with_version_by_version_get_iter"])
+                .start_timer();
+            let mut iter = self
+                .state_kv_db
+                .db_shard(state_key.get_shard_id())
+                .iter::<StateValueSchema>(read_opts)?;
+            drop(timer2);
+            let timer3 = OTHER_TIMERS_SECONDS
+                .with_label_values(&["get_state_value_with_version_by_version_seek"])
+                .start_timer();
+            iter.seek(&(state_key.clone(), version))?;
+            drop(timer3);
+            Ok(iter
+                .next()
+                .transpose()?
+                .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+        }
+        else {
+            let mut read_opts = ReadOptions::default();
+            // We want `None` if the state_key changes in iteration.
+            read_opts.set_prefix_same_as_start(true);
+            let mut iter = self
+                .state_kv_db
+                .db_shard(state_key.get_shard_id())
+                .iter::<StateValueSchema>(read_opts)?;
+            iter.seek(&(state_key.clone(), version))?;
+            Ok(iter
+                .next()
+                .transpose()?
+                .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+        }
+
     }
 
     /// Returns the proof of the given state key and version.

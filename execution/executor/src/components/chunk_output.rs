@@ -107,6 +107,7 @@ impl ChunkOutput {
                 .map(|t| t.into_txn().into_inner())
                 .collect();
             sender.send(flattened_txns).unwrap();
+            drop(_timer);
         //});
 
         let transaction_outputs = Self::execute_block_sharded::<V>(
