@@ -431,6 +431,7 @@ impl DbReader for AptosDB {
         state_store_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
+        // TIMER DELETED
         gauged_api("get_state_value_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
@@ -444,12 +445,13 @@ impl DbReader for AptosDB {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        gauged_api("get_state_value_with_version_by_version", || {
+        // TIMER Deleted
+        //gauged_api("get_state_value_with_version_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             self.state_store
                 .get_state_value_with_version_by_version(state_key, version)
-        })
+        //})
     }
 
     /// Returns the proof of the given state key and version.

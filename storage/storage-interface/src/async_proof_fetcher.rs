@@ -60,9 +60,13 @@ impl AsyncProofFetcher {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        let _timer = TIMER
-            .with_label_values(&["async_proof_fetcher_fetch"])
-            .start_timer();
+
+        let _timer;
+        if fastrand::u32(0..500) < 1 {
+            _timer = TIMER
+                .with_label_values(&["async_proof_fetcher_fetch"])
+                .start_timer();
+        }
         Ok(self
             .reader
             .get_state_value_with_version_by_version(state_key, version)?)
