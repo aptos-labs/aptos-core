@@ -65,7 +65,7 @@ impl RuntimeEnvironment {
     /// Creates a new runtime environment with native functions and VM configurations.
     /// If there are duplicated natives, creation panics. Also, callers can provide
     /// verification extensions to add hooks on top of a bytecode verifier.
-    pub(crate) fn new(
+    pub fn new(
         vm_config: VMConfig,
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         verifier_extension: Option<Arc<dyn VerifierExtension>>,

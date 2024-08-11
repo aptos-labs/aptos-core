@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
+use parking_lot::RwLock;
 use std::collections::BTreeMap;
 
 #[derive(Clone)]
@@ -24,21 +24,19 @@ impl StructNameIndexMap {
     }
 
     pub(crate) fn struct_name_to_idx(&self, struct_name: StructIdentifier) -> StructNameIndex {
-        if let Some(idx) = self.0.read().forward_map.get(&struct_name) {
+        let mut index_map = self.0.write();
+        if let Some(idx) = index_map.forward_map.get(&struct_name) {
             return StructNameIndex(*idx);
         }
-        let mut index_map = self.0.write();
         let idx = index_map.backward_map.len();
         index_map.forward_map.insert(struct_name.clone(), idx);
         index_map.backward_map.push(struct_name);
         StructNameIndex(idx)
     }
 
-    pub(crate) fn idx_to_struct_name(
-        &self,
-        idx: StructNameIndex,
-    ) -> MappedRwLockReadGuard<StructIdentifier> {
-        RwLockReadGuard::map(self.0.read(), |index_map| &index_map.backward_map[idx.0])
+    pub(crate) fn idx_to_struct_name(&self, idx: StructNameIndex) -> StructIdentifier {
+        // TODO(loader_v2): Avoid cloning here, changed for now to avoid deadlocks.
+        self.0.read().backward_map[idx.0].clone()
     }
 }
 
@@ -83,10 +81,10 @@ mod test {
         assert_eq!(bar_idx.0, 1);
 
         // Check that struct names actually correspond to indices.
-        let returned_foo = &*struct_name_idx_map.idx_to_struct_name(foo_idx);
-        assert_eq!(returned_foo, &foo);
-        let returned_bar = &*struct_name_idx_map.idx_to_struct_name(bar_idx);
-        assert_eq!(returned_bar, &bar);
+        let returned_foo = struct_name_idx_map.idx_to_struct_name(foo_idx);
+        assert_eq!(&returned_foo, &foo);
+        let returned_bar = struct_name_idx_map.idx_to_struct_name(bar_idx);
+        assert_eq!(&returned_bar, &bar);
 
         // Re-check indices on second access.
         let foo_idx = struct_name_idx_map.struct_name_to_idx(foo);

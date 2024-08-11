@@ -36,7 +36,7 @@ use move_vm_types::{
         AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
     },
 };
-use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock};
+use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     hash::Hash,
@@ -150,18 +150,18 @@ impl Loader {
 
     versioned_loader_getter!(runtime_environment, RuntimeEnvironment);
 
-    pub(crate) fn v1(runtime_env: RuntimeEnvironment) -> Self {
+    pub(crate) fn v1(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::empty()),
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
-            runtime_environment: Arc::new(runtime_env),
+            runtime_environment,
         })
     }
 
-    pub(crate) fn v2(runtime_env: RuntimeEnvironment) -> Self {
-        Self::V2(LoaderV2::new(runtime_env))
+    pub(crate) fn v2(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
+        Self::V2(LoaderV2::new(runtime_environment))
     }
 
     /// Flush this cache if it is marked as invalidated.
@@ -310,10 +310,7 @@ impl Loader {
     // Internal helpers
     //
 
-    pub(crate) fn get_struct_name(
-        &self,
-        struct_idx: StructNameIndex,
-    ) -> MappedRwLockReadGuard<StructIdentifier> {
+    pub(crate) fn get_struct_name(&self, struct_idx: StructNameIndex) -> StructIdentifier {
         match self {
             Self::V1(loader) => loader
                 .struct_name_index_map()
@@ -1750,7 +1747,7 @@ impl Loader {
             .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        let name = &*self
+        let name = self
             .struct_name_index_map()
             .idx_to_struct_name(struct_name_idx);
         let struct_tag = StructTag {
@@ -1843,10 +1840,10 @@ impl Loader {
             StructLayout::Single(fields) => {
                 // Some types can have fields which are lifted at serialization or deserialization
                 // times. Right now these are Aggregator and AggregatorSnapshot.
-                let struct_name = &*self
+                let struct_name = self
                     .struct_name_index_map()
                     .idx_to_struct_name(struct_name_idx);
-                let maybe_mapping = self.get_identifier_mapping_kind(struct_name);
+                let maybe_mapping = self.get_identifier_mapping_kind(&struct_name);
 
                 let field_tys = fields
                     .iter()
@@ -2263,14 +2260,14 @@ impl Loader {
             //       correct because some other thread can cache depth formula before we reach
             //       this line, and result in an invariant violation. We need to ensure correct
             //       behavior, e.g., make the cache available per thread.
-            let struct_name = &*self
+            let struct_name = self
                 .struct_name_index_map()
                 .idx_to_struct_name(struct_name_idx);
 
             // TODO(loader_v2): Revisit tis, because now we do share the VM...
             println!(
                 "ERROR: Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached: {:?}",
-                struct_name,
+                &struct_name,
                 formula,
                 struct_type.as_ref(),
                 f

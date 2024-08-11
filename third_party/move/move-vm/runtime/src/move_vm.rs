@@ -51,7 +51,13 @@ impl MoveVM {
         Self {
             // TODO(loader_v2): Propagate up to AptosVM layer, the environment needs
             //                  to be passed by callers.
-            runtime: VMRuntime::new(RuntimeEnvironment::new(vm_config, natives, None)),
+            runtime: VMRuntime::new(Arc::new(RuntimeEnvironment::new(vm_config, natives, None))),
+        }
+    }
+
+    pub fn new_with_runtime_environment(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
+        Self {
+            runtime: VMRuntime::new(runtime_environment),
         }
     }
 
