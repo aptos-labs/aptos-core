@@ -15,10 +15,7 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::{
-    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ExecutableTestType,
-};
+use aptos_types::{block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent};
 use claims::{assert_matches, assert_ok};
 use num_cpus;
 use proptest::{
@@ -76,7 +73,6 @@ fn run_transactions<K, V, E>(
             MockTask<KeyType<K>, E>,
             EmptyDataView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
@@ -213,7 +209,6 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
@@ -266,7 +261,6 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
@@ -423,7 +417,6 @@ fn publishing_fixed_params_with_block_gas_limit(
         MockTask<KeyType<[u8; 32]>, MockEvent>,
         DeltaDataView<KeyType<[u8; 32]>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-        ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
         executor_thread_pool,
@@ -464,7 +457,6 @@ fn publishing_fixed_params_with_block_gas_limit(
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             DeltaDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(
                 num_cpus::get(),
@@ -546,7 +538,6 @@ fn non_empty_group(
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
@@ -565,7 +556,6 @@ fn non_empty_group(
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),

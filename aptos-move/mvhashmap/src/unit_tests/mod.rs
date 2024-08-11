@@ -17,7 +17,6 @@ use aptos_aggregator::{
     delta_math::DeltaHistory,
 };
 use aptos_types::{
-    executable::ExecutableTestType,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::state_value::{StateValue, StateValueMetadata},
     write_set::WriteOpKind,
@@ -39,8 +38,7 @@ fn match_unresolved(
 
 #[test]
 fn unsync_map_data_basic() {
-    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
-        UnsyncMap::new();
+    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ()> = UnsyncMap::new();
 
     let ap = KeyType(b"/foo/b".to_vec());
 
@@ -101,8 +99,7 @@ impl TransactionWrite for TestMetadataValue {
 fn write_metadata() {
     let ap = KeyType(b"/foo/b".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestMetadataValue, ExecutableTestType, ()> =
-        MVHashMap::new();
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestMetadataValue, ()> = MVHashMap::new();
 
     let metadata_5 = TestMetadataValue { metadata: 5 };
     let metadata_6 = TestMetadataValue { metadata: 6 };
@@ -131,8 +128,7 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
-        MVHashMap::new();
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ()> = MVHashMap::new();
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data(&ap1, 5);
@@ -309,12 +305,16 @@ fn materialize_delta_shortcut() {
     match_unresolved(vd.fetch_data(&ap, 10), SignedU128::Positive(30));
     assert_err_eq!(
         vd.materialize_delta(&ap, 8),
-        DeltaOp::new(SignedU128::Positive(30), limit, DeltaHistory {
-            max_achieved_positive_delta: 30,
-            min_achieved_negative_delta: 0,
-            min_overflow_positive_delta: None,
-            max_underflow_negative_delta: None,
-        })
+        DeltaOp::new(
+            SignedU128::Positive(30),
+            limit,
+            DeltaHistory {
+                max_achieved_positive_delta: 30,
+                min_achieved_negative_delta: 0,
+                min_overflow_positive_delta: None,
+                max_underflow_negative_delta: None,
+            }
+        )
     );
     vd.set_base_value(
         ap.clone(),

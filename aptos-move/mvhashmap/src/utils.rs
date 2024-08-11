@@ -4,7 +4,8 @@
 use aptos_crypto::hash::{DefaultHasher, HashValue};
 use aptos_types::write_set::TransactionWrite;
 
-pub(crate) fn module_hash<V: TransactionWrite>(module: &V) -> HashValue {
+#[allow(dead_code)]
+fn module_hash<V: TransactionWrite>(module: &V) -> HashValue {
     module
         .extract_raw_bytes()
         .map(|bytes| {

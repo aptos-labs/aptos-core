@@ -9,7 +9,6 @@ use super::{
 use crate::types::ValueWithLayout;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
-    executable::ExecutableTestType,
     state_store::state_value::StateValue,
     write_set::{TransactionWrite, WriteOpKind},
 };
@@ -222,7 +221,7 @@ where
 
     let baseline = Baseline::new(transactions.as_slice(), test_group);
     // Only testing data, provide executable type ().
-    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType, ()>::new();
+    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ()>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.
@@ -349,8 +348,12 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(None);
                         if test_group {
-                            map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
+                            map.group_data().write(
+                                key,
+                                idx as TxnIndex,
+                                1,
+                                vec![(5, (value, None))],
+                            );
                         } else {
                             map.data()
                                 .write(key, idx as TxnIndex, 1, Arc::new(value), None);
@@ -360,8 +363,12 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(Some(v.clone()));
                         if test_group {
-                            map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
+                            map.group_data().write(
+                                key,
+                                idx as TxnIndex,
+                                1,
+                                vec![(5, (value, None))],
+                            );
                         } else {
                             map.data()
                                 .write(key, idx as TxnIndex, 1, Arc::new(value), None);
