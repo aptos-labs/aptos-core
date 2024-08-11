@@ -18,6 +18,7 @@ use aptos_types::{
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{
         errors::StateviewError,
+        state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -25,7 +26,10 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
-use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
+use aptos_vm_types::{
+    module_and_script_storage::code_storage::AptosCodeStorage,
+    resolver::{TExecutorView, TResourceGroupView},
+};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
 use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
@@ -154,6 +158,10 @@ pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
 impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> {
     fn is_module_path(&self) -> bool {
         self.1
+    }
+
+    fn from_state_key(_state_key: StateKey) -> Self {
+        unimplemented!()
     }
 
     fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
@@ -862,6 +870,7 @@ where
         &self,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
+        _code_storage: &impl AptosCodeStorage,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
