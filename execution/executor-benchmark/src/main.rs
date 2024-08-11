@@ -441,10 +441,10 @@ fn main() {
             .unwrap()
             .as_millis() as i64,
     );
-    rayon::ThreadPoolBuilder::new()
-        .thread_name(|index| format!("rayon-global-{}", index))
-        .build_global()
-        .expect("Failed to build rayon global thread pool.");
+    // rayon::ThreadPoolBuilder::new()
+    //     .thread_name(|index| format!("rayon-global-{}", index))
+    //     .build_global()
+    //     .expect("Failed to build rayon global thread pool.");
 
     aptos_node_resource_metrics::register_node_metrics_collector();
     let _mp = MetricsPusher::start_for_local_run("executor-benchmark");

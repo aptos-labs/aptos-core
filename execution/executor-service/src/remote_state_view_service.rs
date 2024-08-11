@@ -70,19 +70,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let num_kv_req_threads = num_cpus::get() / 16;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
-        /*let mut thread_pool = vec![];
-        for _ in 0..remote_shard_addresses.len() {
-            thread_pool.push(
-                rayon::ThreadPoolBuilder::new()
-                    .num_threads(num_threads)
-                    .thread_name(|i| format!("remote-state-view-service-kv-request-handler-{}", i))
-                    .build()
-                    .unwrap(),
-            );
-        }*/
         let thread_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
-            .thread_name(|i| format!("remote-state-view-service-kv-request-handler-{}", i))
+            .thread_name(|i| format!("kv-req-hand-{}", i))
             .build()
             .unwrap();
         let kv_request_type = "remote_kv_request";

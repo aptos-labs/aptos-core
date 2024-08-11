@@ -18,13 +18,13 @@ impl ThreadsPriorityThreadManager {
         // TODO(grao): Make priorities and thread numbers configurable.
         let exe_threads = spawn_rayon_thread_pool_with_start_hook(
             "exe".into(),
-            Some(num_exe_threads),
+            Some(1), //Some(num_exe_threads),
             set_thread_nice_value(-20),
         );
 
         let non_exe_threads = spawn_rayon_thread_pool_with_start_hook(
             "non_exe".into(),
-            Some(16),
+            Some(1), //Some(16),
             set_thread_nice_value(-10),
         );
 

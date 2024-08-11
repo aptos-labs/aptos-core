@@ -97,7 +97,7 @@ impl ChunkOutput {
         drop(timer);
 
         let (sender, receiver) = mpsc::channel();
-        rayon::spawn(move || {
+        //rayon::spawn(move || {
             let _timer = TIMER
                 .with_label_values(&["flatten_transactions"])
                 .start_timer();
@@ -107,7 +107,7 @@ impl ChunkOutput {
                 .map(|t| t.into_txn().into_inner())
                 .collect();
             sender.send(flattened_txns).unwrap();
-        });
+        //});
 
         let transaction_outputs = Self::execute_block_sharded::<V>(
             transactions_arc,
