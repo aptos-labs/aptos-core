@@ -20,6 +20,7 @@ use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::RuntimeEnvironment;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -131,20 +132,26 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         input: CapturedReads<T>,
         output: ExecutionStatus<O, E>,
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
+        runtime_environment: &RuntimeEnvironment,
     ) -> bool {
-        let written_modules = match &output {
-            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                output.module_write_set()
-            },
-            ExecutionStatus::Abort(_)
-            | ExecutionStatus::SpeculativeExecutionAbortError(_)
-            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
-        };
+        if !runtime_environment.vm_config().use_loader_v2 {
+            // Loader V1 implementation does not support concurrent module publishing, and so
+            // we need to record if there is one and fall back to sequential execution.
+            let written_modules = match &output {
+                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                    output.module_write_set()
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
+            };
 
-        if self
-            .check_and_append_module_rw_conflict(input.module_reads.iter(), written_modules.keys())
-        {
-            return false;
+            if self.check_and_append_module_rw_conflict(
+                input.module_reads.iter(),
+                written_modules.keys(),
+            ) {
+                return false;
+            }
         }
 
         *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
@@ -301,6 +308,20 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                                 .map(|(k, _)| (k, KeyKind::Group)),
                         ),
                 ),
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
+    pub(crate) fn module_write_set(&self, txn_idx: TxnIndex) -> Option<BTreeMap<T::Key, T::Value>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.module_write_set())
+                },
                 ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,

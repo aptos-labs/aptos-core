@@ -47,7 +47,7 @@ impl Clone for VMRuntime {
 
 impl VMRuntime {
     /// Creates a new runtime instance with provided environment.
-    pub(crate) fn new(runtime_env: RuntimeEnvironment) -> Self {
+    pub(crate) fn new(runtime_env: Arc<RuntimeEnvironment>) -> Self {
         let loader = if runtime_env.vm_config().use_loader_v2 {
             Loader::v2(runtime_env)
         } else {

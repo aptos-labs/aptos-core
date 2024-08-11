@@ -10,6 +10,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_types::{
     delayed_fields::PanicError,
     executable::{Executable, ModulePath},
+    vm::modules::ModuleStorageEntry,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
@@ -45,10 +46,12 @@ pub struct UnsyncMap<
     group_cache: RefCell<HashMap<K, RefCell<HashMap<T, ValueWithLayout<V>>>>>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 
+    module_storage: RefCell<HashMap<K, Arc<ModuleStorageEntry>>>,
+
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
 
-    // TODO(George):
+    // TODO(loader_v2):
     //   Remove phantom data when we use X: Executable (or other trait) to pass
     //   here for modules.
     phantom_data: PhantomData<X>,
@@ -66,6 +69,7 @@ impl<
         Self {
             resource_map: RefCell::new(HashMap::new()),
             module_map: RefCell::new(HashMap::new()),
+            module_storage: RefCell::new(HashMap::new()),
             group_cache: RefCell::new(HashMap::new()),
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
@@ -92,6 +96,7 @@ impl<
             num_resources: self.resource_map.borrow().len(),
             num_resource_groups: self.group_cache.borrow().len(),
             num_delayed_fields: self.delayed_field_map.borrow().len(),
+            // TODO(loader_v2): Fix this, should be based on the feature flag.
             num_modules: self.module_map.borrow().len(),
             base_resources_size: self.total_base_resource_size.load(Ordering::Relaxed),
             base_delayed_fields_size: self.total_base_delayed_field_size.load(Ordering::Relaxed),
@@ -233,11 +238,15 @@ impl<
         })
     }
 
-    pub fn fetch_module(&self, key: &K) -> Option<Arc<V>> {
+    pub fn fetch_module_for_loader_v2(&self, key: &K) -> Option<Arc<V>> {
         self.module_map
             .borrow()
             .get(key)
             .map(|entry| entry.0.clone())
+    }
+
+    pub fn fetch_module(&self, key: &K) -> Option<Arc<ModuleStorageEntry>> {
+        self.module_storage.borrow().get(key).cloned()
     }
 
     pub fn fetch_delayed_field(&self, id: &I) -> Option<DelayedFieldValue> {
@@ -254,6 +263,12 @@ impl<
         self.module_map
             .borrow_mut()
             .insert(key, (Arc::new(value), None));
+    }
+
+    pub fn write_module_storage_entry(&self, key: K, entry: ModuleStorageEntry) {
+        self.module_storage
+            .borrow_mut()
+            .insert(key, Arc::new(entry));
     }
 
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
