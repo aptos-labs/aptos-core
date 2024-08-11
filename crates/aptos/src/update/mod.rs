@@ -9,6 +9,7 @@ mod helpers;
 mod movefmt;
 mod revela;
 mod tool;
+mod update_helper;
 
 use crate::common::types::CliTypedResult;
 use anyhow::{anyhow, Context, Result};
@@ -87,7 +88,9 @@ impl UpdateRequiredInfo {
     pub fn update_required(&self) -> Result<bool> {
         match self.current_version {
             Some(ref current_version) => {
-                // remove ".beta" or ".rc" for version comparison
+                // ignore ".beta" or ".rc" for version comparison
+                // because bump_is_greater only supports comparison bewteen `x.y.z`
+                // as a result, `1.0.0.rc1` cannot be updated to `1.0.0.rc2`
                 let target_version = if self.target_version.ends_with(".beta") {
                     &self.target_version[0..self.target_version.len() - 5]
                 } else if self.target_version.ends_with(".rc") {
