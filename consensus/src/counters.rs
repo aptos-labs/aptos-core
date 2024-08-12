@@ -30,6 +30,8 @@ pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
 pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
 /// Transaction commit failed (will not be retried) because of a duplicate
 pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
+/// Transaction commit failed (will not be retried) because it expired
+pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
@@ -1178,6 +1180,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
                         TXN_COMMIT_RETRY_LABEL
                     } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
                         TXN_COMMIT_FAILED_DUPLICATE_LABEL
+                    } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
+                        TXN_COMMIT_FAILED_EXPIRED_LABEL
                     } else {
                         TXN_COMMIT_FAILED_LABEL
                     }
