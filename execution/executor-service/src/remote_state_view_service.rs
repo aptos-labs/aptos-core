@@ -293,7 +293,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         outbound_rpc_scheduler.send(resp_message,
                                     MessageType::new("remote_kv_response".to_string()),
                                     kv_tx_clone[shard_id][rand_send_thread_idx].clone(),
-                                    seq_num * 2); // handicap for cmd
+                                    seq_num + 2); // handicap for cmd
         drop(timer_6);
         {
             let curr_time = SystemTime::now()
