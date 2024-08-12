@@ -380,6 +380,7 @@ message MoveFunction {
 message MoveStruct {
   string name = 1;
   bool is_native = 2;
+  bool is_event = 6;
   repeated MoveAbility abilities = 3;
   repeated MoveStructGenericTypeParam generic_type_params = 4;
   repeated MoveStructField fields = 5;

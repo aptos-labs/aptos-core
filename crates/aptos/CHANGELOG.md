@@ -3,6 +3,9 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- **Breaking Change**: change key rotation options such that user has to either pass the name of a new profile or explicitly flag that no profile should be generated, since without this update the interactive profile generator could fail out after the key has already been rotated. This forces the check for new profile validity before doing anything onchain.
+- Add support for key rotation to/from Ledger hardware wallets.
+- Fixes a bug in the Move Prover leading to internal error in generated boogie (error 'global `#0_info` cannot be accessed')
 
 ## [3.5.1] - 2024/07/21
 - Upgraded indexer processors for localnet from 5244b84fa5ed872e5280dc8df032d744d62ad29d to fa1ce4947f4c2be57529f1c9732529e05a06cb7f. Upgraded Hasura metadata accordingly.

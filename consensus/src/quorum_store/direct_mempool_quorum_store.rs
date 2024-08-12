@@ -140,6 +140,7 @@ impl DirectMempoolQuorumStore {
             GetPayloadCommand::GetPayloadRequest(
                 _max_txns,
                 max_txns_after_filtering,
+                _soft_max_txns_after_filtering,
                 max_bytes,
                 _max_inline_txns,
                 _max_inline_bytes,

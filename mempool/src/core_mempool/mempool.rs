@@ -8,12 +8,14 @@ use crate::{
     core_mempool::{
         index::TxnPointer,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
-        transaction_store::TransactionStore,
+        transaction_store::{sender_bucket, TransactionStore},
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
     network::BroadcastPeerPriority,
-    shared_mempool::types::MultiBucketTimelineIndexIds,
+    shared_mempool::types::{
+        MempoolSenderBucket, MultiBucketTimelineIndexIds, TimelineIndexIdentifier,
+    },
 };
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
@@ -26,7 +28,7 @@ use aptos_types::{
     vm_status::DiscardedVMStatus,
 };
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::atomic::Ordering,
     time::{Duration, Instant, SystemTime},
 };
@@ -70,7 +72,7 @@ impl Mempool {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
                 counters::COMMIT_ACCEPTED_LABEL,
-                self.transactions.get_bucket(ranking_score),
+                self.transactions.get_bucket(ranking_score, sender).as_str(),
                 ranking_score,
             );
         }
@@ -92,7 +94,7 @@ impl Mempool {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
                 reason_label,
-                self.transactions.get_bucket(ranking_score),
+                self.transactions.get_bucket(ranking_score, sender).as_str(),
                 ranking_score,
             );
         }
@@ -148,11 +150,13 @@ impl Mempool {
                 .fetch_add(1, Ordering::Relaxed);
             Self::log_txn_latency(
                 insertion_info,
-                bucket,
+                bucket.as_str(),
                 counters::CONSENSUS_PULLED_LABEL,
-                priority.to_string().as_str(),
+                priority.as_str(),
             );
-            counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
+            counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED_BY_BUCKET
+                .with_label_values(&[bucket.as_str()])
+                .observe((prev_count + 1) as f64);
         }
     }
 
@@ -166,7 +170,7 @@ impl Mempool {
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_latency(insertion_info, bucket, stage, priority.to_string().as_str());
+            Self::log_txn_latency(insertion_info, bucket.as_str(), stage, priority.as_str());
         }
     }
 
@@ -237,14 +241,14 @@ impl Mempool {
         {
             Self::log_txn_latency(
                 insertion_info,
-                bucket,
+                bucket.as_str(),
                 counters::COMMIT_ACCEPTED_LABEL,
-                priority.to_string().as_str(),
+                priority.as_str(),
             );
             Self::log_commit_and_parked_latency(
                 insertion_info,
-                bucket,
-                priority.to_string().as_str(),
+                bucket.as_str(),
+                priority.as_str(),
                 tracked_use_case,
             );
 
@@ -254,7 +258,7 @@ impl Mempool {
                 counters::core_mempool_txn_commit_latency(
                     counters::COMMIT_ACCEPTED_BLOCK_LABEL,
                     insertion_info.submitted_by_label(),
-                    bucket,
+                    bucket.as_str(),
                     insertion_to_block,
                     priority.to_string().as_str(),
                 );
@@ -279,7 +283,7 @@ impl Mempool {
         // downstream node (sender of the mempool transaction) in millis since epoch
         ready_time_at_sender: Option<u64>,
         // The prority of this node for the peer that sent the transaction
-        priority: BroadcastPeerPriority,
+        priority: Option<BroadcastPeerPriority>,
     ) -> MempoolStatus {
         trace!(
             LogSchema::new(LogEntry::AddTxn)
@@ -300,6 +304,7 @@ impl Mempool {
         let expiration_time =
             aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
+        let sender = txn.sender();
         let txn_info = MempoolTransaction::new(
             txn.clone(),
             expiration_time,
@@ -316,20 +321,33 @@ impl Mempool {
         let now = aptos_infallible::duration_since_epoch().as_millis() as u64;
 
         if status.code == MempoolStatusCode::Accepted {
+            counters::SENDER_BUCKET_FREQUENCIES
+                .with_label_values(&[sender_bucket(
+                    &sender,
+                    self.transactions.num_sender_buckets(),
+                )
+                .to_string()
+                .as_str()])
+                .inc();
             if let Some(ready_time_at_sender) = ready_time_at_sender {
+                let bucket = self.transactions.get_bucket(ranking_score, &sender);
                 counters::core_mempool_txn_commit_latency(
                     counters::BROADCAST_RECEIVED_LABEL,
                     submitted_by_label,
-                    self.transactions.get_bucket(ranking_score),
+                    bucket.as_str(),
                     Duration::from_millis(now.saturating_sub(ready_time_at_sender)),
-                    priority.to_string().as_str(),
+                    priority
+                        .map_or_else(|| "Unknown".to_string(), |priority| priority.to_string())
+                        .as_str(),
                 );
             }
         }
         counters::core_mempool_txn_ranking_score(
             counters::INSERT_LABEL,
             status.code.to_string().as_str(),
-            self.transactions.get_bucket(ranking_score),
+            self.transactions
+                .get_bucket(ranking_score, &sender)
+                .as_str(),
             ranking_score,
         );
         status
@@ -452,7 +470,9 @@ impl Mempool {
                 counters::core_mempool_txn_ranking_score(
                     counters::CONSENSUS_PULLED_LABEL,
                     counters::CONSENSUS_PULLED_LABEL,
-                    self.transactions.get_bucket(ranking_score),
+                    self.transactions
+                        .get_bucket(ranking_score, &sender)
+                        .as_str(),
                     ranking_score,
                 );
             }
@@ -522,22 +542,46 @@ impl Mempool {
     /// the transaction ready time in millis since epoch
     pub(crate) fn read_timeline(
         &self,
+        sender_bucket: MempoolSenderBucket,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
         priority_of_receiver: BroadcastPeerPriority,
     ) -> (Vec<(SignedTransaction, u64)>, MultiBucketTimelineIndexIds) {
-        self.transactions
-            .read_timeline(timeline_id, count, before, priority_of_receiver)
+        self.transactions.read_timeline(
+            sender_bucket,
+            timeline_id,
+            count,
+            before,
+            priority_of_receiver,
+        )
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive),
     /// along with their ready times in millis since poch
     pub(crate) fn timeline_range(
         &self,
-        start_end_pairs: &[(u64, u64)],
+        sender_bucket: MempoolSenderBucket,
+        start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>,
     ) -> Vec<(SignedTransaction, u64)> {
-        self.transactions.timeline_range(start_end_pairs)
+        self.transactions
+            .timeline_range(sender_bucket, start_end_pairs)
+    }
+
+    pub(crate) fn timeline_range_of_message(
+        &self,
+        sender_start_end_pairs: HashMap<
+            MempoolSenderBucket,
+            HashMap<TimelineIndexIdentifier, (u64, u64)>,
+        >,
+    ) -> Vec<(SignedTransaction, u64)> {
+        sender_start_end_pairs
+            .iter()
+            .flat_map(|(sender_bucket, start_end_pairs)| {
+                self.transactions
+                    .timeline_range(*sender_bucket, start_end_pairs.clone())
+            })
+            .collect()
     }
 
     pub fn gen_snapshot(&self) -> TxnsLog {

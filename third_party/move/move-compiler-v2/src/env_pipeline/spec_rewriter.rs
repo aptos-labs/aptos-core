@@ -255,6 +255,7 @@ fn derive_spec_fun(env: &mut GlobalEnv, fun_id: QualifiedId<FunId>) -> Qualified
         body,
         callees: BTreeSet::new(),
         is_recursive: RefCell::new(None),
+        insts_using_generic_type_reflection: Default::default(),
     };
     env.add_spec_function_def(fun_id.module_id, decl)
 }
