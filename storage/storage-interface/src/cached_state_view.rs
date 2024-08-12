@@ -26,6 +26,7 @@ use std::{
     fmt::{Debug, Formatter},
     sync::Arc,
 };
+use std::time::SystemTime;
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -279,31 +280,64 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        let _timer;
+        let mut do_metrics = false;
         if fastrand::u32(0..500) < 1 {
-            _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
+           do_metrics = true;
         }
-        // let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
-        // First check if the cache has the state value.
-        if let Some(version_and_value_opt) = self
-            .sharded_state_cache
-            .shard(state_key.get_shard_id())
-            .get(state_key)
-        {
-            // This can return None, which means the value has been deleted from the DB.
-            let value_opt = &version_and_value_opt.1;
-            return Ok(value_opt.clone());
+        if do_metrics {
+            let curr_time1 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos() as u64;
+            // First check if the cache has the state value.
+            let timer1 = TIMER.with_label_values(&["get_state_value_dash_map_lock"]).start_timer();
+            if let Some(version_and_value_opt) = self
+                .sharded_state_cache
+                .shard(state_key.get_shard_id())
+                .get(state_key)
+            {
+                // This can return None, which means the value has been deleted from the DB.
+                let value_opt = &version_and_value_opt.1;
+                let curr_time2 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos() as u64;
+                TIMER.with_label_values(&["get_state_value_cache"]).observe((curr_time2 - curr_time1) as f64 / (1000 * 1000 * 1000) as f64);
+                return Ok(value_opt.clone());
+            }
+            drop(timer1);
+            let timer2 = TIMER.with_label_values(&["get_state_value_internal"]).start_timer();
+            let version_and_state_value_option =
+                self.get_version_and_state_value_internal(state_key)?;
+            drop(timer2);
+            let timer3 = TIMER.with_label_values(&["get_state_value_dash_map_insert"]).start_timer();
+            // Update the cache if still empty
+            let new_version_and_value = self
+                .sharded_state_cache
+                .shard(state_key.get_shard_id())
+                .entry(state_key.clone())
+                .or_insert(version_and_state_value_option);
+            drop(timer3);
+            let value_opt = &new_version_and_value.1;
+            let curr_time2 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos() as u64;
+            TIMER.with_label_values(&["get_state_value_internal"]).observe((curr_time2 - curr_time1) as f64 / (1000 * 1000 * 1000) as f64);
+            Ok(value_opt.clone())
         }
-        let version_and_state_value_option =
-            self.get_version_and_state_value_internal(state_key)?;
-        // Update the cache if still empty
-        let new_version_and_value = self
-            .sharded_state_cache
-            .shard(state_key.get_shard_id())
-            .entry(state_key.clone())
-            .or_insert(version_and_state_value_option);
-        let value_opt = &new_version_and_value.1;
-        Ok(value_opt.clone())
+        else {
+            if let Some(version_and_value_opt) = self
+                .sharded_state_cache
+                .shard(state_key.get_shard_id())
+                .get(state_key)
+            {
+                // This can return None, which means the value has been deleted from the DB.
+                let value_opt = &version_and_value_opt.1;
+                return Ok(value_opt.clone());
+            }
+            let version_and_state_value_option =
+                self.get_version_and_state_value_internal(state_key)?;
+            // Update the cache if still empty
+            let new_version_and_value = self
+                .sharded_state_cache
+                .shard(state_key.get_shard_id())
+                .entry(state_key.clone())
+                .or_insert(version_and_state_value_option);
+            let value_opt = &new_version_and_value.1;
+            Ok(value_opt.clone())
+        }
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {

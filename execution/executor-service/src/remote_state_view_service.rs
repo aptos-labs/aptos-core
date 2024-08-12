@@ -85,7 +85,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = 30;//num_threads.unwrap_or_else(num_cpus::get) / 2 + 30;
+        let num_threads = 90;//num_threads.unwrap_or_else(num_cpus::get) / 2 + 30;
         let num_kv_req_threads = 30; //num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -230,20 +230,36 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             shard_id,
             state_keys.len()
         );
+        let state_view_read_lock = state_view.read().unwrap();
         let resp = state_keys
             .into_iter()
             .map(|state_key| {
-                let state_value = state_view
-                    .read()
-                    .unwrap()
-                    .as_ref()
-                    .unwrap()
-                    .get_state_value(&state_key)
-                    .unwrap();
+                let state_value = if let Some(state_view_some) = state_view_read_lock.as_ref() {
+                    state_view_some.get_state_value(&state_key).unwrap()
+                }
+                else {
+                    None
+                };
                 (state_key, state_value)
             })
             .collect_vec();
+        drop(state_view_read_lock);
         drop(timer_2);
+
+        // let resp = state_keys
+        //     .into_iter()
+        //     .map(|state_key| {
+        //         let state_value = state_view
+        //             .read()
+        //             .unwrap()
+        //             .as_ref()
+        //             .unwrap()
+        //             .get_state_value(&state_key)
+        //             .unwrap();
+        //         (state_key, state_value)
+        //     })
+        //     .collect_vec();
+        // drop(timer_2);
 
         let timer_3 = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests_3"])
