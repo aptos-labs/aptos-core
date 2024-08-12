@@ -474,7 +474,7 @@ impl Scheduler {
         }
     }
 
-    pub fn committer_next_task(&self) -> SchedulerTask {
+    pub fn committer_next_task(&self, proximity_interval: usize) -> SchedulerTask {
         if self.done() {
             return SchedulerTask::Done;
         }
@@ -485,8 +485,7 @@ impl Scheduler {
         let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
         let commit_idx = self.commit_state().0;
-        let proximity_interval = 4;
-        if min(idx_to_validate, idx_to_execute) > commit_idx + proximity_interval {
+        if min(idx_to_validate, idx_to_execute) > commit_idx + proximity_interval as u32 {
             return SchedulerTask::Retry;
         }
 
@@ -730,7 +729,7 @@ impl Scheduler {
                                     Some(old_incarnation),
                                 )
                             } else {
-                                info!("TXN {} failed validation, deferring to fallback", txn_idx);
+                                // info!("TXN {} failed validation, deferring to fallback", txn_idx);
                                 None
                             }
                         },

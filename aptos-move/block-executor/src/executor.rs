@@ -820,6 +820,7 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
+        num_committers: usize,
         worker_id: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let vm_init_view: VMInitView<'_, T, S> = VMInitView::new(base_view, versioned_cache);
@@ -846,8 +847,14 @@ where
             Ok(())
         };
 
+        assert!(
+            1 <= num_committers && num_committers <= num_workers,
+            "Incorrect number of committers {}, num_workers = {}",
+            num_committers,
+            num_workers,
+        );
         loop {
-            if worker_id < 2 && matches!(scheduler_task, SchedulerTask::Retry) {
+            if worker_id < num_committers && matches!(scheduler_task, SchedulerTask::Retry) {
                 let mut last_commit_idx = None;
                 while scheduler.should_coordinate_commits() {
                     if let Some(last_idx) = self.prepare_and_queue_commit_ready_txns(
@@ -965,8 +972,14 @@ where
                     SchedulerTask::Retry
                 },
                 SchedulerTask::Retry => {
-                    if worker_id < 2 {
-                        scheduler.committer_next_task()
+                    // Based on simple grid optimizations alongside num_committers.
+                    // TODO: keep up-to-date with changes.
+                    let committer_proximity_interval = match num_workers {
+                        1..=40 => 4,
+                        _ => 5,
+                    };
+                    if worker_id < num_committers {
+                        scheduler.committer_next_task(committer_proximity_interval)
                     } else {
                         scheduler.next_task()
                     }
@@ -1008,6 +1021,13 @@ where
         let num_txns = signature_verified_block.len();
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
+        // Based on simple grid optimizations alongside committer's next_task.
+        // TODO: keep up-to-date with changes.
+        let num_committers = match num_workers {
+            2..=6 => 1,
+            _ => 2,
+        };
+
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
@@ -1044,6 +1064,7 @@ where
                         &shared_commit_state,
                         &final_results,
                         num_workers,
+                        num_committers,
                         *worker_id,
                     ) {
                         // If there are multiple errors, they all get logged:
