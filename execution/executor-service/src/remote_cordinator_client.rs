@@ -336,14 +336,14 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&[&shard_id_clone.to_string(), "result_tx_bcs_ser"])
                 .start_timer();
-            let execute_result_type = format!("execute_result_{}", shard_id_clone);
+            let execute_result_type = format!("execute_result_{}", 0); //Default for all shards for now shard_id_clone);
             let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
             drop(bcs_ser_timer);
             let tx_send_timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&[&shard_id_clone.to_string(), "result_tx_send"])
                 .start_timer();
             outbound_rpc_scheduler_clone.send(
-                Message::create_with_metadata(output_message, 0, seq_num, num_txn as u64),
+                Message::create_with_metadata(output_message, 0, num_txn as u64, shard_id_clone as u64),
                 MessageType::new(execute_result_type),
                 result_tx_clone[rand_result_rx_thread % result_tx_clone.len()].clone(),
                 seq_num);
