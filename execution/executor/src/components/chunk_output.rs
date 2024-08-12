@@ -312,6 +312,10 @@ pub fn update_counters_for_processed_chunk<T, O>(
                     // Specialize duplicate txns for alerts
                     if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_OLD {
                         "discard_sequence_number_too_old"
+                    } else if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_NEW {
+                        "discard_sequence_number_too_new"
+                    } else if *discard_status_code == StatusCode::TRANSACTION_EXPIRED {
+                        "discard_transaction_expired"
                     } else {
                         "discard"
                     },
