@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure};
+use anyhow::ensure;
 use core::fmt;
 use serde::Serialize;
 use std::cmp::{max, Ordering};
@@ -165,13 +165,14 @@ impl fmt::Display for PayloadTxnsSize {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::PayloadTxnsSize;
 
     #[test]
     fn test_payload_txns_size_operations() {
         let txns_size = PayloadTxnsSize::new(100, 100);
-        assert!(txns_size.compute_pct(90), PayloadTxnsSize::new(90, 90));
-        assert!(txns_size.compute_pct(50), PayloadTxnsSize::new(50, 50));
+        assert_eq!(txns_size.compute_pct(90), PayloadTxnsSize::new(90, 90));
+        assert_eq!(txns_size.compute_pct(50), PayloadTxnsSize::new(50, 50));
     }
 }

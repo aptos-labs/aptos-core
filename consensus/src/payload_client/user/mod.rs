@@ -3,7 +3,7 @@
 
 use super::PayloadPullParameters;
 use crate::error::QuorumStoreError;
-use aptos_consensus_types::{common::Payload, utils::PayloadTxnsSize};
+use aptos_consensus_types::common::Payload;
 #[cfg(test)]
 use aptos_types::transaction::SignedTransaction;
 use futures::future::BoxFuture;
@@ -44,6 +44,8 @@ impl UserPayloadClient for DummyClient {
         mut params: PayloadPullParameters,
         _wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
+        use aptos_consensus_types::utils::PayloadTxnsSize;
+
         let timer = Instant::now();
         let mut nxt_txn_idx = 0;
         let mut txns = vec![];
@@ -65,7 +67,7 @@ impl UserPayloadClient for DummyClient {
                 params.max_txns.size_in_bytes() - txn_size,
             );
             params.max_txns_after_filtering -= 1;
-            params.max_txns_after_filtering -= 1;
+            params.soft_max_txns_after_filtering -= 1;
             nxt_txn_idx += 1;
             txns.push(txn);
         }

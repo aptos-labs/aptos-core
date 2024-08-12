@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
-    payload::{InlineBatch, OptQuorumStorePayload, PayloadExecutionLimit},
+    payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
