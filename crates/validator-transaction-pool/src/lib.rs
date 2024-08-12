@@ -12,7 +12,6 @@ use std::{
     time::Instant,
 };
 
-#[derive(Debug)]
 pub enum TransactionFilter {
     PendingTxnHashSet(HashSet<HashValue>),
 }
