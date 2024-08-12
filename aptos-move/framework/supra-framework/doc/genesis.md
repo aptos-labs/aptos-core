@@ -64,6 +64,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool">0x1::pbo_delegation_pool</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
@@ -414,7 +415,31 @@
 
 </dd>
 <dt>
-<code>principle_lockup_time: u64</code>
+<code>multisig_admin: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>unlock_schedule_numerators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>unlock_schedule_denominator: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>unlock_startup_time_from_now: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>unlock_period_duration: u64</code>
 </dt>
 <dd>
 
@@ -447,20 +472,20 @@
 
 
 
-<a id="0x1_genesis_EACCOUNT_NOT_REGISTERED_FOR_COIN"></a>
-
-
-
-<pre><code><b>const</b> <a href="genesis.md#0x1_genesis_EACCOUNT_NOT_REGISTERED_FOR_COIN">EACCOUNT_NOT_REGISTERED_FOR_COIN</a>: u64 = 9;
-</code></pre>
-
-
-
 <a id="0x1_genesis_EDENOMINATOR_IS_ZERO"></a>
 
 
 
 <pre><code><b>const</b> <a href="genesis.md#0x1_genesis_EDENOMINATOR_IS_ZERO">EDENOMINATOR_IS_ZERO</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x1_genesis_EACCOUNT_NOT_REGISTERED_FOR_COIN"></a>
+
+
+
+<pre><code><b>const</b> <a href="genesis.md#0x1_genesis_EACCOUNT_NOT_REGISTERED_FOR_COIN">EACCOUNT_NOT_REGISTERED_FOR_COIN</a>: u64 = 9;
 </code></pre>
 
 
@@ -1169,12 +1194,16 @@ encoded in a single BCS byte array.
     });
     <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_initialize_delegation_pool">pbo_delegation_pool::initialize_delegation_pool</a>(
         &owner_signer,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(pbo_delegator_config.multisig_admin),
         pbo_delegator_config.delegator_config.validator.commission_percentage,
         pbo_delegator_config.delegator_config.delegation_pool_creation_seed,
         pbo_delegator_config.delegator_config.delegator_addresses,
         pbo_delegator_config.delegator_config.delegator_stakes,
         coinInitialization,
-        pbo_delegator_config.principle_lockup_time,
+        pbo_delegator_config.unlock_schedule_numerators,
+        pbo_delegator_config.unlock_schedule_denominator,
+        pbo_delegator_config.unlock_startup_time_from_now+<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>(),
+        pbo_delegator_config.unlock_period_duration,
     );
 
     <b>let</b> pool_address = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_get_owned_pool_address">pbo_delegation_pool::get_owned_pool_address</a>(pbo_delegator_config.delegator_config.owner_address);
