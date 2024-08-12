@@ -60,9 +60,9 @@ impl AsyncProofFetcher {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        let _timer = TIMER
-            .with_label_values(&["async_proof_fetcher_fetch"])
-            .start_timer();
+        // let _timer = TIMER
+        //     .with_label_values(&["async_proof_fetcher_fetch"])
+        //     .start_timer();
         Ok(self
             .reader
             .get_state_value_with_version_by_version(state_key, version)?)
@@ -124,9 +124,10 @@ impl AsyncProofFetcher {
         subtree_root_hash: Option<HashValue>,
         value_hash: Option<HashValue>,
     ) {
-        let _timer = TIMER
-            .with_label_values(&["schedule_async_proof_read"])
-            .start_timer();
+        // Timer deleted
+        // let _timer = TIMER
+        //     .with_label_values(&["schedule_async_proof_read"])
+        //     .start_timer();
         self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
         let reader = self.reader.clone();
         let data_sender = self.data_sender.clone();

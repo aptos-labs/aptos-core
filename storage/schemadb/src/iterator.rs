@@ -65,9 +65,9 @@ where
     where
         SK: SeekKeyCodec<S>,
     {
-        let _timer = APTOS_SCHEMADB_SEEK_LATENCY_SECONDS
-            .with_label_values(&[S::COLUMN_FAMILY_NAME, "seek"])
-            .start_timer();
+        // let _timer = APTOS_SCHEMADB_SEEK_LATENCY_SECONDS
+        //     .with_label_values(&[S::COLUMN_FAMILY_NAME, "seek"])
+        //     .start_timer();
         let key = <SK as SeekKeyCodec<S>>::encode_seek_key(seek_key)?;
         self.db_iter.seek(&key);
         self.status = Status::DoneSeek;
@@ -92,9 +92,9 @@ where
     }
 
     fn next_impl(&mut self) -> aptos_storage_interface::Result<Option<(S::Key, S::Value)>> {
-        let _timer = APTOS_SCHEMADB_ITER_LATENCY_SECONDS
-            .with_label_values(&[S::COLUMN_FAMILY_NAME])
-            .start_timer();
+        // let _timer = APTOS_SCHEMADB_ITER_LATENCY_SECONDS
+        //     .with_label_values(&[S::COLUMN_FAMILY_NAME])
+        //     .start_timer();
 
         if let Status::Advancing = self.status {
             match self.direction {
@@ -114,9 +114,9 @@ where
 
         let raw_key = self.db_iter.key().expect("db_iter.key() failed.");
         let raw_value = self.db_iter.value().expect("db_iter.value(0 failed.");
-        APTOS_SCHEMADB_ITER_BYTES
-            .with_label_values(&[S::COLUMN_FAMILY_NAME])
-            .observe((raw_key.len() + raw_value.len()) as f64);
+        // APTOS_SCHEMADB_ITER_BYTES
+        //     .with_label_values(&[S::COLUMN_FAMILY_NAME])
+        //     .observe((raw_key.len() + raw_value.len()) as f64);
 
         let key = <S::Key as KeyCodec<S>>::decode_key(raw_key);
         let value = <S::Value as ValueCodec<S>>::decode_value(raw_value);
