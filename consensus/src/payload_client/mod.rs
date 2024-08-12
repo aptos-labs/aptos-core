@@ -48,16 +48,10 @@ impl PayloadPullParameters {
     ) -> Self {
         Self {
             max_poll_time,
-            max_txns: PayloadTxnsSize {
-                count: max_txns,
-                bytes: max_txns_bytes,
-            },
+            max_txns: PayloadTxnsSize::new(max_txns, max_txns_bytes),
             max_txns_after_filtering,
             soft_max_txns_after_filtering,
-            max_inline_txns: PayloadTxnsSize {
-                count: max_inline_txns,
-                bytes: max_inline_txns_bytes,
-            },
+            max_inline_txns: PayloadTxnsSize::new(max_inline_txns, max_inline_txns_bytes),
             opt_batch_txns_pct: 0,
             user_txn_filter,
             pending_ordering,
@@ -73,7 +67,11 @@ impl fmt::Debug for PayloadPullParameters {
         f.debug_struct("PayloadPullParameters")
             .field("max_poll_time", &self.max_poll_time)
             .field("max_items", &self.max_txns)
-            .field("max_unique_items", &self.max_unique_txns)
+            .field("max_unique_items", &self.max_txns_after_filtering)
+            .field(
+                "soft_max_txns_after_filtering",
+                &self.soft_max_txns_after_filtering,
+            )
             .field("max_inline_items", &self.max_inline_txns)
             .field("pending_ordering", &self.pending_ordering)
             .field(

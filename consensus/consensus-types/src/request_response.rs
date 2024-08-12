@@ -9,7 +9,6 @@ use anyhow::Result;
 use futures::channel::oneshot;
 use std::{fmt, fmt::Formatter, time::Duration};
 
-#[derive(Debug)]
 pub struct GetPayloadRequest {
     // max number of transactions in the block
     pub max_txns: PayloadTxnsSize,
@@ -41,8 +40,8 @@ impl fmt::Display for GetPayloadCommand {
         match self {
             GetPayloadCommand::GetPayloadRequest(request) => {
                 write!(f,
-                    "GetPayloadRequest [max_txns: {}, max_unique_txns: {}, max_inline_txns: {}, return_non_full: {}, block_timestamp: {:?}]",
-                    request.max_txns, request.max_unique_txns, request.max_inline_txns, request.return_non_full, request.block_timestamp
+                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {}, soft_max_txns_after_filtering: {}, max_inline_txns: {}, return_non_full: {}, block_timestamp: {:?}]",
+                    request.max_txns, request.max_txns_after_filtering, request.soft_max_txns_after_filtering, request.max_inline_txns, request.return_non_full, request.block_timestamp
                 )
             },
         }

@@ -93,7 +93,7 @@ impl PayloadClient for MixedPayloadClient {
         let mut user_txn_pull_params = params;
         user_txn_pull_params.max_txns -= vtxn_size;
         user_txn_pull_params.max_txns_after_filtering -= validator_txns.len() as u64;
-        user_txn_pull_params.soft_max_items_after_filtering -= validator_Txns.len() as u64;
+        user_txn_pull_params.soft_max_txns_after_filtering -= validator_txns.len() as u64;
         user_txn_pull_params.max_poll_time = user_txn_pull_params
             .max_poll_time
             .saturating_sub(validator_txn_pull_timer.elapsed());
@@ -146,6 +146,7 @@ mod tests {
                     120,                    // max_items
                     1048576,                // size limit: 1MB
                     99,                     // max_unique_items
+                    99,
                     50,
                     500000, // inline limit: 500KB
                     PayloadFilter::Empty,
@@ -173,6 +174,7 @@ mod tests {
                     120,                        // max_items
                     1048576,                    // size limit: 1MB
                     99,                         // max_unique_items
+                    99,
                     50,
                     500000, // inline limit: 500KB
                     PayloadFilter::Empty,
@@ -200,6 +202,7 @@ mod tests {
                     2,                      // max_items
                     1048576,                // size limit: 1MB
                     2,                      // max_unique_items
+                    2,
                     0,
                     0, // inline limit: 0
                     PayloadFilter::Empty,
@@ -224,10 +227,11 @@ mod tests {
             .pull_payload(
                 PayloadPullParameters::new_for_test(
                     Duration::from_secs(1), // max_poll_time
-                    120,                    // max_items
+                    40,                     // max_items
                     all_validator_txns[0].size_in_bytes() as u64,
-                    99, // max_unique_items
-                    50,
+                    30, // max_unique_items
+                    30,
+                    10,
                     all_validator_txns[0].size_in_bytes() as u64,
                     PayloadFilter::Empty,
                     false,
@@ -272,6 +276,7 @@ mod tests {
                     120,                       // max_items
                     1048576,                   // size limit: 1MB
                     99,                        // max_unique_items
+                    99,
                     50,
                     500000, // inline limit: 500KB
                     PayloadFilter::Empty,

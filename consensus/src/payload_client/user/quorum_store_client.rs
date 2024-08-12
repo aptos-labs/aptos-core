@@ -116,8 +116,8 @@ impl UserPayloadClient for QuorumStoreClient {
             let payload = self
                 .pull_internal(
                     params.max_txns,
-                    params.max_unique_txns,
                     params.max_txns_after_filtering,
+                    params.soft_max_txns_after_filtering,
                     params.max_inline_txns,
                     params.opt_batch_txns_pct,
                     return_non_full || return_empty || done,

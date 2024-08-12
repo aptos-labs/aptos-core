@@ -3,7 +3,7 @@
 
 use super::PayloadPullParameters;
 use crate::error::QuorumStoreError;
-use aptos_consensus_types::common::Payload;
+use aptos_consensus_types::{common::Payload, utils::PayloadTxnsSize};
 #[cfg(test)]
 use aptos_types::transaction::SignedTransaction;
 use futures::future::BoxFuture;
@@ -48,22 +48,24 @@ impl UserPayloadClient for DummyClient {
         let mut nxt_txn_idx = 0;
         let mut txns = vec![];
         while timer.elapsed() < params.max_poll_time
-            && params.max_txns.count >= 1
+            && params.max_txns.count() >= 1
             && params.max_txns_after_filtering >= 1
-            && params.soft_max_txnss_after_filtering >= 1
-            && params.max_txns.bytes >= 1
+            && params.soft_max_txns_after_filtering >= 1
+            && params.max_txns.size_in_bytes() >= 1
             && nxt_txn_idx < self.txns.len()
         {
             tokio::time::sleep(Duration::from_millis(1)).await;
             let txn = self.txns[nxt_txn_idx].clone();
             let txn_size = txn.raw_txn_bytes_len() as u64;
-            if txn_size > params.max_txns.bytes {
+            if txn_size > params.max_txns.size_in_bytes() {
                 break;
             }
-            params.max_txns.count -= 1;
-            params.max_unique_txns -= 1;
-            params.soft_max_items_after_filtering -= 1;
-            params.max_txns.bytes -= txn_size;
+            params.max_txns = PayloadTxnsSize::new(
+                params.max_txns.count() - 1,
+                params.max_txns.size_in_bytes() - txn_size,
+            );
+            params.max_txns_after_filtering -= 1;
+            params.max_txns_after_filtering -= 1;
             nxt_txn_idx += 1;
             txns.push(txn);
         }

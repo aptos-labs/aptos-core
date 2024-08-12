@@ -1,7 +1,7 @@
 use anyhow::{bail, ensure};
 use core::fmt;
 use serde::Serialize;
-use std::cmp::Ordering;
+use std::cmp::{max, Ordering};
 
 #[derive(Debug, Clone, Copy, Serialize, Default)]
 pub struct PayloadTxnsSize {
@@ -11,7 +11,7 @@ pub struct PayloadTxnsSize {
 
 impl PayloadTxnsSize {
     pub fn new(count: u64, bytes: u64) -> Self {
-        assert!(count <= bytes);
+        assert!(count <= bytes, "count: {} > bytes: {}", count, bytes);
         assert!((count > 0 && bytes > 0) || (count == 0 && bytes == 0));
         Self { count, bytes }
     }
@@ -49,6 +49,9 @@ impl PayloadTxnsSize {
     pub fn try_set_count(&mut self, new_count: u64) -> anyhow::Result<()> {
         ensure!(new_count <= self.bytes);
         self.count = new_count;
+        if new_count == 0 {
+            self.bytes = 0;
+        }
         Ok(())
     }
 
@@ -58,7 +61,7 @@ impl PayloadTxnsSize {
     pub fn compute_with_bytes(&self, new_size_in_bytes: u64) -> PayloadTxnsSize {
         let new_count = if self.bytes > 0 {
             let factor = new_size_in_bytes as f64 / self.bytes as f64;
-            (self.count as f64 * factor) as u64
+            max((self.count as f64 * factor) as u64, 1u64)
         } else {
             // If bytes is zero, then count is zero. In this case, set the new
             // count to be the same as bytes.

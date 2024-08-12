@@ -139,7 +139,7 @@ impl DirectMempoolQuorumStore {
         match req {
             GetPayloadCommand::GetPayloadRequest(request) => {
                 self.handle_block_request(
-                    request.max_unique_txns,
+                    request.max_txns_after_filtering,
                     request.max_txns.size_in_bytes(),
                     request.return_non_full,
                     request.filter,

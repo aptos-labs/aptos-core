@@ -13,7 +13,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
 use futures::channel::oneshot;
-use std::collections::HashSet;
+use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
@@ -55,16 +55,10 @@ async fn get_proposal(
     let (callback_tx, callback_rx) = oneshot::channel();
     let filter_set = HashSet::from_iter(filter.iter().cloned());
     let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
-        max_txns: PayloadTxnsSize {
-            count: max_txns,
-            bytes: 1000000,
-        },
+        max_txns: PayloadTxnsSize::new(max_txns, 1000000),
         max_txns_after_filtering: max_txns,
         soft_max_txns_after_filtering: max_txns,
-        max_inline_txns: PayloadTxnsSize {
-            count: max_txns / 2,
-            bytes: 100000,
-        },
+        max_inline_txns: PayloadTxnsSize::new(max(max_txns / 2, 1), 100000),
         filter: PayloadFilter::InQuorumStore(filter_set),
         callback: callback_tx,
         block_timestamp: aptos_infallible::duration_since_epoch(),

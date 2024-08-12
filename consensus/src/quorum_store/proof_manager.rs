@@ -265,7 +265,9 @@ impl ProofManager {
                             .minimum(request.max_inline_txns);
                         max_inline_txns_to_pull.set_count(min(
                             max_inline_txns_to_pull.count(),
-                            request.max_unique_txns.saturating_sub(cur_unique_txns),
+                            request
+                                .max_txns_after_filtering
+                                .saturating_sub(cur_unique_txns),
                         ));
                         self.batch_queue.pull_batches(
                             max_inline_txns_to_pull,

@@ -664,9 +664,9 @@ fn test_proof_queue_soft_limit() {
         proof_queue.push(batch);
     }
 
-    let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(
+    let (pulled, _, num_unique_txns, _) = proof_queue.pull_proofs(
         &hashset![],
-        100,
+        PayloadTxnsSize::new(100, 100),
         12,
         12,
         true,
@@ -676,9 +676,9 @@ fn test_proof_queue_soft_limit() {
     assert_eq!(pulled.len(), 1);
     assert_eq!(num_unique_txns, 10);
 
-    let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(
+    let (pulled, _, num_unique_txns, _) = proof_queue.pull_proofs(
         &hashset![],
-        100,
+        PayloadTxnsSize::new(100, 100),
         30,
         12,
         true,

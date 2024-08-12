@@ -543,8 +543,7 @@ impl ProofQueue {
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
-                        if cur_bytes == max_bytes
-                            || cur_all_txns == max_txns
+                        if cur_all_txns == max_txns
                             || cur_unique_txns == max_txns_after_filtering
                             || cur_unique_txns >= soft_max_txns_after_filtering
                         {
