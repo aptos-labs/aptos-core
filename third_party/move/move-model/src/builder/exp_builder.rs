@@ -2422,106 +2422,97 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             },
             EA::LValue_::PositionalUnpack(maccess, generics, args) => {
-                let struct_info = self.resolve_struct(expected_type, maccess);
-                let (struct_name, variant, struct_entry) =
-                    if let Some((struct_name, variant, struct_entry)) = struct_info {
-                        (struct_name, variant, struct_entry)
-                    } else {
-                        return self.new_error_pat(loc);
-                    };
-                let struct_name_loc = self.to_loc(&maccess.loc);
-
-                // If this is a struct variant, check whether it exists.
-                if let Some(v) = variant {
-                    if !self.check_variant_declared(
-                        &struct_name,
-                        &struct_entry,
-                        &struct_name_loc,
-                        v,
-                    ) {
-                        return self.new_error_pat(loc);
-                    }
-                }
-
-                let arity = self.get_struct_arity(&struct_entry, &struct_name, loc, variant);
-                if let Some(arity) = arity {
-                    let dotdot_loc = args
-                        .value
-                        .iter()
-                        .filter_map(|arg| {
-                            if let sp!(loc, EA::LValueOrDotdot_::Dotdot) = arg {
-                                Some(loc.clone())
-                            } else {
-                                None
-                            }
-                        })
-                        .next();
-                    if dotdot_loc.is_none() && args.value.len() != arity
-                        || dotdot_loc.is_some()
-                            && args.value.len() > arity
-                            && !(args.value.len() == 1 && arity == 0)
-                    {
-                        self.error(loc, &ErrorMessageContext::PositionalConstructorArgument.arity_mismatch(
+                let Some((struct_id, variant)) = self.translate_constructor_name(
+                    expected_type,
+                    expected_order,
+                    context,
+                    loc,
+                    maccess,
+                    generics,
+                ) else {
+                    return self.new_error_pat(loc);
+                };
+                let struct_entry = self
+                    .parent
+                    .parent
+                    .lookup_struct_entry(struct_id.to_qualified_id());
+                let arity = self.get_struct_arity(&struct_entry, variant).expect("arity");
+                let dotdot_loc = args
+                    .value
+                    .iter()
+                    .filter_map(|arg| {
+                        if let sp!(loc, EA::LValueOrDotdot_::Dotdot) = arg {
+                            Some(loc.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .next();
+                if dotdot_loc.is_none() && args.value.len() != arity
+                    || dotdot_loc.is_some()
+                        && args.value.len() > arity
+                        && !(args.value.len() == 1 && arity == 0)
+                {
+                    self.error(
+                        loc,
+                        &ErrorMessageContext::PositionalConstructorArgument.arity_mismatch(
                             false,
                             args.value.len(),
                             arity,
-                        ));
-                        return self.new_error_pat(loc);
-                    }
-                    let mut fields = UniqueMap::new();
-                    let mut arg_idx = 0;
-                    let mut field_offset = 0;
-                    let mut remainning_fields = arity;
-                    while remainning_fields > 0 {
-                        let sp!(arg_loc, arg) = args.value.get(arg_idx).expect("invalid index");
-                        match arg {
-                            EA::LValueOrDotdot_::LValue(lval) => {
+                        ),
+                    );
+                    return self.new_error_pat(loc);
+                }
+                let mut fields = UniqueMap::new();
+                let mut arg_idx = 0;
+                let mut field_offset = 0;
+                let mut remainning_fields = arity;
+                while remainning_fields > 0 {
+                    let sp!(arg_loc, arg) = args.value.get(arg_idx).expect("invalid index");
+                    match arg {
+                        EA::LValueOrDotdot_::LValue(lval) => {
+                            let field_name = Name::new(
+                                *arg_loc,
+                                move_symbol_pool::Symbol::from(format!("{}", field_offset)),
+                            );
+                            let field_name = Field(field_name);
+                            fields
+                                .add(field_name, (field_offset, lval.clone()))
+                                .expect("duplicate keys");
+                            remainning_fields -= 1;
+                            field_offset += 1;
+                        },
+                        EA::LValueOrDotdot_::Dotdot => {
+                            let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
+                                arity - args.value.len() + 1
+                            } else {
+                                0
+                            };
+                            for _ in 0..fields_to_expand {
                                 let field_name = Name::new(
                                     *arg_loc,
                                     move_symbol_pool::Symbol::from(format!("{}", field_offset)),
                                 );
                                 let field_name = Field(field_name);
                                 fields
-                                    .add(field_name, (field_offset, lval.clone()))
+                                    .add(field_name, (field_offset, wild_card(*arg_loc)))
                                     .expect("duplicate keys");
                                 remainning_fields -= 1;
                                 field_offset += 1;
-                            },
-                            EA::LValueOrDotdot_::Dotdot => {
-                                let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
-                                    arity - args.value.len() + 1
-                                } else {
-                                    0
-                                };
-                                for _ in 0..fields_to_expand {
-                                    let field_name = Name::new(
-                                        *arg_loc,
-                                        move_symbol_pool::Symbol::from(format!("{}", field_offset)),
-                                    );
-                                    let field_name = Field(field_name);
-                                    fields
-                                        .add(field_name, (field_offset, wild_card(*arg_loc)))
-                                        .expect("duplicate keys");
-                                    remainning_fields -= 1;
-                                    field_offset += 1;
-                                }
-                            },
-                        }
-                        arg_idx += 1;
+                            }
+                        },
                     }
-                    let unpack_ =
-                        EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields, None);
-                    let unpack = Spanned::new(lv.loc.clone(), unpack_);
-                    self.translate_lvalue(
-                        &unpack,
-                        expected_type,
-                        expected_order,
-                        match_locals,
-                        context,
-                    )
-                } else {
-                    return self.new_error_pat(loc);
+                    arg_idx += 1;
                 }
+                let unpack_ = EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields, None);
+                let unpack = Spanned::new(lv.loc.clone(), unpack_);
+                self.translate_lvalue(
+                    &unpack,
+                    expected_type,
+                    expected_order,
+                    match_locals,
+                    context,
+                )
             },
         }
     }
@@ -2536,6 +2527,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         maccess: &EA::ModuleAccess,
         generics: &Option<Vec<EA::Type>>,
         fields: Option<&EA::Fields<EA::LValue>>,
+        dotdot: &Option<EA::Dotdot>,
     ) -> Option<Pattern> {
         // Translate constructor name
         let expected_type = self.subs.specialize(expected_type);
@@ -2579,7 +2571,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             if let Some(dotdot) = dotdot {
                 for uncoverd_field in missing_fields {
                     if let Some(field_data) = field_decls.get(&uncoverd_field) {
-                        let field_ty = field_data.ty.instantiate(&instantiation);
+                        let field_ty = field_data.ty.instantiate(&inst);
                         let expected_field_ty = if let Some(kind) = ref_expected {
                             Type::Reference(kind, Box::new(field_ty.clone()))
                         } else {
@@ -4593,7 +4585,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             return None;
         }
         if let Some(fields) = fields {
-            let missing_fields = self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
+            let missing_fields =
+                self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
             self.report_missing_fields(&missing_fields, loc);
             let in_order_fields = self.in_order_fields(&field_decls, fields);
             for (_, name, (exp_idx, field_exp)) in fields.iter() {
@@ -4755,10 +4748,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     fn get_struct_arity<'a>(
-        &'a mut self,
+        &'a self,
         s: &'a StructEntry,
-        struct_name: &QualifiedSymbol,
-        struct_name_loc: &Loc,
         variant: Option<Symbol>,
     ) -> Option<usize> {
         match (&s.layout, variant) {
@@ -4769,21 +4760,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if let Some(variant) = variants.iter().find(|v| v.name == name) {
                     Some(variant.fields.len())
                 } else {
-                    self.error(
-                        struct_name_loc,
-                        &format!(
-                            "struct `{}` has no variant named `{}`",
-                            struct_name.display(self.env()),
-                            name.display(self.symbol_pool())
-                        ),
-                    );
                     None
                 }
             },
-            _ => {
-                self.bug(struct_name_loc, "inconsistent struct definition");
-                None
-            },
+            _ => None,
         }
     }
 
