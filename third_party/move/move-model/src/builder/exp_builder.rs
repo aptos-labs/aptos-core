@@ -2432,11 +2432,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ) else {
                     return self.new_error_pat(loc);
                 };
-                let struct_entry = self
-                    .parent
-                    .parent
-                    .lookup_struct_entry(struct_id.to_qualified_id());
-                let arity = self.get_struct_arity(&struct_entry, variant).expect("arity");
+                let arity = self.get_struct_arity(struct_id.to_qualified_id(), variant).expect("arity");
                 let dotdot_loc = args
                     .value
                     .iter()
@@ -2464,7 +2460,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     return self.new_error_pat(loc);
                 }
                 let mut fields = UniqueMap::new();
+                // the index of the field to be processed as in the user provided arguments
                 let mut arg_idx = 0;
+                // the offset of the field to be processed
                 let mut field_offset = 0;
                 let mut remainning_fields = arity;
                 while remainning_fields > 0 {
@@ -4747,14 +4745,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    fn get_struct_arity<'a>(
-        &'a self,
-        s: &'a StructEntry,
+    fn get_struct_arity(
+        &self,
+        struct_id: QualifiedId<StructId>,
         variant: Option<Symbol>,
     ) -> Option<usize> {
-        match (&s.layout, variant) {
+        let struct_entry = self.parent.parent.lookup_struct_entry(struct_id);
+        match (&struct_entry.layout, variant) {
             (StructLayout::Singleton(fields, _), None) => {
-                Some(if s.is_empty_struct { 0 } else { fields.len() })
+                Some(if struct_entry.is_empty_struct { 0 } else { fields.len() })
             },
             (StructLayout::Variants(variants), Some(name)) => {
                 if let Some(variant) = variants.iter().find(|v| v.name == name) {
