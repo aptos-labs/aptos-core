@@ -707,6 +707,16 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// CAUTION: This is to be used only in the rare circumstances where multisig_admin is convinced that a delegator was the
+    /// rightful owner of `old_delegator` but has lost access and the delegator is also the rightful
+    /// owner of `new_delegator` , Only for those stakeholders which were added at the time of creation
+    /// This does not apply to anyone who added stake later or operator
+    PboDelegationPoolReplaceDelegator {
+        pool_address: AccountAddress,
+        old_delegator: AccountAddress,
+        new_delegator: AccountAddress,
+    },
+
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
     /// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
     /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
@@ -1737,6 +1747,11 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => pbo_delegation_pool_reactivate_stake(pool_address, amount),
+            PboDelegationPoolReplaceDelegator {
+                pool_address,
+                old_delegator,
+                new_delegator,
+            } => pbo_delegation_pool_replace_delegator(pool_address, old_delegator, new_delegator),
             PboDelegationPoolSetBeneficiaryForOperator { new_beneficiary } => {
                 pbo_delegation_pool_set_beneficiary_for_operator(new_beneficiary)
             },
@@ -3996,6 +4011,33 @@ pub fn pbo_delegation_pool_reactivate_stake(
         vec![
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// CAUTION: This is to be used only in the rare circumstances where multisig_admin is convinced that a delegator was the
+/// rightful owner of `old_delegator` but has lost access and the delegator is also the rightful
+/// owner of `new_delegator` , Only for those stakeholders which were added at the time of creation
+/// This does not apply to anyone who added stake later or operator
+pub fn pbo_delegation_pool_replace_delegator(
+    pool_address: AccountAddress,
+    old_delegator: AccountAddress,
+    new_delegator: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("pbo_delegation_pool").to_owned(),
+        ),
+        ident_str!("replace_delegator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&old_delegator).unwrap(),
+            bcs::to_bytes(&new_delegator).unwrap(),
         ],
     ))
 }
@@ -6870,6 +6912,20 @@ mod decoder {
         }
     }
 
+    pub fn pbo_delegation_pool_replace_delegator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::PboDelegationPoolReplaceDelegator {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                old_delegator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                new_delegator: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn pbo_delegation_pool_set_beneficiary_for_operator(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -8261,6 +8317,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "pbo_delegation_pool_reactivate_stake".to_string(),
             Box::new(decoder::pbo_delegation_pool_reactivate_stake),
+        );
+        map.insert(
+            "pbo_delegation_pool_replace_delegator".to_string(),
+            Box::new(decoder::pbo_delegation_pool_replace_delegator),
         );
         map.insert(
             "pbo_delegation_pool_set_beneficiary_for_operator".to_string(),
