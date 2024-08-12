@@ -267,13 +267,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 deser_finished_tx_clone.send(()).unwrap();
             });
         }
-        let mut num_outputs_received = vec![self.num_shards(); 0];
+        let mut num_outputs_received = vec![0u64; self.num_shards()];
         let mut to_receive = self.num_shards();
         // (0..self.num_shards()).into_par_iter().for_each(|shard_id| {
         //     let mut num_outputs_received: u64 = 0;
         loop {
             let received_msg = self.result_rxs[0].recv().unwrap();
-            let shard_id = received_msg.shard_id.unwrap();
+            let shard_id = received_msg.shard_id.unwrap() as usize;
             let num_txn = received_msg.seq_num.unwrap();
             num_outputs_received[shard_id] += num_txn;
             deser_tx.send(received_msg).unwrap();
