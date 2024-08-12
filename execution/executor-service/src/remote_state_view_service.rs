@@ -66,7 +66,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = 120; //num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = 90; //num_threads.unwrap_or_else(num_cpus::get);
         let num_kv_req_threads = num_cpus::get() / 16;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -216,10 +216,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             shard_id,
             state_keys.len()
         );
+        let state_view_read_lock = state_view.read().unwrap();
         let resp = state_keys
             .into_iter()
             .map(|state_key| {
-                let state_value = if let Some(state_view_some) = state_view.read().unwrap().as_ref() {
+                let state_value = if let Some(state_view_some) = state_view_read_lock.as_ref() {
                     state_view_some.get_state_value(&state_key).unwrap()
                 }
                 else {
@@ -235,6 +236,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 (state_key, state_value)
             })
             .collect_vec();
+        drop(state_view_read_lock);
         drop(timer_2);
 
         let timer_3 = REMOTE_EXECUTOR_TIMER
