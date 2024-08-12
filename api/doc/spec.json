@@ -15282,6 +15282,7 @@
         "required": [
           "name",
           "is_native",
+          "is_event",
           "abilities",
           "generic_type_params",
           "fields"
@@ -15293,6 +15294,10 @@
           "is_native": {
             "type": "boolean",
             "description": "Whether the struct is a native struct of Move"
+          },
+          "is_event": {
+            "type": "boolean",
+            "description": "Whether the struct is marked with the #[event] annotation"
           },
           "abilities": {
             "type": "array",
