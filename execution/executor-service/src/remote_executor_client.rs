@@ -380,7 +380,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         outbound_rpc_scheduler_clone.send(msg,
                                                          MessageType::new(execute_command_type),
                                                          senders[shard_id][rand_send_thread_idx].clone(),
-                                                         chunk_idx as u64);
+                                                         0); //chunk_idx as u64);
                         drop(timer_1)
                     });
             });
