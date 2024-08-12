@@ -250,7 +250,7 @@ impl NetworkController {
             inbound_server_shutdown_tx: None,
             outbound_task_shutdown_tx: None,
             listen_addr,
-            outbound_rpc_scheduler: Arc::new(OutboundRpcScheduler::new(Arc::new(runtime::Builder::new_multi_thread().worker_threads(15).enable_all().thread_name("outbound_rpc_scheduler").build().unwrap()))),
+            outbound_rpc_scheduler: Arc::new(OutboundRpcScheduler::new(Arc::new(runtime::Builder::new_multi_thread().worker_threads(45).enable_all().thread_name("outbound_rpc_scheduler").build().unwrap()))),
         }
     }
 
