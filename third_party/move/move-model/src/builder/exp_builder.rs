@@ -4767,6 +4767,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    /// Checks for undeclared fields and return the set of missing fields
     fn check_missing_or_undeclared_fields<T>(
         &mut self,
         struct_name: QualifiedSymbol,
