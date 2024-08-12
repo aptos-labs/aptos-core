@@ -34,7 +34,7 @@ fun m::test() {
   3: $t3 := freeze_ref($t2)
   4: $t4 := infer($t3)
   5: $t5 := 4
-  6: write_ref($t1, $t5)
+  6: write_ref($t5, $t1)
   7: return ()
 }
 

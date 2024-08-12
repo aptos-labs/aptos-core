@@ -98,7 +98,7 @@ object "test_A2_Tables_test_borrow_fail" {
                     $t16 := A2_Table_borrow_mut$u64_u128$($t13, $t15)
                     // $t17 := 1
                     $t17 := 1
-                    // write_ref($t16, $t17)
+                    // write_ref($t17, $t16)
                     $StoreU128($t16, $t17)
                     // $t18 := 0x42
                     $t18 := 0x42
@@ -1967,7 +1967,7 @@ object "test_A2_Tables_test_struct" {
                     $t81 := $Sub($t79, $t80)
                     // $t82 := borrow_field<Tables::Balance>.value($t77)
                     $t82 := $t77
-                    // write_ref($t82, $t81)
+                    // write_ref($t81, $t82)
                     $StoreU256($t82, $t81)
                     // $t83 := 0xcd
                     $t83 := 0xcd
@@ -3113,7 +3113,7 @@ object "test_A2_Tables_test_u256" {
                     $t23 := $MakePtr(false, add($locals, 32))
                     // $t24 := Table::borrow_mut<U256::U256, U256::U256>($t22, $t23)
                     $t24 := A2_Table_borrow_mut$A2_U256_U256_A2_U256_U256$($t22, $t23)
-                    // write_ref($t24, $t8)
+                    // write_ref($t8, $t24)
                     $StoreU256($t24, $t8)
                     // $t25 := borrow_local($t3)
                     $t25 := $MakePtr(false, $locals)

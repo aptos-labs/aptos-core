@@ -22,8 +22,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/fixed_point_arithm.move:42: multiply_x_0_incorrect
    =         x = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:43: multiply_x_0_incorrect
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/fixed_point_arithm.move:43: multiply_x_0_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:44: multiply_x_0_incorrect
    =     at tests/sources/functional/fixed_point_arithm.move:46: multiply_x_0_incorrect (spec)
@@ -56,8 +54,6 @@ error: post-condition does not hold
    =     at ../move-stdlib/sources/fixed_point32.move:126
    =     at ../move-stdlib/sources/fixed_point32.move:127
    =     at tests/sources/functional/fixed_point_arithm.move:82: multiply_x_1_incorrect
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/fixed_point_arithm.move:82: multiply_x_1_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:83: multiply_x_1_incorrect
    =     at tests/sources/functional/fixed_point_arithm.move:85: multiply_x_1_incorrect (spec)
@@ -80,7 +76,6 @@ error: post-condition does not hold
     =     at ../move-stdlib/sources/fixed_point32.move:151: get_raw_value
     =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =         y_raw_val = <redacted>
-    =         y = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:107: mul_div_incorrect
     =         result = <redacted>
@@ -104,7 +99,6 @@ error: post-condition does not hold
     =     at ../move-stdlib/sources/fixed_point32.move:151: get_raw_value
     =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =         y_raw_val = <redacted>
-    =         y = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:107: mul_div_incorrect
     =         result = <redacted>

@@ -1474,7 +1474,7 @@ object "test_A2_M_test_read_and_write_S" {
             let $t2, $t3, $t4, $t5, $t6, $t7
             // $t2 := borrow_field<M::S>.a($t0)
             $t2 := $IndexPtr(s, 32)
-            // write_ref($t2, $t1)
+            // write_ref($t1, $t2)
             $StoreU64($t2, v)
             // $t3 := borrow_field<M::S>.a($t0)
             $t3 := $IndexPtr(s, 32)
@@ -1488,7 +1488,7 @@ object "test_A2_M_test_read_and_write_S" {
             }
             // $t7 := borrow_field<M::S2>.x($t6)
             $t7 := $t6
-            // write_ref($t7, $t5)
+            // write_ref($t5, $t7)
             $StoreU128($t7, $t5)
             // return ()
         }
@@ -2097,7 +2097,7 @@ object "test_A2_M_test_write_S" {
             let $t2, $t3, $t4, $t5, $t6, $t7
             // $t2 := borrow_field<M::S>.a($t0)
             $t2 := $IndexPtr(s, 32)
-            // write_ref($t2, $t1)
+            // write_ref($t1, $t2)
             $StoreU64($t2, v)
             // $t3 := borrow_field<M::S>.a($t0)
             $t3 := $IndexPtr(s, 32)
@@ -2111,7 +2111,7 @@ object "test_A2_M_test_write_S" {
             }
             // $t7 := borrow_field<M::S2>.x($t6)
             $t7 := $t6
-            // write_ref($t7, $t5)
+            // write_ref($t5, $t7)
             $StoreU128($t7, $t5)
             // return ()
         }

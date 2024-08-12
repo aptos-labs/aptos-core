@@ -53,7 +53,7 @@ object "A2_M" {
                 $t11 := 1
                 // $t12 := +($t10, $t11)
                 $t12 := $AddU64($t10, $t11)
-                // write_ref($t8, $t12)
+                // write_ref($t12, $t8)
                 $StoreU64($t8, $t12)
                 // $t13 := move($t0)
                 $t13 := mload($locals)
@@ -318,7 +318,7 @@ object "test_A2_M_test_call_by_ref" {
             let $t1
             // $t1 := 2
             $t1 := 2
-            // write_ref($t0, $t1)
+            // write_ref($t1, $t0)
             $StoreU64(a, $t1)
             // return ()
         }
@@ -562,7 +562,7 @@ object "test_A2_M_test_evaded" {
             $t11 := 1
             // $t12 := +($t10, $t11)
             $t12 := $AddU64($t10, $t11)
-            // write_ref($t8, $t12)
+            // write_ref($t12, $t8)
             $StoreU64($t8, $t12)
             // $t13 := move($t0)
             $t13 := mload($locals)

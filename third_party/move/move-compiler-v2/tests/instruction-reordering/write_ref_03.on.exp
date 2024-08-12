@@ -1,0 +1,59 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64, $t1: &mut u64) {
+  0: touch($t0)
+  1: write_ref($t0, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+public fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64 [unused]
+     var $t5: &mut u64 [unused]
+  0: $t2 := 3
+  1: $t1 := 0
+  2: $t3 := borrow_local($t1)
+  3: m::foo($t2, $t3)
+  4: $t2 := 4
+  5: $t3 := borrow_local($t1)
+  6: m::foo($t2, $t3)
+  7: $t2 := move($t1)
+  8: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+foo(Arg0: u64, Arg1: &mut u64) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: &mut u64)
+	2: WriteRef
+	3: Ret
+}
+public test(): u64 /* def_idx: 1 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: LdU64(3)
+	1: LdU64(0)
+	2: StLoc[0](loc0: u64)
+	3: MutBorrowLoc[0](loc0: u64)
+	4: Call foo(u64, &mut u64)
+	5: LdU64(4)
+	6: MutBorrowLoc[0](loc0: u64)
+	7: Call foo(u64, &mut u64)
+	8: MoveLoc[0](loc0: u64)
+	9: Ret
+}
+}
+============ bytecode verification succeeded ========

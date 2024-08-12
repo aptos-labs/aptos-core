@@ -642,19 +642,19 @@ object "test_A2_Vectors_test_borrow_mut" {
                     $t11 := 90
                     // $t12 := borrow_field<Vectors::S>.x($t10)
                     $t12 := $t10
-                    // write_ref($t12, $t11)
+                    // write_ref($t11, $t12)
                     $StoreU128($t12, $t11)
                     // $t13 := false
                     $t13 := false
                     // $t14 := borrow_field<Vectors::S>.y($t10)
                     $t14 := $IndexPtr($t10, 24)
-                    // write_ref($t14, $t13)
+                    // write_ref($t13, $t14)
                     $StoreU8($t14, $t13)
                     // $t15 := 1028
                     $t15 := 1028
                     // $t16 := borrow_field<Vectors::S>.z($t10)
                     $t16 := $IndexPtr($t10, 16)
-                    // write_ref($t16, $t15)
+                    // write_ref($t15, $t16)
                     $StoreU64($t16, $t15)
                     // $t17 := borrow_local($t2)
                     $t17 := $MakePtr(false, $locals)
@@ -852,19 +852,19 @@ object "test_A2_Vectors_test_borrow_mut" {
                     $t68 := 10
                     // $t69 := borrow_field<Vectors::S>.x($t67)
                     $t69 := $t67
-                    // write_ref($t69, $t68)
+                    // write_ref($t68, $t69)
                     $StoreU128($t69, $t68)
                     // $t70 := true
                     $t70 := true
                     // $t71 := borrow_field<Vectors::S>.y($t67)
                     $t71 := $IndexPtr($t67, 24)
-                    // write_ref($t71, $t70)
+                    // write_ref($t70, $t71)
                     $StoreU8($t71, $t70)
                     // $t72 := 456
                     $t72 := 456
                     // $t73 := borrow_field<Vectors::S>.z($t67)
                     $t73 := $IndexPtr($t67, 16)
-                    // write_ref($t73, $t72)
+                    // write_ref($t72, $t73)
                     $StoreU64($t73, $t72)
                     // $t74 := borrow_local($t2)
                     $t74 := $MakePtr(false, $locals)
@@ -7425,7 +7425,7 @@ object "test_A2_Vectors_test_vectors_in_structs" {
                     $t46 := 1
                     // $t47 := vector::borrow_mut<u64>($t45, $t46)
                     $t47 := A1_vector_borrow_mut$u64$($t45, $t46)
-                    // write_ref($t47, $t43)
+                    // write_ref($t43, $t47)
                     $StoreU64($t47, $t43)
                     // $t48 := borrow_local($t0)
                     $t48 := $MakePtr(false, r)
@@ -7466,7 +7466,7 @@ object "test_A2_Vectors_test_vectors_in_structs" {
                     $t57 := $MakePtr(false, r)
                     // $t58 := borrow_field<Vectors::R>.v($t57)
                     $t58 := $IndexPtr($t57, 32)
-                    // write_ref($t58, $t56)
+                    // write_ref($t56, $t58)
                     if $IsStoragePtr($t58){
                         let $storage_ptr_814019441 := $NewLinkedStorageBase(0x3084f371)
                         let $size_814019441 := $MemoryLoadU64($t56)

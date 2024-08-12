@@ -19,7 +19,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
@@ -30,18 +29,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
-    =         i = <redacted>
-    =     at tests/sources/functional/loop_unroll.move:97: t6_failure
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_unroll.move:95: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:91: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:92: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:94: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
@@ -52,7 +39,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
@@ -63,7 +49,16 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_unroll.move:95: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:91: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:92: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:94: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
+    =     at tests/sources/functional/loop_unroll.move:96: t6_failure
     =         i = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
@@ -74,7 +69,7 @@ error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/loop_unroll.move:128:5
     │
 124 │               assert!(i != 5, 0);
-    │                       ------ abort happened here with code 0x0
+    │               ------ abort happened here with code 0x0
     ·
 128 │ ╭     spec t7_failure {
 129 │ │         pragma unroll = 6;

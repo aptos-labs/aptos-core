@@ -26,7 +26,7 @@ fun m::test_for_each_mut() {
   8: label L2
   9: $t6 := vector::borrow_mut<u64>($t4, $t1)
  10: $t7 := 2
- 11: write_ref($t6, $t7)
+ 11: write_ref($t7, $t6)
  12: $t9 := 1
  13: $t8 := +($t1, $t9)
  14: $t1 := infer($t8)
@@ -88,7 +88,7 @@ fun m::test_for_each_mut() {
      # live vars: $t0, $t1, $t2, $t4, $t6
  10: $t7 := 2
      # live vars: $t0, $t1, $t2, $t4, $t6, $t7
- 11: write_ref($t6, $t7)
+ 11: write_ref($t7, $t6)
      # live vars: $t0, $t1, $t2, $t4
  12: $t9 := 1
      # live vars: $t0, $t1, $t2, $t4, $t9
@@ -169,7 +169,7 @@ fun m::test_for_each_mut() {
      # live vars: $t0, $t1, $t2, $t4, $t6
  10: $t7 := 2
      # live vars: $t0, $t1, $t2, $t4, $t6, $t7
- 11: write_ref($t6, $t7)
+ 11: write_ref($t7, $t6)
      # live vars: $t0, $t1, $t2, $t4
  12: $t9 := 1
      # live vars: $t0, $t1, $t2, $t4, $t9
@@ -300,7 +300,7 @@ fun m::test_for_each_mut() {
      # globals: {}
      # derived-from: @900=$t4
      #
- 11: write_ref($t6, $t7)
+ 11: write_ref($t7, $t6)
      # live vars: $t0, $t1, $t2, $t4
      # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
@@ -519,7 +519,7 @@ fun m::test_for_each_mut() {
      # globals: {}
      # derived-from: @900=$t4
      #
- 11: write_ref($t6, $t7)
+ 11: write_ref($t7, $t6)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
      # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
@@ -685,7 +685,7 @@ fun m::test_for_each_mut() {
   9: $t13 := copy($t4)
  10: $t6 := vector::borrow_mut<u64>($t13, $t1)
  11: $t7 := 2
- 12: write_ref($t6, $t7)
+ 12: write_ref($t7, $t6)
  13: $t9 := 1
  14: $t8 := +($t1, $t9)
  15: $t1 := move($t8)

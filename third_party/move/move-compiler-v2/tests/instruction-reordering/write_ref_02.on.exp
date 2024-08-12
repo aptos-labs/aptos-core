@@ -1,0 +1,34 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+public fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+  0: $t2 := copy($t0)
+  1: $t4 := 1
+  2: $t3 := borrow_local($t0)
+  3: write_ref($t4, $t3)
+  4: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+public test(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: StLoc[1](loc0: u64)
+	2: LdU64(1)
+	3: MutBorrowLoc[0](Arg0: u64)
+	4: WriteRef
+	5: MoveLoc[1](loc0: u64)
+	6: Ret
+}
+}
+============ bytecode verification succeeded ========

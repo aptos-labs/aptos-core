@@ -30,9 +30,7 @@ error: post-condition does not hold
    =         s1 = <redacted>
    =         s2 = <redacted>
    =     at tests/sources/functional/choice.move:47: populate_R
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:48: populate_R
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:49: populate_R
    =     at tests/sources/functional/choice.move:56: populate_R (spec)
 
@@ -46,8 +44,8 @@ error: post-condition does not hold
    =         v = <redacted>
    =     at tests/sources/functional/choice.move:77: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:78: test_not_using_min_incorrect
-   =         <redacted> = <redacted>
    =         v_ref = <redacted>
+   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:79: test_not_using_min_incorrect
    =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:80: test_not_using_min_incorrect
@@ -132,7 +130,6 @@ error: post-condition does not hold
     =         ballot_account = <redacted>
     =     at tests/sources/functional/choice.move:284: create_ballot
     =     at tests/sources/functional/choice.move:283: create_ballot
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/choice.move:291
     =     at tests/sources/functional/choice.move:286: create_ballot
     =     at tests/sources/functional/choice.move:272: new_ballot_id

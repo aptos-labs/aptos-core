@@ -13,7 +13,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
   2: $t4 := borrow_field<m::Scalar>.data($t5)
   3: $t6 := 0
   4: $t3 := vector::borrow_mut<u8>($t4, $t6)
-  5: write_ref($t3, $t0)
+  5: write_ref($t0, $t3)
   6: $t1 := infer($t2)
   7: return $t1
 }
@@ -49,7 +49,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # live vars: $t0, $t2, $t4, $t6
   4: $t3 := vector::borrow_mut<u8>($t4, $t6)
      # live vars: $t0, $t2, $t3
-  5: write_ref($t3, $t0)
+  5: write_ref($t0, $t3)
      # live vars: $t2
   6: $t1 := infer($t2)
      # live vars: $t1
@@ -90,7 +90,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # live vars: $t0, $t2, $t4, $t6
   4: $t3 := vector::borrow_mut<u8>($t4, $t6)
      # live vars: $t0, $t2, $t3
-  5: write_ref($t3, $t0)
+  5: write_ref($t0, $t3)
      # live vars: $t2
   6: $t1 := infer($t2)
      # live vars: $t1
@@ -158,7 +158,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # globals: {}
      # derived-from: @201=$t5,@400=$t4
      #
-  5: write_ref($t3, $t0)
+  5: write_ref($t0, $t3)
      # live vars: $t2
      # graph: {@100=local($t2)[]}
      # locals: {$t2=@100}
@@ -252,7 +252,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # globals: {}
      # derived-from: @201=$t5,@400=$t4
      #
-  5: write_ref($t3, $t0)
+  5: write_ref($t0, $t3)
      # abort state: {returns}
      # live vars: $t2
      # graph: {@100=local($t2)[]}
@@ -312,7 +312,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
   2: $t4 := borrow_field<m::Scalar>.data($t5)
   3: $t6 := 0
   4: $t3 := vector::borrow_mut<u8>($t4, $t6)
-  5: write_ref($t3, $t0)
+  5: write_ref($t0, $t3)
   6: $t1 := move($t2)
   7: return $t1
 }

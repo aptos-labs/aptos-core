@@ -237,11 +237,11 @@ public fun freeze_mut_ref::t5($t0: &mut freeze_mut_ref::G) {
  12: $t10 := borrow_local($t11)
  13: $t13 := 2
  14: $t15 := 0
- 15: write_ref($t2, $t15)
+ 15: write_ref($t15, $t2)
  16: $t16 := freeze_ref(implicit)($t10)
  17: $t12 := infer($t16)
  18: $t14 := infer($t6)
- 19: write_ref($t14, $t13)
+ 19: write_ref($t13, $t14)
  20: return ()
 }
 

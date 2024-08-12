@@ -263,7 +263,7 @@ object "test_A2_M_h1" {
                     }
                     // $t39 := borrow_field<M::T>.s($t38)
                     $t39 := $t38
-                    // write_ref($t39, $t36)
+                    // write_ref($t36, $t39)
                     if $IsStoragePtr($t39){
                         let $storage_ptr_2300595445 := $NewLinkedStorageBase(0x89204cf5)
                         let $size_2300595445 := $MemoryLoadU64($t36)

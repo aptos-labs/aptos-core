@@ -7,10 +7,10 @@ error: abort not covered by any of the `aborts_if` clauses
 14 │ │     }
    │ ╰─────^
    │
-   ┌─ tests/sources/functional/script_provider.move:10:9
+   ┌─ tests/sources/functional/script_provider.move:10:26
    │
 10 │         move_to(account, Info<T>{})
-   │         --------------------------- abort happened here with execution failure
+   │                          --------- abort happened here with execution failure
    │
    =     at tests/sources/functional/script_incorrect.move:6: main
    =         account = <redacted>
@@ -25,7 +25,5 @@ error: abort not covered by any of the `aborts_if` clauses
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
    =     at tests/sources/functional/script_provider.move:9: register
-   =     at tests/sources/functional/script_provider.move:10: register
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/script_provider.move:10: register
    =         ABORTED

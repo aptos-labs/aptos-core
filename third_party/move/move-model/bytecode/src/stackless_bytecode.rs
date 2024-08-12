@@ -67,11 +67,11 @@ impl SpecBlockId {
 /// The kind of an assignment in the bytecode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AssignKind {
-    /// The assign copies the lhs value.
+    /// The assign copies the rhs value.
     Copy,
-    /// The assign moves the lhs value.
+    /// The assign moves the rhs value.
     Move,
-    /// The assign stores the lhs value.
+    /// The assign stores the rhs value.
     // TODO: figure out why we can't treat this as either copy or move. The lifetime analysis
     // currently makes a difference of this case. It originates from stack code where Copy
     // and Move push on the stack and Store pops.
@@ -178,9 +178,13 @@ pub enum Operation {
     Drop,
     /// Indicates that the value is no longer borrowed.
     Release,
+    /// Indicates to the file format generator that the value could be moved/copied 
+    /// to the stack.
+    /// It is preparing the value for a later operation that uses the value.
+    Prepare,
 
     ReadRef,
-    WriteRef,
+    WriteRef, // arguments: (value, reference)
     FreezeRef(/*explicit*/ bool),
     Vector,
 
@@ -276,6 +280,7 @@ impl Operation {
             Operation::Uninit => false,
             Operation::Drop => false,
             Operation::Release => false,
+            Operation::Prepare => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
             Operation::FreezeRef(_) => false,
@@ -865,7 +870,7 @@ impl Bytecode {
             },
             Call(_, _, Operation::WriteRef, srcs, aa) => {
                 // write-ref only distorts the value of the reference, but not the pointer itself
-                (add_abort(vec![], aa), vec![(srcs[0], false)])
+                (add_abort(vec![], aa), vec![(srcs[1], false)])
             },
             Call(_, dests, Function(..), srcs, aa) => {
                 let mut val_targets = vec![];
@@ -1225,6 +1230,9 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             },
             Release => {
                 write!(f, "release")?;
+            },
+            Prepare => {
+                write!(f, "touch")?;
             },
             ReadRef => {
                 write!(f, "read_ref")?;

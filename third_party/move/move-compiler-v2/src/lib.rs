@@ -28,6 +28,7 @@ use crate::{
         ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
+        instruction_reordering::InstructionReorderingProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
@@ -35,6 +36,7 @@ use crate::{
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover,
         unused_assignment_checker::UnusedAssignmentChecker,
+        flush_writes_processor::FlushWritesProcessor,
         variable_coalescing::VariableCoalescing,
     },
 };
@@ -446,9 +448,19 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         pipeline.add_processor(Box::new(DeadStoreElimination {}));
     }
 
+    if options.experiment_on(Experiment::INSTRUCTION_REORDERING) {
+        pipeline.add_processor(Box::new(InstructionReorderingProcessor {}));
+    }
+
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
+    // There should be no "transforming" processors run after this point.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+
+    if options.experiment_on(Experiment::FLUSH_WRITES_OPTIMIZATION) {
+        pipeline.add_processor(Box::new(FlushWritesProcessor {}));
+    }
+
     pipeline
 }
 

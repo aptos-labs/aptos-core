@@ -71,11 +71,11 @@ fun <SELF>_0::check() {
  36: $t13 := 0
  37: $t12 := borrow_local($t13)
  38: $t14 := 1
- 39: write_ref($t12, $t14)
+ 39: write_ref($t14, $t12)
  40: $t16 := [104, 101, 108, 108, 111]
  41: $t15 := borrow_local($t16)
  42: $t17 := [98, 121, 101]
- 43: write_ref($t15, $t17)
+ 43: write_ref($t17, $t15)
  44: $t19 := read_ref($t12)
  45: $t20 := 1
  46: $t18 := ==($t19, $t20)
@@ -228,7 +228,7 @@ fun <SELF>_0::check() {
      # live vars: $t12
  38: $t14 := 1
      # live vars: $t12, $t14
- 39: write_ref($t12, $t14)
+ 39: write_ref($t14, $t12)
      # live vars: $t12
  40: $t16 := [104, 101, 108, 108, 111]
      # live vars: $t12, $t16
@@ -236,7 +236,7 @@ fun <SELF>_0::check() {
      # live vars: $t12, $t15
  42: $t17 := [98, 121, 101]
      # live vars: $t12, $t15, $t17
- 43: write_ref($t15, $t17)
+ 43: write_ref($t17, $t15)
      # live vars: $t12, $t15
  44: $t19 := read_ref($t12)
      # live vars: $t15, $t19
@@ -426,7 +426,7 @@ fun <SELF>_0::check() {
      # live vars: $t12
  38: $t14 := 1
      # live vars: $t12, $t14
- 39: write_ref($t12, $t14)
+ 39: write_ref($t14, $t12)
      # live vars: $t12
  40: $t16 := [104, 101, 108, 108, 111]
      # live vars: $t12, $t16
@@ -434,7 +434,7 @@ fun <SELF>_0::check() {
      # live vars: $t12, $t15
  42: $t17 := [98, 121, 101]
      # live vars: $t12, $t15, $t17
- 43: write_ref($t15, $t17)
+ 43: write_ref($t17, $t15)
      # live vars: $t12, $t15
  44: $t19 := read_ref($t12)
      # live vars: $t15, $t19
@@ -784,7 +784,7 @@ fun <SELF>_0::check() {
      # locals: {$t12=@2501,$t13=@2500}
      # globals: {}
      #
- 39: write_ref($t12, $t14)
+ 39: write_ref($t14, $t12)
      # live vars: $t12
      # graph: {@2500=local($t13)[borrow_mut -> @2501],@2501=derived[]}
      # locals: {$t12=@2501,$t13=@2500}
@@ -808,7 +808,7 @@ fun <SELF>_0::check() {
      # locals: {$t12=@2501,$t13=@2500,$t15=@2901,$t16=@2900}
      # globals: {}
      #
- 43: write_ref($t15, $t17)
+ 43: write_ref($t17, $t15)
      # live vars: $t12, $t15
      # graph: {@2500=local($t13)[borrow_mut -> @2501],@2501=derived[],@2900=local($t16)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t12=@2501,$t13=@2500,$t15=@2901,$t16=@2900}
@@ -1346,7 +1346,7 @@ fun <SELF>_0::check() {
      # locals: {$t12=@2501,$t13=@2500}
      # globals: {}
      #
- 39: write_ref($t12, $t14)
+ 39: write_ref($t14, $t12)
      # abort state: {returns,aborts}
      # live vars: $t12
      # graph: {@2500=local($t13)[borrow_mut -> @2501],@2501=derived[]}
@@ -1374,7 +1374,7 @@ fun <SELF>_0::check() {
      # locals: {$t12=@2501,$t13=@2500,$t15=@2901,$t16=@2900}
      # globals: {}
      #
- 43: write_ref($t15, $t17)
+ 43: write_ref($t17, $t15)
      # abort state: {returns,aborts}
      # live vars: $t12, $t15
      # graph: {@2500=local($t13)[borrow_mut -> @2501],@2501=derived[],@2900=local($t16)[borrow_mut -> @2901],@2901=derived[]}
@@ -1709,11 +1709,11 @@ fun <SELF>_0::check() {
  36: $t13 := 0
  37: $t12 := borrow_local($t13)
  38: $t14 := 1
- 39: write_ref($t12, $t14)
+ 39: write_ref($t14, $t12)
  40: $t16 := [104, 101, 108, 108, 111]
  41: $t15 := borrow_local($t16)
  42: $t17 := [98, 121, 101]
- 43: write_ref($t15, $t17)
+ 43: write_ref($t17, $t15)
  44: $t19 := read_ref($t12)
  45: $t20 := 1
  46: $t18 := ==($t19, $t20)

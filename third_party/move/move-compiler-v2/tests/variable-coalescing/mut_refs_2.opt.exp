@@ -15,7 +15,7 @@ fun m::test($t0: m::S): u64 {
   2: $t5 := borrow_local($t2)
   3: $t4 := borrow_field<m::S>.a($t5)
   4: $t6 := 0
-  5: write_ref($t4, $t6)
+  5: write_ref($t6, $t4)
   6: $t7 := borrow_local($t3)
   7: $t8 := borrow_field<m::S>.a($t7)
   8: $t1 := read_ref($t8)
@@ -39,7 +39,7 @@ fun m::test($t0: m::S): u64 {
   2: $t5 := borrow_local($t2)
   3: $t4 := borrow_field<m::S>.a($t5)
   4: $t6 := 0
-  5: write_ref($t4, $t6)
+  5: write_ref($t6, $t4)
   6: $t7 := borrow_local($t3)
   7: $t8 := borrow_field<m::S>.a($t7)
   8: $t1 := read_ref($t8)
@@ -74,7 +74,7 @@ fun m::test($t0: m::S): u64 {
   4: $t6 := 0
      # live vars: $t3, $t4, $t6
      # events: e:$t4, e:$t6
-  5: write_ref($t4, $t6)
+  5: write_ref($t6, $t4)
      # live vars: $t3
      # events: b:$t7
   6: $t7 := borrow_local($t3)
@@ -106,7 +106,7 @@ fun m::test($t0: m::S): u64 {
   2: $t5 := borrow_local($t2)
   3: $t4 := borrow_field<m::S>.a($t5)
   4: $t6 := 0
-  5: write_ref($t4, $t6)
+  5: write_ref($t6, $t4)
   6: $t7 := borrow_local($t3)
   7: $t8 := borrow_field<m::S>.a($t7)
   8: $t6 := read_ref($t8)
@@ -130,7 +130,7 @@ fun m::test($t0: m::S): u64 {
   2: $t5 := borrow_local($t2)
   3: $t4 := borrow_field<m::S>.a($t5)
   4: $t6 := 0
-  5: write_ref($t4, $t6)
+  5: write_ref($t6, $t4)
   6: $t7 := borrow_local($t3)
   7: $t8 := borrow_field<m::S>.a($t7)
   8: $t6 := read_ref($t8)

@@ -1,0 +1,113 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+  0: touch($t0)
+  1: $t2 := 1
+  2: $t0 := +($t0, $t2)
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64 [unused]
+  0: label L0
+  1: $t1 := m::foo($t0)
+  2: $t0 := move($t1)
+  3: $t1 := 10
+  4: $t2 := >($t0, $t1)
+  5: if ($t2) goto 6 else goto 8
+  6: label L2
+  7: goto 11
+  8: label L3
+  9: label L4
+ 10: goto 0
+ 11: label L1
+ 12: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64 [unused]
+     var $t4: bool
+     var $t5: u64
+  0: label L0
+  1: touch($t1)
+  2: $t4 := <($t1, $t2)
+  3: if ($t4) goto 4 else goto 9
+  4: label L2
+  5: $t5 := m::foo($t1)
+  6: $t0 := move($t5)
+  7: $t1 := copy($t0)
+  8: goto 11
+  9: label L3
+ 10: goto 13
+ 11: label L4
+ 12: goto 0
+ 13: label L1
+ 14: touch($t0)
+ 15: $t0 := +($t0, $t1)
+ 16: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+foo(Arg0: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
+}
+public test1(Arg0: u64) /* def_idx: 1 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Call foo(u64): u64
+	2: StLoc[0](Arg0: u64)
+	3: CopyLoc[0](Arg0: u64)
+	4: LdU64(10)
+	5: Gt
+	6: BrFalse(8)
+B1:
+	7: Branch(9)
+B2:
+	8: Branch(0)
+B3:
+	9: Ret
+}
+public test2(Arg0: u64, Arg1: u64, Arg2: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: CopyLoc[1](Arg1: u64)
+	1: CopyLoc[2](Arg2: u64)
+	2: Lt
+	3: BrFalse(10)
+B1:
+	4: MoveLoc[1](Arg1: u64)
+	5: Call foo(u64): u64
+	6: StLoc[0](Arg0: u64)
+	7: CopyLoc[0](Arg0: u64)
+	8: StLoc[1](Arg1: u64)
+	9: Branch(11)
+B2:
+	10: Branch(12)
+B3:
+	11: Branch(0)
+B4:
+	12: MoveLoc[0](Arg0: u64)
+	13: MoveLoc[1](Arg1: u64)
+	14: Add
+	15: Ret
+}
+}
+============ bytecode verification succeeded ========

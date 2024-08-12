@@ -452,9 +452,9 @@ impl<'a> FunctionGenerator<'a> {
                         print_loc();
                         self.write_ref(
                             ctx,
-                            &get_local_type(srcs[1]),
-                            local(&srcs[0]),
+                            &get_local_type(srcs[0]),
                             local(&srcs[1]),
+                            local(&srcs[0]),
                         )
                     },
                     // FreezeRef transforms a mutable reference to an immutable one so just
@@ -557,6 +557,7 @@ impl<'a> FunctionGenerator<'a> {
 
                     // Specification or other operations which can be ignored here
                     Release
+                    | Prepare
                     | GetField(_, _, _, _)
                     | GetGlobal(_, _, _)
                     | IsParent(_, _)

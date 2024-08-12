@@ -51,7 +51,7 @@ use move_stackless_bytecode::{
     dataflow_domains::{AbstractDomain, JoinResult, MapDomain},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AttrId, Bytecode},
+    stackless_bytecode::{AttrId, Bytecode, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::{
@@ -350,6 +350,9 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
             Load(_, dst, _) => {
                 state.livevars.remove(dst);
             },
+            Call(_, _, Operation::Prepare, _, _) => {
+                // Prepare should be considered as a no-op for live variable analysis.
+            },
             Call(id, dsts, _, srcs, _) => {
                 for dst in dsts {
                     state.livevars.remove(dst);
@@ -409,15 +412,17 @@ pub fn format_livevar_annotation(
 ) -> Option<String> {
     if let Some(LiveVarAnnotation(map)) = target.get_annotations().get::<LiveVarAnnotation>() {
         if let Some(map_at) = map.get(&code_offset) {
-            let mut res = map_at
-                .before
-                .keys()
-                .map(|idx| {
-                    let name = target.get_local_raw_name(*idx);
-                    format!("{}", name.display(target.symbol_pool()))
-                })
-                .join(", ");
-            res.insert_str(0, "live vars: ");
+            let mut res = "live vars: ".to_string();
+            res.push_str(
+                &map_at
+                    .before
+                    .keys()
+                    .map(|idx| {
+                        let name = target.get_local_raw_name(*idx);
+                        format!("{}", name.display(target.symbol_pool()))
+                    })
+                    .join(", "),
+            );
             return Some(res);
         }
     }

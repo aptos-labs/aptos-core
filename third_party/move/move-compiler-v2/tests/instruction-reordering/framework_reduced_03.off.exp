@@ -1,0 +1,360 @@
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::compute($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::take1($t0: &u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::take2($t0: &u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: &u64
+     # live vars: $t0
+  0: $t1 := m::compute($t0)
+     # live vars: $t0, $t1
+  1: $t2 := borrow_local($t0)
+     # live vars: $t1, $t2
+  2: $t4 := borrow_local($t1)
+     # live vars: $t2, $t4
+  3: $t3 := m::take1($t4)
+     # live vars: $t2, $t3
+  4: m::take2($t2, $t3)
+     # live vars:
+  5: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::compute($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::take1($t0: &u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::take2($t0: &u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: &u64
+     # live vars: $t0
+  0: $t1 := m::compute($t0)
+     # live vars: $t0, $t1
+  1: $t2 := borrow_local($t0)
+     # live vars: $t1, $t2
+  2: $t4 := borrow_local($t1)
+     # live vars: $t2, $t4
+  3: $t3 := m::take1($t4)
+     # live vars: $t2, $t3
+  4: m::take2($t2, $t3)
+     # live vars:
+  5: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::compute($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::take1($t0: &u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::take2($t0: &u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: drop($t0)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: &u64
+     # live vars: $t0
+  0: $t1 := m::compute($t0)
+     # live vars: $t0, $t1
+  1: $t2 := borrow_local($t0)
+     # live vars: $t1, $t2
+  2: $t4 := borrow_local($t1)
+     # live vars: $t2, $t4
+  3: $t3 := m::take1($t4)
+     # live vars: $t2, $t3
+  4: m::take2($t2, $t3)
+     # live vars:
+  5: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::compute($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::take1($t0: &u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::take2($t0: &u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: drop($t0)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: &u64
+     # live vars: $t0
+  0: $t1 := m::compute($t0)
+     # live vars: $t0, $t1
+  1: $t2 := borrow_local($t0)
+     # live vars: $t1, $t2
+  2: $t4 := borrow_local($t1)
+     # live vars: $t2, $t4
+  3: $t3 := m::take1($t4)
+     # live vars: $t2, $t3
+  4: m::take2($t2, $t3)
+     # live vars:
+  5: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::compute($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun m::take1($t0: &u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::take2($t0: &u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: drop($t0)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: &u64
+     # live vars: $t0
+  0: $t1 := m::compute($t0)
+     # live vars: $t0, $t1
+  1: $t2 := borrow_local($t0)
+     # live vars: $t1, $t2
+  2: $t4 := borrow_local($t1)
+     # live vars: $t2, $t4
+  3: $t3 := m::take1($t4)
+     # live vars: $t2, $t3
+  4: m::take2($t2, $t3)
+     # live vars:
+  5: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::compute($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun m::take1($t0: &u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::take2($t0: &u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: drop($t0)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: &u64
+     var $t3: u64
+     var $t4: &u64
+     # live vars: $t0
+  0: $t1 := m::compute($t0)
+     # live vars: $t0, $t1
+  1: $t2 := borrow_local($t0)
+     # live vars: $t1, $t2
+  2: $t4 := borrow_local($t1)
+     # live vars: $t2, $t4
+  3: $t3 := m::take1($t4)
+     # live vars: $t2, $t3
+  4: m::take2($t2, $t3)
+     # live vars:
+  5: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+compute(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
+}
+take1(Arg0: &u64): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: &u64)
+	1: ReadRef
+	2: Ret
+}
+take2(Arg0: &u64, Arg1: u64) /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](Arg0: &u64)
+	1: Pop
+	2: Ret
+}
+public test(Arg0: u64) /* def_idx: 3 */ {
+L1:	loc0: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: Call compute(u64): u64
+	2: StLoc[1](loc0: u64)
+	3: ImmBorrowLoc[0](Arg0: u64)
+	4: ImmBorrowLoc[1](loc0: u64)
+	5: Call take1(&u64): u64
+	6: Call take2(&u64, u64)
+	7: Ret
+}
+}
+============ bytecode verification succeeded ========

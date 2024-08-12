@@ -1,0 +1,1559 @@
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test10($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := +($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64, $t1: u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     # live vars: $t0, $t1, $t2, $t3
+  0: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  1: $t5 := +($t6, $t0)
+     # live vars: $t1, $t2, $t3, $t5
+  2: $t8 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t8
+  3: $t7 := +($t8, $t1)
+     # live vars: $t2, $t3, $t5, $t7
+  4: $t10 := 1
+     # live vars: $t2, $t3, $t5, $t7, $t10
+  5: $t9 := +($t10, $t2)
+     # live vars: $t3, $t5, $t7, $t9
+  6: $t12 := 1
+     # live vars: $t3, $t5, $t7, $t9, $t12
+  7: $t11 := +($t12, $t3)
+     # live vars: $t5, $t7, $t9, $t11
+  8: $t13 := +($t5, $t7)
+     # live vars: $t9, $t11, $t13
+  9: $t14 := infer($t13)
+     # live vars: $t9, $t11
+ 10: $t4 := +($t9, $t11)
+     # live vars: $t4
+ 11: return $t4
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test5(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := infer($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := infer($t3)
+     # live vars: $t1, $t2
+  4: $t4 := infer($t1)
+     # live vars: $t2, $t4
+  5: $t0 := +($t4, $t2)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+public fun m::test6(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := infer($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := infer($t3)
+     # live vars: $t1, $t2
+  4: $t4 := infer($t1)
+     # live vars: $t2, $t4
+  5: $t0 := +($t2, $t4)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+public fun m::test7($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test8($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := m::one()
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun m::test9($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  3: $t6 := read_ref($t3)
+     # live vars: $t5, $t6
+  4: $t2 := +($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test10($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := +($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64, $t1: u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     # live vars: $t0, $t1, $t2, $t3
+  0: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  1: $t5 := +($t6, $t0)
+     # live vars: $t1, $t2, $t3, $t5
+  2: $t8 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t8
+  3: $t7 := +($t8, $t1)
+     # live vars: $t2, $t3, $t5, $t7
+  4: $t10 := 1
+     # live vars: $t2, $t3, $t5, $t7, $t10
+  5: $t9 := +($t10, $t2)
+     # live vars: $t3, $t5, $t7, $t9
+  6: $t12 := 1
+     # live vars: $t3, $t5, $t7, $t9, $t12
+  7: $t11 := +($t12, $t3)
+     # live vars: $t5, $t7, $t9, $t11
+  8: $t13 := +($t5, $t7)
+     # live vars: $t9, $t11, $t13
+  9: $t14 := infer($t13)
+     # live vars: $t9, $t11
+ 10: $t4 := +($t9, $t11)
+     # live vars: $t4
+ 11: return $t4
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test5(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := infer($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := infer($t3)
+     # live vars: $t1, $t2
+  4: $t4 := infer($t1)
+     # live vars: $t2, $t4
+  5: $t0 := +($t4, $t2)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+public fun m::test6(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := infer($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := infer($t3)
+     # live vars: $t1, $t2
+  4: $t4 := infer($t1)
+     # live vars: $t2, $t4
+  5: $t0 := +($t2, $t4)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+public fun m::test7($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test8($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := m::one()
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun m::test9($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  3: $t6 := read_ref($t3)
+     # live vars: $t5, $t6
+  4: $t2 := +($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test10($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := +($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64, $t1: u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     # live vars: $t0, $t1, $t2, $t3
+  0: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  1: $t5 := +($t6, $t0)
+     # live vars: $t1, $t2, $t3, $t5
+  2: $t8 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t8
+  3: $t7 := +($t8, $t1)
+     # live vars: $t2, $t3, $t5, $t7
+  4: $t10 := 1
+     # live vars: $t2, $t3, $t5, $t7, $t10
+  5: $t9 := +($t10, $t2)
+     # live vars: $t3, $t5, $t7, $t9
+  6: $t12 := 1
+     # live vars: $t3, $t5, $t7, $t9, $t12
+  7: $t11 := +($t12, $t3)
+     # live vars: $t5, $t7, $t9, $t11
+  8: $t13 := +($t5, $t7)
+     # live vars: $t9, $t11, $t13
+  9: $t14 := move($t13)
+     # live vars: $t9, $t11
+ 10: $t4 := +($t9, $t11)
+     # live vars: $t4
+ 11: return $t4
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test5(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := move($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := move($t3)
+     # live vars: $t1, $t2
+  4: $t4 := move($t1)
+     # live vars: $t2, $t4
+  5: $t0 := +($t4, $t2)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+public fun m::test6(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := move($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := move($t3)
+     # live vars: $t1, $t2
+  4: $t4 := move($t1)
+     # live vars: $t2, $t4
+  5: $t0 := +($t2, $t4)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+public fun m::test7($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test8($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := move($t0)
+     # live vars: $t2
+  1: $t3 := m::one()
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun m::test9($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  3: $t6 := read_ref($t3)
+     # live vars: $t5, $t6
+  4: $t2 := +($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := +($t0, $t2)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test10($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := +($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64, $t1: u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64 [unused]
+     # live vars: $t0, $t1, $t2, $t3
+  0: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  1: $t5 := +($t6, $t0)
+     # live vars: $t1, $t2, $t3, $t5
+  2: $t8 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t8
+  3: $t7 := +($t8, $t1)
+     # live vars: $t2, $t3, $t5, $t7
+  4: $t10 := 1
+     # live vars: $t2, $t3, $t5, $t7, $t10
+  5: $t9 := +($t10, $t2)
+     # live vars: $t3, $t5, $t7, $t9
+  6: $t12 := 1
+     # live vars: $t3, $t5, $t7, $t9, $t12
+  7: $t11 := +($t12, $t3)
+     # live vars: $t5, $t7, $t9, $t11
+  8: $t13 := +($t5, $t7)
+     # live vars: $t9, $t11
+  9: $t4 := +($t9, $t11)
+     # live vars: $t4
+ 10: return $t4
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test5(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := move($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := move($t3)
+     # live vars: $t1, $t2
+  4: $t4 := move($t1)
+     # live vars: $t2, $t4
+  5: $t0 := +($t4, $t2)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+public fun m::test6(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := move($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := move($t3)
+     # live vars: $t1, $t2
+  4: $t4 := move($t1)
+     # live vars: $t2, $t4
+  5: $t0 := +($t2, $t4)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+public fun m::test7($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t3 := +($t0, $t4)
+     # live vars: $t1, $t3
+  2: $t6 := 1
+     # live vars: $t1, $t3, $t6
+  3: $t5 := +($t1, $t6)
+     # live vars: $t3, $t5
+  4: $t2 := +($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::test8($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := move($t0)
+     # live vars: $t2
+  1: $t3 := m::one()
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun m::test9($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  3: $t6 := read_ref($t3)
+     # live vars: $t5, $t6
+  4: $t2 := +($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun m::test10($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t5 := +($t5, $t6)
+     # live vars: $t5
+  5: return $t5
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t0 := +($t0, $t4)
+     # live vars: $t0, $t1
+  2: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  3: $t1 := +($t1, $t4)
+     # live vars: $t0, $t1
+  4: $t0 := +($t0, $t1)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64, $t1: u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: u64 [unused]
+     var $t14: u64 [unused]
+     # live vars: $t0, $t1, $t2, $t3
+  0: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  1: $t0 := +($t6, $t0)
+     # live vars: $t0, $t1, $t2, $t3
+  2: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  3: $t1 := +($t6, $t1)
+     # live vars: $t0, $t1, $t2, $t3
+  4: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  5: $t2 := +($t6, $t2)
+     # live vars: $t0, $t1, $t2, $t3
+  6: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  7: $t3 := +($t6, $t3)
+     # live vars: $t0, $t1, $t2, $t3
+  8: $t0 := +($t0, $t1)
+     # live vars: $t2, $t3
+  9: $t1 := +($t2, $t3)
+     # live vars: $t1
+ 10: return $t1
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t0 := +($t0, $t4)
+     # live vars: $t0, $t1
+  2: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  3: $t1 := +($t1, $t4)
+     # live vars: $t0, $t1
+  4: $t0 := +($t0, $t1)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+public fun m::test5(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := move($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := move($t3)
+     # live vars: $t1, $t2
+  4: $t1 := move($t1)
+     # live vars: $t1, $t2
+  5: $t1 := +($t1, $t2)
+     # live vars: $t1
+  6: return $t1
+}
+
+
+[variant baseline]
+public fun m::test6(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := move($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := move($t3)
+     # live vars: $t1, $t2
+  4: $t1 := move($t1)
+     # live vars: $t1, $t2
+  5: $t1 := +($t2, $t1)
+     # live vars: $t1
+  6: return $t1
+}
+
+
+[variant baseline]
+public fun m::test7($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t0 := +($t0, $t4)
+     # live vars: $t0, $t1
+  2: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  3: $t1 := +($t1, $t4)
+     # live vars: $t0, $t1
+  4: $t0 := +($t0, $t1)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+public fun m::test8($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := m::one()
+     # live vars: $t0, $t3
+  2: $t0 := +($t0, $t3)
+     # live vars: $t0
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun m::test9($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  3: $t6 := read_ref($t3)
+     # live vars: $t5, $t6
+  4: $t5 := +($t5, $t6)
+     # live vars: $t5
+  5: return $t5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t0 := +($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun m::test10($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t5 := +($t5, $t6)
+     # live vars: $t5
+  5: return $t5
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t0 := +($t0, $t4)
+     # live vars: $t0, $t1
+  2: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  3: $t1 := +($t1, $t4)
+     # live vars: $t0, $t1
+  4: $t0 := +($t0, $t1)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64, $t1: u64, $t2: u64, $t3: u64): u64 {
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: u64 [unused]
+     var $t14: u64 [unused]
+     # live vars: $t0, $t1, $t2, $t3
+  0: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  1: $t0 := +($t6, $t0)
+     # live vars: $t0, $t1, $t2, $t3
+  2: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  3: $t1 := +($t6, $t1)
+     # live vars: $t0, $t1, $t2, $t3
+  4: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  5: $t2 := +($t6, $t2)
+     # live vars: $t0, $t1, $t2, $t3
+  6: $t6 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  7: $t3 := +($t6, $t3)
+     # live vars: $t0, $t1, $t2, $t3
+  8: $t0 := +($t0, $t1)
+     # live vars: $t2, $t3
+  9: $t1 := +($t2, $t3)
+     # live vars: $t1
+ 10: return $t1
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t0 := +($t0, $t4)
+     # live vars: $t0, $t1
+  2: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  3: $t1 := +($t1, $t4)
+     # live vars: $t0, $t1
+  4: $t0 := +($t0, $t1)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+public fun m::test5(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := move($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := move($t3)
+     # live vars: $t1, $t2
+  4: $t1 := +($t1, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+public fun m::test6(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := move($t1)
+     # live vars: $t2
+  2: $t3 := 2
+     # live vars: $t2, $t3
+  3: $t1 := move($t3)
+     # live vars: $t1, $t2
+  4: $t1 := +($t2, $t1)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+public fun m::test7($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t0 := +($t0, $t4)
+     # live vars: $t0, $t1
+  2: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  3: $t1 := +($t1, $t4)
+     # live vars: $t0, $t1
+  4: $t0 := +($t0, $t1)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+public fun m::test8($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t3 := m::one()
+     # live vars: $t0, $t3
+  1: $t0 := +($t0, $t3)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun m::test9($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t4)
+     # live vars: $t3, $t5
+  3: $t6 := read_ref($t3)
+     # live vars: $t5, $t6
+  4: $t5 := +($t5, $t6)
+     # live vars: $t5
+  5: return $t5
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+one(): u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+public test1(Arg0: u64): u64 /* def_idx: 1 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
+}
+public test10(Arg0: u64, Arg1: u64): u64 /* def_idx: 2 */ {
+L2:	loc0: &u64
+L3:	loc1: &u64
+B0:
+	0: ImmBorrowLoc[0](Arg0: u64)
+	1: ImmBorrowLoc[1](Arg1: u64)
+	2: StLoc[2](loc0: &u64)
+	3: ReadRef
+	4: MoveLoc[2](loc0: &u64)
+	5: ReadRef
+	6: Add
+	7: Ret
+}
+public test2(Arg0: u64, Arg1: u64): u64 /* def_idx: 3 */ {
+L2:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: MoveLoc[1](Arg1: u64)
+	4: LdU64(1)
+	5: Add
+	6: Add
+	7: Ret
+}
+public test3(Arg0: u64, Arg1: u64, Arg2: u64, Arg3: u64): u64 /* def_idx: 4 */ {
+B0:
+	0: LdU64(1)
+	1: MoveLoc[0](Arg0: u64)
+	2: Add
+	3: LdU64(1)
+	4: MoveLoc[1](Arg1: u64)
+	5: Add
+	6: LdU64(1)
+	7: MoveLoc[2](Arg2: u64)
+	8: Add
+	9: LdU64(1)
+	10: MoveLoc[3](Arg3: u64)
+	11: Add
+	12: StLoc[3](Arg3: u64)
+	13: StLoc[2](Arg2: u64)
+	14: Add
+	15: MoveLoc[2](Arg2: u64)
+	16: MoveLoc[3](Arg3: u64)
+	17: Add
+	18: StLoc[1](Arg1: u64)
+	19: Pop
+	20: MoveLoc[1](Arg1: u64)
+	21: Ret
+}
+public test4(Arg0: u64, Arg1: u64): u64 /* def_idx: 5 */ {
+L2:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: MoveLoc[1](Arg1: u64)
+	4: LdU64(1)
+	5: Add
+	6: Add
+	7: Ret
+}
+public test5(): u64 /* def_idx: 6 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: LdU64(1)
+	1: StLoc[0](loc0: u64)
+	2: LdU64(2)
+	3: MoveLoc[0](loc0: u64)
+	4: Add
+	5: Ret
+}
+public test6(): u64 /* def_idx: 7 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: LdU64(1)
+	1: StLoc[0](loc0: u64)
+	2: MoveLoc[0](loc0: u64)
+	3: LdU64(2)
+	4: Add
+	5: Ret
+}
+public test7(Arg0: u64, Arg1: u64): u64 /* def_idx: 8 */ {
+L2:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: MoveLoc[1](Arg1: u64)
+	4: LdU64(1)
+	5: Add
+	6: Add
+	7: Ret
+}
+public test8(Arg0: u64): u64 /* def_idx: 9 */ {
+L1:	loc0: u64
+B0:
+	0: Call one(): u64
+	1: StLoc[1](loc0: u64)
+	2: MoveLoc[0](Arg0: u64)
+	3: MoveLoc[1](loc0: u64)
+	4: Add
+	5: Ret
+}
+public test9(Arg0: u64, Arg1: u64): u64 /* def_idx: 10 */ {
+L2:	loc0: u64
+L3:	loc1: &u64
+L4:	loc2: u64
+B0:
+	0: ImmBorrowLoc[0](Arg0: u64)
+	1: ImmBorrowLoc[1](Arg1: u64)
+	2: ReadRef
+	3: StLoc[2](loc0: u64)
+	4: ReadRef
+	5: StLoc[4](loc2: u64)
+	6: MoveLoc[2](loc0: u64)
+	7: MoveLoc[4](loc2: u64)
+	8: Add
+	9: Ret
+}
+}
+============ bytecode verification succeeded ========

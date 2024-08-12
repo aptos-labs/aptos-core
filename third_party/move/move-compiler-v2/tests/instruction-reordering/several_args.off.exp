@@ -1,0 +1,398 @@
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64): u64 {
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: $t13 := read_ref($t0)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t13
+  1: $t12 := +($t13, $t1)
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t12
+  2: $t11 := +($t12, $t2)
+     # live vars: $t3, $t4, $t5, $t6, $t11
+  3: $t10 := +($t11, $t3)
+     # live vars: $t4, $t5, $t6, $t10
+  4: $t9 := +($t10, $t4)
+     # live vars: $t5, $t6, $t9
+  5: $t8 := +($t9, $t5)
+     # live vars: $t6, $t8
+  6: $t7 := +($t8, $t6)
+     # live vars: $t7
+  7: return $t7
+}
+
+
+[variant baseline]
+public fun m::test($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0
+  0: $t2 := 2
+     # live vars: $t0, $t2
+  1: $t3 := 3
+     # live vars: $t0, $t2, $t3
+  2: $t4 := 4
+     # live vars: $t0, $t2, $t3, $t4
+  3: $t5 := 5
+     # live vars: $t0, $t2, $t3, $t4, $t5
+  4: $t6 := 6
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6
+  5: $t7 := 7
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6, $t7
+  6: $t1 := m::bar($t0, $t2, $t3, $t4, $t5, $t6, $t7)
+     # live vars: $t1
+  7: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64): u64 {
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: $t13 := read_ref($t0)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t13
+  1: $t12 := +($t13, $t1)
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t12
+  2: $t11 := +($t12, $t2)
+     # live vars: $t3, $t4, $t5, $t6, $t11
+  3: $t10 := +($t11, $t3)
+     # live vars: $t4, $t5, $t6, $t10
+  4: $t9 := +($t10, $t4)
+     # live vars: $t5, $t6, $t9
+  5: $t8 := +($t9, $t5)
+     # live vars: $t6, $t8
+  6: $t7 := +($t8, $t6)
+     # live vars: $t7
+  7: return $t7
+}
+
+
+[variant baseline]
+public fun m::test($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0
+  0: $t2 := 2
+     # live vars: $t0, $t2
+  1: $t3 := 3
+     # live vars: $t0, $t2, $t3
+  2: $t4 := 4
+     # live vars: $t0, $t2, $t3, $t4
+  3: $t5 := 5
+     # live vars: $t0, $t2, $t3, $t4, $t5
+  4: $t6 := 6
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6
+  5: $t7 := 7
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6, $t7
+  6: $t1 := m::bar($t0, $t2, $t3, $t4, $t5, $t6, $t7)
+     # live vars: $t1
+  7: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64): u64 {
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: $t13 := read_ref($t0)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t13
+  1: $t12 := +($t13, $t1)
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t12
+  2: $t11 := +($t12, $t2)
+     # live vars: $t3, $t4, $t5, $t6, $t11
+  3: $t10 := +($t11, $t3)
+     # live vars: $t4, $t5, $t6, $t10
+  4: $t9 := +($t10, $t4)
+     # live vars: $t5, $t6, $t9
+  5: $t8 := +($t9, $t5)
+     # live vars: $t6, $t8
+  6: $t7 := +($t8, $t6)
+     # live vars: $t7
+  7: return $t7
+}
+
+
+[variant baseline]
+public fun m::test($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0
+  0: $t2 := 2
+     # live vars: $t0, $t2
+  1: $t3 := 3
+     # live vars: $t0, $t2, $t3
+  2: $t4 := 4
+     # live vars: $t0, $t2, $t3, $t4
+  3: $t5 := 5
+     # live vars: $t0, $t2, $t3, $t4, $t5
+  4: $t6 := 6
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6
+  5: $t7 := 7
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6, $t7
+  6: $t1 := m::bar($t0, $t2, $t3, $t4, $t5, $t6, $t7)
+     # live vars: $t1
+  7: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64): u64 {
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: $t13 := read_ref($t0)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t13
+  1: $t12 := +($t13, $t1)
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t12
+  2: $t11 := +($t12, $t2)
+     # live vars: $t3, $t4, $t5, $t6, $t11
+  3: $t10 := +($t11, $t3)
+     # live vars: $t4, $t5, $t6, $t10
+  4: $t9 := +($t10, $t4)
+     # live vars: $t5, $t6, $t9
+  5: $t8 := +($t9, $t5)
+     # live vars: $t6, $t8
+  6: $t7 := +($t8, $t6)
+     # live vars: $t7
+  7: return $t7
+}
+
+
+[variant baseline]
+public fun m::test($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0
+  0: $t2 := 2
+     # live vars: $t0, $t2
+  1: $t3 := 3
+     # live vars: $t0, $t2, $t3
+  2: $t4 := 4
+     # live vars: $t0, $t2, $t3, $t4
+  3: $t5 := 5
+     # live vars: $t0, $t2, $t3, $t4, $t5
+  4: $t6 := 6
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6
+  5: $t7 := 7
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6, $t7
+  6: $t1 := m::bar($t0, $t2, $t3, $t4, $t5, $t6, $t7)
+     # live vars: $t1
+  7: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64): u64 {
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: u64
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: $t13 := read_ref($t0)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t13
+  1: $t1 := +($t13, $t1)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+  2: $t1 := +($t1, $t2)
+     # live vars: $t1, $t3, $t4, $t5, $t6
+  3: $t1 := +($t1, $t3)
+     # live vars: $t1, $t4, $t5, $t6
+  4: $t1 := +($t1, $t4)
+     # live vars: $t1, $t5, $t6
+  5: $t1 := +($t1, $t5)
+     # live vars: $t1, $t6
+  6: $t1 := +($t1, $t6)
+     # live vars: $t1
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::test($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0
+  0: $t2 := 2
+     # live vars: $t0, $t2
+  1: $t3 := 3
+     # live vars: $t0, $t2, $t3
+  2: $t4 := 4
+     # live vars: $t0, $t2, $t3, $t4
+  3: $t5 := 5
+     # live vars: $t0, $t2, $t3, $t4, $t5
+  4: $t6 := 6
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6
+  5: $t7 := 7
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6, $t7
+  6: $t2 := m::bar($t0, $t2, $t3, $t4, $t5, $t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64): u64 {
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: u64
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: $t13 := read_ref($t0)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t13
+  1: $t1 := +($t13, $t1)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+  2: $t1 := +($t1, $t2)
+     # live vars: $t1, $t3, $t4, $t5, $t6
+  3: $t1 := +($t1, $t3)
+     # live vars: $t1, $t4, $t5, $t6
+  4: $t1 := +($t1, $t4)
+     # live vars: $t1, $t5, $t6
+  5: $t1 := +($t1, $t5)
+     # live vars: $t1, $t6
+  6: $t1 := +($t1, $t6)
+     # live vars: $t1
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::test($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0
+  0: $t2 := 2
+     # live vars: $t0, $t2
+  1: $t3 := 3
+     # live vars: $t0, $t2, $t3
+  2: $t4 := 4
+     # live vars: $t0, $t2, $t3, $t4
+  3: $t5 := 5
+     # live vars: $t0, $t2, $t3, $t4, $t5
+  4: $t6 := 6
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6
+  5: $t7 := 7
+     # live vars: $t0, $t2, $t3, $t4, $t5, $t6, $t7
+  6: $t2 := m::bar($t0, $t2, $t3, $t4, $t5, $t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+bar(Arg0: &u64, Arg1: u64, Arg2: u64, Arg3: u64, Arg4: u64, Arg5: u64, Arg6: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: &u64)
+	1: ReadRef
+	2: MoveLoc[1](Arg1: u64)
+	3: Add
+	4: MoveLoc[2](Arg2: u64)
+	5: Add
+	6: MoveLoc[3](Arg3: u64)
+	7: Add
+	8: MoveLoc[4](Arg4: u64)
+	9: Add
+	10: MoveLoc[5](Arg5: u64)
+	11: Add
+	12: MoveLoc[6](Arg6: u64)
+	13: Add
+	14: Ret
+}
+public test(Arg0: &u64): u64 /* def_idx: 1 */ {
+L1:	loc0: u64
+L2:	loc1: u64
+L3:	loc2: u64
+L4:	loc3: u64
+L5:	loc4: u64
+L6:	loc5: u64
+B0:
+	0: LdU64(2)
+	1: LdU64(3)
+	2: LdU64(4)
+	3: LdU64(5)
+	4: LdU64(6)
+	5: LdU64(7)
+	6: StLoc[1](loc0: u64)
+	7: StLoc[2](loc1: u64)
+	8: StLoc[3](loc2: u64)
+	9: StLoc[4](loc3: u64)
+	10: StLoc[5](loc4: u64)
+	11: StLoc[6](loc5: u64)
+	12: MoveLoc[0](Arg0: &u64)
+	13: MoveLoc[6](loc5: u64)
+	14: MoveLoc[5](loc4: u64)
+	15: MoveLoc[4](loc3: u64)
+	16: MoveLoc[3](loc2: u64)
+	17: MoveLoc[2](loc1: u64)
+	18: MoveLoc[1](loc0: u64)
+	19: Call bar(&u64, u64, u64, u64, u64, u64, u64): u64
+	20: Ret
+}
+}
+============ bytecode verification succeeded ========

@@ -10,7 +10,7 @@ public fun Test::update<#0>($t0|x: #0) {
   1: $t2 := 0x1
   2: $t3 := borrow_global<Test::A<#0, #0>>($t2)
   3: $t4 := borrow_field<Test::A<#0, #0>>.x1($t3)
-  4: write_ref($t4, $t1)
+  4: write_ref($t1, $t4)
   5: return ()
 }
 
@@ -70,7 +70,7 @@ public fun Test::update_ints() {
   1: $t1 := 0x1
   2: $t2 := borrow_global<Test::A<u64, u128>>($t1)
   3: $t3 := borrow_field<Test::A<u64, u128>>.x1($t2)
-  4: write_ref($t3, $t0)
+  4: write_ref($t0, $t3)
   5: return ()
 }
 
@@ -86,7 +86,7 @@ public fun Test::update<#0>($t0|x: #0) {
   1: $t2 := 0x1
   2: $t3 := borrow_global<Test::A<#0, #0>>($t2)
   3: $t4 := borrow_field<Test::A<#0, #0>>.x1($t3)
-  4: write_ref($t4, $t1)
+  4: write_ref($t1, $t4)
   5: return ()
 }
 
@@ -146,7 +146,7 @@ public fun Test::update_ints() {
   1: $t1 := 0x1
   2: $t2 := borrow_global<Test::A<u64, u128>>($t1)
   3: $t3 := borrow_field<Test::A<u64, u128>>.x1($t2)
-  4: write_ref($t3, $t0)
+  4: write_ref($t0, $t3)
   5: return ()
 }
 

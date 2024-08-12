@@ -1,0 +1,118 @@
+============ after InstructionReorderingProcessor: ================
+
+[variant baseline]
+fun m::inc_immut($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+  0: touch($t0)
+  1: $t2 := 1
+  2: $t0 := +($t0, $t2)
+  3: return $t0
+}
+
+
+[variant baseline]
+fun m::inc_mut($t0: &mut u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64
+  0: $t3 := read_ref($t0)
+  1: $t4 := 1
+  2: $t3 := +($t3, $t4)
+  3: write_ref($t3, $t0)
+  4: $t3 := read_ref($t0)
+  5: return $t3
+}
+
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: u64
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: &mut u64 [unused]
+     var $t14: u64
+  0: $t1 := 1
+  1: $t6 := borrow_local($t1)
+  2: $t5 := m::inc_mut($t6)
+  3: $t7 := 1
+  4: $t5 := +($t5, $t7)
+  5: $t1 := move($t5)
+  6: $t5 := 1
+  7: $t5 := +($t1, $t5)
+  8: $t1 := move($t5)
+  9: $t5 := copy($t1)
+ 10: $t5 := m::inc_immut($t5)
+ 11: $t6 := borrow_local($t1)
+ 12: $t7 := m::inc_mut($t6)
+ 13: $t14 := 1
+ 14: $t7 := +($t7, $t14)
+ 15: $t1 := move($t7)
+ 16: $t7 := move($t1)
+ 17: $t5 := +($t5, $t7)
+ 18: return $t5
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+inc_immut(Arg0: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
+}
+inc_mut(Arg0: &mut u64): u64 /* def_idx: 1 */ {
+B0:
+	0: CopyLoc[0](Arg0: &mut u64)
+	1: ReadRef
+	2: LdU64(1)
+	3: Add
+	4: CopyLoc[0](Arg0: &mut u64)
+	5: WriteRef
+	6: MoveLoc[0](Arg0: &mut u64)
+	7: ReadRef
+	8: Ret
+}
+public test1(): u64 /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+B0:
+	0: LdU64(1)
+	1: StLoc[0](loc0: u64)
+	2: MutBorrowLoc[0](loc0: u64)
+	3: Call inc_mut(&mut u64): u64
+	4: LdU64(1)
+	5: Add
+	6: StLoc[0](loc0: u64)
+	7: MoveLoc[0](loc0: u64)
+	8: LdU64(1)
+	9: Add
+	10: StLoc[0](loc0: u64)
+	11: CopyLoc[0](loc0: u64)
+	12: Call inc_immut(u64): u64
+	13: MutBorrowLoc[0](loc0: u64)
+	14: Call inc_mut(&mut u64): u64
+	15: LdU64(1)
+	16: Add
+	17: Add
+	18: Ret
+}
+}
+============ bytecode verification succeeded ========
