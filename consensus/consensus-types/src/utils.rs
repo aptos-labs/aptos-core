@@ -43,7 +43,14 @@ impl PayloadTxnsSize {
     }
 
     pub fn set_count(&mut self, new_count: u64) {
-        self.try_set_count(new_count).expect("must be valid")
+        if let Err(e) = self.try_set_count(new_count) {
+            error!(
+                "Invalid set count. Resetting bytes. new_count: {}, Error: {}",
+                new_count, e
+            );
+            self.count = new_count;
+            self.bytes = new_count;
+        }
     }
 
     pub fn try_set_count(&mut self, new_count: u64) -> anyhow::Result<()> {
