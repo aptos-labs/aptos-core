@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::keyless::Bn254;
+use crate::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 use crate::keyless::Groth16Proof;
 use ark_ec::Group;
 use ark_groth16::{prepare_verifying_key, Groth16};
