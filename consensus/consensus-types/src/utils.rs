@@ -182,5 +182,51 @@ mod tests {
         let txns_size = PayloadTxnsSize::new(100, 100);
         assert_eq!(txns_size.compute_pct(90), PayloadTxnsSize::new(90, 90));
         assert_eq!(txns_size.compute_pct(50), PayloadTxnsSize::new(50, 50));
+
+        let mut txns_size2 = txns_size;
+        txns_size2.set_count(50);
+        assert_eq!(txns_size2, PayloadTxnsSize::new(50, 100));
+        txns_size2.set_count(200);
+        assert_eq!(txns_size2, PayloadTxnsSize::new(200, 200));
+
+        let txns_size3 = txns_size;
+        let txns_size4 = txns_size;
+        assert_eq!(txns_size3 + txns_size4, PayloadTxnsSize::new(200, 200));
+        assert_eq!(txns_size3 - txns_size4, PayloadTxnsSize::zero());
+
+        let mut txns_size5 = txns_size;
+        txns_size5 += txns_size3;
+        assert_eq!(txns_size5, PayloadTxnsSize::new(200, 200));
+        txns_size5 -= txns_size3;
+        assert_eq!(txns_size5, PayloadTxnsSize::new(100, 100));
+
+        assert_eq!(
+            txns_size.compute_with_bytes(200),
+            PayloadTxnsSize::new(200, 200)
+        );
+        assert_eq!(
+            txns_size.compute_with_bytes(50),
+            PayloadTxnsSize::new(50, 50)
+        );
+
+        assert_eq!(
+            txns_size.saturating_sub(txns_size2),
+            PayloadTxnsSize::zero()
+        );
+        assert_eq!(
+            txns_size2.saturating_sub(txns_size),
+            PayloadTxnsSize::new(100, 100)
+        );
+
+        let txns_size = PayloadTxnsSize::zero();
+        assert_eq!(
+            txns_size.compute_with_bytes(100),
+            PayloadTxnsSize::new(100, 100)
+        );
+
+        let txns_size6 = PayloadTxnsSize::new(10, 30);
+        let txns_size7 = PayloadTxnsSize::new(20, 20);
+        assert_eq!(txns_size6.minimum(txns_size7), PayloadTxnsSize::new(10, 20));
+        assert_eq!(txns_size6.maximum(txns_size7), PayloadTxnsSize::new(20, 30));
     }
 }
