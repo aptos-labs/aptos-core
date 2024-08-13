@@ -426,6 +426,12 @@ pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
 pub type LValueList = Spanned<LValueList_>;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedLValue_(pub LValue, pub Option<Type>);
+pub type TypedLValue = Spanned<TypedLValue_>;
+pub type TypedLValueList_ = Vec<TypedLValue>;
+pub type TypedLValueList = Spanned<TypedLValueList_>;
+
 pub fn wild_card(loc: Loc) -> LValue {
     let wildcard = sp(loc, Symbol::from("_"));
     let lvalue_ = LValue_::Var(sp(loc, ModuleAccess_::Name(wildcard)), None);
@@ -500,7 +506,7 @@ pub enum Exp_ {
     While(Box<Exp>, Box<Exp>),
     Loop(Box<Exp>),
     Block(Sequence),
-    Lambda(LValueList, Box<Exp>),
+    Lambda(TypedLValueList, Box<Exp>),
     Quant(
         QuantKind,
         LValueWithRangeList,
@@ -893,12 +899,16 @@ impl fmt::Display for ModuleAccess_ {
 
 impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", match &self {
-            Visibility::Public(_) => Visibility::PUBLIC,
-            Visibility::Package(_) => Visibility::PACKAGE,
-            Visibility::Friend(_) => Visibility::FRIEND,
-            Visibility::Internal => Visibility::INTERNAL,
-        })
+        write!(
+            f,
+            "{}",
+            match &self {
+                Visibility::Public(_) => Visibility::PUBLIC,
+                Visibility::Package(_) => Visibility::PACKAGE,
+                Visibility::Friend(_) => Visibility::FRIEND,
+                Visibility::Internal => Visibility::INTERNAL,
+            }
+        )
     }
 }
 
@@ -1057,13 +1067,11 @@ impl AstDebug for ModuleDefinition {
             w.writeln(&format!("{}", n))
         }
         attributes.ast_debug(w);
-        w.writeln(
-            if *is_source_module {
-                "source module"
-            } else {
-                "library module"
-            },
-        );
+        w.writeln(if *is_source_module {
+            "source module"
+        } else {
+            "library module"
+        });
         w.writeln(&format!("dependency order #{}", dependency_order));
         for (mident, neighbor) in immediate_neighbors.key_cloned_iter() {
             w.write(&format!("{} {};", neighbor, mident));
@@ -1796,6 +1804,23 @@ impl AstDebug for ExpDotted_ {
                 e.ast_debug(w);
                 w.write(&format!(".{}", n))
             },
+        }
+    }
+}
+
+impl AstDebug for Vec<TypedLValue> {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        w.comma(self, |w, b| b.ast_debug(w));
+    }
+}
+
+impl AstDebug for TypedLValue_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        let TypedLValue_(lv, opt_ty) = self;
+        lv.ast_debug(w);
+        if let Some(ty) = opt_ty {
+            w.write(":");
+            ty.ast_debug(w);
         }
     }
 }

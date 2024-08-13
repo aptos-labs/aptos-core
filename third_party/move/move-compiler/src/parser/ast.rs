@@ -524,6 +524,12 @@ pub type Bind = Spanned<Bind_>;
 pub type BindList = Spanned<Vec<Bind>>;
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct TypedBind_(pub Bind, pub Option<Type>);
+pub type TypedBind = Spanned<TypedBind_>;
+
+pub type TypedBindList = Spanned<Vec<TypedBind>>;
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum BindFieldOrDotDot_ {
     // f : b
     FieldBind(Field, Bind),
@@ -681,7 +687,7 @@ pub enum Exp_ {
     // { seq }
     Block(Sequence),
     // |x1, ..., xn| e
-    Lambda(BindList, Box<Exp>), // spec only
+    Lambda(TypedBindList, Box<Exp>),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -1046,24 +1052,32 @@ impl fmt::Display for BinOp_ {
 
 impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", match &self {
-            Visibility::Public(_) => Visibility::PUBLIC,
-            Visibility::Script(_) => Visibility::SCRIPT,
-            Visibility::Friend(_) => Visibility::FRIEND,
-            Visibility::Package(_) => Visibility::PACKAGE,
-            Visibility::Internal => Visibility::INTERNAL,
-        })
+        write!(
+            f,
+            "{}",
+            match &self {
+                Visibility::Public(_) => Visibility::PUBLIC,
+                Visibility::Script(_) => Visibility::SCRIPT,
+                Visibility::Friend(_) => Visibility::FRIEND,
+                Visibility::Package(_) => Visibility::PACKAGE,
+                Visibility::Internal => Visibility::INTERNAL,
+            }
+        )
     }
 }
 
 impl fmt::Display for Ability_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", match &self {
-            Ability_::Copy => Ability_::COPY,
-            Ability_::Drop => Ability_::DROP,
-            Ability_::Store => Ability_::STORE,
-            Ability_::Key => Ability_::KEY,
-        })
+        write!(
+            f,
+            "{}",
+            match &self {
+                Ability_::Copy => Ability_::COPY,
+                Ability_::Drop => Ability_::DROP,
+                Ability_::Store => Ability_::STORE,
+                Ability_::Key => Ability_::KEY,
+            }
+        )
     }
 }
 
@@ -1780,6 +1794,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
             },
@@ -1787,6 +1802,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
                 w.write(" = ");
@@ -1884,9 +1900,9 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e) => {
+            E::Lambda(sp!(_, tbs), e) => {
                 w.write("|");
-                bs.ast_debug(w);
+                tbs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
             },
@@ -2124,6 +2140,23 @@ impl AstDebug for Bind_ {
                 w.comma(args, |w, b| b.ast_debug(w));
                 w.write(")");
             },
+        }
+    }
+}
+
+impl AstDebug for Vec<TypedBind> {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        w.comma(self, |w, b| b.ast_debug(w));
+    }
+}
+
+impl AstDebug for TypedBind_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        let TypedBind_(b, ty_opt) = self;
+        b.ast_debug(w);
+        if let Some(ty) = ty_opt {
+            w.write(":");
+            ty.ast_debug(w)
         }
     }
 }

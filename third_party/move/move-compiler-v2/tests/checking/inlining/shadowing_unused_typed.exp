@@ -1,0 +1,43 @@
+// -- Model dump before bytecode pipeline
+module 0x42::Test {
+    public inline fun foo(f: |(u64, u64)|,z: u64) {
+        {
+          let (_z: u64): (u64) = Tuple(z);
+          (f)(3, 5);
+          Tuple()
+        };
+        Tuple()
+    }
+    public inline fun quux(f: |(u64, u64)|,_z: u64) {
+        (f)(3, 5);
+        Tuple()
+    }
+    public fun test_shadowing() {
+        {
+          let _x: u64 = 1;
+          _x: u64 = 3;
+          Tuple();
+          Tuple();
+          if Eq<u64>(_x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+    public fun test_shadowing2() {
+        {
+          let _x: u64 = 1;
+          _x: u64 = 3;
+          Tuple();
+          if Eq<u64>(_x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+============ bytecode verification succeeded ========
