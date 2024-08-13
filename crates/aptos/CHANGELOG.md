@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Add safe methods to delete a profile, to rename a profile, and to output the private key of a profile.
 
 ## [4.0.0] - 2024/08/13
 - **Breaking Change**: change key rotation options such that user has to either pass the name of a new profile or explicitly flag that no profile should be generated, since without this update the interactive profile generator could fail out after the key has already been rotated. This forces the check for new profile validity before doing anything onchain.
