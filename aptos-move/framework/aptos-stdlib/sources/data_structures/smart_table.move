@@ -179,10 +179,13 @@ module aptos_std::smart_table {
     public fun add_all<K, V>(
         table: &mut SmartTable<K, V>, keys: vector<K>, values: vector<V>
     ) {
-        vector::zip(keys, values,
+        vector::zip(
+            keys,
+            values,
             |key, value| {
                 add(table, key, value);
-            });
+            },
+        );
     }
 
     inline fun unzip_entries<K: copy, V: copy>(entries: &vector<Entry<K, V>>)
@@ -264,8 +267,9 @@ module aptos_std::smart_table {
         let keys = vector[];
         if (num_keys_to_get == 0)
             return (
-                keys, option::some(starting_bucket_index),
-                option::some(starting_vector_index)
+                keys, option::some(starting_bucket_index), option::some(
+                    starting_vector_index
+                )
             );
         for (bucket_index in starting_bucket_index..num_buckets) {
             bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
@@ -643,9 +647,11 @@ module aptos_std::smart_table {
     public fun smart_table_add_all_test() {
         let table: SmartTable<u64, u64> = new_with_config(1, 100, 2);
         assert!(length(&table) == 0, 0);
-        add_all(&mut table,
+        add_all(
+            &mut table,
             vector[1, 2, 3, 4, 5, 6, 7],
-            vector[1, 2, 3, 4, 5, 6, 7],);
+            vector[1, 2, 3, 4, 5, 6, 7],
+        );
         assert!(length(&table) == 7, 1);
         let i = 1;
         while (i < 8) {
@@ -734,7 +740,7 @@ module aptos_std::smart_table {
             );
             vector::append(&mut keys, returned_keys);
             if (starting_bucket_index_r == option::none()
-                    || starting_vector_index_r == option::none())
+                || starting_vector_index_r == option::none())
             break;
             starting_bucket_index = option::destroy_some(starting_bucket_index_r);
             starting_vector_index = option::destroy_some(starting_vector_index_r);

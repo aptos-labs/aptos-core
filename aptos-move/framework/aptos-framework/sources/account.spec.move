@@ -125,9 +125,9 @@ spec aptos_framework::account {
         aborts_if !exists<Account>(account_address)
             && (
                 account_address == @vm_reserved
-                || account_address == @aptos_framework
-                || account_address == @aptos_token
-                || !(len(authentication_key) == 32)
+                    || account_address == @aptos_framework
+                    || account_address == @aptos_token
+                    || !(len(authentication_key) == 32)
             );
         ensures exists<Account>(account_address);
     }
@@ -232,7 +232,10 @@ spec aptos_framework::account {
         include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf;
         ensures [abstract] result
             == spec_assert_valid_rotation_proof_signature_and_get_auth_key(
-                scheme, public_key_bytes, signature, challenge
+                scheme,
+                public_key_bytes,
+                signature,
+                challenge,
             );
     }
 
@@ -289,29 +292,25 @@ spec aptos_framework::account {
                 bytes: from_public_key_bytes
             };
         aborts_if from_scheme == ED25519_SCHEME
-            && (
-                {
-                    let expected_auth_key =
-                        ed25519::spec_public_key_bytes_to_authentication_key(
-                            from_public_key_bytes
-                        );
-                    account_resource.authentication_key != expected_auth_key
-                }
-            );
+            && ({
+                let expected_auth_key =
+                    ed25519::spec_public_key_bytes_to_authentication_key(
+                        from_public_key_bytes
+                    );
+                account_resource.authentication_key != expected_auth_key
+            });
         include from_scheme == MULTI_ED25519_SCHEME ==>
             multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf {
                 bytes: from_public_key_bytes
             };
         aborts_if from_scheme == MULTI_ED25519_SCHEME
-            && (
-                {
-                    let from_auth_key =
-                        multi_ed25519::spec_public_key_bytes_to_authentication_key(
-                            from_public_key_bytes
-                        );
-                    account_resource.authentication_key != from_auth_key
-                }
-            );
+            && ({
+                let from_auth_key =
+                    multi_ed25519::spec_public_key_bytes_to_authentication_key(
+                        from_public_key_bytes
+                    );
+                account_resource.authentication_key != from_auth_key
+            });
 
         /// [high-level-req-5.1]
         aborts_if from_scheme != ED25519_SCHEME && from_scheme != MULTI_ED25519_SCHEME;
@@ -456,15 +455,13 @@ spec aptos_framework::account {
                 bytes: account_public_key_bytes
             };
         aborts_if account_scheme == ED25519_SCHEME
-            && (
-                {
-                    let expected_auth_key =
-                        ed25519::spec_public_key_bytes_to_authentication_key(
-                            account_public_key_bytes
-                        );
-                    account_resource.authentication_key != expected_auth_key
-                }
-            );
+            && ({
+                let expected_auth_key =
+                    ed25519::spec_public_key_bytes_to_authentication_key(
+                        account_public_key_bytes
+                    );
+                account_resource.authentication_key != expected_auth_key
+            });
         include account_scheme == ED25519_SCHEME ==>
             ed25519::NewSignatureFromBytesAbortsIf { bytes: rotation_capability_sig_bytes };
         aborts_if account_scheme == ED25519_SCHEME
@@ -479,15 +476,13 @@ spec aptos_framework::account {
                 bytes: account_public_key_bytes
             };
         aborts_if account_scheme == MULTI_ED25519_SCHEME
-            && (
-                {
-                    let expected_auth_key =
-                        multi_ed25519::spec_public_key_bytes_to_authentication_key(
-                            account_public_key_bytes
-                        );
-                    account_resource.authentication_key != expected_auth_key
-                }
-            );
+            && ({
+                let expected_auth_key =
+                    multi_ed25519::spec_public_key_bytes_to_authentication_key(
+                        account_public_key_bytes
+                    );
+                account_resource.authentication_key != expected_auth_key
+            });
         include account_scheme == MULTI_ED25519_SCHEME ==>
             multi_ed25519::NewSignatureFromBytesAbortsIf {
                 bytes: rotation_capability_sig_bytes
@@ -533,15 +528,13 @@ spec aptos_framework::account {
                 bytes: account_public_key_bytes
             };
         aborts_if account_scheme == ED25519_SCHEME
-            && (
-                {
-                    let expected_auth_key =
-                        ed25519::spec_public_key_bytes_to_authentication_key(
-                            account_public_key_bytes
-                        );
-                    account_resource.authentication_key != expected_auth_key
-                }
-            );
+            && ({
+                let expected_auth_key =
+                    ed25519::spec_public_key_bytes_to_authentication_key(
+                        account_public_key_bytes
+                    );
+                account_resource.authentication_key != expected_auth_key
+            });
         include account_scheme == ED25519_SCHEME ==>
             ed25519::NewSignatureFromBytesAbortsIf { bytes: signer_capability_sig_bytes };
         aborts_if account_scheme == ED25519_SCHEME
@@ -556,15 +549,13 @@ spec aptos_framework::account {
                 bytes: account_public_key_bytes
             };
         aborts_if account_scheme == MULTI_ED25519_SCHEME
-            && (
-                {
-                    let expected_auth_key =
-                        multi_ed25519::spec_public_key_bytes_to_authentication_key(
-                            account_public_key_bytes
-                        );
-                    account_resource.authentication_key != expected_auth_key
-                }
-            );
+            && ({
+                let expected_auth_key =
+                    multi_ed25519::spec_public_key_bytes_to_authentication_key(
+                        account_public_key_bytes
+                    );
+                account_resource.authentication_key != expected_auth_key
+            });
         include account_scheme == MULTI_ED25519_SCHEME ==>
             multi_ed25519::NewSignatureFromBytesAbortsIf {
                 bytes: signer_capability_sig_bytes
@@ -817,30 +808,26 @@ spec aptos_framework::account {
         include account_scheme == ED25519_SCHEME ==>
             ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key };
         aborts_if account_scheme == ED25519_SCHEME
-            && (
-                {
-                    let expected_auth_key =
-                        ed25519::spec_public_key_bytes_to_authentication_key(
-                            account_public_key
-                        );
-                    account_resource.authentication_key != expected_auth_key
-                }
-            );
+            && ({
+                let expected_auth_key =
+                    ed25519::spec_public_key_bytes_to_authentication_key(
+                        account_public_key
+                    );
+                account_resource.authentication_key != expected_auth_key
+            });
 
         include account_scheme == MULTI_ED25519_SCHEME ==>
             multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf {
                 bytes: account_public_key
             };
         aborts_if account_scheme == MULTI_ED25519_SCHEME
-            && (
-                {
-                    let expected_auth_key =
-                        multi_ed25519::spec_public_key_bytes_to_authentication_key(
-                            account_public_key
-                        );
-                    account_resource.authentication_key != expected_auth_key
-                }
-            );
+            && ({
+                let expected_auth_key =
+                    multi_ed25519::spec_public_key_bytes_to_authentication_key(
+                        account_public_key
+                    );
+                account_resource.authentication_key != expected_auth_key
+            });
 
         include account_scheme == ED25519_SCHEME ==>
             ed25519::NewSignatureFromBytesAbortsIf { bytes: signed_message_bytes };

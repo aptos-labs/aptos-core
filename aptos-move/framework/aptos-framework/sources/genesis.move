@@ -101,8 +101,7 @@ module aptos_framework::genesis {
         );
 
         // put reserved framework reserved accounts under aptos governance
-        let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @
-            0x7, @0x8, @0x9, @0xa];
+        let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
         while (!vector::is_empty(&framework_reserved_addresses)) {
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
             let (_, framework_signer_cap) =
@@ -295,7 +294,9 @@ module aptos_framework::genesis {
 
                 if (employee_group.beneficiary_resetter != @0x0) {
                     vesting::set_beneficiary_resetter(
-                        admin_signer, contract_address, employee_group.beneficiary_resetter
+                        admin_signer,
+                        contract_address,
+                        employee_group.beneficiary_resetter,
                     );
                 };
 
@@ -560,7 +561,8 @@ module aptos_framework::genesis {
 
         let accounts = vector[
             AccountMap { account_address: addr0, balance: 12345, },
-            AccountMap { account_address: addr1, balance: 67890, },];
+            AccountMap { account_address: addr1, balance: 67890, },
+        ];
 
         create_accounts(aptos_framework, accounts);
         assert!(coin::balance<AptosCoin>(addr0) == 12345, 0);
@@ -593,7 +595,8 @@ module aptos_framework::genesis {
 
         let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
         assert!(
-            primary_fungible_store::primary_store_exists(@core_resources, apt_metadata), 2
+            primary_fungible_store::primary_store_exists(@core_resources, apt_metadata),
+            2,
         );
 
         aptos_coin::configure_accounts_for_test(

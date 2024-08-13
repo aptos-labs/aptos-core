@@ -290,7 +290,10 @@ module aptos_std::ristretto255 {
     /// Computes a double-scalar multiplication, returning a_1 p_1 + a_2 p_2
     /// This function is much faster than computing each a_i p_i using `point_mul` and adding up the results using `point_add`.
     public fun double_scalar_mul(
-        scalar1: &Scalar, point1: &RistrettoPoint, scalar2: &Scalar, point2: &RistrettoPoint
+        scalar1: &Scalar,
+        point1: &RistrettoPoint,
+        scalar2: &Scalar,
+        point2: &RistrettoPoint
     ): RistrettoPoint {
         if (!features::bulletproofs_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
@@ -298,7 +301,10 @@ module aptos_std::ristretto255 {
 
         RistrettoPoint {
             handle: double_scalar_mul_internal(
-                point1.handle, point2.handle, scalar1.data, scalar2.data
+                point1.handle,
+                point2.handle,
+                scalar1.data,
+                scalar2.data,
             )
         }
     }
@@ -312,7 +318,8 @@ module aptos_std::ristretto255 {
             !std::vector::is_empty(points), std::error::invalid_argument(E_ZERO_POINTS)
         );
         assert!(
-            !std::vector::is_empty(scalars), std::error::invalid_argument(E_ZERO_SCALARS)
+            !std::vector::is_empty(scalars),
+            std::error::invalid_argument(E_ZERO_SCALARS),
         );
         assert!(
             std::vector::length(points) == std::vector::length(scalars),
@@ -885,7 +892,9 @@ module aptos_std::ristretto255 {
     #[test(fx = @std)]
     fun test_basepoint_double_mul(fx: signer) {
         features::change_feature_flags_for_testing(
-            &fx, vector[features::get_bulletproofs_feature()], vector[]
+            &fx,
+            vector[features::get_bulletproofs_feature()],
+            vector[],
         );
 
         let expected =
@@ -971,14 +980,16 @@ module aptos_std::ristretto255 {
             new_scalar_from_sha2_512(b"2"),
             new_scalar_from_sha2_512(b"3"),
             new_scalar_from_sha2_512(b"4"),
-            new_scalar_from_sha2_512(b"5"),];
+            new_scalar_from_sha2_512(b"5"),
+        ];
 
         let points = vector[
             new_point_from_sha2_512(b"1"),
             new_point_from_sha2_512(b"2"),
             new_point_from_sha2_512(b"3"),
             new_point_from_sha2_512(b"4"),
-            new_point_from_sha2_512(b"5"),];
+            new_point_from_sha2_512(b"5"),
+        ];
 
         let expected =
             std::option::extract(
@@ -1034,7 +1045,8 @@ module aptos_std::ristretto255 {
         // Test (0 - 1) % order = order - 1
         assert!(
             scalar_equals(
-                &scalar_sub(&scalar_zero(), &scalar_one()), &Scalar { data: L_MINUS_ONE }
+                &scalar_sub(&scalar_zero(), &scalar_one()),
+                &Scalar { data: L_MINUS_ONE },
             ),
             1,
         );
@@ -1081,7 +1093,8 @@ module aptos_std::ristretto255 {
         // Non-canonical because high bit is set
         let non_canonical_highbit = vector[
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 128];
+            0, 0, 0, 0, 0, 128
+        ];
         let non_canonical_highbit_hex =
             x"0000000000000000000000000000000000000000000000000000000000000080";
         assert!(non_canonical_highbit == non_canonical_highbit_hex, 1);
@@ -1162,7 +1175,8 @@ module aptos_std::ristretto255 {
 
         let expected: vector<u8> = vector[
             21, 88, 208, 252, 63, 122, 210, 152, 154, 38, 15, 23, 16, 167, 80, 150, 192,
-            221, 77, 226, 62, 25, 224, 148, 239, 48, 176, 10, 185, 69, 168, 11];
+            221, 77, 226, 62, 25, 224, 148, 239, 48, 176, 10, 185, 69, 168, 11
+        ];
 
         assert!(s.data == expected, 1)
     }
@@ -1271,7 +1285,8 @@ module aptos_std::ristretto255 {
         // Subtraction reduces: 0 - 1 = \ell - 1
         let ell_minus_one = Scalar { data: L_MINUS_ONE };
         assert!(
-            scalar_equals(&scalar_sub(&scalar_zero(), &scalar_one()), &ell_minus_one), 1
+            scalar_equals(&scalar_sub(&scalar_zero(), &scalar_one()), &ell_minus_one),
+            1,
         );
 
         // 2 - 1 = 1

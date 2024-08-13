@@ -102,10 +102,11 @@ module aptos_std::simple_map {
         values: vector<Value>,
     ) {
         vector::zip(
-            keys, values,
+            keys,
+            values,
             |key, value| {
                 add(map, key, value);
-            }
+            },
         );
     }
 

@@ -297,7 +297,10 @@ module aptos_framework::primary_fungible_store {
                 to, fungible_asset::transfer_ref_metadata(transfer_ref)
             );
         fungible_asset::transfer_with_ref(
-            transfer_ref, from_primary_store, to_primary_store, amount
+            transfer_ref,
+            from_primary_store,
+            to_primary_store,
+            amount,
         );
     }
 
@@ -357,9 +360,7 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_basic_flow(
-        creator: &signer, aaron: &signer,
-    ) acquires DeriveRefPod {
+    fun test_basic_flow(creator: &signer, aaron: &signer,) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
         let (mint_ref, transfer_ref, burn_ref) =
             init_test_metadata_with_primary_store_enabled(&creator_ref);
@@ -404,9 +405,7 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[test(user_1 = @0xcafe, user_2 = @0xface)]
-    fun test_transfer_to_burnt_store(
-        user_1: &signer, user_2: &signer,
-    ) acquires DeriveRefPod {
+    fun test_transfer_to_burnt_store(user_1: &signer, user_2: &signer,) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(user_1);
         let (mint_ref, _, _) =
             init_test_metadata_with_primary_store_enabled(&creator_ref);

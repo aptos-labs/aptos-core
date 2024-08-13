@@ -171,7 +171,8 @@ module aptos_framework::resource_account {
         resource: &signer, source_addr: address,
     ): account::SignerCapability acquires Container {
         assert!(
-            exists<Container>(source_addr), error::not_found(ECONTAINER_NOT_PUBLISHED)
+            exists<Container>(source_addr),
+            error::not_found(ECONTAINER_NOT_PUBLISHED),
         );
 
         let resource_addr = signer::address_of(resource);

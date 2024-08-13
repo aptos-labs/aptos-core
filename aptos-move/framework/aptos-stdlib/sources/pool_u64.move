@@ -210,7 +210,8 @@ module aptos_std::pool_u64 {
         shares_to_transfer: u64,
     ) {
         assert!(
-            contains(pool, shareholder_1), error::invalid_argument(ESHAREHOLDER_NOT_FOUND)
+            contains(pool, shareholder_1),
+            error::invalid_argument(ESHAREHOLDER_NOT_FOUND),
         );
         assert!(
             shares(pool, shareholder_1) >= shares_to_transfer,
@@ -356,7 +357,8 @@ module aptos_std::pool_u64 {
         assert!(redeem_shares(&mut pool, @1, 500) == expected_value_per_500_shares, 14);
         assert!(redeem_shares(&mut pool, @1, 500) == expected_value_per_500_shares, 15);
         assert!(
-            redeem_shares(&mut pool, @2, 2000) == expected_value_per_500_shares * 4, 16
+            redeem_shares(&mut pool, @2, 2000) == expected_value_per_500_shares * 4,
+            16,
         );
 
         // Due to a very small rounding error of 1, shareholder 3 actually has 1 more coin.

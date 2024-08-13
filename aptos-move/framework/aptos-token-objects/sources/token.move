@@ -164,7 +164,8 @@ module aptos_token_objects::token {
             // Be conservative, as we don't know what length the index will be, and assume worst case (20 chars in MAX_U64)
             assert!(
                 string::length(&name_prefix) + 20
-                    + string::length(option::borrow(&name_with_index_suffix)) <= MAX_TOKEN_NAME_LENGTH,
+                    + string::length(option::borrow(&name_with_index_suffix))
+                    <= MAX_TOKEN_NAME_LENGTH,
                 error::out_of_range(ETOKEN_NAME_TOO_LONG),
             );
         } else {
@@ -873,7 +874,10 @@ module aptos_token_objects::token {
         // Calculate the token address with collection, token name and seed.
         let token_addr =
             create_token_address_with_seed(
-                creator_address, collection_name, token_name, seed
+                creator_address,
+                collection_name,
+                token_name,
+                seed,
             );
         let token = object::address_to_object<Token>(token_addr);
         assert!(object::owner(token) == creator_address, 1);

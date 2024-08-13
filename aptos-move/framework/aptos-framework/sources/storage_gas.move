@@ -306,7 +306,8 @@ module aptos_framework::storage_gas {
                     4000, 44
                 ), new_point(5000, 109), new_point(6000, 271), new_point(7000, 669), new_point(
                     8000, 1648
-                ), new_point(9000, 4061), new_point(9500, 6372), new_point(9900, 9138),],
+                ), new_point(9000, 4061), new_point(9500, 6372), new_point(9900, 9138),
+            ],
         )
     }
 
@@ -437,8 +438,9 @@ module aptos_framework::storage_gas {
         };
         let i = 0;
         while ({
-                spec {
-                    invariant forall j in 0..i: {
+            spec {
+                invariant forall j in 0..i:
+                    {
                         let cur = if (j == 0) {
                             Point { x: 0, y: 0 }
                         } else {
@@ -455,9 +457,9 @@ module aptos_framework::storage_gas {
                             };
                         cur.x < next.x && cur.y <= next.y
                     };
-                };
-                i <= len
-            }) {
+            };
+            i <= len
+        }) {
             let cur = if (i == 0) {
                 &Point { x: 0, y: 0 }
             } else {
@@ -503,14 +505,14 @@ module aptos_framework::storage_gas {
             } else {
                 let (i, j) = (0, num_points - 2);
                 while ({
-                        spec {
-                            invariant i <= j;
-                            invariant j < num_points - 1;
-                            invariant points[i].x <= current_usage_bps;
-                            invariant current_usage_bps < points[j + 1].x;
-                        };
-                        i < j
-                    }) {
+                    spec {
+                        invariant i <= j;
+                        invariant j < num_points - 1;
+                        invariant points[i].x <= current_usage_bps;
+                        invariant current_usage_bps < points[j + 1].x;
+                    };
+                    i < j
+                }) {
                     let mid = j - (j - i) / 2;
                     if (current_usage_bps < vector::borrow(points, mid).x) {
                         spec {

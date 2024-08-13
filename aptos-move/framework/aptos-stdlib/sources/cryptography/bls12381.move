@@ -168,9 +168,7 @@ module aptos_std::bls12381 {
         : Option<AggrOrMultiSignature> {
         let (bytes, success) = aggregate_signatures_internal(signatures);
         if (success) {
-            option::some(
-                AggrOrMultiSignature { bytes },
-            )
+            option::some(AggrOrMultiSignature { bytes })
         } else {
             option::none<AggrOrMultiSignature>()
         }
@@ -282,9 +280,8 @@ module aptos_std::bls12381 {
         while (i < signing_key_count) {
             let sig =
                 sign_arbitrary_bytes(
-                    std::vector::borrow(signing_keys, i), *std::vector::borrow(
-                        messages, i
-                    )
+                    std::vector::borrow(signing_keys, i),
+                    *std::vector::borrow(messages, i),
                 );
             std::vector::push_back(&mut sigs, sig);
             i = i + 1;
@@ -537,7 +534,8 @@ module aptos_std::bls12381 {
             },
             PublicKeyWithPoP {
                 bytes: x"a4cd352daad3a0651c1998dfbaa7a748e08d248a54347544bfedd51a197e016bb6008e9b8e45a744e1a030cc3b27d2da"
-            },];
+            },
+        ];
 
         // agg_pks[i] = \sum_{j <= i}  pk[j]
         let agg_pks = vector[
@@ -555,7 +553,8 @@ module aptos_std::bls12381 {
             },
             AggrPublicKeysWithPoP {
                 bytes: x"b53df1cfee2168f59e5792e710bf22928dc0553e6531dae5c7656c0a66fc12cb82fbb04863938c953dc901a5a79cc0f3"
-            },];
+            },
+        ];
 
         let i = 0;
         let accum_pk = std::vector::empty<PublicKeyWithPoP>();
@@ -604,7 +603,8 @@ module aptos_std::bls12381 {
             ),
             signature_from_bytes(
                 x"8d22876bdf73e6ad36ed98546018f6258cd47e45904b87c071e774a6ef4b07cac323258cb920b2fe2b07cca1f2b24bcb0a3194ec76f32edb92391ed2c39e1ada8919f8ea755c5e39873d33ff3a8f4fba21b1261c1ddb9d1688c2b40b77e355d1",
-            ),];
+            ),
+        ];
 
         // multisigs[i] is a signature on "Hello, Aptoverse!" from signers 1 through i (inclusive)
         let multisigs = vector[
@@ -622,7 +622,8 @@ module aptos_std::bls12381 {
             },
             AggrOrMultiSignature {
                 bytes: x"8284e4e3983f29cb45020c3e2d89066df2eae533a01cb6ca2c4d466b5e02dd22467f59640aa120db2b9cc49e931415c3097e3d54ff977fd9067b5bc6cfa1c885d9d8821aef20c028999a1d97e783ae049d8fa3d0bbac36ce4ca8e10e551d3461"
-            },];
+            },
+        ];
 
         let i = 0;
         let accum_sigs = std::vector::empty<Signature>();
@@ -663,7 +664,8 @@ module aptos_std::bls12381 {
             },
             PublicKeyWithPoP {
                 bytes: x"a4cd352daad3a0651c1998dfbaa7a748e08d248a54347544bfedd51a197e016bb6008e9b8e45a744e1a030cc3b27d2da"
-            },];
+            },
+        ];
 
         // agg_pks[i] = \sum_{j <= i}  pk[j]
         let agg_pks = vector[
@@ -681,7 +683,8 @@ module aptos_std::bls12381 {
             },
             AggrPublicKeysWithPoP {
                 bytes: x"b53df1cfee2168f59e5792e710bf22928dc0553e6531dae5c7656c0a66fc12cb82fbb04863938c953dc901a5a79cc0f3"
-            },];
+            },
+        ];
 
         // multisigs[i] is a signature on "Hello, Aptoverse!" under agg_pks[i]
         let multisigs = vector[
@@ -699,7 +702,8 @@ module aptos_std::bls12381 {
             },
             AggrOrMultiSignature {
                 bytes: x"b627b2cfd8ae59dcf5e58cc6c230ae369985fd096e1bc3be38da5deafcbed7d939f07cccc75383539940c56c6b6453db193f563f5b6e4fe54915afd9e1baea40a297fa7eda74abbdcd4cc5c667d6db3b9bd265782f7693798894400f2beb4637"
-            },];
+            },
+        ];
 
         let i = 0;
         let accum_pk = std::vector::empty<PublicKeyWithPoP>();
@@ -712,7 +716,9 @@ module aptos_std::bls12381 {
 
             assert!(
                 verify_multisignature(
-                    std::vector::borrow(&multisigs, i), &apk, b"Hello, Aptoverse!"
+                    std::vector::borrow(&multisigs, i),
+                    &apk,
+                    b"Hello, Aptoverse!",
                 ),
                 1,
             );
@@ -828,7 +834,8 @@ module aptos_std::bls12381 {
                 vector[
                     get_random_pk_with_pop(),
                     get_random_pk_with_pop(),
-                    get_random_pk_with_pop(),],
+                    get_random_pk_with_pop(),
+                ],
                 vector[x"cd", x"ef"],
             ) == false,
             1,
@@ -843,7 +850,8 @@ module aptos_std::bls12381 {
             x"48656c6c6f2c204170746f73203221",
             x"48656c6c6f2c204170746f73203321",
             x"48656c6c6f2c204170746f73203421",
-            x"48656c6c6f2c204170746f73203521",];
+            x"48656c6c6f2c204170746f73203521",
+        ];
 
         // Public key of signer i
         let pks = vector[
@@ -861,7 +869,8 @@ module aptos_std::bls12381 {
             },
             PublicKeyWithPoP {
                 bytes: x"a79e3d0e9d04587a3b27d05efe5717da05fd93485dc47978c866dc70a01695c2efd247d1dd843a011a4b6b24079d7384"
-            },];
+            },
+        ];
 
         // aggsigs[i] = \sum_{j <= i}  sigs[j], where sigs[j] is a signature on msgs[j] under pks[j]
         let aggsigs = vector[
@@ -879,7 +888,8 @@ module aptos_std::bls12381 {
             },
             AggrOrMultiSignature {
                 bytes: x"a44d967935fbe63a763ce2dd2b16981f967ecd31e20d3266eef5517530cdc233c8a18273b6d9fd7f61dd39178826e3f115df4e7b304f2de17373a95ea0c9a14293dcfd6f0ef416e06fa23f6a3c850d638e4d8f97ab4562ef55d49a96a50baa13"
-            },];
+            },
+        ];
 
         let i = 0;
         let msg_subset = std::vector::empty<vector<u8>>();
@@ -912,15 +922,16 @@ module aptos_std::bls12381 {
                 std::vector::push_back(&mut public_keys, pk);
                 let msg: vector<u8> = vector[
                     104, 101, 108, 108, 111, 32, 97, 112, 116, 111, 115, 32, 117, 115, 101,
-                    114, 32, 48 + (i as u8)]; //"hello aptos user {i}"
+                    114, 32, 48 + (i as u8)
+                ]; //"hello aptos user {i}"
                 std::vector::push_back(&mut messages, msg);
                 i = i + 1;
             };
 
             // Maul messages and public keys.
             let mauled_public_keys = vector[maul_public_key_with_pop(
-                    std::vector::borrow(&public_keys, 0)
-                )];
+                std::vector::borrow(&public_keys, 0)
+            )];
             let mauled_messages = vector[maul_bytes(std::vector::borrow(&messages, 0))];
             let i = 1;
             while (i < signer_count) {
@@ -943,10 +954,12 @@ module aptos_std::bls12381 {
                 1,
             );
             assert!(
-                !verify_aggregate_signature(&aggrsig, mauled_public_keys, messages), 1
+                !verify_aggregate_signature(&aggrsig, mauled_public_keys, messages),
+                1,
             );
             assert!(
-                !verify_aggregate_signature(&aggrsig, public_keys, mauled_messages), 1
+                !verify_aggregate_signature(&aggrsig, public_keys, mauled_messages),
+                1,
             );
 
             // Also test signature aggregation.
@@ -1023,11 +1036,13 @@ module aptos_std::bls12381 {
             },
             Signature {
                 bytes: x"b01ce4632e94d8c611736e96aa2ad8e0528a02f927a81a92db8047b002a8c71dc2d6bfb94729d0973790c10b6ece446817e4b7543afd7ca9a17c75de301ae835d66231c26a003f11ae26802b98d90869a9e73788c38739f7ac9d52659e1f7cf7"
-            },];
+            },
+        ];
         let pks = vector[
             x"94209a296b739577cb076d3bfb1ca8ee936f29b69b7dae436118c4dd1cc26fd43dcd16249476a006b8b949bf022a7858",
             x"ae4851bb9e7782027437ed0e2c026dd63b77a972ddf4bd9f72bcc218e327986568317e3aa9f679c697a2cb7cebf992f3",
-            x"82ed7bb5528303a2e306775040a7309e0bd597b70d9949d8c6198a01a7be0b00079320ebfeaf7bbd5bfe86809940d252",];
+            x"82ed7bb5528303a2e306775040a7309e0bd597b70d9949d8c6198a01a7be0b00079320ebfeaf7bbd5bfe86809940d252",
+        ];
         let messages = vector[b"Hello Aptos!", b"Hello Aptos!", b"Bello Aptos!",];
 
         let i = 0;
@@ -1086,7 +1101,8 @@ module aptos_std::bls12381 {
             x"8843843c76d167c02842a214c21277bad0bfd83da467cb5cf2d3ee67b2dcc7221b9fafa6d430400164012580e0c34d27",
             x"a23b524d4308d46e43ee8cbbf57f3e1c20c47061ad9c3f915212334ea6532451dd5c01d3d3ada6bea10fe180b2c3b450",
             x"a2aaa3eae1df3fc36365491afa1da5181acbb03801afd1430f04bb3b3eb18036f8b756b3508e4caee04beff50d455d1c",
-            x"84985b7e983dbdaddfca1f0b7dad9660bb39fff660e329acec15f69ac48c75dfa5d2df9f0dc320e4e7b7658166e0ac1c",];
+            x"84985b7e983dbdaddfca1f0b7dad9660bb39fff660e329acec15f69ac48c75dfa5d2df9f0dc320e4e7b7658166e0ac1c",
+        ];
 
         let pops = vector[
             proof_of_possession_from_bytes(
@@ -1103,7 +1119,8 @@ module aptos_std::bls12381 {
             ),
             proof_of_possession_from_bytes(
                 x"8899b294f3c066e6dfb59bc0843265a1ccd6afc8f0f38a074d45ded8799c39d25ee0376cd6d6153b0d4d2ff8655e578b140254f1287b9e9df4e2aecc5b049d8556a4ab07f574df68e46348fd78e5298b7913377cf5bb3cf4796bfc755902bfdd",
-            ),];
+            ),
+        ];
 
         assert!(std::vector::length(&pks) == std::vector::length(&pops), 1);
 
@@ -1111,7 +1128,8 @@ module aptos_std::bls12381 {
         while (i < std::vector::length(&pks)) {
             let opt_pk =
                 public_key_from_bytes_with_pop(
-                    *std::vector::borrow(&pks, i), std::vector::borrow(&pops, i)
+                    *std::vector::borrow(&pks, i),
+                    std::vector::borrow(&pops, i),
                 );
             assert!(option::is_some(&opt_pk), 1);
 
@@ -1147,7 +1165,7 @@ module aptos_std::bls12381 {
         assert!(option::is_some(&public_key_from_bytes_with_pop(pk_bytes, &pop)), 1);
         assert!(
             option::is_none(
-                &public_key_from_bytes_with_pop(pk_bytes, &maul_proof_of_possession(&pop))
+                &public_key_from_bytes_with_pop(pk_bytes, &maul_proof_of_possession(&pop)),
             ),
             1,
         );

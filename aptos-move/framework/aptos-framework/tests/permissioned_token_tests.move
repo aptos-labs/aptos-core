@@ -18,7 +18,8 @@ module 0xcafe::permissioned_token_tests {
         let aaron_store = fungible_asset::create_test_store(aaron, metadata);
         let allowed_sender = vector[
             object::object_address(&creator_store),
-            object::object_address(&aaron_store),];
+            object::object_address(&aaron_store),
+        ];
 
         permissioned_token::initialize(creator, &creator_ref, allowed_sender);
 

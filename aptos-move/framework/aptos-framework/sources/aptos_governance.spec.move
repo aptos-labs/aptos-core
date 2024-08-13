@@ -377,8 +377,8 @@ spec aptos_framework::aptos_governance {
         let spec_voting_power = spec_get_voting_power(stake_pool, staking_config);
         let voting_records_v2 = borrow_global<VotingRecordsV2>(@aptos_framework);
         let used_voting_power = if (smart_table::spec_contains(
-                voting_records_v2.votes, record_key
-            )) {
+            voting_records_v2.votes, record_key
+        )) {
             smart_table::spec_get(voting_records_v2.votes, record_key)
         } else { 0 };
         aborts_if !remain_zero_1_cond
@@ -567,20 +567,20 @@ spec aptos_framework::aptos_governance {
         aborts_if timestamp::now_seconds() <= proposal.expiration_secs
             && (
                 option::spec_is_none(proposal.early_resolution_vote_threshold)
-                || proposal.yes_votes < early_resolution_threshold
-                && proposal.no_votes < early_resolution_threshold
+                    || proposal.yes_votes < early_resolution_threshold
+                        && proposal.no_votes < early_resolution_threshold
             );
         aborts_if (
-                timestamp::now_seconds() > proposal.expiration_secs
+            timestamp::now_seconds() > proposal.expiration_secs
                 || option::spec_is_some(proposal.early_resolution_vote_threshold)
-                && (
-                    proposal.yes_votes >= early_resolution_threshold
-                    || proposal.no_votes >= early_resolution_threshold
-                )
-            )
+                    && (
+                        proposal.yes_votes >= early_resolution_threshold
+                            || proposal.no_votes >= early_resolution_threshold
+                    )
+        )
             && (
                 proposal.yes_votes <= proposal.no_votes
-                || proposal.yes_votes + proposal.no_votes < proposal.min_vote_threshold
+                    || proposal.yes_votes + proposal.no_votes < proposal.min_vote_threshold
             );
 
         let post post_approved_hashes = global<ApprovedExecutionHashes>(@aptos_framework);
@@ -718,7 +718,7 @@ spec aptos_framework::aptos_governance {
             stake_pool_res.active.value + stake_pool_res.pending_active.value
                 + stake_pool_res.pending_inactive.value
         } else if (!allow_validator_set_change
-                && (stake::spec_is_current_epoch_validator(pool_address))) {
+            && (stake::spec_is_current_epoch_validator(pool_address))) {
             stake_pool_res.active.value + stake_pool_res.pending_inactive.value
         } else { 0 }
     }
@@ -749,8 +749,8 @@ spec aptos_framework::aptos_governance {
         let voting_power = spec_get_voting_power(stake_pool, staking_config);
         let voting_records_v2 = borrow_global<VotingRecordsV2>(@aptos_framework);
         let used_voting_power = if (smart_table::spec_contains(
-                voting_records_v2.votes, record_key
-            )) {
+            voting_records_v2.votes, record_key
+        )) {
             smart_table::spec_get(voting_records_v2.votes, record_key)
         } else { 0 };
         aborts_if !remain_zero_1_cond

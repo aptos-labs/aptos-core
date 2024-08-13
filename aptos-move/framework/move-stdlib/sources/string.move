@@ -78,9 +78,9 @@ module std::string {
         let l = vector::length(bytes);
         assert!(
             j <= l
-            && i <= j
-            && internal_is_char_boundary(bytes, i)
-            && internal_is_char_boundary(bytes, j),
+                && i <= j
+                && internal_is_char_boundary(bytes, i)
+                && internal_is_char_boundary(bytes, j),
             EINVALID_INDEX,
         );
         String { bytes: internal_sub_string(bytes, i, j) }

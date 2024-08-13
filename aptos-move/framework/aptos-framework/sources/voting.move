@@ -326,8 +326,8 @@ module aptos_framework::voting {
             // If the proposal is a single-step proposal, we check if the metadata passed by the client has the IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY key.
             // If they have the key, we will remove it, because a single-step proposal that doesn't need this key.
         } else if (simple_map::contains_key(
-                &mut metadata, &is_multi_step_in_execution_key
-            )) {
+            &mut metadata, &is_multi_step_in_execution_key
+        )) {
             simple_map::remove(&mut metadata, &is_multi_step_in_execution_key);
         };
 
@@ -658,7 +658,7 @@ module aptos_framework::voting {
             let early_resolution_threshold =
                 *option::borrow(&proposal.early_resolution_vote_threshold);
             if (proposal.yes_votes >= early_resolution_threshold
-                    || proposal.no_votes >= early_resolution_threshold) {
+                || proposal.no_votes >= early_resolution_threshold) {
                 return true
             };
         };
@@ -988,7 +988,10 @@ module aptos_framework::voting {
             );
         } else {
             resolve_proposal_for_test<TestProposal>(
-                governance_address, proposal_id, use_resolve_multi_step, true
+                governance_address,
+                proposal_id,
+                use_resolve_multi_step,
+                true,
             );
         };
         let voting_forum = borrow_global<VotingForum<TestProposal>>(governance_address);
@@ -1125,13 +1128,16 @@ module aptos_framework::voting {
                 3,
             );
             resolve_proposal_for_test<TestProposal>(
-                governance_address, proposal_id, is_multi_step, false
+                governance_address,
+                proposal_id,
+                is_multi_step,
+                false,
             );
 
             // Assert that the multi-step proposal is in execution but not resolved yet.
             assert!(
                 is_multi_step_proposal_in_execution<TestProposal>(governance_address, 0),
-                4
+                4,
             );
             let voting_forum =
                 borrow_global_mut<VotingForum<TestProposal>>(governance_address);

@@ -92,7 +92,8 @@ module aptos_framework::dispatchable_fungible_asset {
             );
             let end_balance = fungible_asset::balance(store);
             assert!(
-                amount <= start_balance - end_balance, error::aborted(EAMOUNT_MISMATCH)
+                amount <= start_balance - end_balance,
+                error::aborted(EAMOUNT_MISMATCH),
             );
             fa
         } else {

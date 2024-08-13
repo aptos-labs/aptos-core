@@ -14,14 +14,15 @@ spec aptos_std::pool_u64 {
     // The invariants of the struct Pool.
     spec Pool {
         // `shares` contains the key `addr` if and only if `shareholders` contains `addr.
-        invariant forall addr: address: (
-            simple_map::spec_contains_key(shares, addr)
-                == vector::spec_contains(shareholders, addr)
-        );
+        invariant forall addr: address:
+            (
+                simple_map::spec_contains_key(shares, addr)
+                    == vector::spec_contains(shareholders, addr)
+            );
 
         // `shareholders` does not contain duplicates.
-        invariant forall i in 0..len(shareholders), j in 0..len(shareholders): shareholders[i] ==
-             shareholders[j] ==> i == j;
+        invariant forall i in 0..len(shareholders), j in 0..len(shareholders):
+            shareholders[i] == shareholders[j] ==> i == j;
     }
 
     // -----------------------

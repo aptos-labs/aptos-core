@@ -201,7 +201,9 @@ module std::vector {
     /// Return `(true, i)` if there's an element that matches the predicate. If there are multiple elements that match
     /// the predicate, only the index of the first one is returned.
     /// Otherwise, returns `(false, 0)`.
-    public inline fun find<Element>(v: &vector<Element>, f: |&Element| bool): (bool, u64) {
+    public inline fun find<Element>(
+        v: &vector<Element>, f: |&Element| bool
+    ): (bool, u64) {
         let find = false;
         let found_index = 0;
         let i = 0;
@@ -245,10 +247,12 @@ module std::vector {
         if (i >= len) abort EINDEX_OUT_OF_BOUNDS;
 
         len = len - 1;
-        while (i < len) swap(v, i, {
+        while (i < len) swap(
+            v, i, {
                 i = i + 1;
                 i
-            });
+            }
+        );
         pop_back(v)
     }
 
@@ -507,7 +511,7 @@ module std::vector {
             v,
             |elem| {
                 if (p(&elem)) push_back(&mut result, elem);
-            }
+            },
         );
         result
     }
@@ -538,9 +542,7 @@ module std::vector {
 
     /// rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point
     /// ie. 3 in the example above
-    public fun rotate<Element>(
-        v: &mut vector<Element>, rot: u64
-    ): u64 {
+    public fun rotate<Element>(v: &mut vector<Element>, rot: u64): u64 {
         let len = length(v);
         rotate_slice(v, 0, rot, len)
     }
@@ -620,9 +622,7 @@ module std::vector {
 
     /// Destroy a vector, just a wrapper around for_each_reverse with a descriptive name
     /// when used in the context of destroying a vector.
-    public inline fun destroy<Element>(
-        v: vector<Element>, d: |Element|
-    ) {
+    public inline fun destroy<Element>(v: vector<Element>, d: |Element|) {
         for_each_reverse(v, |e| d(e))
     }
 

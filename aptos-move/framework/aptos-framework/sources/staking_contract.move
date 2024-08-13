@@ -117,7 +117,9 @@ module aptos_framework::staking_contract {
         new_commission_percentage: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::staking_contract::StakingGroupContainer)]
+    #[resource_group_member(
+        group = aptos_framework::staking_contract::StakingGroupContainer
+    )]
     struct StakingGroupUpdateCommissionEvent has key {
         update_commission_events: EventHandle<UpdateCommissionEvent>,
     }
@@ -549,7 +551,10 @@ module aptos_framework::staking_contract {
         let staking_contract =
             simple_map::borrow_mut(&mut store.staking_contracts, &operator);
         distribute_internal(
-            staker_address, operator, staking_contract, &mut store.distribute_events
+            staker_address,
+            operator,
+            staking_contract,
+            &mut store.distribute_events,
         );
         request_commission_internal(
             operator,
@@ -599,8 +604,8 @@ module aptos_framework::staking_contract {
         let account_addr = signer::address_of(account);
         assert!(
             account_addr == staker
-            || account_addr == operator
-            || account_addr == beneficiary_for_operator(operator),
+                || account_addr == operator
+                || account_addr == beneficiary_for_operator(operator),
             error::unauthenticated(ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY),
         );
         assert_staking_contract_exists(staker, operator);
@@ -613,7 +618,10 @@ module aptos_framework::staking_contract {
 
         // Force distribution of any already inactive stake.
         distribute_internal(
-            staker, operator, staking_contract, &mut store.distribute_events
+            staker,
+            operator,
+            staking_contract,
+            &mut store.distribute_events,
         );
 
         request_commission_internal(
@@ -694,7 +702,10 @@ module aptos_framework::staking_contract {
 
         // Force distribution of any already inactive stake.
         distribute_internal(
-            staker_address, operator, staking_contract, &mut store.distribute_events
+            staker_address,
+            operator,
+            staking_contract,
+            &mut store.distribute_events,
         );
 
         // For simplicity, we request commission to be paid out first. This avoids having to ensure to staker doesn't
@@ -855,7 +866,10 @@ module aptos_framework::staking_contract {
         let staking_contract =
             simple_map::borrow_mut(&mut store.staking_contracts, &operator);
         distribute_internal(
-            staker, operator, staking_contract, &mut store.distribute_events
+            staker,
+            operator,
+            staking_contract,
+            &mut store.distribute_events,
         );
     }
 
@@ -937,7 +951,8 @@ module aptos_framework::staking_contract {
         staker: address, operator: address
     ) acquires Store {
         assert!(
-            exists<Store>(staker), error::not_found(ENO_STAKING_CONTRACT_FOUND_FOR_STAKER)
+            exists<Store>(staker),
+            error::not_found(ENO_STAKING_CONTRACT_FOUND_FOR_STAKER),
         );
         let staking_contracts = &mut borrow_global_mut<Store>(staker).staking_contracts;
         assert!(
@@ -1049,7 +1064,10 @@ module aptos_framework::staking_contract {
                             distribution_pool, unpaid_commission, updated_total_coins
                         );
                     pool_u64::transfer_shares(
-                        distribution_pool, shareholder, operator, shares_to_transfer
+                        distribution_pool,
+                        shareholder,
+                        operator,
+                        shares_to_transfer,
                     );
                 };
             },
@@ -1165,7 +1183,9 @@ module aptos_framework::staking_contract {
             vector::empty<u8>(),
         );
         std::features::change_feature_flags_for_testing(
-            aptos_framework, vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE], vector[]
+            aptos_framework,
+            vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE],
+            vector[],
         );
     }
 
@@ -1184,7 +1204,7 @@ module aptos_framework::staking_contract {
         stake::assert_stake_pool(pool_address, INITIAL_BALANCE, 0, 0, 0);
         assert!(
             last_recorded_principal(staker_address, operator_address) == INITIAL_BALANCE,
-            0
+            0,
         );
 
         // Operator joins the validator set.
@@ -1207,7 +1227,10 @@ module aptos_framework::staking_contract {
             last_recorded_principal(staker_address, operator_address) == new_balance, 0
         );
         assert_distribution(
-            staker_address, operator_address, operator_address, expected_commission_1
+            staker_address,
+            operator_address,
+            operator_address,
+            expected_commission_1,
         );
         stake::fast_forward_to_unlock(pool_address);
 
@@ -1243,7 +1266,10 @@ module aptos_framework::staking_contract {
         new_balance = new_balance - expected_commission_2;
         request_commission(operator, staker_address, operator_address);
         assert_distribution(
-            staker_address, operator_address, operator_address, expected_commission_2
+            staker_address,
+            operator_address,
+            operator_address,
+            expected_commission_2,
         );
         assert!(
             last_recorded_principal(staker_address, operator_address) == new_balance, 0
@@ -1267,11 +1293,17 @@ module aptos_framework::staking_contract {
         unlock_stake(staker, operator_address, new_balance);
         stake::assert_stake_pool(pool_address, 0, 0, 0, new_balance);
         assert_distribution(
-            staker_address, operator_address, operator_address, unpaid_commission
+            staker_address,
+            operator_address,
+            operator_address,
+            unpaid_commission,
         );
         let withdrawn_amount = new_balance - unpaid_commission;
         assert_distribution(
-            staker_address, operator_address, staker_address, withdrawn_amount
+            staker_address,
+            operator_address,
+            staker_address,
+            withdrawn_amount,
         );
         assert!(last_recorded_principal(staker_address, operator_address) == 0, 0);
 
@@ -1323,15 +1355,24 @@ module aptos_framework::staking_contract {
             (new_balance - last_recorded_principal(staker_address, operator_address)) / 10;
         request_commission(operator, staker_address, operator_address);
         assert_distribution(
-            staker_address, operator_address, operator_address, expected_commission
+            staker_address,
+            operator_address,
+            operator_address,
+            expected_commission,
         );
         request_commission(operator, staker_address, operator_address);
         assert_distribution(
-            staker_address, operator_address, operator_address, expected_commission
+            staker_address,
+            operator_address,
+            operator_address,
+            expected_commission,
         );
         request_commission(operator, staker_address, operator_address);
         assert_distribution(
-            staker_address, operator_address, operator_address, expected_commission
+            staker_address,
+            operator_address,
+            operator_address,
+            expected_commission,
         );
     }
 
@@ -1360,10 +1401,16 @@ module aptos_framework::staking_contract {
         let expected_commission = accumulated_rewards / 10;
         let staker_rewards = accumulated_rewards - expected_commission;
         assert_distribution(
-            staker_address, operator_address, staker_address, staker_rewards
+            staker_address,
+            operator_address,
+            staker_address,
+            staker_rewards,
         );
         assert_distribution(
-            staker_address, operator_address, operator_address, expected_commission
+            staker_address,
+            operator_address,
+            operator_address,
+            expected_commission,
         );
     }
 
@@ -1440,7 +1487,9 @@ module aptos_framework::staking_contract {
         assert!(origin_lockup_expiration < stake::get_lockup_secs(pool_address), 0);
     }
 
-    #[test(aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345)]
+    #[test(
+        aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345
+    )]
     public entry fun test_staker_can_switch_operator(
         aptos_framework: &signer,
         staker: &signer,
@@ -1476,7 +1525,11 @@ module aptos_framework::staking_contract {
         // Unpaid commission should be unlocked from the stake pool.
         new_balance = new_balance - commission_for_operator_1;
         stake::assert_stake_pool(
-            pool_address, new_balance, 0, 0, commission_for_operator_1
+            pool_address,
+            new_balance,
+            0,
+            0,
+            commission_for_operator_1,
         );
         assert!(
             last_recorded_principal(staker_address, operator_2_address) == new_balance, 0
@@ -1515,7 +1568,11 @@ module aptos_framework::staking_contract {
             operator_1_balance,
         );
         stake::assert_stake_pool(
-            pool_address, new_balance, 0, 0, commission_for_operator_2
+            pool_address,
+            new_balance,
+            0,
+            0,
+            commission_for_operator_2,
         );
         assert!(
             last_recorded_principal(staker_address, operator_2_address) == new_balance, 0
@@ -1542,7 +1599,9 @@ module aptos_framework::staking_contract {
         );
     }
 
-    #[test(aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345)]
+    #[test(
+        aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345
+    )]
     public entry fun test_staker_can_switch_operator_with_same_commission(
         aptos_framework: &signer,
         staker: &signer,
@@ -1564,7 +1623,15 @@ module aptos_framework::staking_contract {
         assert!(commission_percentage(staker_address, operator_2_address) == 10, 2);
     }
 
-    #[test(aptos_framework = @0x1, staker = @0x123, operator1 = @0x234, beneficiary = @0x345, operator2 = @0x456)]
+    #[
+        test(
+            aptos_framework = @0x1,
+            staker = @0x123,
+            operator1 = @0x234,
+            beneficiary = @0x345,
+            operator2 = @0x456
+        )
+    ]
     public entry fun test_operator_can_set_beneficiary(
         aptos_framework: &signer,
         staker: &signer,
@@ -1618,7 +1685,10 @@ module aptos_framework::staking_contract {
             last_recorded_principal(staker_address, operator1_address) == new_balance, 0
         );
         assert_distribution(
-            staker_address, operator1_address, operator1_address, expected_commission_1
+            staker_address,
+            operator1_address,
+            operator1_address,
+            expected_commission_1,
         );
         stake::fast_forward_to_unlock(pool_address);
 
@@ -1695,10 +1765,16 @@ module aptos_framework::staking_contract {
             withdrawn_stake + unpaid_commission,
         );
         assert_distribution(
-            staker_address, operator_address, operator_address, unpaid_commission
+            staker_address,
+            operator_address,
+            operator_address,
+            unpaid_commission,
         );
         assert_distribution(
-            staker_address, operator_address, staker_address, withdrawn_stake
+            staker_address,
+            operator_address,
+            staker_address,
+            withdrawn_stake,
         );
         assert!(
             last_recorded_principal(staker_address, operator_address) == new_balance, 0
@@ -1753,7 +1829,10 @@ module aptos_framework::staking_contract {
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, withdrawn_stake);
         assert_distribution(staker_address, operator_address, operator_address, 0);
         assert_distribution(
-            staker_address, operator_address, staker_address, withdrawn_stake
+            staker_address,
+            operator_address,
+            staker_address,
+            withdrawn_stake,
         );
         assert!(
             last_recorded_principal(staker_address, operator_address) == new_balance, 0
@@ -1803,10 +1882,16 @@ module aptos_framework::staking_contract {
             withdrawn_stake + unpaid_commission,
         );
         assert_distribution(
-            staker_address, operator_address, operator_address, unpaid_commission
+            staker_address,
+            operator_address,
+            operator_address,
+            unpaid_commission,
         );
         assert_distribution(
-            staker_address, operator_address, staker_address, withdrawn_stake
+            staker_address,
+            operator_address,
+            staker_address,
+            withdrawn_stake,
         );
         assert!(
             last_recorded_principal(staker_address, operator_address) == new_balance, 0
@@ -1835,10 +1920,16 @@ module aptos_framework::staking_contract {
         );
         // There's some small rounding error here.
         assert_distribution(
-            staker_address, operator_address, operator_address, unpaid_commission - 1
+            staker_address,
+            operator_address,
+            operator_address,
+            unpaid_commission - 1,
         );
         assert_distribution(
-            staker_address, operator_address, staker_address, withdrawn_stake
+            staker_address,
+            operator_address,
+            staker_address,
+            withdrawn_stake,
         );
         assert!(
             last_recorded_principal(staker_address, operator_address) == new_balance, 0
@@ -1878,7 +1969,12 @@ module aptos_framework::staking_contract {
         );
     }
 
-    #[test(staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263, operator = @0x9f0a211d218b082987408f1e393afe1ba0c202c6d280f081399788d3360c7f09)]
+    #[
+        test(
+            staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263,
+            operator = @0x9f0a211d218b082987408f1e393afe1ba0c202c6d280f081399788d3360c7f09
+        )
+    ]
     public entry fun test_get_expected_stake_pool_address(
         staker: address, operator: address
     ) {

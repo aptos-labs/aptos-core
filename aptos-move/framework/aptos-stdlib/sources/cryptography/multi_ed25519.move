@@ -143,8 +143,8 @@ module aptos_std::multi_ed25519 {
         : Option<ValidatedPublicKey> {
         // Note that `public_key_validate_internal` will check that `vector::length(&bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES <= MAX_NUMBER_OF_PUBLIC_KEYS`.
         if (vector::length(&bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES && public_key_validate_internal(
-                bytes
-            )) {
+            bytes
+        )) {
             option::some(ValidatedPublicKey { bytes })
         } else {
             option::none<ValidatedPublicKey>()
@@ -372,7 +372,9 @@ module aptos_std::multi_ed25519 {
     #[test(fx = @std)]
     fun bugfix_validated_pk_from_zero_subpks(fx: signer) {
         features::change_feature_flags_for_testing(
-            &fx, vector[features::multi_ed25519_pk_validate_v2_feature()], vector[]
+            &fx,
+            vector[features::multi_ed25519_pk_validate_v2_feature()],
+            vector[],
         );
         let bytes = vector<u8>[1u8];
         assert!(vector::length(&bytes) == 1, 1);
@@ -392,7 +394,9 @@ module aptos_std::multi_ed25519 {
     #[test(fx = @std)]
     fun test_validated_pk_without_threshold_byte(fx: signer) {
         features::change_feature_flags_for_testing(
-            &fx, vector[features::multi_ed25519_pk_validate_v2_feature()], vector[]
+            &fx,
+            vector[features::multi_ed25519_pk_validate_v2_feature()],
+            vector[],
         );
 
         let (_, subpk) = ed25519::generate_keys();
@@ -413,11 +417,14 @@ module aptos_std::multi_ed25519 {
     #[test(fx = @std)]
     fun test_validated_pk_from_small_order_subpk(fx: signer) {
         features::change_feature_flags_for_testing(
-            &fx, vector[features::multi_ed25519_pk_validate_v2_feature()], vector[]
+            &fx,
+            vector[features::multi_ed25519_pk_validate_v2_feature()],
+            vector[],
         );
         let torsion_point_with_threshold_1 = vector<u8>[
             1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 1,];
+            0, 0, 0, 0, 0, 0, 1,
+        ];
 
         assert!(
             option::extract(&mut check_and_get_threshold(torsion_point_with_threshold_1))

@@ -234,9 +234,7 @@ module aptos_token::property_map {
         property.type
     }
 
-    public fun remove(
-        map: &mut PropertyMap, key: &String
-    ): (String, PropertyValue) {
+    public fun remove(map: &mut PropertyMap, key: &String): (String, PropertyValue) {
         let found = contains_key(map, key);
         assert!(found, error::not_found(EPROPERTY_NOT_EXIST));
         simple_map::remove(&mut map.map, key)
@@ -281,9 +279,7 @@ module aptos_token::property_map {
         *property_val = value;
     }
 
-    public fun create_property_value_raw(
-        value: vector<u8>, type: String
-    ): PropertyValue {
+    public fun create_property_value_raw(value: vector<u8>, type: String): PropertyValue {
         PropertyValue { value, type, }
     }
 
@@ -385,8 +381,8 @@ module aptos_token::property_map {
     fun test_read_value_with_type() {
         let keys = vector<String>[utf8(b"attack"), utf8(b"mutable")];
         let values = vector<vector<u8>>[bcs::to_bytes<u8>(&10), bcs::to_bytes<bool>(
-                &false
-            )];
+            &false
+        )];
         let types = vector<String>[utf8(b"u8"), utf8(b"bool")];
         let plist = new(keys, values, types);
         assert!(!read_bool(&plist, &utf8(b"mutable")), 1);
@@ -407,8 +403,8 @@ module aptos_token::property_map {
         let data1: address = @0xcafe;
         let data2: bool = false;
         let pvs = vector<PropertyValue>[create_property_value(&data1), create_property_value(
-                &data2
-            )];
+            &data2
+        )];
         let keys = vector<String>[string::utf8(b"addr"), string::utf8(b"flag")];
         let pm = new_with_key_and_property_value(keys, pvs);
         assert!(length(&pm) == 2, 1);

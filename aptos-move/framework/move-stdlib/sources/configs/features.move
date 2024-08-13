@@ -704,13 +704,13 @@ module std::features {
             &enable,
             |feature| {
                 set(features, *feature, true);
-            }
+            },
         );
         vector::for_each_ref(
             &disable,
             |feature| {
                 set(features, *feature, false);
-            }
+            },
         );
     }
 
@@ -790,13 +790,13 @@ module std::features {
             enable,
             |feature| {
                 set(features, feature, true);
-            }
+            },
         );
         vector::for_each(
             disable,
             |feature| {
                 set(features, feature, false);
-            }
+            },
         );
     }
 

@@ -106,7 +106,8 @@ module std::bit_vector_tests {
         assert!(bit_vector::longest_set_sequence_starting_at(&bitvector, 0) == 20, 0);
         assert!(bit_vector::longest_set_sequence_starting_at(&bitvector, 20) == 0, 0);
         assert!(
-            bit_vector::longest_set_sequence_starting_at(&bitvector, 21) == 100 - 21, 0
+            bit_vector::longest_set_sequence_starting_at(&bitvector, 21) == 100 - 21,
+            0,
         );
     }
 

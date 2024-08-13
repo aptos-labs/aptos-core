@@ -247,9 +247,8 @@ spec aptos_framework::voting {
         aborts_if timestamp::spec_now_seconds()
             <= from_bcs::deserialize<u64>(
                 simple_map::spec_get(
-                    proposal.metadata, std::string::spec_utf8(
-                        RESOLVABLE_TIME_METADATA_KEY
-                    )
+                    proposal.metadata,
+                    std::string::spec_utf8(RESOLVABLE_TIME_METADATA_KEY),
                 ),
             );
         aborts_if transaction_context::spec_get_script_hash() != proposal.execution_hash;
@@ -322,8 +321,8 @@ spec aptos_framework::voting {
                 == std::bcs::serialize(true);
         ensures (
             simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key)
-            && (len(next_execution_hash) == 0
-                && !is_multi_step)
+                && (len(next_execution_hash) == 0
+                    && !is_multi_step)
         ) ==>
             simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key)
                 == std::bcs::serialize(true);
@@ -397,7 +396,7 @@ spec aptos_framework::voting {
             let early_resolution_threshold =
                 option::spec_borrow(proposal.early_resolution_vote_threshold);
             if (proposal.yes_votes >= early_resolution_threshold
-                    || proposal.no_votes >= early_resolution_threshold) { true }
+                || proposal.no_votes >= early_resolution_threshold) { true }
             else { false }
         } else { false }
     }

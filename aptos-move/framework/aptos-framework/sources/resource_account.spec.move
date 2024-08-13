@@ -143,7 +143,7 @@ spec aptos_framework::resource_account {
         aborts_if get
             && !(
                 exists<Account>(resource_addr)
-                && len(global<Account>(source_addr).authentication_key) == 32
+                    && len(global<Account>(source_addr).authentication_key) == 32
             );
         aborts_if !get
             && !(exists<Account>(resource_addr)

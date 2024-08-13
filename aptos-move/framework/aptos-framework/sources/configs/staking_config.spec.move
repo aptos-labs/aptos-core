@@ -153,8 +153,9 @@ spec aptos_framework::staking_config {
         include StakingRewardsConfigRequirement;
         ensures (
             features::spec_periodical_reward_rate_decrease_enabled()
-            && (global<StakingRewardsConfig>(@aptos_framework).rewards_rate.value as u64)
-                != 0
+                && (
+                    global<StakingRewardsConfig>(@aptos_framework).rewards_rate.value as u64
+                ) != 0
         ) ==>
             result_1 <= MAX_REWARDS_RATE
                 && result_2 <= MAX_U64;
@@ -166,8 +167,9 @@ spec aptos_framework::staking_config {
         include StakingRewardsConfigRequirement;
         ensures (
             features::spec_periodical_reward_rate_decrease_enabled()
-            && (global<StakingRewardsConfig>(@aptos_framework).rewards_rate.value as u64)
-                != 0
+                && (
+                    global<StakingRewardsConfig>(@aptos_framework).rewards_rate.value as u64
+                ) != 0
         ) ==>
             result_1 <= MAX_REWARDS_RATE
                 && result_2 <= MAX_U64;

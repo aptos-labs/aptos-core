@@ -483,7 +483,10 @@ module aptos_token_objects::property_map {
             bcs::to_bytes<bool>(&false),
         );
         update(
-            &mutator, &string::utf8(b"u8"), string::utf8(b"u8"), bcs::to_bytes<u8>(&0x21)
+            &mutator,
+            &string::utf8(b"u8"),
+            string::utf8(b"u8"),
+            bcs::to_bytes<u8>(&0x21),
         );
         update(
             &mutator,
@@ -625,13 +628,15 @@ module aptos_token_objects::property_map {
                     b"u32"
                 ), string::utf8(b"u64"), string::utf8(b"u128"), string::utf8(b"u256"), string::utf8(
                     b"vector<u8>"
-                ), string::utf8(b"0x1::string::String"),],
+                ), string::utf8(b"0x1::string::String"),
+            ],
             vector[
                 string::utf8(b"bool"), string::utf8(b"u8"), string::utf8(b"u16"), string::utf8(
                     b"u32"
                 ), string::utf8(b"u64"), string::utf8(b"u128"), string::utf8(b"u256"), string::utf8(
                     b"vector<u8>"
-                ), string::utf8(b"0x1::string::String"),],
+                ), string::utf8(b"0x1::string::String"),
+            ],
             vector[
                 bcs::to_bytes<bool>(&true), bcs::to_bytes<u8>(&0x12), bcs::to_bytes<u16>(
                     &0x1234
@@ -641,7 +646,8 @@ module aptos_token_objects::property_map {
                     &0x1234567812345678123456781234567812345678123456781234567812345678
                 ), bcs::to_bytes<vector<u8>>(&vector[0x01]), bcs::to_bytes<String>(
                     &string::utf8(b"a")
-                ),],
+                ),
+            ],
         )
     }
 

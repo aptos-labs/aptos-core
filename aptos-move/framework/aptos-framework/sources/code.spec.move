@@ -94,7 +94,9 @@ spec aptos_framework::code {
     }
 
     spec check_upgradability(
-        old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>
+        old_pack: &PackageMetadata,
+        new_pack: &PackageMetadata,
+        new_modules: &vector<String>
     ) {
         // TODO: Can't verify 'vector::enumerate' loop.
         pragma aborts_if_is_partial;

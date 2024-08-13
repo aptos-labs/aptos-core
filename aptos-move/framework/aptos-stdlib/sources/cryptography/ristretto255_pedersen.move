@@ -153,7 +153,7 @@ module aptos_std::ristretto255_pedersen {
         std::option::extract(
             &mut ristretto255::new_point_from_bytes(
                 BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE
-            )
+            ),
         )
     }
 }

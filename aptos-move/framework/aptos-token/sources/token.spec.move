@@ -192,7 +192,8 @@ spec aptos_token::token {
         aborts_if !exists<Collections>(creator_addr);
         aborts_if !table::spec_contains(collections.token_data, token_id.token_data_id);
         aborts_if !simple_map::spec_contains_key(
-            token_data.default_properties.map, std::string::spec_utf8(BURNABLE_BY_CREATOR)
+            token_data.default_properties.map,
+            std::string::spec_utf8(BURNABLE_BY_CREATOR),
         );
     }
 

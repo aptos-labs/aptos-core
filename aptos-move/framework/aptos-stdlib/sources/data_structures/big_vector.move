@@ -61,7 +61,8 @@ module aptos_std::big_vector {
     public fun borrow<T>(v: &BigVector<T>, i: u64): &T {
         assert!(i < length(v), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
         vector::borrow(
-            table_with_length::borrow(&v.buckets, i / v.bucket_size), i % v.bucket_size
+            table_with_length::borrow(&v.buckets, i / v.bucket_size),
+            i % v.bucket_size,
         )
     }
 
@@ -146,12 +147,12 @@ module aptos_std::big_vector {
         v.end_index = v.end_index - 1;
         move cur_bucket;
         while ({
-                spec {
-                    invariant cur_bucket_index <= num_buckets;
-                    invariant table_with_length::spec_len(v.buckets) == num_buckets;
-                };
-                (cur_bucket_index < num_buckets)
-            }) {
+            spec {
+                invariant cur_bucket_index <= num_buckets;
+                invariant table_with_length::spec_len(v.buckets) == num_buckets;
+            };
+            (cur_bucket_index < num_buckets)
+        }) {
             // remove one element from the start of current vector
             let cur_bucket =
                 table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index);
@@ -203,7 +204,8 @@ module aptos_std::big_vector {
     /// for v.
     public fun swap<T>(v: &mut BigVector<T>, i: u64, j: u64) {
         assert!(
-            i < length(v) && j < length(v), error::invalid_argument(EINDEX_OUT_OF_BOUNDS)
+            i < length(v) && j < length(v),
+            error::invalid_argument(EINDEX_OUT_OF_BOUNDS),
         );
         let i_bucket_index = i / v.bucket_size;
         let j_bucket_index = j / v.bucket_size;

@@ -85,7 +85,7 @@ module aptos_std::string_utils {
         cons(a, list2(b, c))
     } inline fun list4<T0, T1, T2, T3>(a: T0, b: T1, c: T2, d: T3)
 
-        : Cons<T0, Cons<T1, Cons<T2, Cons<T3, NIL>>>> {
+    : Cons<T0, Cons<T1, Cons<T2, Cons<T3, NIL>>>> {
         cons(a, list3(b, c, d))
     }
 

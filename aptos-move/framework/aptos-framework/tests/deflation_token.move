@@ -58,7 +58,11 @@ module 0xcafe::deflation_token {
     use aptos_framework::fungible_asset::{Metadata, TestToken};
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(major_status = 4037, location = aptos_framework::dispatchable_fungible_asset)]
+    #[
+        expected_failure(
+            major_status = 4037, location = aptos_framework::dispatchable_fungible_asset
+        )
+    ]
     fun test_self_reentrancy(creator: &signer,) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);

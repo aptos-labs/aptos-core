@@ -82,9 +82,7 @@ module aptos_framework::aptos_coin {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
-        let coins = coin::mint<AptosCoin>(
-            18446744073709551615, &mint_cap
-        );
+        let coins = coin::mint<AptosCoin>(18446744073709551615, &mint_cap);
         coin::deposit<AptosCoin>(signer::address_of(core_resources), coins);
 
         move_to(core_resources, MintCapStore { mint_cap });

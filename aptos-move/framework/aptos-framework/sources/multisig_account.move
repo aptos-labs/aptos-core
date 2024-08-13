@@ -955,9 +955,8 @@ module aptos_framework::multisig_account {
         payload: vector<u8>,
     ) acquires MultisigAccount {
         assert!(
-            vector::length(&payload) > 0, error::invalid_argument(
-                EPAYLOAD_CANNOT_BE_EMPTY
-            )
+            vector::length(&payload) > 0,
+            error::invalid_argument(EPAYLOAD_CANNOT_BE_EMPTY),
         );
 
         assert_multisig_account_exists(multisig_account);
@@ -1644,7 +1643,8 @@ module aptos_framework::multisig_account {
             vector[
                 features::get_multisig_accounts_feature(),
                 features::get_multisig_v2_enhancement_feature(),
-                features::get_abort_if_multisig_payload_mismatch_feature()],
+                features::get_abort_if_multisig_payload_mismatch_feature()
+            ],
             vector[],
         );
         timestamp::set_time_has_started_for_testing(framework_signer);
@@ -1680,7 +1680,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         // Create three transactions.
@@ -1692,7 +1696,8 @@ module aptos_framework::multisig_account {
                 == vector[
                     get_transaction(multisig_account, 1),
                     get_transaction(multisig_account, 2),
-                    get_transaction(multisig_account, 3),],
+                    get_transaction(multisig_account, 3),
+                ],
             0,
         );
 
@@ -1711,7 +1716,8 @@ module aptos_framework::multisig_account {
             get_pending_transactions(multisig_account)
                 == vector[
                     get_transaction(multisig_account, 2),
-                    get_transaction(multisig_account, 3),],
+                    get_transaction(multisig_account, 3),
+                ],
             0,
         );
 
@@ -1728,7 +1734,10 @@ module aptos_framework::multisig_account {
 
         // Third transaction can be executed now but execution fails.
         failed_transaction_execution_cleanup(
-            owner_3_addr, multisig_account, PAYLOAD, execution_error()
+            owner_3_addr,
+            multisig_account,
+            PAYLOAD,
+            execution_error(),
         );
         assert!(get_pending_transactions(multisig_account) == vector[], 0);
     }
@@ -1744,7 +1753,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         // Create three transactions.
@@ -1754,7 +1767,8 @@ module aptos_framework::multisig_account {
             get_pending_transactions(multisig_account)
                 == vector[
                     get_transaction(multisig_account, 1),
-                    get_transaction(multisig_account, 2),],
+                    get_transaction(multisig_account, 2),
+                ],
             0,
         );
 
@@ -1839,7 +1853,8 @@ module aptos_framework::multisig_account {
                 // Duplicate owner 2 addresses.
                 address_of(owner_2),
                 address_of(owner_3),
-                address_of(owner_2),],
+                address_of(owner_2),
+            ],
             2,
             vector[],
             vector[],
@@ -1869,7 +1884,8 @@ module aptos_framework::multisig_account {
                 // Duplicate owner 1 addresses.
                 address_of(owner_1),
                 address_of(owner_2),
-                address_of(owner_3),],
+                address_of(owner_3),
+            ],
             2,
             vector[],
             vector[],
@@ -2034,7 +2050,7 @@ module aptos_framework::multisig_account {
         add_owners(multisig_signer, vector[owner_2_addr, owner_3_addr]);
         assert!(
             owners(multisig_account) == vector[owner_1_addr, owner_2_addr, owner_3_addr],
-            2
+            2,
         );
     }
 
@@ -2048,19 +2064,23 @@ module aptos_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 1, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            1,
+            vector[],
+            vector[],
         );
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         let multisig_signer = &create_signer(multisig_account);
         assert!(
             owners(multisig_account) == vector[owner_2_addr, owner_3_addr, owner_1_addr],
-            0
+            0,
         );
         // Removing an empty vector of owners should be no-op.
         remove_owners(multisig_signer, vector[]);
         assert!(
             owners(multisig_account) == vector[owner_2_addr, owner_3_addr, owner_1_addr],
-            1
+            1,
         );
         remove_owners(multisig_signer, vector[owner_2_addr]);
         assert!(owners(multisig_account) == vector[owner_1_addr, owner_3_addr], 2);
@@ -2083,12 +2103,16 @@ module aptos_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 1, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            1,
+            vector[],
+            vector[],
         );
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         assert!(
             owners(multisig_account) == vector[owner_2_addr, owner_3_addr, owner_1_addr],
-            0
+            0,
         );
         let multisig_signer = &create_signer(multisig_account);
         remove_owners(multisig_signer, vector[owner_1_addr, owner_2_addr, owner_3_addr]);
@@ -2105,7 +2129,11 @@ module aptos_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         let multisig_signer = &create_signer(multisig_account);
@@ -2124,7 +2152,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
@@ -2207,7 +2239,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
@@ -2231,7 +2267,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         // Owner 1 and 2 approved but then owner 1 got removed.
@@ -2302,7 +2342,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
@@ -2369,7 +2413,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
@@ -2396,7 +2444,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
@@ -2410,7 +2462,10 @@ module aptos_framework::multisig_account {
             0,
         );
         failed_transaction_execution_cleanup(
-            owner_3_addr, multisig_account, vector[], execution_error()
+            owner_3_addr,
+            multisig_account,
+            vector[],
+            execution_error(),
         );
     }
 
@@ -2425,7 +2480,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         create_transaction_with_hash(owner_3, multisig_account, sha3_256(PAYLOAD));
@@ -2452,7 +2511,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
@@ -2495,7 +2558,11 @@ module aptos_framework::multisig_account {
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         create_with_owners(
-            owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[],
         );
 
         create_transaction(owner_1, multisig_account, PAYLOAD);

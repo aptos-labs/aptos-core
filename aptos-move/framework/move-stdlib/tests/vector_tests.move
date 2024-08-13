@@ -625,10 +625,9 @@ module std::vector_tests {
     fun test_for_each() {
         let v = vector[1, 2, 3];
         let s = 0;
-        V::for_each(v,
-            |e| {
-                s = s + e;
-            });
+        V::for_each(v, |e| {
+            s = s + e;
+        });
         assert!(s == 6, 0)
     }
 
@@ -661,7 +660,7 @@ module std::vector_tests {
             |i, e| {
                 i_s = i_s + i;
                 s = s + *e;
-            }
+            },
         );
         assert!(i_s == 3, 0);
         assert!(s == 6, 0);
@@ -679,11 +678,13 @@ module std::vector_tests {
     fun test_for_each_mut() {
         let v = vector[1, 2, 3];
         let s = 2;
-        V::for_each_mut(&mut v,
+        V::for_each_mut(
+            &mut v,
             |e| {
                 *e = s;
                 s = s + 1
-            });
+            },
+        );
         assert!(v == vector[2, 3, 4], 0)
     }
 
@@ -969,9 +970,10 @@ module std::vector_tests {
     #[test]
     fun test_destroy() {
         let v = vector[MoveOnly {}];
-        vector::destroy(v,
-            |m| {
+        vector::destroy(
+            v, |m| {
                 let MoveOnly {} = m;
-            })
+            }
+        )
     }
 }

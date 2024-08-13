@@ -41,9 +41,7 @@ module aptos_framework::simple_token_fa_tests {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_transfer_with_ref(
-        creator: &signer, aaron: &signer,
-    ) {
+    fun test_transfer_with_ref(creator: &signer, aaron: &signer,) {
         let (creator_ref, test_token) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref) =
             init_test_metadata(&creator_ref);
@@ -83,9 +81,7 @@ module aptos_framework::simple_token_fa_tests {
     }
 
     #[test(fx = @aptos_framework, creator = @0xcafe)]
-    fun test_fungible_asset_upgrade(
-        fx: &signer, creator: &signer
-    ) {
+    fun test_fungible_asset_upgrade(fx: &signer, creator: &signer) {
         let feature = features::get_concurrent_fungible_assets_feature();
         features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
 

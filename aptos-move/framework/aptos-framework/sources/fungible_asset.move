@@ -257,9 +257,8 @@ module aptos_framework::fungible_asset {
         );
         assert!(decimals <= MAX_DECIMALS, error::out_of_range(EDECIMALS_TOO_LARGE));
         assert!(
-            string::length(&icon_uri) <= MAX_URI_LENGTH, error::out_of_range(
-                EURI_TOO_LONG
-            )
+            string::length(&icon_uri) <= MAX_URI_LENGTH,
+            error::out_of_range(EURI_TOO_LONG),
         );
         assert!(
             string::length(&project_uri) <= MAX_URI_LENGTH,
@@ -298,9 +297,8 @@ module aptos_framework::fungible_asset {
     public fun set_untransferable(constructor_ref: &ConstructorRef) {
         let metadata_addr = object::address_from_constructor_ref(constructor_ref);
         assert!(
-            exists<Metadata>(metadata_addr), error::not_found(
-                EFUNGIBLE_METADATA_EXISTENCE
-            )
+            exists<Metadata>(metadata_addr),
+            error::not_found(EFUNGIBLE_METADATA_EXISTENCE),
         );
         let metadata_signer = &object::generate_signer(constructor_ref);
         move_to(metadata_signer, Untransferable {});
@@ -608,8 +606,8 @@ module aptos_framework::fungible_asset {
         if (store_exists_inline(store_addr)) {
             let store_balance = borrow_store_resource(&store).balance;
             if (store_balance == 0 && concurrent_fungible_balance_exists_inline(
-                    store_addr
-                )) {
+                store_addr
+            )) {
                 let balance_resource =
                     borrow_global<ConcurrentFungibleBalance>(store_addr);
                 aggregator_v2::read(&balance_resource.balance)
@@ -633,8 +631,8 @@ module aptos_framework::fungible_asset {
         if (store_exists_inline(store_addr)) {
             let store_balance = borrow_global<FungibleStore>(store_addr).balance;
             if (store_balance == 0 && concurrent_fungible_balance_exists_inline(
-                    store_addr
-                )) {
+                store_addr
+            )) {
                 let balance_resource =
                     borrow_global<ConcurrentFungibleBalance>(store_addr);
                 aggregator_v2::is_at_least(&balance_resource.balance, amount)
@@ -677,7 +675,7 @@ module aptos_framework::fungible_asset {
         let metadata_addr = object::object_address(&metadata);
         // Short circuit on APT for better perf
         if (metadata_addr != @aptos_fungible_asset
-                && exists<DispatchFunctionStore>(metadata_addr)) {
+            && exists<DispatchFunctionStore>(metadata_addr)) {
             option::is_some(
                 &borrow_global<DispatchFunctionStore>(metadata_addr).deposit_function
             )
@@ -698,7 +696,7 @@ module aptos_framework::fungible_asset {
         let metadata_addr = object::object_address(&metadata);
         // Short circuit on APT for better perf
         if (metadata_addr != @aptos_fungible_asset
-                && exists<DispatchFunctionStore>(metadata_addr)) {
+            && exists<DispatchFunctionStore>(metadata_addr)) {
             option::is_some(
                 &borrow_global<DispatchFunctionStore>(metadata_addr).withdraw_function
             )
@@ -1014,9 +1012,8 @@ module aptos_framework::fungible_asset {
     /// Extract a given amount from the given fungible asset and return a new one.
     public fun extract(fungible_asset: &mut FungibleAsset, amount: u64): FungibleAsset {
         assert!(
-            fungible_asset.amount >= amount, error::invalid_argument(
-                EINSUFFICIENT_BALANCE
-            )
+            fungible_asset.amount >= amount,
+            error::invalid_argument(EINSUFFICIENT_BALANCE),
         );
         fungible_asset.amount = fungible_asset.amount - amount;
         FungibleAsset { metadata: fungible_asset.metadata, amount, }
@@ -1046,7 +1043,8 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleStore, ConcurrentFungibleBalance {
         let FungibleAsset { metadata, amount } = fa;
         assert!(
-            exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE)
+            exists<FungibleStore>(store_addr),
+            error::not_found(EFUNGIBLE_STORE_EXISTENCE),
         );
         let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(
@@ -1072,15 +1070,16 @@ module aptos_framework::fungible_asset {
         store_addr: address, amount: u64,
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
         assert!(
-            exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE)
+            exists<FungibleStore>(store_addr),
+            error::not_found(EFUNGIBLE_STORE_EXISTENCE),
         );
 
         let store = borrow_global_mut<FungibleStore>(store_addr);
         let metadata = store.metadata;
         if (amount != 0) {
             if (store.balance == 0 && concurrent_fungible_balance_exists_inline(
-                    store_addr
-                )) {
+                store_addr
+            )) {
                 let balance_resource =
                     borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
                 assert!(
@@ -1089,9 +1088,8 @@ module aptos_framework::fungible_asset {
                 );
             } else {
                 assert!(
-                    store.balance >= amount, error::invalid_argument(
-                        EINSUFFICIENT_BALANCE
-                    )
+                    store.balance >= amount,
+                    error::invalid_argument(EINSUFFICIENT_BALANCE),
                 );
                 store.balance = store.balance - amount;
             };
@@ -1165,7 +1163,8 @@ module aptos_framework::fungible_asset {
     inline fun borrow_store_resource<T: key>(store: &Object<T>): &FungibleStore acquires FungibleStore {
         let store_addr = object::object_address(store);
         assert!(
-            exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE)
+            exists<FungibleStore>(store_addr),
+            error::not_found(EFUNGIBLE_STORE_EXISTENCE),
         );
         borrow_global<FungibleStore>(store_addr)
     }
@@ -1178,7 +1177,8 @@ module aptos_framework::fungible_asset {
             error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED),
         );
         assert!(
-            exists<Supply>(metadata_object_address), error::not_found(ESUPPLY_NOT_FOUND)
+            exists<Supply>(metadata_object_address),
+            error::not_found(ESUPPLY_NOT_FOUND),
         );
         let Supply { current, maximum, } = move_from<Supply>(metadata_object_address);
 
@@ -1293,7 +1293,8 @@ module aptos_framework::fungible_asset {
         assert!(symbol(metadata) == string::utf8(b"@@"), 4);
         assert!(decimals(metadata) == 0, 5);
         assert!(
-            icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 6
+            icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"),
+            6,
         );
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 7);
 
@@ -1333,9 +1334,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_e2e_basic_flow(
-        creator: &signer, aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance, Metadata {
+    fun test_e2e_basic_flow(creator: &signer, aaron: &signer,) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance, Metadata {
         let (mint_ref, transfer_ref, burn_ref, mutate_metadata_ref, test_token) =
             create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
@@ -1375,7 +1374,8 @@ module aptos_framework::fungible_asset {
         assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
         assert!(decimals(metadata) == 0, 10);
         assert!(
-            icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11
+            icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"),
+            11,
         );
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
     }
@@ -1415,9 +1415,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_transfer_with_ref(
-        creator: &signer, aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
+    fun test_transfer_with_ref(creator: &signer, aaron: &signer,) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref, _) =
             create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
@@ -1459,7 +1457,8 @@ module aptos_framework::fungible_asset {
             4,
         );
         assert!(
-            project_uri(metadata) == string::utf8(b"http://www.mutated-example.com"), 5
+            project_uri(metadata) == string::utf8(b"http://www.mutated-example.com"),
+            5,
         );
     }
 
@@ -1481,7 +1480,8 @@ module aptos_framework::fungible_asset {
         assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
         assert!(decimals(metadata) == 0, 10);
         assert!(
-            icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11
+            icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"),
+            11,
         );
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
     }
@@ -1544,7 +1544,8 @@ module aptos_framework::fungible_asset {
         let creator_store = create_test_store(creator, test_token);
         assert!(exists<FungibleStore>(object::object_address(&creator_store)), 3);
         assert!(
-            !exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 4
+            !exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)),
+            4,
         );
 
         let fa = mint(&mint_ref, 30);
@@ -1554,11 +1555,14 @@ module aptos_framework::fungible_asset {
         assert!(exists<FungibleStore>(object::object_address(&creator_store)), 13);
         assert!(borrow_store_resource(&creator_store).balance == 30, 14);
         assert!(
-            !exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 15
+            !exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)),
+            15,
         );
 
         features::change_feature_flags_for_testing(
-            fx, vector[supply_feature, balance_feature], vector[default_balance_feature]
+            fx,
+            vector[supply_feature, balance_feature],
+            vector[default_balance_feature],
         );
 
         let extend_ref = object::generate_extend_ref(&creator_ref);
@@ -1574,7 +1578,8 @@ module aptos_framework::fungible_asset {
         assert!(exists<FungibleStore>(object::object_address(&creator_store)), 9);
         assert!(borrow_store_resource(&creator_store).balance == 0, 10);
         assert!(
-            exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 11
+            exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)),
+            11,
         );
         assert!(
             aggregator_v2::read(
@@ -1612,7 +1617,8 @@ module aptos_framework::fungible_asset {
         let creator_store = create_test_store(creator, test_token);
         assert!(exists<FungibleStore>(object::object_address(&creator_store)), 3);
         assert!(
-            exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 4
+            exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)),
+            4,
         );
 
         let fa = mint(&mint_ref, 30);
@@ -1623,7 +1629,8 @@ module aptos_framework::fungible_asset {
         assert!(exists<FungibleStore>(object::object_address(&creator_store)), 9);
         assert!(borrow_store_resource(&creator_store).balance == 0, 10);
         assert!(
-            exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 11
+            exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)),
+            11,
         );
         assert!(
             aggregator_v2::read(

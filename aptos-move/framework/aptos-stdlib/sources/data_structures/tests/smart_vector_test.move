@@ -23,7 +23,7 @@ module aptos_std::smart_vector_test {
             |x| {
                 assert!(i + 1 == x, 0);
                 i = i + 1;
-            }
+            },
         );
     }
 
@@ -36,7 +36,7 @@ module aptos_std::smart_vector_test {
             |x| {
                 assert!(i == 100 - x, 0);
                 i = i + 1;
-            }
+            },
         );
     }
 
@@ -44,10 +44,9 @@ module aptos_std::smart_vector_test {
     fun smart_vector_for_each_ref_test() {
         let v = make_smart_vector(100);
         let s = 0;
-        V::for_each_ref(&v,
-            |x| {
-                s = s + *x;
-            });
+        V::for_each_ref(&v, |x| {
+            s = s + *x;
+        });
         assert!(s == 5050, 0);
         V::destroy(v);
     }
@@ -68,10 +67,11 @@ module aptos_std::smart_vector_test {
     #[test]
     fun smart_vector_enumerate_ref_test() {
         let v = make_smart_vector(100);
-        V::enumerate_ref(&v,
-            |i, x| {
+        V::enumerate_ref(
+            &v, |i, x| {
                 assert!(i + 1 == *x, 0);
-            });
+            }
+        );
         V::destroy(v);
     }
 
@@ -145,7 +145,7 @@ module aptos_std::smart_vector_test {
             &filtered_v,
             |i, x| {
                 assert!((i + 1) * 10 == *x, 0);
-            }
+            },
         );
         V::destroy(filtered_v);
     }

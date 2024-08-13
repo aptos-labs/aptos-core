@@ -363,7 +363,11 @@ module aptos_framework::transaction_fee {
         coin::destroy_mint_cap(mint_cap);
     }
 
-    #[test(aptos_framework = @aptos_framework, alice = @0xa11ce, bob = @0xb0b, carol = @0xca101)]
+    #[
+        test(
+            aptos_framework = @aptos_framework, alice = @0xa11ce, bob = @0xb0b, carol = @0xca101
+        )
+    ]
     fun test_fees_distribution(
         aptos_framework: signer,
         alice: signer,

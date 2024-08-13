@@ -141,7 +141,8 @@ module aptos_std::crypto_algebra {
     ///
     /// Abort with code `std::error::invalid_argument(E_NON_EQUAL_LENGTHS)` if the sizes of `elements` and `scalars` do not match.
     public fun multi_scalar_mul<G, S>(
-        elements: &vector<Element<G>>, scalars: &vector<Element<S>>
+        elements: &vector<Element<G>>,
+        scalars: &vector<Element<S>>
     ): Element<G> {
         let element_handles = handles_from_elements(elements);
         let scalar_handles = handles_from_elements(scalars);
@@ -176,7 +177,9 @@ module aptos_std::crypto_algebra {
         abort_unless_cryptography_algebra_natives_enabled();
         let g1_handles = handles_from_elements(g1_elements);
         let g2_handles = handles_from_elements(g2_elements);
-        Element<Gt> { handle: multi_pairing_internal<G1, G2, Gt>(g1_handles, g2_handles) }
+        Element<Gt> {
+            handle: multi_pairing_internal<G1, G2, Gt>(g1_handles, g2_handles)
+        }
     }
 
     /// Compute the pairing function (a.k.a., bilinear map) on a `G1` element and a `G2` element.
@@ -259,7 +262,9 @@ module aptos_std::crypto_algebra {
     #[test_only]
     public fun enable_cryptography_algebra_natives(fx: &signer) {
         std::features::change_feature_flags_for_testing(
-            fx, vector[std::features::get_cryptography_algebra_natives_feature()], vector[]
+            fx,
+            vector[std::features::get_cryptography_algebra_natives_feature()],
+            vector[],
         );
     }
 
@@ -268,12 +273,12 @@ module aptos_std::crypto_algebra {
         let element_handles = std::vector::empty();
         let i = 0;
         while ({
-                spec {
-                    invariant len(element_handles) == i;
-                    invariant forall k in 0..i: element_handles[k] == elements[k].handle;
-                };
-                i < num_elements
-            }) {
+            spec {
+                invariant len(element_handles) == i;
+                invariant forall k in 0..i: element_handles[k] == elements[k].handle;
+            };
+            i < num_elements
+        }) {
             std::vector::push_back(
                 &mut element_handles, std::vector::borrow(elements, i).handle
             );

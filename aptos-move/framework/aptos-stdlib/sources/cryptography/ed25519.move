@@ -244,7 +244,8 @@ module aptos_std::ed25519 {
         let msg2 = TestMessage { title: b"Some Title", content: b"That is it.", };
         let sig2 = sign_struct(&sk, copy msg2);
         assert!(
-            signature_verify_strict_t(&sig2, &pk, copy msg2), std::error::invalid_state(2)
+            signature_verify_strict_t(&sig2, &pk, copy msg2),
+            std::error::invalid_state(2),
         );
     }
 }

@@ -83,7 +83,7 @@ module aptos_std::ristretto255_elgamal {
         let right_point = ristretto255::new_point_from_bytes(bytes_right);
 
         if (std::option::is_some<RistrettoPoint>(&mut left_point)
-                && std::option::is_some<RistrettoPoint>(&mut right_point)) {
+            && std::option::is_some<RistrettoPoint>(&mut right_point)) {
             std::option::some<Ciphertext>(
                 Ciphertext {
                     left: std::option::extract<RistrettoPoint>(&mut left_point),

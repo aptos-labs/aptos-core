@@ -203,14 +203,15 @@ module aptos_framework::account {
     public(friend) fun create_account(new_address: address): signer {
         // there cannot be an Account resource under new_addr already.
         assert!(
-            !exists<Account>(new_address), error::already_exists(EACCOUNT_ALREADY_EXISTS)
+            !exists<Account>(new_address),
+            error::already_exists(EACCOUNT_ALREADY_EXISTS),
         );
 
         // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
         assert!(
             new_address != @vm_reserved
-            && new_address != @aptos_framework
-            && new_address != @aptos_token,
+                && new_address != @aptos_framework
+                && new_address != @aptos_token,
             error::invalid_argument(ECANNOT_RESERVED_ADDRESS),
         );
 
@@ -426,7 +427,8 @@ module aptos_framework::account {
             borrow_global<Account>(rotation_cap_offerer_address);
         assert!(
             option::contains(
-                &offerer_account_resource.rotation_capability_offer.for, &delegate_address
+                &offerer_account_resource.rotation_capability_offer.for,
+                &delegate_address,
             ),
             error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER),
         );
@@ -675,7 +677,8 @@ module aptos_framework::account {
         account: &signer, offerer_address: address
     ): signer acquires Account {
         assert!(
-            exists_at(offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST)
+            exists_at(offerer_address),
+            error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST),
         );
 
         // Check if there's an existing signer capability offer from the offerer.
@@ -832,15 +835,15 @@ module aptos_framework::account {
         : (signer, SignerCapability) {
         assert!(
             addr == @0x1
-            || addr == @0x2
-            || addr == @0x3
-            || addr == @0x4
-            || addr == @0x5
-            || addr == @0x6
-            || addr == @0x7
-            || addr == @0x8
-            || addr == @0x9
-            || addr == @0xa,
+                || addr == @0x2
+                || addr == @0x3
+                || addr == @0x4
+                || addr == @0x5
+                || addr == @0x6
+                || addr == @0x7
+                || addr == @0x8
+                || addr == @0x9
+                || addr == @0xa,
             error::permission_denied(ENO_VALID_FRAMEWORK_RESERVED_ADDRESS),
         );
         let signer = create_account_unchecked(addr);
@@ -1091,9 +1094,7 @@ module aptos_framework::account {
 
     #[test_only]
     /// Update address `addr` to have `s` as its sequence number
-    public fun set_sequence_number(
-        addr: address, s: u64
-    ) acquires Account {
+    public fun set_sequence_number(addr: address, s: u64) acquires Account {
         borrow_global_mut<Account>(addr).sequence_number = s;
     }
 
@@ -1240,7 +1241,8 @@ module aptos_framework::account {
 
         assert!(
             option::contains(
-                &borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr
+                &borrow_global<Account>(alice_addr).signer_capability_offer.for,
+                &bob_addr,
             ),
             0,
         );

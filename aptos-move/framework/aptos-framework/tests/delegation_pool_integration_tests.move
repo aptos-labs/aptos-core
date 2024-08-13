@@ -80,7 +80,9 @@ module aptos_framework::delegation_pool_integration_tests {
         );
         reconfiguration::initialize_for_test(aptos_framework);
         features::change_feature_flags_for_testing(
-            aptos_framework, vector[DELEGATION_POOLS, MODULE_EVENT], vector[]
+            aptos_framework,
+            vector[DELEGATION_POOLS, MODULE_EVENT],
+            vector[],
         );
     }
 
@@ -595,7 +597,8 @@ module aptos_framework::delegation_pool_integration_tests {
 
         // Receive back all coins with an extra 1 for rewards.
         assert!(
-            coin::balance<AptosCoin>(signer::address_of(validator)) == 100100000000, 2
+            coin::balance<AptosCoin>(signer::address_of(validator)) == 100100000000,
+            2,
         );
         stake::assert_validator_state(validator_address, 0, 0, 0, 0, 0);
     }
@@ -810,7 +813,14 @@ module aptos_framework::delegation_pool_integration_tests {
         mint_and_add_stake(validator_1, 51 * ONE_APT);
     }
 
-    #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234, validator_3 = @0x345)]
+    #[
+        test(
+            aptos_framework = @0x1,
+            validator_1 = @0x123,
+            validator_2 = @0x234,
+            validator_3 = @0x345
+        )
+    ]
     public entry fun test_multiple_validators_join_and_leave(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -861,7 +871,10 @@ module aptos_framework::delegation_pool_integration_tests {
         let pk_1b_bytes = bls12381::public_key_to_bytes(&pk_1b);
         let pop_1b_bytes = bls12381::proof_of_possession_to_bytes(&pop_1b);
         stake::rotate_consensus_key(
-            validator_1, validator_1_address, pk_1b_bytes, pop_1b_bytes
+            validator_1,
+            validator_1_address,
+            pk_1b_bytes,
+            pop_1b_bytes,
         );
         stake::leave_validator_set(validator_2, validator_2_address);
         stake::join_validator_set(validator_3, validator_3_address);
@@ -887,7 +900,7 @@ module aptos_framework::delegation_pool_integration_tests {
         stake::assert_validator_state(validator_1_address, 101 * ONE_APT, 0, 0, 0, 0);
         assert!(
             stake::get_validator_state(validator_2_address) == VALIDATOR_STATUS_INACTIVE,
-            9
+            9,
         );
         // The validator index of validator 2 stays the same but this doesn't matter as the next time they rejoin the
         // validator set, their index will get set correctly.
@@ -944,7 +957,8 @@ module aptos_framework::delegation_pool_integration_tests {
         stake::assert_validator_state(pool_address, 0, 101 * ONE_APT, 0, 0, 0);
         dp::withdraw(validator, pool_address, 101 * ONE_APT);
         assert!(
-            coin::balance<AptosCoin>(signer::address_of(validator)) == 101 * ONE_APT, 1
+            coin::balance<AptosCoin>(signer::address_of(validator)) == 101 * ONE_APT,
+            1,
         );
         stake::assert_validator_state(pool_address, 0, 0, 0, 0, 0);
 
@@ -1023,7 +1037,16 @@ module aptos_framework::delegation_pool_integration_tests {
         stake::leave_validator_set(validator, validator_address);
     }
 
-    #[test(aptos_framework = @aptos_framework, validator_1 = @aptos_framework, validator_2 = @0x2, validator_3 = @0x3, validator_4 = @0x4, validator_5 = @0x5)]
+    #[
+        test(
+            aptos_framework = @aptos_framework,
+            validator_1 = @aptos_framework,
+            validator_2 = @0x2,
+            validator_3 = @0x3,
+            validator_4 = @0x4,
+            validator_5 = @0x5
+        )
+    ]
     public entry fun test_staking_validator_index(
         aptos_framework: &signer,
         validator_1: &signer,

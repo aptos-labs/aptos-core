@@ -141,14 +141,16 @@ module aptos_std::capability {
             assert!(exists<CapState<Feature>>(root_addr), error::invalid_state(EDELEGATE));
             assert!(
                 vector::contains(
-                    &borrow_global<CapState<Feature>>(root_addr).delegates, &addr
+                    &borrow_global<CapState<Feature>>(root_addr).delegates,
+                    &addr,
                 ),
                 error::invalid_state(EDELEGATE),
             );
             root_addr
         } else {
             assert!(
-                exists<CapState<Feature>>(addr), error::not_found(ECAPABILITY_NOT_FOUND)
+                exists<CapState<Feature>>(addr),
+                error::not_found(ECAPABILITY_NOT_FOUND),
             );
             addr
         }
@@ -189,7 +191,8 @@ module aptos_std::capability {
         if (!exists<CapDelegateState<Feature>>(from)) return;
         let CapDelegateState { root: _root } = move_from<CapDelegateState<Feature>>(from);
         remove_element(
-            &mut borrow_global_mut<CapState<Feature>>(cap.root).delegates, &from
+            &mut borrow_global_mut<CapState<Feature>>(cap.root).delegates,
+            &from,
         );
     }
 

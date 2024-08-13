@@ -127,7 +127,8 @@ module aptos_framework::jwk_consensus_config {
             new_v1(
                 vector[
                     new_oidc_provider(utf8(b"Bob"), utf8(b"https://bob.dev")),
-                    new_oidc_provider(utf8(b"Alice"), utf8(b"https://alice.io")),],
+                    new_oidc_provider(utf8(b"Alice"), utf8(b"https://alice.io")),
+                ],
             );
         set_for_next_epoch(&framework, config);
         on_new_epoch(&framework);
@@ -145,7 +146,8 @@ module aptos_framework::jwk_consensus_config {
             vector[
                 new_oidc_provider(utf8(b"Alice"), utf8(b"https://alice.info")),
                 new_oidc_provider(utf8(b"Bob"), utf8(b"https://bob.dev")),
-                new_oidc_provider(utf8(b"Alice"), utf8(b"https://alice.io")),],
+                new_oidc_provider(utf8(b"Alice"), utf8(b"https://alice.io")),
+            ],
         );
 
     }

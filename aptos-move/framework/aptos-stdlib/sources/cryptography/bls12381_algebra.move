@@ -285,7 +285,7 @@ module aptos_std::bls12381_algebra {
         let val_minus_7 = neg(&val_7);
         assert!(
             FQ12_VAL_7_NEG_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_minus_7),
-            1
+            1,
         );
 
         // Addition.
@@ -315,7 +315,8 @@ module aptos_std::bls12381_algebra {
 
         // Downcasting.
         assert!(
-            eq(&zero<Gt>(), &std::option::extract(&mut downcast<Fq12, Gt>(&val_1))), 1
+            eq(&zero<Gt>(), &std::option::extract(&mut downcast<Fq12, Gt>(&val_1))),
+            1,
         );
     }
 
@@ -350,7 +351,7 @@ module aptos_std::bls12381_algebra {
         // Serialization/deserialization.
         assert!(
             G1_GENERATOR_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&generator),
-            1
+            1,
         );
         assert!(
             G1_GENERATOR_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&generator), 1
@@ -606,7 +607,7 @@ module aptos_std::bls12381_algebra {
         );
         assert!(
             G2_GENERATOR_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&generator),
-            1
+            1,
         );
         let generator_from_uncomp =
             std::option::extract(
@@ -960,7 +961,7 @@ module aptos_std::bls12381_algebra {
         assert!(
             std::option::is_none(
                 &deserialize<Fr, FormatFrLsb>(
-                    &x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73"
+                    &x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73",
                 ),
             ),
             1,
@@ -968,7 +969,7 @@ module aptos_std::bls12381_algebra {
         assert!(
             std::option::is_none(
                 &deserialize<Fr, FormatFrMsb>(
-                    &x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"
+                    &x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001",
                 ),
             ),
             1,
@@ -978,7 +979,7 @@ module aptos_std::bls12381_algebra {
         assert!(
             std::option::is_none(
                 &deserialize<Fr, FormatFrLsb>(
-                    &x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300"
+                    &x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300",
                 ),
             ),
             1,
@@ -986,7 +987,7 @@ module aptos_std::bls12381_algebra {
         assert!(
             std::option::is_none(
                 &deserialize<Fr, FormatFrMsb>(
-                    &x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"
+                    &x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001",
                 ),
             ),
             1,
@@ -1078,7 +1079,8 @@ module aptos_std::bls12381_algebra {
         // Efficient API.
         let m =
             multi_pairing<G1, G2, Gt>(
-                &vector[p0_a0, p1_a1, p2_a2], &vector[q0_b0, q1_b1, q2_b2]
+                &vector[p0_a0, p1_a1, p2_a2],
+                &vector[q0_b0, q1_b1, q2_b2],
             );
         assert!(eq(&n, &m), 1);
     }

@@ -140,49 +140,49 @@ spec aptos_framework::aptos_account {
 
         // create account properties
         aborts_if len(recipients) != len(amounts);
-        aborts_if exists i in 0..len(recipients): !account::exists_at(recipients[i])
-            && length_judgment(recipients[i]);
-        aborts_if exists i in 0..len(recipients): !account::exists_at(recipients[i])
-            && (
-                recipients[i] == @vm_reserved
-                || recipients[i] == @aptos_framework
-                || recipients[i] == @aptos_token
-            );
-        ensures forall i in 0..len(recipients): (
-                !account::exists_at(recipients[i]) ==>
-                !length_judgment(recipients[i])
-            )
-            && (
-                !account::exists_at(recipients[i]) ==>
-                (
-                    recipients[i] != @vm_reserved
-                    && recipients[i] != @aptos_framework
-                    && recipients[i] != @aptos_token
-                )
-            );
+        aborts_if exists i in 0..len(recipients):
+            !account::exists_at(recipients[i]) && length_judgment(recipients[i]);
+        aborts_if exists i in 0..len(recipients):
+            !account::exists_at(recipients[i])
+                && (
+                    recipients[i] == @vm_reserved
+                        || recipients[i] == @aptos_framework
+                        || recipients[i] == @aptos_token
+                );
+        ensures forall i in 0..len(recipients):
+            (!account::exists_at(recipients[i]) ==>
+                !length_judgment(recipients[i]))
+                && (
+                    !account::exists_at(recipients[i]) ==>
+                        (
+                            recipients[i] != @vm_reserved
+                                && recipients[i] != @aptos_framework
+                                && recipients[i] != @aptos_token
+                        )
+                );
 
         // coin::withdraw properties
-        aborts_if exists i in 0..len(recipients): !exists<coin::CoinStore<AptosCoin>>(
-            account_addr_source
-        );
+        aborts_if exists i in 0..len(recipients):
+            !exists<coin::CoinStore<AptosCoin>>(account_addr_source);
         aborts_if exists i in 0..len(recipients): coin_store_source.frozen;
-        aborts_if exists i in 0..len(recipients): global<coin::CoinStore<AptosCoin>>(
-            account_addr_source
-        ).coin.value < amounts[i];
+        aborts_if exists i in 0..len(recipients):
+            global<coin::CoinStore<AptosCoin>>(account_addr_source).coin.value < amounts[i];
 
         // deposit properties
-        aborts_if exists i in 0..len(recipients): exists<coin::CoinStore<AptosCoin>>(
-            recipients[i]
-        ) && global<coin::CoinStore<AptosCoin>>(recipients[i]).frozen;
+        aborts_if exists i in 0..len(recipients):
+            exists<coin::CoinStore<AptosCoin>>(recipients[i])
+                && global<coin::CoinStore<AptosCoin>>(recipients[i]).frozen;
 
         // guid properties
-        aborts_if exists i in 0..len(recipients): account::exists_at(recipients[i])
-            && !exists<coin::CoinStore<AptosCoin>>(recipients[i])
-            && global<account::Account>(recipients[i]).guid_creation_num + 2
-                >= account::MAX_GUID_CREATION_NUM;
-        aborts_if exists i in 0..len(recipients): account::exists_at(recipients[i])
-            && !exists<coin::CoinStore<AptosCoin>>(recipients[i])
-            && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
+        aborts_if exists i in 0..len(recipients):
+            account::exists_at(recipients[i])
+                && !exists<coin::CoinStore<AptosCoin>>(recipients[i])
+                && global<account::Account>(recipients[i]).guid_creation_num + 2
+                    >= account::MAX_GUID_CREATION_NUM;
+        aborts_if exists i in 0..len(recipients):
+            account::exists_at(recipients[i])
+                && !exists<coin::CoinStore<AptosCoin>>(recipients[i])
+                && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
     }
 
     spec can_receive_direct_coin_transfers(account: address): bool {
@@ -213,54 +213,53 @@ spec aptos_framework::aptos_account {
         aborts_if len(recipients) != len(amounts);
 
         //create account properties
-        aborts_if exists i in 0..len(recipients): !account::exists_at(recipients[i])
-            && length_judgment(recipients[i]);
-        aborts_if exists i in 0..len(recipients): !account::exists_at(recipients[i])
-            && (
-                recipients[i] == @vm_reserved
-                || recipients[i] == @aptos_framework
-                || recipients[i] == @aptos_token
-            );
-        ensures forall i in 0..len(recipients): (
-                !account::exists_at(recipients[i]) ==>
-                !length_judgment(recipients[i])
-            )
-            && (
-                !account::exists_at(recipients[i]) ==>
-                (
-                    recipients[i] != @vm_reserved
-                    && recipients[i] != @aptos_framework
-                    && recipients[i] != @aptos_token
-                )
-            );
+        aborts_if exists i in 0..len(recipients):
+            !account::exists_at(recipients[i]) && length_judgment(recipients[i]);
+        aborts_if exists i in 0..len(recipients):
+            !account::exists_at(recipients[i])
+                && (
+                    recipients[i] == @vm_reserved
+                        || recipients[i] == @aptos_framework
+                        || recipients[i] == @aptos_token
+                );
+        ensures forall i in 0..len(recipients):
+            (!account::exists_at(recipients[i]) ==>
+                !length_judgment(recipients[i]))
+                && (
+                    !account::exists_at(recipients[i]) ==>
+                        (
+                            recipients[i] != @vm_reserved
+                                && recipients[i] != @aptos_framework
+                                && recipients[i] != @aptos_token
+                        )
+                );
 
         // coin::withdraw properties
-        aborts_if exists i in 0..len(recipients): !exists<coin::CoinStore<CoinType>>(
-            account_addr_source
-        );
+        aborts_if exists i in 0..len(recipients):
+            !exists<coin::CoinStore<CoinType>>(account_addr_source);
         aborts_if exists i in 0..len(recipients): coin_store_source.frozen;
-        aborts_if exists i in 0..len(recipients): global<coin::CoinStore<CoinType>>(
-            account_addr_source
-        ).coin.value < amounts[i];
+        aborts_if exists i in 0..len(recipients):
+            global<coin::CoinStore<CoinType>>(account_addr_source).coin.value < amounts[i];
 
         // deposit properties
-        aborts_if exists i in 0..len(recipients): exists<coin::CoinStore<CoinType>>(
-            recipients[i]
-        ) && global<coin::CoinStore<CoinType>>(recipients[i]).frozen;
+        aborts_if exists i in 0..len(recipients):
+            exists<coin::CoinStore<CoinType>>(recipients[i])
+                && global<coin::CoinStore<CoinType>>(recipients[i]).frozen;
 
         // guid properties
-        aborts_if exists i in 0..len(recipients): account::exists_at(recipients[i])
-            && !exists<coin::CoinStore<CoinType>>(recipients[i])
-            && global<account::Account>(recipients[i]).guid_creation_num + 2
-                >= account::MAX_GUID_CREATION_NUM;
-        aborts_if exists i in 0..len(recipients): account::exists_at(recipients[i])
-            && !exists<coin::CoinStore<CoinType>>(recipients[i])
-            && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
+        aborts_if exists i in 0..len(recipients):
+            account::exists_at(recipients[i])
+                && !exists<coin::CoinStore<CoinType>>(recipients[i])
+                && global<account::Account>(recipients[i]).guid_creation_num + 2
+                    >= account::MAX_GUID_CREATION_NUM;
+        aborts_if exists i in 0..len(recipients):
+            account::exists_at(recipients[i])
+                && !exists<coin::CoinStore<CoinType>>(recipients[i])
+                && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
 
         // register_coin properties
-        aborts_if exists i in 0..len(recipients): !coin::spec_is_account_registered<CoinType>(
-            recipients[i]
-        ) && !type_info::spec_is_struct<CoinType>();
+        aborts_if exists i in 0..len(recipients):
+            !coin::spec_is_account_registered<CoinType>(recipients[i]) && !type_info::spec_is_struct<CoinType>();
     }
 
     spec deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) {

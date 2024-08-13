@@ -201,13 +201,17 @@ module aptos_framework::code {
         };
 
         event::emit(
-            PublishPackage { code_address: addr, is_upgrade: upgrade_number > 0 },
+            PublishPackage { code_address: addr, is_upgrade: upgrade_number > 0 }
         );
 
         // Request publish
         if (features::code_dependency_check_enabled())
             request_publish_with_allowed_deps(
-                addr, module_names, allowed_deps, code, policy.policy
+                addr,
+                module_names,
+                allowed_deps,
+                code,
+                policy.policy,
             ) else
         // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
         // compatible code.

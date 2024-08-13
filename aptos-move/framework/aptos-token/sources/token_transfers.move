@@ -278,12 +278,12 @@ module aptos_token::token_transfers {
 
         let token_mutation_setting = vector<bool>[false, false, false, false, true];
         let default_keys = vector<String>[string::utf8(b"attack"), string::utf8(
-                b"num_of_use"
-            )];
+            b"num_of_use"
+        )];
         let default_vals = vector<vector<u8>>[b"10", b"5"];
         let default_types = vector<String>[string::utf8(b"integer"), string::utf8(
-                b"integer"
-            )];
+            b"integer"
+        )];
         token::create_token_script(
             creator,
             collection_name,

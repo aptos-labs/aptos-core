@@ -1,6 +1,7 @@
 spec std::acl {
     spec ACL {
-        invariant forall i in 0..len(list), j in 0..len(list): list[i] == list[j] ==> i == j;
+        invariant forall i in 0..len(list), j in 0..len(list):
+            list[i] == list[j] ==> i == j;
     }
 
     spec fun spec_contains(acl: ACL, addr: address): bool {

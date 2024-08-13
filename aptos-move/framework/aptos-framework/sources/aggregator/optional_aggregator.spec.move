@@ -73,12 +73,10 @@ spec aptos_framework::optional_aggregator {
 
     spec sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
         include SubAbortsIf;
-        ensures (
-            (
-                optional_aggregator_value(optional_aggregator)
-                    == optional_aggregator_value(old(optional_aggregator)) - value
-            )
-        );
+        ensures ((
+            optional_aggregator_value(optional_aggregator)
+                == optional_aggregator_value(old(optional_aggregator)) - value
+        ));
     }
 
     spec schema SubAbortsIf {
@@ -105,12 +103,10 @@ spec aptos_framework::optional_aggregator {
 
     spec add(optional_aggregator: &mut OptionalAggregator, value: u128) {
         include AddAbortsIf;
-        ensures (
-            (
-                optional_aggregator_value(optional_aggregator)
-                    == optional_aggregator_value(old(optional_aggregator)) + value
-            )
-        );
+        ensures ((
+            optional_aggregator_value(optional_aggregator)
+                == optional_aggregator_value(old(optional_aggregator)) + value
+        ));
     }
 
     spec schema AddAbortsIf {

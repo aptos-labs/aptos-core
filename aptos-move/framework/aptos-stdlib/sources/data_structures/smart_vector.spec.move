@@ -9,7 +9,7 @@ spec aptos_std::smart_vector {
             || (len(inline_vec) <= option::borrow(inline_capacity));
         // both `inline_capacity` and `bucket_size` should either exist or shouldn't exist at all.
         invariant (option::is_none(inline_capacity)
-                && option::is_none(bucket_size))
+            && option::is_none(bucket_size))
             || (option::is_some(inline_capacity)
                 && option::is_some(bucket_size));
     }

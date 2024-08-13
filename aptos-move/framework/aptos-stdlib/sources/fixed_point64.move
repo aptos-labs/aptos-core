@@ -444,7 +444,9 @@ module aptos_std::fixed_point64 {
         // 9/7 - 1/3 = 20/21
         let expected_result = create_from_rational(20, 21);
         assert_approx_the_same(
-            (get_raw_value(result) as u256), (get_raw_value(expected_result) as u256), 16
+            (get_raw_value(result) as u256),
+            (get_raw_value(expected_result) as u256),
+            16,
         );
     }
 

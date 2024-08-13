@@ -659,15 +659,18 @@ module aptos_framework::jwks {
                                 b"psply8S991RswM0JQJwv51fooFFvZUtYdL8avyKObshyzj7oJuJD8vkf5DKJJF1XOGi6Wv2D-U4b3htgrVXeOjAvaKTYtrQVUG_Txwjebdm2EvBJ4R6UaOULjavcSkb8VzW4l4AmP_yWoidkHq8n6vfHt9alDAONILi7jPDzRC7NvnHQ_x0hkRVh_OAmOJCpkgb0gx9-U8zSBSmowQmvw15AZ1I0buYZSSugY7jwNS2U716oujAiqtRkC7kg4gPouW_SxMleeo8PyRsHpYCfBME66m-P8Zr9Fh1Qgmqg4cWdy_6wUuNc1cbVY_7w1BpHZtZCNeQ56AHUgUFmo2LAQQ",
                             ), // n
                         ),
-                        new_unsupported_jwk(b"key_id_0", b"key_content_0"),],
+                        new_unsupported_jwk(b"key_id_0", b"key_content_0"),
+                    ],
                 },
                 ProviderJWKs {
                     issuer: b"bob",
                     version: 222,
                     jwks: vector[
                         new_unsupported_jwk(b"key_id_1", b"key_content_1"),
-                        new_unsupported_jwk(b"key_id_2", b"key_content_2"),],
-                },],
+                        new_unsupported_jwk(b"key_id_2", b"key_content_2"),
+                    ],
+                },
+            ],
         };
 
         let patch = new_patch_remove_issuer(b"alice");
@@ -681,8 +684,10 @@ module aptos_framework::jwks {
                             version: 222,
                             jwks: vector[
                                 new_unsupported_jwk(b"key_id_1", b"key_content_1"),
-                                new_unsupported_jwk(b"key_id_2", b"key_content_2"),],
-                        },],
+                                new_unsupported_jwk(b"key_id_2", b"key_content_2"),
+                            ],
+                        },
+                    ],
                 },
             1,
         );
@@ -697,9 +702,10 @@ module aptos_framework::jwks {
                             issuer: b"bob",
                             version: 222,
                             jwks: vector[new_unsupported_jwk(
-                                    b"key_id_2", b"key_content_2"
-                                ),],
-                        },],
+                                b"key_id_2", b"key_content_2"
+                            ),],
+                        },
+                    ],
                 },
             1,
         );
@@ -741,14 +747,15 @@ module aptos_framework::jwks {
                             version: 0,
                             jwks: vector[
                                 new_unsupported_jwk(b"key_id_0", b"key_content_0b"),
-                                new_unsupported_jwk(b"key_id_3", b"key_content_3"),],
+                                new_unsupported_jwk(b"key_id_3", b"key_content_3"),
+                            ],
                         },
                         ProviderJWKs {
                             issuer: b"bob",
                             version: 222,
                             jwks: vector[new_unsupported_jwk(
-                                    b"key_id_2", b"key_content_2b"
-                                ),],
+                                b"key_id_2", b"key_content_2b"
+                            ),],
                         },
                         ProviderJWKs {
                             issuer: b"carl",
@@ -761,8 +768,10 @@ module aptos_framework::jwks {
                                     utf8(
                                         b"sm72oBH-R2Rqt4hkjp66tz5qCtq42TMnVgZg2Pdm_zs7_-EoFyNs9sD1MKsZAFaBPXBHDiWywyaHhLgwETLN9hlJIZPzGCEtV3mXJFSYG-8L6t3kyKi9X1lUTZzbmNpE0tf-eMW-3gs3VQSBJQOcQnuiANxbSXwS3PFmi173C_5fDSuC1RoYGT6X3JqLc3DWUmBGucuQjPaUF0w6LMqEIy0W_WYbW7HImwANT6dT52T72md0JWZuAKsRRnRr_bvaUX8_e3K8Pb1K_t3dD6WSLvtmEfUnGQgLynVl3aV5sRYC0Hy_IkRgoxl2fd8AaZT1X_rdPexYpx152Pl_CHJ79Q",
                                     ), // n
-                                )],
-                        },],
+                                )
+                            ],
+                        },
+                    ],
                 },
             1,
         );
@@ -786,7 +795,8 @@ module aptos_framework::jwks {
             &aptos_framework,
             vector[
                 ProviderJWKs { issuer: b"alice", version: 111, jwks: vector[jwk_0, jwk_1], },
-                ProviderJWKs { issuer: b"bob", version: 222, jwks: vector[jwk_2, jwk_3], },],
+                ProviderJWKs { issuer: b"bob", version: 222, jwks: vector[jwk_2, jwk_3], },
+            ],
         );
         assert!(jwk_3 == get_patched_jwk(b"bob", b"key_id_3"), 1);
         assert!(option::some(jwk_3) == try_get_patched_jwk(b"bob", b"key_id_3"), 1);
@@ -809,7 +819,8 @@ module aptos_framework::jwks {
             vector[
                 new_patch_remove_all(),
                 new_patch_upsert_jwk(b"alice", jwk_1),
-                new_patch_upsert_jwk(b"bob", jwk_3),],
+                new_patch_upsert_jwk(b"bob", jwk_3),
+            ],
         );
         assert!(jwk_3 == get_patched_jwk(b"bob", b"key_id_3"), 1);
         assert!(option::some(jwk_3) == try_get_patched_jwk(b"bob", b"key_id_3"), 1);

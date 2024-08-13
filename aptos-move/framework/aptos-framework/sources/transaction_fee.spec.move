@@ -234,7 +234,7 @@ spec aptos_framework::transaction_fee {
         aborts_if amount != 0
             && !(
                 exists<CoinInfo<AptosCoin>>(aptos_addr)
-                && exists<CoinStore<AptosCoin>>(account_addr)
+                    && exists<CoinStore<AptosCoin>>(account_addr)
             );
         aborts_if coin_store.coin.value < amount;
 

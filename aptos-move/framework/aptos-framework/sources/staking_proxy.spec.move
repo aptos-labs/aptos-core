@@ -149,7 +149,7 @@ spec aptos_framework::staking_proxy {
         aborts_if stake::stake_pool_exists(owner_address)
             && !(
                 exists<stake::OwnerCapability>(owner_address)
-                && stake::stake_pool_exists(pool_address)
+                    && stake::stake_pool_exists(pool_address)
             );
         ensures stake::stake_pool_exists(owner_address) ==>
             global<stake::StakePool>(pool_address).operator_address == new_operator;
@@ -201,7 +201,7 @@ spec aptos_framework::staking_proxy {
         aborts_if stake::stake_pool_exists(owner_address)
             && !(
                 exists<stake::OwnerCapability>(owner_address)
-                && stake::stake_pool_exists(pool_address)
+                    && stake::stake_pool_exists(pool_address)
             );
         ensures stake::stake_pool_exists(owner_address) ==>
             global<stake::StakePool>(pool_address).delegated_voter == new_voter;

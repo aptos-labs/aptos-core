@@ -32,9 +32,7 @@ module aptos_framework::managed_coin {
     //
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
-    public entry fun burn<CoinType>(
-        account: &signer, amount: u64,
-    ) acquires Capabilities {
+    public entry fun burn<CoinType>(account: &signer, amount: u64,) acquires Capabilities {
         let account_addr = signer::address_of(account);
 
         assert!(

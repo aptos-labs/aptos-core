@@ -896,9 +896,7 @@ module aptos_token_objects::aptos_token {
 
     #[test(creator = @0x123, noncreator = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = Self)]
-    fun test_set_uri_non_creator(
-        creator: &signer, noncreator: &signer,
-    ) acquires AptosCollection, AptosToken {
+    fun test_set_uri_non_creator(creator: &signer, noncreator: &signer,) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -937,9 +935,7 @@ module aptos_token_objects::aptos_token {
 
     #[test(creator = @0x123, noncreator = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = Self)]
-    fun test_burn_non_creator(
-        creator: &signer, noncreator: &signer,
-    ) acquires AptosCollection, AptosToken {
+    fun test_burn_non_creator(creator: &signer, noncreator: &signer,) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 

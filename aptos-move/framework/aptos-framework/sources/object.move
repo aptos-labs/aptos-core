@@ -631,7 +631,8 @@ module aptos_framework::object {
     ) acquires TombStone, ObjectCore {
         let object_addr = object.inner;
         assert!(
-            exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT)
+            exists<TombStone>(object_addr),
+            error::invalid_argument(EOBJECT_NOT_BURNT),
         );
 
         let TombStone { original_owner: original_owner_addr } =

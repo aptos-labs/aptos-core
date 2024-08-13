@@ -94,7 +94,7 @@ module aptos_framework::randomness_config {
     ): RandomnessConfig {
         RandomnessConfig {
             variant: copyable_any::pack(
-                ConfigV1 { secrecy_threshold, reconstruction_threshold },
+                ConfigV1 { secrecy_threshold, reconstruction_threshold }
             )
         }
     }
