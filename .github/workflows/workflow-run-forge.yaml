@@ -72,6 +72,14 @@ on:
         default: false
         type: boolean
         description: Set to true to skip this job. Useful for PRs that don't require this workflow.
+      FORGE_NUM_VALIDATORS:
+        required: false
+        type: string
+        description: Number of validators to use for the forge test
+      FORGE_NUM_VALIDATOR_FULLNODES:
+        required: false
+        type: string
+        description: Number of validator fullnodes to use for the forge test
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -99,6 +107,8 @@ env:
   COMMENT_HEADER: ${{ inputs.COMMENT_HEADER }}
   VERBOSE: true
   COMMENT_ON_PR: ${{ inputs.COMMENT_ON_PR }}
+  FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}
+  FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
 
 # TODO: should we migrate this to a composite action, so that we can skip it
 # at the call site, and don't need to wrap each step in an if statement?
