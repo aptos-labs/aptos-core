@@ -26,8 +26,8 @@
 
 use crate::{
     common::{
-        check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        native_coin, parse_coin_currency, with_context,
+        check_network, decode_bcs, decode_key, encode_bcs, find_fa_currency, get_account,
+        handle_request, native_coin, parse_coin_currency, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -807,17 +807,7 @@ fn parse_primary_fa_transfer_operation(
 
     // Grab currency accordingly
 
-    let maybe_currency = server_context.currencies.iter().find(|currency| {
-        if let Some(CurrencyMetadata {
-            move_type: _,
-            fa_address: Some(ref fa_address),
-        }) = currency.metadata
-        {
-            fa_address == &metadata.to_string()
-        } else {
-            false
-        }
-    });
+    let maybe_currency = find_fa_currency(&server_context.currencies, metadata);
 
     if let Some(currency) = maybe_currency {
         operations.push(Operation::withdraw(
@@ -883,17 +873,7 @@ fn parse_fa_transfer_operation(
 
     // Grab currency accordingly
 
-    let maybe_currency = server_context.currencies.iter().find(|currency| {
-        if let Some(CurrencyMetadata {
-            move_type: _,
-            fa_address: Some(ref fa_address),
-        }) = currency.metadata
-        {
-            fa_address == &metadata.to_string()
-        } else {
-            false
-        }
-    });
+    let maybe_currency = find_fa_currency(&server_context.currencies, metadata);
 
     if let Some(currency) = maybe_currency {
         operations.push(Operation::withdraw(

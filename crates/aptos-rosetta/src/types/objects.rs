@@ -6,7 +6,7 @@
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
 use crate::{
-    common::native_coin,
+    common::{find_coin_currency, find_fa_currency, native_coin},
     construction::{
         parse_create_stake_pool_operation, parse_delegation_pool_add_stake_operation,
         parse_delegation_pool_unlock_operation, parse_delegation_pool_withdraw_operation,
@@ -1019,17 +1019,7 @@ fn parse_failed_operations_from_txn_payload(
                 // We could add a create here as well on transfer_coins, but we don't know if it will actually happen
                 if let Some(type_tag) = inner.ty_args().first() {
                     // Find currency from type tag
-                    let maybe_currency = currencies.iter().find(|currency| {
-                        if let Some(CurrencyMetadata {
-                            move_type: Some(ref move_type),
-                            fa_address: _,
-                        }) = currency.metadata
-                        {
-                            move_type == &type_tag.to_string()
-                        } else {
-                            false
-                        }
-                    });
+                    let maybe_currency = find_coin_currency(currencies, type_tag);
 
                     if let Some(currency) = maybe_currency {
                         operations = parse_coin_transfer_from_txn_payload(
@@ -1058,17 +1048,7 @@ fn parse_failed_operations_from_txn_payload(
                     .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded));
                 if let Some(Ok(addr)) = maybe_metadata_address {
                     // Find currency from type tag
-                    let maybe_currency = currencies.iter().find(|currency| {
-                        if let Some(CurrencyMetadata {
-                            move_type: _,
-                            fa_address: Some(ref fa_address),
-                        }) = currency.metadata
-                        {
-                            fa_address == &addr.to_string()
-                        } else {
-                            false
-                        }
-                    });
+                    let maybe_currency = find_fa_currency(currencies, addr);
 
                     if let Some(currency) = maybe_currency {
                         operations = parse_primary_fa_transfer_from_txn_payload(
@@ -1382,17 +1362,7 @@ async fn parse_operations_from_write_set(
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_args.first() {
                 // Find the currency and parse it accordingly
-                let maybe_currency = server_context.currencies.iter().find(|currency| {
-                    if let Some(CurrencyMetadata {
-                        move_type: Some(ref move_type),
-                        fa_address: _,
-                    }) = currency.metadata
-                    {
-                        move_type == &type_tag.to_string()
-                    } else {
-                        false
-                    }
-                });
+                let maybe_currency = find_coin_currency(&server_context.currencies, type_tag);
 
                 if let Some(currency) = maybe_currency {
                     parse_coinstore_changes(
@@ -2006,21 +1976,7 @@ async fn parse_fungible_store_changes(
 
     // Find the fungible asset currency association
     let metadata_address = fungible_store.metadata();
-    let maybe_currency = currencies.iter().find(|currency| {
-        if let Some(CurrencyMetadata {
-            move_type: _,
-            fa_address: Some(ref expected_metadata_address),
-        }) = currency.metadata
-        {
-            if let Ok(expected_addr) = AccountAddress::from_str(expected_metadata_address) {
-                expected_addr == metadata_address
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    });
+    let maybe_currency = find_fa_currency(currencies, metadata_address);
 
     // If there's a currency, let's fill in operations
     if let Some(currency) = maybe_currency {

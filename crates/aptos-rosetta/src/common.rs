@@ -19,7 +19,7 @@ use aptos_sdk::move_types::{
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
+use std::{collections::HashSet, convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
 /// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations
@@ -149,13 +149,15 @@ const DEFAULT_COIN: &str = "APT";
 const DEFAULT_DECIMALS: u8 = 8;
 
 /// Provides the [Currency] for 0x1::aptos_coin::AptosCoin aka APT
+///
+/// Note that 0xA is the address for FA, but it has to be skipped in order to have backwards compatibility
 pub fn native_coin() -> Currency {
     Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
         metadata: Some(CurrencyMetadata {
             move_type: Some(native_coin_tag().to_string()),
-            fa_address: Some("0xA".to_string()),
+            fa_address: None,
         }),
     }
 }
@@ -168,6 +170,54 @@ pub fn native_coin_tag() -> TypeTag {
         name: ident_str!(APTOS_COIN_RESOURCE).into(),
         type_args: vec![],
     }))
+}
+
+#[inline]
+pub fn is_native_coin(fa_address: AccountAddress) -> bool {
+    fa_address == AccountAddress::TEN
+}
+
+pub fn find_coin_currency(currencies: &HashSet<Currency>, type_tag: &TypeTag) -> Option<Currency> {
+    currencies
+        .iter()
+        .find(|currency| {
+            if let Some(CurrencyMetadata {
+                move_type: Some(ref move_type),
+                fa_address: _,
+            }) = currency.metadata
+            {
+                move_type == &type_tag.to_string()
+            } else {
+                false
+            }
+        })
+        .cloned()
+}
+pub fn find_fa_currency(
+    currencies: &HashSet<Currency>,
+    metadata_address: AccountAddress,
+) -> Option<Currency> {
+    if is_native_coin(metadata_address) {
+        Some(native_coin())
+    } else {
+        currencies
+            .iter()
+            .find(|currency| {
+                if let Some(CurrencyMetadata {
+                    move_type: _,
+                    fa_address: Some(ref fa_address),
+                }) = currency.metadata
+                {
+                    // TODO: Probably want to cache this
+                    AccountAddress::from_str(fa_address)
+                        .map(|addr| addr == metadata_address)
+                        .unwrap_or(false)
+                } else {
+                    false
+                }
+            })
+            .cloned()
+    }
 }
 
 /// Determines which block to pull for the request
