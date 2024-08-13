@@ -24,7 +24,15 @@ module 0x42::test {
         let S0(..) = x;
     }
 
+    fun simple_0_ref(x: &S0) {
+        let S0(..) = x;
+    }
+
     fun simple_1(x: S1) {
+        let S1(..) = x;
+    }
+
+    fun simple_1_ref(x: &mut S1) {
         let S1(..) = x;
     }
 
@@ -34,7 +42,19 @@ module 0x42::test {
         let S2(.., _x) = x;
     }
 
+    fun simple_2_ref(x: &S2) {
+        let S2(..) = x;
+        let S2(_x, ..) = x;
+        let S2(.., _x) = x;
+    }
+
     fun simple_3(x: S3) {
+        let S3 { .. } = x;
+        let S3 { x: _x, .. } = x;
+        let S3 { y: _y, .. } = x;
+    }
+
+    fun simple_3_ref(x: S3) {
         let S3 { .. } = x;
         let S3 { x: _x, .. } = x;
         let S3 { y: _y, .. } = x;
@@ -50,7 +70,28 @@ module 0x42::test {
         let S4 { y: S3 { x: _x1, .. }, x: _x2 } = x;
     }
 
+    fun nested_ref(x: &S4<bool>) {
+        let S4 { x: _x, .. } = x;
+        let S4 { y: _y, .. } = x;
+        let S4 { y: S3 { .. }, .. } = x;
+        let S4 { y: S3 { x: _x, .. }, .. } = x;
+        let S4 { y: S3 { x: _x1, .. }, x: _x2 } = x;
+        let S4 { y: S3 { y: _y, .. }, .. } = x;
+        let S4 { y: S3 { x: _x1, .. }, x: _x2 } = x;
+    }
+
     fun simple_4(x: E1): u8 {
+        match (x) {
+            E1::A(x, ..) => {
+                x
+            }
+            E1::B(x) => {
+                x
+            }
+        }
+    }
+
+    fun simple_4_ref(x: &E1): &u8 {
         match (x) {
             E1::A(x, ..) => {
                 x

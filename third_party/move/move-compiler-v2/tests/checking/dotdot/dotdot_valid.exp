@@ -51,7 +51,37 @@ module 0x42::test {
           }
         }
     }
+    private fun nested_ref(x: &test::S4<bool>) {
+        {
+          let test::S4<bool>{ x: _x, y: _ } = x;
+          {
+            let test::S4<bool>{ x: _, y: _y } = x;
+            {
+              let test::S4<bool>{ x: _, y: test::S3{ x: _, y: _ } } = x;
+              {
+                let test::S4<bool>{ x: _, y: test::S3{ x: _x, y: _ } } = x;
+                {
+                  let test::S4<bool>{ x: _x2, y: test::S3{ x: _x1, y: _ } } = x;
+                  {
+                    let test::S4<bool>{ x: _, y: test::S3{ x: _, y: _y } } = x;
+                    {
+                      let test::S4<bool>{ x: _x2, y: test::S3{ x: _x1, y: _ } } = x;
+                      Tuple()
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
     private fun simple_0(x: test::S0) {
+        {
+          let test::S0{ dummy_field: _ } = x;
+          Tuple()
+        }
+    }
+    private fun simple_0_ref(x: &test::S0) {
         {
           let test::S0{ dummy_field: _ } = x;
           Tuple()
@@ -63,7 +93,25 @@ module 0x42::test {
           Tuple()
         }
     }
+    private fun simple_1_ref(x: &mut test::S1) {
+        {
+          let test::S1{ 0: _ } = x;
+          Tuple()
+        }
+    }
     private fun simple_2(x: test::S2) {
+        {
+          let test::S2{ 0: _, 1: _ } = x;
+          {
+            let test::S2{ 0: _x, 1: _ } = x;
+            {
+              let test::S2{ 0: _, 1: _x } = x;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun simple_2_ref(x: &test::S2) {
         {
           let test::S2{ 0: _, 1: _ } = x;
           {
@@ -87,7 +135,30 @@ module 0x42::test {
           }
         }
     }
+    private fun simple_3_ref(x: test::S3) {
+        {
+          let test::S3{ x: _, y: _ } = x;
+          {
+            let test::S3{ x: _x, y: _ } = x;
+            {
+              let test::S3{ x: _, y: _y } = x;
+              Tuple()
+            }
+          }
+        }
+    }
     private fun simple_4(x: test::E1): u8 {
+        match (x) {
+          test::E1::A{ 0: x, 1: _ } => {
+            x
+          }
+          test::E1::B{ 0: x } => {
+            x
+          }
+        }
+
+    }
+    private fun simple_4_ref(x: &test::E1): &u8 {
         match (x) {
           test::E1::A{ 0: x, 1: _ } => {
             x
