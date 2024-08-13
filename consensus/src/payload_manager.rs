@@ -191,7 +191,13 @@ impl QuorumStorePayloadManager {
 
     fn batches_removed_from_window(block: &PipelinedBlock) -> Vec<BatchInfo> {
         let mut batches_removed = HashSet::new();
-        if let Some(block_removed) = block.block_window().blocks().first() {
+        if let Some(block_removed) = block
+            .block_window()
+            .blocks()
+            .iter()
+            .chain(std::iter::once(block.block()))
+            .next()
+        {
             for batch in Self::batches_in_block(block_removed) {
                 batches_removed.insert(batch);
             }
@@ -200,15 +206,13 @@ impl QuorumStorePayloadManager {
             .block_window()
             .blocks()
             .iter()
+            .chain(std::iter::once(block.block()))
             .skip(1)
             .for_each(|block| {
                 for batch in Self::batches_in_block(block) {
                     batches_removed.remove(&batch);
                 }
             });
-        for batch in Self::batches_in_block(block.block()) {
-            batches_removed.remove(&batch);
-        }
         batches_removed.into_iter().collect()
     }
 }
