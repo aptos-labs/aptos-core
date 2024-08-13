@@ -269,25 +269,25 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         }
         let mut num_outputs_received = vec![0u64; self.num_shards()];
         let mut to_receive = self.num_shards();
-        // (0..self.num_shards()).into_par_iter().for_each(|shard_id| {
-        //     let mut num_outputs_received: u64 = 0;
-        loop {
-            let received_msg = self.result_rxs[0].recv().unwrap();
-            let shard_id = received_msg.shard_id.unwrap() as usize;
-            let num_txn = received_msg.seq_num.unwrap();
-            num_outputs_received[shard_id] += num_txn;
-            deser_tx.send(received_msg).unwrap();
-            if num_outputs_received[shard_id] == expected_outputs[shard_id] {
-                let delta = get_delta_time(duration_since_epoch);
-                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["9_1_results_tx_msg_remote_exe_recv"]).observe(delta as f64);
-                to_receive -= 1;
-                if to_receive == 0 {
-                    break;
+        (0..self.num_shards()).into_par_iter().for_each(|shard_id| {
+            let mut num_outputs_received: u64 = 0;
+            loop {
+                let received_msg = self.result_rxs[shard_id].recv().unwrap();
+                // let shard_id = received_msg.shard_id.unwrap() as usize;
+                let num_txn = received_msg.seq_num.unwrap();
+                num_outputs_received += num_txn;
+                deser_tx.send(received_msg).unwrap();
+                if num_outputs_received == expected_outputs[shard_id] {
+                    let delta = get_delta_time(duration_since_epoch);
+                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                        .with_label_values(&["9_1_results_tx_msg_remote_exe_recv"]).observe(delta as f64);
+                    // to_receive -= 1;
+                    // if to_receive == 0 {
+                        break;
+                    // }
                 }
             }
-        }
-        // });
+        });
         drop(deser_tx);
         let mut cnt = 0;
         while let Ok(msg) = deser_finished_rx.recv() {

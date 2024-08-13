@@ -336,7 +336,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
             let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&[&shard_id_clone.to_string(), "result_tx_bcs_ser"])
                 .start_timer();
-            let execute_result_type = format!("execute_result_{}", 0); //Default for all shards for now shard_id_clone);
+            let execute_result_type = format!("execute_result_{}", shard_id_clone); // 0); //Default for all shards for now
             let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
             drop(bcs_ser_timer);
             let tx_send_timer = REMOTE_EXECUTOR_TIMER
