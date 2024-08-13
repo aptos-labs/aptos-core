@@ -46,10 +46,9 @@ impl BlockPreparer {
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let mut txns = vec![];
         let mut futures = FuturesOrdered::new();
-        for block in block_window.blocks() {
-            futures.push_back(async move { self.payload_manager.get_transactions(block).await })
+        for block in block_window.blocks().iter().chain(std::iter::once(block)) {
+            futures.push_back(async move { self.payload_manager.get_transactions(block).await });
         }
-        self.payload_manager.get_transactions(block).await?;
         let mut max_txns_from_block_to_execute = None;
         loop {
             match futures.next().await {
