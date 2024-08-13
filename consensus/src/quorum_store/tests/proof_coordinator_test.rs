@@ -6,6 +6,7 @@ use crate::{
     quorum_store::{
         batch_store::BatchReader,
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
+        tests::test_helpers::MockProposersProvider,
         types::Batch,
     },
     test_utils::{create_vec_signed_transactions, mock_quorum_store_sender::MockQuorumStoreSender},
@@ -58,6 +59,7 @@ async fn test_proof_coordinator_basic() {
         tx,
         proof_cache.clone(),
         true,
+        Arc::new(MockProposersProvider::new()),
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);

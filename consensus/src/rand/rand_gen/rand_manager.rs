@@ -4,7 +4,7 @@
 use crate::{
     counters::RAND_QUEUE_SIZE,
     logging::{LogEvent, LogSchema},
-    network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
+    network::{BroadcastOrder, IncomingRandGenRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
     rand::rand_gen::{
         aug_data_store::AugDataStore,
@@ -163,8 +163,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         }
 
         rand_store.add_rand_metadata(metadata.clone());
-        self.network_sender
-            .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
+        self.network_sender.broadcast_without_self(
+            RandMessage::<S, D>::Share(self_share).into_network_message(),
+            BroadcastOrder::ByDecreasingLatency,
+        );
         self.spawn_aggregate_shares_task(metadata.metadata)
     }
 

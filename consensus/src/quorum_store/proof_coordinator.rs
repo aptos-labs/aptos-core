@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    liveness::proposer_election::TNextProposersProvider,
     logging::{LogEvent, LogSchema},
     monitor,
     network::QuorumStoreSender,
@@ -9,8 +10,12 @@ use crate::{
         batch_generator::BatchGeneratorCommand, batch_store::BatchReader, counters, utils::Timeouts,
     },
 };
-use aptos_consensus_types::proof_of_store::{
-    BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
+use aptos_consensus_types::{
+    common::Round,
+    proof_of_store::{
+        BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError,
+        SignedBatchInfoMsg,
+    },
 };
 use aptos_crypto::bls12381;
 use aptos_logger::prelude::*;
@@ -146,6 +151,7 @@ pub(crate) struct ProofCoordinator {
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
     proof_cache: ProofCache,
     broadcast_proofs: bool,
+    next_proposers_provider: Arc<dyn TNextProposersProvider>,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
@@ -157,6 +163,7 @@ impl ProofCoordinator {
         batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
         proof_cache: ProofCache,
         broadcast_proofs: bool,
+        next_proposers_provider: Arc<dyn TNextProposersProvider>,
     ) -> Self {
         Self {
             peer_id,
@@ -168,6 +175,7 @@ impl ProofCoordinator {
             batch_generator_cmd_tx,
             proof_cache,
             broadcast_proofs,
+            next_proposers_provider,
         }
     }
 
@@ -364,7 +372,10 @@ impl ProofCoordinator {
                             }
                             if !proofs.is_empty() {
                                 if self.broadcast_proofs {
-                                    network_sender.broadcast_proof_of_store_msg(proofs).await;
+                                    let current_round = crate::counters::CURRENT_ROUND.get() as Round;
+                                    let next_round_authors: Vec<_> = self.next_proposers_provider.get_next_proposers(current_round, 5);
+
+                                    network_sender.broadcast_proof_of_store_msg(proofs, next_round_authors).await;
                                 } else {
                                     network_sender.send_proof_of_store_msg_to_self(proofs).await;
                                 }

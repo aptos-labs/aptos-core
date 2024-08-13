@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
+    liveness::proposer_election::TNextProposersProvider,
     monitor,
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
@@ -13,7 +14,7 @@ use crate::{
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary},
+    common::{Round, TransactionInProgress, TransactionSummary},
     proof_of_store::{BatchId, BatchInfo},
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
@@ -72,6 +73,7 @@ pub struct BatchGenerator {
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
     back_pressure: BackPressure,
+    next_proposers_provider: Arc<dyn TNextProposersProvider>,
 }
 
 impl BatchGenerator {
@@ -83,6 +85,7 @@ impl BatchGenerator {
         batch_writer: Arc<dyn BatchWriter>,
         mempool_tx: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
+        next_proposers_provider: Arc<dyn TNextProposersProvider>,
     ) -> Self {
         let batch_id = if let Some(mut id) = db
             .clean_and_get_batch_id(epoch)
@@ -117,6 +120,7 @@ impl BatchGenerator {
                 txn_count: false,
                 proof_count: false,
             },
+            next_proposers_provider,
         }
     }
 
@@ -474,7 +478,11 @@ impl BatchGenerator {
                             self.batch_writer.persist(persist_requests);
                             counters::BATCH_CREATION_PERSIST_LATENCY.observe_duration(persist_start.elapsed());
 
-                            network_sender.broadcast_batch_msg(batches).await;
+                            let current_round = crate::counters::CURRENT_ROUND.get() as Round;
+                            let next_round_authors =
+                               self.next_proposers_provider.get_next_proposers(current_round, 5);
+
+                            network_sender.broadcast_batch_msg(batches, next_round_authors).await;
                         } else if tick_start.elapsed() > interval.period().checked_div(2).unwrap_or(Duration::ZERO) {
                             // If the pull takes too long, it's also accounted as a non-empty pull to avoid pulling too often.
                             last_non_empty_pull = tick_start;

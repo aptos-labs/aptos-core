@@ -5,7 +5,29 @@
 use aptos_consensus_types::common::{Author, Round};
 use aptos_fallible::copy_from_slice::copy_slice_to_vec;
 use num_traits::CheckedAdd;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::Arc};
+
+pub trait TNextProposersProvider: Send + Sync {
+    fn get_next_proposers(&self, current_round: Round, num_rounds: u64) -> Vec<Author>;
+}
+
+pub struct NextProposersProvider {
+    election: Arc<dyn ProposerElection + Send + Sync>,
+}
+
+impl NextProposersProvider {
+    pub fn new(election: Arc<dyn ProposerElection + Send + Sync>) -> Self {
+        Self { election }
+    }
+}
+
+impl TNextProposersProvider for NextProposersProvider {
+    fn get_next_proposers(&self, current_round: Round, num_rounds: u64) -> Vec<Author> {
+        (current_round..current_round + num_rounds)
+            .map(|round| self.election.get_valid_proposer(round))
+            .collect()
+    }
+}
 
 /// ProposerElection incorporates the logic of choosing a leader among multiple candidates.
 pub trait ProposerElection {

@@ -5,6 +5,7 @@ use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     consensus_observer::publisher::ConsensusPublisher,
     error::error_kind,
+    liveness::proposer_election::TNextProposersProvider,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
@@ -148,6 +149,7 @@ pub struct InnerBuilder {
     batch_store: Option<Arc<BatchStore>>,
     batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
+    next_proposers_provider: Arc<dyn TNextProposersProvider>,
 }
 
 impl InnerBuilder {
@@ -166,6 +168,7 @@ impl InnerBuilder {
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
+        next_proposers_provider: Arc<dyn TNextProposersProvider>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -221,6 +224,7 @@ impl InnerBuilder {
             batch_store: None,
             batch_reader: None,
             broadcast_proofs,
+            next_proposers_provider,
         }
     }
 
@@ -304,6 +308,7 @@ impl InnerBuilder {
             self.batch_store.clone().unwrap(),
             self.quorum_store_to_mempool_sender,
             self.mempool_txn_pull_timeout_ms,
+            self.next_proposers_provider.clone(),
         );
         spawn_named!(
             "batch_generator",
@@ -345,6 +350,7 @@ impl InnerBuilder {
             self.batch_generator_cmd_tx.clone(),
             self.proof_cache,
             self.broadcast_proofs,
+            self.next_proposers_provider.clone(),
         );
         spawn_named!(
             "proof_coordinator",

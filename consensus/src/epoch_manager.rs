@@ -21,7 +21,7 @@ use crate::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
         },
-        proposer_election::ProposerElection,
+        proposer_election::{NextProposersProvider, ProposerElection, TNextProposersProvider},
         rotating_proposer_election::{choose_leader, RotatingProposer},
         round_proposer_election::RoundProposer,
         round_state::{ExponentialTimeInterval, RoundState},
@@ -679,6 +679,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: &EpochState,
         network_sender: NetworkSender,
         consensus_config: &OnChainConsensusConfig,
+        next_proposers_provider: Arc<dyn TNextProposersProvider>,
     ) -> (
         Arc<dyn TPayloadManager>,
         QuorumStoreClient,
@@ -711,6 +712,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
                 !consensus_config.is_dag_enabled(),
+                next_proposers_provider,
             ))
         } else {
             info!("Building DirectMempool");
@@ -770,6 +772,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -800,9 +803,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.qc_aggregator_type.clone(),
         );
 
-        info!(epoch = epoch, "Create ProposerElection");
-        let proposer_election =
-            self.create_proposer_election(&epoch_state, &onchain_consensus_config);
         let chain_health_backoff_config =
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
         let pipeline_backpressure_config = PipelineBackpressureConfig::new(
@@ -1160,7 +1160,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch_state.epoch, rand_config, fast_rand_config
         );
 
-        let (network_sender, payload_client, payload_manager) = self
+        let (network_sender, proposer_election, payload_client, payload_manager) = self
             .initialize_shared_component(&epoch_state, &consensus_config)
             .await;
 
@@ -1200,6 +1200,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                proposer_election,
             )
             .await
         }
@@ -1208,19 +1209,30 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn initialize_shared_component(
         &mut self,
         epoch_state: &EpochState,
-        consensus_config: &OnChainConsensusConfig,
+        onchain_consensus_config: &OnChainConsensusConfig,
     ) -> (
         NetworkSender,
+        Arc<dyn ProposerElection + Send + Sync>,
         Arc<dyn PayloadClient>,
         Arc<dyn TPayloadManager>,
     ) {
         self.set_epoch_start_metrics(epoch_state);
-        self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
+
+        info!(epoch = epoch_state.epoch, "Create ProposerElection");
+        let proposer_election =
+            self.create_proposer_election(epoch_state, onchain_consensus_config);
+
+        self.quorum_store_enabled = self.enable_quorum_store(onchain_consensus_config);
         let network_sender = self.create_network_sender(epoch_state);
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
-            .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
+            .init_payload_provider(
+                epoch_state,
+                network_sender.clone(),
+                onchain_consensus_config,
+                Arc::new(NextProposersProvider::new(proposer_election.clone())),
+            )
             .await;
-        let effective_vtxn_config = consensus_config.effective_validator_txn_config();
+        let effective_vtxn_config = onchain_consensus_config.effective_validator_txn_config();
         debug!("effective_vtxn_config={:?}", effective_vtxn_config);
         let mixed_payload_client = MixedPayloadClient::new(
             effective_vtxn_config,
@@ -1230,6 +1242,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.start_quorum_store(quorum_store_builder);
         (
             network_sender,
+            proposer_election,
             Arc::new(mixed_payload_client),
             payload_manager,
         )
@@ -1248,6 +1261,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
     ) {
         match self.storage.start(consensus_config.order_vote_enabled()) {
             LivenessStorageData::FullRecoveryData(initial_data) => {
@@ -1265,6 +1279,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     rand_config,
                     fast_rand_config,
                     rand_msg_rx,
+                    proposer_election,
                 )
                 .await
             },
