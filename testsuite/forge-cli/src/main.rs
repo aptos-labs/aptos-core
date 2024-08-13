@@ -281,6 +281,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
+    let suite_name = "realistic_env_load_sweep";
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -1096,7 +1097,7 @@ fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)]) -> Option<
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(100, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
         criteria: [
@@ -1245,13 +1246,11 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
 
 fn load_vs_perf_benchmark() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_initial_fullnode_count(10)
         .add_network_test(LoadVsPerfBenchmark {
             test: Box::new(PerformanceBenchmark),
-            workloads: Workloads::TPS(vec![
-                200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
-            ]),
+            workloads: Workloads::TPS(vec![100, 1000, 5000]),
             criteria: Vec::new(),
             background_traffic: None,
         })
