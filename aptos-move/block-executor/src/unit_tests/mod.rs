@@ -40,6 +40,8 @@ use std::{
     sync::Arc,
 };
 
+mod fallback;
+
 #[test]
 fn resource_group_bcs_fallback() {
     let no_group_incarnation_1: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(

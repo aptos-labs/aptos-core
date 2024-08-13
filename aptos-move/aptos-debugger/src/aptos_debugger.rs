@@ -9,6 +9,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+        BlockSTMCommitterSetting,
     },
     state_store::TStateView,
     transaction::{
@@ -430,8 +431,10 @@ fn execute_block_no_limit(
         BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
-                allow_fallback: true,
+                allow_sequential_fallback: true,
                 discard_failed_blocks: false,
+                enable_block_stm_profiling: false,
+                block_stm_committer_setting: BlockSTMCommitterSetting::Default,
             },
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         },

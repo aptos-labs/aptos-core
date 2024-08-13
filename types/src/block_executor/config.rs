@@ -4,16 +4,46 @@
 use crate::on_chain_config::BlockGasLimitType;
 use serde::{Deserialize, Serialize};
 
+/// Configuration for BlockSTM: determines behavior of the workers that commit
+/// a transactions and may perform a 'fallback' execution of the immediately
+/// following transaction t in order to make sure the critical path of the block
+/// execution does not contain validation failure and re-execution of t.
+///
+/// The default setting is provided by the implementation whereby certain few
+/// workers are designated as committers: only these workers attempt to commit
+/// transactions in rolling commit, and may perform the fallback. Since committing
+/// as early as possible is desired, these workers otherwise perform only tasks
+/// close to the committed prefix, to avoid potentially long dependency waiting.
+///
+/// In the 'All' setting, all workers act as committers and may perform fallback
+/// executions, but they can also each perform any task (no 'close to the
+/// committed prefix' restriction). This setting is used for testing with the
+/// mock executor (that may pause some ongoing executions / workers) to ensure
+/// that the commits (and fallback executions) always happen.
+///
+/// In the 'None' setting, all workers act as committers, and fallback is disabled.
+/// Like 'All' there is no restriction on what tasks a worker can perform. This
+/// setting is also intended for testing and debugging purposes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BlockSTMCommitterSetting {
+    None,
+    Default,
+    All,
+}
+
 /// Local, per-node configuration.
 #[derive(Clone, Debug)]
 pub struct BlockExecutorLocalConfig {
     pub concurrency_level: usize,
     // If specified, parallel execution fallbacks to sequential, if issue occurs.
     // Otherwise, if there is an error in either of the execution, we will panic.
-    pub allow_fallback: bool,
+    pub allow_sequential_fallback: bool,
     // If true, we will discard the failed blocks and continue with the next block.
-    // (allow_fallback needs to be set)
+    // (allow_sequential_fallback needs to be set)
     pub discard_failed_blocks: bool,
+    // If true, block-stm will record and log certain profiling outputs.
+    pub enable_block_stm_profiling: bool,
+    pub block_stm_committer_setting: BlockSTMCommitterSetting,
 }
 
 /// Configuration from on-chain configuration, that is
@@ -71,8 +101,10 @@ impl BlockExecutorConfig {
         Self {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
-                allow_fallback: true,
+                allow_sequential_fallback: true,
                 discard_failed_blocks: false,
+                enable_block_stm_profiling: false,
+                block_stm_committer_setting: BlockSTMCommitterSetting::Default,
             },
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         }
@@ -85,8 +117,10 @@ impl BlockExecutorConfig {
         Self {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
-                allow_fallback: true,
+                allow_sequential_fallback: true,
                 discard_failed_blocks: false,
+                enable_block_stm_profiling: false,
+                block_stm_committer_setting: BlockSTMCommitterSetting::Default,
             },
             onchain: BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
         }

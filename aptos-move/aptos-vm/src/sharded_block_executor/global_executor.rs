@@ -7,7 +7,10 @@ use crate::sharded_block_executor::{
 use aptos_logger::trace;
 use aptos_types::{
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockSTMCommitterSetting,
+        },
         partitioner::{TransactionWithDependencies, GLOBAL_ROUND_ID},
     },
     state_store::StateView,
@@ -62,8 +65,10 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: self.concurrency_level,
-                    allow_fallback: true,
+                    allow_sequential_fallback: true,
                     discard_failed_blocks: false,
+                    enable_block_stm_profiling: false,
+                    block_stm_committer_setting: BlockSTMCommitterSetting::Default,
                 },
                 onchain: onchain_config,
             },

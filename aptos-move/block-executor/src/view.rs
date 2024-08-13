@@ -24,7 +24,7 @@ use aptos_aggregator::{
         ReadPosition,
     },
 };
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_mvhashmap::{
     types::{
         GroupReadResult, Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError,
@@ -482,6 +482,8 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
             .module_reads
             .push(key.clone());
 
+        // TODO: consider adding a lightweight (e.g. only applicable to the currently
+        // next txn) check to other kinds of reads, if it becomes worthwhile optimizing.
         if self.scheduler.has_lost_execution_flag_writing(txn_idx) {
             return Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -1091,6 +1093,47 @@ fn base_value_or_partial_err<T: Transaction>(
     })
 }
 
+// Total number of callbacks and the time spent, across different (executor) view traits.
+struct ViewProfilerState {
+    resource_view_stats: (Duration, usize),
+    group_view_stats: (Duration, usize),
+    module_view_stats: (Duration, usize),
+    aggregator_v1_view_stats: (Duration, usize),
+    delayed_field_view_stats: (Duration, usize),
+}
+
+impl ViewProfilerState {
+    fn record_resource_view_stat(&mut self, start: Instant) {
+        let cur = Instant::now();
+        self.resource_view_stats.0 += cur - start;
+        self.resource_view_stats.1 += 1;
+    }
+
+    fn record_group_view_stat(&mut self, start: Instant) {
+        let cur = Instant::now();
+        self.group_view_stats.0 += cur - start;
+        self.group_view_stats.1 += 1;
+    }
+
+    fn record_module_view_stat(&mut self, start: Instant) {
+        let cur = Instant::now();
+        self.module_view_stats.0 += cur - start;
+        self.module_view_stats.1 += 1;
+    }
+
+    fn record_aggregator_v1_view_stat(&mut self, start: Instant) {
+        let cur = Instant::now();
+        self.aggregator_v1_view_stats.0 += cur - start;
+        self.aggregator_v1_view_stats.1 += 1;
+    }
+
+    fn record_delayed_field_view_stat(&mut self, start: Instant) {
+        let cur = Instant::now();
+        self.delayed_field_view_stats.0 += cur - start;
+        self.delayed_field_view_stats.1 += 1;
+    }
+}
+
 /// A struct that represents a single block execution worker thread's view into the state,
 /// some of which (in Sync case) might be shared with other workers / threads. By implementing
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
@@ -1103,36 +1146,33 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     _incarnation: Incarnation,
     is_fallback: bool,
     _worker_id: usize,
-    debug_state: RefCell<(
-        (Duration, usize), // ResourceView
-        (Duration, usize), // GroupView
-        (Duration, usize), // ModuleView
-        (Duration, usize), // DelayedFields
-        (Duration, usize), // TAggregatorV1View
-    )>,
+    maybe_profiler_state: Option<RefCell<ViewProfilerState>>,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn print_debug_info(&self) {
-        let state = self.debug_state.borrow();
-        println!(
-            "TXN = {}, ResourceView total {:?}, {}, \n\
-                GroupView total {:?} {}\n\
-                ModuleView total {:?} {}\n\
-                DelayedFieldsView total {:?} {}\n\
-                AggregatorV1View total {:?} {}\n",
-            self.txn_idx,
-            state.0 .0,
-            state.0 .1,
-            state.1 .0,
-            state.1 .1,
-            state.2 .0,
-            state.2 .1,
-            state.3 .0,
-            state.3 .1,
-            state.4 .0,
-            state.4 .1,
-        );
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            let state = profiler_state.borrow();
+
+            info!(
+                "TXN = {}, ResourceView total time {:?}, num calls {}; \
+                GroupView total time {:?}, num calls {};\
+                ModuleView total time {:?}, num calls {};\
+                DelayedFieldsView total time {:?}, num_calls {};\
+                AggregatorV1View total time {:?}, num_calls {}.",
+                self.txn_idx,
+                state.resource_view_stats.0,
+                state.resource_view_stats.1,
+                state.group_view_stats.0,
+                state.group_view_stats.1,
+                state.module_view_stats.0,
+                state.module_view_stats.1,
+                state.delayed_field_view_stats.0,
+                state.delayed_field_view_stats.1,
+                state.aggregator_v1_view_stats.0,
+                state.aggregator_v1_view_stats.1,
+            );
+        }
     }
 
     pub(crate) fn new(
@@ -1142,6 +1182,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         _incarnation: Incarnation,
         is_fallback: bool,
         _worker_id: usize,
+        profile_view: bool,
     ) -> Self {
         Self {
             base_view,
@@ -1150,13 +1191,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             is_fallback,
             _incarnation,
             _worker_id,
-            debug_state: RefCell::new((
-                (Duration::ZERO, 0), // ResourceView
-                (Duration::ZERO, 0), // GroupView
-                (Duration::ZERO, 0), // ModuleView
-                (Duration::ZERO, 0), // DelayedFields
-                (Duration::ZERO, 0), // TAggregatorV1View
-            )),
+            maybe_profiler_state: profile_view.then(|| {
+                RefCell::new(ViewProfilerState {
+                    resource_view_stats: (Duration::ZERO, 0),
+                    group_view_stats: (Duration::ZERO, 0),
+                    module_view_stats: (Duration::ZERO, 0),
+                    aggregator_v1_view_stats: (Duration::ZERO, 0),
+                    delayed_field_view_stats: (Duration::ZERO, 0),
+                })
+            }),
         }
     }
 
@@ -1594,12 +1637,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
             )
             .map(|res| res.into_value());
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.0 .0 += cur - st;
-            state.0 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_resource_view_stat(st);
         }
+
         ret
     }
 
@@ -1619,12 +1660,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
                 }
             });
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.0 .0 += cur - st;
-            state.0 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_resource_view_stat(st);
         }
+
         ret
     }
 
@@ -1639,12 +1678,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
                     unreachable!("Read result must be Exists kind")
                 }
             });
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.0 .0 += cur - st;
-            state.0 .1 += 1;
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_resource_view_stat(st);
         }
+
         ret
     }
 }
@@ -1674,11 +1712,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
             }
         };
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.1 .0 += cur - st;
-            state.1 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_group_view_stat(st);
         }
 
         Ok(group_read.into_size())
@@ -1717,11 +1752,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
                 )?;
         };
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.1 .0 += cur - st;
-            state.1 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_group_view_stat(st);
         }
 
         Ok(group_read.into_value().0)
@@ -1789,11 +1821,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView
             },
         };
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.2 .0 += cur - st;
-            state.2 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_module_view_stat(st);
         }
 
         ret
@@ -1825,12 +1854,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for Late
         // self.get_resource_state_value(state_key, Some(&MoveTypeLayout::U128))
         let ret = self.get_resource_state_value(state_key, None);
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.3 .0 += cur - st;
-            state.3 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_aggregator_v1_view_stat(st);
         }
+
         ret
     }
 }
@@ -1861,11 +1890,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
             },
         };
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.3 .0 += cur - st;
-            state.3 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_delayed_field_view_stat(st);
         }
 
         ret
@@ -1908,16 +1936,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
             },
         };
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.3 .0 += cur - st;
-            state.3 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_delayed_field_view_stat(st);
         }
+
         ret
     }
 
     fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        let st = Instant::now();
         let index = match &self.latest_view {
             ViewState::Sync(state) => state.counter.fetch_add(1, Ordering::SeqCst),
             ViewState::Unsync(state) => {
@@ -1927,6 +1956,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
                 id
             },
         };
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_delayed_field_view_stat(st);
+        }
 
         (index, width).into()
     }
@@ -1954,12 +1989,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
             )));
         }
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.3 .0 += cur - st;
-            state.3 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_delayed_field_view_stat(st);
         }
+
         Ok(())
     }
 
@@ -1988,12 +2023,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
             },
         };
 
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.3 .0 += cur - st;
-            state.3 .1 += 1;
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_delayed_field_view_stat(st);
         }
+
         ret
     }
 
@@ -2017,12 +2052,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for Late
                 )
             },
         };
-        if self.txn_idx <= 2 {
-            let cur = Instant::now();
-            let mut state = self.debug_state.borrow_mut();
-            state.3 .0 += cur - st;
-            state.3 .1 += 1;
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_delayed_field_view_stat(st);
         }
+
         ret
     }
 }
@@ -2721,6 +2757,7 @@ mod test {
             0,
             false,
             0,
+            false,
         );
 
         // Test id -- value exchange for a value that does not contain delayed fields
@@ -3009,6 +3046,7 @@ mod test {
             0,
             false,
             0,
+            false,
         )
     }
 
@@ -3053,6 +3091,7 @@ mod test {
                 0,
                 false,
                 0,
+                false,
             );
 
             ViewsComparison {
