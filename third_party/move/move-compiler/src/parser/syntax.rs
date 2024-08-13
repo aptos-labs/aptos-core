@@ -16,6 +16,9 @@ use crate::{
 use move_command_line_common::files::FileHash;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
+use stacker::remaining_stack;
+
+const MIN_STACK_DEPTH: usize = 32768;
 
 struct Context<'env, 'lexer, 'input> {
     env: &'env mut CompilationEnv,
@@ -1411,10 +1414,10 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
 
     // To create the declaration "let flag = false", first create the variable flag, and then assign it to false
     let flag_symb = Symbol::from("__update_iter_flag");
-    let flag = sp(for_loc, vec![sp(
+    let flag = sp(
         for_loc,
-        Bind_::Var(Var(sp(for_loc, flag_symb))),
-    )]);
+        vec![sp(for_loc, Bind_::Var(Var(sp(for_loc, flag_symb))))],
+    );
     let false_exp = sp(for_loc, Exp_::Value(sp(for_loc, Value_::Bool(false))));
     let decl_flag = sp(
         for_loc,
@@ -1424,10 +1427,10 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     // To create the declaration "let ub_value = upper_bound", first create the variable flag, and
     // then assign it to upper_bound
     let ub_value_symbol = Symbol::from("__upper_bound_value");
-    let ub_value_bindlist = sp(for_loc, vec![sp(
+    let ub_value_bindlist = sp(
         for_loc,
-        Bind_::Var(Var(sp(for_loc, ub_value_symbol))),
-    )]);
+        vec![sp(for_loc, Bind_::Var(Var(sp(for_loc, ub_value_symbol))))],
+    );
     let ub_value_assignment = sp(
         for_loc,
         SequenceItem_::Bind(ub_value_bindlist, None, Box::new(ub)),
@@ -1766,6 +1769,17 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 //          | <BinOpExp>
 //          | <UnaryExp> "=" <Exp>
 fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
+    if let Some(depth) = remaining_stack() {
+        if depth < MIN_STACK_DEPTH {
+            let loc = current_token_loc(context.tokens);
+            let msg =
+                "Parsed expression too deep for compiler.  Try increasing RUST_MIN_STACK environment variable, or reduce expression depth.".to_string();
+            return Err(Box::new(diag!(
+                Uncategorized::ResourcesExceeded,
+                (loc, msg)
+            )));
+        }
+    }
     let start_loc = context.tokens.start_loc();
     let token = context.tokens.peek();
     let exp = match token {
