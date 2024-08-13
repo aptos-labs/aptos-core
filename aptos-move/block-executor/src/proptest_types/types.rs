@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
 use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
 use aptos_aggregator::{
     delayed_change::DelayedChange,
@@ -154,7 +155,7 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
     }
 
     fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
-        unimplemented!()
+        unimplemented!("Unused in the test")
     }
 }
 
@@ -451,7 +452,7 @@ impl<
     type Value = ValueType;
 
     fn user_txn_bytes_len(&self) -> usize {
-        0
+        1
     }
 }
 

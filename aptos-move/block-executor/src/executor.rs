@@ -35,7 +35,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
+    block_executor::config::{BlockExecutorConfig, BlockSTMCommitterSetting},
     delayed_fields::PanicError,
     on_chain_config::BlockGasLimitType,
     state_store::{errors::StateviewError, state_value::StateValue, TStateView},
@@ -820,11 +820,19 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
-        num_committers: usize,
+        num_committers_and_proximity_interval: (usize, usize),
         worker_id: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let vm_init_view: VMInitView<'_, T, S> = VMInitView::new(base_view, versioned_cache);
         let executor = E::init(env.clone(), &vm_init_view);
+
+        let (num_committers, committer_proximity_interval) = num_committers_and_proximity_interval;
+        assert!(
+            num_committers <= num_workers,
+            "Incorrect number of committers {}, num_workers = {}",
+            num_committers,
+            num_workers,
+        );
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
 
@@ -847,12 +855,6 @@ where
             Ok(())
         };
 
-        assert!(
-            1 <= num_committers && num_committers <= num_workers,
-            "Incorrect number of committers {}, num_workers = {}",
-            num_committers,
-            num_workers,
-        );
         loop {
             if worker_id < num_committers && matches!(scheduler_task, SchedulerTask::Retry) {
                 let mut last_commit_idx = None;
@@ -972,12 +974,6 @@ where
                     SchedulerTask::Retry
                 },
                 SchedulerTask::Retry => {
-                    // Based on simple grid optimizations alongside num_committers.
-                    // TODO: keep up-to-date with changes.
-                    let committer_proximity_interval = match num_workers {
-                        1..=40 => 4,
-                        _ => 5,
-                    };
                     if worker_id < num_committers {
                         scheduler.committer_next_task(committer_proximity_interval)
                     } else {
@@ -1021,12 +1017,10 @@ where
         let num_txns = signature_verified_block.len();
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
-        // Based on simple grid optimizations alongside committer's next_task.
-        // TODO: keep up-to-date with changes.
-        let num_committers = match num_workers {
-            2..=6 => 1,
-            _ => 2,
-        };
+        let num_committers_and_proximity_interval = get_num_committers_and_proximity_interval(
+            num_workers,
+            self.config.local.block_stm_committer_setting.clone(),
+        );
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -1064,7 +1058,7 @@ where
                         &shared_commit_state,
                         &final_results,
                         num_workers,
-                        num_committers,
+                        num_committers_and_proximity_interval,
                         *worker_id,
                     ) {
                         // If there are multiple errors, they all get logged:
@@ -1503,7 +1497,7 @@ where
                 return Ok(output);
             }
 
-            if !self.config.local.allow_fallback {
+            if !self.config.local.allow_sequential_fallback {
                 panic!("Parallel execution failed and fallback is not allowed");
             }
 
@@ -1529,7 +1523,7 @@ where
                 return Ok(output);
             },
             Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {
-                if !self.config.local.allow_fallback {
+                if !self.config.local.allow_sequential_fallback {
                     panic!("Parallel execution failed and fallback is not allowed");
                 }
 
@@ -1583,5 +1577,22 @@ where
         }
 
         Err(sequential_error)
+    }
+}
+
+fn get_num_committers_and_proximity_interval(
+    num_workers: usize,
+    setting: BlockSTMCommitterSetting,
+) -> (usize, usize) {
+    match setting {
+        // TODO: implement proper handling.
+        BlockSTMCommitterSetting::None => (num_workers, usize::MAX),
+        BlockSTMCommitterSetting::Default => match num_workers {
+            // Based on simple grid optimizations.
+            1..=6 => (1, 4),
+            7..=40 => (2, 4),
+            _ => (2, 5),
+        },
+        BlockSTMCommitterSetting::All => (num_workers, usize::MAX),
     }
 }

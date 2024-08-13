@@ -729,7 +729,7 @@ impl Scheduler {
                                     Some(old_incarnation),
                                 )
                             } else {
-                                // info!("TXN {} failed validation, deferring to fallback", txn_idx);
+                                info!("TXN {} failed validation, deferring to fallback", txn_idx);
                                 None
                             }
                         },

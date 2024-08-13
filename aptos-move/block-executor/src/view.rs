@@ -482,6 +482,8 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
             .module_reads
             .push(key.clone());
 
+        // TODO: consider adding a lightweight (e.g. only applicable to the currently
+        // next txn) check to other kinds of reads, if it becomes worthwhile optimizing.
         if self.scheduler.has_lost_execution_flag_writing(txn_idx) {
             return Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -1594,6 +1596,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
             )
             .map(|res| res.into_value());
 
+        // TODO: FIX FOR ALL TXN IF PROFILER IS ON.
         if self.txn_idx <= 2 {
             let cur = Instant::now();
             let mut state = self.debug_state.borrow_mut();
