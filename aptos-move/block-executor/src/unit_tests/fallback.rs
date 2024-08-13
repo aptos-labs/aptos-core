@@ -1,13 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
+use crate::{
+    executor::BlockExecutor,
+    proptest_types::types::EmptyDataView,
+    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
+    txn_commit_hook::TransactionCommitHook,
+};
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::{
     account_address::AccountAddress,
+    block_executor::config::{BlockExecutorConfig, BlockSTMCommitterSetting},
     contract_event::TransactionEvent,
     delayed_fields::PanicError,
     executable::ModulePath,
@@ -22,16 +28,27 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
-use claims::assert_none;
+use claims::{assert_gt, assert_none};
 use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use num_cpus;
 use std::{
     collections::{BTreeMap, HashSet},
+    marker::PhantomData,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
 };
+use test_case::test_case;
+
+const DEFAULT_STATUS: u64 = 0;
+
+// The flags are values corresponding to 1-bit binary representations.
+const TXN1_READ_FLAG: u64 = 1;
+const TXN2_READ_FLAG: u64 = 2;
+const TXN1_ABORTED_FLAG: u64 = 4;
+const TXN2_FALLBACK_STARTED_FLAG: u64 = 8;
 
 #[derive(Clone)]
 struct TestTransaction {
@@ -186,7 +203,7 @@ impl TransactionOutput for TestOutput {
         unimplemented!("Discarded outputs unused in the test")
     }
 
-    fn materialize_agg_v1(&self, view: &impl TAggregatorV1View<Identifier = TestKey>) {
+    fn materialize_agg_v1(&self, _view: &impl TAggregatorV1View<Identifier = TestKey>) {
         unimplemented!("AggregatorV1 outputs unused in the test")
     }
 
@@ -219,24 +236,43 @@ impl TransactionOutput for TestOutput {
     }
 }
 
+struct TestCommitHook {
+    next_to_commit_idx: Arc<AtomicU64>,
+}
+
+impl TransactionCommitHook for TestCommitHook {
+    type Output = TestOutput;
+
+    fn on_transaction_committed(&self, txn_idx: TxnIndex, _output: &Self::Output) {
+        self.next_to_commit_idx
+            .fetch_max(txn_idx as u64 + 1, Ordering::Relaxed);
+    }
+
+    fn on_execution_aborted(&self, _txn_idx: TxnIndex) {
+        // no-op
+    }
+}
+
 #[derive(Default)]
 struct TestExecutor {
-    // Test the optimization (currently for module reads), where execution halts
-    // if the fallback has already finished. Provided as the block executor environment.
-    test_read_error: bool,
+    // When we test the optimization (currently for module reads), where execution halts
+    // if the fallback has already finished, we provided Some(next_idx_to_commit) via
+    // the block executor's environment parameter (passed down to ExecutorTask's init).
+    // In this case, block execution gets a TestCommitHook that updates the atomic index.
+    maybe_next_idx_to_commit: Option<Arc<AtomicU64>>,
 }
 
 // TODO: picture and description of the test case.
 
 impl ExecutorTask for TestExecutor {
-    type Environment = bool;
+    type Environment = Option<Arc<AtomicU64>>;
     type Error = usize;
     type Output = TestOutput;
     type Txn = TestTransaction;
 
-    fn init(env: bool, _state_view: &impl TStateView<Key = TestKey>) -> Self {
+    fn init(env: Option<Arc<AtomicU64>>, _state_view: &impl TStateView<Key = TestKey>) -> Self {
         TestExecutor {
-            test_read_error: env,
+            maybe_next_idx_to_commit: env,
         }
     }
 
@@ -298,7 +334,7 @@ impl ExecutorTask for TestExecutor {
                         }
                     },
                     1 => {
-                        let mut prev_status =
+                        let prev_status =
                             txn.status.fetch_xor(TXN1_ABORTED_FLAG, Ordering::Relaxed);
                         assert_eq!(
                             prev_status & TXN1_READ_FLAG,
@@ -322,7 +358,7 @@ impl ExecutorTask for TestExecutor {
                 // First execution of TXN2 and fallback both have incarnation 0.
                 assert_eq!(incarnation, 0);
 
-                match fallback {
+                match is_fallback {
                     false => {
                         // Key C should contain no values here, as TXN1 waits for the read flag
                         // set below, before it (starts incarnation that) writes to key C.
@@ -346,7 +382,7 @@ impl ExecutorTask for TestExecutor {
                             1,
                             "TXN1 read flag is set before aborted flag"
                         );
-                        assert_eq!(view.get_resource_state_value(&TestKey::B, None).unwrap());
+                        assert_none!(view.get_resource_state_value(&TestKey::B, None).unwrap());
 
                         // Stay in 'Executing' state, allowing the fallback execution to start
                         // after TXN1 is committed.
@@ -362,11 +398,20 @@ impl ExecutorTask for TestExecutor {
                             "All flags must be set",
                         );
 
-                        if self.test_read_error {
-                            // self.commit_hook
-                            // TransactionCommitHook<Output = AptosTransactionOutput>,
-                            // after 2 is committed, should
-                            // TODO: halt error from fetch_module if we wait for fallback to finish.
+                        if let Some(next_idx_to_commit) = &self.maybe_next_idx_to_commit {
+                            while next_idx_to_commit.load(Ordering::Relaxed) < 3 {}
+
+                            // At this point fallback must have won, since 2 committed. A call
+                            // to get module data should cause an error (to speed up returning).
+                            match view.get_module_state_value(&TestKey::Module) {
+                                Err(e) => {
+                                    assert_eq!(
+                                        e.major_status(),
+                                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                                    );
+                                },
+                                Ok(_) => unreachable!("Must be speculative abort error"),
+                            }
                         }
                     },
                     true => {
@@ -376,9 +421,9 @@ impl ExecutorTask for TestExecutor {
                         assert_eq!(
                             (prev_status & TXN1_READ_FLAG)
                                 + (prev_status & TXN2_READ_FLAG)
-                                + (prev_status & TXN1_ABORTED_FLAG)
+                                + (prev_status & TXN1_ABORTED_FLAG),
                             3,
-                            "All flags must be set"
+                            "All flags must be set",
                         );
 
                         // Fallback must read the correct value, written by TXN1 incarnation 1.
@@ -387,7 +432,7 @@ impl ExecutorTask for TestExecutor {
                             .unwrap()
                             .unwrap();
                         assert_eq!(
-                            state_value.bytes().as_bytes()[0],
+                            c_state_value.bytes()[0],
                             1,
                             "Must be the as_state_value() encoding of FinalCorrectValue"
                         );
@@ -403,12 +448,61 @@ impl ExecutorTask for TestExecutor {
     }
 }
 
-const DEFAULT_STATUS: u64 = 0;
+// When with_commit_hook is true, Executor is provided with a hook to notify of committed
+// transactions, allowing to test additional behavior. However, 'false' case is still interesting
+// as it allows for more concurrent interleavings between the execution and its fallback.
+#[test_case(false)]
+#[test_case(true)]
+fn test_commit_fallback(with_commit_hook: bool) {
+    let num_workers = std::cmp::min(num_cpus::get(), 3);
+    if num_workers < 2 {
+        return;
+    }
 
-// The flags are values corresponding to 1-bit binary representations.
-const TXN1_READ_FLAG: u64 = 1;
-const TXN2_READ_FLAG: u64 = 2;
-const TXN1_ABORTED_FLAG: u64 = 4;
-const TXN2_FALLBACK_STARTED_FLAG: u64 = 8;
+    let next_to_commit_idx_local = Arc::new(AtomicU64::new(0));
+    let maybe_commit_hook = with_commit_hook.then(|| TestCommitHook {
+        next_to_commit_idx: next_to_commit_idx_local.clone(),
+    });
+    let status = Arc::new(AtomicU64::new(DEFAULT_STATUS));
+    let transactions = Vec::from([
+        TestTransaction {
+            id: 0,
+            status: status.clone(),
+        },
+        TestTransaction {
+            id: 0,
+            status: status.clone(),
+        },
+        TestTransaction {
+            id: 0,
+            status: status.clone(),
+        },
+    ]);
 
-// TODO: only run test when there are at least two threads.
+    let data_view = EmptyDataView::<TestKey> {
+        phantom: PhantomData,
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_workers)
+            .build()
+            .unwrap(),
+    );
+
+    let mut config = BlockExecutorConfig::new_no_block_limit(num_workers);
+    // Set a setting that allows commits to happen despite the test suspending
+    // transaction execution by some (unpredictable) workers.
+    config.local.block_stm_committer_setting = BlockSTMCommitterSetting::All;
+
+    let output = BlockExecutor::<
+        TestTransaction,
+        TestExecutor,
+        EmptyDataView<TestKey>,
+        TestCommitHook,
+    >::new(config, executor_thread_pool.clone(), maybe_commit_hook)
+    .execute_transactions_parallel(
+        &with_commit_hook.then(|| next_to_commit_idx_local),
+        &transactions,
+        &data_view,
+    );
+}

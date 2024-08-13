@@ -43,7 +43,10 @@ use aptos_types::state_store::StateViewId;
 use aptos_types::{
     account_config::{self, new_block_event_key, AccountResource},
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockSTMCommitterSetting,
+        },
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
@@ -2532,8 +2535,10 @@ impl VMExecutor for AptosVM {
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: Self::get_concurrency_level(),
-                    allow_fallback: true,
+                    allow_sequential_fallback: true,
                     discard_failed_blocks: Self::get_discard_failed_blocks(),
+                    enable_block_stm_profiling: false,
+                    block_stm_committer_setting: BlockSTMCommitterSetting::Default,
                 },
                 onchain: onchain_config,
             },

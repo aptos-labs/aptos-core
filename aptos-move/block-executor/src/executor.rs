@@ -111,6 +111,7 @@ where
         base_view: &S,
         parallel_state: ParallelState<T>,
         worker_id: usize,
+        profile_view: bool,
     ) -> Result<Option<ValidationMode>, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
@@ -123,13 +124,15 @@ where
             incarnation,
             is_fallback,
             worker_id,
+            profile_view,
         );
 
         let execute_result =
             executor.execute_transaction(&sync_view, txn, idx_to_execute, incarnation, is_fallback);
 
-        // TODO: add to speculative_info for monitoring.
-        // sync_view.print_debug_info();
+        if profile_view {
+            sync_view.print_debug_info();
+        }
 
         let mut read_set = sync_view.take_parallel_reads();
 
@@ -512,6 +515,7 @@ where
         block: &[T],
         num_workers: usize,
         worker_id: usize,
+        enable_profiling: bool,
     ) -> Result<Option<u32>, PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
@@ -544,6 +548,7 @@ where
                         shared_counter,
                     ),
                     worker_id,
+                    enable_profiling,
                 )?;
 
                 scheduler.finish_execution_during_commit(txn_idx)?;
@@ -739,6 +744,7 @@ where
             0,     // dummy incarnation.
             false, // TODO: should we provide based on whether fallback got committed?
             worker_id,
+            false,
         );
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
         let materialized_finalized_groups =
@@ -822,6 +828,8 @@ where
         num_workers: usize,
         num_committers_and_proximity_interval: (usize, usize),
         worker_id: usize,
+        enable_profiling: bool,
+        enable_special_committers: bool,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let vm_init_view: VMInitView<'_, T, S> = VMInitView::new(base_view, versioned_cache);
         let executor = E::init(env.clone(), &vm_init_view);
@@ -856,7 +864,9 @@ where
         };
 
         loop {
-            if worker_id < num_committers && matches!(scheduler_task, SchedulerTask::Retry) {
+            if !enable_special_committers
+                || (worker_id < num_committers && matches!(scheduler_task, SchedulerTask::Retry))
+            {
                 let mut last_commit_idx = None;
                 while scheduler.should_coordinate_commits() {
                     if let Some(last_idx) = self.prepare_and_queue_commit_ready_txns(
@@ -873,45 +883,49 @@ where
                         block,
                         num_workers,
                         worker_id,
+                        enable_profiling,
                     )? {
                         last_commit_idx.replace(last_idx);
                     };
                     scheduler.queueing_commits_mark_done();
                 }
 
-                if let Some(last_commit_idx) = last_commit_idx {
-                    let next_commit_idx = last_commit_idx + 1;
-                    if let Some(incarnation) = scheduler.try_fallback(next_commit_idx) {
-                        if let Some(validation_mode) = Self::execute(
-                            next_commit_idx,
-                            incarnation,
-                            true,
-                            scheduler,
-                            block,
-                            last_input_output,
-                            versioned_cache,
-                            &executor,
-                            base_view,
-                            ParallelState::new(
-                                versioned_cache,
-                                scheduler,
-                                start_shared_counter,
-                                shared_counter,
-                            ),
-                            worker_id,
-                        )? {
-                            // fallback won, no need to validate
-                            scheduler.finish_execution(
+                if enable_special_committers {
+                    if let Some(last_commit_idx) = last_commit_idx {
+                        let next_commit_idx = last_commit_idx + 1;
+                        if let Some(incarnation) = scheduler.try_fallback(next_commit_idx) {
+                            if let Some(validation_mode) = Self::execute(
                                 next_commit_idx,
                                 incarnation,
-                                validation_mode,
-                            )?;
-                        } else {
-                            // fallback lost, clear the corresponding speculative log slot.
-                            clear_speculative_txn_logs(next_commit_idx as usize, true);
-                        }
+                                true,
+                                scheduler,
+                                block,
+                                last_input_output,
+                                versioned_cache,
+                                &executor,
+                                base_view,
+                                ParallelState::new(
+                                    versioned_cache,
+                                    scheduler,
+                                    start_shared_counter,
+                                    shared_counter,
+                                ),
+                                worker_id,
+                                enable_profiling,
+                            )? {
+                                // fallback won, no need to validate
+                                scheduler.finish_execution(
+                                    next_commit_idx,
+                                    incarnation,
+                                    validation_mode,
+                                )?;
+                            } else {
+                                // fallback lost, clear the corresponding speculative log slot.
+                                clear_speculative_txn_logs(next_commit_idx as usize, true);
+                            }
+                        };
                     };
-                };
+                }
             }
 
             drain_commit_queue()?;
@@ -951,6 +965,7 @@ where
                             shared_counter,
                         ),
                         worker_id,
+                        enable_profiling,
                     )? {
                         scheduler.finish_execution(txn_idx, incarnation, validation_mode)?
                     } else {
@@ -974,7 +989,7 @@ where
                     SchedulerTask::Retry
                 },
                 SchedulerTask::Retry => {
-                    if worker_id < num_committers {
+                    if enable_special_committers && worker_id < num_committers {
                         scheduler.committer_next_task(committer_proximity_interval)
                     } else {
                         scheduler.next_task()
@@ -1060,6 +1075,11 @@ where
                         num_workers,
                         num_committers_and_proximity_interval,
                         *worker_id,
+                        self.config.local.enable_block_stm_profiling,
+                        !matches!(
+                            self.config.local.block_stm_committer_setting,
+                            BlockSTMCommitterSetting::None
+                        ),
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,
@@ -1199,6 +1219,7 @@ where
                 0, // incarnation
                 false,
                 0, // worker_id
+                false,
             );
 
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex, 0, false);
@@ -1585,7 +1606,6 @@ fn get_num_committers_and_proximity_interval(
     setting: BlockSTMCommitterSetting,
 ) -> (usize, usize) {
     match setting {
-        // TODO: implement proper handling.
         BlockSTMCommitterSetting::None => (num_workers, usize::MAX),
         BlockSTMCommitterSetting::Default => match num_workers {
             // Based on simple grid optimizations.
