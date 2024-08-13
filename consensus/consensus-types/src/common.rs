@@ -528,7 +528,6 @@ impl Payload {
                 Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
                 // TODO(ibalajiarun): Remove this log when OptQS is enabled.
                 bail!("OptQuorumStore Payload is not expected yet");
-                Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",

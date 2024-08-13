@@ -1,4 +1,5 @@
 use anyhow::ensure;
+use aptos_logger::error;
 use core::fmt;
 use serde::Serialize;
 use std::cmp::{max, Ordering};
