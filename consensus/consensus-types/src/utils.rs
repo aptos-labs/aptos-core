@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use anyhow::ensure;
 use aptos_logger::error;
 use core::fmt;
