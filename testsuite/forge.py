@@ -265,6 +265,7 @@ class ForgeContext:
     forge_test_suite: str
     forge_username: str
     forge_blocking: bool
+    forge_retain_debug_logs: str
 
     github_actions: str
     github_job_url: Optional[str]
@@ -838,6 +839,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_TRIGGERED_BY=forge_triggered_by,
             FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
             FORGE_USERNAME=sanitize_k8s_resource_name(context.forge_username),
+            FORGE_RETAIN_DEBUG_LOGS=context.forge_retain_debug_logs,
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
@@ -1331,6 +1333,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_TEST_SUITE")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
 @envoption("FORGE_IMAGE_TAG")
+@envoption("FORGE_RETAIN_DEBUG_LOGS", "false")
 @envoption("IMAGE_TAG")
 @envoption("UPGRADE_IMAGE_TAG")
 @envoption("FORGE_NAMESPACE")
@@ -1373,6 +1376,7 @@ def test(
     forge_test_suite: str,
     forge_runner_duration_secs: str,
     forge_image_tag: Optional[str],
+    forge_retain_debug_logs: str,
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
     forge_namespace: Optional[str],
@@ -1620,6 +1624,7 @@ def test(
         forge_cluster=forge_cluster,
         forge_test_suite=forge_test_suite,
         forge_username=forge_username,
+        forge_retain_debug_logs=forge_retain_debug_logs,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=(
