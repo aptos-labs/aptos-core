@@ -138,24 +138,24 @@ impl CliCommand<String> for ShowPrivateKey {
         if let Some(profiles) = &config.profiles {
             if let Some(profile) = profiles.get(&self.profile.clone()) {
                 if let Some(private_key) = &profile.private_key {
-                    return Ok(format!("0x{}", hex::encode(private_key.to_bytes())));
+                    Ok(format!("0x{}", hex::encode(private_key.to_bytes())))
                 } else {
-                    return Err(CliError::CommandArgumentError(format!(
+                    Err(CliError::CommandArgumentError(format!(
                         "Profile {} does not have a private key",
                         self.profile
-                    )));
+                    )))
                 }
             } else {
-                return Err(CliError::CommandArgumentError(format!(
+                Err(CliError::CommandArgumentError(format!(
                     "Profile {} does not exist",
                     self.profile
-                )));
-            };
+                )))
+            }
         } else {
-            return Err(CliError::CommandArgumentError(
+            Err(CliError::CommandArgumentError(
                 "Config has no profiles".to_string(),
-            ));
-        };
+            ))
+        }
     }
 }
 
@@ -216,19 +216,24 @@ impl CliCommand<String> for DeleteProfile {
 
         if let Some(profiles) = &mut config.profiles {
             if profiles.remove(&self.profile).is_none() {
-                return Err(CliError::CommandArgumentError(format!(
+                Err(CliError::CommandArgumentError(format!(
                     "Profile {} does not exist",
                     self.profile
-                )));
-            };
+                )))
+            } else {
+                config.save().map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Unable to save config after deleting profile: {}",
+                        err,
+                    ))
+                })?;
+                Ok(format!("Deleted profile {}", self.profile))
+            }
         } else {
-            return Err(CliError::CommandArgumentError(
+            Err(CliError::CommandArgumentError(
                 "Config has no profiles".to_string(),
-            ));
-        };
-
-        config.save()?;
-        Ok(format!("Deleted profile {}", self.profile))
+            ))
+        }
     }
 }
 
@@ -255,30 +260,33 @@ impl CliCommand<String> for RenameProfile {
 
         if let Some(profiles) = &mut config.profiles {
             if profiles.contains_key(&self.new_profile_name.clone()) {
-                return Err(CliError::CommandArgumentError(format!(
+                Err(CliError::CommandArgumentError(format!(
                     "Profile {} already exists",
                     self.new_profile_name
-                )));
-            };
-            if let Some(profile_config) = profiles.remove(&self.profile) {
+                )))
+            } else if let Some(profile_config) = profiles.remove(&self.profile) {
                 profiles.insert(self.new_profile_name.clone(), profile_config);
+                config.save().map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Unable to save config after renaming profile: {}",
+                        err,
+                    ))
+                })?;
+                Ok(format!(
+                    "Renamed profile {} to {}",
+                    self.profile, self.new_profile_name
+                ))
             } else {
-                return Err(CliError::CommandArgumentError(format!(
+                Err(CliError::CommandArgumentError(format!(
                     "Profile {} does not exist",
                     self.profile
-                )));
-            };
+                )))
+            }
         } else {
-            return Err(CliError::CommandArgumentError(
+            Err(CliError::CommandArgumentError(
                 "Config has no profiles".to_string(),
-            ));
-        };
-
-        config.save()?;
-        Ok(format!(
-            "Renamed profile {} to {}",
-            self.profile, self.new_profile_name
-        ))
+            ))
+        }
     }
 }
 
