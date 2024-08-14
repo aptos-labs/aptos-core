@@ -22,7 +22,7 @@ use move_package::{
 };
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
-use move_vm_test_utils::gas_schedule::CostTable;
+use move_vm_test_utils::gas_schedule::{CostTable, GasStatus, TestGasMeter};
 // if unix
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::ExitStatusExt;
@@ -159,6 +159,29 @@ pub enum UnitTestResult {
 
 pub fn run_move_unit_tests<W: Write + Send>(
     pkg_path: &Path,
+    build_config: move_package::BuildConfig,
+    unit_test_config: UnitTestingConfig,
+    natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
+    cost_table: Option<CostTable>,
+    compute_coverage: bool,
+    writer: &mut W,
+) -> Result<UnitTestResult> {
+    run_move_unit_tests_with_gas_meter(
+        pkg_path,
+        build_config,
+        unit_test_config,
+        natives,
+        genesis,
+        cost_table,
+        compute_coverage,
+        writer,
+        None::<GasStatus>,
+    )
+}
+
+pub fn run_move_unit_tests_with_gas_meter<W: Write + Send, G: TestGasMeter + Send>(
+    pkg_path: &Path,
     mut build_config: move_package::BuildConfig,
     mut unit_test_config: UnitTestingConfig,
     natives: Vec<NativeFunctionRecord>,
@@ -166,6 +189,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     cost_table: Option<CostTable>,
     compute_coverage: bool,
     writer: &mut W,
+    gas_meter: Option<G>,
 ) -> Result<UnitTestResult> {
     let mut test_plan = None;
     let mut test_plan_v2 = None;
@@ -301,13 +325,30 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
-    if !unit_test_config
-        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), cost_table, writer)
-        .unwrap()
-        .1
-    {
-        cleanup_trace();
-        return Ok(UnitTestResult::Failure);
+    if let Some(gas_meter) = gas_meter {
+        if !unit_test_config
+            .run_and_report_unit_tests_with_gas_meter(
+                test_plan,
+                Some(natives),
+                Some(genesis),
+                writer,
+                gas_meter,
+            )
+            .unwrap()
+            .1
+        {
+            cleanup_trace();
+            return Ok(UnitTestResult::Failure);
+        }
+    } else {
+        if !unit_test_config
+            .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), cost_table, writer)
+            .unwrap()
+            .1
+        {
+            cleanup_trace();
+            return Ok(UnitTestResult::Failure);
+        }
     }
 
     // Compute the coverage map. This will be used by other commands after this.

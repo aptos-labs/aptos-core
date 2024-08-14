@@ -8,7 +8,7 @@
 //! operations or other native operations; the cost of each native operation will be returned by the
 //! native function itself.
 use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
+    errors::{PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CodeOffset, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
         FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
@@ -18,16 +18,12 @@ use move_binary_format::{
     file_format_common::{instruction_key, Opcodes},
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    gas_algebra::{
+    account_address::AccountAddress, effects::ChangeSet, gas_algebra::{
         AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
         InternalGasUnit, NumArgs, NumBytes, NumTypeNodes, ToUnit,
-    },
-    identifier::IdentStr,
-    language_storage::ModuleId,
-    u256,
-    vm_status::StatusCode,
+    }, identifier::IdentStr, language_storage::ModuleId, u256, vm_status::StatusCode
 };
+use move_vm_runtime::native_extensions::NativeContextExtensions;
 use move_vm_types::{
     gas::{GasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
@@ -38,6 +34,17 @@ use std::{
     ops::{Add, Mul},
     u64,
 };
+
+// gas meter for test-utils
+pub trait TestGasMeter: GasMeter {
+    fn instantiate(&self) -> Self;
+    fn remaining_gas(&self) -> Gas;
+    fn charge_write_set(
+        &mut self,
+        changes: &ChangeSet,
+        extensions: &mut NativeContextExtensions,
+    ) -> VMResult<()>;
+}
 
 pub enum GasUnit {}
 
@@ -100,6 +107,29 @@ impl GasCost {
 }
 
 static ZERO_COST_SCHEDULE: Lazy<CostTable> = Lazy::new(zero_cost_schedule);
+
+
+impl<'a> TestGasMeter for GasStatus<'a> {
+    fn instantiate(&self) -> Self {
+        Self {
+            gas_left: self.gas_left.clone(),
+            cost_table: self.cost_table,
+            charge: self.charge,
+        }
+    }
+
+    fn remaining_gas(&self) -> Gas {
+        self.remaining_gas()
+    }
+
+    fn charge_write_set(
+        &mut self,
+        _changes: &ChangeSet,
+        _extensions: &mut NativeContextExtensions,
+    ) -> VMResult<()> {
+        Ok(())
+    }
+}
 
 /// The Move VM implementation of state for gas metering.
 ///

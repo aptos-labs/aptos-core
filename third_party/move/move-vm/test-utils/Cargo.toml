@@ -21,6 +21,7 @@ move-bytecode-utils = { path = "../../tools/move-bytecode-utils" }
 move-core-types = { path = "../../move-core/types" }
 move-table-extension = { path = "../../extensions/move-table-extension", optional = true }
 move-vm-types = { path = "../types" }
+move-vm-runtime = { path = "../runtime" }
 
 [features]
 default = []
