@@ -1257,6 +1257,15 @@ impl RoundManager {
                         qc
                     ))?;
                 if self.onchain_config.order_vote_enabled() {
+                    // This check is already done in safety rules. As printing the "failed to broadcast order vote"
+                    // in humio logs could sometimes look scary, we are doing the same check again here.
+                    if let Some(last_sent_vote) = self.round_state.vote_sent() {
+                        if let Some((two_chain_timeout, _)) = last_sent_vote.two_chain_timeout() {
+                            if round <= two_chain_timeout.round() {
+                                return Ok(());
+                            }
+                        }
+                    }
                     // Broadcast order vote if the QC is successfully aggregated
                     // Even if broadcast order vote fails, the function will return Ok
                     if let Err(e) = self.broadcast_order_vote(vote, qc.clone()).await {
