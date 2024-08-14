@@ -1,0 +1,35 @@
+name: Rebase Branch with Main
+
+on: [push, pull_request]
+# on:
+#   schedule:
+#     - cron: '0 0 * * *'  # Runs every day at midnight UTC
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        ref: zijie/move-smith-base # Replace with your branch name
+        fetch-depth: 0
+
+    - name: Set up Git
+      run: |
+        git config user.name "Your GitHub Actions Bot"
+        git config user.email "actions@github.com"
+
+    - name: Fetch main
+      run: git fetch origin main
+
+    - name: Rebase branch with main
+      run: git rebase origin/main
+
+    - name: Push rebased branch
+      run: |
+        git push --force-with-lease
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
