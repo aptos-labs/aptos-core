@@ -65,9 +65,10 @@ where
     where
         SK: SeekKeyCodec<S>,
     {
-        let _timer = APTOS_SCHEMADB_SEEK_LATENCY_SECONDS
-            .with_label_values(&[S::COLUMN_FAMILY_NAME, "seek"])
-            .start_timer();
+        // Timer deleted
+        // let _timer = APTOS_SCHEMADB_SEEK_LATENCY_SECONDS
+        //     .with_label_values(&[S::COLUMN_FAMILY_NAME, "seek"])
+        //     .start_timer();
         let key = <SK as SeekKeyCodec<S>>::encode_seek_key(seek_key)?;
         self.db_iter.seek(&key);
         self.status = Status::DoneSeek;

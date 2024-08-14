@@ -444,12 +444,13 @@ impl DbReader for AptosDB {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        gauged_api("get_state_value_with_version_by_version", || {
+        // Timer deleted
+        //gauged_api("get_state_value_with_version_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             self.state_store
                 .get_state_value_with_version_by_version(state_key, version)
-        })
+        //})
     }
 
     /// Returns the proof of the given state key and version.
@@ -459,12 +460,13 @@ impl DbReader for AptosDB {
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
-        gauged_api("get_state_proof_by_version_ext", || {
+        // Timer deleted
+        //gauged_api("get_state_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
             self.state_store
                 .get_state_proof_by_version_ext(state_key, version, root_depth)
-        })
+        //})
     }
 
     fn get_state_value_with_proof_by_version_ext(
