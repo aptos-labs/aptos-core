@@ -6,7 +6,6 @@ use crate::pipeline::{
     avail_copies_analysis::AvailCopiesAnalysisProcessor,
     exit_state_analysis::ExitStateAnalysisProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
-    reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
     unreachable_code_analysis::UnreachableCodeProcessor, variable_coalescing::VariableCoalescing,
 };
@@ -18,6 +17,7 @@ pub mod copy_propagation;
 pub mod dead_store_elimination;
 pub mod exit_state_analysis;
 pub mod livevar_analysis_processor;
+pub mod reference_safety;
 pub mod reference_safety_processor;
 pub mod split_critical_edges_processor;
 pub mod uninitialized_use_checker;
@@ -33,7 +33,7 @@ pub mod visibility_checker;
 pub fn register_formatters(target: &FunctionTarget) {
     ExitStateAnalysisProcessor::register_formatters(target);
     LiveVarAnalysisProcessor::register_formatters(target);
-    ReferenceSafetyProcessor::register_formatters(target);
+    reference_safety::register_formatters(target);
     AvailCopiesAnalysisProcessor::register_formatters(target);
     UninitializedUseChecker::register_formatters(target);
     UnreachableCodeProcessor::register_formatters(target);

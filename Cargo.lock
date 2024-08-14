@@ -10821,6 +10821,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "move-binary-format",
+ "move-borrow-graph",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
  "move-command-line-common",

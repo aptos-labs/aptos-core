@@ -4776,10 +4776,16 @@ impl ExpInfo {
 // =================================================================================================
 /// # Formatting
 
+enum Mode {
+    LineOnly,
+    FileAndLine,
+    Full,
+}
+
 pub struct LocDisplay<'env> {
     loc: &'env Loc,
     env: &'env GlobalEnv,
-    only_line: bool,
+    mode: Mode,
 }
 
 impl Loc {
@@ -4787,7 +4793,15 @@ impl Loc {
         LocDisplay {
             loc: self,
             env,
-            only_line: false,
+            mode: Mode::Full,
+        }
+    }
+
+    pub fn display_file_name_and_line<'env>(&'env self, env: &'env GlobalEnv) -> LocDisplay<'env> {
+        LocDisplay {
+            loc: self,
+            env,
+            mode: Mode::FileAndLine,
         }
     }
 
@@ -4795,7 +4809,7 @@ impl Loc {
         LocDisplay {
             loc: self,
             env,
-            only_line: true,
+            mode: Mode::LineOnly,
         }
     }
 }
@@ -4803,18 +4817,24 @@ impl Loc {
 impl<'env> fmt::Display for LocDisplay<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
-            if self.only_line {
-                write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
-            } else {
-                let offset = self.loc.span.end() - self.loc.span.start();
-                write!(
-                    f,
-                    "at {}:{}:{}+{}",
-                    fname,
-                    pos.line + LineOffset(1),
-                    pos.column + ColumnOffset(1),
-                    offset,
-                )
+            match &self.mode {
+                Mode::LineOnly => {
+                    write!(f, "at line {}", pos.line + LineOffset(1))
+                },
+                Mode::FileAndLine => {
+                    write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
+                },
+                Mode::Full => {
+                    let offset = self.loc.span.end() - self.loc.span.start();
+                    write!(
+                        f,
+                        "at {}:{}:{}+{}",
+                        fname,
+                        pos.line + LineOffset(1),
+                        pos.column + ColumnOffset(1),
+                        offset,
+                    )
+                },
             }
         } else {
             write!(f, "{:?}", self.loc)
