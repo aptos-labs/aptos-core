@@ -1,0 +1,32 @@
+[package]
+name = "aptos-experimental-hexy"
+description = "Aptos Hexy"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-experimental-layered-map = { workspace = true }
+aptos-metrics-core = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+
+[dev-dependencies]
+aptos-crypto = { workspace = true, features = ["fuzzing"] }
+criterion = { workspace = true }
+jemallocator = { workspace = true }
+proptest = { workspace = true }
+rand = { workspace = true }
+
+[[bench]]
+name = "sort_dedup"
+harness = false

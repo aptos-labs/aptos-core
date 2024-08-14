@@ -48,7 +48,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:78: test_not_using_min_incorrect
    =         <redacted> = <redacted>
    =         v_ref = <redacted>
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:79: test_not_using_min_incorrect
    =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:80: test_not_using_min_incorrect
@@ -56,11 +55,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:81: test_not_using_min_incorrect
    =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:82: test_not_using_min_incorrect
-   =         <redacted> = <redacted>
    =         v = <redacted>
-   =     at tests/sources/functional/choice.move:83: test_not_using_min_incorrect
-   =         return = <redacted>
-   =     at tests/sources/functional/choice.move:75: test_not_using_min_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:84: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:87: test_not_using_min_incorrect (spec)
@@ -75,7 +70,6 @@ error: post-condition does not hold
     =     at tests/sources/functional/choice.move:95: test_choice_dup_expected_fail
     =         x = <redacted>
     =     at tests/sources/functional/choice.move:96: test_choice_dup_expected_fail
-    =         <redacted> = <redacted>
     =         result = <redacted>
     =     at tests/sources/functional/choice.move:97: test_choice_dup_expected_fail
     =     at tests/sources/functional/choice.move:100: test_choice_dup_expected_fail (spec)

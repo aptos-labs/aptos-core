@@ -462,6 +462,7 @@ impl ProofQueue {
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: u64,
         max_txns_after_filtering: u64,
+        soft_max_txns_after_filtering: u64,
         max_bytes: u64,
         return_non_full: bool,
         block_timestamp: Duration,
@@ -544,6 +545,7 @@ impl ProofQueue {
                         if cur_bytes == max_bytes
                             || cur_all_txns == max_txns
                             || cur_unique_txns == max_txns_after_filtering
+                            || cur_unique_txns >= soft_max_txns_after_filtering
                         {
                             full = true;
                             return false;
@@ -562,6 +564,7 @@ impl ProofQueue {
             block_unique_txns = cur_unique_txns,
             max_txns = max_txns,
             max_txns_after_filtering = max_txns_after_filtering,
+            soft_max_txns_after_filtering = soft_max_txns_after_filtering,
             max_bytes = max_bytes,
             batch_count = ret.len(),
             full = full,

@@ -141,6 +141,15 @@ pub fn core_mempool_index_size(label: &'static str, size: usize) {
         .set(size as i64)
 }
 
+pub static SENDER_BUCKET_FREQUENCIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_core_mempool_sender_bucket_frequencies",
+        "Frequency of each sender bucket in core mempool",
+        &["sender_bucket"]
+    )
+    .unwrap()
+});
+
 /// Counter tracking size of each bucket in timeline index
 static CORE_MEMPOOL_TIMELINE_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -297,10 +306,11 @@ pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_core_mempool_txn_consensus_pulled",
+pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED_BY_BUCKET: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_core_mempool_txn_consensus_pulled_by_bucket",
         "Number of times a txn was pulled from core mempool by consensus",
+        &["bucket"],
         TXN_CONSENSUS_PULLED_BUCKETS.to_vec()
     )
     .unwrap()

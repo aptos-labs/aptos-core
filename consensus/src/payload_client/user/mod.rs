@@ -18,7 +18,8 @@ pub trait UserPayloadClient: Send + Sync {
         &self,
         max_poll_time: Duration,
         max_items: u64,
-        max_unique_items: u64,
+        max_items_after_filtering: u64,
+        soft_max_items_after_filtering: u64,
         max_bytes: u64,
         max_inline_items: u64,
         max_inline_bytes: u64,
@@ -51,7 +52,8 @@ impl UserPayloadClient for DummyClient {
         &self,
         max_poll_time: Duration,
         mut max_items: u64,
-        mut max_unique_items: u64,
+        mut max_items_after_filtering: u64,
+        mut soft_max_items_after_filtering: u64,
         mut max_bytes: u64,
         _max_inline_items: u64,
         _max_inline_bytes: u64,
@@ -67,7 +69,8 @@ impl UserPayloadClient for DummyClient {
         let mut txns = vec![];
         while timer.elapsed() < max_poll_time
             && max_items >= 1
-            && max_unique_items >= 1
+            && max_items_after_filtering >= 1
+            && soft_max_items_after_filtering >= 1
             && max_bytes >= 1
             && nxt_txn_idx < self.txns.len()
         {
@@ -78,7 +81,8 @@ impl UserPayloadClient for DummyClient {
                 break;
             }
             max_items -= 1;
-            max_unique_items -= 1;
+            max_items_after_filtering -= 1;
+            soft_max_items_after_filtering -= 1;
             max_bytes -= txn_size;
             nxt_txn_idx += 1;
             txns.push(txn);

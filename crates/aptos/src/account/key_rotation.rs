@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{
-    types::{
-        account_address_from_auth_key, account_address_from_public_key,
-        AuthenticationKeyInputOptions, CliCommand, CliConfig, CliError, CliTypedResult,
-        ConfigSearchMode, EncodingOptions, ExtractPublicKey, ParsePrivateKey, ProfileConfig,
-        ProfileOptions, PublicKeyInputOptions, RestOptions, TransactionOptions, TransactionSummary,
-    },
-    utils::{prompt_yes, prompt_yes_with_override, read_line},
+use crate::common::types::{
+    account_address_from_auth_key, account_address_from_public_key, AuthenticationKeyInputOptions,
+    CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
+    ExtractPublicKey, HardwareWalletOptions, ParsePrivateKey, ProfileConfig, ProfileOptions,
+    PublicKeyInputOptions, RestOptions, TransactionOptions, TransactionSummary,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -16,6 +13,7 @@ use aptos_crypto::{
     encoding_type::EncodingType,
     PrivateKey, SigningKey,
 };
+use aptos_ledger;
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
     error::{AptosErrorResponse, RestError},
@@ -27,7 +25,7 @@ use aptos_types::{
     transaction::authenticator::AuthenticationKey,
 };
 use async_trait::async_trait;
-use clap::Parser;
+use clap::{Args, Parser};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -38,31 +36,57 @@ use std::{collections::BTreeMap, path::PathBuf};
 /// rotated you will need to use the original account address, with the
 /// new private key.  There is an interactive prompt to help you add it
 /// to a new profile.
+///
+/// If you wish to rotate from a ledger wallet, it must have its own
+/// profile. If you wish to rotate to a ledger wallet, specify the new
+/// derivation path or index accordingly.
 #[derive(Debug, Parser)]
 pub struct RotateKey {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 
+    #[clap(flatten)]
+    pub(crate) new_auth_key_options: NewAuthKeyOptions,
+
+    #[clap(flatten)]
+    pub(crate) new_profile_options: NewProfileOptions,
+}
+
+#[derive(Args, Debug)]
+#[group(required = true, multiple = false)]
+pub(crate) struct NewAuthKeyOptions {
     /// File name that contains the new private key encoded in the type from `--encoding`
-    #[clap(long, group = "new_private_key_inputs", value_parser)]
+    #[clap(long, value_parser)]
     pub(crate) new_private_key_file: Option<PathBuf>,
 
     /// New private key encoded in the type from `--encoding`
-    #[clap(long, group = "new_private_key_inputs")]
+    #[clap(long)]
     pub(crate) new_private_key: Option<String>,
 
-    /// Name of the profile to save the new private key
+    /// BIP44 derivation path of hardware wallet account, e.g. `m/44'/637'/0'/0'/0'`
     ///
-    /// If not provided, it will interactively have you save a profile,
-    /// unless `--skip_saving_profile` is provided
+    /// Note you may need to escape single quotes in your shell, for example
+    /// `m/44'/637'/0'/0'/0'` would be `m/44\'/637\'/0\'/0\'/0\'`
     #[clap(long)]
-    pub(crate) save_to_profile: Option<String>,
+    pub(crate) new_derivation_path: Option<String>,
 
-    /// Skip saving profile
+    /// BIP44 account index of hardware wallet account, e.g. `0`
     ///
-    /// This skips the interactive profile saving after rotating the authentication key
+    /// Given index `n` maps to BIP44 derivation path `m/44'/637'/n'/0'/0`
+    #[clap(long)]
+    pub(crate) new_derivation_index: Option<String>,
+}
+
+#[derive(Args, Debug)]
+#[group(required = true, multiple = false)]
+pub(crate) struct NewProfileOptions {
+    /// Only specify if you do not want to save a new profile
     #[clap(long)]
     pub(crate) skip_saving_profile: bool,
+
+    /// Name of new the profile to save for the new authentication key
+    #[clap(long)]
+    pub(crate) save_to_profile: Option<String>,
 }
 
 impl ParsePrivateKey for RotateKey {}
@@ -75,8 +99,8 @@ impl RotateKey {
     ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
         self.parse_private_key(
             encoding,
-            self.new_private_key_file.clone(),
-            self.new_private_key.clone(),
+            self.new_auth_key_options.new_private_key_file.clone(),
+            self.new_auth_key_options.new_private_key.clone(),
         )
     }
 }
@@ -94,56 +118,147 @@ impl CliCommand<RotateSummary> for RotateKey {
     }
 
     async fn execute(self) -> CliTypedResult<RotateSummary> {
-        let new_private_key = self
-            .extract_private_key(self.txn_options.encoding_options.encoding)?
-            .ok_or_else(|| {
-                CliError::CommandArgumentError(
-                    "One of ['--new-private-key', '--new-private-key-file'] must be used"
-                        .to_string(),
-                )
-            })?;
+        // Verify profile name before executing rotation operation, to avoid erroring out in a
+        // manner that results in corrupted config state.
+        if let Some(ref new_profile_name) = self.new_profile_options.save_to_profile {
+            if new_profile_name.is_empty() {
+                return Err(CliError::CommandArgumentError(
+                    "New profile name may not be empty".to_string(),
+                ));
+            };
 
-        let (current_private_key, sender_address) = self.txn_options.get_key_and_address()?;
+            // Verify that config exists by attempting to load it.
+            let config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
 
-        if new_private_key == current_private_key {
+            // Verify that the new profile name does not already exist in the config.
+            if let Some(profiles) = config.profiles {
+                if profiles.contains_key(new_profile_name) {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} already exists",
+                        new_profile_name
+                    )));
+                };
+            }
+        };
+
+        // Get current signer options.
+        let current_derivation_path = if self.txn_options.profile_options.profile.is_some() {
+            self.txn_options.profile_options.derivation_path()?
+        } else {
+            None
+        };
+        let (current_private_key, current_address, current_public_key) = if current_derivation_path
+            .is_some()
+        {
+            (
+                None,
+                self.txn_options.profile_options.account_address()?,
+                self.txn_options.profile_options.public_key()?,
+            )
+        } else {
+            let (current_private_key, current_address) = self.txn_options.get_key_and_address()?;
+            (
+                Some(current_private_key),
+                current_address,
+                self.txn_options.get_public_key()?,
+            )
+        };
+
+        // Get new signer options.
+        let new_hardware_wallet_options = HardwareWalletOptions {
+            derivation_path: self.new_auth_key_options.new_derivation_path.clone(),
+            derivation_index: self.new_auth_key_options.new_derivation_index.clone(),
+        };
+        let new_derivation_path = new_hardware_wallet_options.extract_derivation_path()?;
+        let (new_private_key, new_public_key) = if new_derivation_path.is_some() {
+            (
+                None,
+                aptos_ledger::get_public_key(new_derivation_path.clone().unwrap().as_str(), false)?,
+            )
+        } else {
+            let new_private_key = self
+                .extract_private_key(self.txn_options.encoding_options.encoding)?
+                .ok_or_else(|| {
+                    CliError::CommandArgumentError("Unable to parse new private key".to_string())
+                })?;
+            (Some(new_private_key.clone()), new_private_key.public_key())
+        };
+
+        // Check that public key is actually changing.
+        if new_public_key == current_public_key {
             return Err(CliError::CommandArgumentError(
-                "New private key cannot be the same as the current private key".to_string(),
+                "New public key cannot be the same as the current public key".to_string(),
             ));
         }
 
-        // Get sequence number for account
-        let sequence_number = self.txn_options.sequence_number(sender_address).await?;
-        let auth_key = self.txn_options.auth_key(sender_address).await?;
-
+        // Construct rotation proof challenge.
+        let sequence_number = self.txn_options.sequence_number(current_address).await?;
+        let auth_key = self.txn_options.auth_key(current_address).await?;
         let rotation_proof = RotationProofChallenge {
             account_address: CORE_CODE_ADDRESS,
             module_name: "account".to_string(),
             struct_name: "RotationProofChallenge".to_string(),
             sequence_number,
-            originator: sender_address,
+            originator: current_address,
             current_auth_key: AccountAddress::from_bytes(auth_key)
                 .map_err(|err| CliError::UnableToParse("auth_key", err.to_string()))?,
-            new_public_key: new_private_key.public_key().to_bytes().to_vec(),
+            new_public_key: new_public_key.to_bytes().to_vec(),
         };
-
         let rotation_msg =
             bcs::to_bytes(&rotation_proof).map_err(|err| CliError::BCS("rotation_proof", err))?;
 
-        // Signs the struct using both the current private key and the next private key
-        let rotation_proof_signed_by_current_private_key =
-            current_private_key.sign_arbitrary_message(&rotation_msg.clone());
-        let rotation_proof_signed_by_new_private_key =
-            new_private_key.sign_arbitrary_message(&rotation_msg);
+        // Determine if current and new keys are hardware wallets, for better user feedback.
+        let current_is_hardware_wallet = current_derivation_path.is_some();
+        let new_is_hardware_wallet = new_derivation_path.is_some();
 
+        // Sign the struct using both the current private key and the new private key.
+        let rotation_proof_signed_by_current_private_key =
+            if let Some(current_derivation_path) = current_derivation_path.clone() {
+                eprintln!("Sign rotation proof challenge on your Ledger device (current key)");
+                let challenge_signature = aptos_ledger::sign_message(
+                    current_derivation_path.as_str(),
+                    &rotation_msg.clone(),
+                )?;
+                eprintln!("Rotation proof challenge successfully signed (current key)");
+                if !new_is_hardware_wallet {
+                    eprintln!("You will still need to sign the transaction on your Ledger device");
+                }
+                challenge_signature
+            } else {
+                current_private_key
+                    .unwrap()
+                    .sign_arbitrary_message(&rotation_msg.clone())
+            };
+        let rotation_proof_signed_by_new_private_key =
+            if let Some(new_derivation_path) = new_derivation_path.clone() {
+                eprintln!("Sign rotation proof challenge on your Ledger device (new key)");
+                let challenge_signature = aptos_ledger::sign_message(
+                    new_derivation_path.clone().as_str(),
+                    &rotation_msg.clone(),
+                )?;
+                eprintln!("Rotation proof challenge successfully signed (new key)");
+                if current_is_hardware_wallet {
+                    eprintln!("You will still need to sign the transaction on your Ledger device");
+                }
+                challenge_signature
+            } else {
+                new_private_key
+                    .clone()
+                    .unwrap()
+                    .sign_arbitrary_message(&rotation_msg.clone())
+            };
+
+        // Submit transaction.
+        if current_derivation_path.is_some() {
+            eprintln!("Approve transaction on your Ledger device");
+        };
         let txn_summary = self
             .txn_options
             .submit_transaction(aptos_stdlib::account_rotate_authentication_key(
                 0,
-                // Existing public key
-                current_private_key.public_key().to_bytes().to_vec(),
+                current_public_key.to_bytes().to_vec(),
                 0,
-                // New public key
-                new_private_key.public_key().to_bytes().to_vec(),
+                new_public_key.to_bytes().to_vec(),
                 rotation_proof_signed_by_current_private_key
                     .to_bytes()
                     .to_vec(),
@@ -152,10 +267,9 @@ impl CliCommand<RotateSummary> for RotateKey {
             .await
             .map(TransactionSummary::from)?;
 
-        let string = serde_json::to_string_pretty(&txn_summary)
+        let txn_string = serde_json::to_string_pretty(&txn_summary)
             .map_err(|err| CliError::UnableToParse("transaction summary", err.to_string()))?;
-
-        eprintln!("{}", string);
+        eprintln!("{}", txn_string);
 
         if let Some(txn_success) = txn_summary.success {
             if !txn_success {
@@ -169,87 +283,48 @@ impl CliCommand<RotateSummary> for RotateKey {
             ));
         }
 
-        let mut profile_name: String;
-
-        if self.save_to_profile.is_none() {
-            if self.skip_saving_profile
-                || !prompt_yes("Do you want to create a profile for the new key?")
-            {
-                return Ok(RotateSummary {
-                    transaction: txn_summary,
-                    message: None,
-                });
-            }
-
-            eprintln!("Enter the name for the profile");
-            profile_name = read_line("Profile name")?.trim().to_string();
-        } else {
-            // We can safely unwrap here
-            profile_name = self.save_to_profile.unwrap();
+        if self.new_profile_options.skip_saving_profile {
+            return Ok(RotateSummary {
+                transaction: txn_summary,
+                message: None,
+            });
         }
 
-        // Check if profile name exists
+        // Can safe unwrap here since NewProfileOptions arg group requires either that
+        // skip_saving_profile is set, or that a new profile name is specified. If a new profile is
+        // specified, then it will have already been error checked above.
+        let new_profile_name = self.new_profile_options.save_to_profile.unwrap();
+
+        // If no config exists, then the error should've been caught earlier during the profile
+        // name verification step.
         let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
-
-        if let Some(ref profiles) = config.profiles {
-            if profiles.contains_key(&profile_name) {
-                if let Err(cli_err) = prompt_yes_with_override(
-                    format!(
-                        "Profile {} exits. Do you want to provide a new profile name?",
-                        profile_name
-                    )
-                    .as_str(),
-                    self.txn_options.prompt_options,
-                ) {
-                    match cli_err {
-                        CliError::AbortedError => {
-                            return Ok(RotateSummary {
-                                transaction: txn_summary,
-                                message: None,
-                            });
-                        },
-                        _ => {
-                            return Err(cli_err);
-                        },
-                    }
-                }
-
-                eprintln!("Enter the name for the profile");
-                profile_name = read_line("Profile name")?.trim().to_string();
-            }
+        if config.profiles.is_none() {
+            config.profiles = Some(BTreeMap::new());
         }
 
-        if profile_name.is_empty() {
-            return Err(CliError::AbortedError);
-        }
-
-        let mut profile_config = ProfileConfig {
-            private_key: Some(new_private_key.clone()),
-            public_key: Some(new_private_key.public_key()),
-            account: Some(sender_address),
+        // Create new config.
+        let mut new_profile_config = ProfileConfig {
+            public_key: Some(new_public_key),
+            account: Some(current_address),
+            private_key: new_private_key,
+            derivation_path: new_derivation_path,
             ..self.txn_options.profile_options.profile()?
         };
 
         if let Some(url) = self.txn_options.rest_options.url {
-            profile_config.rest_url = Some(url.into());
-        }
-
-        if config.profiles.is_none() {
-            config.profiles = Some(BTreeMap::new());
+            new_profile_config.rest_url = Some(url.into());
         }
 
         config
             .profiles
             .as_mut()
             .unwrap()
-            .insert(profile_name.clone(), profile_config);
+            .insert(new_profile_name.clone(), new_profile_config);
         config.save()?;
-
-        eprintln!("Profile {} is saved.", profile_name);
 
         Ok(RotateSummary {
             transaction: txn_summary,
-            message: Some(format!("Profile {} is saved.", profile_name)),
+            message: Some(format!("Saved new profile {}", new_profile_name)),
         })
     }
 }

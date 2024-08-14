@@ -216,6 +216,10 @@ impl TransactionStore {
         self.sequence_numbers.get(address)
     }
 
+    pub(crate) fn num_sender_buckets(&self) -> MempoolSenderBucket {
+        self.num_sender_buckets
+    }
+
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();

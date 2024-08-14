@@ -2,9 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
-};
+use super::proposer_election::ProposerElection;
 use crate::{
     block_storage::BlockReader,
     counters::{
@@ -29,6 +27,7 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_infallible::Mutex;
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -196,9 +195,10 @@ impl PipelineBackpressureConfig {
                 .sorted()
                 .collect::<Vec<_>>();
             if sizes.len() >= config.min_blocks_to_activate {
-                let calibrated_block_size = *sizes
+                let calibrated_block_size = (*sizes
                     .get(((config.percentile * sizes.len() as f64) as usize).min(sizes.len() - 1))
-                    .expect("guaranteed to be within vector size");
+                    .expect("guaranteed to be within vector size"))
+                .max(config.min_calibrated_txns_per_block);
                 PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS.observe(calibrated_block_size as f64);
                 // Check if calibrated block size is reduction in size, to turn on backpressure.
                 if max_block_txns > calibrated_block_size {
@@ -265,7 +265,7 @@ pub struct ProposalGenerator {
     chain_health_backoff_config: ChainHealthBackoffConfig,
 
     // Last round that a proposal was generated
-    last_round_generated: Round,
+    last_round_generated: Mutex<Round>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
 
@@ -308,7 +308,7 @@ impl ProposalGenerator {
             max_failed_authors_to_store,
             pipeline_backpressure_config,
             chain_health_backoff_config,
-            last_round_generated: 0,
+            last_round_generated: Mutex::new(0),
             quorum_store_enabled,
             vtxn_config,
             allow_batches_without_pos_in_proposal,
@@ -323,7 +323,7 @@ impl ProposalGenerator {
     pub fn generate_nil_block(
         &self,
         round: Round,
-        proposer_election: &mut UnequivocalProposerElection,
+        proposer_election: Arc<dyn ProposerElection>,
     ) -> anyhow::Result<Block> {
         let hqc = self.ensure_highest_quorum_cert(round)?;
         let quorum_cert = hqc.as_ref().clone();
@@ -347,15 +347,18 @@ impl ProposalGenerator {
     /// 3. In case a given round is not greater than the calculated parent, return an OldRound
     /// error.
     pub async fn generate_proposal(
-        &mut self,
+        &self,
         round: Round,
-        proposer_election: &mut UnequivocalProposerElection,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
-        if self.last_round_generated < round {
-            self.last_round_generated = round;
-        } else {
-            bail!("Already proposed in the round {}", round);
+        {
+            let mut last_round_generated = self.last_round_generated.lock();
+            if *last_round_generated < round {
+                *last_round_generated = round;
+            } else {
+                bail!("Already proposed in the round {}", round);
+            }
         }
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
@@ -447,12 +450,14 @@ impl ProposalGenerator {
                 .collect();
             let validator_txn_filter =
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+
             let (validator_txns, mut payload) = self
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     self.max_block_txns,
                     max_block_txns_after_filtering,
+                    max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering),
                     max_block_bytes,
                     // TODO: Set max_inline_txns and max_inline_bytes correctly
                     self.max_inline_txns,
@@ -510,7 +515,7 @@ impl ProposalGenerator {
     }
 
     async fn calculate_max_block_sizes(
-        &mut self,
+        &self,
         voting_power_ratio: f64,
         timestamp: Duration,
         round: Round,
@@ -640,7 +645,7 @@ impl ProposalGenerator {
         round: Round,
         previous_round: Round,
         include_cur_round: bool,
-        proposer_election: &mut UnequivocalProposerElection,
+        proposer_election: Arc<dyn ProposerElection>,
     ) -> Vec<(Round, Author)> {
         let end_round = round + u64::from(include_cur_round);
         let mut failed_authors = Vec::new();

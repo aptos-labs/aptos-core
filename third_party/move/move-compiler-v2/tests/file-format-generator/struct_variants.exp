@@ -15,6 +15,23 @@ enum CommonFields {
 	z: u64
  }
 }
+enum CommonFieldsAtDifferentOffset has drop {
+ Foo{
+	x: u64,
+	y: u64
+ },
+ Bar{
+	x: u64,
+	z: u64
+ },
+ Baz{
+	z: u64
+ },
+ Balt{
+	foo: u8,
+	z: u64
+ }
+}
 enum Inner {
  Inner1{
 	x: u64
@@ -500,6 +517,35 @@ B5:
 	29: MoveLoc[4](loc3: u64)
 	30: Add
 	31: Ret
+}
+select_common_fields_different_offset(Arg0: CommonFieldsAtDifferentOffset): u64 /* def_idx: 10 */ {
+L1:	loc0: &CommonFieldsAtDifferentOffset
+L2:	loc1: &u64
+B0:
+	0: ImmBorrowLoc[0](Arg0: CommonFieldsAtDifferentOffset)
+	1: StLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	2: CopyLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	3: TestVariant[9](CommonFieldsAtDifferentOffset/Bar)
+	4: BrTrue(9)
+B1:
+	5: CopyLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	6: TestVariant[10](CommonFieldsAtDifferentOffset/Balt)
+	7: BrTrue(9)
+B2:
+	8: Branch(13)
+B3:
+	9: MoveLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	10: ImmBorrowVariantField[4](Bar.z|Balt.z: u64)
+	11: StLoc[2](loc1: &u64)
+	12: Branch(16)
+B4:
+	13: MoveLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	14: ImmBorrowVariantField[5](Baz.z: u64)
+	15: StLoc[2](loc1: &u64)
+B5:
+	16: MoveLoc[2](loc1: &u64)
+	17: ReadRef
+	18: Ret
 }
 }
 ============ bytecode verification succeeded ========

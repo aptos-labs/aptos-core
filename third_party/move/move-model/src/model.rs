@@ -1372,6 +1372,81 @@ impl GlobalEnv {
         }
     }
 
+    /// Determines whether the given spec fun uses type reflection over type parameters.
+    pub fn spec_fun_uses_generic_type_reflection(
+        &self,
+        fun_id: &QualifiedInstId<SpecFunId>,
+    ) -> bool {
+        fn uses_generic_type_reflection(
+            env: &GlobalEnv,
+            visited: &mut BTreeSet<QualifiedInstId<SpecFunId>>,
+            fun: &QualifiedInstId<SpecFunId>,
+        ) -> bool {
+            if !visited.insert(fun.clone()) {
+                return false;
+            }
+            let module = env.get_module(fun.module_id);
+            let decl = module.get_spec_fun(fun.id);
+            if let Some(def) = &decl.body {
+                // Check called spec funs
+                def.called_spec_funs(env).into_iter().any(|qid| {
+                    let qid_inst = qid.instantiate(&fun.inst);
+                    is_generic_type_reflection(env, &qid_inst)
+                        || uses_generic_type_reflection(env, visited, &qid_inst)
+                })
+            } else {
+                false
+            }
+        }
+        fn is_generic_type_reflection(
+            env: &GlobalEnv,
+            fun_id: &QualifiedInstId<SpecFunId>,
+        ) -> bool {
+            static REFLECTION_FUNS: Lazy<BTreeSet<String>> = Lazy::new(|| {
+                [
+                    well_known::TYPE_INFO_SPEC.to_owned(),
+                    well_known::TYPE_NAME_SPEC.to_owned(),
+                    well_known::TYPE_NAME_GET_SPEC.to_owned(),
+                ]
+                .into_iter()
+                .collect()
+            });
+            // The function must be at `extlib` or `stdlib`.
+            let module = env.get_module(fun_id.module_id);
+            let addr = module.get_name().addr();
+            if addr == &env.get_extlib_address() || addr == &env.get_stdlib_address() {
+                let fun = module.get_spec_fun(fun_id.id);
+                let name = format!(
+                    "{}::{}",
+                    module.get_name().name().display(module.symbol_pool()),
+                    fun.name.display(module.symbol_pool())
+                );
+                REFLECTION_FUNS.contains(&name)
+                    && fun_id.inst.iter().any(|ty| ty.is_type_parameter())
+            } else {
+                false
+            }
+        }
+        let module = self.get_module(fun_id.module_id);
+        let decl = module.get_spec_fun(fun_id.id);
+        let uses = decl
+            .insts_using_generic_type_reflection
+            .borrow()
+            .get(&fun_id.inst)
+            .cloned();
+        if let Some(b) = uses {
+            b
+        } else {
+            let b = uses_generic_type_reflection(self, &mut BTreeSet::new(), fun_id);
+            module
+                .get_spec_fun(fun_id.id)
+                .insts_using_generic_type_reflection
+                .borrow_mut()
+                .insert(fun_id.inst.clone(), b);
+            b
+        }
+    }
+
     /// Returns true if the type represents the well-known event handle type.
     pub fn is_wellknown_event_handle_type(&self, ty: &Type) -> bool {
         if let Type::Struct(mid, sid, _) = ty {
@@ -1628,7 +1703,6 @@ impl GlobalEnv {
             loc: loc.clone(),
             offset: 0,
             variant: None,
-            common_for_variants: false,
             ty,
         });
         StructData {
@@ -3200,6 +3274,7 @@ impl<'env> ModuleEnv<'env> {
             print_code: true,
             print_basic_blocks: true,
             print_locals: true,
+            print_bytecode_stats: false,
         });
         Some(
             disas
@@ -3530,7 +3605,7 @@ impl<'env> StructEnv<'env> {
         self.data
             .field_data
             .values()
-            .filter(|data| data.common_for_variants || variant.is_none() || data.variant == variant)
+            .filter(|data| variant.is_none() || data.variant == variant)
             .sorted_by_key(|data| data.offset)
             .map(move |data| FieldEnv {
                 struct_env: self.clone(),
@@ -3653,9 +3728,6 @@ pub struct FieldData {
     /// If the field is associated with a variant, the name of that variant.
     pub variant: Option<Symbol>,
 
-    /// Whether the field is common between all variants
-    pub common_for_variants: bool,
-
     /// The type of this field.
     pub ty: Type,
 }
@@ -3724,11 +3796,6 @@ impl<'env> FieldEnv<'env> {
     /// Gets the variant this field is associated with
     pub fn get_variant(&self) -> Option<Symbol> {
         self.data.variant
-    }
-
-    /// Returns true if this field is common between variants
-    pub fn is_common_variant_field(&self) -> bool {
-        self.data.common_for_variants
     }
 }
 
@@ -4768,6 +4835,15 @@ impl GetNameString for QualifiedId<StructId> {
 impl GetNameString for QualifiedId<FunId> {
     fn get_name_for_display(&self, env: &GlobalEnv) -> String {
         env.get_function_qid(*self).get_full_name_str()
+    }
+}
+
+impl GetNameString for QualifiedId<SpecFunId> {
+    fn get_name_for_display(&self, env: &GlobalEnv) -> String {
+        env.get_spec_fun(*self)
+            .name
+            .display(env.symbol_pool())
+            .to_string()
     }
 }
 
