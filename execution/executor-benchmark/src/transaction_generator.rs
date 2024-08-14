@@ -47,6 +47,8 @@ use std::{
     },
 };
 use thread_local::ThreadLocal;
+use aptos_types::account_config::ObjectGroupResource;
+use aptos_types::transaction::authenticator::AuthenticationKey;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -66,8 +68,8 @@ fn get_sequence_number(address: AccountAddress, reader: Arc<dyn DbReader>) -> u6
         Some(account_resource) => account_resource.sequence_number(),
         None => match lite_account::AccountResource::fetch_move_resource_from_group(
             &db_state_view,
-            &address,
-            &LiteAccountGroup::struct_tag(),
+            &AuthenticationKey::object_address_from_object(&address, &AccountAddress::TEN).account_address(),
+            &ObjectGroupResource::struct_tag(),
         )
         .unwrap()
         {
