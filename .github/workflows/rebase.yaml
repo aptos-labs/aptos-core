@@ -4,6 +4,8 @@ on: [push, pull_request]
 # on:
 #   schedule:
 #     - cron: '0 0 * * *'  # Runs every day at midnight UTC
+permissions:
+  contents: write  # Grants write permission to the contents of the repository
 
 jobs:
   rebase:
