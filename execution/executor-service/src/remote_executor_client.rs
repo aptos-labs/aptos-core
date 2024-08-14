@@ -128,7 +128,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
                 let mut command_tx = vec![];
-                for _ in 0..num_threads/(2 * num_shards) {
+                for _ in 0..std::cmp::max(1, num_threads/(2 * num_shards)) {
                     command_tx.push(Arc::new(tokio::sync::Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone()))));
                 }
                 let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
@@ -238,13 +238,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let mut results = vec![TransactionOutput::default(); total_expected_outputs as usize];
         let results_ptr = Pointer(results.as_mut_ptr());
         let num_deser_threads = self.num_shards();
-        let deser_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .thread_name(move |index| format!("rmt-exe-cli-res-rx-{}", index))
-                .num_threads(num_deser_threads)
-                .build()
-                .unwrap(),
-        );
+        // let deser_thread_pool = Arc::new(
+        //     rayon::ThreadPoolBuilder::new()
+        //         .thread_name(move |index| format!("rmt-exe-cli-res-rx-{}", index))
+        //         .num_threads(num_deser_threads)
+        //         .build()
+        //         .unwrap(),
+        // );
         let (deser_tx, deser_rx) = crossbeam_channel::unbounded();
         let (deser_finished_tx, deser_finished_rx) = crossbeam_channel::unbounded();
         let deser_finished_tx = Arc::new(deser_finished_tx);
@@ -252,7 +252,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             let results_clone = results_ptr.clone();
             let deser_rx_clone: Receiver<Message> = deser_rx.clone();
             let deser_finished_tx_clone = deser_finished_tx.clone();
-            deser_thread_pool.spawn(move || {
+            self.cmd_tx_thread_pool.spawn(move || {
                 while let Ok(msg) = deser_rx_clone.recv() {
                     let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
                         .with_label_values(&["0", "result_rx_bcs_deser"])
