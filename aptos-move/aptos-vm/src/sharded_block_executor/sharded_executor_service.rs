@@ -365,8 +365,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 .get_sample_sum();
             info!(
                 "On shard execution tps {} txns/s ({} txns / {} s)",
-                self.shard_id,
-                (cumulative_txns as f64 / exe_time),
+                cumulative_txns as f64 / exe_time,
                 cumulative_txns,
                 exe_time
             );
