@@ -50,9 +50,9 @@ pub(crate) fn new_extensions<'a>() -> NativeContextExtensions<'a> {
 
 /// Print the change sets for available native context extensions.
 #[allow(unused)]
-pub(crate) fn print_change_sets<W: Write>(_w: &mut W, mut extensions: NativeContextExtensions) {
+pub(crate) fn print_change_sets<W: Write>(_w: &mut W, extensions: &mut NativeContextExtensions) {
     #[cfg(feature = "table-extension")]
-    print_table_extension(_w, &mut extensions);
+    print_table_extension(_w, extensions);
 }
 
 // =============================================================================================
