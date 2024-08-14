@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
+aptos-bounded-executor = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-dkg = { workspace = true }
@@ -34,6 +35,7 @@ hashbrown = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
+lru = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }

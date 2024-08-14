@@ -40,7 +40,7 @@ use std::{
 /// LedgerInfo with the `version` being the latest version that will be committed if B gets 2f+1
 /// votes. It sets `consensus_data_hash` to represent B so that if those 2f+1 votes are gathered a
 /// QC is formed on B.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct LedgerInfo {
     commit_info: BlockInfo,
@@ -199,7 +199,7 @@ pub fn generate_ledger_info_with_sig(
     LedgerInfoWithSignatures::new(
         ledger_info,
         validator_verifier
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(&partial_sig, None)
             .unwrap(),
     )
 }
@@ -357,7 +357,7 @@ impl LedgerInfoWithPartialSignatures {
         &self,
         verifier: &ValidatorVerifier,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        let aggregated_sig = verifier.aggregate_signatures(&self.partial_sigs)?;
+        let aggregated_sig = verifier.aggregate_signatures(&self.partial_sigs, None)?;
         Ok(LedgerInfoWithSignatures::new(
             self.ledger_info.clone(),
             aggregated_sig,
@@ -402,7 +402,7 @@ impl Arbitrary for LedgerInfoWithV0 {
                     let signature = dummy_signature.clone();
                     partial_sig.add_signature(signer.author(), signature);
                 }
-                let aggregated_sig = verifier.aggregate_signatures(&partial_sig).unwrap();
+                let aggregated_sig = verifier.aggregate_signatures(&partial_sig, None).unwrap();
                 Self {
                     ledger_info,
                     signatures: aggregated_sig,
@@ -444,7 +444,7 @@ mod tests {
                 .expect("Incorrect quorum size.");
 
         let mut aggregated_signature = validator_verifier
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(&partial_sig, None)
             .unwrap();
 
         let ledger_info_with_signatures =
@@ -457,7 +457,7 @@ mod tests {
         }
 
         aggregated_signature = validator_verifier
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(&partial_sig, None)
             .unwrap();
 
         let ledger_info_with_signatures_reversed =

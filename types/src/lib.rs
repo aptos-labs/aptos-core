@@ -31,6 +31,7 @@ pub mod network_address;
 pub mod nibble;
 pub mod object_address;
 pub mod on_chain_config;
+pub mod optimistic_validator_verifier;
 pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;

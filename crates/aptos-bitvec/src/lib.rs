@@ -96,6 +96,16 @@ impl BitVec {
         self.inner[bucket] |= 0b1000_0000 >> bucket_pos as u8;
     }
 
+    pub fn or(&mut self, other: &BitVec) {
+        let len = std::cmp::max(self.inner.len(), other.inner.len());
+        self.inner.resize(len, 0);
+        for i in 0..len {
+            let a = self.inner.get(i).copied().unwrap_or(0);
+            let b = other.inner.get(i).copied().unwrap_or(0);
+            self.inner[i] = a | b;
+        }
+    }
+
     /// Checks if the bit at position @pos is set.
     #[inline]
     pub fn is_set(&self, pos: u16) -> bool {
