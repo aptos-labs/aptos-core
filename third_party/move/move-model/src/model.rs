@@ -1268,6 +1268,9 @@ impl GlobalEnv {
                         .iter()
                         .any(|label| self.file_id_is_primary_target.contains(&label.file_id)))
         }) {
+            if diag.severity == Severity::Warning {
+                continue;
+            }
             if !*reported {
                 // Avoid showing the same message twice. This can happen e.g. because of
                 // duplication of expressions via schema inclusion.

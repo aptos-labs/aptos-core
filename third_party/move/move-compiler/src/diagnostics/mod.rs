@@ -146,6 +146,9 @@ fn render_diagnostics(
     });
     let mut seen: HashSet<Diagnostic> = HashSet::new();
     for diag in diags.diagnostics {
+        if diag.info.severity() == Severity::Warning {
+            continue;
+        }
         if seen.contains(&diag) {
             continue;
         }

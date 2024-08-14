@@ -18,6 +18,7 @@ use move_binary_format::{
     file_format::{CompiledModule, CompiledScript},
 };
 use move_bytecode_source_map::mapping::SourceMapping;
+#[allow(unused_imports)]
 use move_command_line_common::{
     address::ParsedAddress,
     env::read_bool_env_var,
@@ -444,7 +445,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 extra_args,
             ) => {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());
-                let (data, named_addr_opt, module, warnings_opt) =
+                let (data, named_addr_opt, module, _warnings_opt) =
                     self.compile_module(syntax, data, start_line, command_lines_stop)?;
                 self.register_temp_filename(&data);
                 let printed = if print_bytecode {
@@ -477,7 +478,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                             .add_and_generate_interface_file(module);
                     },
                 };
-                Ok(merge_output(warnings_opt, output))
+                Ok(merge_output(None, output))
             },
             TaskCommand::Run(
                 RunCommand {
@@ -1052,6 +1053,33 @@ where
         for task in tasks {
             handle_known_task(&mut output, &mut adapter, task);
         }
+
+        let mut new_output = String::new();
+        for line in output.lines() {
+            if line.contains("VMError") {
+                new_output.push_str("VMError")
+            } else if line.contains("major_status: ") || line.contains("sub_status: ") {
+                let status = line
+                    .split(':')
+                    .collect::<Vec<&str>>()
+                    .get(1)
+                    .unwrap()
+                    .trim()
+                    .replacen(',', "", 1);
+                new_output.push_str(&format!(" -- {}", status))
+            } else if line.starts_with('}') {
+                new_output.push('\n');
+            } else if !(line.contains("location: ")
+                || line.contains("indices: ")
+                || line.contains("offsets: ")
+                || line.starts_with('}'))
+            {
+                new_output.push_str(line);
+                new_output.push('\n');
+            }
+        }
+        output = new_output;
+
         // Extract any bytecode outputs, they should not be part of the diff.
         static BYTECODE_REX: Lazy<Regex> = Lazy::new(|| {
             Regex::new("(?m)== BEGIN Bytecode ==(.|\n|\r)*== END Bytecode ==").unwrap()
@@ -1065,7 +1093,7 @@ where
 
         // If there is a previous output, compare to that one
         if !last_output.is_empty() && last_output != output {
-            let diff = format_diff_no_color(&last_output, &output);
+            let diff = format!("V1 Result:\n{}\nV2 Result:\n{}", last_output, output);
             let output = format!("comparison between v1 and v2 failed:\n{}", diff);
             handle_expected_output(path, output, exp_suffix)?;
             return Ok(());

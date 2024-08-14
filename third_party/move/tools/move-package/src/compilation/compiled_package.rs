@@ -12,6 +12,7 @@ use crate::{
     Architecture, BuildConfig, CompilerConfig, CompilerVersion,
 };
 use anyhow::{bail, ensure, Result};
+#[allow(unused_imports)]
 use colored::Colorize;
 use itertools::{Either, Itertools};
 use move_abigen::{Abigen, AbigenOptions};
@@ -528,7 +529,7 @@ impl CompiledPackage {
     }
 
     pub(crate) fn build_all<W: Write>(
-        w: &mut W,
+        _w: &mut W,
         project_root: &Path,
         resolved_package: ResolvedPackage,
         transitive_dependencies: Vec<(
@@ -561,15 +562,15 @@ impl CompiledPackage {
             for dep_path in source_paths.clone() {
                 source_package_map.insert(dep_path.as_str().to_string(), *dep_package_name);
             }
-            writeln!(
-                w,
-                "{} {}",
-                "INCLUDING DEPENDENCY".bold().green(),
-                dep_package_name
-            )?;
+            // writeln!(
+            //     w,
+            //     "{} {}",
+            //     "INCLUDING DEPENDENCY".bold().green(),
+            //     dep_package_name
+            // )?;
         }
         let root_package_name = resolved_package.source_package.package.name;
-        writeln!(w, "{} {}", "BUILDING".bold().green(), root_package_name)?;
+        // writeln!(w, "{} {}", "BUILDING".bold().green(), root_package_name)?;
         // gather source/dep files with their address mappings
         let (sources_package_paths, deps_package_paths) = make_source_and_deps_for_compiler(
             resolution_graph,

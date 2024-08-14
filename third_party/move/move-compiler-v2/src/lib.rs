@@ -544,9 +544,11 @@ fn report_bytecode_verification_error(
                     loc,
                     &format!(
                         "reference safety check failed on bytecode level. \
+                The error code is: `{:?}` \
                 This is a known issue, to be fixed later, resulting from differences between \
                 safety rules of the v1 and v2 compiler. Try to rewrite your code \
                  to workaround this problem.{}",
+                        e.major_status(),
                         debug_info
                     ),
                 )
