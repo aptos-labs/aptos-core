@@ -2,13 +2,14 @@
 remote_endpoint: ~
 name: "v1.18"
 proposals:
-  - name: enable_use_compatibility_checker_v2
+  - name: enable_use_compatibility_checker_v2_enum_types
     metadata:
-      title: "Enable compatibility checker v2"
-      description: "Enable the feature flag to use compatibility checker v2"
+      title: "Enable compatibility checker v2 and enum types"
+      description: "Enable the feature flag to use compatibility checker v2 and enum type"
       discussion_url: "https://github.com/aptos-foundation/AIPs/pull/481"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
             - use_compatibility_checker_v2
+            - enable_enum_types
