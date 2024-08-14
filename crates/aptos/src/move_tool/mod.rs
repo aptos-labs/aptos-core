@@ -777,14 +777,10 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         let size = bcs::serialized_size(&package_publication_data.payload)?;
         println!("package size {} bytes", size);
         if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-            return Err(CliError::UnexpectedError(format!(
-                "The package is larger than {} bytes ({} bytes)! To lower the size \
-            you may want to include less artifacts via `--included-artifacts`. \
-            You can also override this check with `--override-size-check. \
-            Alternatively, you can use the `--chunked-publish` to enable \
-            chunked publish mode, which chunks down the package and deploys it in several stages.",
-                MAX_PUBLISH_PACKAGE_SIZE, size
-            )));
+            return Err(CliError::PackageSizeExceeded(
+                size,
+                MAX_PUBLISH_PACKAGE_SIZE,
+            ));
         }
 
         Ok(package_publication_data)
@@ -1172,28 +1168,25 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
 
             submit_chunked_publish_transactions(payloads, &self.txn_options).await
         } else {
-            let package_publication_data = create_package_publication_data(
+            let payload = create_package_publication_data(
                 package,
                 PublishType::ObjectDeploy,
                 Some(object_address),
-            )?;
-            let size = bcs::serialized_size(&package_publication_data.payload)?;
+            )?
+            .payload;
+            let size = bcs::serialized_size(&payload)?;
             println!("package size {} bytes", size);
 
             if !self.override_size_check_option.override_size_check
                 && size > MAX_PUBLISH_PACKAGE_SIZE
             {
-                return Err(CliError::UnexpectedError(format!(
-                    "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included-artifacts`. \
-                You can also override this check with `--override-size-check. \
-                Alternatively, you can use the `--chunked-publish` to enable \
-                chunked publish mode, which chunks down the package and deploys it in several stages.",
-                    MAX_PUBLISH_PACKAGE_SIZE, size
-                )));
+                return Err(CliError::PackageSizeExceeded(
+                    size,
+                    MAX_PUBLISH_PACKAGE_SIZE,
+                ));
             }
             self.txn_options
-                .submit_transaction(package_publication_data.payload)
+                .submit_transaction(payload)
                 .await
                 .map(TransactionSummary::from)
         };
@@ -1293,14 +1286,10 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             if !self.override_size_check_option.override_size_check
                 && size > MAX_PUBLISH_PACKAGE_SIZE
             {
-                return Err(CliError::UnexpectedError(format!(
-                    "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included-artifacts`. \
-                You can also override this check with `--override-size-check. \
-                Alternatively, you can use the `--chunked-publish` to enable \
-                chunked publish mode, which chunks down the package and deploys it in several stages.",
-                    MAX_PUBLISH_PACKAGE_SIZE, size
-                )));
+                return Err(CliError::PackageSizeExceeded(
+                    size,
+                    MAX_PUBLISH_PACKAGE_SIZE,
+                ));
             }
             self.txn_options
                 .submit_transaction(payload)
@@ -1346,7 +1335,23 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
-        let sequence_number = self.txn_options.sequence_number(sender_address).await? + 1;
+        let sequence_number = if self.chunked_publish_option.chunked_publish {
+            // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
+            // This involves building the package with mock account address `0xcafe` to calculate the transaction count.
+            let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
+            self.move_options
+                .add_named_address(self.address_name.clone(), mock_object_address.to_string());
+            let package =
+                build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+            let mock_payloads =
+                create_chunked_publish_payloads(package, PublishType::AccountDeploy, None)?
+                    .payloads;
+            let staging_tx_count = (mock_payloads.len() - 1) as u64;
+            self.txn_options.sequence_number(sender_address).await? + staging_tx_count + 1
+        } else {
+            self.txn_options.sequence_number(sender_address).await? + 1
+        };
+
         let object_address = create_object_code_deployment_address(sender_address, sequence_number);
 
         self.move_options
@@ -1360,20 +1365,51 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
-        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
-            bcs::to_bytes(&package.extract_metadata()?)
-                .expect("Failed to serialize PackageMetadata"),
-            package.extract_code(),
-        );
+        let result = if self.chunked_publish_option.chunked_publish {
+            let payloads =
+                create_chunked_publish_payloads(package, PublishType::ObjectDeploy, None)?.payloads;
 
-        submit_tx_and_check(
-            &self.txn_options,
-            payload,
-            &object_address.to_string(),
-            self.override_size_check_option.override_size_check,
-            "Code was successfully deployed to object address {}.",
-        )
-        .await
+            let size = &payloads
+                .iter()
+                .map(bcs::serialized_size)
+                .sum::<Result<usize, _>>()?;
+            println!("package size {} bytes", size);
+            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &payloads.len());
+            println!("{}", message.bold());
+
+            submit_chunked_publish_transactions(payloads, &self.txn_options).await
+        } else {
+            let payload = create_package_publication_data(
+                package,
+                PublishType::ObjectDeploy,
+                Some(object_address),
+            )?
+            .payload;
+
+            let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
+
+            if !self.override_size_check_option.override_size_check
+                && size > MAX_PUBLISH_PACKAGE_SIZE
+            {
+                return Err(CliError::PackageSizeExceeded(
+                    size,
+                    MAX_PUBLISH_PACKAGE_SIZE,
+                ));
+            }
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        };
+
+        if result.is_ok() {
+            println!(
+                "Code was successfully deployed to object address {}.",
+                object_address
+            );
+        }
+        result
     }
 }
 
@@ -1437,21 +1473,54 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
-        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
-            bcs::to_bytes(&package.extract_metadata()?)
-                .expect("Failed to serialize PackageMetadata"),
-            package.extract_code(),
-            self.object_address,
-        );
+        let result = if self.chunked_publish_option.chunked_publish {
+            let payloads = create_chunked_publish_payloads(
+                package,
+                PublishType::ObjectUpgrade,
+                Some(self.object_address),
+            )?
+            .payloads;
 
-        submit_tx_and_check(
-            &self.txn_options,
-            payload,
-            &self.object_address.to_string(),
-            self.override_size_check_option.override_size_check,
-            "Code was successfully upgraded at object address {}.",
-        )
-        .await
+            let size = &payloads
+                .iter()
+                .map(bcs::serialized_size)
+                .sum::<Result<usize, _>>()?;
+            println!("package size {} bytes", size);
+            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", &payloads.len());
+            println!("{}", message.bold());
+            submit_chunked_publish_transactions(payloads, &self.txn_options).await
+        } else {
+            let payload = create_package_publication_data(
+                package,
+                PublishType::ObjectUpgrade,
+                Some(self.object_address),
+            )?
+            .payload;
+
+            let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
+
+            if !self.override_size_check_option.override_size_check
+                && size > MAX_PUBLISH_PACKAGE_SIZE
+            {
+                return Err(CliError::PackageSizeExceeded(
+                    size,
+                    MAX_PUBLISH_PACKAGE_SIZE,
+                ));
+            }
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        };
+
+        if result.is_ok() {
+            println!(
+                "Code was successfully deployed to object address {}.",
+                self.object_address
+            );
+        }
+        result
     }
 }
 
@@ -1463,38 +1532,6 @@ fn build_package_options(
         .included_artifacts
         .build_options(move_options)?;
     BuiltPackage::build(move_options.get_package_path()?, options)
-}
-
-async fn submit_tx_and_check(
-    txn_options: &TransactionOptions,
-    payload: TransactionPayload,
-    object_address: &str,
-    override_size_check: bool,
-    success_message: &str,
-) -> CliTypedResult<TransactionSummary> {
-    let size = bcs::serialized_size(&payload)?;
-    println!("package size {} bytes", size);
-
-    if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-        return Err(CliError::UnexpectedError(format!(
-            "The package is larger than {} bytes ({} bytes)! To lower the size \
-            you may want to include fewer artifacts via `--included-artifacts`. \
-            You can also override this check with `--override-size-check. \
-            Alternatively, you can use the `--chunked-publish` to enable \
-            chunked publish mode, which chunks down the package and deploys it in several stages.",
-            MAX_PUBLISH_PACKAGE_SIZE, size
-        )));
-    }
-
-    let result = txn_options
-        .submit_transaction(payload)
-        .await
-        .map(TransactionSummary::from);
-
-    if result.is_ok() {
-        println!("{} {}", success_message, object_address);
-    }
-    result
 }
 
 async fn submit_chunked_publish_transactions(

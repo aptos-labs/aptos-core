@@ -106,6 +106,14 @@ pub enum CliError {
     MoveTestError,
     #[error("Move Prover failed: {0}")]
     MoveProverError(String),
+    #[error(
+        "The package is larger than {1} bytes ({0} bytes)! \
+        To lower the size you may want to include less artifacts via `--included-artifacts`. \
+        You can also override this check with `--override-size-check. \
+        Alternatively, you can use the `--chunked-publish` to enable chunked publish mode, \
+        which chunks down the package and deploys it in several stages."
+    )]
+    PackageSizeExceeded(usize, usize),
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
     #[error("Unable to read file '{0}', error: {1}")]
@@ -131,6 +139,7 @@ impl CliError {
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError => "MoveTestError",
             CliError::MoveProverError(_) => "MoveProverError",
+            CliError::PackageSizeExceeded(_, _) => "PackageSizeExceeded",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
