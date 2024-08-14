@@ -359,20 +359,17 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             }).unwrap();
             stream_results_finished_rx.recv().unwrap();
             self.coordinator_client.lock().unwrap().reset_state_view();
-            if (i % 50 == 49) {
-                let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
-                    .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-                    .unwrap()
-                    .get_sample_sum();
-                info!(
-                    "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
-                    self.shard_id,
-                    (cumulative_txns as f64 / exe_time),
-                    cumulative_txns,
-                    exe_time
-                );
-            }
-            i = i + 1;
+            let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
+                .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+                .unwrap()
+                .get_sample_sum();
+            info!(
+                "On shard execution tps {} txns/s ({} txns / {} s)",
+                self.shard_id,
+                (cumulative_txns as f64 / exe_time),
+                cumulative_txns,
+                exe_time
+            );
         }
 
         let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
