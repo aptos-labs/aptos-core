@@ -27,6 +27,8 @@ use std::{
 
 /// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::pipelined_block::PipelinedBlock)
 /// that adds `children` field to know the parent-child relationship between blocks.
+// TODO: remove debug
+#[derive(Debug)]
 struct LinkableBlock {
     /// Executed block that has raw block data and execution output.
     executed_block: Arc<PipelinedBlock>,
@@ -399,10 +401,13 @@ impl BlockTree {
 
         let mut blocks_pruned = VecDeque::new();
         let mut blocks_to_be_pruned = vec![self.linkable_window_root()];
+        info!("blocks_to_be_pruned: {:?}", blocks_to_be_pruned);
         while let Some(block_to_remove) = blocks_to_be_pruned.pop() {
+            info!("block_to_remove: {:?}", block_to_remove);
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
             for child_id in block_to_remove.children() {
+                info!(" child_id: {}", child_id);
                 if next_window_root_id == *child_id {
                     continue;
                 }
@@ -410,9 +415,11 @@ impl BlockTree {
                     self.get_linkable_block(child_id)
                         .expect("Child must exist in the tree"),
                 );
+                info!("blocks_to_be_pruned: {:?}", blocks_to_be_pruned);
             }
             // Track all the block ids removed
             blocks_pruned.push_back(block_to_remove.id());
+            info!("blocks_pruned: {:?}", blocks_pruned);
         }
         blocks_pruned
     }
@@ -547,18 +554,14 @@ impl BlockTree {
         update_counters_for_committed_blocks(blocks_to_commit);
         let current_round = self.commit_root().round();
         let committed_round = block_to_commit.round();
-        debug!(
+        info!(
             LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
             committed_round = committed_round,
             block_id = block_to_commit.id(),
         );
 
         let window_root_id = self.find_window_root(block_to_commit.id());
-        info!(
-            "Window root: {}",
-            self.get_block(&window_root_id)
-                .expect("Window root must exist")
-        );
+        info!("Updating to window_root_id: {}", window_root_id);
         let ids_to_remove = self.find_blocks_to_prune(window_root_id);
         info!("Pruning blocks: {:?}", ids_to_remove);
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
