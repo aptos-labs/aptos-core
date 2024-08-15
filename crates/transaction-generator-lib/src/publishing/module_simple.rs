@@ -324,7 +324,7 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
-            EntryPoints::UnmanagedLaunchpadMint { .. } => {"unmanaged-launchpad"}
+            EntryPoints::UnmanagedLaunchpadMint { .. } => {"unmanaged_launchpad"}
         }
     }
 
@@ -726,12 +726,19 @@ impl EntryPoints {
                 )
             },
             EntryPoints::UnmanagedLaunchpadMint { .. } => {
+                // Set this to an address with a deployed `unmanaged_launchpad`
+                let module_id = ModuleId::new(
+                    AccountAddress::from_hex_literal("0x6af6b4a2580a8bf5275abd3489e23a159ddfc1ef73a2a62b1bf539dd3cc8fa08").unwrap(),
+                    Identifier::new("unmanaged_launchpad").unwrap()
+                );
+
+                // Set this to a collection addr after creating
+                let collection_addr = "0xeb5f23a679244837a193a66d79cadcc65462722957edea40651a5c15e41ed981";
                 get_payload(
                     module_id,
                     ident_str!("mint").to_owned(),
                     vec![
-                        // Devnet contract address - Redeploy and change address if devnet wiped
-                        bcs::to_bytes(&AccountAddress::from_hex_literal("0x30b18808e694801d8b5d1fec95ee46ec96023115fec92dd35c2c82d1b66011fa").unwrap()).unwrap(),
+                        bcs::to_bytes(&AccountAddress::from_hex_literal(collection_addr).unwrap()).unwrap(),
                     ],
                 )
             }

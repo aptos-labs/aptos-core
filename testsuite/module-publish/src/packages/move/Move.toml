@@ -4,8 +4,8 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-unmanaged_launchpad = "0x3eccd6b0ee1320247771584d52bdadf44d05a0355aa3ebd232e715f2109e56d9"
-minter = "0xfa0a807f204b16d220c080f69bd7720dfef219b9d0736eccab1c40ae0b4accb3"
+unmanaged_launchpad = "_"
+minter = "_"
 
 [dev-addresses]
 unmanaged_launchpad = "0x123"

@@ -51,7 +51,7 @@ NUM_ACCOUNTS = max(
     [
         int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
         (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
-    ]
+        ]
 )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
@@ -78,10 +78,10 @@ else:
 
 if os.environ.get("RELEASE_BUILD"):
     BUILD_FLAG = "--release"
-    BUILD_FOLDER = "../target/release"
+    BUILD_FOLDER = "target/release"
 else:
     BUILD_FLAG = "--profile performance"
-    BUILD_FOLDER = "../target/performance"
+    BUILD_FOLDER = "target/performance"
 
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
@@ -297,12 +297,12 @@ def execute_command(command):
     print(f"Executing command:\n\t{command}\nand waiting for it to finish...")
     result = []
     with Popen(
-        command,
-        shell=True,
-        text=True,
-        stdout=PIPE,
-        bufsize=1,
-        universal_newlines=True,
+            command,
+            shell=True,
+            text=True,
+            stdout=PIPE,
+            bufsize=1,
+            universal_newlines=True,
     ) as p:
         # stream to output while command is executing
         if p.stdout is not None:
@@ -358,7 +358,7 @@ def get_only(values):
 
 
 def extract_run_results(
-    output: str, prefix: str, create_db: bool = False
+        output: str, prefix: str, create_db: bool = False
 ) -> RunResults:
     if create_db:
         tps = float(
@@ -431,10 +431,10 @@ def extract_run_results(
 
 
 def print_table(
-    results: Sequence[RunGroupInstance],
-    by_levels: bool,
-    single_field: Optional[Tuple[str, Callable[[RunResults], Any]]],
-    number_of_execution_threads=EXECUTION_ONLY_NUMBER_OF_THREADS,
+        results: Sequence[RunGroupInstance],
+        by_levels: bool,
+        single_field: Optional[Tuple[str, Callable[[RunResults], Any]]],
+        number_of_execution_threads=EXECUTION_ONLY_NUMBER_OF_THREADS,
 ):
     headers = [
         "transaction_type",
@@ -538,7 +538,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 part for part in line.strip().split(CALIBRATION_SEPARATOR) if part
             ]
         )
-        >= 1
+           >= 1
     }
     print(calibrated_expected_tps)
 
@@ -560,8 +560,8 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     )
 
     for (
-        test_index,
-        test,
+            test_index,
+            test,
     ) in enumerate(TESTS):
         if SELECTED_FLOW not in test.included_in:
             continue
@@ -582,10 +582,10 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             workload_args_str = ""
         else:
             transaction_type_list = (
-                test.key_extra.transaction_type_override or test.key.transaction_type
+                    test.key_extra.transaction_type_override or test.key.transaction_type
             )
             transaction_weights_list = (
-                test.key_extra.transaction_weights_override or "1"
+                    test.key_extra.transaction_weights_override or "1"
             )
             workload_args_str = f"--transaction-type {transaction_type_list} --transaction-weights {transaction_weights_list}"
 
@@ -602,9 +602,9 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         txn_emitter_prefix_str = "" if NUM_BLOCKS > 200 else " --generate-then-execute"
 
         ADDITIONAL_DST_POOL_ACCOUNTS = (
-            2
-            * MAX_BLOCK_SIZE
-            * (1 if test.key_extra.smaller_working_set else NUM_BLOCKS)
+                2
+                * MAX_BLOCK_SIZE
+                * (1 if test.key_extra.smaller_working_set else NUM_BLOCKS)
         )
 
         common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
@@ -647,7 +647,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 RunGroupInstance(
                     key=RunGroupKey(
                         transaction_type=test.key.transaction_type
-                        + f" [stage {stage}]",
+                                         + f" [stage {stage}]",
                         module_working_set_size=test.key.module_working_set_size,
                         executor_type=test.key.executor_type,
                     ),
@@ -723,8 +723,8 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             continue
 
         if (
-            NOISE_LOWER_LIMIT is not None
-            and single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT
+                NOISE_LOWER_LIMIT is not None
+                and single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT
         ):
             text = f"regression detected {single_node_result.tps} < {expected_tps * NOISE_LOWER_LIMIT} = {expected_tps} * {NOISE_LOWER_LIMIT}, {test.key} didn't meet TPS requirements"
             if not test.waived:
@@ -732,14 +732,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             else:
                 warnings.append(text)
         elif (
-            NOISE_LOWER_LIMIT_WARN is not None
-            and single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT_WARN
+                NOISE_LOWER_LIMIT_WARN is not None
+                and single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT_WARN
         ):
             text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {expected_tps * NOISE_LOWER_LIMIT_WARN} = {expected_tps} * {NOISE_LOWER_LIMIT_WARN}, {test.key} didn't meet TPS requirements"
             warnings.append(text)
         elif (
-            NOISE_UPPER_LIMIT is not None
-            and single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT
+                NOISE_UPPER_LIMIT is not None
+                and single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT
         ):
             text = f"perf improvement detected {single_node_result.tps} > {expected_tps * NOISE_UPPER_LIMIT} = {expected_tps} * {NOISE_UPPER_LIMIT}, {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             if not test.waived:
@@ -747,8 +747,8 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             else:
                 warnings.append(text)
         elif (
-            NOISE_UPPER_LIMIT_WARN is not None
-            and single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT_WARN
+                NOISE_UPPER_LIMIT_WARN is not None
+                and single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT_WARN
         ):
             text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {expected_tps * NOISE_UPPER_LIMIT_WARN} = {expected_tps} * {NOISE_UPPER_LIMIT_WARN}, {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             warnings.append(text)
