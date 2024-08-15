@@ -1323,6 +1323,86 @@ mod tests {
     }
 
     #[test]
+    fn test_fallback_transactions() {
+        let s = Scheduler::new(2);
+        assert_matches!(s.try_fallback(0), Some(0));
+        assert_matches!(s.try_incarnate(0), None);
+
+        let fallback_v = if true {
+            None
+        } else {
+            Some(|| -> bool {
+                return false;
+            })
+        };
+
+        assert_matches!(s.has_lost_execution_flag_writing(0), false);
+
+        assert_matches!(s.try_set_execution_flag_writing(0, fallback_v), Some(true)); //no need to validate
+
+        let not_fallback_win_validation = Some(|| -> bool {
+            return true;
+        });
+        let not_fallback_lose_validation = Some(|| -> bool {
+            return false;
+        });
+
+        assert_matches!(s.has_lost_execution_flag_writing(0), true); //no need to validate
+        assert_matches!(
+            s.try_set_execution_flag_writing(0, not_fallback_win_validation),
+            None
+        );
+
+        assert_matches!(s.set_executed_status(0, 0), Ok(()));
+        s.try_abort(0, 0);
+        assert_matches!(s.set_aborted_status(0, 0), Ok(()));
+
+        s.try_incarnate(0);
+
+        assert_matches!(s.try_fallback(0), Some(1));
+
+        assert_matches!(
+            s.try_set_execution_flag_writing(0, not_fallback_lose_validation),
+            None
+        ); //no need to validate
+        assert_matches!(
+            s.try_set_execution_flag_writing(0, not_fallback_win_validation),
+            Some(true)
+        );
+        assert_matches!(s.try_fallback(0), None);
+
+        assert_matches!(s.set_executed_status(0, 1), Ok(()));
+        s.try_abort(0, 1);
+        assert_matches!(s.set_aborted_status(0, 1), Ok(()));
+        s.try_incarnate(0);
+
+        assert_matches!(
+            s.try_set_execution_flag_writing(0, not_fallback_lose_validation),
+            Some(false)
+        ); //n
+
+        assert_matches!(s.set_executed_status(0, 2), Ok(()));
+
+        s.try_abort(0, 2);
+        assert_matches!(s.set_aborted_status(0, 2), Ok(()));
+        s.try_incarnate(0);
+
+        let condvar = Condvar::new();
+        let dep = Arc::new((Mutex::new(DependencyStatus::Unresolved), condvar));
+        let dep_2 = Arc::clone(&dep);
+        assert_matches!(s.suspend(0, dep), Ok(true));
+        assert_matches!(s.resume(0), Ok(()));
+
+        assert_matches!(s.try_fallback(0), Some(3));
+
+        assert_matches!(s.set_executed_status(0, 3), Ok(()));
+
+        assert_matches!(&*dep_2.0.lock(), DependencyStatus::ExecutionHalted);
+
+        assert_matches!(s.try_fallback(0), None);
+    }
+
+    #[test]
     fn scheduler_halt_status() {
         let s = Scheduler::new(5);
         for i in 0..5 {
