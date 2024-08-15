@@ -52,12 +52,20 @@ module 0x42::test {
         let S2(.., _x) = x;
         let S2(.., _) = x;
         let S2(_, ..) = x;
+        let S2(_x, _y, ..) = x;
+        let S2(_x, .., _y) = x;
+        let S2(.., _x, _y) = x;
     }
 
     fun simple_2_ref(x: &S2) {
         let S2(..) = x;
         let S2(_x, ..) = x;
         let S2(.., _x) = x;
+        let S2(.., _) = x;
+        let S2(_, ..) = x;
+        let S2(_x, _y, ..) = x;
+        let S2(_x, .., _y) = x;
+        let S2(.., _x, _y) = x;
     }
 
     fun simple_3(x: S3) {

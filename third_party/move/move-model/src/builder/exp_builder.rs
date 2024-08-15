@@ -2481,7 +2481,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         },
                         EA::LValueOrDotdot_::Dotdot => {
                             let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
-                                arity - args.value.len() + 1
+                                arity + 1 - args.value.len()
                             } else {
                                 0
                             };
