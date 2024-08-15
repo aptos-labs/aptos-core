@@ -2757,8 +2757,14 @@ impl AptosVM {
         return match user_session.execute(|session| {
             get_randomness_annotation(&resolver, session, entry_fn)
         }) {
-            Ok(_) => true,
-            Err(_) => false,
+            Ok(annotation) => {
+                println!("daniel require_randomness annotation: {:?}", annotation);
+                annotation.is_some()
+            },
+            Err(err) => {
+                println!("daniel require_randomness error: {:?}", err);
+                false
+            },
         };
     }
 }

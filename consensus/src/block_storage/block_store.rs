@@ -379,16 +379,7 @@ impl BlockStore {
         self.storage
             .save_tree(vec![pipelined_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
-        let result = self.inner.write().insert_block(pipelined_block);
-        let can_pre_execute = self.skip_non_rand_blocks && !block.require_randomness();
-        if can_pre_execute {
-            if let Ok(block) = &result {
-                self.execution_client
-                    .pre_execute(block)
-                    .await;
-            }
-        }
-        result
+        self.inner.write().insert_block(pipelined_block)
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.
@@ -498,6 +489,10 @@ impl BlockStore {
 
     pub fn check_payload(&self, proposal: &Block) -> bool {
         self.payload_manager.check_payload_availability(proposal)
+    }
+
+    pub fn execution_client(&self) -> Arc<dyn TExecutionClient> {
+        self.execution_client.clone()
     }
 }
 

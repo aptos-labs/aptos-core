@@ -23,7 +23,7 @@ use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::{self, Block}, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
+    block::{self, Block}, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
@@ -702,7 +702,7 @@ impl RoundManager {
                     "Planning to vote for a NIL block {}", nil_block
                 );
                 counters::VOTE_NIL_COUNT.inc();
-                let nil_vote = self.vote_block(nil_block).await?;
+                let (nil_vote, _) = self.vote_block(nil_block).await?;
                 (true, nil_vote)
             },
         };
@@ -977,7 +977,8 @@ impl RoundManager {
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
-        let vote = self
+        let require_randomness = proposal.require_randomness();
+        let (vote, pipelined_block) = self
             .vote_block(proposal)
             .await
             .context("[RoundManager] Process proposal")?;
@@ -994,6 +995,13 @@ impl RoundManager {
         };
 
         if self.randomness_config.skip_non_rand_blocks() {
+            if !require_randomness {
+                self.block_store
+                    .execution_client()
+                    .pre_execute(&pipelined_block)
+                    .await;
+            }
+
             self.broadcast_precommit_vote(vote.ledger_info().commit_info().clone(), consensus_data_hash).await;
         }
 
@@ -1020,7 +1028,7 @@ impl RoundManager {
     /// * then verify the voting rules
     /// * save the updated state to consensus DB
     /// * return a VoteMsg with the LedgerInfo to be committed in case the vote gathers QC.
-    async fn vote_block(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
+    async fn vote_block(&mut self, proposed_block: Block) -> anyhow::Result<(Vote, Arc<PipelinedBlock>)> {
         let block_arc = self
             .block_store
             .insert_block(proposed_block)
@@ -1056,7 +1064,7 @@ impl RoundManager {
             .save_vote(&vote)
             .context("[RoundManager] Fail to persist last vote")?;
 
-        Ok(vote)
+        Ok((vote, block_arc))
     }
 
     async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {

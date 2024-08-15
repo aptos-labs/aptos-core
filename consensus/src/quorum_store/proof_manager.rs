@@ -217,9 +217,14 @@ impl ProofManager {
                 let max_txns_with_proof = request
                     .max_txns
                     .compute_pct(100 - request.opt_batch_txns_pct);
+                let batch_store_ref = match request.return_all_txns {
+                    true => Some(&self.batch_queue.batch_store),
+                    false => None,
+                };
 
                 let (
                     proof_block,
+                    qs_transactions,
                     txns_with_proof_size,
                     cur_unique_txns,
                     proof_queue_fully_utilized,
@@ -230,6 +235,7 @@ impl ProofManager {
                     request.soft_max_txns_after_filtering,
                     request.return_non_full,
                     request.block_timestamp,
+                    batch_store_ref,
                 );
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
@@ -238,7 +244,7 @@ impl ProofManager {
 
                 let excluded_batches: Vec<_> = excluded_batches.iter().cloned().collect();
 
-                let (opt_batches, opt_batch_txns_size) = if self.enable_opt_quorum_store {
+                let (opt_batches, opt_qs_transactions, opt_batch_txns_size) = if self.enable_opt_quorum_store {
                     // TODO(ibalajiarun): Support unique txn calculation
                     let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
                     let (opt_batches, size) = self
@@ -247,13 +253,18 @@ impl ProofManager {
 
                     (
                         opt_batches
+                            .clone()
                             .into_iter()
                             .map(|(batch_info, _)| batch_info)
                             .collect(),
+                        opt_batches
+                            .into_iter()
+                            .flat_map(|(_, txns)| txns)
+                            .collect::<Vec<SignedTransaction>>(),
                         size,
                     )
                 } else {
-                    (Vec::new(), PayloadTxnsSize::zero())
+                    (Vec::new(), Vec::new(), PayloadTxnsSize::zero())
                 };
 
                 let cur_txns = txns_with_proof_size + opt_batch_txns_size;
@@ -283,6 +294,12 @@ impl ProofManager {
                 counters::NUM_INLINE_BATCHES.observe(inline_block_size.count() as f64);
                 counters::NUM_INLINE_TXNS.observe(inline_block_size.size_in_bytes() as f64);
 
+                let inline_transactions = inline_block
+                    .clone()
+                    .into_iter()
+                    .flat_map(|(_, txns)| txns)
+                    .collect::<Vec<SignedTransaction>>();
+
                 let response = if self.enable_opt_quorum_store {
                     let inline_batches = inline_block.into();
                     Payload::OptQuorumStore(OptQuorumStorePayload::new(
@@ -307,7 +324,13 @@ impl ProofManager {
                     )
                 };
 
-                let res = GetPayloadResponse::GetPayloadResponse(response);
+                let all_transactions = qs_transactions
+                    .into_iter()
+                    .chain(opt_qs_transactions.into_iter())
+                    .chain(inline_transactions.into_iter())
+                    .collect::<Vec<SignedTransaction>>();
+
+                let res = GetPayloadResponse::GetPayloadResponse((response, all_transactions));
                 match request.callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),

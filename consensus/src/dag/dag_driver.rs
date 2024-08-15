@@ -255,7 +255,7 @@ impl DagDriver {
             .health_backoff
             .calculate_payload_limits(new_round, &self.payload_config);
 
-        let (validator_txns, payload) = match self
+        let (validator_txns, payload, all_txns) = match self
             .payload_client
             .pull_payload(
                 PayloadPullParameters {
@@ -272,6 +272,7 @@ impl DagDriver {
                     pending_uncommitted_blocks: 0,
                     recent_max_fill_fraction: 0.0,
                     block_timestamp: self.time_service.now_unix_time(),
+                    return_all_txns: false,
                 },
                 sys_payload_filter,
                 Box::pin(async {}),
@@ -287,6 +288,7 @@ impl DagDriver {
                         self.quorum_store_enabled,
                         self.allow_batches_without_pos_in_proposal,
                     ),
+                    vec![],
                 )
             },
         };

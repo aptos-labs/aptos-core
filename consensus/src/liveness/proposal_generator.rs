@@ -361,7 +361,9 @@ impl ProposalGenerator {
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
-        let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+        let skip_non_rand_blocks = self.onchain_randomness_config.skip_non_rand_blocks();
+
+        let (validator_txns, payload, all_txns, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
             (
@@ -370,6 +372,7 @@ impl ProposalGenerator {
                     self.quorum_store_enabled,
                     self.allow_batches_without_pos_in_proposal,
                 ),
+                vec![],
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
@@ -451,7 +454,7 @@ impl ProposalGenerator {
             let validator_txn_filter =
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
 
-            let (validator_txns, mut payload) = self
+            let (validator_txns, mut payload, mut all_txns) = self
                 .payload_client
                 .pull_payload(
                     PayloadPullParameters {
@@ -467,6 +470,7 @@ impl ProposalGenerator {
                         pending_uncommitted_blocks: pending_blocks.len(),
                         recent_max_fill_fraction: max_fill_fraction,
                         block_timestamp: timestamp,
+                        return_all_txns: skip_non_rand_blocks,
                     },
                     validator_txn_filter,
                     wait_callback,
@@ -479,8 +483,10 @@ impl ProposalGenerator {
                 && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
             {
                 payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
+                let len = max_txns_from_block_to_execute.unwrap_or(all_txns.len() as u64) as usize;
+                all_txns = all_txns[..len].to_vec();
             }
-            (validator_txns, payload, timestamp.as_micros() as u64)
+            (validator_txns, payload, all_txns, timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
@@ -491,44 +497,28 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        let maybe_require_randomness = if self.onchain_randomness_config.skip_non_rand_blocks() {
-            // let mut require_randomness = false;
-            // let block_id = HashValue::zero();
-            // let parent_block_id = self.block_store.ordered_root().id();
-            // if let Ok(stale_state_view) = self.execution_proxy.get_state_view(block_id, parent_block_id) {
-            //     println!("daniel debug 1 round {}", round);
-            //     let block_data = BlockData::new_proposal_ext(
-            //         validator_txns.clone(),
-            //         payload.clone(),
-            //         self.author,
-            //         failed_authors.clone(),
-            //         round,
-            //         timestamp,
-            //         quorum_cert.clone(),
-            //         None,
-            //     );
-            //     if let Ok(txns) = self.execution_proxy.get_transactions_for_proposal(&block_data).await {
-            //         let vm = AptosVM::new(&stale_state_view);
-            //         for txn in txns.iter() {
-            //             if vm.require_randomness(&stale_state_view, txn, 0) {
-            //                 require_randomness = true;
-            //                 break;
-            //             }
-            //         }
-            //     }
-            // }
-
-            // Some(require_randomness)
-
-            if round % 2 == 0 {
-                Some(false)
-            } else {
-                Some(true)
+        let maybe_require_randomness = if skip_non_rand_blocks {
+            let mut require_randomness = false;
+            let block_id = HashValue::zero();
+            let parent_block_id = self.block_store.commit_root().id();
+            match self.execution_proxy.get_state_view(block_id, parent_block_id) {
+                Ok(stale_state_view) => {
+                    let vm = AptosVM::new(&stale_state_view);
+                    for txn in all_txns.iter() {
+                        if vm.require_randomness(&stale_state_view, txn, 0) {
+                            require_randomness = true;
+                            break;
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("[ProposalGenerator] Failed to get stale state view of block {}, error: {:?}", parent_block_id, e);
+                }
             }
+            Some(require_randomness)
         } else {
             None
         };
-        println!("[Proposal] epoch {} round {} maybe_require_randomness {:?}", quorum_cert.certified_block().epoch(), round, maybe_require_randomness);
 
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(

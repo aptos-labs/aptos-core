@@ -13,14 +13,14 @@ use aptos_types::{transaction::SignedTransaction, PeerId};
 use chrono::Utc;
 use futures::channel::{mpsc::Sender, oneshot};
 use move_core_types::account_address::AccountAddress;
+use num_traits::Signed;
 use rand::{seq::SliceRandom, thread_rng};
 use std::{
-    cmp::{Ordering, Reverse},
-    collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque},
-    hash::Hash,
-    time::{Duration, Instant},
+    cmp::{Ordering, Reverse}, collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque}, hash::Hash, sync::Arc, time::{Duration, Instant}
 };
 use tokio::time::timeout;
+
+use super::batch_store::BatchStore;
 
 pub(crate) struct Timeouts<T> {
     timeouts: VecDeque<(i64, T)>,
@@ -466,8 +466,10 @@ impl ProofQueue {
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
-    ) -> (Vec<ProofOfStore>, PayloadTxnsSize, u64, bool) {
+        batch_store_ref: Option<&Arc<BatchStore>>,
+    ) -> (Vec<ProofOfStore>, Vec<SignedTransaction>, PayloadTxnsSize, u64, bool) {
         let mut ret = vec![];
+        let mut ret_transactions: Vec<SignedTransaction> = vec![];
         let mut cur_unique_txns = 0;
         let mut cur_all_txns = PayloadTxnsSize::zero();
         let mut excluded_txns = 0;
@@ -501,6 +503,13 @@ impl ProofQueue {
                     } else if let Some(Some((proof, insertion_time))) =
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
+                        // for marking randomness transactions, when batch_store is set, check if the batch is in the local batch store
+                        if let Some(batch_store) = batch_store_ref {
+                            if batch_store.get_batch_from_local(proof.info().digest()).is_err() {
+                                // The batch is not in the local batch store, skip it.
+                                return false;
+                            }
+                        }
                         // Calculate the number of unique transactions if this batch is included in the result
                         let unique_txns = if let Some((txn_summaries, _, _)) =
                             self.batch_summaries.get(&sort_key.batch_key)
@@ -541,7 +550,20 @@ impl ProofQueue {
                             },
                         );
                         let bucket = proof.gas_bucket_start();
+                        let transactions = match batch_store_ref {
+                            Some(batch_store) => {
+                                batch_store
+                                    .get_batch_from_local(proof.info().digest())
+                                    .expect("Batch should be in local batch store")
+                                    .payload().clone()
+
+                            }
+                            None => None
+                        };
                         ret.push(proof.clone());
+                        if let Some(transactions) = transactions {
+                            ret_transactions.extend(transactions);
+                        }
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
                         if cur_all_txns == max_txns
                             || cur_unique_txns == max_txns_after_filtering
@@ -582,9 +604,9 @@ impl ProofQueue {
             self.log_remaining_data_after_pull(excluded_batches, &ret);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            (ret, cur_all_txns, cur_unique_txns, !full)
+            (ret, ret_transactions, cur_all_txns, cur_unique_txns, !full)
         } else {
-            (Vec::new(), PayloadTxnsSize::zero(), 0, !full)
+            (Vec::new(), Vec::new(), PayloadTxnsSize::zero(), 0, !full)
         }
     }
 

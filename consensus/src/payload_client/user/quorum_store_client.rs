@@ -13,7 +13,7 @@ use aptos_consensus_types::{
     utils::PayloadTxnsSize,
 };
 use aptos_logger::info;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::{SignedTransaction, Transaction};
 use fail::fail_point;
 use futures::future::BoxFuture;
 use futures_channel::{mpsc, oneshot};
@@ -57,7 +57,8 @@ impl QuorumStoreClient {
         return_non_full: bool,
         exclude_payloads: PayloadFilter,
         block_timestamp: Duration,
-    ) -> anyhow::Result<Payload, QuorumStoreError> {
+        return_all_txns: bool,
+    ) -> anyhow::Result<(Payload, Vec<SignedTransaction>), QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
         let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
             max_txns,
@@ -69,6 +70,7 @@ impl QuorumStoreClient {
             return_non_full,
             callback,
             block_timestamp,
+            return_all_txns,
         });
         // send to shared mempool
         self.consensus_to_quorum_store_sender
@@ -84,7 +86,7 @@ impl QuorumStoreClient {
                 Err(anyhow::anyhow!("[consensus] did not receive GetBlockResponse on time").into())
             },
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
-                GetPayloadResponse::GetPayloadResponse(payload) => Ok(payload),
+                GetPayloadResponse::GetPayloadResponse((payload, all_txns)) => Ok((payload, all_txns)),
             },
         }
     }
@@ -96,7 +98,7 @@ impl UserPayloadClient for QuorumStoreClient {
         &self,
         params: PayloadPullParameters,
         wait_callback: BoxFuture<'static, ()>,
-    ) -> anyhow::Result<Payload, QuorumStoreError> {
+    ) -> anyhow::Result<(Payload, Vec<SignedTransaction>), QuorumStoreError> {
         let return_non_full = params.recent_max_fill_fraction
             < self.wait_for_full_blocks_above_recent_fill_threshold
             && params.pending_uncommitted_blocks < self.wait_for_full_blocks_above_pending_blocks;
@@ -111,10 +113,10 @@ impl UserPayloadClient for QuorumStoreClient {
         // keep polling QuorumStore until there's payloads available or there's still pending payloads
         let start_time = Instant::now();
 
-        let payload = loop {
+        let (payload, all_txns) = loop {
             // Make sure we don't wait more than expected, due to thread scheduling delays/processing time consumed
             let done = start_time.elapsed() >= params.max_poll_time;
-            let payload = self
+            let (payload, all_txns) = self
                 .pull_internal(
                     params.max_txns,
                     params.max_txns_after_filtering,
@@ -124,6 +126,7 @@ impl UserPayloadClient for QuorumStoreClient {
                     return_non_full || return_empty || done,
                     params.user_txn_filter.clone(),
                     params.block_timestamp,
+                    params.return_all_txns,
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
@@ -133,7 +136,7 @@ impl UserPayloadClient for QuorumStoreClient {
                 sleep(Duration::from_millis(NO_TXN_DELAY)).await;
                 continue;
             }
-            break payload;
+            break (payload, all_txns);
         };
         info!(
             pull_params = ?params,
@@ -145,6 +148,6 @@ impl UserPayloadClient for QuorumStoreClient {
             "Pull payloads from QuorumStore: proposal"
         );
 
-        Ok(payload)
+        Ok((payload, all_txns))
     }
 }

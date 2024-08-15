@@ -242,6 +242,7 @@ impl OnChainRandomnessConfig {
         }
     }
 
+    // daniel todo: fix on-chain config
     pub fn skip_non_rand_blocks(&self) -> bool {
         match self {
             OnChainRandomnessConfig::Off => false,

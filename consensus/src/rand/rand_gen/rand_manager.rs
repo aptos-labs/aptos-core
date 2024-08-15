@@ -149,7 +149,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
 
     fn process_incoming_metadata(&self, metadata: FullRandMetadata, require_randomness: bool) -> Option<DropGuard> {
         if self.skip_non_rand_blocks && !require_randomness {
-            debug!("[RandManager] Skip non-random block epoch {} round {} id {}.", metadata.epoch(), metadata.round(), metadata.block_id);
+            info!(LogSchema::new(LogEvent::SkipRandomnessGeneration)
+                .epoch(self.epoch_state.epoch)
+                .author(self.author)
+                .round(metadata.round()));
             return None;
         }
         let self_share = S::generate(&self.config, metadata.metadata.clone());
