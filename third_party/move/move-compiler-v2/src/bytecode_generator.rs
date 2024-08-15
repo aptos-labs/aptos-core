@@ -63,9 +63,9 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         gen.results.push(temp);
         let pool = gen.func_env.module_env.symbol_pool();
         let name = if multiple {
-            pool.make(&format!("$return[{}]", p))
+            pool.make(&format!("return[{}]", p))
         } else {
-            pool.make("$return")
+            pool.make("return")
         };
         gen.local_names.insert(temp, name);
     }

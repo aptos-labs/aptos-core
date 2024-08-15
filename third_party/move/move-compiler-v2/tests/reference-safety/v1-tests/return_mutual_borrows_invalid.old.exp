@@ -68,7 +68,7 @@ error: mutable reference in local `s1` requires exclusive access but is borrowed
    │         -----^^-
    │         │    │
    │         │    requirement enforced here
-   │         conflicting reference `$return[0]` used here
+   │         conflicting reference `return[0]` used here
 
 error: same mutable reference in return value 1 is also used in other return value 2 in argument list
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:32:9
@@ -95,7 +95,7 @@ error: mutable reference in local `f` requires exclusive access but is borrowed
    │         -----^-
    │         │    │
    │         │    requirement enforced here
-   │         conflicting reference `$return[0]` used here
+   │         conflicting reference `return[0]` used here
 
 error: mutable reference in return value 1 requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:36:9
@@ -113,7 +113,7 @@ error: mutable reference in local `s1` requires exclusive access but is borrowed
    │         ││          │
    │         ││          requirement enforced here
    │         │previous mutable field borrow
-   │         conflicting reference `$return[0]` used here
+   │         conflicting reference `return[0]` used here
 
 error: mutable reference in return value 2 requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:39:9
@@ -132,7 +132,7 @@ error: mutable reference in local `s1` requires exclusive access but is borrowed
    │         ││           │
    │         ││           requirement enforced here
    │         │previous mutable call result
-   │         conflicting reference `$return[0]` used here
+   │         conflicting reference `return[0]` used here
 
 error: mutable reference in return value 2 requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:42:9
@@ -163,7 +163,7 @@ error: mutable reference in local `f` requires exclusive access but is borrowed
    │         -----^-
    │         │    │
    │         │    requirement enforced here
-   │         conflicting reference `$return[0]` used here
+   │         conflicting reference `return[0]` used here
 
 error: mutable reference in return value 1 requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:46:9
@@ -185,7 +185,7 @@ error: mutable reference in local `s1` requires exclusive access but is borrowed
    │         ││      │           requirement enforced here
    │         ││      previous mutable field borrow
    │         │used by mutable call result
-   │         conflicting reference `$return[0]` used here
+   │         conflicting reference `return[0]` used here
 
 error: mutable reference in return value 2 requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:49:9

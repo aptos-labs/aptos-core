@@ -270,9 +270,9 @@ impl<'env> FunctionTarget<'env> {
     pub fn get_local_name_for_error_message(&self, temp: TempIndex) -> String {
         if let Some(sym) = self.data.local_names.get(&temp) {
             let sym_str = sym.display(self.global_env().symbol_pool()).to_string();
-            if sym_str == "$return" {
+            if sym_str == "return" {
                 "return value".to_owned()
-            } else if let Some(mut number_str) = sym_str.strip_prefix("$return[") {
+            } else if let Some(mut number_str) = sym_str.strip_prefix("return[") {
                 if number_str.ends_with(']') {
                     number_str = &number_str[0..number_str.len() - 1]
                 }
