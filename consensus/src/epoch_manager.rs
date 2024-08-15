@@ -80,19 +80,12 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_safety_rules::SafetyRulesManager;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
-    account_address::AccountAddress,
-    dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
-    epoch_change::EpochChangeProof,
-    epoch_state::EpochState,
-    jwks::SupportedOIDCProviders,
-    on_chain_config::{
+    account_address::AccountAddress, dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG}, epoch_change::EpochChangeProof, epoch_state::EpochState, jwks::SupportedOIDCProviders, on_chain_config::{
         Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
         RandomnessConfigSeqNum, ValidatorSet,
-    },
-    randomness::{RandKeys, WvufPP, WVUF},
-    validator_signer::ValidatorSigner,
+    }, optimistic_validator_verifier::OptimisticValidatorVerifier, randomness::{RandKeys, WvufPP, WVUF}, validator_signer::ValidatorSigner
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
@@ -177,6 +170,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
+    optimistic_vote_verifier: Option<Arc<OptimisticValidatorVerifier<Vote>>>,
+    optimistic_order_vote_verifier: Option<Arc<OptimisticValidatorVerifier<OrderVote>>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -1072,12 +1067,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
+        let validator_verifier = (&validator_set).into();
         let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
-            verifier: (&validator_set).into(),
+            verifier: validator_verifier.clone(),
         });
-
         self.epoch_state = Some(epoch_state.clone());
+        self.optimistic_vote_verifier = Some(Arc::new(OptimisticValidatorVerifier::new(
+            validator_verifier,
+            16,
+        )));
+        self.optimistic_order_vote_verifier = Some(Arc::new(OptimisticValidatorVerifier::new(
+            validator_verifier,
+            16,
+        )));
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
@@ -1425,6 +1428,32 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
+            if let UnverifiedEvent::VoteMsg(vote_msg) = unverified_event {
+                if let Ok(_) = vote_msg.partial_verify() {
+                    
+                } else {
+                    error!(
+                        SecurityEvent::ConsensusInvalidMessage,
+                        remote_peer = peer_id,
+                        error = ?e,
+                        unverified_event = unverified_event
+                    );
+                }
+            } else if let  UnverifiedEvent::OrderVoteMsg(order_vote_msg) = unverified_event {
+                if let Ok(_) = order_vote_msg.partial_verify() {
+                    
+                } else {
+                    error!(
+                        SecurityEvent::ConsensusInvalidMessage,
+                        remote_peer = peer_id,
+                        error = ?e,
+                        unverified_event = unverified_event
+                    );
+                }
+            } else {
+                
+            }
+
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(

@@ -8,8 +8,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::bls12381;
 // use rayon::iter::IntoParallelRefIterator;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -46,7 +45,6 @@ pub struct OptimisticValidatorVerifier<VoteType> {
     // we can ignore the votes.
     recent_aggregated_blocks: LruCache<LedgerInfo, ()>,
     verification_frequency: u64,
-    bounded_executor: BoundedExecutor,
 }
 
 // TODO: How does garbage collection happen?
@@ -58,14 +56,12 @@ impl<VoteType: Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> 
     pub fn new(
         validator_verifier: Arc<ValidatorVerifier>,
         verification_frequency: u64,
-        bounded_executor: BoundedExecutor,
     ) -> Self {
         Self {
             validator_verifier,
             vote_data: HashMap::new(),
             recent_aggregated_blocks: LruCache::new(30),
             verification_frequency,
-            bounded_executor,
         }
     }
 
@@ -145,12 +141,12 @@ impl<VoteType: Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> 
         if has_enough_voting_power || signature_data.unverified_votes.len() as u64 >= self.verification_frequency {
             let aggregated_signature = self.validator_verifier.aggregate_signatures(
                 &PartialSignatures::new(signature_data.unverified_votes.iter().map(|(account_address, (signature, vote))| (account_address.clone(), signature.clone())).collect()),
-                signature_data.aggregated_signature
+                signature_data.aggregated_signature.clone()
             )?;
             match self.validator_verifier.verify_multi_signatures(block, &aggregated_signature) {
                 Ok(_) => {
-                    signature_data.aggregated_signature = Some(aggregated_signature);
-                    signature_data.verified_votes.extend(signature_data.unverified_votes.iter().map(|(account_address, (_signature, vote))| (account_address.clone(), vote.clone())).collect());
+                    signature_data.aggregated_signature = Some(aggregated_signature.clone());
+                    signature_data.verified_votes.extend(signature_data.unverified_votes.iter().map(|(account_address, (_signature, vote))| (account_address.clone(), vote.clone())).collect::<Vec<_>>());
                     signature_data.unverified_votes.clear();
                 },
                 Err(err) => {

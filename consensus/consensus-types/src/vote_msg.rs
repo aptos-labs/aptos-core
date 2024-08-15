@@ -54,7 +54,7 @@ impl VoteMsg {
         self.vote.vote_data().proposed().id()
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn partial_verify(&self) -> anyhow::Result<()> {
         ensure!(
             self.vote().epoch() == self.sync_info.epoch(),
             "VoteMsg has different epoch"
@@ -68,10 +68,23 @@ impl VoteMsg {
                 timeout.hqc_round() <= self.sync_info.highest_certified_round(),
                 "2-chain Timeout hqc should be less or equal than the sync info hqc"
             );
-        }
+        };
         // We're not verifying SyncInfo here yet: we are going to verify it only in case we need
         // it. This way we avoid verifying O(n) SyncInfo messages while aggregating the votes
         // (O(n^2) signature verifications).
-        self.vote().verify(validator)
+        self.vote().partial_verify()?;
+        Ok(())
+    }
+
+    pub fn signature_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.vote().signature_verify(validator)
+    }
+
+    // We're not verifying SyncInfo here yet: we are going to verify it only in case we need
+    // it. This way we avoid verifying O(n) SyncInfo messages while aggregating the votes
+    // (O(n^2) signature verifications).
+    pub fn full_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.partial_verify()?;
+        self.signature_verify(validator)
     }
 }
