@@ -22,6 +22,8 @@ module 0x42::test {
         y: U
     }
 
+    struct S7(u8, u16, u32, u64);
+
     enum E1 has drop {
         A(u8, bool),
         B(u8),
@@ -156,4 +158,9 @@ module 0x42::test {
             }
         }
     }
+
+    fun simple_6(x: &S7) {
+        let S7(_w, .., _z) = x;
+    }
+
 }
