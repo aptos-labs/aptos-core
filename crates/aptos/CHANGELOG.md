@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Add safe methods to delete a profile, to rename a profile, and to output the private key of a profile.
 - Add `aptos update movefmt`. This installs / updates the `movefmt` binary, which is needed for the new `aptos move fmt` subcommand.
 - Integrate the Move formatter `movefmt` which is now available via `aptos move fmt`
 
