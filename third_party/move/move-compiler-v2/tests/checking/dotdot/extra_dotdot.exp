@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: the constructor takes 3 arguments but 4 were provided
+  ┌─ tests/checking/dotdot/extra_dotdot.move:5:13
+  │
+5 │         let S(x, _, _, ..) = x;
+  │             ^^^^^^^^^^^^^^
