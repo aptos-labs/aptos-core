@@ -33,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
+    block_executor::config::{BlockExecutorConfig, BlockSTMCommitterBackup},
     delayed_fields::PanicError,
     executable::Executable,
     on_chain_config::BlockGasLimitType,
@@ -108,13 +108,26 @@ where
         executor: &E,
         base_view: &S,
         parallel_state: ParallelState<T, X>,
+        worker_id: usize,
+        enable_profiling: bool,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
-        let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
+        let sync_view = LatestView::new(
+            base_view,
+            ViewState::Sync(parallel_state),
+            idx_to_execute,
+            incarnation,
+            worker_id,
+            enable_profiling, // profile view callbacks.
+        );
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+
+        if enable_profiling {
+            sync_view.log_callback_profiling_info();
+        }
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -451,6 +464,7 @@ where
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
     /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
+    #[allow(clippy::too_many_arguments)]
     fn prepare_and_queue_commit_ready_txns(
         &self,
         block_gas_limit_type: &BlockGasLimitType,
@@ -465,6 +479,8 @@ where
         executor: &E,
         block: &[T],
         num_workers: usize,
+        worker_id: usize,
+        enable_profiling: bool,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
@@ -491,6 +507,8 @@ where
                         start_shared_counter,
                         shared_counter,
                     ),
+                    worker_id,
+                    enable_profiling,
                 )?;
 
                 scheduler.finish_execution_during_commit(txn_idx)?;
@@ -671,6 +689,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        worker_id: usize,
     ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::<T, X>::new(
             versioned_cache,
@@ -678,7 +697,14 @@ where
             start_shared_counter,
             shared_counter,
         );
-        let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
+        let latest_view = LatestView::new(
+            base_view,
+            ViewState::Sync(parallel_state),
+            txn_idx,
+            0, // dummy incarnation
+            worker_id,
+            false, // profile view callbacks
+        );
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
@@ -745,6 +771,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn worker_loop(
         &self,
         env: &E::Environment,
@@ -759,11 +786,23 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
+        num_committers_and_proximity_interval: (usize, usize),
+        worker_id: usize,
+        enable_profiling: bool,
+        enable_special_committers: bool,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(env.clone(), base_view);
         drop(init_timer);
+
+        let (num_committers, committer_proximity_interval) = num_committers_and_proximity_interval;
+        assert!(
+            num_committers <= num_workers,
+            "Incorrect number of committers {}, num_workers = {}",
+            num_committers,
+            num_workers,
+        );
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::Retry;
@@ -779,28 +818,38 @@ where
                     last_input_output,
                     base_view,
                     final_results,
+                    worker_id,
                 )?;
             }
             Ok(())
         };
 
         loop {
-            while scheduler.should_coordinate_commits() {
-                self.prepare_and_queue_commit_ready_txns(
-                    &self.config.onchain.block_gas_limit_type,
-                    scheduler,
-                    versioned_cache,
-                    &mut scheduler_task,
-                    last_input_output,
-                    shared_commit_state,
-                    base_view,
-                    start_shared_counter,
-                    shared_counter,
-                    &executor,
-                    block,
-                    num_workers,
-                )?;
-                scheduler.queueing_commits_mark_done();
+            if !enable_special_committers // If not enabled, everyone tries to commit
+                || (worker_id < num_committers &&
+		    !matches!(scheduler_task, SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(_))
+		)) {
+                while scheduler.should_coordinate_commits() {
+                    self.prepare_and_queue_commit_ready_txns(
+                        &self.config.onchain.block_gas_limit_type,
+                        scheduler,
+                        versioned_cache,
+                        &mut scheduler_task,
+                        last_input_output,
+                        shared_commit_state,
+                        base_view,
+                        start_shared_counter,
+                        shared_counter,
+                        &executor,
+                        block,
+                        num_workers,
+                        worker_id,
+                        enable_profiling,
+                    )?;
+                    scheduler.queueing_commits_mark_done();
+                }
+
+                // TODO: back-up logic - next PR.
             }
 
             drain_commit_queue()?;
@@ -837,6 +886,8 @@ where
                             start_shared_counter,
                             shared_counter,
                         ),
+                        worker_id,
+                        enable_profiling,
                     )?;
                     scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
                 },
@@ -851,15 +902,23 @@ where
                         cvar.notify_one();
                     }
 
-                    scheduler.next_task()
+                    SchedulerTask::Retry
                 },
-                SchedulerTask::Retry => scheduler.next_task(),
+                SchedulerTask::Retry => {
+                    if enable_special_committers && worker_id < num_committers {
+                        scheduler.committer_next_task(committer_proximity_interval)
+                    } else {
+                        scheduler.next_task()
+                    }
+                },
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
-                    break Ok(());
+                    break;
                 },
             }
         }
+
+        Ok(())
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -889,6 +948,12 @@ where
         let num_txns = signature_verified_block.len();
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
+        let num_committers_and_proximity_interval = get_num_committers_and_proximity_interval(
+            num_txns,
+            num_workers,
+            self.config.local.block_stm_committer_backup.clone(),
+        );
+
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
@@ -908,9 +973,10 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let worker_ids: Vec<usize> = (0..num_workers).collect();
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..num_workers {
+            for worker_id in &worker_ids {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         env,
@@ -924,6 +990,13 @@ where
                         &shared_commit_state,
                         &final_results,
                         num_workers,
+                        num_committers_and_proximity_interval,
+                        *worker_id,
+                        self.config.local.enable_block_stm_profiling,
+                        !matches!(
+                            self.config.local.block_stm_committer_backup,
+                            BlockSTMCommitterBackup::None
+                        ),
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,
@@ -932,7 +1005,6 @@ where
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
                         }
                         shared_maybe_error.store(true, Ordering::SeqCst);
-
                         // Make sure to halt the scheduler if it hasn't already been halted.
                         scheduler.halt();
                     }
@@ -946,16 +1018,12 @@ where
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        let block_end_info = if self
+        let block_end_info = self
             .config
             .onchain
             .block_gas_limit_type
             .add_block_limit_outcome_onchain()
-        {
-            Some(shared_commit_state.into_inner().get_block_end_info())
-        } else {
-            None
-        };
+            .then(|| shared_commit_state.into_inner().get_block_end_info());
 
         (!shared_maybe_error.load(Ordering::SeqCst))
             .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
@@ -1065,6 +1133,9 @@ where
                 base_view,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
+                0,     // incarnation
+                0,     // worker id
+                false, // profile view callbacks
             );
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
@@ -1362,7 +1433,7 @@ where
                 return Ok(output);
             }
 
-            if !self.config.local.allow_fallback {
+            if !self.config.local.allow_sequential_block_fallback {
                 panic!("Parallel execution failed and fallback is not allowed");
             }
 
@@ -1387,7 +1458,7 @@ where
                 return Ok(output);
             },
             Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {
-                if !self.config.local.allow_fallback {
+                if !self.config.local.allow_sequential_block_fallback {
                     panic!("Parallel execution failed and fallback is not allowed");
                 }
 
@@ -1440,5 +1511,22 @@ where
         }
 
         Err(sequential_error)
+    }
+}
+
+fn get_num_committers_and_proximity_interval(
+    num_txns: usize,
+    num_workers: usize,
+    setting: BlockSTMCommitterBackup,
+) -> (usize, usize) {
+    match setting {
+        BlockSTMCommitterBackup::None => (num_workers, num_txns),
+        BlockSTMCommitterBackup::Default => match num_workers {
+            // Based on simple grid optimizations.
+            1..=6 => (1, 4),
+            7..=40 => (2, 4),
+            _ => (2, 5),
+        },
+        BlockSTMCommitterBackup::All => (num_workers, num_txns),
     }
 }
