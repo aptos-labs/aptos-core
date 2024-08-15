@@ -8,6 +8,10 @@ module 0x42::test {
         B {
             0: u8,
         }
+        C {
+            x: u8,
+            y: test::S1,
+        }
     }
     struct S0 {
         dummy_field: bool,
@@ -199,6 +203,9 @@ module 0x42::test {
           test::E1::B{ 0: x } => {
             x
           }
+          test::E1::C{ x, y: _ } => {
+            x
+          }
         }
 
     }
@@ -208,6 +215,24 @@ module 0x42::test {
             x
           }
           test::E1::B{ 0: x } => {
+            x
+          }
+        }
+
+    }
+    private fun simple_5(x: test::E1): u8 {
+        match (x) {
+          test::E1::A{ 0: _, 1: y } => {
+            if y {
+              1
+            } else {
+              0
+            }
+          }
+          test::E1::B{ 0: x } => {
+            x
+          }
+          test::E1::C{ x: _, y: test::S1{ 0: x } } => {
             x
           }
         }
