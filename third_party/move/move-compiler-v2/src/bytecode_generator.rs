@@ -791,12 +791,14 @@ impl<'env> Generator<'env> {
             Operation::Shr => self.gen_op_call(targets, id, BytecodeOperation::Shr, args),
             Operation::And => self.gen_logical_shortcut(true, targets, id, args),
             Operation::Or => self.gen_logical_shortcut(false, targets, id, args),
-            Operation::Eq => self.gen_op_call(targets, id, BytecodeOperation::Eq, args),
-            Operation::Neq => self.gen_op_call(targets, id, BytecodeOperation::Neq, args),
-            Operation::Lt => self.gen_op_call(targets, id, BytecodeOperation::Lt, args),
-            Operation::Gt => self.gen_op_call(targets, id, BytecodeOperation::Gt, args),
-            Operation::Le => self.gen_op_call(targets, id, BytecodeOperation::Le, args),
-            Operation::Ge => self.gen_op_call(targets, id, BytecodeOperation::Ge, args),
+            Operation::Eq => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Eq, args),
+            Operation::Neq => {
+                self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Neq, args)
+            },
+            Operation::Lt => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Lt, args),
+            Operation::Gt => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Gt, args),
+            Operation::Le => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Le, args),
+            Operation::Ge => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Ge, args),
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
@@ -894,6 +896,28 @@ impl<'env> Generator<'env> {
             },
         };
         self.gen_op_call(targets, id, bytecode_op, args)
+    }
+
+    fn gen_op_call_auto_freeze(
+        &mut self,
+        targets: Vec<TempIndex>,
+        id: NodeId,
+        op: BytecodeOperation,
+        args: &[Exp],
+    ) {
+        // Freeze arguments if needed
+        let args = args
+            .iter()
+            .map(|e| {
+                let ty = self.env().get_node_type(e.node_id());
+                if let Type::Reference(ReferenceKind::Mutable, elem_ty) = ty {
+                    self.maybe_convert(e, &Type::Reference(ReferenceKind::Immutable, elem_ty))
+                } else {
+                    e.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        self.gen_op_call(targets, id, op, &args)
     }
 
     fn gen_op_call(
