@@ -2508,7 +2508,7 @@ pub enum ErrorMessageContext {
     /// The error appears in the argument list of a function.
     Argument,
     /// The error appears in the argument list of a positional constructor.
-    PositionalConstructorArgument,
+    PositionalUnpackArgument,
     /// The error appears in a type argument.
     TypeArgument,
     /// The error appears in the argument of a receiver style function.
@@ -2562,7 +2562,7 @@ impl ErrorMessageContext {
                 "cannot pass `{}` to a function which expects argument of type `{}`",
                 actual, expected
             ),
-            PositionalConstructorArgument => format!(
+            PositionalUnpackArgument => format!(
                 "cannot pass `{}` to a constructor which expects argument of type `{}`",
                 actual, expected
             ),
@@ -2632,7 +2632,7 @@ impl ErrorMessageContext {
                 },
                 actual
             ),
-            PositionalConstructorArgument => format!(
+            PositionalUnpackArgument => format!(
                 "the constructor takes {} {} but {} were provided",
                 expected,
                 if for_type_args {
@@ -2696,7 +2696,7 @@ impl ErrorMessageContext {
                 "the function takes {} but {} was provided",
                 expected, actual
             ),
-            PositionalConstructorArgument => format!(
+            PositionalUnpackArgument => format!(
                 "the constructor takes {} but {} was provided",
                 expected, actual
             ),
@@ -2722,7 +2722,7 @@ impl ErrorMessageContext {
                 "the function takes a reference but `{}` was provided",
                 actual
             ),
-            PositionalConstructorArgument => format!(
+            PositionalUnpackArgument => format!(
                 "the constructor takes a reference but `{}` was provided",
                 actual
             ),

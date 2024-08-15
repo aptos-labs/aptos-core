@@ -2451,7 +2451,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 {
                     self.error(
                         loc,
-                        &ErrorMessageContext::PositionalConstructorArgument.arity_mismatch(
+                        &ErrorMessageContext::PositionalUnpackArgument.arity_mismatch(
                             false,
                             args.value.len(),
                             arity,
