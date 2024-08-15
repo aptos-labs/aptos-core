@@ -485,7 +485,7 @@ impl Scheduler {
         let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
         let commit_idx = self.commit_state().0;
-        if min(idx_to_validate, idx_to_execute) > commit_idx + proximity_interval as u32 {
+        if min(idx_to_validate, idx_to_execute) > commit_idx + proximity_interval as TxnIndex {
             return SchedulerTask::Retry;
         }
 

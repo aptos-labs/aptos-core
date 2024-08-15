@@ -28,7 +28,7 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
-use claims::{assert_gt, assert_none};
+use claims::assert_none;
 use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
@@ -53,7 +53,6 @@ const TXN2_FALLBACK_STARTED_FLAG: u64 = 8;
 #[derive(Clone)]
 struct TestTransaction {
     id: u8,
-    status: Arc<AtomicU64>,
 }
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Ord, Eq)]
@@ -65,17 +64,31 @@ enum TestKey {
     Module,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum TestValue {
     None, // Used to represent empty storage slots, i.e. 'deletion' write.
-    SpeculativeWrongValue,
-    FinalCorrectValue,
+    SpeculativeWrongValue(Bytes),
+    FinalCorrectValue(Bytes),
+}
+
+impl TestValue {
+    fn speculative_wrong_value() -> Self {
+        TestValue::SpeculativeWrongValue(vec![0u8].into()) // Contains '0'
+    }
+
+    fn final_correct_value() -> Self {
+        TestValue::FinalCorrectValue(vec![1u8].into()) // Contains '1'
+    }
 }
 
 impl TransactionWrite for TestValue {
     fn bytes(&self) -> Option<&Bytes> {
-        // We do not call get_x_bytes() in the test.
-        unimplemented!("Unused in the test")
+        match self {
+            TestValue::None => None,
+            TestValue::SpeculativeWrongValue(bytes) | TestValue::FinalCorrectValue(bytes) => {
+                Some(bytes)
+            },
+        }
     }
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
@@ -91,8 +104,9 @@ impl TransactionWrite for TestValue {
     fn as_state_value(&self) -> Option<StateValue> {
         match self {
             TestValue::None => None,
-            TestValue::SpeculativeWrongValue => Some(StateValue::new_legacy(vec![0u8].into())),
-            TestValue::FinalCorrectValue => Some(StateValue::new_legacy(vec![1u8].into())),
+            TestValue::SpeculativeWrongValue(bytes) | TestValue::FinalCorrectValue(bytes) => {
+                Some(StateValue::new_legacy(bytes.clone()))
+            },
         }
     }
 
@@ -152,33 +166,33 @@ impl TransactionOutput for TestOutput {
     }
 
     fn module_write_set(&self) -> BTreeMap<TestKey, TestValue> {
-        unimplemented!("Module writes unused in the test")
+        BTreeMap::new()
     }
 
     fn aggregator_v1_write_set(&self) -> BTreeMap<TestKey, TestValue> {
-        unimplemented!("Aggregator V1 writes unused in the test")
+        BTreeMap::new()
     }
 
     fn aggregator_v1_delta_set(&self) -> Vec<(TestKey, DeltaOp)> {
-        unimplemented!("Aggregator V1 deltas Unused in the test")
+        Vec::new()
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
-        unimplemented!("Delayed fields unused in the test")
+        BTreeMap::new()
     }
 
     fn reads_needing_delayed_field_exchange(
         &self,
     ) -> Vec<(TestKey, StateValueMetadata, Arc<MoveTypeLayout>)> {
-        unimplemented!("Delayed fields unused in the test")
+        Vec::new()
     }
 
     fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(TestKey, StateValueMetadata)> {
-        unimplemented!("Delayed fields unused in the test")
+        Vec::new()
     }
 
     fn get_events(&self) -> Vec<(TestEvent, Option<MoveTypeLayout>)> {
-        unimplemented!("Events unused in the test")
+        Vec::new()
     }
 
     fn resource_group_write_set(
@@ -188,15 +202,16 @@ impl TransactionOutput for TestOutput {
         TestValue,
         BTreeMap<(), (TestValue, Option<Arc<MoveTypeLayout>>)>,
     )> {
-        unimplemented!("Groups unused in the test")
+        Vec::new()
     }
 
     fn resource_group_metadata_ops(&self) -> Vec<(TestKey, TestValue)> {
-        unimplemented!("Groups unused in the test")
+        Vec::new()
     }
 
+    // Used due to output initialization in block executor, o.w. shouldn't occur in the test.
     fn skip_output() -> Self {
-        unimplemented!("Skip output unused in the test")
+        TestOutput { writes: vec![] }
     }
 
     fn discard_output(_discard_code: StatusCode) -> Self {
@@ -260,19 +275,24 @@ struct TestExecutor {
     // the block executor's environment parameter (passed down to ExecutorTask's init).
     // In this case, block execution gets a TestCommitHook that updates the atomic index.
     maybe_next_idx_to_commit: Option<Arc<AtomicU64>>,
+    synchronization_status: Arc<AtomicU64>,
 }
 
 // TODO: picture and description of the test case.
 
 impl ExecutorTask for TestExecutor {
-    type Environment = Option<Arc<AtomicU64>>;
+    type Environment = (Option<Arc<AtomicU64>>, Arc<AtomicU64>);
     type Error = usize;
     type Output = TestOutput;
     type Txn = TestTransaction;
 
-    fn init(env: Option<Arc<AtomicU64>>, _state_view: &impl TStateView<Key = TestKey>) -> Self {
+    fn init(
+        env: (Option<Arc<AtomicU64>>, Arc<AtomicU64>),
+        _state_view: &impl TStateView<Key = TestKey>,
+    ) -> Self {
         TestExecutor {
-            maybe_next_idx_to_commit: env,
+            maybe_next_idx_to_commit: env.0,
+            synchronization_status: env.1,
         }
     }
 
@@ -297,19 +317,16 @@ impl ExecutorTask for TestExecutor {
                 assert_eq!(incarnation, 0);
                 assert_eq!(is_fallback, false);
 
+                let target_mask = TXN1_READ_FLAG + TXN2_READ_FLAG;
                 loop {
-                    let status = txn.status.load(Ordering::Relaxed);
-                    if status != DEFAULT_STATUS {
-                        assert_gt!(
-                            status & TXN1_READ_FLAG + status & TXN2_READ_FLAG,
-                            0,
-                            "TXN1 and TXN2 perform a read first, set flag",
-                        );
+                    let status = self.synchronization_status.load(Ordering::Relaxed);
+                    if status & target_mask == target_mask {
+                        // TXN1 and TXN2 have started and performed reads.
                         break;
                     }
                 }
 
-                writes.push((TestKey::A, TestValue::FinalCorrectValue));
+                writes.push((TestKey::A, TestValue::final_correct_value()));
             },
             1 => {
                 assert_eq!(txn_idx, 1, "Algorithm for TXN 1");
@@ -321,33 +338,42 @@ impl ExecutorTask for TestExecutor {
                         // for the read flag set below, before it writes.
                         assert_none!(view.get_resource_state_value(&TestKey::A, None).unwrap());
 
-                        let mut prev_status =
-                            txn.status.fetch_xor(TXN1_READ_FLAG, Ordering::Relaxed);
-                        assert!(prev_status == DEFAULT_STATUS || prev_status == TXN2_READ_FLAG);
+                        let prev_status = self
+                            .synchronization_status
+                            .fetch_xor(TXN1_READ_FLAG, Ordering::Relaxed);
+                        // 2 workers: (0, 0) is waiting for (1,0) and (2,0). (1,0) starts first and
+                        // only after (1,0) finishes (2,0) may start.
+                        assert!(prev_status == DEFAULT_STATUS);
 
-                        writes.push((TestKey::B, TestValue::SpeculativeWrongValue));
-
-                        // Do not finish execution until TXN2 reads key C, guaranteeing the read
-                        // may not observe the write by incarnation 1 that starts after.
-                        while prev_status & TXN2_READ_FLAG == 0 {
-                            prev_status = txn.status.load(Ordering::Relaxed);
-                        }
+                        writes.push((TestKey::B, TestValue::speculative_wrong_value()));
                     },
                     1 => {
-                        let prev_status =
-                            txn.status.fetch_xor(TXN1_ABORTED_FLAG, Ordering::Relaxed);
+                        // Do not finish execution until TXN2 reads key C, guaranteeing the read
+                        // may not observe the write by incarnation 1 that starts after.
+                        while (self.synchronization_status.load(Ordering::Relaxed) & TXN2_READ_FLAG)
+                            == 0
+                        {}
+
+                        // No write should be visible at B.
+                        assert_none!(view.get_resource_state_value(&TestKey::B, None).unwrap());
+                        // TODO: check A. and final correct value.
+
+                        let prev_status = self
+                            .synchronization_status
+                            .fetch_xor(TXN1_ABORTED_FLAG, Ordering::Relaxed);
                         assert_eq!(
                             prev_status & TXN1_READ_FLAG,
-                            1,
+                            TXN1_READ_FLAG,
                             "TXN1 prior incarnation must set the read flag"
                         );
                         assert_eq!(
                             prev_status & TXN2_READ_FLAG,
-                            1,
+                            TXN2_READ_FLAG,
                             "TXN1 prior incarnation waits to finish for TXN2 read flag set"
                         );
 
-                        writes.push((TestKey::C, TestValue::FinalCorrectValue));
+                        writes.push((TestKey::B, TestValue::final_correct_value()));
+                        writes.push((TestKey::C, TestValue::final_correct_value()));
                     },
                     _ => unreachable!("Incarnation for TXN 1 should be 0 or 1"),
                 }
@@ -364,38 +390,60 @@ impl ExecutorTask for TestExecutor {
                         // set below, before it (starts incarnation that) writes to key C.
                         assert_none!(view.get_resource_state_value(&TestKey::C, None).unwrap());
 
-                        let mut prev_status =
-                            txn.status.fetch_xor(TXN2_READ_FLAG, Ordering::Relaxed);
-                        assert!(prev_status == DEFAULT_STATUS || prev_status == TXN1_READ_FLAG);
+                        let mut prev_status = self
+                            .synchronization_status
+                            .fetch_xor(TXN2_READ_FLAG, Ordering::Relaxed);
+                        assert!(prev_status == TXN1_READ_FLAG);
 
-                        writes.push((TestKey::D, TestValue::SpeculativeWrongValue));
+                        writes.push((TestKey::D, TestValue::speculative_wrong_value()));
 
-                        // Waiting for TXN1 aborted flag to be set guarantees that the following
-                        // read from key B would not observe the write from TXN1 incarnation 0,
-                        // instead potentially waiting for the corresponding estimate, and
-                        // eventually observing no write to key B by TXN1 incarnation 1.
                         while prev_status & TXN1_ABORTED_FLAG == 0 {
-                            prev_status = txn.status.load(Ordering::Relaxed);
+                            prev_status = self.synchronization_status.load(Ordering::Relaxed);
                         }
                         assert_eq!(
                             prev_status & TXN1_READ_FLAG,
-                            1,
+                            TXN1_READ_FLAG,
                             "TXN1 read flag is set before aborted flag"
                         );
-                        assert_none!(view.get_resource_state_value(&TestKey::B, None).unwrap());
+                        // Waiting for TXN1 aborted flag to be set above guarantees that the
+                        // read from key B below may not observe the write from TXN1 incarnation 0,
+                        // but will instead observe a dependency (an Estimate in MVHashMap).
+                        // Even if the dependency is resolved, the other worker (since there are 2)
+                        // that commits TXN1 will start fallback execution immediately after
+                        // (before signaling the suspended Read here). finish_execution of the
+                        // fallback will do the signal, providing an SpeculativeAbort error.
+                        //
+                        match view.get_resource_state_value(&TestKey::B, None) {
+                            Err(e) => {
+                                assert_eq!(
+                                    e.major_status(),
+                                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                                );
+                            },
+                            Ok(maybe_state_value) => {
+                                // There is a slim chance (as (2, 0) starts before (1, 1)), that
+                                // Read happens after (1,1) has completed. In this case, it will
+                                // read the value from (1,1).
+                                assert!(
+                                    maybe_state_value.unwrap().bytes().is_empty(),
+                                    "Must be encoding of FinalCorrectValue2"
+                                );
+                            },
+                        }
 
                         // Stay in 'Executing' state, allowing the fallback execution to start
                         // after TXN1 is committed.
                         while prev_status & TXN2_FALLBACK_STARTED_FLAG == 0 {
-                            prev_status = txn.status.load(Ordering::Relaxed);
+                            prev_status = self.synchronization_status.load(Ordering::Relaxed);
                         }
+                        let target_mask = TXN1_READ_FLAG
+                            + TXN2_READ_FLAG
+                            + TXN1_ABORTED_FLAG
+                            + TXN2_FALLBACK_STARTED_FLAG;
                         assert_eq!(
-                            (prev_status & TXN1_READ_FLAG)
-                                + (prev_status & TXN2_READ_FLAG)
-                                + (prev_status & TXN1_ABORTED_FLAG)
-                                + (prev_status & TXN2_FALLBACK_STARTED_FLAG),
-                            4,
-                            "All flags must be set",
+                            prev_status & target_mask,
+                            target_mask,
+                            "Txn 2: all flags must be set",
                         );
 
                         if let Some(next_idx_to_commit) = &self.maybe_next_idx_to_commit {
@@ -415,15 +463,14 @@ impl ExecutorTask for TestExecutor {
                         }
                     },
                     true => {
-                        let prev_status = txn
-                            .status
+                        let prev_status = self
+                            .synchronization_status
                             .fetch_xor(TXN2_FALLBACK_STARTED_FLAG, Ordering::Relaxed);
+                        let target_mask = TXN1_READ_FLAG + TXN2_READ_FLAG + TXN1_ABORTED_FLAG;
                         assert_eq!(
-                            (prev_status & TXN1_READ_FLAG)
-                                + (prev_status & TXN2_READ_FLAG)
-                                + (prev_status & TXN1_ABORTED_FLAG),
-                            3,
-                            "All flags must be set",
+                            prev_status & target_mask,
+                            target_mask,
+                            "TXN2 fallback: all flags must be set",
                         );
 
                         // Fallback must read the correct value, written by TXN1 incarnation 1.
@@ -454,29 +501,19 @@ impl ExecutorTask for TestExecutor {
 #[test_case(false)]
 #[test_case(true)]
 fn test_commit_fallback(with_commit_hook: bool) {
-    let num_workers = std::cmp::min(num_cpus::get(), 3);
-    if num_workers < 2 {
+    if num_cpus::get() < 2 {
         return;
     }
+    let num_workers = 2;
 
     let next_to_commit_idx_local = Arc::new(AtomicU64::new(0));
     let maybe_commit_hook = with_commit_hook.then(|| TestCommitHook {
         next_to_commit_idx: next_to_commit_idx_local.clone(),
     });
-    let status = Arc::new(AtomicU64::new(DEFAULT_STATUS));
     let transactions = Vec::from([
-        TestTransaction {
-            id: 0,
-            status: status.clone(),
-        },
-        TestTransaction {
-            id: 0,
-            status: status.clone(),
-        },
-        TestTransaction {
-            id: 0,
-            status: status.clone(),
-        },
+        TestTransaction { id: 0 },
+        TestTransaction { id: 1 },
+        TestTransaction { id: 2 },
     ]);
 
     let data_view = EmptyDataView::<TestKey> {
@@ -494,15 +531,35 @@ fn test_commit_fallback(with_commit_hook: bool) {
     // transaction execution by some (unpredictable) workers.
     config.local.block_stm_committer_setting = BlockSTMCommitterSetting::All;
 
-    let output = BlockExecutor::<
+    let synchronization_status = Arc::new(AtomicU64::new(DEFAULT_STATUS));
+
+    let binding = BlockExecutor::<
         TestTransaction,
         TestExecutor,
         EmptyDataView<TestKey>,
         TestCommitHook,
     >::new(config, executor_thread_pool.clone(), maybe_commit_hook)
     .execute_transactions_parallel(
-        &with_commit_hook.then(|| next_to_commit_idx_local),
+        &(
+            with_commit_hook.then(|| next_to_commit_idx_local),
+            synchronization_status,
+        ),
         &transactions,
         &data_view,
-    );
+    )
+    .unwrap();
+    let output = binding.get_transaction_outputs_forced();
+
+    assert_eq!(output.len(), 3);
+    assert_eq!(output[0].writes.len(), 1);
+    assert_eq!(output[0].writes[0].0, TestKey::A);
+    assert_eq!(output[0].writes[0].1, TestValue::final_correct_value());
+
+    assert_eq!(output[1].writes.len(), 2);
+    assert_eq!(output[1].writes[0].0, TestKey::B);
+    assert_eq!(output[1].writes[0].1, TestValue::final_correct_value());
+    assert_eq!(output[1].writes[1].0, TestKey::C);
+    assert_eq!(output[1].writes[1].1, TestValue::final_correct_value());
+
+    assert!(output[2].writes.is_empty());
 }
