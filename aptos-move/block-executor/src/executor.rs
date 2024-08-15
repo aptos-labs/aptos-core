@@ -555,6 +555,7 @@ where
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
     /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
+    #[allow(clippy::too_many_arguments)]
     fn prepare_and_queue_commit_ready_txns(
         &self,
         worker_id: usize,
@@ -859,6 +860,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn worker_loop(
         &self,
         worker_id: usize,
