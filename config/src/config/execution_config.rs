@@ -54,6 +54,9 @@ pub struct ExecutionConfig {
     pub transaction_filter: Filter,
     /// Used during DB bootstrapping
     pub genesis_waypoint: Option<WaypointConfig>,
+    /// Makes worker threads that commit a txn perform backup execution of the next txn (to
+    /// provide a competitive completion guarantee to the sequential execution of transactions).
+    pub enable_committer_backup: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -86,6 +89,7 @@ impl Default for ExecutionConfig {
             processed_transactions_detailed_counters: false,
             transaction_filter: Filter::empty(),
             genesis_waypoint: None,
+            enable_committer_backup: true,
         }
     }
 }

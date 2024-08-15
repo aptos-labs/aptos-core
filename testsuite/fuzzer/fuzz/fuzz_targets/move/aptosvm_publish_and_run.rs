@@ -14,7 +14,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::static_config::AptosVMStaticConfig;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
@@ -166,7 +166,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         packages.push(cur)
     }
 
-    AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
+    AptosVMStaticConfig::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
         &VM,
         ChainId::mainnet(),

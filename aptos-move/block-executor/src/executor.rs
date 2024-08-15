@@ -35,7 +35,6 @@ use aptos_mvhashmap::{
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     delayed_fields::PanicError,
-    executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
     transaction::{
@@ -62,22 +61,75 @@ use std::{
     },
 };
 
-pub struct BlockExecutor<T, E, S, L, X> {
+struct SharedSyncParams<'a, T, E, S>
+where
+    T: Transaction,
+    E: ExecutorTask<Txn = T>,
+    S: TStateView<Key = T::Key> + Sync,
+{
+    // TODO: should not need to pass base view.
+    base_view: &'a S,
+    scheduler: &'a Scheduler,
+    versioned_cache: &'a MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
+    last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
+    delayed_field_id_counter: &'a AtomicU32,
+    shared_commit_state: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
+    final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
+}
+
+struct ParallelExecutionConfig {
+    committer_backup_enabled: bool,
+    profiling_enabled: bool,
+
+    num_workers: usize,
+
+    // For delayed field ID replacement.
+    start_delayed_field_id_counter: u32,
+}
+
+impl ParallelExecutionConfig {
+    fn new(
+        committer_backup_enabled: bool,
+        profiling_enabled: bool,
+        num_workers: usize,
+        start_delayed_field_id_counter: u32,
+    ) -> Self {
+        Self {
+            committer_backup_enabled,
+            profiling_enabled,
+            num_workers,
+            start_delayed_field_id_counter,
+        }
+    }
+
+    fn worker_should_backup(&self, scheduler_task: &SchedulerTask) -> bool {
+        // Execution task would be problematic for the special committer behavior,
+        // as back-up execution can create a task that must be executed earlier.
+        // O.w. the execution of scheduler_task may depend on it (and get suspended).
+        self.committer_backup_enabled
+            && !matches!(
+                scheduler_task,
+                SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Execution)
+                    | SchedulerTask::Done,
+            )
+    }
+}
+
+pub struct BlockExecutor<T, E, S, L> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, X)>,
+    phantom: PhantomData<(T, E, S, L)>,
 }
 
-impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
+impl<T, E, S, L> BlockExecutor<T, E, S, L>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
-    X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -100,21 +152,41 @@ where
     }
 
     fn execute(
+        signature_verified_block: &[T],
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        signature_verified_block: &[T],
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
         executor: &E,
-        base_view: &S,
-        parallel_state: ParallelState<T, X>,
+        worker_id: usize,
+        profiling_enabled: bool,
+        start_delayed_field_id_counter: u32,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
+        let parallel_state = ParallelState::new(
+            shared_sync_params.versioned_cache,
+            shared_sync_params.scheduler,
+            start_delayed_field_id_counter,
+            shared_sync_params.delayed_field_id_counter,
+        );
+        let last_input_output = shared_sync_params.last_input_output;
+        let versioned_cache = shared_sync_params.versioned_cache;
+
         // VM execution.
-        let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
+        let sync_view = LatestView::new(
+            shared_sync_params.base_view,
+            ViewState::Sync(parallel_state),
+            idx_to_execute,
+            incarnation,
+            worker_id,
+            profiling_enabled, // profile view callbacks.
+        );
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+
+        if profiling_enabled {
+            sync_view.log_callback_profiling_info();
+        }
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -320,7 +392,7 @@ where
     fn validate(
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
     ) -> Result<bool, PanicError> {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let read_set = last_input_output
@@ -350,7 +422,7 @@ where
     fn update_transaction_on_abort(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
     ) {
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
@@ -392,7 +464,7 @@ where
         valid: bool,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
         scheduler: &Scheduler,
     ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
@@ -413,7 +485,7 @@ where
 
     fn validate_commit_ready(
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
     ) -> Result<bool, PanicError> {
         let read_set = last_input_output
@@ -453,20 +525,19 @@ where
     /// way, the materialization can be almost embarrassingly parallelizable.
     fn prepare_and_queue_commit_ready_txns(
         &self,
-        block_gas_limit_type: &BlockGasLimitType,
-        scheduler: &Scheduler,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler_task: &mut SchedulerTask,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
-        base_view: &S,
-        start_shared_counter: u32,
-        shared_counter: &AtomicU32,
-        executor: &E,
         block: &[T],
-        num_workers: usize,
+        worker_id: usize,
+        block_gas_limit_type: &BlockGasLimitType,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
+        scheduler_task: &mut SchedulerTask,
+        executor: &E,
+        config: &ParallelExecutionConfig,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
-        let mut block_limit_processor = shared_commit_state.acquire();
+        let mut block_limit_processor = shared_sync_params.shared_commit_state.acquire();
+
+        let scheduler = shared_sync_params.scheduler;
+        let versioned_cache = shared_sync_params.versioned_cache;
+        let last_input_output = shared_sync_params.last_input_output;
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
@@ -478,19 +549,14 @@ where
                 // after execution, inside finish_execution_during_commit.
                 // Because of that, we can also ignore _needs_suffix_validation result.
                 let _needs_suffix_validation = Self::execute(
+                    block,
                     txn_idx,
                     incarnation + 1,
-                    block,
-                    last_input_output,
-                    versioned_cache,
+                    shared_sync_params,
                     executor,
-                    base_view,
-                    ParallelState::new(
-                        versioned_cache,
-                        scheduler,
-                        start_shared_counter,
-                        shared_counter,
-                    ),
+                    worker_id,
+                    config.profiling_enabled,
+                    config.start_delayed_field_id_counter,
                 )?;
 
                 scheduler.finish_execution_during_commit(txn_idx)?;
@@ -593,7 +659,7 @@ where
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
-                        num_workers,
+                        config.num_workers,
                     );
 
                     // failpoint triggering error at the last committed transaction,
@@ -612,7 +678,7 @@ where
     fn materialize_aggregator_v1_delta_writes(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
         base_view: &S,
     ) -> Vec<(T::Key, WriteOp)> {
         // Materialize all the aggregator v1 deltas.
@@ -664,21 +730,27 @@ where
     fn materialize_txn_commit(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
-        start_shared_counter: u32,
-        shared_counter: &AtomicU32,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        base_view: &S,
-        final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
+        start_delayed_field_id_counter: u32,
+        worker_id: usize,
     ) -> Result<(), PanicError> {
-        let parallel_state = ParallelState::<T, X>::new(
+        let versioned_cache = shared_sync_params.versioned_cache;
+        let last_input_output = shared_sync_params.last_input_output;
+
+        let parallel_state = ParallelState::<T>::new(
             versioned_cache,
-            scheduler,
-            start_shared_counter,
-            shared_counter,
+            shared_sync_params.scheduler,
+            start_delayed_field_id_counter,
+            shared_sync_params.delayed_field_id_counter,
         );
-        let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
+        let latest_view = LatestView::new(
+            shared_sync_params.base_view,
+            ViewState::Sync(parallel_state),
+            txn_idx,
+            0, // dummy incarnation
+            worker_id,
+            false, // profile view callbacks
+        );
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
@@ -704,7 +776,7 @@ where
             txn_idx,
             last_input_output,
             versioned_cache,
-            base_view,
+            shared_sync_params.base_view,
         );
 
         last_input_output.record_materialized_txn_output(
@@ -731,7 +803,7 @@ where
             }
         }
 
-        let mut final_results = final_results.acquire();
+        let mut final_results = shared_sync_params.final_results.acquire();
         match last_input_output.take_output(txn_idx) {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
@@ -747,38 +819,31 @@ where
 
     fn worker_loop(
         &self,
-        env: &E::Environment,
         block: &[T],
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
-        // TODO: should not need to pass base view.
-        base_view: &S,
-        start_shared_counter: u32,
-        shared_counter: &AtomicU32,
-        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
-        final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-        num_workers: usize,
+        env: &E::Environment,
+        worker_id: usize,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
+        config: &ParallelExecutionConfig,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(env.clone(), base_view);
+        let executor = E::init(env.clone(), shared_sync_params.base_view);
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::Retry;
 
+        let scheduler = shared_sync_params.scheduler;
+        let last_input_output = shared_sync_params.last_input_output;
+        let versioned_cache = shared_sync_params.versioned_cache;
+
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
                 self.materialize_txn_commit(
                     txn_idx,
-                    versioned_cache,
-                    scheduler,
-                    start_shared_counter,
-                    shared_counter,
-                    last_input_output,
-                    base_view,
-                    final_results,
+                    shared_sync_params,
+                    config.start_delayed_field_id_counter,
+                    worker_id,
                 )?;
             }
             Ok(())
@@ -787,20 +852,19 @@ where
         loop {
             while scheduler.should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
-                    &self.config.onchain.block_gas_limit_type,
-                    scheduler,
-                    versioned_cache,
-                    &mut scheduler_task,
-                    last_input_output,
-                    shared_commit_state,
-                    base_view,
-                    start_shared_counter,
-                    shared_counter,
-                    &executor,
                     block,
-                    num_workers,
+                    worker_id,
+                    &self.config.onchain.block_gas_limit_type,
+                    shared_sync_params,
+                    &mut scheduler_task,
+                    &executor,
+                    config,
                 )?;
                 scheduler.queueing_commits_mark_done();
+            }
+
+            if config.worker_should_backup(&scheduler_task) {
+                // TODO: back-up logic - next PR.
             }
 
             drain_commit_queue()?;
@@ -824,19 +888,14 @@ where
                     ExecutionTaskType::Execution,
                 ) => {
                     let needs_suffix_validation = Self::execute(
+                        block,
                         txn_idx,
                         incarnation,
-                        block,
-                        last_input_output,
-                        versioned_cache,
+                        shared_sync_params,
                         &executor,
-                        base_view,
-                        ParallelState::new(
-                            versioned_cache,
-                            scheduler,
-                            start_shared_counter,
-                            shared_counter,
-                        ),
+                        worker_id,
+                        config.profiling_enabled,
+                        config.start_delayed_field_id_counter,
                     )?;
                     scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
                 },
@@ -851,15 +910,17 @@ where
                         cvar.notify_one();
                     }
 
-                    scheduler.next_task()
+                    SchedulerTask::Retry
                 },
                 SchedulerTask::Retry => scheduler.next_task(),
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
-                    break Ok(());
+                    break;
                 },
             }
         }
+
+        Ok(())
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -879,8 +940,8 @@ where
         );
 
         let versioned_cache = MVHashMap::new();
-        let start_shared_counter = gen_id_start_value(false);
-        let shared_counter = AtomicU32::new(start_shared_counter);
+        let start_delayed_field_id_counter = gen_id_start_value(false);
+        let delayed_field_id_counter = AtomicU32::new(start_delayed_field_id_counter);
 
         if signature_verified_block.is_empty() {
             return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
@@ -888,6 +949,12 @@ where
 
         let num_txns = signature_verified_block.len();
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
+        let config = ParallelExecutionConfig::new(
+            self.config.local.enable_committer_backup,
+            self.config.local.enable_block_stm_profiling,
+            num_workers,
+            start_delayed_field_id_counter,
+        );
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -908,22 +975,27 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
+            base_view,
+            scheduler: &scheduler,
+            versioned_cache: &versioned_cache,
+            last_input_output: &last_input_output,
+            delayed_field_id_counter: &delayed_field_id_counter,
+            shared_commit_state: &shared_commit_state,
+            final_results: &final_results,
+        };
+
+        let worker_ids: Vec<usize> = (0..num_workers).collect();
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..num_workers {
+            for worker_id in &worker_ids {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
-                        env,
                         signature_verified_block,
-                        &last_input_output,
-                        &versioned_cache,
-                        &scheduler,
-                        base_view,
-                        start_shared_counter,
-                        &shared_counter,
-                        &shared_commit_state,
-                        &final_results,
-                        num_workers,
+                        env,
+                        *worker_id,
+                        &shared_sync_params,
+                        &config,
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,
@@ -932,7 +1004,6 @@ where
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
                         }
                         shared_maybe_error.store(true, Ordering::SeqCst);
-
                         // Make sure to halt the scheduler if it hasn't already been halted.
                         scheduler.halt();
                     }
@@ -946,16 +1017,12 @@ where
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        let block_end_info = if self
+        let block_end_info = self
             .config
             .onchain
             .block_gas_limit_type
             .add_block_limit_outcome_onchain()
-        {
-            Some(shared_commit_state.into_inner().get_block_end_info())
-        } else {
-            None
-        };
+            .then(|| shared_commit_state.into_inner().get_block_end_info());
 
         (!shared_maybe_error.load(Ordering::SeqCst))
             .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
@@ -963,7 +1030,7 @@ where
     }
 
     fn apply_output_sequential(
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         output: &E::Output,
         resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
@@ -1061,10 +1128,13 @@ where
             TxnLastInputOutput::new(num_txns as TxnIndex);
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let latest_view = LatestView::<T, S, X>::new(
+            let latest_view = LatestView::<T, S>::new(
                 base_view,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
+                0,     // incarnation
+                0,     // worker id
+                false, // profile view callbacks
             );
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
@@ -1362,7 +1432,7 @@ where
                 return Ok(output);
             }
 
-            if !self.config.local.allow_fallback {
+            if !self.config.local.allow_sequential_block_fallback {
                 panic!("Parallel execution failed and fallback is not allowed");
             }
 
@@ -1387,7 +1457,7 @@ where
                 return Ok(output);
             },
             Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {
-                if !self.config.local.allow_fallback {
+                if !self.config.local.allow_sequential_block_fallback {
                     panic!("Parallel execution failed and fallback is not allowed");
                 }
 
@@ -1440,5 +1510,64 @@ where
         }
 
         Err(sequential_error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_infallible::Mutex;
+    use std::sync::Condvar;
+
+    #[test]
+    fn test_committer_backup_enabled() {
+        let config = ParallelExecutionConfig::new(true, false, 10, 7);
+        assert!(config.committer_backup_enabled);
+        assert!(!config.profiling_enabled);
+        assert_eq!(config.num_workers, 10);
+        assert_eq!(config.start_delayed_field_id_counter, 7);
+
+        assert!(config.worker_should_backup(&SchedulerTask::Retry));
+        assert!(!config.worker_should_backup(&SchedulerTask::Done));
+        assert!(!config.worker_should_backup(&SchedulerTask::ExecutionTask(
+            1,
+            1,
+            ExecutionTaskType::Execution
+        )));
+        assert!(config.worker_should_backup(&SchedulerTask::ExecutionTask(
+            1,
+            0,
+            ExecutionTaskType::Wakeup(Arc::new((
+                Mutex::new(DependencyStatus::Unresolved),
+                Condvar::new()
+            )))
+        )));
+        assert!(config.worker_should_backup(&SchedulerTask::ValidationTask(1, 0, 0)));
+    }
+
+    #[test]
+    fn test_committer_backup_disabled() {
+        let config = ParallelExecutionConfig::new(false, true, 10, 7);
+        assert!(!config.committer_backup_enabled);
+        assert!(config.profiling_enabled);
+        assert_eq!(config.num_workers, 10);
+        assert_eq!(config.start_delayed_field_id_counter, 7);
+
+        assert!(!config.worker_should_backup(&SchedulerTask::Retry));
+        assert!(!config.worker_should_backup(&SchedulerTask::Done));
+        assert!(!config.worker_should_backup(&SchedulerTask::ExecutionTask(
+            1,
+            1,
+            ExecutionTaskType::Execution
+        )));
+        assert!(!config.worker_should_backup(&SchedulerTask::ExecutionTask(
+            1,
+            0,
+            ExecutionTaskType::Wakeup(Arc::new((
+                Mutex::new(DependencyStatus::Unresolved),
+                Condvar::new()
+            )))
+        )));
+        assert!(!config.worker_should_backup(&SchedulerTask::ValidationTask(1, 0, 0)));
     }
 }

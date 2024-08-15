@@ -5,6 +5,7 @@
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
 use aptos_aggregator::types::code_invariant_error;
 use aptos_infallible::Mutex;
+use aptos_logger::debug;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::delayed_fields::PanicError;
 use concurrent_queue::{ConcurrentQueue, PopError};
@@ -411,7 +412,6 @@ impl Scheduler {
         None
     }
 
-    #[cfg(test)]
     /// Return the TxnIndex and Wave of current commit index
     pub fn commit_state(&self) -> (TxnIndex, u32) {
         let commit_state = self.commit_state.dereference();
@@ -642,6 +642,24 @@ impl Scheduler {
         }
 
         !self.has_halted.swap(true, Ordering::SeqCst)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn debug_status(&self) {
+        let commit_idx = self.commit_state().0;
+        if commit_idx == self.num_txns - 1 {
+            return;
+        }
+
+        let status = self.txn_status[(commit_idx + 1) as usize].0.read();
+
+        debug!(
+            "commit idx={}, validation_idx={}, execution_idx={}, status={:?}",
+            commit_idx,
+            Self::unpack_validation_idx(self.validation_idx.load(Ordering::SeqCst)).0,
+            self.execution_idx.load(Ordering::SeqCst),
+            *status,
+        );
     }
 }
 

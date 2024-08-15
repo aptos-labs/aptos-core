@@ -10,7 +10,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::static_config::AptosVMStaticConfig;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use once_cell::sync::Lazy;
 use std::{
@@ -27,7 +27,7 @@ use threadpool::ThreadPool;
 static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
     ThreadPool::with_name(
         "proof_reader".to_string(),
-        AptosVM::get_num_proof_reading_threads(),
+        AptosVMStaticConfig::get_num_proof_reading_threads(),
     )
 });
 
