@@ -56,6 +56,8 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
+        enable_block_stm_profiling: bool,
+        enable_committer_backup: bool,
     ) -> Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
@@ -68,9 +70,14 @@ impl AptosDebugger {
         for concurrency_level in concurrency_levels {
             for i in 0..repeat_execution_times {
                 let start_time = Instant::now();
-                let cur_result =
-                    execute_block_no_limit(&sig_verified_txns, &state_view, *concurrency_level)
-                        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+                let cur_result = execute_block_no_limit(
+                    &sig_verified_txns,
+                    &state_view,
+                    *concurrency_level,
+                    enable_block_stm_profiling,
+                    enable_committer_backup,
+                )
+                .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
                 println!(
                     "[{} txns from {}] Finished execution round {}/{} with concurrency_level={} in {}ms",
@@ -155,6 +162,8 @@ impl AptosDebugger {
         use_same_block_boundaries: bool,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
+        enable_block_stm_profiling: bool,
+        enable_committer_backup: bool,
     ) -> Result<Vec<TransactionOutput>> {
         let (txns, txn_infos) = self
             .debugger
@@ -170,6 +179,8 @@ impl AptosDebugger {
                     txns.clone(),
                     repeat_execution_times,
                     concurrency_levels,
+                    enable_block_stm_profiling,
+                    enable_committer_backup,
                 )
                 .await?)
         } else {
@@ -179,6 +190,8 @@ impl AptosDebugger {
                 txns,
                 repeat_execution_times,
                 concurrency_levels,
+                enable_block_stm_profiling,
+                enable_committer_backup,
                 txn_infos,
             )
             .await
@@ -227,12 +240,16 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
+        enable_block_stm_profiling: bool,
+        enable_committer_backup: bool,
     ) -> Result<Vec<TransactionOutput>> {
         let results = self.execute_transactions_at_version(
             begin,
             txns,
             repeat_execution_times,
             concurrency_levels,
+            enable_block_stm_profiling,
+            enable_committer_backup,
         )?;
         let mut ret = vec![];
         let mut is_reconfig = false;
@@ -256,6 +273,8 @@ impl AptosDebugger {
         mut txns: Vec<Transaction>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
+        enable_block_stm_profiling: bool,
+        enable_committer_backup: bool,
         mut txn_infos: Vec<TransactionInfo>,
     ) -> Result<Vec<TransactionOutput>> {
         let mut ret = vec![];
@@ -271,6 +290,8 @@ impl AptosDebugger {
                     txns.clone(),
                     repeat_execution_times,
                     concurrency_levels,
+                    enable_block_stm_profiling,
+                    enable_committer_backup,
                 )
                 .await?;
             begin += epoch_result.len() as u64;
@@ -290,6 +311,8 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
+        enable_block_stm_profiling: bool,
+        enable_committer_backup: bool,
     ) -> Result<Vec<TransactionOutput>> {
         let mut ret = vec![];
         let mut cur = vec![];
@@ -302,6 +325,8 @@ impl AptosDebugger {
                     to_execute,
                     repeat_execution_times,
                     concurrency_levels,
+                    enable_block_stm_profiling,
+                    enable_committer_backup,
                 )?;
                 cur_version += results.len() as u64;
                 ret.extend(results);
@@ -314,6 +339,8 @@ impl AptosDebugger {
                 cur,
                 repeat_execution_times,
                 concurrency_levels,
+                enable_block_stm_profiling,
+                enable_committer_backup,
             )?;
             ret.extend(results);
         }
@@ -423,6 +450,8 @@ fn execute_block_no_limit(
     sig_verified_txns: &[SignatureVerifiedTransaction],
     state_view: &DebuggerStateView,
     concurrency_level: usize,
+    enable_block_stm_profiling: bool,
+    enable_committer_backup: bool,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {
     BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
         sig_verified_txns,
@@ -430,8 +459,10 @@ fn execute_block_no_limit(
         BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
-                allow_fallback: true,
+                allow_sequential_block_fallback: true,
                 discard_failed_blocks: false,
+                enable_block_stm_profiling,
+                enable_committer_backup,
             },
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         },

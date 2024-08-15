@@ -20,6 +20,7 @@ use crate::{
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
+    static_config::AptosVMStaticConfig,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation, verifier,
@@ -108,20 +109,11 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
-use num_cpus;
-use once_cell::sync::OnceCell;
 use std::{
-    cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
     marker::Sync,
     sync::Arc,
 };
-
-static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
-static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
-static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
-static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
-static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 
 macro_rules! deprecated_module_bundle {
     () => {
@@ -296,82 +288,6 @@ impl AptosVM {
     #[inline(always)]
     fn chain_id(&self) -> ChainId {
         self.move_vm.env.chain_id()
-    }
-
-    /// Sets execution concurrency level when invoked the first time.
-    pub fn set_concurrency_level_once(mut concurrency_level: usize) {
-        concurrency_level = min(concurrency_level, num_cpus::get());
-        // Only the first call succeeds, due to OnceCell semantics.
-        EXECUTION_CONCURRENCY_LEVEL.set(concurrency_level).ok();
-    }
-
-    /// Get the concurrency level if already set, otherwise return default 1
-    /// (sequential execution).
-    ///
-    /// The concurrency level is fixed to 1 if gas profiling is enabled.
-    pub fn get_concurrency_level() -> usize {
-        match EXECUTION_CONCURRENCY_LEVEL.get() {
-            Some(concurrency_level) => *concurrency_level,
-            None => 1,
-        }
-    }
-
-    pub fn set_num_shards_once(mut num_shards: usize) {
-        num_shards = max(num_shards, 1);
-        // Only the first call succeeds, due to OnceCell semantics.
-        NUM_EXECUTION_SHARD.set(num_shards).ok();
-    }
-
-    pub fn get_num_shards() -> usize {
-        match NUM_EXECUTION_SHARD.get() {
-            Some(num_shards) => *num_shards,
-            None => 1,
-        }
-    }
-
-    /// Sets runtime config when invoked the first time.
-    pub fn set_discard_failed_blocks(enable: bool) {
-        // Only the first call succeeds, due to OnceCell semantics.
-        DISCARD_FAILED_BLOCKS.set(enable).ok();
-    }
-
-    /// Get the discard failed blocks flag if already set, otherwise return default (false)
-    pub fn get_discard_failed_blocks() -> bool {
-        match DISCARD_FAILED_BLOCKS.get() {
-            Some(enable) => *enable,
-            None => false,
-        }
-    }
-
-    /// Sets the # of async proof reading threads.
-    pub fn set_num_proof_reading_threads_once(mut num_threads: usize) {
-        // TODO(grao): Do more analysis to tune this magic number.
-        num_threads = min(num_threads, 256);
-        // Only the first call succeeds, due to OnceCell semantics.
-        NUM_PROOF_READING_THREADS.set(num_threads).ok();
-    }
-
-    /// Returns the # of async proof reading threads if already set, otherwise return default value
-    /// (32).
-    pub fn get_num_proof_reading_threads() -> usize {
-        match NUM_PROOF_READING_THREADS.get() {
-            Some(num_threads) => *num_threads,
-            None => 32,
-        }
-    }
-
-    /// Sets additional details in counters when invoked the first time.
-    pub fn set_processed_transactions_detailed_counters() {
-        // Only the first call succeeds, due to OnceCell semantics.
-        PROCESSED_TRANSACTIONS_DETAILED_COUNTERS.set(true).ok();
-    }
-
-    /// Get whether we should capture additional details in counters
-    pub fn get_processed_transactions_detailed_counters() -> bool {
-        match PROCESSED_TRANSACTIONS_DETAILED_COUNTERS.get() {
-            Some(value) => *value,
-            None => false,
-        }
     }
 
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
@@ -2580,9 +2496,12 @@ impl VMExecutor for AptosVM {
             state_view,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
-                    concurrency_level: Self::get_concurrency_level(),
-                    allow_fallback: true,
-                    discard_failed_blocks: Self::get_discard_failed_blocks(),
+                    concurrency_level: AptosVMStaticConfig::get_concurrency_level(),
+                    allow_sequential_block_fallback: true,
+                    discard_failed_blocks: AptosVMStaticConfig::get_discard_failed_blocks(),
+                    enable_block_stm_profiling:
+                        AptosVMStaticConfig::get_block_stm_profiling_enabled(),
+                    enable_committer_backup: AptosVMStaticConfig::get_committer_backup_enabled(),
                 },
                 onchain: onchain_config,
             },
@@ -2612,7 +2531,7 @@ impl VMExecutor for AptosVM {
         let ret = sharded_block_executor.execute_block(
             state_view,
             transactions,
-            AptosVM::get_concurrency_level(),
+            AptosVMStaticConfig::get_concurrency_level(),
             onchain_config,
         );
         if ret.is_ok() {

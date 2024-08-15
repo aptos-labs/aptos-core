@@ -6,7 +6,7 @@ use aptos_logger::info;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_vm::{
     sharded_block_executor::{local_executor_shard::LocalExecutorClient, ShardedBlockExecutor},
-    AptosVM,
+    static_config::AptosVMStaticConfig,
 };
 use once_cell::sync::Lazy;
 use std::sync::Arc;
@@ -16,6 +16,9 @@ pub static SHARDED_BLOCK_EXECUTOR: Lazy<
 > = Lazy::new(|| {
     info!("LOCAL_SHARDED_BLOCK_EXECUTOR created");
     Arc::new(Mutex::new(
-        LocalExecutorClient::create_local_sharded_block_executor(AptosVM::get_num_shards(), None),
+        LocalExecutorClient::create_local_sharded_block_executor(
+            AptosVMStaticConfig::get_num_shards(),
+            None,
+        ),
     ))
 });

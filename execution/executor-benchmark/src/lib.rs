@@ -733,7 +733,7 @@ mod tests {
     use aptos_temppath::TempPath;
     use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
     use aptos_types::on_chain_config::Features;
-    use aptos_vm::AptosVM;
+    use aptos_vm::{static_config::AptosVMStaticConfig, AptosVM};
 
     fn test_generic_benchmark<E>(
         transaction_type: Option<TransactionTypeArg>,
@@ -791,9 +791,9 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
-        AptosVM::set_num_shards_once(1);
-        AptosVM::set_concurrency_level_once(4);
-        AptosVM::set_processed_transactions_detailed_counters();
+        AptosVMStaticConfig::set_num_shards_once(1);
+        AptosVMStaticConfig::set_concurrency_level_once(4);
+        AptosVMStaticConfig::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVM>(
             Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),

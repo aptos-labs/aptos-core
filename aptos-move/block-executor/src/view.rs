@@ -9,6 +9,7 @@ use crate::{
         UnsyncReadSet,
     },
     counters,
+    profiler::{ViewKind, ViewProfilerState, ViewProfilerTimer},
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
     value_exchange::{
         does_value_need_exchange, filter_value_for_exchange, TemporaryValueToIdentifierMapping,
@@ -27,9 +28,9 @@ use aptos_aggregator::{
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
-        GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
-        UnsyncGroupError, ValueWithLayout,
+        GroupReadResult, Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError,
+        MVGroupError, MVModulesError, StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError,
+        ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -37,7 +38,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     delayed_fields::PanicError,
-    executable::{Executable, ModulePath},
+    executable::ModulePath,
     state_store::{
         errors::StateviewError,
         state_storage_usage::StateStorageUsage,
@@ -155,8 +156,8 @@ trait ResourceGroupState<T: Transaction> {
     ) -> PartialVMResult<GroupReadResult>;
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
-    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+pub(crate) struct ParallelState<'a, T: Transaction> {
+    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
@@ -437,9 +438,9 @@ fn wait_for_dependency(
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
+impl<'a, T: Transaction> ParallelState<'a, T> {
     pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
         shared_scheduler: &'a Scheduler,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
@@ -459,12 +460,11 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
-    // TODO: Actually fill in the logic to record fetched executables, etc.
     fn fetch_module(
         &self,
         key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
+    ) -> anyhow::Result<Arc<T::Value>, MVModulesError> {
         // Record for the R/W path intersection fallback for modules.
         self.captured_reads
             .borrow_mut()
@@ -523,7 +523,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T, X> {
+impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.versioned_map.data().set_base_value(key, value);
     }
@@ -665,7 +665,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<'a, T, X> {
+impl<'a, T: Transaction> ResourceGroupState<T> for ParallelState<'a, T> {
     fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>) {
         self.versioned_map
             .group_data()
@@ -768,17 +768,17 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
     }
 }
 
-pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+pub(crate) struct SequentialState<'a, T: Transaction> {
+    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
     pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
     pub(crate) incorrect_use: RefCell<bool>,
 }
 
-impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
+impl<'a, T: Transaction> SequentialState<'a, T> {
     pub fn new(
-        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
     ) -> Self {
@@ -800,7 +800,7 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a, T, X> {
+impl<'a, T: Transaction> ResourceState<T> for SequentialState<'a, T> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.unsync_map.set_base_value(key, value);
     }
@@ -869,7 +869,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialState<'a, T, X> {
+impl<'a, T: Transaction> ResourceGroupState<T> for SequentialState<'a, T> {
     fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>) {
         self.unsync_map
             .set_group_base_values(group_key.clone(), base_values);
@@ -934,12 +934,12 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
     }
 }
 
-pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
-    Sync(ParallelState<'a, T, X>),
-    Unsync(SequentialState<'a, T, X>),
+pub(crate) enum ViewState<'a, T: Transaction> {
+    Sync(ParallelState<'a, T>),
+    Unsync(SequentialState<'a, T>),
 }
 
-impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
+impl<'a, T: Transaction> ViewState<'a, T> {
     fn get_resource_state(&self) -> &dyn ResourceState<T> {
         match self {
             ViewState::Sync(state) => state,
@@ -960,22 +960,38 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     base_view: &'a S,
-    pub(crate) latest_view: ViewState<'a, T, X>,
+    pub(crate) latest_view: ViewState<'a, T>,
     txn_idx: TxnIndex,
+    incarnation: Incarnation,
+    worker_id: usize,
+    maybe_profiler_state: Option<RefCell<ViewProfilerState>>,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new(
         base_view: &'a S,
-        latest_view: ViewState<'a, T, X>,
+        latest_view: ViewState<'a, T>,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        worker_id: usize,
+        profile_callbacks: bool,
     ) -> Self {
         Self {
             base_view,
             latest_view,
             txn_idx,
+            incarnation,
+            worker_id,
+            maybe_profiler_state: profile_callbacks.then(|| RefCell::new(ViewProfilerState::new())),
+        }
+    }
+
+    pub(crate) fn log_callback_profiling_info(&self) {
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            let state = profiler_state.borrow();
+            state.log_info(self.txn_idx, self.incarnation, self.worker_id);
         }
     }
 
@@ -1131,7 +1147,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_reads_needing_exchange_sequential(
         &self,
         read_set: &HashSet<T::Key>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
@@ -1163,7 +1179,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     fn get_group_reads_needing_exchange_parallel(
         &self,
-        parallel_state: &ParallelState<'a, T, X>,
+        parallel_state: &ParallelState<'a, T>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
@@ -1228,7 +1244,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_group_reads_needing_exchange_sequential(
         &self,
         group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
@@ -1384,9 +1400,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'a, T, S> {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
 
@@ -1395,6 +1409,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(
             state_key,
             UnknownOrLayout::Known(maybe_layout),
@@ -1407,6 +1424,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
@@ -1418,6 +1438,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::ResourceView);
+
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Exists)
             .map(|res| {
                 if let ReadResult::Exists(v) = res {
@@ -1429,9 +1452,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGroupView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestView<'a, T, S> {
     type GroupKey = T::Key;
     type Layout = MoveTypeLayout;
     type ResourceTag = T::Tag;
@@ -1440,6 +1461,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         &self,
         group_key: &Self::GroupKey,
     ) -> PartialVMResult<ResourceGroupSize> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::GroupView);
+
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
             ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
@@ -1463,6 +1487,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::GroupView);
+
         let mut group_read = self
             .latest_view
             .get_resource_group_state()
@@ -1515,16 +1542,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
-        match &self.latest_view {
-            ViewState::Sync(_) => true,
-            ViewState::Unsync(_) => true,
-        }
+        true
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView<'a, T, S> {
     type Key = T::Key;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
@@ -1534,14 +1556,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
             state_key,
         );
 
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::ModuleView);
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 use MVModulesError::*;
-                use MVModulesOutput::*;
 
                 match state.fetch_module(state_key, self.txn_idx) {
-                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                    Ok(Module((v, _))) => Ok(v.as_state_value()),
+                    Ok(v) => Ok(v.as_state_value()),
                     Err(Dependency(_)) => {
                         // Return anything (e.g. module does not exist) to avoid waiting,
                         // because parallel execution will fall back to sequential anyway.
@@ -1565,9 +1588,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> StateStorageView for LatestView<'a, T, S> {
     fn id(&self) -> StateViewId {
         self.base_view.id()
     }
@@ -1577,15 +1598,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorV1View
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for LatestView<'a, T, S> {
     type Identifier = T::Key;
 
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::AggregatorV1View);
+
         // TODO[agg_v1](cleanup):
         // Integrate aggregators V1. That is, we can lift the u128 value
         // from the state item by passing the right layout here. This can
@@ -1595,9 +1617,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFieldView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestView<'a, T, S> {
     type Identifier = T::Identifier;
     type ResourceGroupTag = T::Tag;
     type ResourceKey = T::Key;
@@ -1606,6 +1626,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         &self,
         id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => get_delayed_field_value_impl(
                 &state.captured_reads,
@@ -1630,6 +1653,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         delta: &SignedU128,
         max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => delayed_field_try_add_delta_outcome_impl(
                 &state.captured_reads,
@@ -1661,6 +1687,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     }
 
     fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::DelayedFieldView);
+
         let index = match &self.latest_view {
             ViewState::Sync(state) => state.counter.fetch_add(1, Ordering::SeqCst),
             ViewState::Unsync(state) => {
@@ -1675,6 +1704,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     }
 
     fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::DelayedFieldView);
+
         let unique_index = id.extract_unique_index();
 
         let start_counter = match &self.latest_view {
@@ -1694,6 +1726,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 id, unique_index, start_counter, current_counter
             )));
         }
+
         Ok(())
     }
 
@@ -1705,6 +1738,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
         PanicError,
     > {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => state
                 .captured_reads
@@ -1727,6 +1763,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
+        let _view_profiler_timer =
+            ViewProfilerTimer::new(&self.maybe_profiler_state, ViewKind::DelayedFieldView);
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_ids, skip)
@@ -1768,7 +1807,6 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
-        executable::Executable,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,
             state_value::StateValue, TStateView,
@@ -2426,25 +2464,19 @@ mod test {
         }
     }
 
-    #[derive(Clone)]
-    struct MockExecutable {}
-
-    impl Executable for MockExecutable {
-        fn size_bytes(&self) -> usize {
-            unimplemented!();
-        }
-    }
-
     #[test]
     fn test_id_value_exchange() {
         let unsync_map = UnsyncMap::new();
         let counter = RefCell::new(5);
         let base_view = MockStateView::new(HashMap::new());
         let start_counter = 5;
-        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
+        let latest_view = LatestView::<TestTransactionType, MockStateView>::new(
             &base_view,
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
+            0,
+            0,
+            false,
         );
 
         // Test id -- value exchange for a value that does not contain delayed fields
@@ -2702,7 +2734,7 @@ mod test {
     }
 
     struct Holder {
-        unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
+        unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, DelayedFieldID>,
         counter: RefCell<u32>,
         base_view: MockStateView,
     }
@@ -2722,14 +2754,17 @@ mod test {
 
     fn create_sequential_latest_view<'a>(
         h: &'a Holder,
-    ) -> LatestView<'a, TestTransactionType, MockStateView, MockExecutable> {
-        let sequential_state: SequentialState<'a, TestTransactionType, MockExecutable> =
+    ) -> LatestView<'a, TestTransactionType, MockStateView> {
+        let sequential_state: SequentialState<'a, TestTransactionType> =
             SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
-        LatestView::<'a, TestTransactionType, MockStateView, MockExecutable>::new(
+        LatestView::<'a, TestTransactionType, MockStateView>::new(
             &h.base_view,
             ViewState::Unsync(sequential_state),
             1,
+            0,
+            0,
+            false,
         )
     }
 
@@ -2738,7 +2773,7 @@ mod test {
         holder: Holder,
         counter: AtomicU32,
         base_view: MockStateView,
-        versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
+        versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, DelayedFieldID>,
         scheduler: Scheduler,
     }
 
@@ -2762,17 +2797,19 @@ mod test {
 
         fn new_view(&self) -> ViewsComparison<'_> {
             let latest_view_seq = create_sequential_latest_view(&self.holder);
-            let latest_view_par =
-                LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
-                    &self.base_view,
-                    ViewState::Sync(ParallelState::new(
-                        &self.versioned_map,
-                        &self.scheduler,
-                        self.start_counter,
-                        &self.counter,
-                    )),
-                    1,
-                );
+            let latest_view_par = LatestView::<TestTransactionType, MockStateView>::new(
+                &self.base_view,
+                ViewState::Sync(ParallelState::new(
+                    &self.versioned_map,
+                    &self.scheduler,
+                    self.start_counter,
+                    &self.counter,
+                )),
+                1,
+                0,
+                0,
+                false,
+            );
 
             ViewsComparison {
                 latest_view_seq,
@@ -2782,8 +2819,8 @@ mod test {
     }
 
     struct ViewsComparison<'a> {
-        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
-        latest_view_par: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
+        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView>,
+        latest_view_par: LatestView<'a, TestTransactionType, MockStateView>,
     }
 
     impl<'a> ViewsComparison<'a> {
