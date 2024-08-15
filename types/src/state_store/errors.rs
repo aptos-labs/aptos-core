@@ -4,7 +4,7 @@
 
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum StateviewError {
     #[error("{0} not found.")]
     NotFound(String),
