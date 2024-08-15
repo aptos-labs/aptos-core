@@ -2633,12 +2633,12 @@ impl ErrorMessageContext {
                 actual
             ),
             PositionalUnpackArgument => format!(
-                "the constructor takes {} {} but {} were provided",
+                "the struct/variant has {} {} but {} were provided",
                 expected,
                 if for_type_args {
                     pluralize("type argument", expected)
                 } else {
-                    pluralize("argument", expected)
+                    pluralize("field", expected)
                 },
                 actual
             ),
@@ -2723,7 +2723,7 @@ impl ErrorMessageContext {
                 actual
             ),
             PositionalUnpackArgument => format!(
-                "the constructor takes a reference but `{}` was provided",
+                "the struct/variant has a reference field but...",
                 actual
             ),
             OperatorArgument => {
