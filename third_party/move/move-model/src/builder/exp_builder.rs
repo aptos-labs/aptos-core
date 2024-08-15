@@ -2446,8 +2446,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .next();
                 if dotdot_loc.is_none() && args.value.len() != arity
                     || dotdot_loc.is_some()
-                        && args.value.len() > arity
-                        && !(args.value.len() == 1 && arity == 0)
+                        && args.value.len() - 1 > arity
                 {
                     self.error(
                         loc,
