@@ -2697,7 +2697,7 @@ impl ErrorMessageContext {
                 expected, actual
             ),
             PositionalUnpackArgument => format!(
-                "the constructor takes {} but {} was provided",
+                "the struct/variant has {} but {} were provided",
                 expected, actual
             ),
             Return => format!(
