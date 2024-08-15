@@ -72,6 +72,7 @@ pub enum TransactionTypeArg {
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
     DeserializeU256,
+    UnmanagedLaunchpadMint,
 }
 
 impl TransactionTypeArg {
@@ -318,6 +319,9 @@ impl TransactionTypeArg {
                 })
             },
             TransactionTypeArg::DeserializeU256 => call_custom_module(EntryPoints::DeserializeU256),
+            TransactionTypeArg::UnmanagedLaunchpadMint => {
+                call_custom_module(EntryPoints::UnmanagedLaunchpadMint { })
+            }
         }
     }
 

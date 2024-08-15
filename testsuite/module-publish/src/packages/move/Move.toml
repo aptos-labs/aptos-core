@@ -1,0 +1,29 @@
+[package]
+name = "unmanaged-launchpad"
+version = "1.0.0"
+authors = []
+
+[addresses]
+unmanaged_launchpad = "0x3eccd6b0ee1320247771584d52bdadf44d05a0355aa3ebd232e715f2109e56d9"
+minter = "0xfa0a807f204b16d220c080f69bd7720dfef219b9d0736eccab1c40ae0b4accb3"
+
+[dev-addresses]
+unmanaged_launchpad = "0x123"
+minter = "0x456"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dependencies.AptosTokenObjects]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'mainnet'
+subdir = 'aptos-move/framework/aptos-token-objects'
+
+[dependencies.TokenMinter]
+git = 'https://github.com/aptos-labs/token-minter.git'
+rev = 'main'
+subdir = 'token-minter/'
+
+[dev-dependencies]

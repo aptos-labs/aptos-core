@@ -78,10 +78,10 @@ else:
 
 if os.environ.get("RELEASE_BUILD"):
     BUILD_FLAG = "--release"
-    BUILD_FOLDER = "target/release"
+    BUILD_FOLDER = "../target/release"
 else:
     BUILD_FLAG = "--profile performance"
-    BUILD_FOLDER = "target/performance"
+    BUILD_FOLDER = "../target/performance"
 
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""

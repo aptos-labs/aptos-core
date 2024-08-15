@@ -267,6 +267,7 @@ pub enum EntryPoints {
         num_points_per_txn: usize,
     },
     DeserializeU256,
+    UnmanagedLaunchpadMint,
 }
 
 impl EntryPoints {
@@ -323,6 +324,7 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::UnmanagedLaunchpadMint { .. } => {"unmanaged-launchpad"}
         }
     }
 
@@ -382,6 +384,7 @@ impl EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::UnmanagedLaunchpadMint { .. } => {"unmanaged_launchpad"}
         }
     }
 
@@ -722,6 +725,16 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::UnmanagedLaunchpadMint { .. } => {
+                get_payload(
+                    module_id,
+                    ident_str!("mint").to_owned(),
+                    vec![
+                        // Devnet contract address - Redeploy and change address if devnet wiped
+                        bcs::to_bytes(&AccountAddress::from_hex_literal("0x30b18808e694801d8b5d1fec95ee46ec96023115fec92dd35c2c82d1b66011fa").unwrap()).unwrap(),
+                    ],
+                )
+            }
         }
     }
 
@@ -829,6 +842,7 @@ impl EntryPoints {
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
             EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
+            EntryPoints::UnmanagedLaunchpadMint { .. } => AutomaticArgs::Signer,
         }
     }
 }
