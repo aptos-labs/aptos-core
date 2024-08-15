@@ -375,10 +375,10 @@ impl BatchProofQueue {
         }
         self.inc_remaining(&author, num_txns);
 
-        // sample!(
-        //     SampleRate::Duration(Duration::from_millis(500)),
-        //     self.gc_expired_batch_summaries_without_proofs()
-        // );
+        sample!(
+            SampleRate::Duration(Duration::from_millis(500)),
+            self.gc_expired_batch_summaries_without_proofs()
+        );
     }
 
     pub fn insert_batches(
@@ -444,10 +444,10 @@ impl BatchProofQueue {
             }
         }
 
-        // sample!(
-        //     SampleRate::Duration(Duration::from_millis(500)),
-        //     self.gc_expired_batch_summaries_without_proofs()
-        // );
+        sample!(
+            SampleRate::Duration(Duration::from_millis(500)),
+            self.gc_expired_batch_summaries_without_proofs()
+        );
         counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION.observe_duration(start.elapsed());
     }
 
@@ -455,8 +455,9 @@ impl BatchProofQueue {
     // proof before the batch expires, the batch summary will be garbage collected.
     fn gc_expired_batch_summaries_without_proofs(&mut self) {
         let timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
-        self.items
-            .retain(|_, item| item.proof.is_some() || item.info.expiration() > timestamp);
+        self.items.retain(|_, item| {
+            item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp
+        });
     }
 
     fn log_remaining_data_after_pull(
@@ -539,11 +540,14 @@ impl BatchProofQueue {
         let proof_of_stores: Vec<_> = result
             .into_iter()
             .map(|item| {
-                let proof = item.proof.clone().expect("proof must exist");
+                let proof = item.proof.clone().expect("proof must exist due to filter");
                 let bucket = proof.gas_bucket_start();
                 counters::pos_to_pull(
                     bucket,
-                    item.proof_insertion_time.unwrap().elapsed().as_secs_f64(),
+                    item.proof_insertion_time
+                        .expect("proof must exist due to filter")
+                        .elapsed()
+                        .as_secs_f64(),
                 );
                 proof
             })

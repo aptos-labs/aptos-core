@@ -4,11 +4,7 @@
 use super::batch_store::BatchStore;
 use crate::{
     monitor,
-    quorum_store::{
-        batch_generator::BackPressure,
-        counters,
-        utils::{BatchProofQueue, BatchSortKey},
-    },
+    quorum_store::{batch_generator::BackPressure, counters, utils::BatchProofQueue},
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
@@ -18,16 +14,10 @@ use aptos_consensus_types::{
     utils::PayloadTxnsSize,
 };
 use aptos_logger::prelude::*;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use rand::{seq::SliceRandom, thread_rng};
-use std::{
-    cmp::min,
-    collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
-    time::Duration,
-};
+use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -136,7 +126,11 @@ impl ProofManager {
                     // TODO(ibalajiarun): Support unique txn calculation
                     let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
                     let (opt_batches, opt_payload_size, _) = self.batch_proof_queue.pull_batches(
-                        &excluded_batches,
+                        &excluded_batches
+                            .iter()
+                            .cloned()
+                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                            .collect(),
                         max_opt_batch_txns_size,
                         request.max_txns_after_filtering,
                         request.soft_max_txns_after_filtering,
