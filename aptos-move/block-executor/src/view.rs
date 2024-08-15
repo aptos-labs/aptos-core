@@ -9,6 +9,7 @@ use crate::{
         UnsyncReadSet,
     },
     counters,
+    profiler::ViewProfilerState,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
     value_exchange::{
         does_value_need_exchange, filter_value_for_exchange, TemporaryValueToIdentifierMapping,
@@ -27,8 +28,8 @@ use aptos_aggregator::{
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
-        GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
+        GroupReadResult, Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError,
+        MVGroupError, MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
         UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
@@ -70,6 +71,7 @@ use std::{
         atomic::{AtomicU32, Ordering},
         Arc,
     },
+    time::Instant,
 };
 
 /// A struct which describes the result of the read from the proxy. The client
@@ -964,6 +966,9 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X:
     base_view: &'a S,
     pub(crate) latest_view: ViewState<'a, T, X>,
     txn_idx: TxnIndex,
+    incarnation: Incarnation,
+    worker_id: usize,
+    maybe_profiler_state: Option<RefCell<ViewProfilerState>>,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
@@ -971,11 +976,24 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         base_view: &'a S,
         latest_view: ViewState<'a, T, X>,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        worker_id: usize,
+        profile_callbacks: bool,
     ) -> Self {
         Self {
             base_view,
             latest_view,
             txn_idx,
+            incarnation,
+            worker_id,
+            maybe_profiler_state: profile_callbacks.then(|| RefCell::new(ViewProfilerState::new())),
+        }
+    }
+
+    pub(crate) fn log_callback_profiling_info(&self) {
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            let state = profiler_state.borrow();
+            state.log_info(self.txn_idx, self.incarnation, self.worker_id);
         }
     }
 
@@ -1395,37 +1413,70 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
-        self.get_resource_state_value_impl(
-            state_key,
-            UnknownOrLayout::Known(maybe_layout),
-            ReadKind::Value,
-        )
-        .map(|res| res.into_value())
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
+        let ret = self
+            .get_resource_state_value_impl(
+                state_key,
+                UnknownOrLayout::Known(maybe_layout),
+                ReadKind::Value,
+            )
+            .map(|res| res.into_value());
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_resource_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
+        }
+
+        ret
     }
 
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
+        let ret = self
+            .get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
                     v
                 } else {
                     unreachable!("Read result must be Metadata kind")
                 }
-            })
+            });
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_resource_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
+        }
+
+        ret
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Exists)
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
+        let ret = self
+            .get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Exists)
             .map(|res| {
                 if let ReadResult::Exists(v) = res {
                     v
                 } else {
                     unreachable!("Read result must be Exists kind")
                 }
-            })
+            });
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_resource_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
+        }
+
+        ret
     }
 }
 
@@ -1440,6 +1491,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         &self,
         group_key: &Self::GroupKey,
     ) -> PartialVMResult<ResourceGroupSize> {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
             ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
@@ -1454,6 +1507,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
             }
         };
 
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_group_view_stat(start_instant.expect("Must be set at the function start"));
+        }
+
         Ok(group_read.into_size())
     }
 
@@ -1463,6 +1522,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
         let mut group_read = self
             .latest_view
             .get_resource_group_state()
@@ -1488,6 +1549,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                     &|value, layout| self.patch_base_value(value, layout),
                 )?;
         };
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_group_view_stat(start_instant.expect("Must be set at the function start"));
+        }
 
         Ok(group_read.into_value().0)
     }
@@ -1515,10 +1582,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
-        match &self.latest_view {
-            ViewState::Sync(_) => true,
-            ViewState::Unsync(_) => true,
-        }
+        true
     }
 }
 
@@ -1534,7 +1598,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
             state_key,
         );
 
-        match &self.latest_view {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
+        let ret = match &self.latest_view {
             ViewState::Sync(state) => {
                 use MVModulesError::*;
                 use MVModulesOutput::*;
@@ -1561,7 +1627,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                     |v| Ok(v.as_state_value()),
                 )
             },
+        };
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state
+                .borrow_mut()
+                .record_module_view_stat(start_instant.expect("Must be set at the function start"));
         }
+
+        ret
     }
 }
 
@@ -1586,12 +1660,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
         &self,
         state_key: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
         // TODO[agg_v1](cleanup):
         // Integrate aggregators V1. That is, we can lift the u128 value
         // from the state item by passing the right layout here. This can
         // be useful for cross-testing the old and the new flows.
         // self.get_resource_state_value(state_key, Some(&MoveTypeLayout::U128))
-        self.get_resource_state_value(state_key, None)
+        let ret = self.get_resource_state_value(state_key, None);
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_aggregator_v1_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
+        }
+
+        ret
     }
 }
 
@@ -1606,7 +1690,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         &self,
         id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-        match &self.latest_view {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
+        let ret = match &self.latest_view {
             ViewState::Sync(state) => get_delayed_field_value_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
@@ -1620,7 +1706,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                     code_invariant_error(format!("DelayedField {:?} not found in get_delayed_field_value in sequential execution", id))
                 })?)
             },
+        };
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_delayed_field_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
         }
+
+        ret
     }
 
     fn delayed_field_try_add_delta_outcome(
@@ -1630,7 +1724,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         delta: &SignedU128,
         max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
-        match &self.latest_view {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
+        let ret = match &self.latest_view {
             ViewState::Sync(state) => delayed_field_try_add_delta_outcome_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
@@ -1657,10 +1753,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                     Ok(true)
                 }
             },
+        };
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_delayed_field_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
         }
+
+        ret
     }
 
     fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
         let index = match &self.latest_view {
             ViewState::Sync(state) => state.counter.fetch_add(1, Ordering::SeqCst),
             ViewState::Unsync(state) => {
@@ -1671,10 +1777,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             },
         };
 
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_delayed_field_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
+        }
+
         (index, width).into()
     }
 
     fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
         let unique_index = id.extract_unique_index();
 
         let start_counter = match &self.latest_view {
@@ -1694,6 +1808,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 id, unique_index, start_counter, current_counter
             )));
         }
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_delayed_field_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
+        }
+
         Ok(())
     }
 
@@ -1705,7 +1826,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
         PanicError,
     > {
-        match &self.latest_view {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
+        let ret = match &self.latest_view {
             ViewState::Sync(state) => state
                 .captured_reads
                 .borrow()
@@ -1719,7 +1842,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                     skip,
                 )
             },
+        };
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_delayed_field_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
         }
+
+        ret
     }
 
     fn get_group_reads_needing_exchange(
@@ -1727,7 +1858,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
-        match &self.latest_view {
+        let start_instant = self.maybe_profiler_state.as_ref().map(|_| Instant::now());
+
+        let ret = match &self.latest_view {
             ViewState::Sync(state) => {
                 self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_ids, skip)
             },
@@ -1740,7 +1873,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                     skip,
                 )
             },
+        };
+
+        if let Some(profiler_state) = &self.maybe_profiler_state {
+            profiler_state.borrow_mut().record_delayed_field_view_stat(
+                start_instant.expect("Must be set at the function start"),
+            );
         }
+
+        ret
     }
 }
 
@@ -2445,6 +2586,9 @@ mod test {
             &base_view,
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
+            0,
+            0,
+            false,
         );
 
         // Test id -- value exchange for a value that does not contain delayed fields
@@ -2730,6 +2874,9 @@ mod test {
             &h.base_view,
             ViewState::Unsync(sequential_state),
             1,
+            0,
+            0,
+            false,
         )
     }
 
@@ -2772,6 +2919,9 @@ mod test {
                         &self.counter,
                     )),
                     1,
+                    0,
+                    0,
+                    false,
                 );
 
             ViewsComparison {

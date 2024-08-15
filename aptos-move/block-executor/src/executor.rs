@@ -33,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
+    block_executor::config::{BlockExecutorConfig, BlockSTMCommitterBackup},
     delayed_fields::PanicError,
     executable::Executable,
     on_chain_config::BlockGasLimitType,
@@ -61,6 +61,97 @@ use std::{
         Arc,
     },
 };
+
+struct ParallelExecutionParams {
+    enable_special_committers: bool,
+    enable_profiling: bool,
+
+    num_workers: usize,
+    num_committers: usize,
+    committer_proximity_interval: usize,
+
+    // For delayed field ID replacement.
+    start_shared_counter: u32,
+}
+
+impl ParallelExecutionParams {
+    fn new(
+        committer_backup_setting: &BlockSTMCommitterBackup,
+        enable_profiling: bool,
+        num_txns: usize,
+        num_workers: usize,
+        start_shared_counter: u32,
+    ) -> Self {
+        let enable_special_committers =
+            !matches!(committer_backup_setting, BlockSTMCommitterBackup::None);
+        let (num_committers, committer_proximity_interval) = match committer_backup_setting {
+            BlockSTMCommitterBackup::None => (num_workers, num_txns),
+            BlockSTMCommitterBackup::Default => match num_workers {
+                // Based on simple grid optimizations.
+                1..=6 => (1, 4),
+                7..=40 => (2, 4),
+                _ => (2, 5),
+            },
+            BlockSTMCommitterBackup::All => (num_workers, num_txns),
+        };
+
+        assert!(
+            num_committers <= num_workers,
+            "Incorrect number of committers {}, num_workers = {}",
+            num_committers,
+            num_workers,
+        );
+
+        Self {
+            enable_special_committers,
+            enable_profiling,
+            num_workers,
+            num_committers,
+            committer_proximity_interval,
+            start_shared_counter,
+        }
+    }
+
+    fn worker_should_commit(&self, worker_id: usize) -> bool {
+        debug_assert!(worker_id < self.num_workers);
+
+        // If there are no special committers (back-up / prefer closer tasks), all
+        // workers try to commit.
+        let ret = worker_id < self.num_committers;
+
+        // A worker may not be selected to do commit logic only when special committer
+        // logic is enabled (BlockSTMCommitterBackup::Default handling in constructor).
+        debug_assert!(ret || self.enable_special_committers);
+
+        ret
+    }
+
+    fn worker_should_backup(&self, scheduler_task: &SchedulerTask) -> bool {
+        // Execution task would be problematic for the special committer behavior,
+        // as back-up execution can create a task that must be executed earlier.
+        // O.w. the execution of scheduler_task may depend on it (and get suspended).
+        self.enable_special_committers
+            && !matches!(
+                scheduler_task,
+                SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Execution)
+                    | SchedulerTask::Done,
+            )
+    }
+
+    fn worker_next_task(&self, worker_id: usize, scheduler: &Scheduler) -> SchedulerTask {
+        // Special committer_next_task method allows the committers to first query and
+        // only take the next task to perfom if it would not be far (non-atomic check)
+        // from the committed index.
+        let use_committer_next_task =
+            self.enable_special_committers && worker_id < self.num_committers;
+
+        if use_committer_next_task {
+            scheduler.committer_next_task(self.committer_proximity_interval)
+        } else {
+            scheduler.next_task()
+        }
+    }
+}
 
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -108,13 +199,26 @@ where
         executor: &E,
         base_view: &S,
         parallel_state: ParallelState<T, X>,
+        worker_id: usize,
+        enable_profiling: bool,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
-        let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
+        let sync_view = LatestView::new(
+            base_view,
+            ViewState::Sync(parallel_state),
+            idx_to_execute,
+            incarnation,
+            worker_id,
+            enable_profiling, // profile view callbacks.
+        );
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+
+        if enable_profiling {
+            sync_view.log_callback_profiling_info();
+        }
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -453,6 +557,7 @@ where
     /// way, the materialization can be almost embarrassingly parallelizable.
     fn prepare_and_queue_commit_ready_txns(
         &self,
+        worker_id: usize,
         block_gas_limit_type: &BlockGasLimitType,
         scheduler: &Scheduler,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
@@ -460,11 +565,10 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
-        start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
-        num_workers: usize,
+        params: &ParallelExecutionParams,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
@@ -488,9 +592,11 @@ where
                     ParallelState::new(
                         versioned_cache,
                         scheduler,
-                        start_shared_counter,
+                        params.start_shared_counter,
                         shared_counter,
                     ),
+                    worker_id,
+                    params.enable_profiling,
                 )?;
 
                 scheduler.finish_execution_during_commit(txn_idx)?;
@@ -593,7 +699,7 @@ where
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
-                        num_workers,
+                        params.num_workers,
                     );
 
                     // failpoint triggering error at the last committed transaction,
@@ -671,6 +777,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        worker_id: usize,
     ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::<T, X>::new(
             versioned_cache,
@@ -678,7 +785,14 @@ where
             start_shared_counter,
             shared_counter,
         );
-        let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
+        let latest_view = LatestView::new(
+            base_view,
+            ViewState::Sync(parallel_state),
+            txn_idx,
+            0, // dummy incarnation
+            worker_id,
+            false, // profile view callbacks
+        );
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
@@ -747,6 +861,7 @@ where
 
     fn worker_loop(
         &self,
+        worker_id: usize,
         env: &E::Environment,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -754,11 +869,10 @@ where
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
-        start_shared_counter: u32,
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-        num_workers: usize,
+        params: &ParallelExecutionParams,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -774,33 +888,40 @@ where
                     txn_idx,
                     versioned_cache,
                     scheduler,
-                    start_shared_counter,
+                    params.start_shared_counter,
                     shared_counter,
                     last_input_output,
                     base_view,
                     final_results,
+                    worker_id,
                 )?;
             }
             Ok(())
         };
 
         loop {
-            while scheduler.should_coordinate_commits() {
-                self.prepare_and_queue_commit_ready_txns(
-                    &self.config.onchain.block_gas_limit_type,
-                    scheduler,
-                    versioned_cache,
-                    &mut scheduler_task,
-                    last_input_output,
-                    shared_commit_state,
-                    base_view,
-                    start_shared_counter,
-                    shared_counter,
-                    &executor,
-                    block,
-                    num_workers,
-                )?;
-                scheduler.queueing_commits_mark_done();
+            if params.worker_should_commit(worker_id) {
+                while scheduler.should_coordinate_commits() {
+                    self.prepare_and_queue_commit_ready_txns(
+                        worker_id,
+                        &self.config.onchain.block_gas_limit_type,
+                        scheduler,
+                        versioned_cache,
+                        &mut scheduler_task,
+                        last_input_output,
+                        shared_commit_state,
+                        base_view,
+                        shared_counter,
+                        &executor,
+                        block,
+                        params,
+                    )?;
+                    scheduler.queueing_commits_mark_done();
+                }
+
+                if params.worker_should_backup(&scheduler_task) {
+                    // TODO: back-up logic - next PR.
+                }
             }
 
             drain_commit_queue()?;
@@ -834,9 +955,11 @@ where
                         ParallelState::new(
                             versioned_cache,
                             scheduler,
-                            start_shared_counter,
+                            params.start_shared_counter,
                             shared_counter,
                         ),
+                        worker_id,
+                        params.enable_profiling,
                     )?;
                     scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
                 },
@@ -851,15 +974,17 @@ where
                         cvar.notify_one();
                     }
 
-                    scheduler.next_task()
+                    SchedulerTask::Retry
                 },
-                SchedulerTask::Retry => scheduler.next_task(),
+                SchedulerTask::Retry => params.worker_next_task(worker_id, scheduler),
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
-                    break Ok(());
+                    break;
                 },
             }
         }
+
+        Ok(())
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -888,6 +1013,13 @@ where
 
         let num_txns = signature_verified_block.len();
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
+        let params = ParallelExecutionParams::new(
+            &self.config.local.block_stm_committer_backup,
+            self.config.local.enable_block_stm_profiling,
+            num_txns,
+            num_workers,
+            start_shared_counter,
+        );
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -908,22 +1040,23 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let worker_ids: Vec<usize> = (0..num_workers).collect();
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..num_workers {
+            for worker_id in &worker_ids {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
+                        *worker_id,
                         env,
                         signature_verified_block,
                         &last_input_output,
                         &versioned_cache,
                         &scheduler,
                         base_view,
-                        start_shared_counter,
                         &shared_counter,
                         &shared_commit_state,
                         &final_results,
-                        num_workers,
+                        &params,
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,
@@ -932,7 +1065,6 @@ where
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
                         }
                         shared_maybe_error.store(true, Ordering::SeqCst);
-
                         // Make sure to halt the scheduler if it hasn't already been halted.
                         scheduler.halt();
                     }
@@ -946,16 +1078,12 @@ where
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        let block_end_info = if self
+        let block_end_info = self
             .config
             .onchain
             .block_gas_limit_type
             .add_block_limit_outcome_onchain()
-        {
-            Some(shared_commit_state.into_inner().get_block_end_info())
-        } else {
-            None
-        };
+            .then(|| shared_commit_state.into_inner().get_block_end_info());
 
         (!shared_maybe_error.load(Ordering::SeqCst))
             .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
@@ -1065,6 +1193,9 @@ where
                 base_view,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
+                0,     // incarnation
+                0,     // worker id
+                false, // profile view callbacks
             );
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
@@ -1362,7 +1493,7 @@ where
                 return Ok(output);
             }
 
-            if !self.config.local.allow_fallback {
+            if !self.config.local.allow_sequential_block_fallback {
                 panic!("Parallel execution failed and fallback is not allowed");
             }
 
@@ -1387,7 +1518,7 @@ where
                 return Ok(output);
             },
             Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {
-                if !self.config.local.allow_fallback {
+                if !self.config.local.allow_sequential_block_fallback {
                     panic!("Parallel execution failed and fallback is not allowed");
                 }
 
@@ -1440,5 +1571,123 @@ where
         }
 
         Err(sequential_error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_infallible::Mutex;
+    use std::sync::Condvar;
+
+    #[test]
+    fn test_no_special_committer_param() {
+        let params = ParallelExecutionParams::new(&BlockSTMCommitterBackup::None, false, 10, 5, 7);
+        assert!(!params.enable_special_committers);
+        assert!(!params.enable_profiling);
+        assert_eq!(params.start_shared_counter, 7);
+        assert_eq!(params.num_workers, 5);
+        assert_eq!(params.num_committers, 5); // should be equal to num_workers
+        assert_eq!(params.committer_proximity_interval, 10); // should be equal to num_txns
+
+        for i in 0..params.num_workers {
+            assert!(params.worker_should_commit(i));
+        }
+        assert!(!params.worker_should_backup(&SchedulerTask::Retry));
+    }
+
+    #[test]
+    fn test_all_special_committer_param() {
+        let params = ParallelExecutionParams::new(&BlockSTMCommitterBackup::All, true, 10, 5, 7);
+        assert!(params.enable_special_committers);
+        assert!(params.enable_profiling);
+        assert_eq!(params.start_shared_counter, 7);
+        assert_eq!(params.num_workers, 5);
+        assert_eq!(params.num_committers, 5); // should be equal to num_workers
+        assert_eq!(params.committer_proximity_interval, 10); // should be equal to num_txns
+
+        for i in 0..params.num_workers {
+            assert!(params.worker_should_commit(i));
+        }
+        assert!(params.worker_should_backup(&SchedulerTask::Retry));
+    }
+
+    #[test]
+    fn test_default_backup_param() {
+        let params =
+            ParallelExecutionParams::new(&BlockSTMCommitterBackup::Default, true, 10, 5, 7);
+        assert!(params.enable_special_committers);
+        assert!(params.enable_profiling);
+        assert_eq!(params.start_shared_counter, 7);
+        assert_eq!(params.num_workers, 5);
+        assert_eq!(params.num_committers, 1);
+        assert_eq!(params.committer_proximity_interval, 4);
+
+        assert!(params.worker_should_commit(0));
+        for i in 1..params.num_workers {
+            assert!(!params.worker_should_commit(i));
+        }
+
+        // Worker should back-up assumes the worker is a committer.
+        assert!(params.worker_should_backup(&SchedulerTask::Retry));
+        assert!(!params.worker_should_backup(&SchedulerTask::ExecutionTask(
+            1,
+            1,
+            ExecutionTaskType::Execution
+        )));
+
+        let params =
+            ParallelExecutionParams::new(&BlockSTMCommitterBackup::Default, true, 100, 8, 7);
+        assert!(params.enable_special_committers);
+        assert!(params.enable_profiling);
+        assert_eq!(params.start_shared_counter, 7);
+        assert_eq!(params.num_workers, 8);
+        assert_eq!(params.num_committers, 2);
+        assert_eq!(params.committer_proximity_interval, 4);
+
+        assert!(params.worker_should_commit(0));
+        assert!(params.worker_should_commit(1));
+        for i in 2..params.num_workers {
+            assert!(!params.worker_should_commit(i));
+        }
+
+        // Worker should back-up assumes the worker is a committer.
+        assert!(params.worker_should_backup(&SchedulerTask::ValidationTask(1, 0, 0)));
+        assert!(!params.worker_should_backup(&SchedulerTask::ExecutionTask(
+            1,
+            1,
+            ExecutionTaskType::Execution
+        )));
+        assert!(!params.worker_should_backup(&SchedulerTask::Done));
+
+        let params =
+            ParallelExecutionParams::new(&BlockSTMCommitterBackup::Default, true, 100, 41, 7);
+        assert!(params.enable_special_committers);
+        assert!(params.enable_profiling);
+        assert_eq!(params.start_shared_counter, 7);
+        assert_eq!(params.num_workers, 41);
+        assert_eq!(params.num_committers, 2);
+        assert_eq!(params.committer_proximity_interval, 5);
+
+        assert!(params.worker_should_commit(0));
+        assert!(params.worker_should_commit(1));
+        for i in 2..params.num_workers {
+            assert!(!params.worker_should_commit(i));
+        }
+
+        // Worker should back-up assumes the worker is a committer.
+        assert!(params.worker_should_backup(&SchedulerTask::ExecutionTask(
+            1,
+            0,
+            ExecutionTaskType::Wakeup(Arc::new((
+                Mutex::new(DependencyStatus::Unresolved),
+                Condvar::new()
+            )))
+        )));
+        assert!(!params.worker_should_backup(&SchedulerTask::ExecutionTask(
+            1,
+            1,
+            ExecutionTaskType::Execution
+        )));
     }
 }

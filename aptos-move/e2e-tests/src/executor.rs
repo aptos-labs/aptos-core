@@ -29,6 +29,7 @@ use aptos_types::{
     },
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+        BlockSTMCommitterBackup,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -527,8 +528,10 @@ impl FakeExecutor {
                 } else {
                     usize::min(4, num_cpus::get())
                 },
-                allow_fallback: self.allow_block_executor_fallback,
+                allow_sequential_block_fallback: self.allow_block_executor_fallback,
                 discard_failed_blocks: false,
+                enable_block_stm_profiling: false,
+                block_stm_committer_backup: BlockSTMCommitterBackup::Default,
             },
             onchain: onchain_config,
         };
