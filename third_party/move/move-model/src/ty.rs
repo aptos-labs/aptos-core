@@ -2563,7 +2563,7 @@ impl ErrorMessageContext {
                 actual, expected
             ),
             PositionalUnpackArgument => format!(
-                "cannot pass `{}` to a constructor which expects argument of type `{}`",
+                "cannot match {} to a struct field of type {}",
                 actual, expected
             ),
             OperatorArgument => format!(
