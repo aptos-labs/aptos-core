@@ -2723,7 +2723,7 @@ impl ErrorMessageContext {
                 actual
             ),
             PositionalUnpackArgument => format!(
-                "the struct/variant has a reference field but...",
+                "the struct/variant has a reference field but `{}` was provided",
                 actual
             ),
             OperatorArgument => {
