@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{tests::batch_store_test::batch_store_for_test, utils::BatchProofQueue};
+use crate::quorum_store::{
+    batch_proof_queue::BatchProofQueue, tests::batch_store_test::batch_store_for_test,
+};
 use aptos_consensus_types::{
     common::TxnSummaryWithExpiration,
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},

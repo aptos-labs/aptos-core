@@ -4,7 +4,7 @@
 use super::batch_store::BatchStore;
 use crate::{
     monitor,
-    quorum_store::{batch_generator::BackPressure, counters, utils::BatchProofQueue},
+    quorum_store::{batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters},
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
