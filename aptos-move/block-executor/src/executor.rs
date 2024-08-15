@@ -1033,6 +1033,7 @@ where
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let num_committers_and_proximity_interval = get_num_committers_and_proximity_interval(
+            num_txns,
             num_workers,
             self.config.local.block_stm_committer_setting.clone(),
         );
@@ -1602,17 +1603,18 @@ where
 }
 
 fn get_num_committers_and_proximity_interval(
+    num_txns: usize,
     num_workers: usize,
     setting: BlockSTMCommitterSetting,
 ) -> (usize, usize) {
     match setting {
-        BlockSTMCommitterSetting::None => (num_workers, usize::MAX),
+        BlockSTMCommitterSetting::None => (num_workers, num_txns),
         BlockSTMCommitterSetting::Default => match num_workers {
             // Based on simple grid optimizations.
             1..=6 => (1, 4),
             7..=40 => (2, 4),
             _ => (2, 5),
         },
-        BlockSTMCommitterSetting::All => (num_workers, usize::MAX),
+        BlockSTMCommitterSetting::All => (num_workers, num_txns),
     }
 }
