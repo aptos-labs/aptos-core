@@ -2464,8 +2464,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let mut arg_idx = 0;
                 // the offset of the field to be processed
                 let mut field_offset = 0;
-                let mut remainning_fields = arity;
-                while remainning_fields > 0 {
+                let mut remaining = arity;
+                while remaining > 0 {
                     let sp!(arg_loc, arg) = args.value.get(arg_idx).expect("invalid index");
                     match arg {
                         EA::LValueOrDotdot_::LValue(lval) => {
@@ -2477,7 +2477,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             fields
                                 .add(field_name, (field_offset, lval.clone()))
                                 .expect("duplicate keys");
-                            remainning_fields -= 1;
+                            remaining -= 1;
                             field_offset += 1;
                         },
                         EA::LValueOrDotdot_::Dotdot => {
@@ -2495,7 +2495,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 fields
                                     .add(field_name, (field_offset, wild_card(*arg_loc)))
                                     .expect("duplicate keys");
-                                remainning_fields -= 1;
+                                remaining -= 1;
                                 field_offset += 1;
                             }
                         },
