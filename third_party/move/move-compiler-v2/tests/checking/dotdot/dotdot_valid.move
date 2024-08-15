@@ -48,6 +48,8 @@ module 0x42::test {
         let S2(..) = x;
         let S2(_x, ..) = x;
         let S2(.., _x) = x;
+        let S2(.., _) = x;
+        let S2(_, ..) = x;
     }
 
     fun simple_2_ref(x: &S2) {

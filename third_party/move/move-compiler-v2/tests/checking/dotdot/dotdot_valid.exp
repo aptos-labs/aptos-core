@@ -154,7 +154,13 @@ module 0x42::test {
             let test::S2{ 0: _x, 1: _ } = x;
             {
               let test::S2{ 0: _, 1: _x } = x;
-              Tuple()
+              {
+                let test::S2{ 0: _, 1: _ } = x;
+                {
+                  let test::S2{ 0: _, 1: _ } = x;
+                  Tuple()
+                }
+              }
             }
           }
         }
