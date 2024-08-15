@@ -15,6 +15,13 @@ module 0x42::test {
         y: S3
     }
 
+    struct S5<T, U>(T, U);
+
+    struct S6<T, U> {
+        x: T,
+        y: U
+    }
+
     enum E1 has drop {
         A(u8, bool),
         B(u8),
@@ -60,7 +67,7 @@ module 0x42::test {
         let S3 { y: _y, .. } = x;
     }
 
-    fun nested(x: S4<bool>) {
+    fun nested1(x: S4<bool>) {
         let S4 { x: _x, .. } = x;
         let S4 { y: _y, .. } = x;
         let S4 { y: S3 { .. }, .. } = x;
@@ -70,7 +77,7 @@ module 0x42::test {
         let S4 { y: S3 { x: _x1, .. }, x: _x2 } = x;
     }
 
-    fun nested_ref(x: &S4<bool>) {
+    fun nested1_ref(x: &S4<bool>) {
         let S4 { x: _x, .. } = x;
         let S4 { y: _y, .. } = x;
         let S4 { y: S3 { .. }, .. } = x;
@@ -78,6 +85,30 @@ module 0x42::test {
         let S4 { y: S3 { x: _x1, .. }, x: _x2 } = x;
         let S4 { y: S3 { y: _y, .. }, .. } = x;
         let S4 { y: S3 { x: _x1, .. }, x: _x2 } = x;
+    }
+
+    fun nested2(x: S5<bool, S1>) {
+        let S5(.., S1(..)) = x;
+    }
+
+    fun nested2_ref(x: &S5<bool, S1>) {
+        let S5(.., S1(..)) = x;
+    }
+
+    fun nested3(x: S5<bool, S4<bool>>) {
+        let S5(.., S4 { .. }) = x;
+    }
+
+    fun nested3_ref(x: &S5<bool, S4<bool>>) {
+        let S5(.., S4 { .. }) = x;
+    }
+
+    fun nested4(x: S4<S1>) {
+        let S4 { x: S1(..), .. } = x;
+    }
+
+    fun nested4_ref(x: &S4<S1>) {
+        let S4 { x: S1(..), .. } = x;
     }
 
     fun simple_4(x: E1): u8 {

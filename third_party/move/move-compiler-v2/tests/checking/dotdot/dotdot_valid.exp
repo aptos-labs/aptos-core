@@ -27,7 +27,15 @@ module 0x42::test {
         x: #0,
         y: test::S3,
     }
-    private fun nested(x: test::S4<bool>) {
+    struct S5 {
+        0: #0,
+        1: #1,
+    }
+    struct S6 {
+        x: #0,
+        y: #1,
+    }
+    private fun nested1(x: test::S4<bool>) {
         {
           let test::S4<bool>{ x: _x, y: _ } = x;
           {
@@ -51,7 +59,7 @@ module 0x42::test {
           }
         }
     }
-    private fun nested_ref(x: &test::S4<bool>) {
+    private fun nested1_ref(x: &test::S4<bool>) {
         {
           let test::S4<bool>{ x: _x, y: _ } = x;
           {
@@ -73,6 +81,42 @@ module 0x42::test {
               }
             }
           }
+        }
+    }
+    private fun nested2(x: test::S5<bool, test::S1>) {
+        {
+          let test::S5<bool, test::S1>{ 0: _, 1: test::S1{ 0: _ } } = x;
+          Tuple()
+        }
+    }
+    private fun nested2_ref(x: &test::S5<bool, test::S1>) {
+        {
+          let test::S5<bool, test::S1>{ 0: _, 1: test::S1{ 0: _ } } = x;
+          Tuple()
+        }
+    }
+    private fun nested3(x: test::S5<bool, test::S4<bool>>) {
+        {
+          let test::S5<bool, test::S4<bool>>{ 0: _, 1: test::S4<bool>{ x: _, y: _ } } = x;
+          Tuple()
+        }
+    }
+    private fun nested3_ref(x: &test::S5<bool, test::S4<bool>>) {
+        {
+          let test::S5<bool, test::S4<bool>>{ 0: _, 1: test::S4<bool>{ x: _, y: _ } } = x;
+          Tuple()
+        }
+    }
+    private fun nested4(x: test::S4<test::S1>) {
+        {
+          let test::S4<test::S1>{ x: test::S1{ 0: _ }, y: _ } = x;
+          Tuple()
+        }
+    }
+    private fun nested4_ref(x: &test::S4<test::S1>) {
+        {
+          let test::S4<test::S1>{ x: test::S1{ 0: _ }, y: _ } = x;
+          Tuple()
         }
     }
     private fun simple_0(x: test::S0) {
