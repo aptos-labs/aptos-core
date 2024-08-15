@@ -365,6 +365,7 @@ impl InnerBuilder {
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
+            self.config.enable_opt_quorum_store,
         );
         spawn_named!(
             "proof_manager",
@@ -444,6 +445,7 @@ impl InnerBuilder {
                 // TODO: remove after splitting out clean requests
                 self.coordinator_tx.clone(),
                 consensus_publisher,
+                self.verifier.get_ordered_account_addresses(),
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

@@ -4,6 +4,7 @@
 use crate::schema::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     transaction_accumulator::TransactionAccumulatorSchema,
+    transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
 };
 use anyhow::anyhow;
 use aptos_accumulator::{HashReader, MerkleAccumulator};
@@ -126,6 +127,12 @@ impl TransactionAccumulatorDb {
 
     /// Returns the root hash at given `version`.
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
+        if let Some(hash) = self
+            .db
+            .get::<TransactionAccumulatorRootHashSchema>(&version)?
+        {
+            return Ok(hash);
+        }
         Accumulator::get_root_hash(self, version + 1).map_err(Into::into)
     }
 
@@ -141,6 +148,7 @@ impl TransactionAccumulatorDb {
     /// More details are in this issue https://github.com/aptos-labs/aptos-core/issues/1288.
     pub(crate) fn prune(begin: Version, end: Version, db_batch: &SchemaBatch) -> Result<()> {
         for version_to_delete in begin..end {
+            db_batch.delete::<TransactionAccumulatorRootHashSchema>(&version_to_delete)?;
             // The even version will be pruned in the iteration of version + 1.
             if version_to_delete % 2 == 0 {
                 continue;

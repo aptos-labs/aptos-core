@@ -5,6 +5,7 @@ use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary, TxnSummaryWithExpiration},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
+    utils::PayloadTxnsSize,
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -256,6 +257,7 @@ impl ProofQueue {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn batch_summaries_len(&self) -> usize {
         self.batch_summaries.len()
     }
@@ -459,16 +461,15 @@ impl ProofQueue {
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
-        max_txns: u64,
+        max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
-        max_bytes: u64,
+        soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
-    ) -> (Vec<ProofOfStore>, u64, bool) {
+    ) -> (Vec<ProofOfStore>, PayloadTxnsSize, u64, bool) {
         let mut ret = vec![];
-        let mut cur_bytes = 0;
         let mut cur_unique_txns = 0;
-        let mut cur_all_txns = 0;
+        let mut cur_all_txns = PayloadTxnsSize::zero();
         let mut excluded_txns = 0;
         let mut full = false;
         // Set of all the excluded transactions and all the transactions included in the result
@@ -490,6 +491,10 @@ impl ProofQueue {
         while !iters.is_empty() {
             iters.shuffle(&mut thread_rng());
             iters.retain_mut(|iter| {
+                if full {
+                    return false;
+                }
+
                 if let Some((sort_key, batch)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
@@ -512,16 +517,14 @@ impl ProofQueue {
                         } else {
                             cur_unique_txns + batch.num_txns()
                         };
-                        if cur_bytes + batch.num_bytes() > max_bytes
+                        if cur_all_txns + batch.size() > max_txns
                             || unique_txns > max_txns_after_filtering
-                            || cur_all_txns + batch.num_txns() > max_txns
                         {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
-                        cur_bytes += batch.num_bytes();
-                        cur_all_txns += batch.num_txns();
+                        cur_all_txns += batch.size();
                         // Add this batch to filtered_txns and calculate the number of
                         // unique transactions added in the result so far.
                         cur_unique_txns += self.batch_summaries.get(&sort_key.batch_key).map_or(
@@ -540,9 +543,9 @@ impl ProofQueue {
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
-                        if cur_bytes == max_bytes
-                            || cur_all_txns == max_txns
+                        if cur_all_txns == max_txns
                             || cur_unique_txns == max_txns_after_filtering
+                            || cur_unique_txns >= soft_max_txns_after_filtering
                         {
                             full = true;
                             return false;
@@ -556,12 +559,11 @@ impl ProofQueue {
         }
         info!(
             // before non full check
-            byte_size = cur_bytes,
             block_total_txns = cur_all_txns,
             block_unique_txns = cur_unique_txns,
             max_txns = max_txns,
             max_txns_after_filtering = max_txns_after_filtering,
-            max_bytes = max_bytes,
+            soft_max_txns_after_filtering = soft_max_txns_after_filtering,
             batch_count = ret.len(),
             full = full,
             return_non_full = return_non_full,
@@ -570,19 +572,19 @@ impl ProofQueue {
 
         if full || return_non_full {
             counters::BLOCK_SIZE_WHEN_PULL.observe(cur_unique_txns as f64);
-            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns as f64);
+            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns.count() as f64);
             counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
-                .observe((cur_all_txns.saturating_sub(cur_unique_txns)) as f64);
-            counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
+                .observe((cur_all_txns.count().saturating_sub(cur_unique_txns)) as f64);
+            counters::BLOCK_BYTES_WHEN_PULL.observe(cur_all_txns.size_in_bytes() as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
             // Number of proofs remaining in proof queue after the pull
             self.log_remaining_data_after_pull(excluded_batches, &ret);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            (ret, cur_unique_txns, !full)
+            (ret, cur_all_txns, cur_unique_txns, !full)
         } else {
-            (Vec::new(), 0, !full)
+            (Vec::new(), PayloadTxnsSize::zero(), 0, !full)
         }
     }
 

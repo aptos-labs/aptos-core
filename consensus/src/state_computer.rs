@@ -322,7 +322,7 @@ impl StateComputer for ExecutionProxy {
             "commit_block",
             tokio::task::spawn_blocking(move || {
                 executor
-                    .commit_blocks_ext(block_ids, proof, false)
+                    .commit_blocks(block_ids, proof)
                     .expect("Failed to commit blocks");
             })
             .await
@@ -487,11 +487,10 @@ async fn test_commit_sync_race() {
             todo!()
         }
 
-        fn commit_blocks_ext(
+        fn commit_blocks(
             &self,
             _block_ids: Vec<HashValue>,
             ledger_info_with_sigs: LedgerInfoWithSignatures,
-            _save_state_snapshots: bool,
         ) -> ExecutorResult<()> {
             *self.time.lock() = LogicalTime::new(
                 ledger_info_with_sigs.ledger_info().epoch(),

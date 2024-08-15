@@ -132,7 +132,7 @@ impl ModuleGenerator {
                 .expect("Serialization of CompilationMetadata should succeed"),
         };
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_NEXT,
+            version: file_format_common::VERSION_MAX,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
             metadata: vec![metadata],
             ..Default::default()
@@ -277,7 +277,13 @@ impl ModuleGenerator {
         self.source_map
             .add_struct_field_mapping(struct_def_idx, variant_idx, ctx.env.to_ir_loc(field_loc))
             .expect(SOURCE_MAP_OK);
-        let name = self.name_index(ctx, field_loc, field_env.get_name());
+        let mut field_symbol = field_env.get_name();
+        let field_name = ctx.symbol_to_str(field_symbol);
+        // Append `_` if this is a positional field (digits), as the binary format expects proper identifiers
+        if field_name.starts_with(|c: char| c.is_ascii_digit()) {
+            field_symbol = ctx.env.symbol_pool().make(&format!("_{}", field_name));
+        }
+        let name = self.name_index(ctx, field_loc, field_symbol);
         let signature =
             FF::TypeSignature(self.signature_token(ctx, field_loc, &field_env.get_type()));
         FF::FieldDefinition { name, signature }

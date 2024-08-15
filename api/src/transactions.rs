@@ -995,7 +995,7 @@ impl TransactionsApi {
             address.into(),
             page.start_option(),
             page.limit(&latest_ledger_info)?,
-            latest_ledger_info.version(),
+            account.ledger_version,
             &latest_ledger_info,
         )?;
         match accept_type {

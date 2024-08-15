@@ -130,8 +130,10 @@ fn dag_realistic_env_max_load_test(
                 )
                 .add_latency_threshold(4.0, LatencyType::P50)
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 15.0,
-                    max_round_gap: 8,
+                    max_non_epoch_no_progress_secs: 15.0,
+                    max_epoch_no_progress_secs: 15.0,
+                    max_non_epoch_round_gap: 8,
+                    max_epoch_round_gap: 8,
                 }),
         )
 }
@@ -217,8 +219,10 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 20,
+                    max_non_epoch_no_progress_secs: 20.0,
+                    max_epoch_no_progress_secs: 20.0,
+                    max_non_epoch_round_gap: 20,
+                    max_epoch_round_gap: 20,
                 }),
         )
 }

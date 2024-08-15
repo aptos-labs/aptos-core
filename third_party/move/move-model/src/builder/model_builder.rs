@@ -133,7 +133,8 @@ pub(crate) struct StructEntry {
 
 #[derive(Debug, Clone)]
 pub(crate) enum StructLayout {
-    Singleton(BTreeMap<Symbol, FieldData>),
+    /// The second bool is true iff the struct has positional fields
+    Singleton(BTreeMap<Symbol, FieldData>, bool),
     Variants(Vec<StructVariant>),
     None,
 }
@@ -144,6 +145,7 @@ pub(crate) struct StructVariant {
     pub name: Symbol,
     pub attributes: Vec<Attribute>,
     pub fields: BTreeMap<Symbol, FieldData>,
+    pub is_positional: bool,
 }
 
 /// A declaration of a function.
@@ -537,36 +539,34 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
-    /// Looks up the fields of a structure, with instantiated field types. Returns empty
-    /// map if the struct has variants.
-    pub fn lookup_struct_fields(
+    /// Looks up field declaration, returning a list of optional variant name and type of the field
+    /// in the variant. The variant name is None and the list a singleton for proper struct types.
+    pub fn lookup_struct_field_decl(
         &self,
         id: &QualifiedInstId<StructId>,
-    ) -> (BTreeMap<Symbol, Type>, bool) {
+        field_name: Symbol,
+    ) -> (Vec<(Option<Symbol>, Type)>, bool) {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        let instantiate_fields = |fields: &BTreeMap<Symbol, FieldData>, common_only: bool| {
+        let get_instantiated_field = |fields: &BTreeMap<Symbol, FieldData>| {
             fields
-                .values()
-                .filter_map(|f| {
-                    if !common_only || f.common_for_variants {
-                        Some((f.name, f.ty.instantiate(&id.inst)))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
+                .get(&field_name)
+                .map(|data| data.ty.instantiate(&id.inst))
         };
         match &entry.layout {
-            StructLayout::Singleton(fields) => (instantiate_fields(fields, false), false),
+            StructLayout::Singleton(fields, _) => (
+                get_instantiated_field(fields)
+                    .map(|ty| vec![(None, ty)])
+                    .unwrap_or_default(),
+                false,
+            ),
             StructLayout::Variants(variants) => (
-                if variants.is_empty() {
-                    BTreeMap::new()
-                } else {
-                    instantiate_fields(&variants[0].fields, true)
-                },
+                variants
+                    .iter()
+                    .filter_map(|v| get_instantiated_field(&v.fields).map(|ty| (Some(v.name), ty)))
+                    .collect(),
                 true,
             ),
-            _ => (BTreeMap::new(), false),
+            _ => (vec![], false),
         }
     }
 

@@ -678,7 +678,7 @@ fn struct_def(
 fn struct_fields(context: &mut Context, _loc: Loc, elayout: E::StructLayout) -> N::StructFields {
     match elayout {
         E::StructLayout::Native(loc) => N::StructFields::Native(loc),
-        E::StructLayout::Singleton(em) => {
+        E::StructLayout::Singleton(em, _) => {
             N::StructFields::Defined(em.map(|_f, (idx, t)| (idx, type_(context, t))))
         },
         E::StructLayout::Variants(_) => {
@@ -1107,8 +1107,8 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
             assert!(context.env.has_errors());
             NE::UnresolvedError
         },
-        // Matches variants only allowed in Move 2
-        EE::Match(..) => {
+        // Variants only allowed in Move 2
+        EE::Match(..) | EE::Test(..) => {
             panic!("ICE unexpected Move 2 construct")
         },
         // Matches variants only allowed in specs (we handle the allowed ones above)
@@ -1181,6 +1181,7 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
                 nfields.expect("ICE fields were already unique"),
             )
         },
+        EL::PositionalUnpack(_, _, _) => panic!("positional fields only allowed in v2"),
         EL::Var(_, _) => panic!("unexpected specification construct"),
     };
     Some(sp(loc, nl_))

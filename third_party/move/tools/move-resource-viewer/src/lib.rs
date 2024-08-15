@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::fat_type::{FatStructType, FatType, WrappedAbilitySet};
+use crate::fat_type::{FatStructLayout, FatStructType, FatType, WrappedAbilitySet};
 use anyhow::{anyhow, bail};
 pub use limit::Limiter;
 use move_binary_format::{
@@ -10,8 +10,8 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError},
     file_format::{
-        Ability, AbilitySet, CompiledScript, SignatureToken, StructDefinitionIndex,
-        StructFieldInformation, StructHandleIndex,
+        Ability, AbilitySet, CompiledScript, FieldDefinition, SignatureToken,
+        StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
     },
     views::FunctionHandleView,
     CompiledModule,
@@ -40,6 +40,7 @@ mod limit;
 pub struct AnnotatedMoveStruct {
     pub abilities: AbilitySet,
     pub ty_tag: StructTag,
+    pub variant_info: Option<(u16, Identifier)>,
     pub value: Vec<(Identifier, AnnotatedMoveValue)>,
 }
 
@@ -246,16 +247,24 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         tag: &StructTag,
         blob: &[u8],
-    ) -> anyhow::Result<Vec<(Identifier, MoveValue)>> {
+    ) -> anyhow::Result<(Option<Identifier>, Vec<(Identifier, MoveValue)>)> {
         let ty = self.resolve_struct(tag)?;
         let struct_def = (&ty).try_into().map_err(into_vm_status)?;
         Ok(match MoveStruct::simple_deserialize(blob, &struct_def)? {
-            MoveStruct::Runtime(runtime) => self
-                .get_field_names(&ty)?
-                .into_iter()
-                .zip(runtime)
-                .collect(),
-            MoveStruct::WithFields(fields) | MoveStruct::WithTypes { fields, .. } => fields,
+            MoveStruct::Runtime(values) => {
+                let (tag, field_names) = self.get_field_information(&ty, None)?;
+                debug_assert_eq!(tag, None);
+                (None, field_names.into_iter().zip(values).collect())
+            },
+            MoveStruct::RuntimeVariant(tag, values) => {
+                let (variant_info, field_names) = self.get_field_information(&ty, Some(tag))?;
+                (
+                    variant_info.map(|(_, name)| name),
+                    field_names.into_iter().zip(values).collect(),
+                )
+            },
+            MoveStruct::WithFields(fields) | MoveStruct::WithTypes { fields, .. } => (None, fields),
+            MoveStruct::WithVariantFields(name, _, fields) => (Some(name), fields),
         })
     }
 
@@ -304,15 +313,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         limit.charge(module_name.as_bytes().len())?;
         limit.charge(name.as_bytes().len())?;
 
-        match &struct_def.field_information {
-            StructFieldInformation::Native => Err(anyhow!("Unexpected Native Struct")),
-            StructFieldInformation::Declared(defs) => Ok(FatStructType {
-                address,
-                module: module_name,
-                name,
-                abilities: WrappedAbilitySet(abilities),
-                ty_args,
-                layout: defs
+        let make_fields =
+            |fields: &[FieldDefinition], limit: &mut Limiter| -> anyhow::Result<Vec<FatType>> {
+                fields
                     .iter()
                     .map(|field_def| {
                         self.resolve_signature(
@@ -321,11 +324,32 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                             limit,
                         )
                     })
-                    .collect::<anyhow::Result<_>>()?,
+                    .collect::<anyhow::Result<_>>()
+            };
+
+        match &struct_def.field_information {
+            StructFieldInformation::Native => Err(anyhow!("Unexpected Native Struct")),
+            StructFieldInformation::Declared(fields) => Ok(FatStructType {
+                address,
+                module: module_name,
+                name,
+                abilities: WrappedAbilitySet(abilities),
+                ty_args,
+                layout: FatStructLayout::Singleton(make_fields(fields, limit)?),
             }),
-            StructFieldInformation::DeclaredVariants(..) => Err(anyhow!(
-                "Struct variants not yet supported by resource viewer"
-            )),
+            StructFieldInformation::DeclaredVariants(variants) => Ok(FatStructType {
+                address,
+                module: module_name,
+                name,
+                abilities: WrappedAbilitySet(abilities),
+                ty_args,
+                layout: FatStructLayout::Variants(
+                    variants
+                        .iter()
+                        .map(|variant| make_fields(&variant.fields, limit))
+                        .collect::<anyhow::Result<_>>()?,
+                ),
+            }),
         }
     }
 
@@ -439,37 +463,81 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         let struct_tag = ty
             .struct_tag(limit)
             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let field_names = self.get_field_names(ty)?;
-        for names in field_names.iter() {
-            limit.charge(names.as_bytes().len())?;
+        let (variant_tag, field_values) = move_struct.optional_variant_and_fields();
+        let (variant_info, field_names) = self.get_field_information(ty, variant_tag)?;
+        if let Some((_, name)) = &variant_info {
+            limit.charge(name.as_bytes().len())?;
         }
-        let mut annotated_fields = vec![];
-        for (ty, v) in ty.layout.iter().zip(move_struct.fields().iter()) {
-            annotated_fields.push(self.annotate_value(v, ty, limit)?);
+        for name in field_names.iter() {
+            limit.charge(name.as_bytes().len())?;
         }
-        Ok(AnnotatedMoveStruct {
-            abilities: ty.abilities.0,
-            ty_tag: struct_tag,
-            value: field_names.into_iter().zip(annotated_fields).collect(),
-        })
+
+        let annotate_values = |values: &[MoveValue], tys: &[FatType], limit: &mut Limiter| {
+            values
+                .iter()
+                .zip(tys)
+                .zip(field_names.iter())
+                .map(|((v, ty), n)| self.annotate_value(v, ty, limit).map(|v| (n.clone(), v)))
+                .collect::<anyhow::Result<Vec<_>>>()
+        };
+
+        match &ty.layout {
+            FatStructLayout::Singleton(field_tys) => Ok(AnnotatedMoveStruct {
+                abilities: ty.abilities.0,
+                ty_tag: struct_tag,
+                variant_info: None,
+                value: annotate_values(field_values, field_tys, limit)?,
+            }),
+            FatStructLayout::Variants(variants) => match variant_tag {
+                Some(tag) if (tag as usize) < variants.len() => {
+                    let field_tys = &variants[tag as usize];
+                    Ok(AnnotatedMoveStruct {
+                        abilities: ty.abilities.0,
+                        ty_tag: struct_tag,
+                        variant_info,
+                        value: annotate_values(field_values, field_tys, limit)?,
+                    })
+                },
+                _ => bail!("type and value mismatch: malformed variant tag"),
+            },
+        }
     }
 
-    fn get_field_names(&self, ty: &FatStructType) -> anyhow::Result<Vec<Identifier>> {
+    fn get_field_information(
+        &self,
+        ty: &FatStructType,
+        variant: Option<u16>,
+    ) -> anyhow::Result<(Option<(u16, Identifier)>, Vec<Identifier>)> {
         let module_id = ModuleId::new(ty.address, ty.module.clone());
         let module = self.view_existing_module(&module_id)?;
         let module = module.borrow();
         let struct_def_idx = find_struct_def_in_module(module, ty.name.as_ident_str())?;
         let struct_def = module.struct_def_at(struct_def_idx);
 
-        match &struct_def.field_information {
-            StructFieldInformation::Native => Err(anyhow!("Unexpected Native Struct")),
-            StructFieldInformation::Declared(defs) => Ok(defs
-                .iter()
-                .map(|field_def| module.identifier_at(field_def.name).to_owned())
-                .collect()),
-            StructFieldInformation::DeclaredVariants(..) => Err(anyhow!(
-                "Struct variants not yet supported by resource viewer"
+        let ident_at = |name| module.identifier_at(name).to_owned();
+
+        match (variant, &struct_def.field_information) {
+            (_, StructFieldInformation::Native) => Err(anyhow!("Unexpected Native Struct")),
+            (None, StructFieldInformation::Declared(defs)) => Ok((
+                None,
+                defs.iter()
+                    .map(|field_def| ident_at(field_def.name))
+                    .collect(),
             )),
+            (Some(tag), StructFieldInformation::DeclaredVariants(variants))
+                if (tag as usize) < variants.len() =>
+            {
+                let variant = &variants[tag as usize];
+                Ok((
+                    Some((tag, ident_at(variant.name))),
+                    variant
+                        .fields
+                        .iter()
+                        .map(|field_def| ident_at(field_def.name).to_owned())
+                        .collect(),
+                ))
+            },
+            _ => bail!("inconsistent layout information"),
         }
     }
 
@@ -591,7 +659,11 @@ fn pretty_print_struct(
     indent: u64,
 ) -> std::fmt::Result {
     pretty_print_ability_modifiers(f, value.abilities)?;
-    writeln!(f, "{} {{", value.ty_tag)?;
+    write!(f, "{}", value.ty_tag)?;
+    if let Some((_, name)) = &value.variant_info {
+        write!(f, "::{}", name)?;
+    }
+    writeln!(f, " {{")?;
     for (field_name, v) in value.value.iter() {
         write_indent(f, indent + 4)?;
         write!(f, "{}: ", field_name)?;
@@ -616,7 +688,13 @@ fn pretty_print_ability_modifiers(f: &mut Formatter, abilities: AbilitySet) -> s
 
 impl serde::Serialize for AnnotatedMoveStruct {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut s = serializer.serialize_map(Some(self.value.len()))?;
+        let mut s;
+        if let Some((_, name)) = &self.variant_info {
+            s = serializer.serialize_map(Some(self.value.len() + 1))?;
+            s.serialize_entry("$variant", name)?;
+        } else {
+            s = serializer.serialize_map(Some(self.value.len()))?;
+        }
         for (f, v) in &self.value {
             s.serialize_entry(f, v)?
         }

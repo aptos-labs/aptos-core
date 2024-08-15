@@ -100,7 +100,11 @@ pub enum EmitJobMode {
     },
     WaveTps {
         average_tps: usize,
+        // amount of traffic that is oscilating:
+        // 1.0 means it oscilates between [0, 2 * average_tps]
+        // 0.3 means it oscilates between [0.7 * average_tps, 1.3 * average_tps]
         wave_ratio: f32,
+        // number of waves within the wait_millis interval (which is txn_expiration_time + 180s)
         num_waves: usize,
     },
 }
@@ -236,6 +240,11 @@ impl EmitJobRequest {
 
     pub fn max_gas_per_txn(mut self, max_gas_per_txn: u64) -> Self {
         self.max_gas_per_txn = max_gas_per_txn;
+        self
+    }
+
+    pub fn init_expiration_multiplier(mut self, init_expiration_multiplier: f64) -> Self {
+        self.init_expiration_multiplier = init_expiration_multiplier;
         self
     }
 
@@ -911,6 +920,7 @@ impl TxnEmitter {
     }
 }
 
+#[allow(dead_code)]
 fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
@@ -924,7 +934,7 @@ fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
 /// we were able to fetch last.
 async fn wait_for_accounts_sequence(
     start_time: Instant,
-    clients: &Vec<RestClient>,
+    client: &RestClient,
     account_seqs: &HashMap<AccountAddress, (u64, u64)>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
@@ -934,7 +944,6 @@ async fn wait_for_accounts_sequence(
 
     let mut sum_of_completion_timestamps_millis = 0u128;
     loop {
-        let client = pick_client(clients);
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();

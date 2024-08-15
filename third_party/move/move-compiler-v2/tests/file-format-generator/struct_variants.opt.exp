@@ -15,6 +15,23 @@ enum CommonFields {
 	z: u64
  }
 }
+enum CommonFieldsAtDifferentOffset has drop {
+ Foo{
+	x: u64,
+	y: u64
+ },
+ Bar{
+	x: u64,
+	z: u64
+ },
+ Baz{
+	z: u64
+ },
+ Balt{
+	foo: u8,
+	z: u64
+ }
+}
 enum Inner {
  Inner1{
 	x: u64
@@ -449,44 +466,71 @@ L3:	loc2: u64
 L4:	loc3: u64
 B0:
 	0: ImmBorrowLoc[0](Arg0: CommonFields)
-	1: StLoc[1](loc0: &CommonFields)
-	2: MoveLoc[1](loc0: &CommonFields)
-	3: ImmBorrowVariantField[3](Foo.x|Bar.x: u64)
-	4: ReadRef
-	5: ImmBorrowLoc[0](Arg0: CommonFields)
-	6: StLoc[1](loc0: &CommonFields)
-	7: CopyLoc[1](loc0: &CommonFields)
-	8: TestVariant[7](CommonFields/Foo)
-	9: StLoc[2](loc1: bool)
-	10: StLoc[3](loc2: u64)
-	11: MoveLoc[2](loc1: bool)
-	12: BrFalse(20)
+	1: ImmBorrowVariantField[3](Foo.x|Bar.x: u64)
+	2: ReadRef
+	3: ImmBorrowLoc[0](Arg0: CommonFields)
+	4: StLoc[1](loc0: &CommonFields)
+	5: CopyLoc[1](loc0: &CommonFields)
+	6: TestVariant[7](CommonFields/Foo)
+	7: StLoc[2](loc1: bool)
+	8: StLoc[3](loc2: u64)
+	9: MoveLoc[2](loc1: bool)
+	10: BrFalse(18)
 B1:
-	13: MoveLoc[1](loc0: &CommonFields)
-	14: Pop
-	15: MoveLoc[0](Arg0: CommonFields)
-	16: UnpackVariant[7](CommonFields/Foo)
-	17: StLoc[4](loc3: u64)
-	18: Pop
-	19: Branch(30)
+	11: MoveLoc[1](loc0: &CommonFields)
+	12: Pop
+	13: MoveLoc[0](Arg0: CommonFields)
+	14: UnpackVariant[7](CommonFields/Foo)
+	15: StLoc[4](loc3: u64)
+	16: Pop
+	17: Branch(28)
 B2:
-	20: MoveLoc[1](loc0: &CommonFields)
-	21: TestVariant[8](CommonFields/Bar)
-	22: BrFalse(28)
+	18: MoveLoc[1](loc0: &CommonFields)
+	19: TestVariant[8](CommonFields/Bar)
+	20: BrFalse(26)
 B3:
-	23: MoveLoc[0](Arg0: CommonFields)
-	24: UnpackVariant[8](CommonFields/Bar)
-	25: StLoc[4](loc3: u64)
-	26: Pop
-	27: Branch(30)
+	21: MoveLoc[0](Arg0: CommonFields)
+	22: UnpackVariant[8](CommonFields/Bar)
+	23: StLoc[4](loc3: u64)
+	24: Pop
+	25: Branch(28)
 B4:
-	28: LdU64(15621340914461310977)
-	29: Abort
+	26: LdU64(15621340914461310977)
+	27: Abort
 B5:
-	30: MoveLoc[3](loc2: u64)
-	31: MoveLoc[4](loc3: u64)
-	32: Add
-	33: Ret
+	28: MoveLoc[3](loc2: u64)
+	29: MoveLoc[4](loc3: u64)
+	30: Add
+	31: Ret
+}
+select_common_fields_different_offset(Arg0: CommonFieldsAtDifferentOffset): u64 /* def_idx: 10 */ {
+L1:	loc0: &CommonFieldsAtDifferentOffset
+L2:	loc1: &u64
+B0:
+	0: ImmBorrowLoc[0](Arg0: CommonFieldsAtDifferentOffset)
+	1: StLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	2: CopyLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	3: TestVariant[9](CommonFieldsAtDifferentOffset/Bar)
+	4: BrTrue(9)
+B1:
+	5: CopyLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	6: TestVariant[10](CommonFieldsAtDifferentOffset/Balt)
+	7: BrTrue(9)
+B2:
+	8: Branch(13)
+B3:
+	9: MoveLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	10: ImmBorrowVariantField[4](Bar.z|Balt.z: u64)
+	11: StLoc[2](loc1: &u64)
+	12: Branch(16)
+B4:
+	13: MoveLoc[1](loc0: &CommonFieldsAtDifferentOffset)
+	14: ImmBorrowVariantField[5](Baz.z: u64)
+	15: StLoc[2](loc1: &u64)
+B5:
+	16: MoveLoc[2](loc1: &u64)
+	17: ReadRef
+	18: Ret
 }
 }
 ============ bytecode verification succeeded ========

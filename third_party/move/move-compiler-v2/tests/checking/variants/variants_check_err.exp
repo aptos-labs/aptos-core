@@ -1,45 +1,45 @@
 
 Diagnostics:
 error: variant `Rgb` not declared in `m::Color`
-   ┌─ tests/checking/variants/variants_check_err.move:15:13
+   ┌─ tests/checking/variants/variants_check_err.move:21:13
    │
-15 │             Color::Rgb{red, green, blue} => false,
+21 │             Color::Rgb{red, green, blue} => false,
    │             ^^^^^^^^^^
 
 error: variants not allowed in this context
-   ┌─ tests/checking/variants/variants_check_err.move:21:41
+   ┌─ tests/checking/variants/variants_check_err.move:27:34
    │
-21 │     fun missplaced_variant(self: Color::Red): bool {
-   │                                         ^^^
+27 │     fun missplaced_variant(self: Color::Red): bool {
+   │                                  ^^^^^^^^^^
+
+error: undeclared struct `m::missplaced_variant`
+   ┌─ tests/checking/variants/variants_check_err.move:28:9
+   │
+28 │         0x815::m::missplaced_variant::Red();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: variants not allowed in this context
-   ┌─ tests/checking/variants/variants_check_err.move:22:39
+   ┌─ tests/checking/variants/variants_check_err.move:32:29
    │
-22 │         0x815::m::missplaced_variant::Red();
-   │                                       ^^^
-
-error: variants not allowed in this context
-   ┌─ tests/checking/variants/variants_check_err.move:26:36
-   │
-26 │     fun missing_field(self: Color::Red): bool {
-   │                                    ^^^
+32 │     fun missing_field(self: Color::Red): bool {
+   │                             ^^^^^^^^^^
 
 error: missing field `blue`
-   ┌─ tests/checking/variants/variants_check_err.move:28:13
+   ┌─ tests/checking/variants/variants_check_err.move:34:13
    │
-28 │             Color::RGB{red, green} => false,
+34 │             Color::RGB{red, green} => false,
    │             ^^^^^^^^^^^^^^^^^^^^^^
 
 error: field `black` not declared in `m::Color`
-   ┌─ tests/checking/variants/variants_check_err.move:34:42
+   ┌─ tests/checking/variants/variants_check_err.move:40:42
    │
-34 │             Color::RGB{red, green, blue, black} => false,
+40 │             Color::RGB{red, green, blue, black} => false,
    │                                          ^^^^^
 
-error: field `red` not declared in all variants of `Color`
-   ┌─ tests/checking/variants/variants_check_err.move:39:9
+error: cannot select field `f1` since it has different types in variants of enum `Fields`
+   ┌─ tests/checking/variants/variants_check_err.move:49:9
    │
-39 │         self.red
+49 │         self.f1 + (self.f2 as u64)
    │         ^^^^
    │
-   = field must be declared in all variants of `Color` to be accessible without match expression
+   = field `f1` has type `u8` in variant `V3` and type `u64` in variant `V1` and type `u64` in variant `V2`

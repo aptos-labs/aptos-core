@@ -25,7 +25,7 @@ struct Args {
     #[clap(long = "skip-private")]
     pub skip_private: bool,
 
-    /// Do not print the disassembled bytecodes of each function.
+    /// Do not print the disassembled bytecode for each function.
     #[clap(long = "skip-code")]
     pub skip_code: bool,
 
@@ -36,6 +36,10 @@ struct Args {
     /// Do not print the basic blocks of each function.
     #[clap(long = "skip-basic-blocks")]
     pub skip_basic_blocks: bool,
+
+    /// Print statistics about the bytecode.
+    #[clap(long = "print-bytecode-stats")]
+    pub print_bytecode_stats: bool,
 
     /// Treat input file as a script (default is to treat file as a module)
     #[clap(short = 's', long = "script")]
@@ -85,6 +89,7 @@ fn main() {
     disassembler_options.only_externally_visible = args.skip_private;
     disassembler_options.print_basic_blocks = !args.skip_basic_blocks;
     disassembler_options.print_locals = !args.skip_locals;
+    disassembler_options.print_bytecode_stats = args.print_bytecode_stats;
 
     // TODO: make source mapping work with the Move source language
     let no_loc = Spanned::unsafe_no_loc(()).loc;
@@ -123,9 +128,9 @@ fn main() {
         );
     }
 
-    let dissassemble_string = disassembler.disassemble().expect("Unable to dissassemble");
+    let disassemble_string = disassembler.disassemble().expect("Unable to disassemble");
 
-    println!("{}", dissassemble_string);
+    println!("{}", disassemble_string);
 }
 
 #[test]

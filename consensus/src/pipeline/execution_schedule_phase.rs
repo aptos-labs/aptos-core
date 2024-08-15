@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
+use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::{debug, info};
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -50,7 +50,7 @@ pub struct ExecutionSchedulePhase {
 
 impl ExecutionSchedulePhase {
     pub fn new(execution_proxy: Arc<dyn StateComputer>, execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
-        Self { 
+        Self {
             execution_proxy,
             execution_futures,
         }
@@ -105,22 +105,37 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         //      ExecutionWait phase is never kicked off.
         let fut = tokio::task::spawn(async move {
             let mut results = vec![];
-            for block in ordered_blocks {
+            // wait for all futs so that lifetime_guard is guaranteed to be dropped only
+            // after all executor calls are over
+            for block in &ordered_blocks {
                 debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 if let Some((_, fut)) = execution_futures.remove(&block.id()) {
-                    let PipelineExecutionResult {
-                    input_txns,
-                    result,
-                    execution_time,
-                } = fut.await?;
-                    results.push(block.set_execution_result(input_txns, result, execution_time));
-                } else {
-                    return Err(ExecutorError::internal_err(format!(
-                        "Failed to find compute result for block {}",
-                        block.id()
-                    )));
+                    results.push(fut.await)
                 }
             }
+            let results = itertools::zip_eq(ordered_blocks, results)
+                .map(|(block, res)| {
+                    // if let Some((_, fut)) = execution_futures.remove(&block.id()) {
+                    //     let PipelineExecutionResult {
+                    //         input_txns,
+                    //         result,
+                    //         execution_time,
+                    //     } = res?;
+                    //     Ok(block.set_execution_result(input_txns, result, execution_time))
+                    // } else {
+                    //     return Err(ExecutorError::internal_err(format!(
+                    //         "Failed to find compute result for block {}",
+                    //         block.id()
+                    //     )));
+                    // }
+                    let PipelineExecutionResult {
+                        input_txns,
+                        result,
+                        execution_time,
+                    } = res?;
+                    Ok(block.set_execution_result(input_txns, result, execution_time))
+                })
+                .collect::<ExecutorResult<Vec<_>>>()?;
             drop(lifetime_guard);
             Ok(results)
         })

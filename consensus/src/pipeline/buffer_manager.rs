@@ -7,7 +7,8 @@ use crate::{
     consensus_observer::{
         network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
     },
-    counters, monitor,
+    counters::{self, log_executor_error_occurred},
+    monitor,
     network::{IncomingCommitRequest, NetworkSender},
     network_interface::ConsensusMsg,
     pipeline::{
@@ -26,7 +27,6 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -544,16 +544,12 @@ impl BufferManager {
 
         let executed_blocks = match inner {
             Ok(result) => result,
-            Err(ExecutorError::CouldNotGetData) => {
-                warn!("Execution error - CouldNotGetData {}", block_id);
-                return;
-            },
-            Err(ExecutorError::BlockNotFound(block_id)) => {
-                warn!("Execution error BlockNotFound {}", block_id);
-                return;
-            },
             Err(e) => {
-                error!("Execution error {:?} for {}", e, block_id);
+                log_executor_error_occurred(
+                    e,
+                    &counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT,
+                    block_id,
+                );
                 return;
             },
         };
@@ -699,7 +695,7 @@ impl BufferManager {
                     };
                     let mut commit_votes = self.buffered_commit_votes.entry(target_block_id).or_default();
                     commit_votes.insert(author, commit_msg);
-                    
+
                     // reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
             },

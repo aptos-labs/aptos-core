@@ -18,12 +18,8 @@ use move_abigen::{Abigen, AbigenOptions};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_source_map::utils::source_map_from_file;
 use move_bytecode_utils::Modules;
-use move_command_line_common::{
-    env::get_bytecode_version_from_env,
-    files::{
-        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
-        SOURCE_MAP_EXTENSION,
-    },
+use move_command_line_common::files::{
+    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_compiler::{
     attr_derivation,
@@ -327,7 +323,7 @@ impl OnDiskCompiledPackage {
         &self,
         package_name: Symbol,
         compiled_unit: &CompiledUnitWithSource,
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
     ) -> Result<()> {
         let root_package = self.package.compiled_package_info.package_name;
         assert!(self.root_path.ends_with(root_package.as_str()));
@@ -353,7 +349,7 @@ impl OnDiskCompiledPackage {
                 .with_extension(MOVE_COMPILED_EXTENSION),
             compiled_unit
                 .unit
-                .serialize(get_bytecode_version_from_env(bytecode_version))
+                .serialize(Some(bytecode_version))
                 .as_slice(),
         )?;
         self.save_under(
@@ -622,7 +618,7 @@ impl CompiledPackage {
         // If bytecode dependency is not empty, do not allow renaming
         if !bytecode_deps.is_empty() {
             if let Some(pkg_name) = resolution_graph.contains_renaming() {
-                anyhow::bail!(
+                bail!(
                     "Found address renaming in package '{}' when \
                     building with bytecode dependencies -- this is currently not supported",
                     pkg_name
@@ -695,6 +691,9 @@ impl CompiledPackage {
                     compile_test_code: flags.keep_testing_functions(),
                     ..Default::default()
                 };
+                for experiment in &config.experiments {
+                    options = options.set_experiment(experiment, true)
+                }
                 options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
                 compiler_driver_v2(options)?
             },
@@ -736,8 +735,10 @@ impl CompiledPackage {
                 deps_compiled_units.push((package_name, unit))
             }
         }
-        let bytecode_version = get_bytecode_version_from_env(config.bytecode_version);
-
+        let bytecode_version = config
+            .language_version
+            .unwrap_or_default()
+            .infer_bytecode_version(config.bytecode_version);
         let mut compiled_docs = None;
         let mut compiled_abis = None;
         let mut move_model = None;
@@ -872,7 +873,7 @@ impl CompiledPackage {
     pub(crate) fn save_to_disk(
         &self,
         under_path: PathBuf,
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
     ) -> Result<OnDiskCompiledPackage> {
         self.check_filepaths_ok()?;
         assert!(under_path.ends_with(CompiledPackageLayout::Root.path()));
@@ -939,7 +940,7 @@ impl CompiledPackage {
     }
 
     fn build_abis(
-        bytecode_version: Option<u32>,
+        bytecode_version: u32,
         model: &GlobalEnv,
         compiled_units: &[CompiledUnitWithSource],
     ) -> Vec<(String, Vec<u8>)> {
@@ -948,11 +949,11 @@ impl CompiledPackage {
             .map(|unit| match &unit.unit {
                 CompiledUnit::Script(script) => (
                     script.name.to_string(),
-                    unit.unit.serialize(bytecode_version),
+                    unit.unit.serialize(Some(bytecode_version)),
                 ),
                 CompiledUnit::Module(module) => (
                     module.name.to_string(),
-                    unit.unit.serialize(bytecode_version),
+                    unit.unit.serialize(Some(bytecode_version)),
                 ),
             })
             .collect();

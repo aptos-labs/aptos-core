@@ -4,6 +4,7 @@
 use super::fetch_metadata::ValidatorInfo;
 use anyhow::Result;
 use aptos_bitvec::BitVec;
+use aptos_logger::error;
 use aptos_rest_client::VersionedNewBlockEvent;
 use aptos_storage_interface::{DbReader, Order};
 use aptos_types::{
@@ -16,6 +17,7 @@ use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     convert::TryFrom,
     ops::Add,
+    time::Duration,
 };
 
 /// Single validator stats
@@ -226,6 +228,79 @@ impl Add for EpochStats {
                 .collect(),
         }
     }
+}
+
+pub struct RunningAvg {
+    sum: f64,
+    count: u64,
+}
+
+impl RunningAvg {
+    fn empty() -> Self {
+        Self { sum: 0.0, count: 0 }
+    }
+
+    fn observe(&mut self, value: f32) {
+        self.sum += value as f64;
+        self.count += 1;
+    }
+
+    pub fn get(&self) -> f64 {
+        if self.count > 0 {
+            self.sum / self.count as f64
+        } else {
+            0.0
+        }
+    }
+}
+
+pub struct GapSummary {
+    pub max_gap: f32,
+    at_version: u64,
+    avg: RunningAvg,
+}
+
+impl GapSummary {
+    fn empty() -> Self {
+        Self {
+            max_gap: 0.0,
+            at_version: 0,
+            avg: RunningAvg::empty(),
+        }
+    }
+
+    fn observe(&mut self, gap: f32, version: u64) {
+        if gap > self.max_gap {
+            self.max_gap = gap;
+            self.at_version = version;
+        }
+        self.avg.observe(gap)
+    }
+
+    pub fn to_string_as_round(&self) -> String {
+        format!(
+            "{} rounds at version {} (avg {:.2})",
+            self.max_gap as u64,
+            self.at_version,
+            self.avg.get(),
+        )
+    }
+
+    pub fn to_string_as_time(&self) -> String {
+        format!(
+            "{:.2}s no progress at version {} (avg {:.2}s)",
+            self.max_gap,
+            self.at_version,
+            self.avg.get(),
+        )
+    }
+}
+
+pub struct MaxGapInfo {
+    pub non_epoch_round_gap: GapSummary,
+    pub epoch_round_gap: GapSummary,
+    pub non_epoch_time_gap: GapSummary,
+    pub epoch_time_gap: GapSummary,
 }
 
 /// Analyze validator performance
@@ -480,6 +555,77 @@ impl AnalyzeValidators {
         };
     }
 
+    pub fn analyze_gap<'a, I>(blocks: I) -> MaxGapInfo
+    where
+        I: Iterator<Item = &'a VersionedNewBlockEvent>,
+    {
+        let mut non_epoch_round_gap = GapSummary::empty();
+        let mut epoch_round_gap = GapSummary::empty();
+
+        let mut non_epoch_time_gap = GapSummary::empty();
+        let mut epoch_time_gap = GapSummary::empty();
+
+        let mut prev_non_nil_block = None;
+        let mut prev_non_nil_ts = 0;
+        let mut failed_from_nil = 0;
+        let mut epoch_from_nil = false;
+        let mut previous_epooch = 0;
+        let mut previous_round = 0;
+        for block in blocks {
+            let is_nil = block.event.proposer() == AccountAddress::ZERO;
+
+            let (current_gap, current_epoch_change) = if previous_epooch == block.event.epoch() {
+                (block.event.round() - previous_round - 1, false)
+            } else {
+                (block.event.failed_proposer_indices().len() as u64, true)
+            };
+
+            if is_nil {
+                failed_from_nil += current_gap;
+                epoch_from_nil |= current_epoch_change;
+            } else {
+                if prev_non_nil_ts > 0 {
+                    let round_gap = current_gap + failed_from_nil;
+                    let time_gap = block.event.proposed_time() as i64 - prev_non_nil_ts as i64;
+                    let epoch_change = current_epoch_change || epoch_from_nil;
+
+                    let (round_gap_summary, time_gap_summary) = if epoch_change {
+                        (&mut epoch_round_gap, &mut epoch_time_gap)
+                    } else {
+                        (&mut non_epoch_round_gap, &mut non_epoch_time_gap)
+                    };
+
+                    round_gap_summary.observe(round_gap as f32, block.version);
+
+                    if time_gap < 0 {
+                        error!(
+                            "Clock went backwards? {}, {:?}, {:?}",
+                            time_gap, block, prev_non_nil_block
+                        );
+                    } else {
+                        let time_gap_secs = Duration::from_micros(time_gap as u64).as_secs_f32();
+                        time_gap_summary.observe(time_gap_secs, block.version);
+                    }
+                }
+
+                failed_from_nil = 0;
+                epoch_from_nil = false;
+                prev_non_nil_ts = block.event.proposed_time();
+                prev_non_nil_block = Some(block);
+            }
+
+            previous_epooch = block.event.epoch();
+            previous_round = block.event.round();
+        }
+
+        MaxGapInfo {
+            non_epoch_round_gap,
+            epoch_round_gap,
+            non_epoch_time_gap,
+            epoch_time_gap,
+        }
+    }
+
     /// Print validator stats in a table
     pub fn print_detailed_epoch_table(
         epoch_stats: &EpochStats,
@@ -651,5 +797,23 @@ impl AnalyzeValidators {
                 100.0 * voted_voting_power as f32 / epoch_stats.total_voting_power as f32,
             );
         }
+    }
+
+    pub fn print_gap<'a, I>(blocks: I)
+    where
+        I: Iterator<Item = &'a VersionedNewBlockEvent>,
+    {
+        let gap_info = Self::analyze_gap(blocks);
+
+        println!(
+            "Max non-epoch-change gaps: {}, {}.",
+            gap_info.non_epoch_round_gap.to_string_as_round(),
+            gap_info.non_epoch_time_gap.to_string_as_time(),
+        );
+        println!(
+            "Max epoch-change gaps: {}, {}.",
+            gap_info.epoch_round_gap.to_string_as_round(),
+            gap_info.epoch_time_gap.to_string_as_time(),
+        );
     }
 }

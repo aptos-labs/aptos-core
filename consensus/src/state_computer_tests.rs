@@ -121,11 +121,10 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         Ok(StateComputeResult::new_dummy())
     }
 
-    fn commit_blocks_ext(
+    fn commit_blocks(
         &self,
         _block_ids: Vec<HashValue>,
         _ledger_info_with_sigs: LedgerInfoWithSignatures,
-        _save_state_snapshots: bool,
     ) -> ExecutorResult<()> {
         Ok(())
     }

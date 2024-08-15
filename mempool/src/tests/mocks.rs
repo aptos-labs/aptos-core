@@ -186,7 +186,7 @@ impl MockSharedMempool {
                         TimelineState::NotReady,
                         false,
                         None,
-                        BroadcastPeerPriority::Primary,
+                        Some(BroadcastPeerPriority::Primary),
                     )
                     .code
                     != MempoolStatusCode::Accepted

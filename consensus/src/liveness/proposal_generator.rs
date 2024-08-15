@@ -2,16 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
-};
+use super::proposer_election::ProposerElection;
 use crate::{
     block_storage::BlockReader, counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
         PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
-        PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING, PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE,
-        PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
-    }, payload_client::PayloadClient, pipeline::execution_client::{ExecutionProxyClient, TExecutionClient}, state_computer::ExecutionProxy, util::time_service::TimeService
+        PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
+        PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
+        PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
+    }, payload_client::{PayloadClient, PayloadPullParameters}, state_computer::ExecutionProxy, util::time_service::TimeService
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{
@@ -23,8 +22,10 @@ use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter, Round},
     pipelined_block::ExecutionSummary,
     quorum_cert::QuorumCert,
+    utils::PayloadTxnsSize,
 };
 use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue};
+use aptos_infallible::Mutex;
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_types::{on_chain_config::{OnChainRandomnessConfig, ValidatorTxnConfig}, transaction::Transaction, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -153,12 +154,8 @@ impl PipelineBackpressureConfig {
     pub fn get_execution_block_size_backoff(
         &self,
         block_execution_times: &[ExecutionSummary],
+        max_block_txns: u64,
     ) -> Option<u64> {
-        info!(
-            "Estimated block execution times: {:?}",
-            block_execution_times
-        );
-
         self.execution.as_ref().and_then(|config| {
             let sizes = block_execution_times
                 .iter()
@@ -168,7 +165,9 @@ impl PipelineBackpressureConfig {
                     let execution_time_ms = summary.execution_time.as_millis();
                     // Only block above the time threshold are considered giving enough signal to support calibration
                     // so we filter out shorter locks
-                    if execution_time_ms > config.min_block_time_ms_to_activate as u128 {
+                    if execution_time_ms > config.min_block_time_ms_to_activate as u128
+                        && summary.payload_len > 0
+                    {
                         // TODO: After cost of "retries" is reduced with execution pool, we
                         // should be computing block gas limit here, simply as:
                         // `config.target_block_time_ms / execution_time_ms * gas_consumed_by_block``
@@ -193,12 +192,27 @@ impl PipelineBackpressureConfig {
                     }
                 })
                 .sorted()
-                // .sorted_by_key(|key| key.unwrap_or(u64::MAX))
                 .collect::<Vec<_>>();
-            info!("Estimated block back-offs block sizes: {:?}", sizes);
             if sizes.len() >= config.min_blocks_to_activate {
-                let index = (config.percentile * sizes.len() as f64) as usize;
-                sizes.get(index).copied()
+                let calibrated_block_size = (*sizes
+                    .get(((config.percentile * sizes.len() as f64) as usize).min(sizes.len() - 1))
+                    .expect("guaranteed to be within vector size"))
+                .max(config.min_calibrated_txns_per_block);
+                PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS.observe(calibrated_block_size as f64);
+                // Check if calibrated block size is reduction in size, to turn on backpressure.
+                if max_block_txns > calibrated_block_size {
+                    info!(
+                        block_execution_times = format!("{:?}", block_execution_times),
+                        estimated_calibrated_block_sizes = format!("{:?}", sizes),
+                        calibrated_block_size = calibrated_block_size,
+                        "Execution backpressure recalibration: proposing reducing from {} to {}",
+                        max_block_txns,
+                        calibrated_block_size,
+                    );
+                    Some(calibrated_block_size)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -228,24 +242,25 @@ pub struct ProposalGenerator {
     time_service: Arc<dyn TimeService>,
     // Max time for preparation of the proposal
     quorum_store_poll_time: Duration,
-    // Max number of transactions to be added to a proposed block.
-    max_block_txns: u64,
+    // Max number of transactions (count, bytes) to be added to a proposed block.
+    max_block_txns: PayloadTxnsSize,
     // Max number of unique transactions to be added to a proposed block.
     max_block_txns_after_filtering: u64,
-    // Max number of bytes to be added to a proposed block.
-    max_block_bytes: u64,
-    // Max number of inline transactions to be added to a proposed block.
-    max_inline_txns: u64,
-    // Max number of inline bytes to be added to a proposed block.
-    max_inline_bytes: u64,
+    // Max number of inline transactions (count, bytes) to be added to a proposed block.
+    max_inline_txns: PayloadTxnsSize,
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
+
+    /// If backpressure target block size is below it, update `max_txns_to_execute` instead.
+    /// Applied to execution, pipeline and chain health backpressure.
+    /// Needed as we cannot subsplit QS batches.
+    min_max_txns_in_block_after_filtering_from_backpressure: u64,
 
     pipeline_backpressure_config: PipelineBackpressureConfig,
     chain_health_backoff_config: ChainHealthBackoffConfig,
 
     // Last round that a proposal was generated
-    last_round_generated: Round,
+    last_round_generated: Mutex<Round>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
     onchain_randomness_config: OnChainRandomnessConfig,
@@ -263,12 +278,11 @@ impl ProposalGenerator {
         payload_client: Arc<dyn PayloadClient>,
         time_service: Arc<dyn TimeService>,
         quorum_store_poll_time: Duration,
-        max_block_txns: u64,
+        max_block_txns: PayloadTxnsSize,
         max_block_txns_after_filtering: u64,
-        max_block_bytes: u64,
-        max_inline_txns: u64,
-        max_inline_bytes: u64,
+        max_inline_txns: PayloadTxnsSize,
         max_failed_authors_to_store: usize,
+        min_max_txns_in_block_after_filtering_from_backpressure: u64,
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
@@ -285,13 +299,12 @@ impl ProposalGenerator {
             quorum_store_poll_time,
             max_block_txns,
             max_block_txns_after_filtering,
-            max_block_bytes,
+            min_max_txns_in_block_after_filtering_from_backpressure,
             max_inline_txns,
-            max_inline_bytes,
             max_failed_authors_to_store,
             pipeline_backpressure_config,
             chain_health_backoff_config,
-            last_round_generated: 0,
+            last_round_generated: Mutex::new(0),
             quorum_store_enabled,
             vtxn_config,
             onchain_randomness_config,
@@ -308,7 +321,7 @@ impl ProposalGenerator {
     pub fn generate_nil_block(
         &self,
         round: Round,
-        proposer_election: &mut UnequivocalProposerElection,
+        proposer_election: Arc<dyn ProposerElection>,
     ) -> anyhow::Result<Block> {
         let hqc = self.ensure_highest_quorum_cert(round)?;
         let quorum_cert = hqc.as_ref().clone();
@@ -332,15 +345,18 @@ impl ProposalGenerator {
     /// 3. In case a given round is not greater than the calculated parent, return an OldRound
     /// error.
     pub async fn generate_proposal(
-        &mut self,
+        &self,
         round: Round,
-        proposer_election: &mut UnequivocalProposerElection,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
-        if self.last_round_generated < round {
-            self.last_round_generated = round;
-        } else {
-            bail!("Already proposed in the round {}", round);
+        {
+            let mut last_round_generated = self.last_round_generated.lock();
+            if *last_round_generated < round {
+                *last_round_generated = round;
+            } else {
+                bail!("Already proposed in the round {}", round);
+            }
         }
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
@@ -390,8 +406,8 @@ impl ProposalGenerator {
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
             let (
+                max_block_txns,
                 max_block_txns_after_filtering,
-                max_block_bytes,
                 max_txns_from_block_to_execute,
                 proposal_delay,
             ) = self
@@ -408,19 +424,21 @@ impl ProposalGenerator {
                 tokio::time::sleep(proposal_delay).await;
             }
 
-            let max_pending_block_len = pending_blocks
+            let max_pending_block_size = pending_blocks
                 .iter()
-                .map(|block| block.payload().map_or(0, |p| p.len()))
-                .max()
-                .unwrap_or(0);
-            let max_pending_block_bytes = pending_blocks
-                .iter()
-                .map(|block| block.payload().map_or(0, |p| p.size()))
-                .max()
-                .unwrap_or(0);
+                .map(|block| {
+                    block.payload().map_or(PayloadTxnsSize::zero(), |p| {
+                        PayloadTxnsSize::new(p.len() as u64, p.size() as u64)
+                    })
+                })
+                .reduce(PayloadTxnsSize::maximum)
+                .unwrap_or_default();
             // Use non-backpressure reduced values for computing fill_fraction
-            let max_fill_fraction = (max_pending_block_len as f32 / self.max_block_txns as f32)
-                .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
+            let max_fill_fraction =
+                (max_pending_block_size.count() as f32 / self.max_block_txns.count() as f32).max(
+                    max_pending_block_size.size_in_bytes() as f32
+                        / self.max_block_txns.size_in_bytes() as f32,
+                );
             PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
             PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
 
@@ -432,23 +450,26 @@ impl ProposalGenerator {
                 .collect();
             let validator_txn_filter =
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+
             let (validator_txns, mut payload) = self
                 .payload_client
                 .pull_payload(
-                    self.quorum_store_poll_time.saturating_sub(proposal_delay),
-                    self.max_block_txns,
-                    max_block_txns_after_filtering,
-                    max_block_bytes,
-                    // TODO: Set max_inline_txns and max_inline_bytes correctly
-                    self.max_inline_txns,
-                    self.max_inline_bytes,
+                    PayloadPullParameters {
+                        max_poll_time: self.quorum_store_poll_time.saturating_sub(proposal_delay),
+                        max_txns: max_block_txns,
+                        max_txns_after_filtering: max_block_txns_after_filtering,
+                        soft_max_txns_after_filtering: max_txns_from_block_to_execute
+                            .unwrap_or(max_block_txns_after_filtering),
+                        max_inline_txns: self.max_inline_txns,
+                        opt_batch_txns_pct: 0,
+                        user_txn_filter: payload_filter,
+                        pending_ordering,
+                        pending_uncommitted_blocks: pending_blocks.len(),
+                        recent_max_fill_fraction: max_fill_fraction,
+                        block_timestamp: timestamp,
+                    },
                     validator_txn_filter,
-                    payload_filter,
                     wait_callback,
-                    pending_ordering,
-                    pending_blocks.len(),
-                    max_fill_fraction,
-                    timestamp,
                 )
                 .await
                 .context("Fail to retrieve payload")?;
@@ -534,17 +555,15 @@ impl ProposalGenerator {
         Ok(block)
     }
 
-    #[allow(clippy::unwrap_used)]
     async fn calculate_max_block_sizes(
-        &mut self,
+        &self,
         voting_power_ratio: f64,
         timestamp: Duration,
         round: Round,
-    ) -> (u64, u64, Option<u64>, Duration) {
+    ) -> (PayloadTxnsSize, u64, Option<u64>, Duration) {
         let mut values_max_block_txns_after_filtering = vec![self.max_block_txns_after_filtering];
-        let mut values_max_block_bytes = vec![self.max_block_bytes];
+        let mut values_max_block = vec![self.max_block_txns];
         let mut values_proposal_delay = vec![Duration::ZERO];
-        let mut values_max_txns_from_block_to_execute = vec![];
 
         let chain_health_backoff = self
             .chain_health_backoff_config
@@ -552,10 +571,10 @@ impl ProposalGenerator {
         if let Some(value) = chain_health_backoff {
             values_max_block_txns_after_filtering
                 .push(value.max_sending_block_txns_after_filtering_override);
-            values_max_block_bytes.push(value.max_sending_block_bytes_override);
-            if let Some(val) = value.max_txns_from_block_to_execute {
-                values_max_txns_from_block_to_execute.push(val);
-            }
+            values_max_block.push(
+                self.max_block_txns
+                    .compute_with_bytes(value.max_sending_block_bytes_override),
+            );
             values_proposal_delay.push(Duration::from_millis(value.backoff_proposal_delay_ms));
             CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
         } else {
@@ -569,10 +588,10 @@ impl ProposalGenerator {
         if let Some(value) = pipeline_backpressure {
             values_max_block_txns_after_filtering
                 .push(value.max_sending_block_txns_after_filtering_override);
-            values_max_block_bytes.push(value.max_sending_block_bytes_override);
-            if let Some(val) = value.max_txns_from_block_to_execute {
-                values_max_txns_from_block_to_execute.push(val);
-            }
+            values_max_block.push(
+                self.max_block_txns
+                    .compute_with_bytes(value.max_sending_block_bytes_override),
+            );
             values_proposal_delay.push(Duration::from_millis(value.backpressure_proposal_delay_ms));
             PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(1.0);
         } else {
@@ -581,25 +600,17 @@ impl ProposalGenerator {
 
         let mut execution_backpressure_applied = false;
         if let Some(config) = &self.pipeline_backpressure_config.execution {
-            if pipeline_pending_latency.as_millis()
-                > config.back_pressure_pipeline_latency_limit_ms as u128
-            {
-                let execution_backpressure = self
-                    .pipeline_backpressure_config
-                    .get_execution_block_size_backoff(
-                        &self
-                            .block_store
-                            .get_recent_block_execution_times(config.num_blocks_to_look_at),
-                    );
-                if let Some(execution_backpressure_block_size) = execution_backpressure {
-                    values_max_block_txns_after_filtering.push(
-                        (execution_backpressure_block_size as f64
-                            * config.reordering_ovarpacking_factor.max(1.0))
-                            as u64,
-                    );
-                    values_max_txns_from_block_to_execute.push(execution_backpressure_block_size);
-                    execution_backpressure_applied = true;
-                }
+            let execution_backpressure = self
+                .pipeline_backpressure_config
+                .get_execution_block_size_backoff(
+                    &self
+                        .block_store
+                        .get_recent_block_execution_times(config.num_blocks_to_look_at),
+                    self.max_block_txns_after_filtering,
+                );
+            if let Some(execution_backpressure_block_size) = execution_backpressure {
+                values_max_block_txns_after_filtering.push(execution_backpressure_block_size);
+                execution_backpressure_applied = true;
             }
         }
         EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(
@@ -610,26 +621,39 @@ impl ProposalGenerator {
             },
         );
 
-        // the unwrap are safe because we always have at least one value in the vectors, see initialization.
-        let max_block_txns = values_max_block_txns_after_filtering
+        let max_block_txns_after_filtering = values_max_block_txns_after_filtering
             .into_iter()
             .min()
-            .unwrap();
+            .expect("always initialized to at least one value");
 
-        let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
-        let proposal_delay = values_proposal_delay.into_iter().max().unwrap();
-        let max_txns_from_block_to_execute = values_max_txns_from_block_to_execute
+        let max_block_size = values_max_block
             .into_iter()
-            .min()
-            .filter(|v| *v < max_block_txns);
+            .reduce(PayloadTxnsSize::minimum)
+            .expect("always initialized to at least one value");
+        let proposal_delay = values_proposal_delay
+            .into_iter()
+            .max()
+            .expect("always initialized to at least one value");
+
+        let (max_block_txns_after_filtering, max_txns_from_block_to_execute) = if self
+            .min_max_txns_in_block_after_filtering_from_backpressure
+            > max_block_txns_after_filtering
+        {
+            (
+                self.min_max_txns_in_block_after_filtering_from_backpressure,
+                Some(max_block_txns_after_filtering),
+            )
+        } else {
+            (max_block_txns_after_filtering, None)
+        };
 
         warn!(
             pipeline_pending_latency = pipeline_pending_latency.as_millis(),
             proposal_delay_ms = proposal_delay.as_millis(),
-            max_block_txns = max_block_txns,
+            max_block_txns_after_filtering = max_block_txns_after_filtering,
             max_txns_from_block_to_execute =
-                max_txns_from_block_to_execute.unwrap_or(max_block_txns),
-            max_block_bytes = max_block_bytes,
+                max_txns_from_block_to_execute.unwrap_or(max_block_txns_after_filtering),
+            max_block_size = max_block_size,
             is_pipeline_backpressure = pipeline_backpressure.is_some(),
             is_execution_backpressure = execution_backpressure_applied,
             is_chain_health_backoff = chain_health_backoff.is_some(),
@@ -638,8 +662,8 @@ impl ProposalGenerator {
         );
 
         (
-            max_block_txns,
-            max_block_bytes,
+            max_block_size,
+            max_block_txns_after_filtering,
             max_txns_from_block_to_execute,
             proposal_delay,
         )
@@ -668,7 +692,7 @@ impl ProposalGenerator {
         round: Round,
         previous_round: Round,
         include_cur_round: bool,
-        proposer_election: &mut UnequivocalProposerElection,
+        proposer_election: Arc<dyn ProposerElection>,
     ) -> Vec<(Round, Author)> {
         let end_round = round + u64::from(include_cur_round);
         let mut failed_authors = Vec::new();
