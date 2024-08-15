@@ -39,6 +39,12 @@ module 0x42::test {
         x: #0,
         y: #1,
     }
+    struct S7 {
+        0: u8,
+        1: u16,
+        2: u32,
+        3: u64,
+    }
     private fun nested1(x: test::S4<bool>) {
         {
           let test::S4<bool>{ x: _x, y: _ } = x;
@@ -158,7 +164,16 @@ module 0x42::test {
                 let test::S2{ 0: _, 1: _ } = x;
                 {
                   let test::S2{ 0: _, 1: _ } = x;
-                  Tuple()
+                  {
+                    let test::S2{ 0: _x, 1: _y } = x;
+                    {
+                      let test::S2{ 0: _x, 1: _y } = x;
+                      {
+                        let test::S2{ 0: _x, 1: _y } = x;
+                        Tuple()
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -172,7 +187,22 @@ module 0x42::test {
             let test::S2{ 0: _x, 1: _ } = x;
             {
               let test::S2{ 0: _, 1: _x } = x;
-              Tuple()
+              {
+                let test::S2{ 0: _, 1: _ } = x;
+                {
+                  let test::S2{ 0: _, 1: _ } = x;
+                  {
+                    let test::S2{ 0: _x, 1: _y } = x;
+                    {
+                      let test::S2{ 0: _x, 1: _y } = x;
+                      {
+                        let test::S2{ 0: _x, 1: _y } = x;
+                        Tuple()
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -243,5 +273,11 @@ module 0x42::test {
           }
         }
 
+    }
+    private fun simple_6(x: &test::S7) {
+        {
+          let test::S7{ 0: _w, 1: _, 2: _, 3: _z } = x;
+          Tuple()
+        }
     }
 } // end 0x42::test
