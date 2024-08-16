@@ -45,7 +45,7 @@ where
         (bottom_layer, top_layer)
     }
 
-    fn bottom_layer(&self) -> u64 {
+    pub(crate) fn bottom_layer(&self) -> u64 {
         self.bottom_layer.layer()
     }
 
@@ -53,11 +53,11 @@ where
         self.top_layer.layer()
     }
 
-    fn get_node_strong(&self, node_ref: &NodeRef<K, V>) -> NodeStrongRef<K, V> {
+    pub(crate) fn get_node_strong(&self, node_ref: &NodeRef<K, V>) -> NodeStrongRef<K, V> {
         node_ref.get_strong_with_min_layer(self.bottom_layer())
     }
 
-    fn root(&self) -> NodeStrongRef<K, V> {
+    pub(crate) fn root(&self) -> NodeStrongRef<K, V> {
         self.get_node_strong(self.top_layer.root())
     }
 }
@@ -102,6 +102,10 @@ where
         S: core::hash::BuildHasher + Default,
     {
         self.get_with_hasher(key, &Default::default())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
+        crate::iterator::LayeredMapIterator::new(self)
     }
 
     fn new_leaf(&self, key_hash: KeyHash, items: &[Item<K, V>]) -> NodeRef<K, V> {
