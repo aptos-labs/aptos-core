@@ -490,6 +490,7 @@ async fn create_and_fund_new_accounts(
         .chunks(max_num_accounts_per_batch)
         .map(|chunk| chunk.to_vec())
         .collect::<Vec<_>>();
+    let source_address = source_account.address();
     for (batch_index, batch) in accounts_by_batch.into_iter().enumerate() {
         let creation_requests: Vec<_> = batch
             .iter()
@@ -506,7 +507,12 @@ async fn create_and_fund_new_accounts(
         txn_executor
             .execute_transactions_with_counter(&creation_requests, counters)
             .await
-            .with_context(|| format!("Account {} couldn't mint batch {}", source_account.address(), batch_index))?;
+            .with_context(|| {
+                format!(
+                    "Account {} couldn't mint batch {}",
+                    source_address, batch_index
+                )
+            })?;
     }
     Ok(())
 }
