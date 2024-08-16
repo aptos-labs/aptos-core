@@ -5,12 +5,3 @@ error: invalid assignment
    │
 12 │         S1(a, b) = x;
    │         ^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
-
-error: duplicate declaration, item, or annotation
-   ┌─ tests/checking/dotdot/assign.move:16:6
-   │
-10 │     fun proj_0<A, B>(x: &S1<A, B>): &A {
-   │         ------ Alias previously defined here
-   ·
-16 │     fun proj_0<A, B, C>(s: &S2<A, B, C>): &A {
-   │         ^^^^^^ Duplicate module member or alias 'proj_0'. Top level names in a namespace must be unique

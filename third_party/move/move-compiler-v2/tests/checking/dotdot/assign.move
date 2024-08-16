@@ -7,13 +7,13 @@ module 0x42::test {
 		z: C,
 	}
 
-	fun proj_0<A, B>(x: &S1<A, B>): &A {
+	fun proj_0_S1<A, B>(x: &S1<A, B>): &A {
 		let a;
 		S1(a, b) = x;
 		a
 	}
 
-	fun proj_0<A, B, C>(s: &S2<A, B, C>): &A {
+	fun proj_0_S2<A, B, C>(s: &S2<A, B, C>): &A {
 		let a;
 		let y;
 		let z;
