@@ -28,12 +28,12 @@ error: global memory invariant does not hold
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
    =     at tests/sources/functional/global_invariants.move:55: remove_S_invalid
+   =     at tests/sources/functional/global_invariants.move:56: remove_S_invalid
    =     at ../move-stdlib/sources/signer.move:12: address_of
    =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:13: address_of
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
-   =     at tests/sources/functional/global_invariants.move:56: remove_S_invalid
    =     at tests/sources/functional/global_invariants.move:18
 
 error: global memory invariant does not hold
@@ -51,6 +51,7 @@ error: global memory invariant does not hold
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
    =     at tests/sources/functional/global_invariants.move:64: remove_R_invalid
+   =     at tests/sources/functional/global_invariants.move:65: remove_R_invalid
    =     at ../move-stdlib/sources/signer.move:12: address_of
    =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:13: address_of
