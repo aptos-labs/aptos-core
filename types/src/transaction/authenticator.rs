@@ -1043,7 +1043,7 @@ impl AnySignature {
                     },
                     EphemeralCertificate::OpenIdSig(_) => {},
                 }
-
+                println!("0816 - EPH");
                 signature
                     .ephemeral_signature
                     .verify(&txn_and_zkp, &signature.ephemeral_pubkey)

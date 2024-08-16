@@ -193,7 +193,7 @@ pub(crate) fn validate_authenticators(
 
     for (pk, sig) in authenticators {
         let jwk = get_jwk_for_authenticator(&patched_jwks, pk, sig)?;
-
+        println!("0816 - ZKP");
         match &sig.cert {
             EphemeralCertificate::ZeroKnowledgeSig(zksig) => match jwk {
                 JWK::RSA(rsa_jwk) => {
