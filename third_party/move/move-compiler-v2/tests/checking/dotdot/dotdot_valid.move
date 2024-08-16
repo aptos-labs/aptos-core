@@ -169,6 +169,7 @@ module 0x42::test {
 
     fun simple_6(x: &S7) {
         let S7(_w, .., _z) = x;
+        let S7(_w, _x, .., _y, _z) = x;
     }
 
     inline fun lambda_param(f: |S2| bool): bool {

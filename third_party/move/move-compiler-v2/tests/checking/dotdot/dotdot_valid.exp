@@ -283,7 +283,10 @@ module 0x42::test {
     private fun simple_6(x: &test::S7) {
         {
           let test::S7{ 0: _w, 1: _, 2: _, 3: _z } = x;
-          Tuple()
+          {
+            let test::S7{ 0: _w, 1: _x, 2: _y, 3: _z } = x;
+            Tuple()
+          }
         }
     }
     private fun test_lambda_param(): bool {
