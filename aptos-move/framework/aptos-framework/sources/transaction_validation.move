@@ -3,7 +3,9 @@ module aptos_framework::transaction_validation {
     use std::error;
     use std::features;
     use std::signer;
+    use std::string::utf8;
     use std::vector;
+    use aptos_std::debug;
 
     use aptos_framework::account;
     use aptos_framework::aptos_account;
@@ -99,7 +101,7 @@ module aptos_framework::transaction_validation {
                 txn_authentication_key == account::get_authentication_key(transaction_sender),
                 error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
             );
-
+            debug::print(&utf8(b"0816 - SEQ"));
             let account_sequence_number = account::get_sequence_number(transaction_sender);
             assert!(
                 txn_sequence_number < (1u64 << 63),
